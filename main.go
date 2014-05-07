@@ -9,31 +9,34 @@ import(
 )
 
 /*
-TODO: Configuration loader
-TODO: Configuration: Error template file path
-TODO: Configuration: Set forwarding URL
-TODO: Set launch port
 TODO: Set configuration file (Command line)
 TODO: Configuration: set redis DB details
 TODO: Redis storage manager
-TODO: API endpoints for management functions: AddKey, RevokeKey, UpdateKey, GetKeyDetails
+TODO: API endpoints for management functions: AddKey, RevokeKey, UpdateKey, GetKeyDetails, RequestKey (creates a key for user instead of self supplied)
 TODO: Secure API endpoints (perhaps with just a shared secret, should be internally used anyway)
 TODO: Configuration: Set shared secret
+TODO: Configuration: Error template file path
+TODO: Make SessionLimiter an interface so we can have different limiter types (e.g. queued requests?)
+TODO: Add QuotaLimiter so time-based quotas can be added
 */
+
 
 var log = logrus.New()
 var authManager = AuthorisationManager{MockStorageManager{map[string]string{"1234": "{\"LastCheck\":1399469149,\"Allowance\":5.0,\"Rate\":1.0,\"Per\":1.0}"}}}
 var sessionLimiter = SessionLimiter{}
+var config = Config{}
 
 func main() {
-	remote, err := url.Parse("http://www.lonelycode.com")
+	LoadConfig("tyk.conf", &config)
+	remote, err := url.Parse(config.TargetUrl)
 	if err != nil {
 		log.Error(err)
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
-	http.HandleFunc("/", handler(proxy))
-	err = http.ListenAndServe(":8080", nil)
+	http.HandleFunc(config.ListenPath, handler(proxy))
+	targetPort := fmt.Sprintf(":%d", config.ListenPort)
+	err = http.ListenAndServe(targetPort, nil)
 	if err != nil {
 		log.Error(err)
 	}
