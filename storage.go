@@ -13,15 +13,15 @@ type StorageHandler interface {
 	SetKey(string, string) // Second input string is expected to be a JSON object (SessionState)
 }
 
-// MockStorageManager implements the StorageHandler interface,
+// InMemoryStorageManager implements the StorageHandler interface,
 // it uses an in-memory map to store sessions, should only be used
 // for testing purposes
-type MockStorageManager struct {
+type InMemoryStorageManager struct {
 	Sessions map[string]string
 }
 
 // GetKey retrieves the key from the in-memory map
-func (s MockStorageManager) GetKey(keyName string) (string, error) {
+func (s InMemoryStorageManager) GetKey(keyName string) (string, error) {
 	value, ok := s.Sessions[keyName]
 	if !ok {
 		return "", KeyError{}
@@ -31,6 +31,6 @@ func (s MockStorageManager) GetKey(keyName string) (string, error) {
 }
 
 // SetKey updates the in-memory key
-func (s MockStorageManager) SetKey(keyName string, sessionState string) {
+func (s InMemoryStorageManager) SetKey(keyName string, sessionState string) {
 	s.Sessions[keyName] = sessionState
 }
