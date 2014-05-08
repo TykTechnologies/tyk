@@ -160,8 +160,6 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "POST" || r.Method == "PUT" {
 		responseMessage, code = handleAddOrUpdate(keyName, r)
-		w.WriteHeader(code)
-		fmt.Fprintf(w, string(responseMessage))
 
 	} else if r.Method == "GET" {
 		if keyName != "" {

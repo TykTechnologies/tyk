@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // AuthorisationHandler is used to validate a session key,
@@ -10,6 +11,7 @@ import (
 // a SessionState object (deserialised JSON)
 type AuthorisationHandler interface {
 	IsKeyAuthorised(string) (bool, SessionState)
+	IsKeyExpired(SessionState) bool
 }
 
 // AuthorisationManager implements AuthorisationHandler,
@@ -34,6 +36,19 @@ func (b AuthorisationManager) IsKeyAuthorised(keyName string) (bool, SessionStat
 		} else {
 			return true, newSession
 		}
+	}
+}
+
+func (b AuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
+	if newSession.Expires >= 1 {
+		diff := newSession.Expires - time.Now().Unix()
+		if diff > 0 {
+			return false
+		} else {
+			return true
+		}
+	} else {
+		return false
 	}
 }
 

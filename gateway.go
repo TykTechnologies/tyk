@@ -18,15 +18,20 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 		if authHeaderValue != "" {
 			// Check if API key valid
 			key_authorised, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
+			keyExpired := authManager.IsKeyExpired(&thisSessionState)
 			if key_authorised {
-				// If valid, check if within rate limit
-				forwardMessage := sessionLimiter.ForwardMessage(&thisSessionState)
-				if forwardMessage {
-					success_handler(w, r, p)
+				if  !keyExpired {
+					// If valid, check if within rate limit
+					forwardMessage := sessionLimiter.ForwardMessage(&thisSessionState)
+					if forwardMessage {
+						success_handler(w, r, p)
+					} else {
+						handle_error(w, r, "Rate limit exceeded", 429)
+					}
+					authManager.UpdateSession(authHeaderValue, thisSessionState)
 				} else {
-					handle_error(w, r, "Rate limit exceeded", 429)
+					handle_error(w, r, "Key has expired, please renew", 403)
 				}
-				authManager.UpdateSession(authHeaderValue, thisSessionState)
 			} else {
 				handle_error(w, r, "Key not authorised", 403)
 			}

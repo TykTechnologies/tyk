@@ -12,6 +12,7 @@ type SessionState struct {
 	Allowance float64 `json:"allowance"`
 	Rate      float64 `json:"rate"`
 	Per       float64 `json:"per"`
+	Expires   int64 `json:"expires"`
 }
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
@@ -47,6 +48,7 @@ func createSampleSession() {
 	thisSession.Allowance = thisSession.Rate
 	thisSession.LastCheck = time.Now().Unix()
 	thisSession.Per = 8.0
+	thisSession.Expires = 0
 
 	b, _ := json.Marshal(thisSession)
 
