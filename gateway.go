@@ -22,11 +22,16 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 			if key_authorised {
 				if  !keyExpired {
 					// If valid, check if within rate limit
-					forwardMessage := sessionLimiter.ForwardMessage(&thisSessionState)
+					forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
 					if forwardMessage {
 						success_handler(w, r, p)
 					} else {
-						handle_error(w, r, "Rate limit exceeded", 429)
+						if reason == 1 {
+							handle_error(w, r, "Rate limit exceeded", 429)
+						} else if reason == 2 {
+							handle_error(w, r, "Quota exceeded", 429)
+						}
+
 					}
 					authManager.UpdateSession(authHeaderValue, thisSessionState)
 				} else {

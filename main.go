@@ -14,7 +14,6 @@ import (
 TODO: Configuration: set redis DB details
 TODO: Redis storage manager
 TODO: Add QuotaLimiter so time-based quotas can be added
-TODO: Keys should expire
 */
 
 var log = logrus.New()
