@@ -13,9 +13,27 @@ type ApiModifyKeySuccess struct {
 	Action string	`json:"action"`
 }
 
+type ApiStatusMsg struct {
+	Status string	`json:"status"`
+	Error string `json:"error"`
+}
+
+func createError(errorMsg string) []byte {
+	errorObj := ApiStatusMsg{"error", errorMsg}
+	responseMsg, err := json.Marshal(&errorObj)
+
+	if err != nil {
+		log.Error("Couldn't marshal error stats")
+		log.Error(err)
+	}
+
+	return responseMsg
+}
+
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	success := true
 	decoder := json.NewDecoder(r.Body)
+	var responseMessage []byte
 	var newSession SessionState
 	err := decoder.Decode(&newSession)
 	code := 200
@@ -23,14 +41,15 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	if err != nil {
 		log.Error("Couldn't decode new session object")
 		log.Error(err)
-		code = 403
+		code = 400
 		success = false
+		responseMessage = createError("Request malformed")
 	} else {
 		// Update our session object (create it)
 		authManager.UpdateSession(keyName, newSession)
 	}
 
-	var responseMessage []byte
+
 	var action string
 	if r.Method == "POST" {
 		action = "added"
@@ -160,8 +179,8 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		// Return Not supported message (and code)
-		code = 400
-		responseMessage = []byte(systemError)
+		code = 405
+		responseMessage = createError("Method not supported")
 	}
 
 	w.WriteHeader(code)
@@ -188,9 +207,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			u5, err := uuid.NewV5(uuid.NamespaceURL, []byte("tyk.io"))
 
 			if err != nil {
-				code = 500
+				code = 400
 				log.Error("Couldn't decode body")
 				log.Error(err)
+				responseMessage = createError("Request malformed")
 
 			} else {
 				keyName := u5.String()
@@ -212,8 +232,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else {
-		code = 400
-		responseMessage = []byte(systemError)
+		code = 405
+		responseMessage = createError("Method not supported")
 	}
 
 	w.WriteHeader(code)

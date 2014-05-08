@@ -17,7 +17,6 @@ TODO: Secure API endpoints (perhaps with just a shared secret, should be interna
 TODO: Configuration: Set shared secret
 TODO: Add QuotaLimiter so time-based quotas can be added
 TODO: Keys should expire
-TODO: Clean up error response messages
 */
 
 
