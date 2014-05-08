@@ -4,6 +4,7 @@ import(
 	"fmt"
 	"net/url"
 	"net/http"
+	"html/template"
 	"net/http/httputil"
 	"github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt.go"
@@ -24,6 +25,8 @@ var log = logrus.New()
 var authManager = AuthorisationManager{}
 var sessionLimiter = SessionLimiter{}
 var config = Config{}
+var templates = &template.Template{}
+var systemError string = "{\"status\": \"system error, please contact administrator\"}"
 
 func setupGlobals() {
 	if config.Storage.Type == "memory" {
@@ -31,6 +34,9 @@ func setupGlobals() {
 			InMemoryStorageManager{
 				map[string]string{}}}
 	}
+
+	template_file := fmt.Sprintf("%s/error.json", config.TemplatePath)
+	templates = template.Must(template.ParseFiles(template_file))
 }
 
 func init() {
@@ -73,6 +79,7 @@ func init() {
 }
 
 func main() {
+	createSampleSession()
 	remote, err := url.Parse(config.TargetUrl)
 	if err != nil {
 		log.Error("Culdn't parse target URL")
@@ -80,6 +87,7 @@ func main() {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
+	http.HandleFunc("/tyk/key/", addKeyHandler)
 	http.HandleFunc(config.ListenPath, handler(proxy))
 	targetPort := fmt.Sprintf(":%d", config.ListenPort)
 	err = http.ListenAndServe(targetPort, nil)
@@ -88,38 +96,4 @@ func main() {
 	}
 }
 
-func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
 
-		// Check for API key existence
-		authHeaderValue := r.Header.Get("authorisation")
-		if authHeaderValue != "" {
-			// Check if API key valid
-			key_authorised, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
-			if key_authorised {
-				// If valid, check if within rate limit
-				forwardMessage := sessionLimiter.ForwardMessage(&thisSessionState)
-				if forwardMessage {
-					success_handler(w, r, p)
-				} else {
-					handle_error(w, r, "Rate limit exceeded", 429)
-				}
-				authManager.UpdateSession(authHeaderValue, thisSessionState)
-			} else {
-				handle_error(w, r, "Key not authorised", 403)
-			}
-		} else {
-			handle_error(w, r, "Authorisation field missing", 400)
-		}
-	}
-}
-
-func success_handler(w http.ResponseWriter, r *http.Request, p *httputil.ReverseProxy) {
-	p.ServeHTTP(w, r)
-}
-
-func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code int) {
-	w.WriteHeader(err_code)
-	// TODO: This should be a template
-	fmt.Fprintf(w, "NOT AUTHORISED: %s", err)
-}

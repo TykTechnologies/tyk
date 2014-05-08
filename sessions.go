@@ -8,10 +8,10 @@ import (
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
 type SessionState struct {
-	LastCheck int64
-	Allowance float64
-	Rate float64
-	Per float64
+	LastCheck int64		`json:"last_check"`
+	Allowance float64	`json:"allowance"`
+	Rate float64		`json:"rate"`
+	Per float64			`json:"per"`
 }
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
