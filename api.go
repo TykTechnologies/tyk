@@ -4,6 +4,7 @@ import(
 	"fmt"
 	"net/http"
 	"encoding/json"
+	"github.com/nu7hatch/gouuid"
 )
 
 type ApiModifyKeySuccess struct {
@@ -159,6 +160,58 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		// Return Not supported message (and code)
+		code = 400
+		responseMessage = []byte(systemError)
+	}
+
+	w.WriteHeader(code)
+	fmt.Fprintf(w, string(responseMessage))
+}
+
+func createKeyHandler(w http.ResponseWriter, r *http.Request) {
+	var responseMessage []byte
+	code := 200
+	var responseObj = ApiModifyKeySuccess{}
+
+	if r.Method == "POST" {
+		decoder := json.NewDecoder(r.Body)
+		var newSession SessionState
+		err := decoder.Decode(&newSession)
+
+		if err != nil {
+			responseMessage = []byte(systemError)
+			code = 500
+			log.Error("Couldn't decode body")
+			log.Error(err)
+
+		} else {
+			u5, err := uuid.NewV5(uuid.NamespaceURL, []byte("tyk.io"))
+
+			if err != nil {
+				code = 500
+				log.Error("Couldn't decode body")
+				log.Error(err)
+
+			} else {
+				keyName := u5.String()
+				authManager.UpdateSession(keyName, newSession)
+				responseObj.Action = "create"
+				responseObj.Key = keyName
+				responseObj.Status = "ok"
+
+				responseMessage, err = json.Marshal(&responseObj)
+
+				if err != nil {
+					log.Error("Marshalling failed")
+					log.Error(err)
+					responseMessage = []byte(systemError)
+					code = 500
+				}
+
+			}
+		}
+
+	} else {
 		code = 400
 		responseMessage = []byte(systemError)
 	}
