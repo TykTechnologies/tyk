@@ -13,7 +13,6 @@ import (
 /*
 TODO: Configuration: set redis DB details
 TODO: Redis storage manager
-TODO: Add QuotaLimiter so time-based quotas can be added
 */
 
 var log = logrus.New()
@@ -43,7 +42,6 @@ func init() {
 	Options:
 		-h --help      Show this screen
 		--conf=FILE    Load a named configuration file
-		--test         Create a test key
 
 	`
 
@@ -64,12 +62,6 @@ func init() {
 
 	loadConfig(filename, &config)
 	setupGlobals()
-
-	test_value, _ := arguments["--test"].(bool)
-	if test_value {
-		log.Info("Adding test key: '1234' to storage map")
-		authManager.Store.SetKey("1234", "{\"LastCheck\":1399469149,\"Allowance\":5.0,\"Rate\":1.0,\"Per\":1.0}")
-	}
 
 }
 
