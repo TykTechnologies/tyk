@@ -204,7 +204,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			log.Error(err)
 
 		} else {
-			u5, err := uuid.NewV5(uuid.NamespaceURL, []byte("tyk.io"))
+			u5, err := uuid.NewV4()
+			log.Info(u5.String())
 
 			if err != nil {
 				code = 400
@@ -238,4 +239,16 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(code)
 	fmt.Fprintf(w, string(responseMessage))
+}
+
+func securityHandler(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tykAuthKey := r.Header.Get("x-tyk-authorisation")
+		if tykAuthKey != config.Secret {
+			// Error
+			handle_error(w, r, "Authorisation failed", 403)
+		} else {
+			handler(w, r)
+		}
+	}
 }

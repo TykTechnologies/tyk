@@ -13,8 +13,6 @@ import(
 /*
 TODO: Configuration: set redis DB details
 TODO: Redis storage manager
-TODO: Secure API endpoints (perhaps with just a shared secret, should be internally used anyway)
-TODO: Configuration: Set shared secret
 TODO: Add QuotaLimiter so time-based quotas can be added
 TODO: Keys should expire
 */
@@ -86,8 +84,8 @@ func main() {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
-	http.HandleFunc("/tyk/keys/create", createKeyHandler)
-	http.HandleFunc("/tyk/keys/", keyHandler)
+	http.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
+	http.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
 	http.HandleFunc(config.ListenPath, handler(proxy))
 	targetPort := fmt.Sprintf(":%d", config.ListenPort)
 	err = http.ListenAndServe(targetPort, nil)
