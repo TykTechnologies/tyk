@@ -42,3 +42,25 @@ func (b AuthorisationManager) UpdateSession(keyName string, session SessionState
 	v, _ := json.Marshal(session)
 	b.Store.SetKey(keyName, string(v))
 }
+
+func (b AuthorisationManager) GetSessionDetail(keyName string) (SessionState, bool) {
+	jsonKeyVal, err := b.Store.GetKey(keyName)
+	var thisSession SessionState
+	if err != nil {
+		log.Warning("Key does not exist")
+		return thisSession, false
+	} else {
+		err := json.Unmarshal([]byte(jsonKeyVal), &thisSession)
+		if err != nil {
+			log.Error("Couldn't unmarshal session object")
+			log.Error(err)
+			return thisSession, false
+		} else {
+			return thisSession, true
+		}
+	}
+}
+
+func (b AuthorisationManager) GetSessions() []string {
+	return b.Store.GetKeys()
+}

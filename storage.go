@@ -11,6 +11,8 @@ func (e KeyError) Error() string {
 type StorageHandler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
 	SetKey(string, string) // Second input string is expected to be a JSON object (SessionState)
+	GetKeys() []string
+	DeleteKey(string) bool
 }
 
 // InMemoryStorageManager implements the StorageHandler interface,
@@ -33,4 +35,18 @@ func (s InMemoryStorageManager) GetKey(keyName string) (string, error) {
 // SetKey updates the in-memory key
 func (s InMemoryStorageManager) SetKey(keyName string, sessionState string) {
 	s.Sessions[keyName] = sessionState
+}
+
+func (s InMemoryStorageManager) GetKeys() []string {
+	sessions := make([]string, 0, len(s.Sessions))
+	for key, _ := range s.Sessions {
+		sessions = append(sessions, key)
+	}
+
+	return sessions
+}
+
+func (s InMemoryStorageManager) DeleteKey(keyName string) bool {
+	delete(s.Sessions, keyName)
+	return true
 }
