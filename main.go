@@ -1,13 +1,13 @@
 package main
 
-import(
+import (
 	"fmt"
-	"net/url"
-	"net/http"
-	"html/template"
-	"net/http/httputil"
 	"github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt.go"
+	"html/template"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
 )
 
 /*
@@ -16,7 +16,6 @@ TODO: Redis storage manager
 TODO: Add QuotaLimiter so time-based quotas can be added
 TODO: Keys should expire
 */
-
 
 var log = logrus.New()
 var authManager = AuthorisationManager{}
@@ -93,5 +92,3 @@ func main() {
 		log.Error(err)
 	}
 }
-
-

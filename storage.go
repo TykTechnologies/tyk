@@ -1,7 +1,8 @@
 package main
 
 // KeyError is a standard error for when a key is not found in the storage engine
-type KeyError struct {}
+type KeyError struct{}
+
 func (e KeyError) Error() string {
 	return "Key not found"
 }
@@ -10,7 +11,7 @@ func (e KeyError) Error() string {
 // used by AuthorisationManager to read and write key values to the backend
 type StorageHandler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
-	SetKey(string, string) // Second input string is expected to be a JSON object (SessionState)
+	SetKey(string, string)         // Second input string is expected to be a JSON object (SessionState)
 	GetKeys() []string
 	DeleteKey(string) bool
 }

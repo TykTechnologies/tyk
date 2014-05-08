@@ -1,21 +1,21 @@
 package main
 
-import(
-	"fmt"
-	"net/http"
+import (
 	"encoding/json"
+	"fmt"
 	"github.com/nu7hatch/gouuid"
+	"net/http"
 )
 
 type ApiModifyKeySuccess struct {
-	Key string 		`json:"key"`
-	Status string	`json:"status"`
-	Action string	`json:"action"`
+	Key    string `json:"key"`
+	Status string `json:"status"`
+	Action string `json:"action"`
 }
 
 type ApiStatusMsg struct {
-	Status string	`json:"status"`
-	Error string `json:"error"`
+	Status string `json:"status"`
+	Error  string `json:"error"`
 }
 
 func createError(errorMsg string) []byte {
@@ -48,7 +48,6 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		// Update our session object (create it)
 		authManager.UpdateSession(keyName, newSession)
 	}
-
 
 	var action string
 	if r.Method == "POST" {
@@ -103,7 +102,7 @@ func handleGetDetail(sessionKey string) ([]byte, int) {
 }
 
 type APIAllKeys struct {
-	ApiKeys []string	`json:"keys"`
+	ApiKeys []string `json:"keys"`
 }
 
 func handleGetAllKeys() ([]byte, int) {
@@ -132,7 +131,7 @@ func handleGetAllKeys() ([]byte, int) {
 }
 
 type APIStatusMessage struct {
-	Status bool	`json:"status"`
+	Status  bool   `json:"status"`
 	Message string `json:"message"`
 }
 

@@ -1,21 +1,21 @@
 package main
 
 import (
-	"io/ioutil"
 	"encoding/json"
+	"io/ioutil"
 )
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
-	ListenPath string `json:"listen_path"`
-	ListenPort int `json:"listen_port"`
-	TargetUrl string `json:"target_url"`
-	Secret string `json:"secret"`
+	ListenPath   string `json:"listen_path"`
+	ListenPort   int    `json:"listen_port"`
+	TargetUrl    string `json:"target_url"`
+	Secret       string `json:"secret"`
 	TemplatePath string `json:"template_path"`
-	Storage struct {
-		Type string `json:"type"`
-		Host string `json:"host"`
-		Port int `json:"port"`
+	Storage      struct {
+		Type     string `json:"type"`
+		Host     string `json:"host"`
+		Port     int    `json:"port"`
 		Username string `json:"username"`
 		Password string `json:"password"`
 	} `json:"storage"`

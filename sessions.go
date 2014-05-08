@@ -1,26 +1,26 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
-	"encoding/json"
 )
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
 type SessionState struct {
-	LastCheck int64		`json:"last_check"`
-	Allowance float64	`json:"allowance"`
-	Rate float64		`json:"rate"`
-	Per float64			`json:"per"`
+	LastCheck int64   `json:"last_check"`
+	Allowance float64 `json:"allowance"`
+	Rate      float64 `json:"rate"`
+	Per       float64 `json:"per"`
 }
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
-type SessionLimiter struct {}
+type SessionLimiter struct{}
 
 // ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
-func (l SessionLimiter)ForwardMessage(currentSession *SessionState) bool {
+func (l SessionLimiter) ForwardMessage(currentSession *SessionState) bool {
 	current := time.Now().Unix()
 
 	timePassed := current - currentSession.LastCheck
