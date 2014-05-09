@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"github.com/buger/goterm"
 )
 
 /*
@@ -22,8 +23,20 @@ var config = Config{}
 var templates = &template.Template{}
 var systemError string = "{\"status\": \"system error, please contact administrator\"}"
 
+func displayConfig() {
+//	config_color := goterm.MAGENTA
+	config_table := goterm.NewTable(0, 10, 5, ' ', 0)
+	fmt.Fprintf(config_table, "Listening on port:\t%d\n", config.ListenPort)
+	fmt.Fprintf(config_table, "Source path:\t%s\n", config.ListenPath)
+	fmt.Fprintf(config_table, "Gateway target:\t%s\n", config.TargetUrl)
+
+	fmt.Println(config_table)
+	fmt.Println("")
+}
+
 func setupGlobals() {
 	if config.Storage.Type == "memory" {
+		log.Warning("Using in-memory storage. Warning: this is not scalable.")
 		authManager = AuthorisationManager{
 			InMemoryStorageManager{
 				map[string]string{}}}
@@ -65,8 +78,18 @@ func init() {
 
 }
 
+func intro() {
+	fmt.Print("\n\n")
+	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v0.1", goterm.GREEN)))
+	fmt.Println(goterm.Bold(goterm.Color("=======================", goterm.GREEN)))
+	fmt.Print("Copyright Jively Ltd. 2014")
+	fmt.Print("\nhttp://www.tyk.io\n\n")
+}
+
 func main() {
-	createSampleSession()
+	intro()
+	displayConfig()
+
 	remote, err := url.Parse(config.TargetUrl)
 	if err != nil {
 		log.Error("Culdn't parse target URL")

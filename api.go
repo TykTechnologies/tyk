@@ -243,7 +243,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					code = 500
 				} else {
 					log.WithFields(logrus.Fields{
-						"key": sessionKey,
+						"key": keyName,
 					}).Info("Generated new key - success.")
 				}
 
