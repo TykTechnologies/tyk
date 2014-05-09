@@ -12,6 +12,7 @@ type Config struct {
 	TargetUrl    string `json:"target_url"`
 	Secret       string `json:"secret"`
 	TemplatePath string `json:"template_path"`
+	AuthHeaderName string `json:"auth_header_name"`
 	Storage      struct {
 		Type     string `json:"type"`
 		Host     string `json:"host"`
@@ -19,6 +20,7 @@ type Config struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	} `json:"storage"`
+	ExcludePaths []string `json:"exclude_paths"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

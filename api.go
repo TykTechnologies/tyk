@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/nu7hatch/gouuid"
 	"net/http"
+	"github.com/Sirupsen/logrus"
 )
 
 type ApiModifyKeySuccess struct {
@@ -47,6 +48,9 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	} else {
 		// Update our session object (create it)
 		authManager.UpdateSession(keyName, newSession)
+		log.WithFields(logrus.Fields{
+			"key": keyName,
+		}).Info("New key added or updated.")
 	}
 
 	var action string
@@ -97,7 +101,15 @@ func handleGetDetail(sessionKey string) ([]byte, int) {
 		notFound := APIStatusMessage{false, "Key not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
+		log.WithFields(logrus.Fields{
+			"key": sessionKey,
+		}).Info("Attempted key retrieval - failure.")
+	} else {
+		log.WithFields(logrus.Fields{
+			"key": sessionKey,
+		}).Info("Attempted key retrieval - success.")
 	}
+
 	return responseMessage, code
 }
 
@@ -126,6 +138,7 @@ func handleGetAllKeys() ([]byte, int) {
 	if success {
 		return responseMessage, code
 	} else {
+		log.Info("Attempted keys retrieval - success.")
 		return []byte(systemError), code
 	}
 }
@@ -148,6 +161,10 @@ func handleDeleteKey(keyName string) ([]byte, int) {
 		log.Error("Marshalling failed")
 		log.Error(err)
 		return []byte(systemError), 500
+	} else {
+		log.WithFields(logrus.Fields{
+		"key": keyName,
+		}).Info("Attempted key deletion - success.")
 	}
 
 	return responseMessage, code
@@ -224,6 +241,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					log.Error(err)
 					responseMessage = []byte(systemError)
 					code = 500
+				} else {
+					log.WithFields(logrus.Fields{
+						"key": sessionKey,
+					}).Info("Generated new key - success.")
 				}
 
 			}
@@ -243,6 +264,7 @@ func securityHandler(handler func(http.ResponseWriter, *http.Request)) func(http
 		tykAuthKey := r.Header.Get("x-tyk-authorisation")
 		if tykAuthKey != config.Secret {
 			// Error
+			log.Warning("Attempted administrative access with invalid or missing key!")
 			handle_error(w, r, "Authorisation failed", 403)
 		} else {
 			handler(w, r)
