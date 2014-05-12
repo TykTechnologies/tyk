@@ -35,6 +35,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Username = "user"
 	configStruct.Storage.Password = "password"
 	configStruct.Storage.Port = 6379
+	configStruct.AuthHeaderName = "authorisation"
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
