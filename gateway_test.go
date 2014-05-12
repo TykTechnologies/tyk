@@ -1,16 +1,16 @@
 package main
 
 import (
-	"testing"
-	"net/http/httptest"
-	"net/url"
-	"net/http"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"net/http/httputil"
+	"net/url"
+	"testing"
 	"time"
 )
 
-func createThrottledSession() SessionState{
+func createThrottledSession() SessionState {
 	var thisSession SessionState
 	thisSession.Rate = 1.0
 	thisSession.Allowance = thisSession.Rate
@@ -25,7 +25,7 @@ func createThrottledSession() SessionState{
 	return thisSession
 }
 
-func createQuotaSession() SessionState{
+func createQuotaSession() SessionState {
 	var thisSession SessionState
 	thisSession.Rate = 8.0
 	thisSession.Allowance = thisSession.Rate
@@ -86,7 +86,6 @@ func TestThrottling(t *testing.T) {
 		t.Error("Third request returned invalid message, got: \n", third_recorder.Body.String())
 	}
 }
-
 
 func TestQuota(t *testing.T) {
 	thisSession := createQuotaSession()

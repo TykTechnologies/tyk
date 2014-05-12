@@ -1,16 +1,16 @@
 package main
 
 import (
-	"testing"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"net/http"
-	"encoding/json"
 	"strings"
+	"testing"
 )
 
 type Success struct {
-	Key string `json:"key"`
+	Key    string `json:"key"`
 	Status string `json:"status"`
 	Action string `json:"action"`
 }

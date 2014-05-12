@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/nu7hatch/gouuid"
 	"net/http"
-	"github.com/Sirupsen/logrus"
 )
 
 type ApiModifyKeySuccess struct {
@@ -144,7 +144,7 @@ func handleGetAllKeys() ([]byte, int) {
 }
 
 type APIStatusMessage struct {
-	Status  string   `json:"status"`
+	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
@@ -163,7 +163,7 @@ func handleDeleteKey(keyName string) ([]byte, int) {
 		return []byte(systemError), 500
 	} else {
 		log.WithFields(logrus.Fields{
-		"key": keyName,
+			"key": keyName,
 		}).Info("Attempted key deletion - success.")
 	}
 
@@ -219,7 +219,6 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 		} else {
 			u5, err := uuid.NewV4()
-			log.Info(u5.String())
 
 			if err != nil {
 				code = 400

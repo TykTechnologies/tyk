@@ -8,15 +8,15 @@ import (
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
 type SessionState struct {
-	LastCheck int64   `json:"last_check"`
-	Allowance float64 `json:"allowance"`
-	Rate      float64 `json:"rate"`
-	Per       float64 `json:"per"`
-	Expires   int64 `json:"expires"`
-	QuotaMax  int64 `json:"quota_max"`
-	QuotaRenews int64 `json:"quota_renews"`
-	QuotaRemaining int64 `json:"quota_remaining"`
-	QuotaRenewalRate int64 `json:"quota_renewal_rate"`
+	LastCheck        int64   `json:"last_check"`
+	Allowance        float64 `json:"allowance"`
+	Rate             float64 `json:"rate"`
+	Per              float64 `json:"per"`
+	Expires          int64   `json:"expires"`
+	QuotaMax         int64   `json:"quota_max"`
+	QuotaRenews      int64   `json:"quota_renews"`
+	QuotaRemaining   int64   `json:"quota_remaining"`
+	QuotaRenewalRate int64   `json:"quota_renewal_rate"`
 }
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
@@ -27,29 +27,28 @@ type SessionLimiter struct{}
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState) (bool, int) {
 
+	current := time.Now().Unix()
 
-		current := time.Now().Unix()
+	timePassed := current - currentSession.LastCheck
+	currentSession.LastCheck = current
+	currentSession.Allowance += float64(timePassed) * (currentSession.Rate / currentSession.Per)
 
-		timePassed := current - currentSession.LastCheck
-		currentSession.LastCheck = current
-		currentSession.Allowance += float64(timePassed) * (currentSession.Rate / currentSession.Per)
+	if currentSession.Allowance > currentSession.Rate {
+		// Throttle
+		currentSession.Allowance = currentSession.Rate
+	}
 
-		if currentSession.Allowance > currentSession.Rate {
-			// Throttle
-			currentSession.Allowance = currentSession.Rate
-		}
-
-		if currentSession.Allowance < 1.0 {
-			return false, 1
+	if currentSession.Allowance < 1.0 {
+		return false, 1
+	} else {
+		currentSession.Allowance -= 1
+		if !l.IsQuotaExceeded(currentSession) {
+			return true, 0
 		} else {
-			currentSession.Allowance -= 1
-			if !l.IsQuotaExceeded(currentSession) {
-				return true, 0
-			} else {
-				return false, 2
-			}
-
+			return false, 2
 		}
+
+	}
 
 }
 
@@ -61,7 +60,7 @@ func (l SessionLimiter) IsQuotaExceeded(currentSession *SessionState) bool {
 
 	if currentSession.QuotaRemaining == 0 {
 		current := time.Now().Unix()
-		if currentSession.QuotaRenews - current < 0 {
+		if currentSession.QuotaRenews-current < 0 {
 			// quota used up, but we're passed renewal time
 			currentSession.QuotaRenews = current + currentSession.QuotaRenewalRate
 			currentSession.QuotaRemaining = currentSession.QuotaMax
@@ -82,7 +81,7 @@ func (l SessionLimiter) IsQuotaExceeded(currentSession *SessionState) bool {
 }
 
 // createSampleSession is a debug function to create a mock session value
-func createSampleSession() SessionState{
+func createSampleSession() SessionState {
 	var thisSession SessionState
 	thisSession.Rate = 5.0
 	thisSession.Allowance = thisSession.Rate
@@ -99,4 +98,3 @@ func createSampleSession() SessionState{
 	fmt.Println(string(b))
 	return thisSession
 }
-

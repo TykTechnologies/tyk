@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/buger/goterm"
 	"github.com/docopt/docopt.go"
 	"html/template"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"github.com/buger/goterm"
 )
 
 /*
@@ -26,7 +26,7 @@ var templates = &template.Template{}
 var systemError string = "{\"status\": \"system error, please contact administrator\"}"
 
 func displayConfig() {
-//	config_color := goterm.MAGENTA
+	//	config_color := goterm.MAGENTA
 	config_table := goterm.NewTable(0, 10, 5, ' ', 0)
 	fmt.Fprintf(config_table, "Listening on port:\t%d\n", config.ListenPort)
 	fmt.Fprintf(config_table, "Source path:\t%s\n", config.ListenPath)
@@ -40,8 +40,14 @@ func setupGlobals() {
 	if config.Storage.Type == "memory" {
 		log.Warning("Using in-memory storage. Warning: this is not scalable.")
 		authManager = AuthorisationManager{
-			InMemoryStorageManager{
+			&InMemoryStorageManager{
 				map[string]string{}}}
+	} else if config.Storage.Type == "redis" {
+		log.Info("Using Redis storage manager.")
+		authManager = AuthorisationManager{
+			&RedisStorageManager{}}
+
+		authManager.Store.Connect()
 	}
 
 	template_file := fmt.Sprintf("%s/error.json", config.TemplatePath)

@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
 	"strings"
-	"github.com/Sirupsen/logrus"
 )
 
 type ApiError struct {
@@ -29,7 +29,7 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 			key_authorised, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
 			keyExpired := authManager.IsKeyExpired(&thisSessionState)
 			if key_authorised {
-				if  !keyExpired {
+				if !keyExpired {
 					// If valid, check if within rate limit
 					forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
 					if forwardMessage {
@@ -37,16 +37,16 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 					} else {
 						if reason == 1 {
 							log.WithFields(logrus.Fields{
-								"path": r.URL.Path,
+								"path":   r.URL.Path,
 								"origin": r.RemoteAddr,
-								"key": authHeaderValue,
+								"key":    authHeaderValue,
 							}).Info("Key rate limit exceeded.")
 							handle_error(w, r, "Rate limit exceeded", 429)
 						} else if reason == 2 {
 							log.WithFields(logrus.Fields{
-								"path": r.URL.Path,
+								"path":   r.URL.Path,
 								"origin": r.RemoteAddr,
-								"key": authHeaderValue,
+								"key":    authHeaderValue,
 							}).Info("Key quota limit exceeded.")
 							handle_error(w, r, "Quota exceeded", 429)
 						}
@@ -55,23 +55,23 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 					authManager.UpdateSession(authHeaderValue, thisSessionState)
 				} else {
 					log.WithFields(logrus.Fields{
-						"path": r.URL.Path,
+						"path":   r.URL.Path,
 						"origin": r.RemoteAddr,
-						"key": authHeaderValue,
+						"key":    authHeaderValue,
 					}).Info("Attempted access from expired key.")
 					handle_error(w, r, "Key has expired, please renew", 403)
 				}
 			} else {
 				log.WithFields(logrus.Fields{
-					"path": r.URL.Path,
+					"path":   r.URL.Path,
 					"origin": r.RemoteAddr,
-					"key": authHeaderValue,
+					"key":    authHeaderValue,
 				}).Info("Attempted access with non-existent key.")
 				handle_error(w, r, "Key not authorised", 403)
 			}
 		} else {
 			log.WithFields(logrus.Fields{
-				"path": r.URL.Path,
+				"path":   r.URL.Path,
 				"origin": r.RemoteAddr,
 			}).Info("Attempted access with malformed header, no auth header found.")
 			handle_error(w, r, "Authorisation field missing", 400)

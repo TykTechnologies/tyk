@@ -7,13 +7,13 @@ import (
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
-	ListenPath   string `json:"listen_path"`
-	ListenPort   int    `json:"listen_port"`
-	TargetUrl    string `json:"target_url"`
-	Secret       string `json:"secret"`
-	TemplatePath string `json:"template_path"`
+	ListenPath     string `json:"listen_path"`
+	ListenPort     int    `json:"listen_port"`
+	TargetUrl      string `json:"target_url"`
+	Secret         string `json:"secret"`
+	TemplatePath   string `json:"template_path"`
 	AuthHeaderName string `json:"auth_header_name"`
-	Storage      struct {
+	Storage        struct {
 		Type     string `json:"type"`
 		Host     string `json:"host"`
 		Port     int    `json:"port"`
