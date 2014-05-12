@@ -14,6 +14,8 @@ import (
 /*
 TODO: Configuration: set redis DB details
 TODO: Redis storage manager
+TODO: IP white list for admin functions
+TODO: Flag to record analytics
 */
 
 var log = logrus.New()
