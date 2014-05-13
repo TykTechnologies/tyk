@@ -12,7 +12,7 @@ import (
 )
 
 /*
-TODO: Flag to record analytics
+TODO: Analytics purge to disk / DB
 */
 
 var log = logrus.New()
@@ -58,6 +58,7 @@ func setupGlobals() {
 			RedisStorageManager{KeyPrefix: "analytics-"}}
 
 		analytics.Store.Connect()
+		analytics.PurgeCache()
 	}
 
 	template_file := fmt.Sprintf("%s/error.json", config.TemplatePath)

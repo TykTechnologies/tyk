@@ -158,6 +158,33 @@ func (r RedisStorageManager) GetKeys() []string {
 	return []string{}
 }
 
+func (r RedisStorageManager) GetKeysAndValues() map[string]string {
+	if r.db == nil {
+		r.Connect()
+		return r.GetKeysAndValues()
+	} else {
+		searchStr := r.KeyPrefix + "*"
+		sessionsInterface, err := r.db.Do("KEYS", searchStr)
+		if err != nil {
+			log.Error("Error trying to get all keys:")
+			log.Error(err)
+
+		} else {
+			keys, _ := redis.Strings(sessionsInterface, err)
+			valueObj, err := r.db.Do("MGET", sessionsInterface.([]interface{})...)
+			values, err := redis.Strings(valueObj, err)
+
+			returnValues := make(map[string]string)
+			for i, v := range keys {
+				returnValues[r.cleanKey(v)] = values[i]
+			}
+
+			return returnValues
+		}
+	}
+	return map[string]string{}
+}
+
 func (r RedisStorageManager) DeleteKey(keyName string) bool {
 	if r.db == nil {
 		r.Connect()
@@ -167,6 +194,28 @@ func (r RedisStorageManager) DeleteKey(keyName string) bool {
 		if err != nil {
 			log.Error("Error trying to delete key:")
 			log.Error(err)
+		}
+	}
+	return true
+}
+
+func (r RedisStorageManager) DeleteKeys(keys []string) bool {
+	if r.db == nil {
+		r.Connect()
+		return r.DeleteKeys(keys)
+	} else {
+		if len(keys) > 0 {
+			asInterface := make([]interface{}, len(keys))
+			for i, v := range(keys) {
+				asInterface[i] = interface{}(r.fixKey(v))
+			}
+			_, err := r.db.Do("DEL", asInterface...)
+			if err != nil {
+				log.Error("Error trying to delete keys:")
+				log.Error(err)
+			}
+		} else {
+			log.Info("RedisStorageManager called DEL - Nothing to delete")
 		}
 	}
 	return true
