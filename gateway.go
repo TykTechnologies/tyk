@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"time"
 )
 
 type ApiError struct {
@@ -80,10 +81,39 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 }
 
 func success_handler(w http.ResponseWriter, r *http.Request, p *httputil.ReverseProxy) {
+	if config.EnableAnalytics {
+		t := time.Now()
+		thisRecord := AnalyticsRecord{
+			r.Method,
+			r.URL.Path,
+			r.ContentLength,
+			r.Header.Get("User-Agent"),
+			t.Day(),
+			t.Month(),
+			t.Year(),
+			t.Hour(),
+			200}
+		analytics.RecordHit(thisRecord)
+	}
 	p.ServeHTTP(w, r)
 }
 
 func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code int) {
+	if config.EnableAnalytics {
+		t := time.Now()
+		thisRecord := AnalyticsRecord{
+			r.Method,
+			r.URL.Path,
+			r.ContentLength,
+			r.Header.Get("User-Agent"),
+			t.Day(),
+			t.Month(),
+			t.Year(),
+			t.Hour(),
+			err_code}
+		analytics.RecordHit(thisRecord)
+	}
+
 	w.WriteHeader(err_code)
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("X-Generator", "tyk.io")

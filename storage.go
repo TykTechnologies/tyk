@@ -70,6 +70,7 @@ func (s InMemoryStorageManager) DeleteKey(keyName string) bool {
 // RedisStorageManager is a storage manager that uses the redis database.
 type RedisStorageManager struct {
 	db redis.Conn
+	KeyPrefix string
 }
 
 func (r *RedisStorageManager) Connect() bool {
@@ -93,12 +94,12 @@ func (r *RedisStorageManager) Connect() bool {
 }
 
 func (r *RedisStorageManager) fixKey(keyName string) string {
-	setKeyName := "apikey-" + keyName
+	setKeyName := r.KeyPrefix + keyName
 	return setKeyName
 }
 
 func (r *RedisStorageManager) cleanKey(keyName string) string {
-	setKeyName := strings.Replace(keyName, "apikey-", "", 1)
+	setKeyName := strings.Replace(keyName, r.KeyPrefix, "", 1)
 	return setKeyName
 }
 
@@ -139,7 +140,8 @@ func (r RedisStorageManager) GetKeys() []string {
 		r.Connect()
 		return r.GetKeys()
 	} else {
-		sessionsInterface, err := r.db.Do("KEYS", "apikey-*")
+		searchStr := r.KeyPrefix + "*"
+		sessionsInterface, err := r.db.Do("KEYS", searchStr)
 		if err != nil {
 			log.Error("Error trying to get all keys:")
 			log.Error(err)

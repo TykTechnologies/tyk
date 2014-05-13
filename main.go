@@ -12,9 +12,6 @@ import (
 )
 
 /*
-TODO: Configuration: set redis DB details
-TODO: Redis storage manager
-TODO: IP white list for admin functions
 TODO: Flag to record analytics
 */
 
@@ -24,6 +21,7 @@ var sessionLimiter = SessionLimiter{}
 var config = Config{}
 var templates = &template.Template{}
 var systemError string = "{\"status\": \"system error, please contact administrator\"}"
+var analytics = RedisAnalyticsHandler{}
 
 func displayConfig() {
 	//	config_color := goterm.MAGENTA
@@ -45,9 +43,21 @@ func setupGlobals() {
 	} else if config.Storage.Type == "redis" {
 		log.Info("Using Redis storage manager.")
 		authManager = AuthorisationManager{
-			&RedisStorageManager{}}
+			&RedisStorageManager{KeyPrefix:"apikey-"}}
 
 		authManager.Store.Connect()
+	}
+
+	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
+		log.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
+	}
+
+	if config.EnableAnalytics {
+		log.Info("Setting up analytics DB connection")
+		analytics = RedisAnalyticsHandler{
+			RedisStorageManager{KeyPrefix:"analytics-"}}
+
+		analytics.Store.Connect()
 	}
 
 	template_file := fmt.Sprintf("%s/error.json", config.TemplatePath)

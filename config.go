@@ -21,6 +21,7 @@ type Config struct {
 		Password string `json:"password"`
 	} `json:"storage"`
 	ExcludePaths []string `json:"exclude_paths"`
+	EnableAnalytics bool `json:"enable_analytics"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
@@ -36,6 +37,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Password = "password"
 	configStruct.Storage.Port = 6379
 	configStruct.AuthHeaderName = "authorisation"
+	configStruct.EnableAnalytics = false
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
