@@ -43,7 +43,7 @@ func setupGlobals() {
 	} else if config.Storage.Type == "redis" {
 		log.Info("Using Redis storage manager.")
 		authManager = AuthorisationManager{
-			&RedisStorageManager{KeyPrefix:"apikey-"}}
+			&RedisStorageManager{KeyPrefix: "apikey-"}}
 
 		authManager.Store.Connect()
 	}
@@ -55,7 +55,7 @@ func setupGlobals() {
 	if config.EnableAnalytics {
 		log.Info("Setting up analytics DB connection")
 		analytics = RedisAnalyticsHandler{
-			RedisStorageManager{KeyPrefix:"analytics-"}}
+			RedisStorageManager{KeyPrefix: "analytics-"}}
 
 		analytics.Store.Connect()
 	}

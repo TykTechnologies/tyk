@@ -1,23 +1,23 @@
 package main
 
 import (
-    "github.com/vmihailenco/msgpack"
-	"github.com/nu7hatch/gouuid"
 	"fmt"
+	"github.com/nu7hatch/gouuid"
+	"github.com/vmihailenco/msgpack"
 	"time"
 )
 
 // AnalyticsRecord encodes the details of a request
 type AnalyticsRecord struct {
-	Method  		string
-	Path			string
-	ContentLength	int64
-	UserAgent		string
-	Day				int
-	Month 			time.Month
-	Year 			int
-	Hour 			int
-	ResponseCode	int
+	Method        string
+	Path          string
+	ContentLength int64
+	UserAgent     string
+	Day           int
+	Month         time.Month
+	Year          int
+	Hour          int
+	ResponseCode  int
 }
 
 // AnalyticsError is an error for when writing to the storage engine fails

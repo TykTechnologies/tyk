@@ -20,8 +20,8 @@ type Config struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	} `json:"storage"`
-	ExcludePaths []string `json:"exclude_paths"`
-	EnableAnalytics bool `json:"enable_analytics"`
+	ExcludePaths    []string `json:"exclude_paths"`
+	EnableAnalytics bool     `json:"enable_analytics"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

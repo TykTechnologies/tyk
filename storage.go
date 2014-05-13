@@ -69,7 +69,7 @@ func (s InMemoryStorageManager) DeleteKey(keyName string) bool {
 
 // RedisStorageManager is a storage manager that uses the redis database.
 type RedisStorageManager struct {
-	db redis.Conn
+	db        redis.Conn
 	KeyPrefix string
 }
 
