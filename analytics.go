@@ -1,13 +1,13 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"github.com/nu7hatch/gouuid"
 	"github.com/vmihailenco/msgpack"
-	"time"
 	"os"
-	"encoding/csv"
 	"strconv"
+	"time"
 )
 
 // AnalyticsRecord encodes the details of a request
@@ -62,7 +62,7 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 }
 
 type CSVPurger struct {
-	Store	*RedisStorageManager
+	Store *RedisStorageManager
 }
 
 // StartPurgeLoop is used as a goroutine to ensure that the cache is purged
@@ -87,7 +87,7 @@ func (c CSVPurger) PurgeCache() {
 	defer outfile.Close()
 	writer := csv.NewWriter(outfile)
 
-	var headers = []string { "METHOD", "PATH", "SIZE", "UA", "DAY", "MONTH", "YEAR", "HOUR", "RESPONSE" }
+	var headers = []string{"METHOD", "PATH", "SIZE", "UA", "DAY", "MONTH", "YEAR", "HOUR", "RESPONSE"}
 
 	err := writer.Write(headers)
 	if err != nil {
@@ -105,7 +105,7 @@ func (c CSVPurger) PurgeCache() {
 				log.Error("Couldn't unmarshal analytics data:")
 				log.Error(err)
 			} else {
-				toWrite := []string {
+				toWrite := []string{
 					decoded.Method,
 					decoded.Path,
 					strconv.FormatInt(decoded.ContentLength, 10),

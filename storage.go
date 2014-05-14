@@ -72,9 +72,9 @@ func (s InMemoryStorageManager) DeleteKey(keyName string) bool {
 }
 
 // WillBulk remove keys from sessions DB
-func (s InMemoryStorageManager) DeleteKeys(keys []string) bool{
+func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 
-	for _, keyName := range(keys) {
+	for _, keyName := range keys {
 		delete(s.Sessions, keyName)
 	}
 
@@ -222,7 +222,7 @@ func (r RedisStorageManager) DeleteKeys(keys []string) bool {
 	} else {
 		if len(keys) > 0 {
 			asInterface := make([]interface{}, len(keys))
-			for i, v := range(keys) {
+			for i, v := range keys {
 				asInterface[i] = interface{}(r.fixKey(v))
 			}
 			_, err := r.db.Do("DEL", asInterface...)
