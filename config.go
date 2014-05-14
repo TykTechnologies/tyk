@@ -46,8 +46,8 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Port = 6379
 	configStruct.AuthHeaderName = "authorisation"
 	configStruct.EnableAnalytics = false
-	configStruct.AnalyticsConfig.CSVDir = "logs"
-	configStruct.AnalyticsConfig.Type = "CSV"
+	configStruct.AnalyticsConfig.CSVDir = "/tmp"
+	configStruct.AnalyticsConfig.Type = "csv"
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
