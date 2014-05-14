@@ -11,10 +11,6 @@ import (
 	"net/url"
 )
 
-/*
-TODO: Analytics purge to disk / DB
-*/
-
 var log = logrus.New()
 var authManager = AuthorisationManager{}
 var sessionLimiter = SessionLimiter{}
@@ -24,7 +20,6 @@ var systemError string = "{\"status\": \"system error, please contact administra
 var analytics = RedisAnalyticsHandler{}
 
 func displayConfig() {
-	//	config_color := goterm.MAGENTA
 	config_table := goterm.NewTable(0, 10, 5, ' ', 0)
 	fmt.Fprintf(config_table, "Listening on port:\t%d\n", config.ListenPort)
 	fmt.Fprintf(config_table, "Source path:\t%s\n", config.ListenPath)
@@ -57,7 +52,7 @@ func setupGlobals() {
 		log.Info("Setting up analytics DB connection")
 		analytics = RedisAnalyticsHandler{
 			Store: &AnalyticsStore,
-			Clean: CSVPurger{&AnalyticsStore}}
+			Clean: &MongoPurger{&AnalyticsStore, nil}}
 
 		analytics.Store.Connect()
 		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
