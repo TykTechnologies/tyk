@@ -93,7 +93,7 @@ at the rate specified by `purge_delay` (in seconds). The `mongo` type will store
 chosing, ensure the details are correct in order to connect.
 
 Recommended Deployment
-======================
+----------------------
 
 It is our opinion that the safest way to set up Tyk is behind another web server, as it should act as a part of your infrastructure stack, and 
 not be front-line. A typical setup would involve:
@@ -105,7 +105,7 @@ not be front-line. A typical setup would involve:
 Tyk can be load-balanced the same way any other web server can, so you can have multiple instances running on different ports.
 
 Starting Tyk
-============
+------------
 
 Starting Tyk is very simple: 
 
