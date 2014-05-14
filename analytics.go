@@ -32,11 +32,16 @@ func (e AnalyticsError) Error() string {
 
 type AnalyticsHandler interface {
 	RecordHit(AnalyticsRecord) error
+}
+
+type Purger interface {
 	PurgeCache()
+	StartPurgeLoop(int)
 }
 
 type RedisAnalyticsHandler struct {
-	Store RedisStorageManager
+	Store *RedisStorageManager
+	Clean Purger
 }
 
 func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
@@ -56,12 +61,29 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	return nil
 }
 
-func (r RedisAnalyticsHandler) PurgeCache() {
-	// TODO: Create filename from time parameters
-	// TODO: Configurable analytics directory
-	// TODO: Configurable cache purge writer (e.g. PG)
+type CSVPurger struct {
+	Store	*RedisStorageManager
+}
 
-	outfile, _ := os.Create("test.analytics.csv")
+// StartPurgeLoop is used as a goroutine to ensure that the cache is purged
+// of analytics data (assuring size is small).
+func (c CSVPurger) StartPurgeLoop(nextCount int) {
+	time.Sleep(time.Duration(nextCount) * time.Second)
+	c.PurgeCache()
+	c.StartPurgeLoop(nextCount)
+}
+
+// PurgeCache Will pull all the analytics data from the
+// cache and drop it to a storage engine, in this case a CSV file
+func (c CSVPurger) PurgeCache() {
+	curtime := time.Now()
+	fname := fmt.Sprintf("%s%d-%s-%d-%d-%d.csv", config.AnalyticsConfig.CSVDir, curtime.Year(), curtime.Month().String(), curtime.Day(), curtime.Hour(), curtime.Minute())
+
+	ferr := os.MkdirAll(config.AnalyticsConfig.CSVDir, 0777)
+	if ferr != nil {
+		log.Error(ferr)
+	}
+	outfile, _ := os.Create(fname)
 	defer outfile.Close()
 	writer := csv.NewWriter(outfile)
 
@@ -72,7 +94,7 @@ func (r RedisAnalyticsHandler) PurgeCache() {
 		log.Error("Failed to write file headers!")
 		log.Error(err)
 	} else {
-		KeyValueMap := r.Store.GetKeysAndValues()
+		KeyValueMap := c.Store.GetKeysAndValues()
 		keys := []string{}
 
 		for k, v := range KeyValueMap {
@@ -101,6 +123,6 @@ func (r RedisAnalyticsHandler) PurgeCache() {
 			}
 		}
 		writer.Flush()
-		r.Store.DeleteKeys(keys)
+		c.Store.DeleteKeys(keys)
 	}
 }

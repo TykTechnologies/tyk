@@ -22,6 +22,11 @@ type Config struct {
 	} `json:"storage"`
 	ExcludePaths    []string `json:"exclude_paths"`
 	EnableAnalytics bool     `json:"enable_analytics"`
+	AnalyticsConfig struct {
+		Type	string			`json:"type"`
+		CSVDir	string			`json:"csv_dir"`
+		PurgeDelay int			`json:"purge_delay"`
+	}	`json:"analytics_config"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
@@ -38,6 +43,8 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Port = 6379
 	configStruct.AuthHeaderName = "authorisation"
 	configStruct.EnableAnalytics = false
+	configStruct.AnalyticsConfig.CSVDir = "logs"
+	configStruct.AnalyticsConfig.Type = "CSV"
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")

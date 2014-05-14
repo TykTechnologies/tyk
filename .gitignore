@@ -2,3 +2,4 @@
 .vagrant/
 tyk.conf
 tyk
+logs/

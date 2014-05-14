@@ -53,12 +53,14 @@ func setupGlobals() {
 	}
 
 	if config.EnableAnalytics {
+		AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
 		log.Info("Setting up analytics DB connection")
 		analytics = RedisAnalyticsHandler{
-			RedisStorageManager{KeyPrefix: "analytics-"}}
+			Store: &AnalyticsStore,
+			Clean: CSVPurger{&AnalyticsStore}}
 
 		analytics.Store.Connect()
-		analytics.PurgeCache()
+		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
 	}
 
 	template_file := fmt.Sprintf("%s/error.json", config.TemplatePath)
