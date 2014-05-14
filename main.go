@@ -50,9 +50,19 @@ func setupGlobals() {
 	if config.EnableAnalytics {
 		AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
 		log.Info("Setting up analytics DB connection")
-		analytics = RedisAnalyticsHandler{
-			Store: &AnalyticsStore,
-			Clean: &MongoPurger{&AnalyticsStore, nil}}
+
+		if config.AnalyticsConfig.Type == "csv" {
+			log.Info("Using CSV cache purge")
+			analytics = RedisAnalyticsHandler{
+				Store: &AnalyticsStore,
+				Clean: &CSVPurger{&AnalyticsStore}}
+
+		} else if config.AnalyticsConfig.Type == "mongo" {
+			log.Info("Using MongoDB cache purge")
+			analytics = RedisAnalyticsHandler{
+				Store: &AnalyticsStore,
+				Clean: &MongoPurger{&AnalyticsStore, nil}}
+		}
 
 		analytics.Store.Connect()
 		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
