@@ -128,9 +128,8 @@ func (c CSVPurger) PurgeCache() {
 	}
 }
 
-
 type MongoPurger struct {
-	Store *RedisStorageManager
+	Store     *RedisStorageManager
 	dbSession *mgo.Session
 }
 
@@ -185,6 +184,5 @@ func (m *MongoPurger) PurgeCache() {
 			}
 		}
 	}
-
 
 }

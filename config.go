@@ -23,12 +23,12 @@ type Config struct {
 	ExcludePaths    []string `json:"exclude_paths"`
 	EnableAnalytics bool     `json:"enable_analytics"`
 	AnalyticsConfig struct {
-		Type       string `json:"type"`
-		CSVDir     string `json:"csv_dir"`
-		MongoURL   string `json:"mongo_url"`
-		MongoDbName   string `json:"mongo_db_name"`
-		MongoCollection   string `json:"mongo_collection"`
-		PurgeDelay int    `json:"purge_delay"`
+		Type            string `json:"type"`
+		CSVDir          string `json:"csv_dir"`
+		MongoURL        string `json:"mongo_url"`
+		MongoDbName     string `json:"mongo_db_name"`
+		MongoCollection string `json:"mongo_collection"`
+		PurgeDelay      int    `json:"purge_delay"`
 	} `json:"analytics_config"`
 }
 
