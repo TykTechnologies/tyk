@@ -111,6 +111,7 @@ Starting Tyk
 
 Starting Tyk is very simple: 
 
-    vagrant@precise64:/vagrant$ ./tyk --conf=tyk_sample.con
+    > ./tyk [--conf=tyk_sample.con] [--port=PORT]
     
-The `--conf` flag is optional, Tyk will create a configuration file if it can't find one.
+The `--conf` flag is optional, Tyk will create a configuration file if it can't find one. Stating `--port` will override 
+the port set in the configuration file.
