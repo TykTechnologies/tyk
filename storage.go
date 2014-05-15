@@ -4,6 +4,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // KeyError is a standard error for when a key is not found in the storage engine
@@ -85,26 +86,37 @@ func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 
 // RedisStorageManager is a storage manager that uses the redis database.
 type RedisStorageManager struct {
-	db        redis.Conn
+	pool *redis.Pool
 	KeyPrefix string
 }
 
+func (r *RedisStorageManager) newPool(server, password string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle: 3,
+		IdleTimeout: 240 * time.Second,
+		Dial: func () (redis.Conn, error) {
+			c, err := redis.Dial("tcp", server)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := c.Do("AUTH", password); err != nil {
+				c.Close()
+				return nil, err
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
+}
+
 func (r *RedisStorageManager) Connect() bool {
-	var err error
+
 	fullPath := config.Storage.Host + ":" + strconv.Itoa(config.Storage.Port)
 	log.Info("Connecting to redis on: ", fullPath)
-	r.db, err = redis.Dial("tcp", fullPath)
-	if err != nil {
-		log.Error("Couldn't connect to host")
-		log.Error(err)
-	}
-
-	if _, err := r.db.Do("AUTH", config.Storage.Password); err != nil {
-		r.db.Close()
-		log.Error("Couldn't log into redis server:")
-		log.Error(err)
-		return false
-	}
+	r.pool = r.newPool(fullPath, config.Storage.Password)
 
 	return true
 }
@@ -119,12 +131,15 @@ func (r *RedisStorageManager) cleanKey(keyName string) string {
 	return setKeyName
 }
 
-func (r RedisStorageManager) GetKey(keyName string) (string, error) {
-	if r.db == nil {
+func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.GetKey(keyName)
 	} else {
-		value, err := redis.String(r.db.Do("GET", r.fixKey(keyName)))
+		value, err := redis.String(db.Do("GET", r.fixKey(keyName)))
 		if err != nil {
 			log.Error("Error trying to get value:")
 			log.Error(err)
@@ -138,12 +153,15 @@ func (r RedisStorageManager) GetKey(keyName string) (string, error) {
 	return "", KeyError{}
 }
 
-func (r RedisStorageManager) SetKey(keyName string, sessionState string) {
-	if r.db == nil {
+func (r *RedisStorageManager) SetKey(keyName string, sessionState string) {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		r.SetKey(keyName, sessionState)
 	} else {
-		_, err := r.db.Do("SET", r.fixKey(keyName), sessionState)
+		_, err := db.Do("SET", r.fixKey(keyName), sessionState)
 		if err != nil {
 			log.Error("Error trying to set value:")
 			log.Error(err)
@@ -151,13 +169,16 @@ func (r RedisStorageManager) SetKey(keyName string, sessionState string) {
 	}
 }
 
-func (r RedisStorageManager) GetKeys() []string {
-	if r.db == nil {
+func (r *RedisStorageManager) GetKeys() []string {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.GetKeys()
 	} else {
 		searchStr := r.KeyPrefix + "*"
-		sessionsInterface, err := r.db.Do("KEYS", searchStr)
+		sessionsInterface, err := db.Do("KEYS", searchStr)
 		if err != nil {
 			log.Error("Error trying to get all keys:")
 			log.Error(err)
@@ -174,20 +195,23 @@ func (r RedisStorageManager) GetKeys() []string {
 	return []string{}
 }
 
-func (r RedisStorageManager) GetKeysAndValues() map[string]string {
-	if r.db == nil {
+func (r *RedisStorageManager) GetKeysAndValues() map[string]string {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.GetKeysAndValues()
 	} else {
 		searchStr := r.KeyPrefix + "*"
-		sessionsInterface, err := r.db.Do("KEYS", searchStr)
+		sessionsInterface, err := db.Do("KEYS", searchStr)
 		if err != nil {
 			log.Error("Error trying to get all keys:")
 			log.Error(err)
 
 		} else {
 			keys, _ := redis.Strings(sessionsInterface, err)
-			valueObj, err := r.db.Do("MGET", sessionsInterface.([]interface{})...)
+			valueObj, err := db.Do("MGET", sessionsInterface.([]interface{})...)
 			values, err := redis.Strings(valueObj, err)
 
 			returnValues := make(map[string]string)
@@ -201,12 +225,15 @@ func (r RedisStorageManager) GetKeysAndValues() map[string]string {
 	return map[string]string{}
 }
 
-func (r RedisStorageManager) DeleteKey(keyName string) bool {
-	if r.db == nil {
+func (r *RedisStorageManager) DeleteKey(keyName string) bool {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.DeleteKey(keyName)
 	} else {
-		_, err := r.db.Do("DEL", r.fixKey(keyName))
+		_, err := db.Do("DEL", r.fixKey(keyName))
 		if err != nil {
 			log.Error("Error trying to delete key:")
 			log.Error(err)
@@ -215,8 +242,11 @@ func (r RedisStorageManager) DeleteKey(keyName string) bool {
 	return true
 }
 
-func (r RedisStorageManager) DeleteKeys(keys []string) bool {
-	if r.db == nil {
+func (r *RedisStorageManager) DeleteKeys(keys []string) bool {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.DeleteKeys(keys)
 	} else {
@@ -225,7 +255,7 @@ func (r RedisStorageManager) DeleteKeys(keys []string) bool {
 			for i, v := range keys {
 				asInterface[i] = interface{}(r.fixKey(v))
 			}
-			_, err := r.db.Do("DEL", asInterface...)
+			_, err := db.Do("DEL", asInterface...)
 			if err != nil {
 				log.Error("Error trying to delete keys:")
 				log.Error(err)

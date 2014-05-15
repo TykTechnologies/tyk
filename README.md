@@ -95,14 +95,16 @@ chosing, ensure the details are correct in order to connect.
 Recommended Deployment
 ----------------------
 
-It is our opinion that the safest way to set up Tyk is behind another web server, as it should act as a part of your infrastructure stack, and 
-not be front-line. A typical setup would involve:
+It is our opinion that the safest way to set up Tyk is as multiple processes behind another web server such as NginX, 
+as it should act as a part of your infrastructure stack, and not be front-line. A typical setup would involve:
 
 1. NGinX acting as the web server
-2. API requests (via host or path) are reverse-proxied upstream to Tyk, which is listening on a non-public port
+2. API requests (via host or path) are reverse-proxied upstream to multiple Tyk processes, which is listening on a non-public port
 3. Tyk is configured to target your API application and listen on `/`
 
 Tyk can be load-balanced the same way any other web server can, so you can have multiple instances running on different ports.
+
+To run multiple procs we suggest using a tool such as supervisord.
 
 Starting Tyk
 ------------
