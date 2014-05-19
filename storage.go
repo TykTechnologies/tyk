@@ -18,7 +18,7 @@ func (e KeyError) Error() string {
 // used by AuthorisationManager to read and write key values to the backend
 type StorageHandler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
-	SetKey(string, string)         // Second input string is expected to be a JSON object (SessionState)
+	SetKey(string, string, int64)         // Second input string is expected to be a JSON object (SessionState)
 	GetKeys() []string
 	DeleteKey(string) bool
 	Connect() bool
@@ -49,7 +49,7 @@ func (s InMemoryStorageManager) GetKey(keyName string) (string, error) {
 }
 
 // SetKey updates the in-memory key
-func (s InMemoryStorageManager) SetKey(keyName string, sessionState string) {
+func (s InMemoryStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
 	s.Sessions[keyName] = sessionState
 }
 
@@ -153,15 +153,22 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	return "", KeyError{}
 }
 
-func (r *RedisStorageManager) SetKey(keyName string, sessionState string) {
+func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
 	db := r.pool.Get()
 	defer db.Close()
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
-		r.SetKey(keyName, sessionState)
+		r.SetKey(keyName, sessionState, timeout)
 	} else {
 		_, err := db.Do("SET", r.fixKey(keyName), sessionState)
+		if timeout > 0 {
+			_, exp_err := db.Do("EXPIRE", r.fixKey(keyName), timeout)
+			if exp_err != nil {
+				log.Error("Could not EXPIRE key")
+				log.Error(exp_err)
+			}
+		}
 		if err != nil {
 			log.Error("Error trying to set value:")
 			log.Error(err)
