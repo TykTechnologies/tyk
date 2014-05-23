@@ -260,7 +260,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 func securityHandler(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get("x-tyk-authorisation")
+		tykAuthKey := r.Header.Get("X-Tyk-Authorisation")
 		if tykAuthKey != config.Secret {
 			// Error
 			log.Warning("Attempted administrative access with invalid or missing key!")
