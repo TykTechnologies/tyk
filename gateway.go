@@ -94,7 +94,8 @@ func success_handler(w http.ResponseWriter, r *http.Request, p *httputil.Reverse
 			t.Year(),
 			t.Hour(),
 			200,
-			keyName}
+			keyName,
+			t}
 		analytics.RecordHit(thisRecord)
 	}
 	p.ServeHTTP(w, r)
@@ -114,7 +115,8 @@ func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code i
 			t.Year(),
 			t.Hour(),
 			err_code,
-			keyName}
+			keyName,
+			t}
 		analytics.RecordHit(thisRecord)
 	}
 

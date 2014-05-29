@@ -23,6 +23,7 @@ type AnalyticsRecord struct {
 	Hour          int
 	ResponseCode  int
 	APIKey		  string
+	TimeStamp	  time.Time
 }
 
 // AnalyticsError is an error for when writing to the storage engine fails
