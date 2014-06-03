@@ -42,14 +42,14 @@ func handler(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) 
 								"origin": r.RemoteAddr,
 								"key":    authHeaderValue,
 							}).Info("Key rate limit exceeded.")
-							handle_error(w, r, "Rate limit exceeded", 429)
+							handle_error(w, r, "Rate limit exceeded", 409)
 						} else if reason == 2 {
 							log.WithFields(logrus.Fields{
 								"path":   r.URL.Path,
 								"origin": r.RemoteAddr,
 								"key":    authHeaderValue,
 							}).Info("Key quota limit exceeded.")
-							handle_error(w, r, "Quota exceeded", 429)
+							handle_error(w, r, "Quota exceeded", 409)
 						}
 
 					}

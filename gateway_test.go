@@ -75,8 +75,8 @@ func TestThrottling(t *testing.T) {
 	if third_recorder.Code == 200 {
 		t.Error("Third request failed, should not be 200!: \n", third_recorder.Body.String())
 	}
-	if third_recorder.Code != 429 {
-		t.Error("Third request returned invalid code, should 429, got: \n", third_recorder.Code)
+	if third_recorder.Code != 409 {
+		t.Error("Third request returned invalid code, should 409, got: \n", third_recorder.Code)
 	}
 
 	newApiError := TykErrorResponse{}
@@ -118,8 +118,8 @@ func TestQuota(t *testing.T) {
 	if third_recorder.Code == 200 {
 		t.Error("Third request failed, should not be 200!: \n", third_recorder.Code)
 	}
-	if third_recorder.Code != 429 {
-		t.Error("Third request returned invalid code, should 429, got: \n", third_recorder.Code)
+	if third_recorder.Code != 409 {
+		t.Error("Third request returned invalid code, should 409, got: \n", third_recorder.Code)
 	}
 
 	newApiError := TykErrorResponse{}
