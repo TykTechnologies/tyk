@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strconv"
+	"os"
 )
 
 var log = logrus.New()
@@ -19,6 +20,8 @@ var config = Config{}
 var templates = &template.Template{}
 var systemError string = "{\"status\": \"system error, please contact administrator\"}"
 var analytics = RedisAnalyticsHandler{}
+var prof_file = &os.File{}
+var doMemoryProfile bool
 
 func displayConfig() {
 	config_table := goterm.NewTable(0, 10, 5, ' ', 0)
@@ -83,6 +86,7 @@ func init() {
 		-h --help      Show this screen
 		--conf=FILE    Load a named configuration file
 		--port=PORT    Listen on PORT (overrides confg file)
+		--memprofile   Generate a memory profile
 
 	`
 
@@ -115,6 +119,8 @@ func init() {
 		}
 	}
 
+	doMemoryProfile, _ = arguments["--memprofile"].(bool)
+
 }
 
 func intro() {
@@ -128,6 +134,12 @@ func intro() {
 func main() {
 	intro()
 	displayConfig()
+
+	if doMemoryProfile {
+		log.Info("Memory profiling active")
+		prof_file, _ = os.Create("tyk.mprof")
+		defer prof_file.Close()
+	}
 
 	remote, err := url.Parse(config.TargetUrl)
 	if err != nil {
@@ -144,4 +156,7 @@ func main() {
 	if err != nil {
 		log.Error(err)
 	}
+
+
+
 }

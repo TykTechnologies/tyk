@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 	"strings"
 	"time"
+	"runtime/pprof"
 )
 
 type ApiError struct {
@@ -99,6 +100,9 @@ func success_handler(w http.ResponseWriter, r *http.Request, p *httputil.Reverse
 		analytics.RecordHit(thisRecord)
 	}
 	p.ServeHTTP(w, r)
+	if doMemoryProfile {
+		pprof.WriteHeapProfile(prof_file)
+	}
 }
 
 func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code int) {
@@ -125,4 +129,7 @@ func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code i
 	w.Header().Add("X-Generator", "tyk.io")
 	thisError := ApiError{fmt.Sprintf("%s", err)}
 	templates.ExecuteTemplate(w, "error.json", &thisError)
+	if doMemoryProfile {
+		pprof.WriteHeapProfile(prof_file)
+	}
 }
