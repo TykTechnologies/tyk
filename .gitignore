@@ -5,3 +5,4 @@ tyk
 logs/
 test.conf
 *.mprof
+apps/test.json

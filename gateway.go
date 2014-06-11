@@ -34,6 +34,44 @@ func handler(p *httputil.ReverseProxy, apiSpec ApiSpec) func(http.ResponseWriter
 		if authHeaderValue != "" {
 			// Check if API key valid
 			key_authorised, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
+
+			// Check if this version is allowable!
+			accessingVersion := apiSpec.getVersionFromRequest(r)
+			apiName := apiSpec.Name
+
+			// If there's nothing in our profile, we let them through to the next phase
+			if len(thisSessionState.AccessRights) > 0 {
+				// Run auth checks
+				versionList, apiExists := thisSessionState.AccessRights[apiName]
+				if !apiExists {
+					log.WithFields(logrus.Fields{
+						"path":   r.URL.Path,
+						"origin": r.RemoteAddr,
+						"key":    authHeaderValue,
+					}).Info("Attempted access to unauthorised API.")
+					handle_error(w, r, "Access to this API has been disallowed", 403, apiSpec)
+					return
+
+				} else {
+					found := false
+					for _, vInfo := range versionList.Versions {
+						if vInfo == accessingVersion {
+							found = true
+							break
+						}
+					}
+					if !found {
+						log.WithFields(logrus.Fields{
+							"path":   r.URL.Path,
+							"origin": r.RemoteAddr,
+							"key":    authHeaderValue,
+						}).Info("Attempted access to unauthorised API version.")
+						handle_error(w, r, "Access to this API version has been disallowed", 403, apiSpec)
+						return
+					}
+				}
+			}
+
 			keyExpired := authManager.IsKeyExpired(&thisSessionState)
 			if key_authorised {
 				if !keyExpired {

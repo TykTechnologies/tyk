@@ -89,7 +89,7 @@ func (a *ApiDefinitionLoader) LoadDefinitions(dir string) []ApiSpec {
 				thisAppConfig := ApiDefinition{}
 				err := json.Unmarshal(appConfig, &thisAppConfig)
 				if err != nil {
-					log.Error("Couldn't unmarshal configuration")
+					log.Error("Couldn't unmarshal api configuration")
 					log.Error(err)
 				} else {
 					// Got the configuration, build the spec!

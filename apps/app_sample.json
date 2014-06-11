@@ -1,5 +1,5 @@
 {
-    "name": "Test API",
+    "name": "Tyk Test API",
     "definition": {
         "location": "header",
         "key": "version"
@@ -22,7 +22,7 @@
         }
     },
     "proxy": {
-        "listen_path": "/",
+        "listen_path": "/tyk-api-test/",
         "target_url": "http://tyk.io"
     }
 }
