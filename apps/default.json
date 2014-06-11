@@ -1,0 +1,25 @@
+{
+    "name": "Default",
+    "proxy": {
+        "listen_path": "/",
+        "target_url": "http://lonelycode.com/"
+    },
+    "auth": {
+        "auth_header_name": "authorisation"
+    },
+    "paths": {
+        "ignored": [
+            "/v1/sessions"
+        ],
+        "white_list": [],
+        "black_list": []
+    },
+    "version_info": {
+        "name": "v1.0",
+        "definition": {
+            "location": "url",
+            "key": "/api/v1"
+        },
+        "expires": "Tue Jun 10 2014 14:22:05 GMT+0100 (BST)"
+    }
+}
