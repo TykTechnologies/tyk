@@ -7,12 +7,9 @@ import (
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
-	ListenPath     string `json:"listen_path"`
 	ListenPort     int    `json:"listen_port"`
-	TargetUrl      string `json:"target_url"`
 	Secret         string `json:"secret"`
 	TemplatePath   string `json:"template_path"`
-	AuthHeaderName string `json:"auth_header_name"`
 	Storage        struct {
 		Type     string `json:"type"`
 		Host     string `json:"host"`
@@ -20,7 +17,6 @@ type Config struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	} `json:"storage"`
-	ExcludePaths    []string `json:"exclude_paths"`
 	EnableAnalytics bool     `json:"enable_analytics"`
 	AnalyticsConfig struct {
 		Type            string `json:"type"`
@@ -34,9 +30,7 @@ type Config struct {
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
 func WriteDefaultConf(configStruct *Config) {
-	configStruct.ListenPath = "/gateway"
 	configStruct.ListenPort = 8080
-	configStruct.TargetUrl = "http://localhost:8080/api"
 	configStruct.Secret = "352d20ee67be67f6340b4c0605b044b7"
 	configStruct.TemplatePath = "templates"
 	configStruct.Storage.Type = "memory"
@@ -44,7 +38,6 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Username = "user"
 	configStruct.Storage.Password = "password"
 	configStruct.Storage.Port = 6379
-	configStruct.AuthHeaderName = "authorisation"
 	configStruct.EnableAnalytics = false
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"
 	configStruct.AnalyticsConfig.Type = "csv"

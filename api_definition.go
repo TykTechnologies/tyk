@@ -4,6 +4,10 @@ import (
 	"regexp"
 	"time"
 	"net/http"
+	"io/ioutil"
+	"strings"
+	"path/filepath"
+	"encoding/json"
 )
 
 type ApiDefinition struct {
@@ -16,11 +20,6 @@ type ApiDefinition struct {
 		NotVersioned bool `json:"not_versioned"`
 		Versions map[string]VersionInfo `json:"versions"`
 	} `json:"version_data"`
-}
-
-type VersionInfo struct {
-	Name string `json:"name"`
-	Expires string `json:"expires"`
 	Proxy struct {
 		ListenPath string `json:"listen_path"`
 		TargetUrl string `json:"target_url"`
@@ -28,6 +27,11 @@ type VersionInfo struct {
 	Auth struct {
 		AuthHeaderName string `json:"auth_header_name"`
 	} `json:"auth"`
+}
+
+type VersionInfo struct {
+	Name string `json:"name"`
+	Expires string `json:"expires"`
 	Paths struct {
 		Ignored []string `json:"ignored"`
 		WhiteList []string `json:"white_list"`
@@ -69,13 +73,42 @@ type ApiSpec struct {
 
 type ApiDefinitionLoader struct {}
 
-func (a *ApiDefinitionLoader) LoadDefinitions(definitionFolder string) []ApiSpec {
+func (a *ApiDefinitionLoader) LoadDefinitions(dir string) []ApiSpec {
+	var ApiSpecs = []ApiSpec{}
 	// Grab json files from directory
-	// Check if white list and black list are being used (only one can be used at a time)
-	// If White list is being used, set flag so we don't let requests through unless on list
-	// If only black list and ignored are being used, all requests are filtered except these ones.
+	files, _ := ioutil.ReadDir(dir)
+	for _, f := range files {
+		if strings.Contains(f.Name(), ".json") {
+			filePath := filepath.Join(dir, f.Name())
+			log.Info("Loading API Specification from ", filePath)
+			appConfig, err := ioutil.ReadFile(filePath)
+			if err != nil {
+				log.Error("Couldn't load app configuration file")
+				log.Error(err)
+			} else {
+				thisAppConfig := ApiDefinition{}
+				err := json.Unmarshal(appConfig, &thisAppConfig)
+				if err != nil {
+					log.Error("Couldn't unmarshal configuration")
+					log.Error(err)
+				} else {
+					// Got the configuration, build the spec!
+					newAppSpec := ApiSpec{}
+					newAppSpec.ApiDefinition = thisAppConfig
+					newAppSpec.RxPaths = make(map[string][]UrlSpec)
+					newAppSpec.WhiteListEnabled = make(map[string]bool)
+					for _, v := range(thisAppConfig.VersionData.Versions) {
+						pathSpecs, whiteListSpecs := a.getPathSpecs(v)
+						newAppSpec.RxPaths[v.Name] = pathSpecs
+						newAppSpec.WhiteListEnabled[v.Name] = whiteListSpecs
+					}
+					ApiSpecs = append(ApiSpecs, newAppSpec)
+				}
+			}
+		}
+	}
 
-	return []ApiSpec{}
+	return ApiSpecs
 }
 
 func (a *ApiDefinitionLoader) getPathSpecs(apiVersionDef VersionInfo) ([]UrlSpec, bool) {
@@ -156,9 +189,13 @@ func (a *ApiSpec) getVersionFromRequest(r *http.Request) string {
 		} else {
 			return ""
 		}
-	} else if a.ApiDefinition.VersionDefinition.Location == "url" {
-		// TODO - URL MATCH
-		return ""
+	} else if a.ApiDefinition.VersionDefinition.Location == "url-param" {
+		fromParam := r.FormValue(a.ApiDefinition.VersionDefinition.Key)
+		if fromParam != "" {
+			return fromParam
+		} else {
+			return ""
+		}
 	} else {
 		return ""
 	}
@@ -238,48 +275,34 @@ func (a *ApiSpec) GetVersionData(r *http.Request) (VersionInfo, []UrlSpec, bool,
 		if versionKey == "" {
 			return thisVersion, versionRxPaths, versionWLStatus, VersionNotFound
 		}
-
-		// Load Version Data - General
-		var ok bool
-		thisVersion, ok =  a.ApiDefinition.VersionData.Versions[versionKey]
-		if !ok {
-			return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
-		}
-
-
-		// Load path data and whitelist data for version
-		RxPaths, rxOk := a.RxPaths[versionKey]
-		WhiteListStatus, wlOk := a.WhiteListEnabled[versionKey]
-
-		if !rxOk {
-			log.Error("no RX Paths found for version")
-			log.Error(versionKey)
-			return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
-		}
-
-		if !wlOk {
-			log.Error("No whitelist data found")
-			return thisVersion, versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
-		}
-
-		versionRxPaths = RxPaths
-		versionWLStatus = WhiteListStatus
-
-		return thisVersion, versionRxPaths, versionWLStatus, StatusOk
 	}
 
-	return thisVersion, versionRxPaths, versionWLStatus, GeneralFailure
+	// Load Version Data - General
+	var ok bool
+	thisVersion, ok = a.ApiDefinition.VersionData.Versions[versionKey]
+	if !ok {
+		return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
+	}
+
+
+	// Load path data and whitelist data for version
+	RxPaths, rxOk := a.RxPaths[versionKey]
+	WhiteListStatus, wlOk := a.WhiteListEnabled[versionKey]
+
+	if !rxOk {
+		log.Error("no RX Paths found for version")
+		log.Error(versionKey)
+		return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
+	}
+
+	if !wlOk {
+		log.Error("No whitelist data found")
+		return thisVersion, versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
+	}
+
+	versionRxPaths = RxPaths
+	versionWLStatus = WhiteListStatus
+
+	return thisVersion, versionRxPaths, versionWLStatus, StatusOk
+
 }
-
-/*
-
-Get /api/blah version=1
-Extract Version Info
-v1
-Load Version Data for v1
-Pull RXPaths for version info
-Pull White-list bool for versionInfo
-Compare route to RxPaths
-Route matched? -> Check status (White, black ignore)
-Route not matched -> Check Whitelist status -> action
-*/

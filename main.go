@@ -26,8 +26,8 @@ var doMemoryProfile bool
 func displayConfig() {
         config_table := goterm.NewTable(0, 10, 5, ' ', 0)
         fmt.Fprintf(config_table, "Listening on port:\t%d\n", config.ListenPort)
-        fmt.Fprintf(config_table, "Source path:\t%s\n", config.ListenPath)
-        fmt.Fprintf(config_table, "Gateway target:\t%s\n", config.TargetUrl)
+//        fmt.Fprintf(config_table, "Source path:\t%s\n", config.ListenPath)
+//        fmt.Fprintf(config_table, "Gateway target:\t%s\n", config.TargetUrl)
 
         fmt.Println(config_table)
         fmt.Println("")
@@ -141,18 +141,25 @@ func main() {
                 defer prof_file.Close()
         }
 
-        remote, err := url.Parse(config.TargetUrl)
-        if err != nil {
-                log.Error("Culdn't parse target URL")
-                log.Error(err)
-        }
-
-        proxy := httputil.NewSingleHostReverseProxy(remote)
         http.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
         http.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
-        http.HandleFunc(config.ListenPath, handler(proxy))
+
+		// load the APi defs
+		thisApiLoader := ApiDefinitionLoader{}
+		ApiSpecs := thisApiLoader.LoadDefinitions("./apps/")
+		for _, spec := range(ApiSpecs) {
+			// Create a new handler for each API spec
+			remote, err := url.Parse(spec.ApiDefinition.Proxy.TargetUrl)
+			if err != nil {
+				log.Error("Culdn't parse target URL")
+				log.Error(err)
+			}
+			proxy := httputil.NewSingleHostReverseProxy(remote)
+			http.HandleFunc(spec.Proxy.ListenPath, handler(proxy, spec))
+		}
+
         targetPort := fmt.Sprintf(":%d", config.ListenPort)
-        err = http.ListenAndServe(targetPort, nil)
+        err := http.ListenAndServe(targetPort, nil)
         if err != nil {
                 log.Error(err)
         }

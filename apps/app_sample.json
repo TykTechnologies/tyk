@@ -1,0 +1,28 @@
+{
+    "name": "Test API",
+    "definition": {
+        "location": "header",
+        "key": "version"
+    },
+    "auth": {
+        "auth_header_name": "authorization"
+    },
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "v1": {
+                "name": "v1",
+                "expires": "3000-01-02 15:04",
+                "paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                }
+            }
+        }
+    },
+    "proxy": {
+        "listen_path": "/",
+        "target_url": "http://tyk.io"
+    }
+}
