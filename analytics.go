@@ -92,7 +92,7 @@ func (c CSVPurger) PurgeCache() {
 	defer outfile.Close()
 	writer := csv.NewWriter(outfile)
 
-	var headers = []string{"METHOD", "PATH", "SIZE", "UA", "DAY", "MONTH", "YEAR", "HOUR", "RESPONSE"}
+	var headers = []string{"METHOD", "PATH", "SIZE", "UA", "DAY", "MONTH", "YEAR", "HOUR", "RESPONSE", "APINAME", "APIVERSION"}
 
 	err := writer.Write(headers)
 	if err != nil {
@@ -119,7 +119,9 @@ func (c CSVPurger) PurgeCache() {
 					decoded.Month.String(),
 					strconv.Itoa(decoded.Year),
 					strconv.Itoa(decoded.Hour),
-					strconv.Itoa(decoded.ResponseCode)}
+					strconv.Itoa(decoded.ResponseCode),
+					decoded.APIName,
+					decoded.APIVersion}
 				err := writer.Write(toWrite)
 				if err != nil {
 					log.Error("File write failed!")
