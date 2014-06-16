@@ -128,6 +128,10 @@ func success_handler(w http.ResponseWriter, r *http.Request, p *httputil.Reverse
 	if config.EnableAnalytics {
 		t := time.Now()
 		keyName := r.Header.Get(spec.ApiDefinition.Auth.AuthHeaderName)
+		version := spec.getVersionFromRequest(r)
+		if version == "" {
+			version = "Non Versioned"
+		}
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
@@ -139,7 +143,9 @@ func success_handler(w http.ResponseWriter, r *http.Request, p *httputil.Reverse
 			t.Hour(),
 			200,
 			keyName,
-			t}
+			t,
+			version,
+			spec.ApiDefinition.Name}
 		analytics.RecordHit(thisRecord)
 	}
 	p.ServeHTTP(w, r)
@@ -152,6 +158,10 @@ func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code i
 	if config.EnableAnalytics {
 		t := time.Now()
 		keyName := r.Header.Get(spec.ApiDefinition.Auth.AuthHeaderName)
+		version := spec.getVersionFromRequest(r)
+		if version == "" {
+			version = "Non Versioned"
+		}
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
@@ -163,7 +173,9 @@ func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code i
 			t.Hour(),
 			err_code,
 			keyName,
-			t}
+			t,
+			version,
+			spec.ApiDefinition.Name}
 		analytics.RecordHit(thisRecord)
 	}
 
