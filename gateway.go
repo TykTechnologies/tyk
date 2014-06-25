@@ -147,7 +147,8 @@ func success_handler(w http.ResponseWriter, r *http.Request, p *httputil.Reverse
 			keyName,
 			t,
 			version,
-			spec.ApiDefinition.Name}
+			spec.ApiDefinition.Name,
+			spec.ApiDefinition.OrgId}
 		analytics.RecordHit(thisRecord)
 	}
 
@@ -183,7 +184,8 @@ func handle_error(w http.ResponseWriter, r *http.Request, err string, err_code i
 			keyName,
 			t,
 			version,
-			spec.ApiDefinition.Name}
+			spec.ApiDefinition.Name,
+			spec.ApiDefinition.OrgId}
 		analytics.RecordHit(thisRecord)
 	}
 
