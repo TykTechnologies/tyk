@@ -8,6 +8,7 @@ import (
 
 type AccessDefinition struct {
 	ApiName string		`json:"api_name"`
+	ApiId	string		`json:"api_id"`
 	Versions []string	`json:"versions"`
 }
 

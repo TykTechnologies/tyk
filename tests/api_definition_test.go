@@ -20,7 +20,7 @@ func createDefinition() ApiSpec {
 	thisDef.VersionData.NotVersioned = false
 
 	v1.Name = "v1"
-	v1.Auth.AuthHeaderName = "authorization"
+	thisDef.Auth.AuthHeaderName = "authorization"
 	v1.Expires = "2006-01-02 15:04" //TODO: Change this
 	thisDef.Proxy.ListenPath = "/v1"
 	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
@@ -56,7 +56,7 @@ func createNonExpiringDefinition() ApiSpec {
 	thisDef.VersionData.NotVersioned = false
 
 	v1.Name = "v1"
-	v1.Auth.AuthHeaderName = "authorization"
+	thisDef.Auth.AuthHeaderName = "authorization"
 	v1.Expires = "3000-01-02 15:04" //TODO: Change this
 	thisDef.Proxy.ListenPath = "/v1"
 	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
@@ -103,7 +103,7 @@ func createNonExpiringMultiDefinition() ApiSpec {
 	thisDef.VersionData.NotVersioned = false
 
 	v1.Name = "v1"
-	v1.Auth.AuthHeaderName = "authorization"
+	thisDef.Auth.AuthHeaderName = "authorization"
 	v1.Expires = "3000-01-02 15:04"
 	thisDef.Proxy.ListenPath = "/v1"
 	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
@@ -112,7 +112,7 @@ func createNonExpiringMultiDefinition() ApiSpec {
 	v1.Paths.WhiteList = []string{"v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"}
 
 	v2.Name = "v2"
-	v2.Auth.AuthHeaderName = "authorization"
+	thisDef.Auth.AuthHeaderName = "authorization"
 	v2.Expires = "3000-01-02 15:04"
 	thisDef.Proxy.ListenPath = "/v2"
 	thisDef.Proxy.TargetUrl = "http://lonelycode.com"

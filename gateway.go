@@ -38,12 +38,12 @@ func handler(p *httputil.ReverseProxy, apiSpec ApiSpec) func(http.ResponseWriter
 
 			// Check if this version is allowable!
 			accessingVersion := apiSpec.getVersionFromRequest(r)
-			apiName := apiSpec.Name
+			apiId := apiSpec.ApiId
 
 			// If there's nothing in our profile, we let them through to the next phase
 			if len(thisSessionState.AccessRights) > 0 {
 				// Run auth checks
-				versionList, apiExists := thisSessionState.AccessRights[apiName]
+				versionList, apiExists := thisSessionState.AccessRights[apiId]
 				if !apiExists {
 					log.WithFields(logrus.Fields{
 						"path":   r.URL.Path,
