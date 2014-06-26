@@ -19,7 +19,7 @@ func (e KeyError) Error() string {
 type StorageHandler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
 	SetKey(string, string, int64)         // Second input string is expected to be a JSON object (SessionState)
-	GetKeys() []string
+	GetKeys(string) []string
 	DeleteKey(string) bool
 	Connect() bool
 	GetKeysAndValues() map[string]string
@@ -53,7 +53,7 @@ func (s InMemoryStorageManager) SetKey(keyName string, sessionState string, time
 	s.Sessions[keyName] = sessionState
 }
 
-func (s InMemoryStorageManager) GetKeys() []string {
+func (s InMemoryStorageManager) GetKeys(filter string) []string {
 	sessions := make([]string, 0, len(s.Sessions))
 	for key, _ := range s.Sessions {
 		sessions = append(sessions, key)
@@ -176,15 +176,15 @@ func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeou
 	}
 }
 
-func (r *RedisStorageManager) GetKeys() []string {
+func (r *RedisStorageManager) GetKeys(filter string) []string {
 	db := r.pool.Get()
 	defer db.Close()
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
-		return r.GetKeys()
+		return r.GetKeys(filter)
 	} else {
-		searchStr := r.KeyPrefix + "*"
+		searchStr := r.KeyPrefix + filter + "*"
 		sessionsInterface, err := db.Do("KEYS", searchStr)
 		if err != nil {
 			log.Error("Error trying to get all keys:")

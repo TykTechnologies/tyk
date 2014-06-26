@@ -26,6 +26,7 @@ type AnalyticsRecord struct {
 	TimeStamp	  time.Time
 	APIVersion	  string
 	APIName		  string
+	ApiId		  string
 	OrgId		  string
 }
 

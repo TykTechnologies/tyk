@@ -6,6 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/nu7hatch/gouuid"
 	"net/http"
+	"strings"
 )
 
 type ApiModifyKeySuccess struct {
@@ -117,14 +118,14 @@ type APIAllKeys struct {
 	ApiKeys []string `json:"keys"`
 }
 
-func handleGetAllKeys() ([]byte, int) {
+func handleGetAllKeys(filter string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	code := 200
 
 	var err error
 
-	sessions := authManager.GetSessions()
+	sessions := authManager.GetSessions(filter)
 	sessionsObj := APIAllKeys{sessions}
 
 	responseMessage, err = json.Marshal(&sessionsObj)
@@ -172,6 +173,7 @@ func handleDeleteKey(keyName string) ([]byte, int) {
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := r.URL.Path[len("/tyk/keys/"):]
+	filter := r.FormValue("filter")
 	var responseMessage []byte
 	var code int
 
@@ -184,7 +186,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, code = handleGetDetail(keyName)
 		} else {
 			// Return list of keys
-			responseMessage, code = handleGetAllKeys()
+			responseMessage, code = handleGetAllKeys(filter)
 		}
 
 	} else if r.Method == "DELETE" {
@@ -199,6 +201,16 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(code)
 	fmt.Fprintf(w, string(responseMessage))
+}
+
+func expandKey(orgId, key string) string {
+	return fmt.Sprintf("%s-%s", orgId, key)
+}
+
+func extractKey(orgId, key string) string {
+	replacementStr := fmt.Sprintf("%s-", orgId)
+	replaced := strings.Replace(key, replacementStr, "", 1)
+	return replaced
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +231,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 		} else {
 			u5, err := uuid.NewV4()
+			new_key := expandKey(newSession.OrgId, u5.String())
 
 			if err != nil {
 				code = 400
@@ -227,7 +240,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				responseMessage = createError("Request malformed")
 
 			} else {
-				keyName := u5.String()
+				keyName := new_key
 				authManager.UpdateSession(keyName, newSession)
 				responseObj.Action = "create"
 				responseObj.Key = keyName

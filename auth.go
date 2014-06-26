@@ -78,6 +78,6 @@ func (b AuthorisationManager) GetSessionDetail(keyName string) (SessionState, bo
 	}
 }
 
-func (b AuthorisationManager) GetSessions() []string {
-	return b.Store.GetKeys()
+func (b AuthorisationManager) GetSessions(filter string) []string {
+	return b.Store.GetKeys(filter)
 }

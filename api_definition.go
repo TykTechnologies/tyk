@@ -12,6 +12,7 @@ import (
 
 type ApiDefinition struct {
 	Name string `json:"name"`
+	ApiId string `json:"api_id"`
 	OrgId string `json:"org_id"`
 	VersionDefinition struct {
 		Location string `json:"location"`

@@ -1,6 +1,7 @@
 {
     "name": "Tyk Test API",
-    "org_id":, "default",
+    "api_id": "1",
+    "org_id": "default",
     "definition": {
         "location": "header",
         "key": "version"
@@ -24,6 +25,6 @@
     },
     "proxy": {
         "listen_path": "/tyk-api-test/",
-        "target_url": "http://tyk.io"
+        "target_url": "http://jive.ly"
     }
 }
