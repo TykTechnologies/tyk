@@ -8,39 +8,44 @@ import (
 	"strings"
 	"path/filepath"
 	"encoding/json"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
 )
 
 type ApiDefinition struct {
-	Name string `json:"name"`
-	ApiId string `json:"api_id"`
-	OrgId string `json:"org_id"`
+	Id bson.ObjectId `bson:"_id,omitempty" json:"id"`
+	Name string `bson:"name" json:"name"`
+	ApiId string `bson:"api_id" json:"api_id"`
+	OrgId string `bson:"org_id" json:"org_id"`
 	VersionDefinition struct {
-		Location string `json:"location"`
-		Key string `json:"key"`
-	} `json:"definition"`
+		Location string `bson:"location" json:"location"`
+		Key string `bson:"key" json:"key"`
+	} `bson:"definition" json:"definition"`
 	VersionData struct {
-		NotVersioned bool `json:"not_versioned"`
-		Versions map[string]VersionInfo `json:"versions"`
-	} `json:"version_data"`
+		NotVersioned bool `bson:"not_versioned" json:"not_versioned"`
+		Versions map[string]VersionInfo `bson:"versions" json:"versions"`
+	} `bson:"version_data" json:"version_data"`
 	Proxy struct {
-		ListenPath string `json:"listen_path"`
-		TargetUrl string `json:"target_url"`
-		StripListenPath bool `json:"strip_listen_path"`
-	} `json:"proxy"`
+		ListenPath string `bson:"listen_path" json:"listen_path"`
+		TargetUrl string `bson:"target_url" json:"target_url"`
+		StripListenPath bool `bson:"strip_listen_path" json:"strip_listen_path"`
+	} `bson:"proxy" json:"proxy"`
 	Auth struct {
-		AuthHeaderName string `json:"auth_header_name"`
-	} `json:"auth"`
+		AuthHeaderName string `bson:"auth_header_name" json:"auth_header_name"`
+	} `bson:"auth" json:"auth"`
+	Active bool `bson:"active" json:"active"`
 }
 
 type VersionInfo struct {
-	Name string `json:"name"`
-	Expires string `json:"expires"`
+	Name string `bson:"name" json:"name"`
+	Expires string `bson:"expires" json:"expires"`
 	Paths struct {
-		Ignored []string `json:"ignored"`
-		WhiteList []string `json:"white_list"`
-		BlackList []string `json:"black_list"`
-	} `json:"paths"`
+		Ignored []string `bson:"ignored" json:"ignored"`
+		WhiteList []string `bson:"white_list" json:"white_list"`
+		BlackList []string `bson:"black_list" json:"black_list"`
+	} `bson:"paths" json:"paths"`
 }
+
 
 type UrlStatus int
 
@@ -74,7 +79,58 @@ type ApiSpec struct {
 	WhiteListEnabled map[string]bool
 }
 
-type ApiDefinitionLoader struct {}
+type ApiDefinitionLoader struct {
+	dbSession *mgo.Session
+}
+
+func (a *ApiDefinitionLoader) Connect() {
+	var err error
+	a.dbSession, err = mgo.Dial(config.AnalyticsConfig.MongoURL)
+	if err != nil {
+		log.Error("Mongo connection failed:")
+		log.Panic(err)
+	}
+}
+
+func (a *ApiDefinitionLoader) MakeSpec(thisAppConfig ApiDefinition) ApiSpec {
+	newAppSpec := ApiSpec{}
+	newAppSpec.ApiDefinition = thisAppConfig
+	newAppSpec.RxPaths = make(map[string][]UrlSpec)
+	newAppSpec.WhiteListEnabled = make(map[string]bool)
+	for _, v := range(thisAppConfig.VersionData.Versions) {
+		pathSpecs, whiteListSpecs := a.getPathSpecs(v)
+		newAppSpec.RxPaths[v.Name] = pathSpecs
+		newAppSpec.WhiteListEnabled[v.Name] = whiteListSpecs
+	}
+
+	return newAppSpec
+}
+
+func (a *ApiDefinitionLoader) LoadDefinitionsFromMongo() []ApiSpec {
+	var ApiSpecs = []ApiSpec{}
+
+	a.Connect()
+	apiCollection := a.dbSession.DB("").C("tyk_apis")
+
+	search := bson.M{
+		"active": true,
+	}
+
+	var ApiDefinitions = []ApiDefinition{}
+	mongoErr := apiCollection.Find(search).All(&ApiDefinitions)
+
+	if mongoErr != nil {
+		log.Error("Could not find any application configs!")
+		return ApiSpecs
+	}
+
+	for _, thisAppConfig := range(ApiDefinitions) {
+		// Got the configuration, build the spec!
+		newAppSpec := a.MakeSpec(thisAppConfig)
+		ApiSpecs = append(ApiSpecs, newAppSpec)
+	}
+	return ApiSpecs
+}
 
 func (a *ApiDefinitionLoader) LoadDefinitions(dir string) []ApiSpec {
 	var ApiSpecs = []ApiSpec{}
@@ -96,15 +152,7 @@ func (a *ApiDefinitionLoader) LoadDefinitions(dir string) []ApiSpec {
 					log.Error(err)
 				} else {
 					// Got the configuration, build the spec!
-					newAppSpec := ApiSpec{}
-					newAppSpec.ApiDefinition = thisAppConfig
-					newAppSpec.RxPaths = make(map[string][]UrlSpec)
-					newAppSpec.WhiteListEnabled = make(map[string]bool)
-					for _, v := range(thisAppConfig.VersionData.Versions) {
-						pathSpecs, whiteListSpecs := a.getPathSpecs(v)
-						newAppSpec.RxPaths[v.Name] = pathSpecs
-						newAppSpec.WhiteListEnabled[v.Name] = whiteListSpecs
-					}
+					newAppSpec := a.MakeSpec(thisAppConfig)
 					ApiSpecs = append(ApiSpecs, newAppSpec)
 				}
 			}

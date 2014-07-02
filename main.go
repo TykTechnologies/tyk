@@ -29,8 +29,6 @@ var doMemoryProfile bool
 func displayConfig() {
         config_table := goterm.NewTable(0, 10, 5, ' ', 0)
         fmt.Fprintf(config_table, "Listening on port:\t%d\n", config.ListenPort)
-//        fmt.Fprintf(config_table, "Source path:\t%s\n", config.ListenPath)
-//        fmt.Fprintf(config_table, "Gateway target:\t%s\n", config.TargetUrl)
 
         fmt.Println(config_table)
         fmt.Println("")
@@ -138,7 +136,15 @@ func loadApps() {
 	// load the APi defs
 	log.Info("Loading API configurations.")
 	thisApiLoader := ApiDefinitionLoader{}
-	ApiSpecs := thisApiLoader.LoadDefinitions("./apps/")
+	var ApiSpecs []ApiSpec
+
+	if config.UseDBAppConfigs {
+		log.Info("Using App Configuration from Mongo DB")
+		ApiSpecs = thisApiLoader.LoadDefinitionsFromMongo()
+	} else {
+		ApiSpecs = thisApiLoader.LoadDefinitions("./apps/")
+	}
+
 	for _, spec := range(ApiSpecs) {
 		// Create a new handler for each API spec
 		remote, err := url.Parse(spec.ApiDefinition.Proxy.TargetUrl)
@@ -146,6 +152,7 @@ func loadApps() {
 			log.Error("Culdn't parse target URL")
 			log.Error(err)
 		}
+		log.Info(remote)
 		proxy := httputil.NewSingleHostReverseProxy(remote)
 		http.HandleFunc(spec.Proxy.ListenPath, handler(proxy, spec))
 	}

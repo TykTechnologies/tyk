@@ -10,6 +10,7 @@ type Config struct {
 	ListenPort     int    `json:"listen_port"`
 	Secret         string `json:"secret"`
 	TemplatePath   string `json:"template_path"`
+	UseDBAppConfigs bool `json:"use_db_app_configs"`
 	Storage        struct {
 		Type     string `json:"type"`
 		Host     string `json:"host"`
