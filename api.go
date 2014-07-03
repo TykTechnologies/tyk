@@ -204,11 +204,15 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func expandKey(orgId, key string) string {
-	return fmt.Sprintf("%s-%s", orgId, key)
+	if orgId == "" {
+		return fmt.Sprintf("%s", key)
+	} else {
+		return fmt.Sprintf("%s%s", orgId, key)
+	}
 }
 
 func extractKey(orgId, key string) string {
-	replacementStr := fmt.Sprintf("%s-", orgId)
+	replacementStr := fmt.Sprintf("%s", orgId)
 	replaced := strings.Replace(key, replacementStr, "", 1)
 	return replaced
 }
@@ -231,7 +235,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 		} else {
 			u5, err := uuid.NewV4()
-			new_key := expandKey(newSession.OrgId, u5.String())
+			cleanSting := strings.Replace(u5.String(), "-", "", -1)
+			new_key := expandKey(newSession.OrgId, cleanSting)
 
 			if err != nil {
 				code = 400
