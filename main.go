@@ -132,18 +132,16 @@ func intro() {
         fmt.Print("\nhttp://www.tyk.io\n\n")
 }
 
-func loadApiEndpoints() {
+func loadApiEndpoints(Muxer *http.ServeMux) {
 	// set up main API handlers
-	http.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
-	http.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
-	http.HandleFunc("/tyk/reload/", securityHandler(resetHandler))
+	Muxer.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
+	Muxer.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
+	Muxer.HandleFunc("/tyk/reload/", securityHandler(resetHandler))
 }
 
-func loadApps() {
-	// load the APi defs
-	log.Info("Loading API configurations.")
-	thisApiLoader := ApiDefinitionLoader{}
+func getApiSpecs() []ApiSpec {
 	var ApiSpecs []ApiSpec
+	thisApiLoader := ApiDefinitionLoader{}
 
 	if config.UseDBAppConfigs {
 		log.Info("Using App Configuration from Mongo DB")
@@ -151,6 +149,13 @@ func loadApps() {
 	} else {
 		ApiSpecs = thisApiLoader.LoadDefinitions("./apps/")
 	}
+
+	return ApiSpecs
+}
+
+func loadApps(ApiSpecs []ApiSpec, Muxer *http.ServeMux) {
+	// load the APi defs
+	log.Info("Loading API configurations.")
 
 	for _, spec := range(ApiSpecs) {
 		// Create a new handler for each API spec
@@ -161,15 +166,18 @@ func loadApps() {
 		}
 		log.Info(remote)
 		proxy := httputil.NewSingleHostReverseProxy(remote)
-		http.HandleFunc(spec.Proxy.ListenPath, handler(proxy, spec))
+		Muxer.HandleFunc(spec.Proxy.ListenPath, handler(proxy, spec))
 	}
 }
 
 func ReloadURLStructure() {
-	log.Warning("RELOADING")
-	http.DefaultServeMux = http.NewServeMux()
-	loadApiEndpoints()
-	loadApps()
+	newMuxes := http.NewServeMux()
+	loadApiEndpoints(newMuxes)
+	specs := getApiSpecs()
+	loadApps(specs, newMuxes)
+
+	http.DefaultServeMux = newMuxes
+	log.Info("Reload complete")
 }
 
 func main() {
@@ -183,7 +191,7 @@ func main() {
         }
 
         targetPort := fmt.Sprintf(":%d", config.ListenPort)
-	loadApiEndpoints()
+	loadApiEndpoints(http.DefaultServeMux)
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()
@@ -197,14 +205,16 @@ func main() {
 		log.Println("Listening on", l.Addr())
 
 		// Accept connections in a new goroutine.
-		loadApps()
+		specs := getApiSpecs()
+		loadApps(specs, http.DefaultServeMux)
 		go http.Serve(l, nil)
 
 	} else {
 
 		// Resume accepting connections in a new goroutine.
 		log.Println("Resuming listening on", l.Addr())
-		loadApps()
+		specs := getApiSpecs()
+		loadApps(specs, http.DefaultServeMux)
 		go http.Serve(l, nil)
 
 		// Kill the parent, now that the child has started successfully.
