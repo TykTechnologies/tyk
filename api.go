@@ -171,6 +171,28 @@ func handleDeleteKey(keyName string) ([]byte, int) {
 	return responseMessage, code
 }
 
+func handleURLReload() ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	ReloadURLStructure()
+
+	code := 200
+
+	statusObj := ApiErrorMessage{"ok", ""}
+	responseMessage, err = json.Marshal(&statusObj)
+
+	if err != nil {
+		log.Error("Marshalling failed")
+		log.Error(err)
+		return []byte(systemError), 500
+	} else {
+		log.WithFields(logrus.Fields{}).Info("Reloaded URL Structure - Success")
+	}
+
+	return responseMessage, code
+}
+
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := r.URL.Path[len("/tyk/keys/"):]
 	filter := r.FormValue("filter")
@@ -192,6 +214,23 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "DELETE" {
 		// Remove a key
 		responseMessage, code = handleDeleteKey(keyName)
+
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	w.WriteHeader(code)
+	fmt.Fprintf(w, string(responseMessage))
+}
+
+func resetHandler(w http.ResponseWriter, r *http.Request) {
+	var responseMessage []byte
+	var code int
+
+	if r.Method == "GET" {
+		responseMessage, code = handleURLReload()
 
 	} else {
 		// Return Not supported message (and code)

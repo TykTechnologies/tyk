@@ -132,6 +132,13 @@ func intro() {
         fmt.Print("\nhttp://www.tyk.io\n\n")
 }
 
+func loadApiEndpoints() {
+	// set up main API handlers
+	http.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
+	http.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
+	http.HandleFunc("/tyk/reload/", securityHandler(resetHandler))
+}
+
 func loadApps() {
 	// load the APi defs
 	log.Info("Loading API configurations.")
@@ -158,6 +165,13 @@ func loadApps() {
 	}
 }
 
+func ReloadURLStructure() {
+	log.Warning("RELOADING")
+	http.DefaultServeMux = http.NewServeMux()
+	loadApiEndpoints()
+	loadApps()
+}
+
 func main() {
         intro()
         displayConfig()
@@ -168,12 +182,8 @@ func main() {
                 defer prof_file.Close()
         }
 
-        http.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
-        http.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
-
-
-
         targetPort := fmt.Sprintf(":%d", config.ListenPort)
+	loadApiEndpoints()
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()
