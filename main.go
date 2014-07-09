@@ -14,6 +14,7 @@ import (
 	"github.com/rcrowley/goagain"
 	"net"
 	"time"
+	"github.com/justinas/alice"
 )
 
 var log = logrus.New()
@@ -153,6 +154,41 @@ func getApiSpecs() []ApiSpec {
 	return ApiSpecs
 }
 
+func customHandler1(h http.Handler) http.Handler {
+	thisHandler := func(w http.ResponseWriter, r *http.Request) {
+		log.Info("Middlwware 1 called!")
+		h.ServeHTTP(w, r)
+	}
+
+	return http.HandlerFunc(thisHandler)
+}
+
+func customHandler2(h http.Handler) http.Handler {
+	thisHandler := func(w http.ResponseWriter, r *http.Request) {
+		log.Info("Middlwware 2 called!")
+		h.ServeHTTP(w, r)
+	}
+
+	return http.HandlerFunc(thisHandler)
+}
+
+type StructMiddleware struct{
+	spec ApiSpec
+}
+
+func (s StructMiddleware) New(spec ApiSpec) func(http.Handler) http.Handler {
+	aliceHandler := func(h http.Handler) http.Handler {
+		thisHandler := func(w http.ResponseWriter, r *http.Request) {
+			log.Info("Middlwware 3 called!")
+			log.Info(spec.ApiId)
+			h.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(thisHandler)
+	}
+
+	return aliceHandler
+}
+
 func loadApps(ApiSpecs []ApiSpec, Muxer *http.ServeMux) {
 	// load the APi defs
 	log.Info("Loading API configurations.")
@@ -166,7 +202,17 @@ func loadApps(ApiSpecs []ApiSpec, Muxer *http.ServeMux) {
 		}
 		log.Info(remote)
 		proxy := httputil.NewSingleHostReverseProxy(remote)
-		Muxer.HandleFunc(spec.Proxy.ListenPath, handler(proxy, spec))
+
+		myHandler := http.HandlerFunc(handler(proxy, spec))
+		tykMiddleware := TykMiddleware{spec, proxy}
+
+		chain := alice.New(
+			VersionCheck{tykMiddleware}.New(),
+			KeyExists{tykMiddleware}.New(),
+			AccessRightsCheck{tykMiddleware}.New(),
+			KeyExpired{tykMiddleware}.New(),
+			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(myHandler)
+		Muxer.Handle(spec.Proxy.ListenPath, chain)
 	}
 }
 

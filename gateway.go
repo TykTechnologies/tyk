@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/Sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
 	"time"
@@ -17,112 +16,12 @@ type ApiError struct {
 func handler(p *httputil.ReverseProxy, apiSpec ApiSpec) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// Check versioning, blacklist, whitelist and ignored status
-		requestValid, stat := apiSpec.IsRequestValid(r)
-		if requestValid == false {
-			handle_error(w, r, string(stat), 409, apiSpec)
-			return
-		}
+		tm := TykMiddleware{apiSpec, p}
+		handler := SuccessHandler{tm}
+		// Skip all other execution
+		handler.ServeHTTP(w, r)
+		return
 
-		if stat == StatusOkAndIgnore {
-			success_handler(w, r, p, apiSpec)
-			return
-		}
-
-		// All is ok with the request itself, now auth and validate the rest
-		// Check for API key existence
-		authHeaderValue := r.Header.Get(apiSpec.ApiDefinition.Auth.AuthHeaderName)
-		if authHeaderValue != "" {
-			// Check if API key valid
-			key_authorised, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
-
-			// Check if this version is allowable!
-			accessingVersion := apiSpec.getVersionFromRequest(r)
-			apiId := apiSpec.ApiId
-
-			// If there's nothing in our profile, we let them through to the next phase
-			if len(thisSessionState.AccessRights) > 0 {
-				// Run auth checks
-				versionList, apiExists := thisSessionState.AccessRights[apiId]
-				if !apiExists {
-					log.WithFields(logrus.Fields{
-						"path":   r.URL.Path,
-						"origin": r.RemoteAddr,
-						"key":    authHeaderValue,
-					}).Info("Attempted access to unauthorised API.")
-					handle_error(w, r, "Access to this API has been disallowed", 403, apiSpec)
-					return
-
-				} else {
-					found := false
-					for _, vInfo := range versionList.Versions {
-						if vInfo == accessingVersion {
-							found = true
-							break
-						}
-					}
-					if !found {
-						log.WithFields(logrus.Fields{
-							"path":   r.URL.Path,
-							"origin": r.RemoteAddr,
-							"key":    authHeaderValue,
-						}).Info("Attempted access to unauthorised API version.")
-						handle_error(w, r, "Access to this API version has been disallowed", 403, apiSpec)
-						return
-					}
-				}
-			}
-
-			keyExpired := authManager.IsKeyExpired(&thisSessionState)
-			if key_authorised {
-				if !keyExpired {
-					// If valid, check if within rate limit
-					forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
-					if forwardMessage {
-						success_handler(w, r, p, apiSpec)
-					} else {
-						// TODO Use an Enum!
-						if reason == 1 {
-							log.WithFields(logrus.Fields{
-								"path":   r.URL.Path,
-								"origin": r.RemoteAddr,
-								"key":    authHeaderValue,
-							}).Info("Key rate limit exceeded.")
-							handle_error(w, r, "Rate limit exceeded", 409, apiSpec)
-						} else if reason == 2 {
-							log.WithFields(logrus.Fields{
-								"path":   r.URL.Path,
-								"origin": r.RemoteAddr,
-								"key":    authHeaderValue,
-							}).Info("Key quota limit exceeded.")
-							handle_error(w, r, "Quota exceeded", 409, apiSpec)
-						}
-
-					}
-					authManager.UpdateSession(authHeaderValue, thisSessionState)
-				} else {
-					log.WithFields(logrus.Fields{
-						"path":   r.URL.Path,
-						"origin": r.RemoteAddr,
-						"key":    authHeaderValue,
-					}).Info("Attempted access from expired key.")
-					handle_error(w, r, "Key has expired, please renew", 403, apiSpec)
-				}
-			} else {
-				log.WithFields(logrus.Fields{
-					"path":   r.URL.Path,
-					"origin": r.RemoteAddr,
-					"key":    authHeaderValue,
-				}).Info("Attempted access with non-existent key.")
-				handle_error(w, r, "Key not authorised", 403, apiSpec)
-			}
-		} else {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": r.RemoteAddr,
-			}).Info("Attempted access with malformed header, no auth header found.")
-			handle_error(w, r, "Authorisation field missing", 400, apiSpec)
-		}
 	}
 }
 
