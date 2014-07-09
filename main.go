@@ -203,7 +203,7 @@ func loadApps(ApiSpecs []ApiSpec, Muxer *http.ServeMux) {
 		log.Info(remote)
 		proxy := httputil.NewSingleHostReverseProxy(remote)
 
-		myHandler := http.HandlerFunc(handler(proxy, spec))
+		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 		tykMiddleware := TykMiddleware{spec, proxy}
 
 		chain := alice.New(
@@ -211,7 +211,7 @@ func loadApps(ApiSpecs []ApiSpec, Muxer *http.ServeMux) {
 			KeyExists{tykMiddleware}.New(),
 			KeyExpired{tykMiddleware}.New(),
 			AccessRightsCheck{tykMiddleware}.New(),
-			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(myHandler)
+			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
 		Muxer.Handle(spec.Proxy.ListenPath, chain)
 	}
 }
