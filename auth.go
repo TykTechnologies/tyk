@@ -55,7 +55,6 @@ func (b AuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
 // UpdateSession updates the session state in the storage engine
 func (b AuthorisationManager) UpdateSession(keyName string, session SessionState) {
 	v, _ := json.Marshal(session)
-	log.Info(session)
 	key_exp := (session.Expires - time.Now().Unix()) + 300 // Add 5 minutes to key expiry, just in case
 
 	b.Store.SetKey(keyName, string(v), key_exp)

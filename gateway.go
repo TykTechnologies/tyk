@@ -13,6 +13,7 @@ type ApiError struct {
 	Message string
 }
 
+// Proxies request onwards
 func handler(p *httputil.ReverseProxy, apiSpec ApiSpec) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
