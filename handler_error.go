@@ -23,7 +23,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		}
 
 		if e.TykMiddleware.Spec.ApiDefinition.Proxy.StripListenPath {
-			r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
+			r.URL.Path = strings.Replace(r.URL.Path, e.TykMiddleware.Spec.Proxy.ListenPath, "", 1)
 		}
 
 		thisRecord := AnalyticsRecord{
