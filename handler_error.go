@@ -6,6 +6,7 @@ import (
 	"runtime/pprof"
 	"fmt"
 	"github.com/gorilla/context"
+	"strings"
 )
 
 type ErrorHandler struct{
@@ -20,6 +21,11 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		if version == "" {
 			version = "Non Versioned"
 		}
+
+		if e.TykMiddleware.Spec.ApiDefinition.Proxy.StripListenPath {
+			r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
+		}
+
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
