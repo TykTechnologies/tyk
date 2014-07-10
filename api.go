@@ -16,14 +16,14 @@ type APIModifyKeySuccess struct {
 	Action string `json:"action"`
 }
 
-// ApiErrorMessage is an object that defines when a generic error occurred
-type ApiErrorMessage struct {
+// APIErrorMessage is an object that defines when a generic error occurred
+type APIErrorMessage struct {
 	Status string `json:"status"`
 	Error  string `json:"error"`
 }
 
 func createError(errorMsg string) []byte {
-	errorObj := ApiErrorMessage{"error", errorMsg}
+	errorObj := APIErrorMessage{"error", errorMsg}
 	responseMsg, err := json.Marshal(&errorObj)
 
 	if err != nil {
@@ -118,7 +118,7 @@ func handleGetDetail(sessionKey string) ([]byte, int) {
 
 // APIAllKeys represents a list of keys in the memory store
 type APIAllKeys struct {
-	ApiKeys []string `json:"keys"`
+	APIKeys []string `json:"keys"`
 }
 
 func handleGetAllKeys(filter string) ([]byte, int) {
@@ -141,10 +141,11 @@ func handleGetAllKeys(filter string) ([]byte, int) {
 
 	if success {
 		return responseMessage, code
-	} else {
-		log.Info("Attempted keys retrieval - success.")
-		return []byte(E_SYSTEM_ERROR), code
 	}
+
+	log.Info("Attempted keys retrieval - success.")
+	return []byte(E_SYSTEM_ERROR), code
+
 }
 
 // APIStatusMessage represents an API status message
@@ -166,11 +167,12 @@ func handleDeleteKey(keyName string) ([]byte, int) {
 		log.Error("Marshalling failed")
 		log.Error(err)
 		return []byte(E_SYSTEM_ERROR), 500
-	} else {
-		log.WithFields(logrus.Fields{
-			"key": keyName,
-		}).Info("Attempted key deletion - success.")
 	}
+
+	log.WithFields(logrus.Fields{
+		"key": keyName,
+	}).Info("Attempted key deletion - success.")
+
 
 	return responseMessage, code
 }
@@ -183,16 +185,16 @@ func handleURLReload() ([]byte, int) {
 
 	code := 200
 
-	statusObj := ApiErrorMessage{"ok", ""}
+	statusObj := APIErrorMessage{"ok", ""}
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
 		log.Error("Marshalling failed")
 		log.Error(err)
 		return []byte(E_SYSTEM_ERROR), 500
-	} else {
-		log.WithFields(logrus.Fields{}).Info("Reloaded URL Structure - Success")
 	}
+
+	log.WithFields(logrus.Fields{}).Info("Reloaded URL Structure - Success")
 
 	return responseMessage, code
 }
@@ -246,16 +248,16 @@ func resetHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(responseMessage))
 }
 
-func expandKey(orgId, key string) string {
-	if orgId == "" {
+func expandKey(orgID, key string) string {
+	if orgID == "" {
 		return fmt.Sprintf("%s", key)
-	} else {
-		return fmt.Sprintf("%s%s", orgId, key)
 	}
+
+	return fmt.Sprintf("%s%s", orgID, key)
 }
 
-func extractKey(orgId, key string) string {
-	replacementStr := fmt.Sprintf("%s", orgId)
+func extractKey(orgID, key string) string {
+	replacementStr := fmt.Sprintf("%s", orgID)
 	replaced := strings.Replace(key, replacementStr, "", 1)
 	return replaced
 }
@@ -279,7 +281,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			u5, err := uuid.NewV4()
 			cleanSting := strings.Replace(u5.String(), "-", "", -1)
-			new_key := expandKey(newSession.OrgID, cleanSting)
+			newKey := expandKey(newSession.OrgID, cleanSting)
 
 			if err != nil {
 				code = 400
@@ -288,7 +290,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				responseMessage = createError("Request malformed")
 
 			} else {
-				keyName := new_key
+				keyName := newKey
 				authManager.UpdateSession(keyName, newSession)
 				responseObj.Action = "create"
 				responseObj.Key = keyName
@@ -331,8 +333,9 @@ func securityHandler(handler func(http.ResponseWriter, *http.Request)) func(http
 			fmt.Fprintf(w, string(responseMessage))
 
 			return
-		} else {
-			handler(w, r)
 		}
+
+		handler(w, r)
+
 	}
 }

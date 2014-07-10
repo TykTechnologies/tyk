@@ -7,3 +7,4 @@ test.conf
 *.mprof
 apps/test.json
 logs
+lint_results.txt
