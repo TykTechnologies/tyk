@@ -9,22 +9,31 @@ import (
 	"time"
 )
 
+// ContextKey is a key type to avoid collisions
 type ContextKey int
 
+// Enums for keys to be stored in a session context - this is how gorilla expects
+// these to be implemented and is lifted pretty much from docs
 const (
 	SessionData     = 0
 	AuthHeaderValue = 1
 )
 
+// TykMiddleware wraps up the ApiSpec and Proxy objects to be included in a
+// middleware handler, this can probably be handled better.
 type TykMiddleware struct {
 	Spec  APISpec
 	Proxy *httputil.ReverseProxy
 }
 
+// SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
 	TykMiddleware
 }
 
+// ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
+// final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
+// Spec states the path is Ignored
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if config.EnableAnalytics {
 		t := time.Now()

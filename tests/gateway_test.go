@@ -116,10 +116,10 @@ func TestThrottling(t *testing.T) {
 		t.Error("Third request returned invalid code, should 409, got: \n", third_recorder.Code)
 	}
 
-	newApiError := TykErrorResponse{}
-	json.Unmarshal([]byte(third_recorder.Body.String()), &newApiError)
+	newAPIError := TykErrorResponse{}
+	json.Unmarshal([]byte(third_recorder.Body.String()), &newAPIError)
 
-	if newApiError.Error != "Rate limit exceeded" {
+	if newAPIError.Error != "Rate limit exceeded" {
 		t.Error("Third request returned invalid message, got: \n", third_recorder.Body.String())
 	}
 }
@@ -160,10 +160,10 @@ func TestQuota(t *testing.T) {
 		t.Error("Third request returned invalid code, should 409, got: \n", third_recorder.Code)
 	}
 
-	newApiError := TykErrorResponse{}
-	json.Unmarshal([]byte(third_recorder.Body.String()), &newApiError)
+	newAPIError := TykErrorResponse{}
+	json.Unmarshal([]byte(third_recorder.Body.String()), &newAPIError)
 
-	if newApiError.Error != "Quota exceeded" {
-		t.Error("Third request returned invalid message, got: \n", newApiError.Error)
+	if newAPIError.Error != "Quota exceeded" {
+		t.Error("Third request returned invalid message, got: \n", newAPIError.Error)
 	}
 }

@@ -5,11 +5,7 @@ import (
 	"net/http/httputil"
 )
 
-type ApiError struct {
-	Message string
-}
-
-// Proxies request onwards
+// ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *httputil.ReverseProxy, apiSpec APISpec) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
