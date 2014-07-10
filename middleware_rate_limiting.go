@@ -7,10 +7,13 @@ import (
 	"github.com/gorilla/context"
 )
 
+// RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
+// within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
 	TykMiddleware
 }
 
+// New creates a new HttpHandler for the alice middleware package
 func (k RateLimitAndQuotaCheck) New() func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {

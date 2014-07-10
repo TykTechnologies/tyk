@@ -7,10 +7,13 @@ import (
 	"github.com/gorilla/context"
 )
 
+// KeyExists will check if the key being used to access the API is in the request data,
+// and then if the key is in the storage engine
 type KeyExists struct {
 	TykMiddleware
 }
 
+// New creates a new HttpHandler for the alice middleware package
 func (k KeyExists) New() func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -29,8 +32,8 @@ func (k KeyExists) New() func(http.Handler) http.Handler {
 			}
 
 			// Check if API key valid
-			key_exists, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
-			if !key_exists {
+			keyExists, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
+			if !keyExists {
 				log.WithFields(logrus.Fields{
 					"path":   r.URL.Path,
 					"origin": r.RemoteAddr,

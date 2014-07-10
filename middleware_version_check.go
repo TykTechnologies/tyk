@@ -4,10 +4,12 @@ import "net/http"
 
 import ()
 
+// VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
 	TykMiddleware
 }
 
+// New creates a new HttpHandler for the alice middleware package
 func (s VersionCheck) New() func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
