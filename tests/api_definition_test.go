@@ -8,11 +8,11 @@ import (
 	"io/ioutil"
 )
 
-func createDefinition() ApiSpec {
-	var thisDef = ApiDefinition{}
+func createDefinition() APISpec {
+	var thisDef = APIDefinition{}
 	var v1 = VersionInfo{}
-	var thisSpec = ApiSpec{}
-	var thisLoader = ApiDefinitionLoader{}
+	var thisSpec = APISpec{}
+	var thisLoader = APIDefinitionLoader{}
 
 	thisDef.Name = "Test API"
 	thisDef.VersionDefinition.Key = "version"
@@ -23,7 +23,7 @@ func createDefinition() ApiSpec {
 	thisDef.Auth.AuthHeaderName = "authorization"
 	v1.Expires = "2006-01-02 15:04" //TODO: Change this
 	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
+	thisDef.Proxy.TargetURL = "http://lonelycode.com"
 	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
 	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
 	v1.Paths.WhiteList = []string{"v1/disallowed/whitelist/literal", "v1/disallowed/whitelist/{id}"}
@@ -31,9 +31,9 @@ func createDefinition() ApiSpec {
 	thisDef.VersionData.Versions = make(map[string]VersionInfo)
 	thisDef.VersionData.Versions[v1.Name] = v1
 
-	thisSpec.ApiDefinition = thisDef
+	thisSpec.APIDefinition = thisDef
 
-	thisSpec.RxPaths = make(map[string][]UrlSpec)
+	thisSpec.RxPaths = make(map[string][]URLSpec)
 	thisSpec.WhiteListEnabled = make(map[string]bool)
 
 	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
@@ -44,11 +44,11 @@ func createDefinition() ApiSpec {
 	return thisSpec
 }
 
-func createNonExpiringDefinition() ApiSpec {
-	var thisDef = ApiDefinition{}
+func createNonExpiringDefinition() APISpec {
+	var thisDef = APIDefinition{}
 	var v1 = VersionInfo{}
-	var thisSpec = ApiSpec{}
-	var thisLoader = ApiDefinitionLoader{}
+	var thisSpec = APISpec{}
+	var thisLoader = APIDefinitionLoader{}
 
 	thisDef.Name = "Test API"
 	thisDef.VersionDefinition.Key = "version"
@@ -59,7 +59,7 @@ func createNonExpiringDefinition() ApiSpec {
 	thisDef.Auth.AuthHeaderName = "authorization"
 	v1.Expires = "3000-01-02 15:04" //TODO: Change this
 	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
+	thisDef.Proxy.TargetURL = "http://lonelycode.com"
 	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
 	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
 	v1.Paths.WhiteList = []string{"v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"}
@@ -67,9 +67,9 @@ func createNonExpiringDefinition() ApiSpec {
 	thisDef.VersionData.Versions = make(map[string]VersionInfo)
 	thisDef.VersionData.Versions[v1.Name] = v1
 
-	thisSpec.ApiDefinition = thisDef
+	thisSpec.APIDefinition = thisDef
 
-	thisSpec.RxPaths = make(map[string][]UrlSpec)
+	thisSpec.RxPaths = make(map[string][]URLSpec)
 	thisSpec.WhiteListEnabled = make(map[string]bool)
 
 	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
@@ -80,7 +80,7 @@ func createNonExpiringDefinition() ApiSpec {
 	return thisSpec
 }
 
-func writeDefToFile(configStruct ApiDefinition) {
+func writeDefToFile(configStruct APIDefinition) {
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling configuration!")
@@ -90,12 +90,12 @@ func writeDefToFile(configStruct ApiDefinition) {
 	}
 }
 
-func createNonExpiringMultiDefinition() ApiSpec {
-	var thisDef = ApiDefinition{}
+func createNonExpiringMultiDefinition() APISpec {
+	var thisDef = APIDefinition{}
 	var v1 = VersionInfo{}
 	var v2 = VersionInfo{}
-	var thisSpec = ApiSpec{}
-	var thisLoader = ApiDefinitionLoader{}
+	var thisSpec = APISpec{}
+	var thisLoader = APIDefinitionLoader{}
 
 	thisDef.Name = "Test API"
 	thisDef.VersionDefinition.Key = "version"
@@ -106,7 +106,7 @@ func createNonExpiringMultiDefinition() ApiSpec {
 	thisDef.Auth.AuthHeaderName = "authorization"
 	v1.Expires = "3000-01-02 15:04"
 	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
+	thisDef.Proxy.TargetURL = "http://lonelycode.com"
 	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
 	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
 	v1.Paths.WhiteList = []string{"v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"}
@@ -115,7 +115,7 @@ func createNonExpiringMultiDefinition() ApiSpec {
 	thisDef.Auth.AuthHeaderName = "authorization"
 	v2.Expires = "3000-01-02 15:04"
 	thisDef.Proxy.ListenPath = "/v2"
-	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
+	thisDef.Proxy.TargetURL = "http://lonelycode.com"
 	v2.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
 	v2.Paths.BlackList = []string{"v1/disallowed/blacklist/literal"}
 	v2.Paths.WhiteList = []string{}
@@ -124,9 +124,9 @@ func createNonExpiringMultiDefinition() ApiSpec {
 	thisDef.VersionData.Versions[v1.Name] = v1
 	thisDef.VersionData.Versions[v2.Name] = v2
 
-	thisSpec.ApiDefinition = thisDef
+	thisSpec.APIDefinition = thisDef
 
-	thisSpec.RxPaths = make(map[string][]UrlSpec)
+	thisSpec.RxPaths = make(map[string][]URLSpec)
 	thisSpec.WhiteListEnabled = make(map[string]bool)
 
 	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
@@ -179,7 +179,7 @@ func TestNotVersioned(t *testing.T) {
 	thisSpec := createNonExpiringDefinition()
 	thisSpec.VersionData.NotVersioned = true
 
-	writeDefToFile(thisSpec.ApiDefinition)
+	writeDefToFile(thisSpec.APIDefinition)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok != true {

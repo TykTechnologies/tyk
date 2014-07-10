@@ -15,7 +15,7 @@ func (k KeyExists) New() func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
 
-			authHeaderValue := r.Header.Get(k.Spec.ApiDefinition.Auth.AuthHeaderName)
+			authHeaderValue := r.Header.Get(k.Spec.APIDefinition.Auth.AuthHeaderName)
 			if authHeaderValue == "" {
 				// No header value, fail
 				log.WithFields(logrus.Fields{

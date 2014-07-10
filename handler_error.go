@@ -16,13 +16,13 @@ type ErrorHandler struct {
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, err_code int) {
 	if config.EnableAnalytics {
 		t := time.Now()
-		keyName := r.Header.Get(e.Spec.ApiDefinition.Auth.AuthHeaderName)
+		keyName := r.Header.Get(e.Spec.APIDefinition.Auth.AuthHeaderName)
 		version := e.Spec.getVersionFromRequest(r)
 		if version == "" {
 			version = "Non Versioned"
 		}
 
-		if e.TykMiddleware.Spec.ApiDefinition.Proxy.StripListenPath {
+		if e.TykMiddleware.Spec.APIDefinition.Proxy.StripListenPath {
 			r.URL.Path = strings.Replace(r.URL.Path, e.TykMiddleware.Spec.Proxy.ListenPath, "", 1)
 		}
 
@@ -39,9 +39,9 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			keyName,
 			t,
 			version,
-			e.Spec.ApiDefinition.Name,
-			e.Spec.ApiDefinition.APIID,
-			e.Spec.ApiDefinition.OrgID}
+			e.Spec.APIDefinition.Name,
+			e.Spec.APIDefinition.APIID,
+			e.Spec.APIDefinition.OrgID}
 		analytics.RecordHit(thisRecord)
 	}
 

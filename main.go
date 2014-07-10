@@ -142,18 +142,18 @@ func loadApiEndpoints(Muxer *http.ServeMux) {
 	Muxer.HandleFunc("/tyk/reload/", securityHandler(resetHandler))
 }
 
-func getApiSpecs() []ApiSpec {
-	var ApiSpecs []ApiSpec
-	thisApiLoader := ApiDefinitionLoader{}
+func getAPISpecs() []APISpec {
+	var APISpecs []APISpec
+	thisApiLoader := APIDefinitionLoader{}
 
 	if config.UseDBAppConfigs {
 		log.Info("Using App Configuration from Mongo DB")
-		ApiSpecs = thisApiLoader.LoadDefinitionsFromMongo()
+		APISpecs = thisApiLoader.LoadDefinitionsFromMongo()
 	} else {
-		ApiSpecs = thisApiLoader.LoadDefinitions("./apps/")
+		APISpecs = thisApiLoader.LoadDefinitions("./apps/")
 	}
 
-	return ApiSpecs
+	return APISpecs
 }
 
 func customHandler1(h http.Handler) http.Handler {
@@ -175,10 +175,10 @@ func customHandler2(h http.Handler) http.Handler {
 }
 
 type StructMiddleware struct {
-	spec ApiSpec
+	spec APISpec
 }
 
-func (s StructMiddleware) New(spec ApiSpec) func(http.Handler) http.Handler {
+func (s StructMiddleware) New(spec APISpec) func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
 			log.Info("Middlwware 3 called!")
@@ -191,13 +191,13 @@ func (s StructMiddleware) New(spec ApiSpec) func(http.Handler) http.Handler {
 	return aliceHandler
 }
 
-func loadApps(ApiSpecs []ApiSpec, Muxer *http.ServeMux) {
+func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
 	log.Info("Loading API configurations.")
 
-	for _, spec := range ApiSpecs {
+	for _, spec := range APISpecs {
 		// Create a new handler for each API spec
-		remote, err := url.Parse(spec.ApiDefinition.Proxy.TargetUrl)
+		remote, err := url.Parse(spec.APIDefinition.Proxy.TargetURL)
 		if err != nil {
 			log.Error("Culdn't parse target URL")
 			log.Error(err)
@@ -221,7 +221,7 @@ func loadApps(ApiSpecs []ApiSpec, Muxer *http.ServeMux) {
 func ReloadURLStructure() {
 	newMuxes := http.NewServeMux()
 	loadApiEndpoints(newMuxes)
-	specs := getApiSpecs()
+	specs := getAPISpecs()
 	loadApps(specs, newMuxes)
 
 	http.DefaultServeMux = newMuxes
@@ -253,7 +253,7 @@ func main() {
 		log.Println("Listening on", l.Addr())
 
 		// Accept connections in a new goroutine.
-		specs := getApiSpecs()
+		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
 		go http.Serve(l, nil)
 
@@ -261,7 +261,7 @@ func main() {
 
 		// Resume accepting connections in a new goroutine.
 		log.Println("Resuming listening on", l.Addr())
-		specs := getApiSpecs()
+		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
 		go http.Serve(l, nil)
 

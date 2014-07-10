@@ -44,11 +44,11 @@ type TykErrorResponse struct {
 	Error string
 }
 
-func createNonVersionedDefinition() ApiSpec {
-	var thisDef = ApiDefinition{}
+func createNonVersionedDefinition() APISpec {
+	var thisDef = APIDefinition{}
 	var v1 = VersionInfo{}
-	var thisSpec = ApiSpec{}
-	var thisLoader = ApiDefinitionLoader{}
+	var thisSpec = APISpec{}
+	var thisLoader = APIDefinitionLoader{}
 
 	thisDef.Name = "Test API"
 	thisDef.VersionDefinition.Key = "version"
@@ -59,16 +59,16 @@ func createNonVersionedDefinition() ApiSpec {
 	thisDef.Auth.AuthHeaderName = "authorisation"
 	v1.Expires = "2106-01-02 15:04"
 	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetUrl = "http://lonelycode.com"
+	thisDef.Proxy.TargetURL = "http://lonelycode.com"
 	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
 	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
 
 	thisDef.VersionData.Versions = make(map[string]VersionInfo)
 	thisDef.VersionData.Versions[v1.Name] = v1
 
-	thisSpec.ApiDefinition = thisDef
+	thisSpec.APIDefinition = thisDef
 
-	thisSpec.RxPaths = make(map[string][]UrlSpec)
+	thisSpec.RxPaths = make(map[string][]URLSpec)
 	thisSpec.WhiteListEnabled = make(map[string]bool)
 
 	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)

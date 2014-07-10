@@ -10,7 +10,7 @@ type ApiError struct {
 }
 
 // Proxies request onwards
-func ProxyHandler(p *httputil.ReverseProxy, apiSpec ApiSpec) func(http.ResponseWriter, *http.Request) {
+func ProxyHandler(p *httputil.ReverseProxy, apiSpec APISpec) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		tm := TykMiddleware{apiSpec, p}

@@ -25,7 +25,7 @@ TODO:
 5. Requires a webhook handler to notify resource provider when an oauth token is updated through refresh (POSTs old_oauth_token,
    new_oauth_token - will do so until it receives a 200 OK response or max 3 times).
 
-Idea:
+IDea:
 -----
 1. Request to /authorize
 2. Tyk extracts all relevant data and pre-screens client_id, client_secret and redirect_uri

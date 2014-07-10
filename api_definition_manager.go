@@ -12,8 +12,9 @@ import (
 	"time"
 )
 
-type ApiDefinition struct {
-	Id                bson.ObjectId `bson:"_id,omitempty" json:"id"`
+// APIDefinition represents the configuration for a single proxied API and it's versions.
+type APIDefinition struct {
+	ID                bson.ObjectId `bson:"_id,omitempty" json:"id"`
 	Name              string        `bson:"name" json:"name"`
 	APIID             string        `bson:"api_id" json:"api_id"`
 	OrgID             string        `bson:"org_id" json:"org_id"`
@@ -27,7 +28,7 @@ type ApiDefinition struct {
 	} `bson:"version_data" json:"version_data"`
 	Proxy struct {
 		ListenPath      string `bson:"listen_path" json:"listen_path"`
-		TargetUrl       string `bson:"target_url" json:"target_url"`
+		TargetURL       string `bson:"target_url" json:"target_url"`
 		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
 	} `bson:"proxy" json:"proxy"`
 	Auth struct {
@@ -36,6 +37,8 @@ type ApiDefinition struct {
 	Active bool `bson:"active" json:"active"`
 }
 
+// VersionInfo encapsulates all the data for a specific api_version, elements in the
+// Paths array are checked as part of the proxy routing.
 type VersionInfo struct {
 	Name    string `bson:"name" json:"name"`
 	Expires string `bson:"expires" json:"expires"`
@@ -46,16 +49,21 @@ type VersionInfo struct {
 	} `bson:"paths" json:"paths"`
 }
 
-type UrlStatus int
+// URLStatus is a custom enum type to avoid collisions
+type URLStatus int
 
+// Enums representing the various statuses for a VersionInfo Path match during a
+// proxy request
 const (
-	Ignored   UrlStatus = 1
-	WhiteList UrlStatus = 2
-	BlackList UrlStatus = 3
+	Ignored   URLStatus = 1
+	WhiteList URLStatus = 2
+	BlackList URLStatus = 3
 )
 
+// RequestStatus is a custom type to avoid collisions
 type RequestStatus string
 
+// Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
 const (
 	VersionNotFound                RequestStatus = "Version information not found"
 	VersionDoesNotExist            RequestStatus = "This API version doesn't seem to exist"
@@ -68,22 +76,30 @@ const (
 	StatusOk                       RequestStatus = "Everything OK, passing"
 )
 
-type UrlSpec struct {
+// URLSpec represents a flattened specification for URLs, used to check if a proxy URL
+// path is on any of the white, plack or ignored lists. This is generated as part of the
+// configuration init
+type URLSpec struct {
 	Spec   *regexp.Regexp
-	Status UrlStatus
+	Status URLStatus
 }
 
-type ApiSpec struct {
-	ApiDefinition
-	RxPaths          map[string][]UrlSpec
+// APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
+// flattened URL list is checked for matching paths and then it's status evaluated if found.
+type APISpec struct {
+	APIDefinition
+	RxPaths          map[string][]URLSpec
 	WhiteListEnabled map[string]bool
 }
 
-type ApiDefinitionLoader struct {
+// APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
+// and LoadDefinitions(), each will pull api specifications from different locations.
+type APIDefinitionLoader struct {
 	dbSession *mgo.Session
 }
 
-func (a *ApiDefinitionLoader) Connect() {
+// Connect connects to the storage engine - can be null
+func (a *APIDefinitionLoader) Connect() {
 	var err error
 	a.dbSession, err = mgo.Dial(config.AnalyticsConfig.MongoURL)
 	if err != nil {
@@ -92,10 +108,12 @@ func (a *ApiDefinitionLoader) Connect() {
 	}
 }
 
-func (a *ApiDefinitionLoader) MakeSpec(thisAppConfig ApiDefinition) ApiSpec {
-	newAppSpec := ApiSpec{}
-	newAppSpec.ApiDefinition = thisAppConfig
-	newAppSpec.RxPaths = make(map[string][]UrlSpec)
+// MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
+// keyed to the Api version name, which is determined during routing to speed up lookups
+func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
+	newAppSpec := APISpec{}
+	newAppSpec.APIDefinition = thisAppConfig
+	newAppSpec.RxPaths = make(map[string][]URLSpec)
 	newAppSpec.WhiteListEnabled = make(map[string]bool)
 	for _, v := range thisAppConfig.VersionData.Versions {
 		pathSpecs, whiteListSpecs := a.getPathSpecs(v)
@@ -106,8 +124,9 @@ func (a *ApiDefinitionLoader) MakeSpec(thisAppConfig ApiDefinition) ApiSpec {
 	return newAppSpec
 }
 
-func (a *ApiDefinitionLoader) LoadDefinitionsFromMongo() []ApiSpec {
-	var ApiSpecs = []ApiSpec{}
+// LoadDefinitionsFromMongo will connect and download ApiDefintions from a Mongo DB instance.
+func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
+	var APISpecs = []APISpec{}
 
 	a.Connect()
 	apiCollection := a.dbSession.DB("").C("tyk_apis")
@@ -116,24 +135,26 @@ func (a *ApiDefinitionLoader) LoadDefinitionsFromMongo() []ApiSpec {
 		"active": true,
 	}
 
-	var ApiDefinitions = []ApiDefinition{}
-	mongoErr := apiCollection.Find(search).All(&ApiDefinitions)
+	var APIDefinitions = []APIDefinition{}
+	mongoErr := apiCollection.Find(search).All(&APIDefinitions)
 
 	if mongoErr != nil {
 		log.Error("Could not find any application configs!")
-		return ApiSpecs
+		return APISpecs
 	}
 
-	for _, thisAppConfig := range ApiDefinitions {
+	for _, thisAppConfig := range APIDefinitions {
 		// Got the configuration, build the spec!
 		newAppSpec := a.MakeSpec(thisAppConfig)
-		ApiSpecs = append(ApiSpecs, newAppSpec)
+		APISpecs = append(APISpecs, newAppSpec)
 	}
-	return ApiSpecs
+	return APISpecs
 }
 
-func (a *ApiDefinitionLoader) LoadDefinitions(dir string) []ApiSpec {
-	var ApiSpecs = []ApiSpec{}
+// LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
+// to be the JSON representation of APIDefinition object
+func (a *APIDefinitionLoader) LoadDefinitions(dir string) []APISpec {
+	var APISpecs = []APISpec{}
 	// Grab json files from directory
 	files, _ := ioutil.ReadDir(dir)
 	for _, f := range files {
@@ -145,7 +166,7 @@ func (a *ApiDefinitionLoader) LoadDefinitions(dir string) []ApiSpec {
 				log.Error("Couldn't load app configuration file")
 				log.Error(err)
 			} else {
-				thisAppConfig := ApiDefinition{}
+				thisAppConfig := APIDefinition{}
 				err := json.Unmarshal(appConfig, &thisAppConfig)
 				if err != nil {
 					log.Error("Couldn't unmarshal api configuration")
@@ -153,21 +174,21 @@ func (a *ApiDefinitionLoader) LoadDefinitions(dir string) []ApiSpec {
 				} else {
 					// Got the configuration, build the spec!
 					newAppSpec := a.MakeSpec(thisAppConfig)
-					ApiSpecs = append(ApiSpecs, newAppSpec)
+					APISpecs = append(APISpecs, newAppSpec)
 				}
 			}
 		}
 	}
 
-	return ApiSpecs
+	return APISpecs
 }
 
-func (a *ApiDefinitionLoader) getPathSpecs(apiVersionDef VersionInfo) ([]UrlSpec, bool) {
-	ignoredPaths := a.CompilePathSpec(apiVersionDef.Paths.Ignored, Ignored)
-	blackListPaths := a.CompilePathSpec(apiVersionDef.Paths.BlackList, BlackList)
-	whiteListPaths := a.CompilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList)
+func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef VersionInfo) ([]URLSpec, bool) {
+	ignoredPaths := a.compilePathSpec(apiVersionDef.Paths.Ignored, Ignored)
+	blackListPaths := a.compilePathSpec(apiVersionDef.Paths.BlackList, BlackList)
+	whiteListPaths := a.compilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList)
 
-	combinedPath := []UrlSpec{}
+	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
 	combinedPath = append(combinedPath, blackListPaths...)
 	combinedPath = append(combinedPath, whiteListPaths...)
@@ -179,27 +200,29 @@ func (a *ApiDefinitionLoader) getPathSpecs(apiVersionDef VersionInfo) ([]UrlSpec
 	return combinedPath, false
 }
 
-func (a *ApiDefinitionLoader) CompilePathSpec(paths []string, specType UrlStatus) []UrlSpec {
+
+func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {
 
 	// transform a configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
-	apiLangIdsRegex, _ := regexp.Compile("{(.*?)}")
-	thisUrlSpec := []UrlSpec{}
+	apiLangIDsRegex, _ := regexp.Compile("{(.*?)}")
+	thisURLSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
-		asRegexStr := apiLangIdsRegex.ReplaceAllString(stringSpec, "(.*?)")
+		asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, "(.*?)")
 		asRegex, _ := regexp.Compile(asRegexStr)
 
-		newSpec := UrlSpec{}
+		newSpec := URLSpec{}
 		newSpec.Spec = asRegex
 		newSpec.Status = specType
-		thisUrlSpec = append(thisUrlSpec, newSpec)
+		thisURLSpec = append(thisURLSpec, newSpec)
 	}
 
-	return thisUrlSpec
+	return thisURLSpec
 }
 
-func (a *ApiSpec) IsUrlAllowedAndIgnored(url string, RxPaths []UrlSpec, WhiteListStatus bool) (bool, bool) {
+// IsURLAllowedAndIgnored checks if a url is allowed and ignored.
+func (a *APISpec) IsURLAllowedAndIgnored(url string, RxPaths []URLSpec, WhiteListStatus bool) (bool, bool) {
 	// Check if ignored
 	for _, v := range RxPaths {
 		match := v.Spec.MatchString(url)
@@ -213,11 +236,12 @@ func (a *ApiSpec) IsUrlAllowedAndIgnored(url string, RxPaths []UrlSpec, WhiteLis
 			} else if v.Status == WhiteList {
 				// Matched whitelist, allow request but filter
 				return true, false
-			} else {
-				// Should not occur, something has gone wrong
-				log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
-				return false, false
 			}
+
+			// Should not occur, something has gone wrong
+			log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
+			return false, false
+
 		}
 	}
 
@@ -225,27 +249,30 @@ func (a *ApiSpec) IsUrlAllowedAndIgnored(url string, RxPaths []UrlSpec, WhiteLis
 	if WhiteListStatus {
 		// We have a whitelist, nothing gets through unless specifically defined
 		return false, false
-	} else {
-		// No whitelist, but also not in any of the other lists, let it through and filter
-		return true, false
 	}
+
+	// No whitelist, but also not in any of the other lists, let it through and filter
+	return true, false
+
 }
 
-func (a *ApiSpec) getVersionFromRequest(r *http.Request) string {
-	if a.ApiDefinition.VersionDefinition.Location == "header" {
-		versionHeaderVal := r.Header.Get(a.ApiDefinition.VersionDefinition.Key)
+func (a *APISpec) getVersionFromRequest(r *http.Request) string {
+	if a.APIDefinition.VersionDefinition.Location == "header" {
+		versionHeaderVal := r.Header.Get(a.APIDefinition.VersionDefinition.Key)
 		if versionHeaderVal != "" {
 			return versionHeaderVal
-		} else {
-			return ""
 		}
-	} else if a.ApiDefinition.VersionDefinition.Location == "url-param" {
-		fromParam := r.FormValue(a.ApiDefinition.VersionDefinition.Key)
+
+		return ""
+
+	} else if a.APIDefinition.VersionDefinition.Location == "url-param" {
+		fromParam := r.FormValue(a.APIDefinition.VersionDefinition.Key)
 		if fromParam != "" {
 			return fromParam
-		} else {
-			return ""
 		}
+
+		return ""
+
 	} else {
 		return ""
 	}
@@ -253,7 +280,8 @@ func (a *ApiSpec) getVersionFromRequest(r *http.Request) string {
 	return ""
 }
 
-func (a *ApiSpec) IsThisApiVersionExpired(versionDef VersionInfo) bool {
+// IsThisAPIVersionExpired checks if an API version (during a proxied request) is expired
+func (a *APISpec) IsThisAPIVersionExpired(versionDef VersionInfo) bool {
 	// Never expires
 	if versionDef.Expires == "-1" {
 		return false
@@ -269,19 +297,22 @@ func (a *ApiSpec) IsThisApiVersionExpired(versionDef VersionInfo) bool {
 		log.Error("Could not parse expiry date for API, dissallow")
 		log.Error(err)
 		return true
-	} else {
-		remaining := time.Since(t)
-		if remaining < 0 {
-			// It's in the future, keep going
-			return false
-		} else {
-			// It's in the past, expire
-			return true
-		}
 	}
+
+	remaining := time.Since(t)
+	if remaining < 0 {
+		// It's in the future, keep going
+		return false
+	}
+
+	// It's in the past, expire
+	return true
+
 }
 
-func (a *ApiSpec) IsRequestValid(r *http.Request) (bool, RequestStatus) {
+// IsRequestValid will check if an incoming request has valid version data and return a RequestStatus that
+// describes the status of the request
+func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus) {
 	versionMetaData, versionPaths, whiteListStatus, stat := a.GetVersionData(r)
 
 	// Screwed up version info - fail and pass through
@@ -290,13 +321,13 @@ func (a *ApiSpec) IsRequestValid(r *http.Request) (bool, RequestStatus) {
 	}
 
 	// Is the API version expired?
-	if a.IsThisApiVersionExpired(versionMetaData) == true {
+	if a.IsThisAPIVersionExpired(versionMetaData) == true {
 		// Expired - fail
 		return false, VersionExpired
 	}
 
 	// not expired, let's check path info
-	allowURL, ignore := a.IsUrlAllowedAndIgnored(r.URL.Path, versionPaths, whiteListStatus)
+	allowURL, ignore := a.IsURLAllowedAndIgnored(r.URL.Path, versionPaths, whiteListStatus)
 	if !allowURL {
 		return false, EndPointNotAllowed
 	}
@@ -309,16 +340,18 @@ func (a *ApiSpec) IsRequestValid(r *http.Request) (bool, RequestStatus) {
 
 }
 
-func (a *ApiSpec) GetVersionData(r *http.Request) (VersionInfo, []UrlSpec, bool, RequestStatus) {
+// GetVersionData attempts to extract the version data from a request, depending on where it is stored in the
+// request (currently only "header" is supported)
+func (a *APISpec) GetVersionData(r *http.Request) (VersionInfo, []URLSpec, bool, RequestStatus) {
 	var thisVersion = VersionInfo{}
 	var versionKey string
-	var versionRxPaths = []UrlSpec{}
+	var versionRxPaths = []URLSpec{}
 	var versionWLStatus bool
 
 	// Are we versioned?
-	if a.ApiDefinition.VersionData.NotVersioned {
+	if a.APIDefinition.VersionData.NotVersioned {
 		// Get the first one in the list
-		for k, v := range a.ApiDefinition.VersionData.Versions {
+		for k, v := range a.APIDefinition.VersionData.Versions {
 			versionKey = k
 			thisVersion = v
 			break
@@ -333,7 +366,7 @@ func (a *ApiSpec) GetVersionData(r *http.Request) (VersionInfo, []UrlSpec, bool,
 
 	// Load Version Data - General
 	var ok bool
-	thisVersion, ok = a.ApiDefinition.VersionData.Versions[versionKey]
+	thisVersion, ok = a.APIDefinition.VersionData.Versions[versionKey]
 	if !ok {
 		return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
 	}
