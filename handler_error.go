@@ -1,15 +1,15 @@
 package main
 
 import (
-	"net/http"
-	"time"
-	"runtime/pprof"
 	"fmt"
 	"github.com/gorilla/context"
+	"net/http"
+	"runtime/pprof"
 	"strings"
+	"time"
 )
 
-type ErrorHandler struct{
+type ErrorHandler struct {
 	TykMiddleware
 }
 

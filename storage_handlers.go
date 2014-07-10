@@ -18,7 +18,7 @@ func (e KeyError) Error() string {
 // used by AuthorisationManager to read and write key values to the backend
 type StorageHandler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
-	SetKey(string, string, int64)         // Second input string is expected to be a JSON object (SessionState)
+	SetKey(string, string, int64)  // Second input string is expected to be a JSON object (SessionState)
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	Connect() bool
@@ -86,15 +86,15 @@ func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 
 // RedisStorageManager is a storage manager that uses the redis database.
 type RedisStorageManager struct {
-	pool *redis.Pool
+	pool      *redis.Pool
 	KeyPrefix string
 }
 
 func (r *RedisStorageManager) newPool(server, password string) *redis.Pool {
 	return &redis.Pool{
-		MaxIdle: 3,
+		MaxIdle:     3,
 		IdleTimeout: 240 * time.Second,
-		Dial: func () (redis.Conn, error) {
+		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", server)
 			if err != nil {
 				return nil, err

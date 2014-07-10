@@ -22,12 +22,12 @@ type AnalyticsRecord struct {
 	Year          int
 	Hour          int
 	ResponseCode  int
-	APIKey		  string
-	TimeStamp	  time.Time
-	APIVersion	  string
-	APIName		  string
-	ApiId		  string
-	OrgId		  string
+	APIKey        string
+	TimeStamp     time.Time
+	APIVersion    string
+	APIName       string
+	ApiId         string
+	OrgId         string
 }
 
 // AnalyticsError is an error for when writing to the storage engine fails
@@ -37,20 +37,26 @@ func (e AnalyticsError) Error() string {
 	return "Recording request failed!"
 }
 
+// AnalyticsHandler is an interface to record analytics data to a writer.
 type AnalyticsHandler interface {
 	RecordHit(AnalyticsRecord) error
 }
 
+// Purger is an interface that will define how the in-memory store will be purged
+// of analytics data to prevent it growing too large
 type Purger interface {
 	PurgeCache()
 	StartPurgeLoop(int)
 }
 
+// RedisAnalyticsHandler implements AnalyticsHandler and will record analytics
+// data to a redis back end as defined in the Config object
 type RedisAnalyticsHandler struct {
 	Store *RedisStorageManager
 	Clean Purger
 }
 
+// RecordHit will store an AnalyticsRecord in Redis
 func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	encoded, err := msgpack.Marshal(thisRecord)
 	u5, _ := uuid.NewV4()
@@ -68,6 +74,7 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	return nil
 }
 
+// CSVPurger purges the in-memory analytics store to a CSV file as defined in the Config object
 type CSVPurger struct {
 	Store *RedisStorageManager
 }
@@ -136,11 +143,14 @@ func (c CSVPurger) PurgeCache() {
 	}
 }
 
+// MongoPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
+// in the Config object
 type MongoPurger struct {
 	Store     *RedisStorageManager
 	dbSession *mgo.Session
 }
 
+// Connect Connects to Mongo
 func (m *MongoPurger) Connect() {
 	var err error
 	m.dbSession, err = mgo.Dial(config.AnalyticsConfig.MongoURL)
@@ -150,12 +160,15 @@ func (m *MongoPurger) Connect() {
 	}
 }
 
+// StartPurgeLoop starts the loop that will be started as a goroutine and pull data out of the in-memory
+// store and into MongoDB
 func (m MongoPurger) StartPurgeLoop(nextCount int) {
 	time.Sleep(time.Duration(nextCount) * time.Second)
 	m.PurgeCache()
 	m.StartPurgeLoop(nextCount)
 }
 
+// PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (m *MongoPurger) PurgeCache() {
 	if m.dbSession == nil {
 		log.Info("Not connected to analytics store, connecting...")

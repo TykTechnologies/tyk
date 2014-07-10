@@ -1,34 +1,34 @@
 package main
 
 import (
-	"regexp"
-	"time"
-	"net/http"
-	"io/ioutil"
-	"strings"
-	"path/filepath"
 	"encoding/json"
+	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
+	"net/http"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 )
 
 type ApiDefinition struct {
-	Id bson.ObjectId `bson:"_id,omitempty" json:"id"`
-	Name string `bson:"name" json:"name"`
-	ApiId string `bson:"api_id" json:"api_id"`
-	OrgId string `bson:"org_id" json:"org_id"`
+	Id                bson.ObjectId `bson:"_id,omitempty" json:"id"`
+	Name              string        `bson:"name" json:"name"`
+	ApiId             string        `bson:"api_id" json:"api_id"`
+	OrgId             string        `bson:"org_id" json:"org_id"`
 	VersionDefinition struct {
 		Location string `bson:"location" json:"location"`
-		Key string `bson:"key" json:"key"`
+		Key      string `bson:"key" json:"key"`
 	} `bson:"definition" json:"definition"`
 	VersionData struct {
-		NotVersioned bool `bson:"not_versioned" json:"not_versioned"`
-		Versions map[string]VersionInfo `bson:"versions" json:"versions"`
+		NotVersioned bool                   `bson:"not_versioned" json:"not_versioned"`
+		Versions     map[string]VersionInfo `bson:"versions" json:"versions"`
 	} `bson:"version_data" json:"version_data"`
 	Proxy struct {
-		ListenPath string `bson:"listen_path" json:"listen_path"`
-		TargetUrl string `bson:"target_url" json:"target_url"`
-		StripListenPath bool `bson:"strip_listen_path" json:"strip_listen_path"`
+		ListenPath      string `bson:"listen_path" json:"listen_path"`
+		TargetUrl       string `bson:"target_url" json:"target_url"`
+		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
 	} `bson:"proxy" json:"proxy"`
 	Auth struct {
 		AuthHeaderName string `bson:"auth_header_name" json:"auth_header_name"`
@@ -37,45 +37,45 @@ type ApiDefinition struct {
 }
 
 type VersionInfo struct {
-	Name string `bson:"name" json:"name"`
+	Name    string `bson:"name" json:"name"`
 	Expires string `bson:"expires" json:"expires"`
-	Paths struct {
-		Ignored []string `bson:"ignored" json:"ignored"`
+	Paths   struct {
+		Ignored   []string `bson:"ignored" json:"ignored"`
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
 }
 
-
 type UrlStatus int
 
 const (
-	Ignored UrlStatus = 1
+	Ignored   UrlStatus = 1
 	WhiteList UrlStatus = 2
 	BlackList UrlStatus = 3
 )
 
 type RequestStatus string
+
 const (
-	VersionNotFound RequestStatus = "Version information not found"
-	VersionDoesNotExist RequestStatus = "This API version doesn't seem to exist"
-	VersionPathsNotFound RequestStatus = "Path information could not be found for version"
-	VersionWhiteListStatusNotFound = "WhiteListStatus for path not found"
-	VersionExpired RequestStatus = "Api Version has expired, please check documentation or contact administrator"
-	EndPointNotAllowed RequestStatus = "Requested endpoint is forbidden"
-	GeneralFailure RequestStatus = "An error occured that should have not been possible"
-	StatusOkAndIgnore RequestStatus = "Everything OK, passing and not filtering"
-	StatusOk RequestStatus = "Everything OK, passing"
+	VersionNotFound                RequestStatus = "Version information not found"
+	VersionDoesNotExist            RequestStatus = "This API version doesn't seem to exist"
+	VersionPathsNotFound           RequestStatus = "Path information could not be found for version"
+	VersionWhiteListStatusNotFound               = "WhiteListStatus for path not found"
+	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
+	GeneralFailure                 RequestStatus = "An error occured that should have not been possible"
+	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
+	StatusOk                       RequestStatus = "Everything OK, passing"
 )
 
 type UrlSpec struct {
-	Spec *regexp.Regexp
+	Spec   *regexp.Regexp
 	Status UrlStatus
 }
 
 type ApiSpec struct {
 	ApiDefinition
-	RxPaths map[string][]UrlSpec
+	RxPaths          map[string][]UrlSpec
 	WhiteListEnabled map[string]bool
 }
 
@@ -97,7 +97,7 @@ func (a *ApiDefinitionLoader) MakeSpec(thisAppConfig ApiDefinition) ApiSpec {
 	newAppSpec.ApiDefinition = thisAppConfig
 	newAppSpec.RxPaths = make(map[string][]UrlSpec)
 	newAppSpec.WhiteListEnabled = make(map[string]bool)
-	for _, v := range(thisAppConfig.VersionData.Versions) {
+	for _, v := range thisAppConfig.VersionData.Versions {
 		pathSpecs, whiteListSpecs := a.getPathSpecs(v)
 		newAppSpec.RxPaths[v.Name] = pathSpecs
 		newAppSpec.WhiteListEnabled[v.Name] = whiteListSpecs
@@ -124,7 +124,7 @@ func (a *ApiDefinitionLoader) LoadDefinitionsFromMongo() []ApiSpec {
 		return ApiSpecs
 	}
 
-	for _, thisAppConfig := range(ApiDefinitions) {
+	for _, thisAppConfig := range ApiDefinitions {
 		// Got the configuration, build the spec!
 		newAppSpec := a.MakeSpec(thisAppConfig)
 		ApiSpecs = append(ApiSpecs, newAppSpec)
@@ -166,7 +166,6 @@ func (a *ApiDefinitionLoader) getPathSpecs(apiVersionDef VersionInfo) ([]UrlSpec
 	ignoredPaths := a.CompilePathSpec(apiVersionDef.Paths.Ignored, Ignored)
 	blackListPaths := a.CompilePathSpec(apiVersionDef.Paths.BlackList, BlackList)
 	whiteListPaths := a.CompilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList)
-
 
 	combinedPath := []UrlSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -338,7 +337,6 @@ func (a *ApiSpec) GetVersionData(r *http.Request) (VersionInfo, []UrlSpec, bool,
 	if !ok {
 		return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
 	}
-
 
 	// Load path data and whitelist data for version
 	RxPaths, rxOk := a.RxPaths[versionKey]

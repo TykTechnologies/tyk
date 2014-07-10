@@ -1,27 +1,27 @@
 package main
 
 import (
+	"github.com/gorilla/context"
 	"net/http"
 	"net/http/httputil"
-	"time"
-	"strings"
 	"runtime/pprof"
-	"github.com/gorilla/context"
+	"strings"
+	"time"
 )
 
 type ContextKey int
 
 const (
-	SessionData = 0
+	SessionData     = 0
 	AuthHeaderValue = 1
 )
 
 type TykMiddleware struct {
-	Spec ApiSpec
+	Spec  ApiSpec
 	Proxy *httputil.ReverseProxy
 }
 
-type SuccessHandler struct{
+type SuccessHandler struct {
 	TykMiddleware
 }
 

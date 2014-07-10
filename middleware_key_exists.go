@@ -3,11 +3,11 @@ package main
 import "net/http"
 
 import (
-	"github.com/gorilla/context"
 	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/context"
 )
 
-type KeyExists struct{
+type KeyExists struct {
 	TykMiddleware
 }
 

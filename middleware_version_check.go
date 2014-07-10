@@ -4,11 +4,9 @@ import "net/http"
 
 import ()
 
-type VersionCheck struct{
+type VersionCheck struct {
 	TykMiddleware
 }
-
-
 
 func (s VersionCheck) New() func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {

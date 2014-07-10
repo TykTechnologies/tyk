@@ -3,18 +3,18 @@ package main
 import "net/http"
 
 import (
-	"github.com/gorilla/context"
 	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/context"
 )
 
-type RateLimitAndQuotaCheck struct{
+type RateLimitAndQuotaCheck struct {
 	TykMiddleware
 }
 
 func (k RateLimitAndQuotaCheck) New() func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
-
+			sessionLimiter := SessionLimiter{}
 			thisSessionState := context.Get(r, SessionData).(SessionState)
 			authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 			forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)

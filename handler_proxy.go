@@ -1,10 +1,8 @@
 package main
 
 import (
-
 	"net/http"
 	"net/http/httputil"
-
 )
 
 type ApiError struct {

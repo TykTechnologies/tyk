@@ -7,18 +7,18 @@ import (
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
-	ListenPort     int    `json:"listen_port"`
-	Secret         string `json:"secret"`
-	TemplatePath   string `json:"template_path"`
-	UseDBAppConfigs bool `json:"use_db_app_configs"`
-	Storage        struct {
+	ListenPort      int    `json:"listen_port"`
+	Secret          string `json:"secret"`
+	TemplatePath    string `json:"template_path"`
+	UseDBAppConfigs bool   `json:"use_db_app_configs"`
+	Storage         struct {
 		Type     string `json:"type"`
 		Host     string `json:"host"`
 		Port     int    `json:"port"`
 		Username string `json:"username"`
 		Password string `json:"password"`
 	} `json:"storage"`
-	EnableAnalytics bool     `json:"enable_analytics"`
+	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
 		Type            string `json:"type"`
 		CSVDir          string `json:"csv_dir"`

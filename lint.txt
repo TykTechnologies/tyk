@@ -1,0 +1,150 @@
+analytics.go:40:6: exported type AnalyticsHandler should have comment or be unexported
+analytics.go:44:6: exported type Purger should have comment or be unexported
+analytics.go:49:6: exported type RedisAnalyticsHandler should have comment or be unexported
+analytics.go:54:1: exported method RedisAnalyticsHandler.RecordHit should have comment or be unexported
+analytics.go:71:6: exported type CSVPurger should have comment or be unexported
+analytics.go:139:6: exported type MongoPurger should have comment or be unexported
+analytics.go:144:1: exported method MongoPurger.Connect should have comment or be unexported
+analytics.go:153:1: exported method MongoPurger.StartPurgeLoop should have comment or be unexported
+analytics.go:159:1: exported method MongoPurger.PurgeCache should have comment or be unexported
+analytics.go:29:2: struct field ApiId should be APIID
+analytics.go:30:2: struct field OrgId should be OrgID
+analytics.go:64:9: if block ends with a return statement, so drop this else and outdent its block
+analytics.go:183:5: should replace i += 1 with i++
+api.go:12:6: exported type ApiModifyKeySuccess should have comment or be unexported
+api.go:18:6: exported type ApiErrorMessage should have comment or be unexported
+api.go:117:6: exported type APIAllKeys should have comment or be unexported
+api.go:147:6: exported type APIStatusMessage should have comment or be unexported
+api.go:12:6: type ApiModifyKeySuccess should be APIModifyKeySuccess
+api.go:18:6: type ApiErrorMessage should be APIErrorMessage
+api.go:118:2: struct field ApiKeys should be APIKeys
+api.go:245:16: func parameter orgId should be orgID
+api.go:253:17: func parameter orgId should be orgID
+api.go:278:4: don't use underscores in Go names; var new_key should be newKey
+api.go:141:9: if block ends with a return statement, so drop this else and outdent its block
+api.go:165:9: if block ends with a return statement, so drop this else and outdent its block
+api.go:189:9: if block ends with a return statement, so drop this else and outdent its block
+api.go:248:9: if block ends with a return statement, so drop this else and outdent its block
+api.go:330:10: if block ends with a return statement, so drop this else and outdent its block
+api_definition_manager.go:15:6: exported type ApiDefinition should have comment or be unexported
+api_definition_manager.go:39:6: exported type VersionInfo should have comment or be unexported
+api_definition_manager.go:49:6: exported type UrlStatus should have comment or be unexported
+api_definition_manager.go:52:2: exported const Ignored should have comment (or a comment on this block) or be unexported
+api_definition_manager.go:57:6: exported type RequestStatus should have comment or be unexported
+api_definition_manager.go:60:2: exported const VersionNotFound should have comment (or a comment on this block) or be unexported
+api_definition_manager.go:71:6: exported type UrlSpec should have comment or be unexported
+api_definition_manager.go:76:6: exported type ApiSpec should have comment or be unexported
+api_definition_manager.go:82:6: exported type ApiDefinitionLoader should have comment or be unexported
+api_definition_manager.go:86:1: exported method ApiDefinitionLoader.Connect should have comment or be unexported
+api_definition_manager.go:95:1: exported method ApiDefinitionLoader.MakeSpec should have comment or be unexported
+api_definition_manager.go:109:1: exported method ApiDefinitionLoader.LoadDefinitionsFromMongo should have comment or be unexported
+api_definition_manager.go:135:1: exported method ApiDefinitionLoader.LoadDefinitions should have comment or be unexported
+api_definition_manager.go:182:1: exported method ApiDefinitionLoader.CompilePathSpec should have comment or be unexported
+api_definition_manager.go:202:1: exported method ApiSpec.IsUrlAllowedAndIgnored should have comment or be unexported
+api_definition_manager.go:256:1: exported method ApiSpec.IsThisApiVersionExpired should have comment or be unexported
+api_definition_manager.go:284:1: exported method ApiSpec.IsRequestValid should have comment or be unexported
+api_definition_manager.go:312:1: exported method ApiSpec.GetVersionData should have comment or be unexported
+api_definition_manager.go:15:6: type ApiDefinition should be APIDefinition
+api_definition_manager.go:16:2: struct field Id should be ID
+api_definition_manager.go:18:2: struct field ApiId should be APIID
+api_definition_manager.go:19:2: struct field OrgId should be OrgID
+api_definition_manager.go:30:3: struct field TargetUrl should be TargetURL
+api_definition_manager.go:49:6: type UrlStatus should be URLStatus
+api_definition_manager.go:71:6: type UrlSpec should be URLSpec
+api_definition_manager.go:76:6: type ApiSpec should be APISpec
+api_definition_manager.go:82:6: type ApiDefinitionLoader should be APIDefinitionLoader
+api_definition_manager.go:110:6: var ApiSpecs should be APISpecs
+api_definition_manager.go:119:6: var ApiDefinitions should be APIDefinitions
+api_definition_manager.go:136:6: var ApiSpecs should be APISpecs
+api_definition_manager.go:187:2: var thisUrlSpec should be thisURLSpec
+api_definition_manager.go:202:19: func IsUrlAllowedAndIgnored should be IsURLAllowedAndIgnored
+api_definition_manager.go:256:19: func IsThisApiVersionExpired should be IsThisAPIVersionExpired
+api_definition_manager.go:216:11: if block ends with a return statement, so drop this else and outdent its block
+api_definition_manager.go:228:9: if block ends with a return statement, so drop this else and outdent its block
+api_definition_manager.go:239:10: if block ends with a return statement, so drop this else and outdent its block
+api_definition_manager.go:246:10: if block ends with a return statement, so drop this else and outdent its block
+api_definition_manager.go:272:9: if block ends with a return statement, so drop this else and outdent its block
+api_definition_manager.go:277:10: if block ends with a return statement, so drop this else and outdent its block
+auth_manager.go:42:1: exported method AuthorisationManager.IsKeyExpired should have comment or be unexported
+auth_manager.go:63:1: exported method AuthorisationManager.GetSessionDetail should have comment or be unexported
+auth_manager.go:81:1: exported method AuthorisationManager.GetSessions should have comment or be unexported
+auth_manager.go:58:2: don't use underscores in Go names; var key_exp should be keyExp
+auth_manager.go:30:9: if block ends with a return statement, so drop this else and outdent its block
+auth_manager.go:36:10: if block ends with a return statement, so drop this else and outdent its block
+auth_manager.go:47:10: if block ends with a return statement, so drop this else and outdent its block
+auth_manager.go:69:9: if block ends with a return statement, so drop this else and outdent its block
+auth_manager.go:75:10: if block ends with a return statement, so drop this else and outdent its block
+handler_error.go:12:6: exported type ErrorHandler should have comment or be unexported
+handler_error.go:16:1: exported method ErrorHandler.HandleError should have comment or be unexported
+handler_error.go:16:87: don't use underscores in Go names; method parameter err_code should be errCode
+handler_proxy.go:8:6: exported type ApiError should have comment or be unexported
+handler_proxy.go:12:1: comment on exported function ProxyHandler should be of the form "ProxyHandler ..."
+handler_proxy.go:8:6: type ApiError should be APIError
+handler_success.go:12:6: exported type ContextKey should have comment or be unexported
+handler_success.go:15:2: exported const SessionData should have comment (or a comment on this block) or be unexported
+handler_success.go:19:6: exported type TykMiddleware should have comment or be unexported
+handler_success.go:24:6: exported type SuccessHandler should have comment or be unexported
+main.go:29:2: exported const E_SYSTEM_ERROR should have comment (or a comment on this block) or be unexported
+main.go:177:6: exported type StructMiddleware should have comment or be unexported
+main.go:181:1: exported method StructMiddleware.New should have comment or be unexported
+main.go:221:1: exported function ReloadURLStructure should have comment or be unexported
+main.go:25:5: don't use underscores in Go names; var prof_file should be profFile
+main.go:29:2: don't use ALL_CAPS in Go names; use CamelCase
+main.go:33:2: don't use underscores in Go names; var config_table should be configTable
+main.go:79:2: don't use underscores in Go names; var template_file should be templateFile
+main.go:138:6: func loadApiEndpoints should be loadAPIEndpoints
+main.go:145:6: func getApiSpecs should be getAPISpecs
+main.go:146:6: var ApiSpecs should be APISpecs
+main.go:147:2: var thisApiLoader should be thisAPILoader
+main.go:194:15: func parameter ApiSpecs should be APISpecs
+middleware_access_rights.go:10:6: exported type AccessRightsCheck should have comment or be unexported
+middleware_access_rights.go:14:1: exported method AccessRightsCheck.New should have comment or be unexported
+middleware_key_exists.go:10:6: exported type KeyExists should have comment or be unexported
+middleware_key_exists.go:14:1: exported method KeyExists.New should have comment or be unexported
+middleware_key_exists.go:32:4: don't use underscores in Go names; var key_exists should be keyExists
+middleware_key_expired_check.go:10:6: exported type KeyExpired should have comment or be unexported
+middleware_key_expired_check.go:14:1: exported method KeyExpired.New should have comment or be unexported
+middleware_rate_limiting.go:10:6: exported type RateLimitAndQuotaCheck should have comment or be unexported
+middleware_rate_limiting.go:14:1: exported method RateLimitAndQuotaCheck.New should have comment or be unexported
+middleware_version_check.go:7:6: exported type VersionCheck should have comment or be unexported
+middleware_version_check.go:11:1: exported method VersionCheck.New should have comment or be unexported
+session_manager.go:9:6: exported type AccessDefinition should have comment or be unexported
+session_manager.go:63:1: exported method SessionLimiter.IsQuotaExceeded should have comment or be unexported
+session_manager.go:10:2: struct field ApiName should be APIName
+session_manager.go:11:2: struct field ApiId should be APIID
+session_manager.go:27:2: struct field OrgId should be OrgID
+session_manager.go:51:9: if block ends with a return statement, so drop this else and outdent its block
+session_manager.go:55:10: if block ends with a return statement, so drop this else and outdent its block
+session_manager.go:76:10: if block ends with a return statement, so drop this else and outdent its block
+session_manager.go:52:3: should replace currentSession.Allowance -= 1 with currentSession.Allowance--
+session_manager.go:83:3: should replace currentSession.QuotaRemaining -= 1 with currentSession.QuotaRemaining--
+storage_handlers.go:56:1: exported method InMemoryStorageManager.GetKeys should have comment or be unexported
+storage_handlers.go:65:1: exported method InMemoryStorageManager.GetKeysAndValues should have comment or be unexported
+storage_handlers.go:75:1: comment on exported method InMemoryStorageManager.DeleteKeys should be of the form "DeleteKeys ..."
+storage_handlers.go:115:1: exported method RedisStorageManager.Connect should have comment or be unexported
+storage_handlers.go:134:1: exported method RedisStorageManager.GetKey should have comment or be unexported
+storage_handlers.go:156:1: exported method RedisStorageManager.SetKey should have comment or be unexported
+storage_handlers.go:179:1: exported method RedisStorageManager.GetKeys should have comment or be unexported
+storage_handlers.go:205:1: exported method RedisStorageManager.GetKeysAndValues should have comment or be unexported
+storage_handlers.go:235:1: exported method RedisStorageManager.DeleteKey should have comment or be unexported
+storage_handlers.go:252:1: exported method RedisStorageManager.DeleteKeys should have comment or be unexported
+storage_handlers.go:166:7: don't use underscores in Go names; var exp_err should be expErr
+storage_handlers.go:46:9: if block ends with a return statement, so drop this else and outdent its block
+storage_handlers.go:141:9: if block ends with a return statement, so drop this else and outdent its block
+storage_handlers.go:186:9: if block ends with a return statement, so drop this else and outdent its block
+storage_handlers.go:212:9: if block ends with a return statement, so drop this else and outdent its block
+storage_handlers.go:242:9: if block ends with a return statement, so drop this else and outdent its block
+storage_handlers.go:259:9: if block ends with a return statement, so drop this else and outdent its block
+storage_handlers.go:58:11: should omit 2nd value from range; this loop is equivalent to `for key := range ...`
+storage_handlers.go:42:1: receiver name s should be consistent with previous receiver name r for InMemoryStorageManager
+storage_handlers.go:52:1: receiver name s should be consistent with previous receiver name r for InMemoryStorageManager
+storage_handlers.go:56:1: receiver name s should be consistent with previous receiver name r for InMemoryStorageManager
+storage_handlers.go:65:1: receiver name s should be consistent with previous receiver name r for InMemoryStorageManager
+storage_handlers.go:70:1: receiver name s should be consistent with previous receiver name r for InMemoryStorageManager
+storage_handlers.go:76:1: receiver name s should be consistent with previous receiver name r for InMemoryStorageManager
+tests/gateway_test.go:107:2: don't use underscores in Go names; var second_recorder should be secondRecorder
+tests/gateway_test.go:109:2: don't use underscores in Go names; var third_recorder should be thirdRecorder
+tests/gateway_test.go:119:2: var newApiError should be newAPIError
+tests/gateway_test.go:151:2: don't use underscores in Go names; var second_recorder should be secondRecorder
+tests/gateway_test.go:153:2: don't use underscores in Go names; var third_recorder should be thirdRecorder
+tests/gateway_test.go:163:2: var newApiError should be newAPIError
