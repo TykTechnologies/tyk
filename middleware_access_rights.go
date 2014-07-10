@@ -7,10 +7,14 @@ import (
 	"github.com/gorilla/context"
 )
 
+// AccessRightsCheck is a midleware that will check if the key bing used to access the API has
+// permission to access the specific version. If no permission data is in the SessionState, then
+// it is assumed that the user can go through.
 type AccessRightsCheck struct {
 	TykMiddleware
 }
 
+// New creates a new HttpHandler for the alice middleware package
 func (a AccessRightsCheck) New() func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
