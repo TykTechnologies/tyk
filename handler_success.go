@@ -69,7 +69,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.Proxy.ServeHTTP(w, r)
 
 	if doMemoryProfile {
-		pprof.WriteHeapProfile(prof_file)
+		pprof.WriteHeapProfile(profileFile)
 	}
 
 	context.Clear(r)

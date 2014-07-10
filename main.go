@@ -22,18 +22,19 @@ var authManager = AuthorisationManager{}
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
-var prof_file = &os.File{}
+var profileFile = &os.File{}
 var doMemoryProfile bool
 
+// Generic system error
 const (
 	E_SYSTEM_ERROR string = "{\"status\": \"system error, please contact administrator\"}"
 )
 
 func displayConfig() {
-	config_table := goterm.NewTable(0, 10, 5, ' ', 0)
-	fmt.Fprintf(config_table, "Listening on port:\t%d\n", config.ListenPort)
+	configTable := goterm.NewTable(0, 10, 5, ' ', 0)
+	fmt.Fprintf(configTable, "Listening on port:\t%d\n", config.ListenPort)
 
-	fmt.Println(config_table)
+	fmt.Println(configTable)
 	fmt.Println("")
 }
 
@@ -76,8 +77,8 @@ func setupGlobals() {
 		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
 	}
 
-	template_file := fmt.Sprintf("%s/error.json", config.TemplatePath)
-	templates = template.Must(template.ParseFiles(template_file))
+	templateFile := fmt.Sprintf("%s/error.json", config.TemplatePath)
+	templates = template.Must(template.ParseFiles(templateFile))
 }
 
 func init() {
@@ -135,7 +136,7 @@ func intro() {
 	fmt.Print("\nhttp://www.tyk.io\n\n")
 }
 
-func loadApiEndpoints(Muxer *http.ServeMux) {
+func loadAPIEndpoints(Muxer *http.ServeMux) {
 	// set up main API handlers
 	Muxer.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
 	Muxer.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
@@ -144,51 +145,16 @@ func loadApiEndpoints(Muxer *http.ServeMux) {
 
 func getAPISpecs() []APISpec {
 	var APISpecs []APISpec
-	thisApiLoader := APIDefinitionLoader{}
+	thisAPILoader := APIDefinitionLoader{}
 
 	if config.UseDBAppConfigs {
 		log.Info("Using App Configuration from Mongo DB")
-		APISpecs = thisApiLoader.LoadDefinitionsFromMongo()
+		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
 	} else {
-		APISpecs = thisApiLoader.LoadDefinitions("./apps/")
+		APISpecs = thisAPILoader.LoadDefinitions("./apps/")
 	}
 
 	return APISpecs
-}
-
-func customHandler1(h http.Handler) http.Handler {
-	thisHandler := func(w http.ResponseWriter, r *http.Request) {
-		log.Info("Middlwware 1 called!")
-		h.ServeHTTP(w, r)
-	}
-
-	return http.HandlerFunc(thisHandler)
-}
-
-func customHandler2(h http.Handler) http.Handler {
-	thisHandler := func(w http.ResponseWriter, r *http.Request) {
-		log.Info("Middlwware 2 called!")
-		h.ServeHTTP(w, r)
-	}
-
-	return http.HandlerFunc(thisHandler)
-}
-
-type StructMiddleware struct {
-	spec APISpec
-}
-
-func (s StructMiddleware) New(spec APISpec) func(http.Handler) http.Handler {
-	aliceHandler := func(h http.Handler) http.Handler {
-		thisHandler := func(w http.ResponseWriter, r *http.Request) {
-			log.Info("Middlwware 3 called!")
-			log.Info(spec.APIID)
-			h.ServeHTTP(w, r)
-		}
-		return http.HandlerFunc(thisHandler)
-	}
-
-	return aliceHandler
 }
 
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
@@ -218,9 +184,12 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	}
 }
 
+// ReloadURLStructure will create a new muxer, reload all the app configs for an
+// instance and then replace the DefaultServeMux with the new one, this enables a
+// reconfiguration to take place without stopping any requests from being handled.
 func ReloadURLStructure() {
 	newMuxes := http.NewServeMux()
-	loadApiEndpoints(newMuxes)
+	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()
 	loadApps(specs, newMuxes)
 
@@ -234,12 +203,12 @@ func main() {
 
 	if doMemoryProfile {
 		log.Info("Memory profiling active")
-		prof_file, _ = os.Create("tyk.mprof")
-		defer prof_file.Close()
+		profileFile, _ = os.Create("tyk.mprof")
+		defer profileFile.Close()
 	}
 
 	targetPort := fmt.Sprintf(":%d", config.ListenPort)
-	loadApiEndpoints(http.DefaultServeMux)
+	loadAPIEndpoints(http.DefaultServeMux)
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()

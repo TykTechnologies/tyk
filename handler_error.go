@@ -59,7 +59,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 	thisError := APIError{fmt.Sprintf("%s", err)}
 	templates.ExecuteTemplate(w, "error.json", &thisError)
 	if doMemoryProfile {
-		pprof.WriteHeapProfile(prof_file)
+		pprof.WriteHeapProfile(profileFile)
 	}
 
 	// Clean up
