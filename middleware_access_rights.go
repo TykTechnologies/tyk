@@ -22,7 +22,7 @@ func (a AccessRightsCheck) New() func(http.Handler) http.Handler {
 			// If there's nothing in our profile, we let them through to the next phase
 			if len(thisSessionState.AccessRights) > 0 {
 				// Otherwise, run auth checks
-				versionList, apiExists := thisSessionState.AccessRights[a.Spec.ApiId]
+				versionList, apiExists := thisSessionState.AccessRights[a.Spec.APIID]
 				if !apiExists {
 					log.WithFields(logrus.Fields{
 						"path":   r.URL.Path,

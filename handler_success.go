@@ -52,8 +52,8 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			t,
 			version,
 			s.Spec.ApiDefinition.Name,
-			s.Spec.ApiDefinition.ApiId,
-			s.Spec.ApiDefinition.OrgId}
+			s.Spec.ApiDefinition.APIID,
+			s.Spec.ApiDefinition.OrgID}
 		analytics.RecordHit(thisRecord)
 	}
 

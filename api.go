@@ -9,12 +9,14 @@ import (
 	"strings"
 )
 
-type ApiModifyKeySuccess struct {
+// APIModifyKeySuccess represents when a Key modification was successful
+type APIModifyKeySuccess struct {
 	Key    string `json:"key"`
 	Status string `json:"status"`
 	Action string `json:"action"`
 }
 
+// ApiErrorMessage is an object that defines when a generic error occurred
 type ApiErrorMessage struct {
 	Status string `json:"status"`
 	Error  string `json:"error"`
@@ -62,7 +64,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	}
 
 	if success {
-		response := ApiModifyKeySuccess{
+		response := APIModifyKeySuccess{
 			keyName,
 			"ok",
 			action}
@@ -114,6 +116,7 @@ func handleGetDetail(sessionKey string) ([]byte, int) {
 	return responseMessage, code
 }
 
+// APIAllKeys represents a list of keys in the memory store
 type APIAllKeys struct {
 	ApiKeys []string `json:"keys"`
 }
@@ -144,6 +147,7 @@ func handleGetAllKeys(filter string) ([]byte, int) {
 	}
 }
 
+// APIStatusMessage represents an API status message
 type APIStatusMessage struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
@@ -155,7 +159,7 @@ func handleDeleteKey(keyName string) ([]byte, int) {
 	authManager.Store.DeleteKey(keyName)
 	code := 200
 
-	statusObj := ApiModifyKeySuccess{keyName, "ok", "deleted"}
+	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
@@ -259,7 +263,7 @@ func extractKey(orgId, key string) string {
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	code := 200
-	var responseObj = ApiModifyKeySuccess{}
+	var responseObj = APIModifyKeySuccess{}
 
 	if r.Method == "POST" {
 		decoder := json.NewDecoder(r.Body)
@@ -275,7 +279,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			u5, err := uuid.NewV4()
 			cleanSting := strings.Replace(u5.String(), "-", "", -1)
-			new_key := expandKey(newSession.OrgId, cleanSting)
+			new_key := expandKey(newSession.OrgID, cleanSting)
 
 			if err != nil {
 				code = 400

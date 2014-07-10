@@ -8,7 +8,7 @@ import (
 
 type AccessDefinition struct {
 	ApiName  string   `json:"api_name"`
-	ApiId    string   `json:"api_id"`
+	APIID    string   `json:"api_id"`
 	Versions []string `json:"versions"`
 }
 
@@ -24,7 +24,7 @@ type SessionState struct {
 	QuotaRemaining   int64                       `json:"quota_remaining"`
 	QuotaRenewalRate int64                       `json:"quota_renewal_rate"`
 	AccessRights     map[string]AccessDefinition `json:"access_rights"`
-	OrgId            string                      `json:"org_id"`
+	OrgID            string                      `json:"org_id"`
 }
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to

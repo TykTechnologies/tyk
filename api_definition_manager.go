@@ -15,8 +15,8 @@ import (
 type ApiDefinition struct {
 	Id                bson.ObjectId `bson:"_id,omitempty" json:"id"`
 	Name              string        `bson:"name" json:"name"`
-	ApiId             string        `bson:"api_id" json:"api_id"`
-	OrgId             string        `bson:"org_id" json:"org_id"`
+	APIID             string        `bson:"api_id" json:"api_id"`
+	OrgID             string        `bson:"org_id" json:"org_id"`
 	VersionDefinition struct {
 		Location string `bson:"location" json:"location"`
 		Key      string `bson:"key" json:"key"`

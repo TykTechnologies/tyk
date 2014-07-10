@@ -40,8 +40,8 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			t,
 			version,
 			e.Spec.ApiDefinition.Name,
-			e.Spec.ApiDefinition.ApiId,
-			e.Spec.ApiDefinition.OrgId}
+			e.Spec.ApiDefinition.APIID,
+			e.Spec.ApiDefinition.OrgID}
 		analytics.RecordHit(thisRecord)
 	}
 

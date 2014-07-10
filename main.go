@@ -182,7 +182,7 @@ func (s StructMiddleware) New(spec ApiSpec) func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
 			log.Info("Middlwware 3 called!")
-			log.Info(spec.ApiId)
+			log.Info(spec.APIID)
 			h.ServeHTTP(w, r)
 		}
 		return http.HandlerFunc(thisHandler)

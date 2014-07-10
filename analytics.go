@@ -26,8 +26,8 @@ type AnalyticsRecord struct {
 	TimeStamp     time.Time
 	APIVersion    string
 	APIName       string
-	ApiId         string
-	OrgId         string
+	APIID         string
+	OrgID         string
 }
 
 // AnalyticsError is an error for when writing to the storage engine fails
@@ -67,9 +67,9 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 		log.Error("Error encoding analytics data:")
 		log.Error(err)
 		return AnalyticsError{}
-	} else {
-		r.Store.SetKey(keyName, string(encoded), 0)
 	}
+
+	r.Store.SetKey(keyName, string(encoded), 0)
 
 	return nil
 }
@@ -193,7 +193,7 @@ func (m *MongoPurger) PurgeCache() {
 				} else {
 					keys[i] = interface{}(decoded)
 				}
-				i += 1
+				i++
 			}
 
 			err := analyticsCollection.Insert(keys...)
