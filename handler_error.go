@@ -9,11 +9,14 @@ import (
 	"time"
 )
 
+// ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
+// the ErrorHandler if something is wrong with the request and halt the request processing through the chain
 type ErrorHandler struct {
 	TykMiddleware
 }
 
-func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, err_code int) {
+// HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
+func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
 	if config.EnableAnalytics {
 		t := time.Now()
 		keyName := r.Header.Get(e.Spec.APIDefinition.Auth.AuthHeaderName)
@@ -35,7 +38,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			t.Month(),
 			t.Year(),
 			t.Hour(),
-			err_code,
+			errCode,
 			keyName,
 			t,
 			version,
@@ -45,7 +48,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		analytics.RecordHit(thisRecord)
 	}
 
-	w.WriteHeader(err_code)
+	w.WriteHeader(errCode)
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("X-Generator", "tyk.io")
 	thisError := ApiError{fmt.Sprintf("%s", err)}
