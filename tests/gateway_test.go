@@ -120,24 +120,24 @@ func TestThrottling(t *testing.T) {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
 	}
 
-	second_recorder := httptest.NewRecorder()
-	chain.ServeHTTP(second_recorder, req)
+	secondRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(secondRecorder, req)
 
-	third_recorder := httptest.NewRecorder()
-	chain.ServeHTTP(third_recorder, req)
+	thirdRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(thirdRecorder, req)
 
-	if third_recorder.Code == 200 {
-		t.Error("Third request failed, should not be 200!: \n", third_recorder.Code)
+	if thirdRecorder.Code == 200 {
+		t.Error("Third request failed, should not be 200!: \n", thirdRecorder.Code)
 	}
-	if third_recorder.Code != 403 {
-		t.Error("Third request returned invalid code, should 403, got: \n", third_recorder.Code)
+	if thirdRecorder.Code != 403 {
+		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
 	}
 
 	newAPIError := TykErrorResponse{}
-	json.Unmarshal([]byte(third_recorder.Body.String()), &newAPIError)
+	json.Unmarshal([]byte(thirdRecorder.Body.String()), &newAPIError)
 
 	if newAPIError.Error != "Rate limit exceeded" {
-		t.Error("Third request returned invalid message, got: \n", third_recorder.Code)
+		t.Error("Third request returned invalid message, got: \n", thirdRecorder.Code)
 	}
 }
 
@@ -164,20 +164,20 @@ func TestQuota(t *testing.T) {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
 	}
 
-	second_recorder := httptest.NewRecorder()
-	chain.ServeHTTP(second_recorder, req)
-	third_recorder := httptest.NewRecorder()
-	chain.ServeHTTP(third_recorder, req)
+	secondRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(secondRecorder, req)
+	thirdRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(thirdRecorder, req)
 
-	if third_recorder.Code == 200 {
-		t.Error("Third request failed, should not be 200!: \n", third_recorder.Code)
+	if thirdRecorder.Code == 200 {
+		t.Error("Third request failed, should not be 200!: \n", thirdRecorder.Code)
 	}
-	if third_recorder.Code != 403 {
-		t.Error("Third request returned invalid code, should 403, got: \n", third_recorder.Code)
+	if thirdRecorder.Code != 403 {
+		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
 	}
 
 	newAPIError := TykErrorResponse{}
-	json.Unmarshal([]byte(third_recorder.Body.String()), &newAPIError)
+	json.Unmarshal([]byte(thirdRecorder.Body.String()), &newAPIError)
 
 	if newAPIError.Error != "Quota exceeded" {
 		t.Error("Third request returned invalid message, got: \n", newAPIError.Error)
