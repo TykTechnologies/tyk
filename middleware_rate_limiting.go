@@ -22,7 +22,7 @@ func (k RateLimitAndQuotaCheck) New() func(http.Handler) http.Handler {
 			authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 			forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
 
-			// Ensure all this gets recorded
+			// Ensure quota and rate data for this session are recorded
 			authManager.UpdateSession(authHeaderValue, thisSessionState)
 
 			if !forwardMessage {

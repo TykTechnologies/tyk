@@ -6,8 +6,9 @@ import (
 	"time"
 )
 
+// AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
-	ApiName  string   `json:"api_name"`
+	APIiName  string   `json:"api_name"`
 	APIID    string   `json:"api_id"`
 	Versions []string `json:"versions"`
 }
@@ -48,18 +49,19 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState) (bool, int)
 
 	if currentSession.Allowance < 1.0 {
 		return false, 1
-	} else {
-		currentSession.Allowance -= 1
-		if !l.IsQuotaExceeded(currentSession) {
-			return true, 0
-		} else {
-			return false, 2
-		}
-
 	}
+
+	currentSession.Allowance--
+	if !l.IsQuotaExceeded(currentSession) {
+		return true, 0
+	}
+
+	return false, 2
 
 }
 
+// IsQuotaExceeded will confirm if a session key has exceeded it's quota, if a quota has been exceeded,
+// but the quata renewal time has passed, it will be refreshed.
 func (l SessionLimiter) IsQuotaExceeded(currentSession *SessionState) bool {
 	if currentSession.QuotaMax == -1 {
 		// No quota set
@@ -73,14 +75,13 @@ func (l SessionLimiter) IsQuotaExceeded(currentSession *SessionState) bool {
 			currentSession.QuotaRenews = current + currentSession.QuotaRenewalRate
 			currentSession.QuotaRemaining = currentSession.QuotaMax
 			return false
-		} else {
-			// quota used up
-			return true
 		}
+		// quota used up
+		return true
 	}
 
 	if currentSession.QuotaRemaining > 0 {
-		currentSession.QuotaRemaining -= 1
+		currentSession.QuotaRemaining--
 		return false
 	}
 
