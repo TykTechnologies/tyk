@@ -138,9 +138,9 @@ func intro() {
 
 func loadAPIEndpoints(Muxer *http.ServeMux) {
 	// set up main API handlers
-	Muxer.HandleFunc("/tyk/keys/create", securityHandler(createKeyHandler))
-	Muxer.HandleFunc("/tyk/keys/", securityHandler(keyHandler))
-	Muxer.HandleFunc("/tyk/reload/", securityHandler(resetHandler))
+	Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
+	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
+	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
 }
 
 func getAPISpecs() []APISpec {
