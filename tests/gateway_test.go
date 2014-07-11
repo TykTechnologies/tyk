@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 	"time"
+	"github.com/justinas/alice"
 )
 
 func createThrottledSession() SessionState {
@@ -42,6 +43,21 @@ func createQuotaSession() SessionState {
 
 type TykErrorResponse struct {
 	Error string
+}
+
+func getChain(spec APISpec) http.Handler {
+	remote, _ := url.Parse("http://lonelycode.com/")
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	tykMiddleware := TykMiddleware{spec, proxy}
+	chain := alice.New(
+		VersionCheck{tykMiddleware}.New(),
+		KeyExists{tykMiddleware}.New(),
+		KeyExpired{tykMiddleware}.New(),
+		AccessRightsCheck{tykMiddleware}.New(),
+		RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+
+	return chain
 }
 
 func createNonVersionedDefinition() APISpec {
@@ -96,31 +112,32 @@ func TestThrottling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	remote, _ := url.Parse("http://lonelycode.com/")
-	thisProxy := httputil.NewSingleHostReverseProxy(remote)
-	handler(thisProxy, spec)(recorder, req)
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
 	}
 
 	second_recorder := httptest.NewRecorder()
-	handler(thisProxy, spec)(second_recorder, req)
+	chain.ServeHTTP(second_recorder, req)
+
 	third_recorder := httptest.NewRecorder()
-	handler(thisProxy, spec)(third_recorder, req)
+	chain.ServeHTTP(third_recorder, req)
 
 	if third_recorder.Code == 200 {
-		t.Error("Third request failed, should not be 200!: \n", third_recorder.Body.String())
+		t.Error("Third request failed, should not be 200!: \n", third_recorder.Code)
 	}
-	if third_recorder.Code != 409 {
-		t.Error("Third request returned invalid code, should 409, got: \n", third_recorder.Code)
+	if third_recorder.Code != 403 {
+		t.Error("Third request returned invalid code, should 403, got: \n", third_recorder.Code)
 	}
 
 	newAPIError := TykErrorResponse{}
 	json.Unmarshal([]byte(third_recorder.Body.String()), &newAPIError)
 
 	if newAPIError.Error != "Rate limit exceeded" {
-		t.Error("Third request returned invalid message, got: \n", third_recorder.Body.String())
+		t.Error("Third request returned invalid message, got: \n", third_recorder.Code)
 	}
 }
 
@@ -140,24 +157,23 @@ func TestQuota(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	remote, _ := url.Parse("http://lonelycode.com/")
-	thisProxy := httputil.NewSingleHostReverseProxy(remote)
-	handler(thisProxy, spec)(recorder, req)
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
 	}
 
 	second_recorder := httptest.NewRecorder()
-	handler(thisProxy, spec)(second_recorder, req)
+	chain.ServeHTTP(second_recorder, req)
 	third_recorder := httptest.NewRecorder()
-	handler(thisProxy, spec)(third_recorder, req)
+	chain.ServeHTTP(third_recorder, req)
 
 	if third_recorder.Code == 200 {
 		t.Error("Third request failed, should not be 200!: \n", third_recorder.Code)
 	}
-	if third_recorder.Code != 409 {
-		t.Error("Third request returned invalid code, should 409, got: \n", third_recorder.Code)
+	if third_recorder.Code != 403 {
+		t.Error("Third request returned invalid code, should 403, got: \n", third_recorder.Code)
 	}
 
 	newAPIError := TykErrorResponse{}
