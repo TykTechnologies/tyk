@@ -25,7 +25,7 @@ func (k RateLimitAndQuotaCheck) New() func(http.Handler) http.Handler {
 			// Ensure quota and rate data for this session are recorded
 			authManager.UpdateSession(authHeaderValue, thisSessionState)
 
-			log.Info(thisSessionState)
+			log.Debug("SessionState: ", thisSessionState)
 
 			if !forwardMessage {
 				// TODO Use an Enum!

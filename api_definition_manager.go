@@ -24,6 +24,7 @@ type APIDefinition struct {
 		AllowedAccessTypes []osin.AccessRequestType `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
+	NotificationsDetails NotificationsManager `bson:"notifications" json:"notifications"`
 	VersionDefinition struct {
 		Location string `bson:"location" json:"location"`
 		Key      string `bson:"key" json:"key"`
