@@ -5,6 +5,10 @@ import (
 	"github.com/RangelReale/osin"
 	"fmt"
 	"encoding/json"
+	"encoding/base64"
+	"github.com/nu7hatch/gouuid"
+	"strings"
+	"time"
 )
 /*
 TODO:
@@ -112,8 +116,17 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 	var code int
 
 	if r.Method == "POST" {
+		// On AUTH grab session state data and add to UserData (not validated, not good!)
+		sessionStateJSONData := r.FormValue("key_rules")
+		if sessionStateJSONData == "" {
+			responseMessage := createError("Authorise request is missing key_rules in params")
+			w.WriteHeader(400)
+			fmt.Fprintf(w, string(responseMessage))
+			return
+		}
+
 		// Handle the authorisation and write the JSON output to the resource provider
-		resp := o.Manager.HandleAuthorisation(r, true)
+		resp := o.Manager.HandleAuthorisation(r, true, sessionStateJSONData)
 		code = 200
 		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
 		if resp.IsError {
@@ -141,7 +154,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 
 	if r.Method == "GET" || r.Method == "POST" {
 		// Extract client data and check
-		resp := o.Manager.HandleAuthorisation(r, false)
+		resp := o.Manager.HandleAuthorisation(r, false, "")
 		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
 		if resp.IsError {
 			// Something went wrong, write out the error details and kill the response
@@ -223,7 +236,7 @@ type OAuthManager struct {
 }
 
 // HandleAuthorisation creates the authorisation data for the request
-func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool) *osin.Response {
+func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessionState string) *osin.Response {
 	resp := o.OsinServer.NewResponse()
 
 	if ar := o.OsinServer.HandleAuthorizeRequest(resp, r); ar != nil {
@@ -231,6 +244,7 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool) *osin
 		ar.Authorized = true
 
 		if complete {
+			ar.UserData = sessionState
 			o.OsinServer.FinishAuthorizeRequest(resp, r, ar)
 		}
 	}
@@ -354,12 +368,28 @@ func (r RedisOsinStorageInterface) RemoveAuthorize(code string) error{
 
 // SaveAccess will save a token and it's access data to redis
 func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error{
+
 	if authDataJSON, marshalErr := json.Marshal(accessData); marshalErr != nil {
 		return marshalErr
 	} else {
 		key := ACCESS_PREFIX + accessData.AccessToken
 		log.Debug("Saving ACCESS key: ", key)
 		r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+
+		// Create a SessionState object and register it with the authmanager
+		var newSession SessionState
+		marshalErr := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
+
+		if marshalErr != nil {
+			log.Error("Couldn't decode SessionState from UserData")
+			log.Error(marshalErr)
+			return marshalErr
+		}
+
+		// Override timeouts so that we can be in sync with Osin
+		newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
+
+		authManager.UpdateSession(accessData.AccessToken, newSession)
 
 	}
 
@@ -405,6 +435,12 @@ func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, e
 func (r RedisOsinStorageInterface) RemoveAccess(token string) error{
 	key := ACCESS_PREFIX + token
 	r.store.DeleteKey(key)
+
+	// remove the access token from central storage too
+	authDeleted := authManager.Store.DeleteKey(token)
+	if !authDeleted {
+		log.Error("Couldn't remove from authManager!")
+	}
 	return nil
 }
 
@@ -435,4 +471,32 @@ func (r RedisOsinStorageInterface) RemoveRefresh(token string) error{
 	key := REFRESH_PREFIX + token
 	r.store.DeleteKey(key)
 	return nil
+}
+
+// AccessTokenGenDefault is the default authorization token generator
+type AccessTokenGenTyk struct {
+}
+
+// GenerateAccessToken generates base64-encoded UUID access and refresh tokens
+func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken string, refreshtoken string, err error) {
+	log.Info("Generating new token")
+	u5, err := uuid.NewV4()
+	var newSession SessionState
+	marshalErr := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
+
+	if marshalErr != nil {
+		log.Error("Couldn't decode SessionState from UserData")
+		log.Error(marshalErr)
+		return "", "", marshalErr
+	}
+
+	cleanSting := strings.Replace(u5.String(), "-", "", -1)
+	accesstoken = expandKey(newSession.OrgID, cleanSting)
+
+	if generaterefresh {
+		u6, _ := uuid.NewV4()
+		refreshtoken = strings.Replace(u6.String(), "-", "", -1)
+		refreshtoken = base64.StdEncoding.EncodeToString([]byte(refreshtoken))
+	}
+	return
 }

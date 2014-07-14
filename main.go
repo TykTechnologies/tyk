@@ -30,6 +30,7 @@ var doMemoryProfile bool
 const (
 	E_SYSTEM_ERROR string = "{\"status\": \"system error, please contact administrator\"}"
 	OAUTH_AUTH_CODE_TIMEOUT int = 60 * 60
+	OAUTH_PREFIX string = "oauth-data."
 )
 
 func displayConfig() {
@@ -164,12 +165,12 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux) {
 	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
 
-
 	serverConfig := osin.NewServerConfig()
 	serverConfig.ErrorStatusCode = 403
-	serverConfig.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
-	serverConfig.AllowedAuthorizeTypes = osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
-	OAuthPrefix := "oauth-data." + spec.APIID
+	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes //osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
+	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes // osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
+
+	OAuthPrefix := OAUTH_PREFIX + spec.APIID
 	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager.Connect()
 	osinStorage := RedisOsinStorageInterface{&storageManager}
@@ -185,6 +186,8 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux) {
 	log.Warning("Test client added")
 
 	osinServer := osin.NewServer(serverConfig, osinStorage)
+	osinServer.AccessTokenGen = &AccessTokenGenTyk{}
+
 	oauthManager := OAuthManager{osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
@@ -206,7 +209,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		}
 
 		// TODO: Remove this, testing only
-		addOAuthHandlers(spec, Muxer)
+		if spec.UseOauth2 {
+			addOAuthHandlers(spec, Muxer)
+		}
 
 		proxy := httputil.NewSingleHostReverseProxy(remote)
 
@@ -216,6 +221,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		chain := alice.New(
 			VersionCheck{tykMiddleware}.New(),
 			KeyExists{tykMiddleware}.New(),
+			Oauth2KeyExists{tykMiddleware}.New(),
 			KeyExpired{tykMiddleware}.New(),
 			AccessRightsCheck{tykMiddleware}.New(),
 			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)

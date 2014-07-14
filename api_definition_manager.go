@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"github.com/RangelReale/osin"
 )
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
@@ -18,6 +19,11 @@ type APIDefinition struct {
 	Name              string        `bson:"name" json:"name"`
 	APIID             string        `bson:"api_id" json:"api_id"`
 	OrgID             string        `bson:"org_id" json:"org_id"`
+	UseOauth2	  bool		`bson:"use_oauth2" json:"use_oauth2"`
+	Oauth2Meta struct {
+		AllowedAccessTypes []osin.AccessRequestType `bson:"allowed_access_types" json:"allowed_access_types"`
+		AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
+	} `bson:"oauth_meta" json:"oauth_meta"`
 	VersionDefinition struct {
 		Location string `bson:"location" json:"location"`
 		Key      string `bson:"key" json:"key"`
