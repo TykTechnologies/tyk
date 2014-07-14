@@ -167,8 +167,23 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux) {
 
 	serverConfig := osin.NewServerConfig()
 	serverConfig.ErrorStatusCode = 403
+	serverConfig.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
+	serverConfig.AllowedAuthorizeTypes = osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
 	OAuthPrefix := "oauth-data." + spec.APIID
-	osinStorage := RedisOsinStorageInterface{&RedisStorageManager{KeyPrefix: OAuthPrefix}}
+	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
+	storageManager.Connect()
+	osinStorage := RedisOsinStorageInterface{&storageManager}
+
+	// TODO: Remove this
+	log.Warning("Adding test client")
+	testClient := &osin.Client{
+		Id:          "1234",
+		Secret:      "aabbccdd",
+		RedirectUri: "http://client.oauth.com",
+	}
+	osinStorage.SetClient(testClient.Id, testClient)
+	log.Warning("Test client added")
+
 	osinServer := osin.NewServer(serverConfig, osinStorage)
 	oauthManager := OAuthManager{osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}

@@ -68,6 +68,7 @@ type NewOAuthNotification struct {
 	NewOAuthToken string
 	OldOAuthToken string
 	RefreshToken string
+	OldRefreshToken string
 	NotificationType OAuthNotificationType
 }
 
@@ -77,10 +78,25 @@ type OAuthHandlers struct{
 }
 
 func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.Response) ([]byte, bool) {
+
+	// TODO: Might need to clear this out
+	if osinResponse.Output["state"] == "" {
+		log.Debug("Removing state")
+		delete(osinResponse.Output, "state")
+	}
+
+	redirect, rediErr := osinResponse.GetRedirectUrl()
+
+	if rediErr == nil {
+		// Hack to inject redirect into response
+		osinResponse.Output["redirect_to"] = redirect
+	}
+
 	if respData, marshalErr := json.Marshal(&osinResponse.Output); marshalErr != nil {
+		return []byte{}, false
+	} else {
 		return respData, true
 	}
-	return []byte{}, false
 }
 
 
@@ -95,9 +111,10 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 	var responseMessage []byte
 	var code int
 
-	if r.Method == "GET" {
+	if r.Method == "POST" {
 		// Handle the authorisation and write the JSON output to the resource provider
-		resp := o.Manager.HandleAuthorisation(r)
+		resp := o.Manager.HandleAuthorisation(r, true)
+		code = 200
 		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
 		if resp.IsError {
 			code = resp.ErrorStatusCode
@@ -111,6 +128,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		responseMessage = createError("Method not supported")
 	}
 
+
 	w.WriteHeader(code)
 	fmt.Fprintf(w, string(responseMessage))
 }
@@ -123,11 +141,12 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 
 	if r.Method == "GET" || r.Method == "POST" {
 		// Extract client data and check
-		resp := o.Manager.HandleAuthorisation(r)
+		resp := o.Manager.HandleAuthorisation(r, false)
 		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
 		if resp.IsError {
 			// Something went wrong, write out the error details and kill the response
 			w.WriteHeader(resp.ErrorStatusCode)
+			responseMessage = createError(resp.StatusText)
 			fmt.Fprintf(w, string(responseMessage))
 			return
 		}
@@ -162,15 +181,31 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 		}
 
 		// Ping endpoint with o_auth key and auth_key
-
-		// TODO: This isn;t working
+		code = 200
+		code := r.FormValue("code")
+		OldRefreshToken := r.FormValue("refresh_token")
+		log.Debug("AUTH CODE: ", code)
+		NewOAuthToken := ""
+		if resp.Output["access_token"] != nil {
+			NewOAuthToken = resp.Output["access_token"].(string)
+		}
+		log.Debug("TOKEN: ", NewOAuthToken)
+		RefreshToken := ""
+		if resp.Output["refresh_token"] != nil {
+			RefreshToken = resp.Output["refresh_token"].(string)
+		}
+		log.Debug("REFRESH: ", RefreshToken)
+		log.Debug("Old REFRESH: ", OldRefreshToken)
 		newNotification := NewOAuthNotification{
-			AuthCode: resp.Output["code"].(string),
-			NewOAuthToken: resp.Output["access_token"].(string),
-			RefreshToken: resp.Output["refresh_token"].(string),
+			AuthCode: code,
+			NewOAuthToken: NewOAuthToken,
+			RefreshToken: RefreshToken,
+			OldRefreshToken: OldRefreshToken,
 			NotificationType: NEW_ACCESS_TOKEN,
 		}
+
 		o.notifyClientOfNewOauth(newNotification)
+
 
 	} else {
 		// Return Not supported message (and code)
@@ -188,12 +223,16 @@ type OAuthManager struct {
 }
 
 // HandleAuthorisation creates the authorisation data for the request
-func (o *OAuthManager) HandleAuthorisation(r *http.Request) *osin.Response {
+func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool) *osin.Response {
 	resp := o.OsinServer.NewResponse()
+
 	if ar := o.OsinServer.HandleAuthorizeRequest(resp, r); ar != nil {
 		// Since this is called by the Reource provider (proxied API), we assume it has been approved
 		ar.Authorized = true
-		o.OsinServer.FinishAuthorizeRequest(resp, r, ar)
+
+		if complete {
+			o.OsinServer.FinishAuthorizeRequest(resp, r, ar)
+		}
 	}
 	if resp.IsError && resp.InternalError != nil {
 		fmt.Printf("ERROR: %s\n", resp.InternalError)
@@ -258,31 +297,36 @@ func (r RedisOsinStorageInterface) GetClient(id string) (*osin.Client, error){
 
 // SetClient creates client data
 func (r RedisOsinStorageInterface) SetClient(id string, client *osin.Client) error {
+	clientDataJSON, err := json.Marshal(client)
 
-	if clientDataJSON, marshalErr := json.Marshal(&client); marshalErr != nil {
-		key := CLIENT_PREFIX + id
-		r.store.SetKey(key, string(clientDataJSON), 0)
-		return nil
-	} else {
-		return marshalErr
+	if err != nil {
+		log.Error("Couldn't marshal client data")
+		log.Error(err)
+		return err
 	}
+
+	key := CLIENT_PREFIX + id
+	r.store.SetKey(key, string(clientDataJSON), 0)
+	return nil
 }
 
 // SaveAuthorize saves authorisation data to REdis
 func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error{
-
 	if authDataJSON, marshalErr := json.Marshal(&authData); marshalErr != nil {
+		return marshalErr
+	} else {
 		key := AUTH_PREFIX + authData.Code
+		log.Debug("Saving auth code: ", key)
 		r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 		return nil
-	} else {
-		return marshalErr
+
 	}
 }
 
 // LoadAuthorize loads auth data from redis
 func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error){
 	key := AUTH_PREFIX + code
+	log.Debug("Loading auth code: ", key)
 	authJSON, storeErr := r.store.GetKey(key)
 
 	if storeErr != nil {
@@ -311,21 +355,24 @@ func (r RedisOsinStorageInterface) RemoveAuthorize(code string) error{
 // SaveAccess will save a token and it's access data to redis
 func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error{
 	if authDataJSON, marshalErr := json.Marshal(accessData); marshalErr != nil {
-		key := ACCESS_PREFIX + accessData.AccessToken
-		r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
-		return nil
-	} else {
 		return marshalErr
+	} else {
+		key := ACCESS_PREFIX + accessData.AccessToken
+		log.Debug("Saving ACCESS key: ", key)
+		r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+
 	}
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
 		if authDataJSON, marshalErr := json.Marshal(&accessData); marshalErr != nil {
+			return marshalErr
+		} else {
 			key := REFRESH_PREFIX + accessData.RefreshToken
+			log.Debug("Saving REFRESH key: ", key)
 			r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
 			return nil
-		} else {
-			return marshalErr
+
 		}
 	}
 
@@ -335,6 +382,7 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 // LoadAccess will load access data from redis
 func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error){
 	key := ACCESS_PREFIX + token
+	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, storeErr := r.store.GetKey(key)
 
 	if storeErr != nil {
@@ -363,6 +411,7 @@ func (r RedisOsinStorageInterface) RemoveAccess(token string) error{
 // LoadRefresh will load access data from Redis
 func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error){
 	key := REFRESH_PREFIX + token
+	log.Debug("Loading REFRESH key: ", key)
 	accessJSON, storeErr := r.store.GetKey(key)
 
 	if storeErr != nil {
@@ -387,4 +436,3 @@ func (r RedisOsinStorageInterface) RemoveRefresh(token string) error{
 	r.store.DeleteKey(key)
 	return nil
 }
-
