@@ -23,6 +23,7 @@ type StorageHandler interface {
 	DeleteKey(string) bool
 	Connect() bool
 	GetKeysAndValues() map[string]string
+	GetKeysAndValuesWithFilter(string) map[string]string
 	DeleteKeys([]string) bool
 }
 
@@ -68,6 +69,11 @@ func (s InMemoryStorageManager) GetKeys(filter string) []string {
 
 // GetKeysAndValues returns all keys and their data, very expensive call.
 func (s InMemoryStorageManager) GetKeysAndValues() map[string]string {
+	return s.Sessions
+}
+
+func (s InMemoryStorageManager) GetKeysAndValuesWithFilter(filter string) map[string]string {
+	log.Warning("NOT IMPLEMENTED")
 	return s.Sessions
 }
 
@@ -211,6 +217,38 @@ func (r *RedisStorageManager) GetKeys(filter string) []string {
 	}
 
 	return []string{}
+}
+
+// GetKeysAndValues will return all keys and their values - not to be used lightly
+func (r *RedisStorageManager) GetKeysAndValuesWithFilter(filter string) map[string]string {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.GetKeysAndValuesWithFilter(filter)
+	}
+
+	searchStr := r.KeyPrefix + filter + "*"
+	sessionsInterface, err := db.Do("KEYS", searchStr)
+	if err != nil {
+		log.Error("Error trying to get filtered client keys:")
+		log.Error(err)
+
+	} else {
+		keys, _ := redis.Strings(sessionsInterface, err)
+		valueObj, err := db.Do("MGET", sessionsInterface.([]interface{})...)
+		values, err := redis.Strings(valueObj, err)
+
+		returnValues := make(map[string]string)
+		for i, v := range keys {
+			returnValues[r.cleanKey(v)] = values[i]
+		}
+
+		return returnValues
+	}
+
+	return map[string]string{}
 }
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly

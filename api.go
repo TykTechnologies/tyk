@@ -328,6 +328,11 @@ type NewClientRequest struct {
 	APIID string			`json:"api_id"`
 }
 
+func createOauthClientStorageID(APIID string, clientID string) string {
+	storageID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX + clientID
+	return storageID
+}
+
 func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	code := 200
@@ -345,8 +350,6 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		// Do stuff
-
 		u5, err := uuid.NewV4()
 		cleanSting := strings.Replace(u5.String(), "-", "", -1)
 		u5Secret, err := uuid.NewV4()
@@ -357,8 +360,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		newClient.RedirectUri = newOauthClient.ClientRedirectURI
 		newClient.Secret = secret
 
-		// + "." + spec.APIID + "."
-		storageID := OAUTH_PREFIX + newOauthClient.APIID + "." + CLIENT_PREFIX + newClient.Id
+		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.Id)
 		storeErr := genericOsinStorage.SetClient(storageID, &newClient, true)
 
 		if storeErr != nil {
@@ -392,6 +394,171 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(code)
 	fmt.Fprintf(w, string(responseMessage))
+}
+
+func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
+	keyCombined := r.URL.Path[len("/tyk/oauth/clients/"):]
+	var responseMessage []byte
+	var code int
+
+	keyName := ""
+	apiID := ""
+
+	parts := strings.Split(keyCombined, "/")
+	if len(parts) == 2 {
+		keyName = parts[1]
+		apiID = parts[0]
+	} else if len(parts) == 1 {
+		apiID = parts[0]
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+		w.WriteHeader(code)
+		fmt.Fprintf(w, string(responseMessage))
+		return
+	}
+
+	if r.Method == "GET" {
+		if keyName != "" {
+			// Return single client detail
+			responseMessage, code = getOauthClientDetails(keyName, apiID)
+		} else {
+			// Return list of keys
+			responseMessage, code = getOauthClients(apiID)
+		}
+
+	} else if r.Method == "DELETE" {
+		// Remove a key
+		responseMessage, code = handleDeleteOAuthClient(keyName, apiID)
+
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	w.WriteHeader(code)
+	fmt.Fprintf(w, string(responseMessage))
+}
+
+// Get client details
+func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
+	success := true
+	var responseMessage []byte
+	var err error
+	code := 200
+
+	storageID := createOauthClientStorageID(APIID, keyName)
+	thisClientData, getClientErr := genericOsinStorage.GetClientNoPrefix(storageID)
+	if getClientErr != nil {
+		success = false
+	} else {
+		reportableClientData := OAuthClient{
+			ClientID: thisClientData.Id,
+			ClientSecret: thisClientData.Secret,
+			ClientRedirectURI: thisClientData.RedirectUri,
+		}
+		responseMessage, err = json.Marshal(&reportableClientData)
+		if err != nil {
+			log.Error("Marshalling failed")
+			log.Error(err)
+			success = false
+		}
+	}
+
+	if !success {
+		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		code = 404
+		log.WithFields(logrus.Fields{
+		"key": keyName,
+	}).Info("Attempted oauth client retrieval - failure.")
+	} else {
+		log.WithFields(logrus.Fields{
+		"key": keyName,
+	}).Info("Attempted oauth client retrieval - success.")
+	}
+
+	return responseMessage, code
+}
+
+// Delete Client
+func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	storageID := createOauthClientStorageID(APIID, keyName)
+	osinErr := genericOsinStorage.DeleteClient(storageID, true)
+
+	code := 200
+	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
+
+	if osinErr != nil {
+		code = 500
+		errObj := APIErrorMessage{"error", "Delete failed"}
+		responseMessage, err = json.Marshal(&errObj)
+		return responseMessage, code
+	}
+
+	responseMessage, err = json.Marshal(&statusObj)
+
+	if err != nil {
+		log.Error("Marshalling failed")
+		log.Error(err)
+		return []byte(E_SYSTEM_ERROR), 500
+	}
+
+	log.WithFields(logrus.Fields{
+		"key": keyName,
+	}).Info("Attempted OAuth client deletion - success.")
+
+	return responseMessage, code
+}
+// List Clients
+func getOauthClients(APIID string) ([]byte, int) {
+	success := true
+	var responseMessage []byte
+	var err error
+	code := 200
+
+	filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
+	thisClientData, getClientsErr := genericOsinStorage.GetClients(filterID, true)
+	if getClientsErr != nil {
+		success = false
+	} else {
+		clients := []OAuthClient{}
+		for _, osinClient := range(*thisClientData) {
+			reportableClientData := OAuthClient{
+				ClientID: osinClient.Id,
+				ClientSecret: osinClient.Secret,
+				ClientRedirectURI: osinClient.RedirectUri,
+			}
+			clients = append(clients, reportableClientData)
+		}
+
+		responseMessage, err = json.Marshal(&clients)
+		if err != nil {
+			log.Error("Marshalling failed")
+			log.Error(err)
+			success = false
+		}
+	}
+
+	if !success {
+		notFound := APIStatusMessage{"error", "OAuth slients not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		code = 404
+		log.WithFields(logrus.Fields{
+		"API": APIID,
+	}).Info("Attempted oauth client retrieval - failure.")
+	} else {
+		log.WithFields(logrus.Fields{
+		"API": APIID,
+	}).Info("Attempted oauth clients retrieval - success.")
+	}
+
+	return responseMessage, code
 }
 
 func MakeNewOsinServer() *RedisOsinStorageInterface {
