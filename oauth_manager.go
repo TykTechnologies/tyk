@@ -55,9 +55,9 @@ Effort required by Resource Owner:
 
 // OAuthClient is a representation within an APISpec of a client
 type OAuthClient struct {
-	ClientID string
-	ClientSecret string
-	ClientRedirectURI string
+	ClientID string			`json:"client_id"`
+	ClientSecret string		`json:"secret"`
+	ClientRedirectURI string	`json:"redirect_uri"`
 }
 
 type OAuthNotificationType string
@@ -284,10 +284,10 @@ func (o *OAuthManager) IsRequestValid(r *http.Request) bool {
 // These enums fix the prefix to use when storing various OAuth keys and data, since we
 // delegate everything to the osin framework
 const (
-	AUTH_PREFIX string = "oauth-authorize-"
-	CLIENT_PREFIX string = "oauth-clientid-"
-	ACCESS_PREFIX string = "oauth-access-"
-	REFRESH_PREFIX string = "oauth-refresh-"
+	AUTH_PREFIX string = "oauth-authorize."
+	CLIENT_PREFIX string = "oauth-clientid."
+	ACCESS_PREFIX string = "oauth-access."
+	REFRESH_PREFIX string = "oauth-refresh."
 )
 
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
@@ -316,7 +316,7 @@ func (r RedisOsinStorageInterface) GetClient(id string) (*osin.Client, error){
 }
 
 // SetClient creates client data
-func (r RedisOsinStorageInterface) SetClient(id string, client *osin.Client) error {
+func (r RedisOsinStorageInterface) SetClient(id string, client *osin.Client, ignore_prefix bool) error {
 	clientDataJSON, err := json.Marshal(client)
 
 	if err != nil {
@@ -326,6 +326,10 @@ func (r RedisOsinStorageInterface) SetClient(id string, client *osin.Client) err
 	}
 
 	key := CLIENT_PREFIX + id
+	if ignore_prefix {
+		key = id
+	}
+
 	r.store.SetKey(key, string(clientDataJSON), 0)
 	return nil
 }

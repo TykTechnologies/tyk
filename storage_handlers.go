@@ -141,6 +141,7 @@ func (r *RedisStorageManager) cleanKey(keyName string) string {
 func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	db := r.pool.Get()
 	defer db.Close()
+	log.Info("Getting key: ", r.fixKey(keyName))
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
@@ -163,6 +164,7 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
 	db := r.pool.Get()
 	defer db.Close()
+	log.Info("Setting key: ", r.fixKey(keyName))
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()

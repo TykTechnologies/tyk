@@ -25,6 +25,7 @@ var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
 var profileFile = &os.File{}
 var doMemoryProfile bool
+var genericOsinStorage *RedisOsinStorageInterface
 
 // Generic system error
 const (
@@ -79,6 +80,8 @@ func setupGlobals() {
 		analytics.Store.Connect()
 		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
 	}
+
+	genericOsinStorage = MakeNewOsinServer()
 
 	templateFile := fmt.Sprintf("%s/error.json", config.TemplatePath)
 	templates = template.Must(template.ParseFiles(templateFile))
@@ -144,6 +147,7 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 	Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
 	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
 	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
+	Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
 }
 
 func getAPISpecs() []APISpec {
@@ -170,7 +174,7 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux) {
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes //osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes // osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
 
-	OAuthPrefix := OAUTH_PREFIX + spec.APIID
+	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
 	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager.Connect()
 	osinStorage := RedisOsinStorageInterface{&storageManager}
@@ -182,7 +186,7 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux) {
 		Secret:      "aabbccdd",
 		RedirectUri: "http://client.oauth.com",
 	}
-	osinStorage.SetClient(testClient.Id, testClient)
+	osinStorage.SetClient(testClient.Id, testClient, false)
 	log.Warning("Test client added")
 
 	osinServer := osin.NewServer(serverConfig, osinStorage)
