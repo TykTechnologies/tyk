@@ -1,15 +1,16 @@
 package main
 
 import (
-	"net/http"
-	"github.com/RangelReale/osin"
-	"fmt"
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"github.com/RangelReale/osin"
 	"github.com/nu7hatch/gouuid"
+	"net/http"
 	"strings"
 	"time"
 )
+
 /*
 
 Sample Oaut Flow:
@@ -32,32 +33,34 @@ Effort required by Resource Owner:
 
 */
 
-// TODO: Actually redirec tthe client on the passthrough
-
 // OAuthClient is a representation within an APISpec of a client
 type OAuthClient struct {
-	ClientID string			`json:"client_id"`
-	ClientSecret string		`json:"secret"`
-	ClientRedirectURI string	`json:"redirect_uri"`
+	ClientID          string `json:"client_id"`
+	ClientSecret      string `json:"secret"`
+	ClientRedirectURI string `json:"redirect_uri"`
 }
 
+// OAuthNotificationType const to reduce risk of colisions
 type OAuthNotificationType string
+
+// Notifcation codes for new and refresh codes
 const (
-	NEW_ACCESS_TOKEN OAuthNotificationType = "new"
+	NEW_ACCESS_TOKEN     OAuthNotificationType = "new"
 	REFRESH_ACCESS_TOKEN OAuthNotificationType = "refresh"
-	NEW_AUTH_TOKEN OAuthNotificationType = "pending"
 )
 
+// NewOAuthNotification is a notification sent to a
+// webhook when an access request or a refresh request comes in.
 type NewOAuthNotification struct {
-	AuthCode string
-	NewOAuthToken string
-	RefreshToken string
-	OldRefreshToken string
+	AuthCode         string
+	NewOAuthToken    string
+	RefreshToken     string
+	OldRefreshToken  string
 	NotificationType OAuthNotificationType
 }
 
 // OAuthHandlers are the HTTP Handlers that manage the Tyk OAuth flow
-type OAuthHandlers struct{
+type OAuthHandlers struct {
 	Manager OAuthManager
 }
 
@@ -81,16 +84,16 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 	} else {
 		return respData, true
 	}
-}
 
+}
 
 func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification) bool {
 	log.Info("Notifying client host")
-	go o.Manager.Api.NotificationsDetails.SendRequest(false, 0, notification)
+	go o.Manager.API.NotificationsDetails.SendRequest(false, 0, notification)
 	return true
 }
 
-// GenerateAuthCodeData handles a resource provider approving an OAuth request from a client
+// HandleGenerateAuthCodeData handles a resource provider approving an OAuth request from a client
 func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
@@ -121,12 +124,11 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		responseMessage = createError("Method not supported")
 	}
 
-
 	w.WriteHeader(code)
 	fmt.Fprintf(w, string(responseMessage))
 }
 
-// AuthorizePassthrough handles a Client Auth request, first it checks if the client
+// HandleAuthorizePassthrough handles a Client Auth request, first it checks if the client
 // is OK (otherwise it blocks the request), then it forwards on to the resource providers approval URI
 func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
@@ -146,9 +148,8 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 			return
 		}
 
-		w.Header().Add("Location", o.Manager.Api.Oauth2Meta.AuthorizeLoginRedirect)
+		w.Header().Add("Location", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
 		w.WriteHeader(307)
-
 
 	} else {
 		// Return Not supported message (and code)
@@ -158,9 +159,11 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 		fmt.Fprintf(w, string(responseMessage))
 	}
 
-
 }
 
+// HandleAccessRequest handles the OAuth 2.0 token or refresh access request, and wraps Tyk's own and Osin's OAuth handlers,
+// returns a response to the client and notifies the provider of the access request (in order to track identity against
+// OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
@@ -199,15 +202,14 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 		}
 
 		newNotification := NewOAuthNotification{
-			AuthCode: code,
-			NewOAuthToken: NewOAuthToken,
-			RefreshToken: RefreshToken,
-			OldRefreshToken: OldRefreshToken,
+			AuthCode:         code,
+			NewOAuthToken:    NewOAuthToken,
+			RefreshToken:     RefreshToken,
+			OldRefreshToken:  OldRefreshToken,
 			NotificationType: notificationType,
 		}
 
 		o.notifyClientOfNewOauth(newNotification)
-
 
 	} else {
 		// Return Not supported message (and code)
@@ -221,7 +223,7 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
 type OAuthManager struct {
-	Api APISpec
+	API        APISpec
 	OsinServer *osin.Server
 }
 
@@ -268,19 +270,20 @@ func (o *OAuthManager) IsRequestValid(r *http.Request) bool {
 // These enums fix the prefix to use when storing various OAuth keys and data, since we
 // delegate everything to the osin framework
 const (
-	AUTH_PREFIX string = "oauth-authorize."
-	CLIENT_PREFIX string = "oauth-clientid."
-	ACCESS_PREFIX string = "oauth-access."
+	AUTH_PREFIX    string = "oauth-authorize."
+	CLIENT_PREFIX  string = "oauth-clientid."
+	ACCESS_PREFIX  string = "oauth-access."
 	REFRESH_PREFIX string = "oauth-refresh."
 )
 
+// TODO: Refactor this to move prefix handling into a checker method, then it can be an unexported setting in the struct.
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
-type RedisOsinStorageInterface struct{
+type RedisOsinStorageInterface struct {
 	store StorageHandler
 }
 
 // GetClient will retrieve client data
-func (r RedisOsinStorageInterface) GetClient(id string) (*osin.Client, error){
+func (r RedisOsinStorageInterface) GetClient(id string) (*osin.Client, error) {
 	key := CLIENT_PREFIX + id
 
 	clientJSON, storeErr := r.store.GetKey(key)
@@ -300,8 +303,9 @@ func (r RedisOsinStorageInterface) GetClient(id string) (*osin.Client, error){
 	return &thisClient, nil
 }
 
-// GetClient will retrieve client data
-func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (*osin.Client, error){
+// GetClientNoPrefix will retrieve client data, but not asign a prefix - this is an unfortunate hack,
+// but we don't want to change the signature in Osin for GetClient to support the odd Redis prefixing
+func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (*osin.Client, error) {
 
 	key := id
 
@@ -322,7 +326,8 @@ func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (*osin.Client, e
 	return &thisClient, nil
 }
 
-func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) (*[]osin.Client, error){
+// GetClients will retreive a list of clients for a prefix
+func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) (*[]osin.Client, error) {
 	key := CLIENT_PREFIX + filter
 	if ignorePrefix {
 		key = filter
@@ -332,7 +337,7 @@ func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) 
 
 	theseClients := []osin.Client{}
 
-	for _, clientJSON := range(clientJSON) {
+	for _, clientJSON := range clientJSON {
 		thisClient := osin.Client{}
 		if marshalErr := json.Unmarshal([]byte(clientJSON), &thisClient); marshalErr != nil {
 			log.Error("Couldn't unmarshal OAuth client object")
@@ -376,7 +381,7 @@ func (r RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) er
 }
 
 // SaveAuthorize saves authorisation data to REdis
-func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error{
+func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error {
 	if authDataJSON, marshalErr := json.Marshal(&authData); marshalErr != nil {
 		return marshalErr
 	} else {
@@ -386,10 +391,12 @@ func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) e
 		return nil
 
 	}
+
+
 }
 
 // LoadAuthorize loads auth data from redis
-func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error){
+func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	key := AUTH_PREFIX + code
 	log.Debug("Loading auth code: ", key)
 	authJSON, storeErr := r.store.GetKey(key)
@@ -411,57 +418,59 @@ func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeDa
 }
 
 // RemoveAuthorize removes authorisation keys from redis
-func (r RedisOsinStorageInterface) RemoveAuthorize(code string) error{
+func (r RedisOsinStorageInterface) RemoveAuthorize(code string) error {
 	key := AUTH_PREFIX + code
 	r.store.DeleteKey(key)
 	return nil
 }
 
 // SaveAccess will save a token and it's access data to redis
-func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error{
-
-	if authDataJSON, marshalErr := json.Marshal(accessData); marshalErr != nil {
+func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error {
+	authDataJSON, marshalErr := json.Marshal(accessData)
+	if marshalErr != nil {
 		return marshalErr
-	} else {
-		key := ACCESS_PREFIX + accessData.AccessToken
-		log.Debug("Saving ACCESS key: ", key)
-		r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
-
-		// Create a SessionState object and register it with the authmanager
-		var newSession SessionState
-		marshalErr := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
-
-		if marshalErr != nil {
-			log.Error("Couldn't decode SessionState from UserData")
-			log.Error(marshalErr)
-			return marshalErr
-		}
-
-		// Override timeouts so that we can be in sync with Osin
-		newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
-
-		authManager.UpdateSession(accessData.AccessToken, newSession)
-
 	}
+
+	key := ACCESS_PREFIX + accessData.AccessToken
+	log.Debug("Saving ACCESS key: ", key)
+	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+
+	// Create a SessionState object and register it with the authmanager
+	var newSession SessionState
+	unmarshalErr := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
+
+	if unmarshalErr != nil {
+		log.Error("Couldn't decode SessionState from UserData")
+		log.Error(unmarshalErr)
+		return unmarshalErr
+	}
+
+	// Override timeouts so that we can be in sync with Osin
+	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
+
+	authManager.UpdateSession(accessData.AccessToken, newSession)
+
+
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
-		if authDataJSON, marshalErr := json.Marshal(&accessData); marshalErr != nil {
+		if accessDataJSON, marshalErr := json.Marshal(&accessData); marshalErr != nil {
 			return marshalErr
 		} else {
 			key := REFRESH_PREFIX + accessData.RefreshToken
 			log.Debug("Saving REFRESH key: ", key)
-			r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+			r.store.SetKey(key, string(accessDataJSON), int64(accessData.ExpiresIn))
 			return nil
-
 		}
+
+
 	}
 
 	return nil
 }
 
 // LoadAccess will load access data from redis
-func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error){
+func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
 	key := ACCESS_PREFIX + token
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, storeErr := r.store.GetKey(key)
@@ -483,7 +492,7 @@ func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, e
 }
 
 // RemoveAccess will remove access data from Redis
-func (r RedisOsinStorageInterface) RemoveAccess(token string) error{
+func (r RedisOsinStorageInterface) RemoveAccess(token string) error {
 	key := ACCESS_PREFIX + token
 	r.store.DeleteKey(key)
 
@@ -496,7 +505,7 @@ func (r RedisOsinStorageInterface) RemoveAccess(token string) error{
 }
 
 // LoadRefresh will load access data from Redis
-func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error){
+func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error) {
 	key := REFRESH_PREFIX + token
 	log.Debug("Loading REFRESH key: ", key)
 	accessJSON, storeErr := r.store.GetKey(key)
@@ -518,13 +527,14 @@ func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, 
 }
 
 // RemoveRefresh will remove a refresh token from redis
-func (r RedisOsinStorageInterface) RemoveRefresh(token string) error{
+func (r RedisOsinStorageInterface) RemoveRefresh(token string) error {
 	key := REFRESH_PREFIX + token
 	r.store.DeleteKey(key)
 	return nil
 }
 
-// AccessTokenGenDefault is the default authorization token generator
+// TODO: This should be centralised
+// AccessTokenGenTyk is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
 type AccessTokenGenTyk struct {
 }
 

@@ -72,6 +72,8 @@ func (s InMemoryStorageManager) GetKeysAndValues() map[string]string {
 	return s.Sessions
 }
 
+
+// GetKeysAndValuesWithFilter does nothing here
 func (s InMemoryStorageManager) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	log.Warning("NOT IMPLEMENTED")
 	return s.Sessions
@@ -162,7 +164,6 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 		return value, nil
 	}
 
-
 	return "", KeyError{}
 }
 
@@ -219,7 +220,7 @@ func (r *RedisStorageManager) GetKeys(filter string) []string {
 	return []string{}
 }
 
-// GetKeysAndValues will return all keys and their values - not to be used lightly
+// GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r *RedisStorageManager) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	db := r.pool.Get()
 	defer db.Close()

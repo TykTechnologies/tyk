@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/buger/goterm"
 	"github.com/docopt/docopt.go"
-	"github.com/RangelReale/osin"
 	"github.com/justinas/alice"
 	"github.com/rcrowley/goagain"
 	"html/template"
@@ -29,9 +29,9 @@ var genericOsinStorage *RedisOsinStorageInterface
 
 // Generic system error
 const (
-	E_SYSTEM_ERROR string = "{\"status\": \"system error, please contact administrator\"}"
-	OAUTH_AUTH_CODE_TIMEOUT int = 60 * 60
-	OAUTH_PREFIX string = "oauth-data."
+	E_SYSTEM_ERROR          string = "{\"status\": \"system error, please contact administrator\"}"
+	OAUTH_AUTH_CODE_TIMEOUT int    = 60 * 60
+	OAUTH_PREFIX            string = "oauth-data."
 )
 
 // Display introductory details
@@ -131,7 +131,7 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 
 	serverConfig := osin.NewServerConfig()
 	serverConfig.ErrorStatusCode = 403
-	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes //osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
+	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes       //osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes // osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
 
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."

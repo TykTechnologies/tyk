@@ -1,14 +1,14 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/nu7hatch/gouuid"
 	"net/http"
 	"strings"
-	"github.com/RangelReale/osin"
-	"encoding/base64"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -175,7 +175,6 @@ func handleDeleteKey(keyName string) ([]byte, int) {
 		"key": keyName,
 	}).Info("Attempted key deletion - success.")
 
-
 	return responseMessage, code
 }
 
@@ -323,9 +322,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(responseMessage))
 }
 
+// NewClientRequest is an outward facing JSON object translated from osin OAuthClients
 type NewClientRequest struct {
-	ClientRedirectURI string	`json:"redirect_uri"`
-	APIID string			`json:"api_id"`
+	ClientRedirectURI string `json:"redirect_uri"`
+	APIID             string `json:"api_id"`
 }
 
 func createOauthClientStorageID(APIID string, clientID string) string {
@@ -369,8 +369,8 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 
 		reportableClientData := OAuthClient{
-			ClientID: newClient.Id,
-			ClientSecret: newClient.Secret,
+			ClientID:          newClient.Id,
+			ClientSecret:      newClient.Secret,
 			ClientRedirectURI: newClient.RedirectUri,
 		}
 
@@ -383,7 +383,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			code = 500
 		} else {
 			log.WithFields(logrus.Fields{
-			"key": newClient.Id,
+				"key": newClient.Id,
 			}).Info("New OAuth Client registered successfully.")
 		}
 
@@ -455,8 +455,8 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		success = false
 	} else {
 		reportableClientData := OAuthClient{
-			ClientID: thisClientData.Id,
-			ClientSecret: thisClientData.Secret,
+			ClientID:          thisClientData.Id,
+			ClientSecret:      thisClientData.Secret,
 			ClientRedirectURI: thisClientData.RedirectUri,
 		}
 		responseMessage, err = json.Marshal(&reportableClientData)
@@ -472,12 +472,12 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
 		log.WithFields(logrus.Fields{
-		"key": keyName,
-	}).Info("Attempted oauth client retrieval - failure.")
+			"key": keyName,
+		}).Info("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
-		"key": keyName,
-	}).Info("Attempted oauth client retrieval - success.")
+			"key": keyName,
+		}).Info("Attempted oauth client retrieval - success.")
 	}
 
 	return responseMessage, code
@@ -515,6 +515,7 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 
 	return responseMessage, code
 }
+
 // List Clients
 func getOauthClients(APIID string) ([]byte, int) {
 	success := true
@@ -528,10 +529,10 @@ func getOauthClients(APIID string) ([]byte, int) {
 		success = false
 	} else {
 		clients := []OAuthClient{}
-		for _, osinClient := range(*thisClientData) {
+		for _, osinClient := range *thisClientData {
 			reportableClientData := OAuthClient{
-				ClientID: osinClient.Id,
-				ClientSecret: osinClient.Secret,
+				ClientID:          osinClient.Id,
+				ClientSecret:      osinClient.Secret,
 				ClientRedirectURI: osinClient.RedirectUri,
 			}
 			clients = append(clients, reportableClientData)
@@ -550,17 +551,19 @@ func getOauthClients(APIID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
 		log.WithFields(logrus.Fields{
-		"API": APIID,
-	}).Info("Attempted oauth client retrieval - failure.")
+			"API": APIID,
+		}).Info("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
-		"API": APIID,
-	}).Info("Attempted oauth clients retrieval - success.")
+			"API": APIID,
+		}).Info("Attempted oauth clients retrieval - success.")
 	}
 
 	return responseMessage, code
 }
 
+// MakeNewOsinServer creates a generic osinStorage object, used primarily by the API to create and get keys outside of an APISpec context.
+// This is not ideal, but is only used in the Tyk API and nowhere else.
 func MakeNewOsinServer() *RedisOsinStorageInterface {
 	log.Info("Creating generic redis OAuth connection")
 	storageManager := RedisStorageManager{KeyPrefix: ""}

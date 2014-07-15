@@ -8,7 +8,7 @@ import (
 
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
-	APIiName  string   `json:"api_name"`
+	APIiName string   `json:"api_name"`
 	APIID    string   `json:"api_id"`
 	Versions []string `json:"versions"`
 }

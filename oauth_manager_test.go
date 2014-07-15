@@ -2,28 +2,28 @@ package main
 
 /*
 	NOTE: Requires the test tyk.conf to be in place and the settings to b correct - ugly, I know, but necessary for the end to end to work correctly.
- */
+*/
 
 import (
-	"github.com/RangelReale/osin"
-	"testing"
 	"bytes"
-	"net/url"
-	"net/http"
-	"github.com/justinas/alice"
-	"net/http/httputil"
-	"net/http/httptest"
 	"encoding/json"
-	"io/ioutil"
 	"fmt"
+	"github.com/RangelReale/osin"
+	"github.com/justinas/alice"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
+	"testing"
 )
 
 const (
 	T_REDIRECT_URI string = "http://client.oauth.com"
-	T_CLIENT_ID string = "1234"
+	T_CLIENT_ID    string = "1234"
 )
 
-var key_rules = `
+var keyRules = `
 {     "last_check": 1402492859,     "org_id": "53ac07777cbb8c2d53000002",     "allowance": 0,     "rate": 1,     "per": 1,     "expires": 0,     "quota_max": -1,     "quota_renews": 1399567002,     "quota_remaining": 10,     "quota_renewal_rate": 300 }
 `
 
@@ -126,7 +126,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", T_REDIRECT_URI)
 	param.Set("client_id", T_CLIENT_ID)
-	param.Set("key_rules", key_rules)
+	param.Set("key_rules", keyRules)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorisation", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -157,7 +157,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	param.Set("response_type", "token")
 	param.Set("redirect_uri", T_REDIRECT_URI)
 	param.Set("client_id", T_CLIENT_ID)
-	param.Set("key_rules", key_rules)
+	param.Set("key_rules", keyRules)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorisation", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -176,8 +176,6 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	}
 }
 
-
-
 func GetAuthCode() map[string]string {
 	thisSpec := createOauthAppDefinition()
 	testMuxer := http.NewServeMux()
@@ -190,7 +188,7 @@ func GetAuthCode() map[string]string {
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", T_REDIRECT_URI)
 	param.Set("client_id", T_CLIENT_ID)
-	param.Set("key_rules", key_rules)
+	param.Set("key_rules", keyRules)
 	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorisation", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -209,7 +207,7 @@ func GetAuthCode() map[string]string {
 }
 
 type tokenData struct {
-	AccessToken string  `json:"access_token"`
+	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
 
@@ -231,8 +229,6 @@ func GetToken() tokenData {
 	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"net/http"
 	"fmt"
+	"net/http"
 )
 
 // CheckIsAPIOwner will ensure that the accessor of the tyk API has the correct security credentials - this is a

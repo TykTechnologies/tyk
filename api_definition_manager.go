@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/RangelReale/osin"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -10,23 +11,22 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"github.com/RangelReale/osin"
 )
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 type APIDefinition struct {
-	ID                bson.ObjectId `bson:"_id,omitempty" json:"id"`
-	Name              string        `bson:"name" json:"name"`
-	APIID             string        `bson:"api_id" json:"api_id"`
-	OrgID             string        `bson:"org_id" json:"org_id"`
-	UseOauth2	  bool		`bson:"use_oauth2" json:"use_oauth2"`
+	ID         bson.ObjectId `bson:"_id,omitempty" json:"id"`
+	Name       string        `bson:"name" json:"name"`
+	APIID      string        `bson:"api_id" json:"api_id"`
+	OrgID      string        `bson:"org_id" json:"org_id"`
+	UseOauth2  bool          `bson:"use_oauth2" json:"use_oauth2"`
 	Oauth2Meta struct {
-		AllowedAccessTypes []osin.AccessRequestType `bson:"allowed_access_types" json:"allowed_access_types"`
-		AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
-		AuthorizeLoginRedirect string `bson:"auth_login_redirect" json:"auth_login_redirect"`
+		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
+		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
+		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
 	NotificationsDetails NotificationsManager `bson:"notifications" json:"notifications"`
-	VersionDefinition struct {
+	VersionDefinition    struct {
 		Location string `bson:"location" json:"location"`
 		Key      string `bson:"key" json:"key"`
 	} `bson:"definition" json:"definition"`
@@ -207,7 +207,6 @@ func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef VersionInfo) ([]URLSpec
 
 	return combinedPath, false
 }
-
 
 func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {
 
