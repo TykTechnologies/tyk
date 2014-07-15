@@ -34,6 +34,16 @@ const (
 	OAUTH_PREFIX string = "oauth-data."
 )
 
+// Display introductory details
+func intro() {
+	fmt.Print("\n\n")
+	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v0.1", goterm.GREEN)))
+	fmt.Println(goterm.Bold(goterm.Color("=======================", goterm.GREEN)))
+	fmt.Print("Copyright Jively Ltd. 2014")
+	fmt.Print("\nhttp://www.tyk.io\n\n")
+}
+
+// Display configuration options
 func displayConfig() {
 	configTable := goterm.NewTable(0, 10, 5, ' ', 0)
 	fmt.Fprintf(configTable, "Listening on port:\t%d\n", config.ListenPort)
@@ -42,6 +52,7 @@ func displayConfig() {
 	fmt.Println("")
 }
 
+// Create all globals and init connection handlers
 func setupGlobals() {
 	if config.Storage.Type == "memory" {
 		log.Warning("Using in-memory storage. Warning: this is not scalable.")
@@ -87,7 +98,120 @@ func setupGlobals() {
 	templates = template.Must(template.ParseFiles(templateFile))
 }
 
+// Pull API Specs from configuration
+func getAPISpecs() []APISpec {
+	var APISpecs []APISpec
+	thisAPILoader := APIDefinitionLoader{}
+
+	if config.UseDBAppConfigs {
+		log.Info("Using App Configuration from Mongo DB")
+		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
+	} else {
+		APISpecs = thisAPILoader.LoadDefinitions("./apps/")
+	}
+
+	return APISpecs
+}
+
+// Set up default Tyk control API endpoints - these are global, so need to be added first
+func loadAPIEndpoints(Muxer *http.ServeMux) {
+	// set up main API handlers
+	Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
+	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
+	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
+	Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
+	Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
+}
+
+// Create API-specific OAuth handlers and respective auth servers
+func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
+	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
+	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
+	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
+
+	serverConfig := osin.NewServerConfig()
+	serverConfig.ErrorStatusCode = 403
+	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes //osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
+	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes // osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
+
+	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
+	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
+	storageManager.Connect()
+	osinStorage := RedisOsinStorageInterface{&storageManager}
+
+	if test {
+		// TODO: Remove this
+		log.Warning("Adding test client")
+		testClient := &osin.Client{
+			Id:          "1234",
+			Secret:      "aabbccdd",
+			RedirectUri: "http://client.oauth.com",
+		}
+		osinStorage.SetClient(testClient.Id, testClient, false)
+		log.Warning("Test client added")
+	}
+	osinServer := osin.NewServer(serverConfig, osinStorage)
+	osinServer.AccessTokenGen = &AccessTokenGenTyk{}
+
+	oauthManager := OAuthManager{spec, osinServer}
+	oauthHandlers := OAuthHandlers{oauthManager}
+
+	log.Warning("Configuration", spec.NotificationsDetails)
+
+	Muxer.HandleFunc(apiAuthorizePath, CheckIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
+	Muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
+	Muxer.HandleFunc(clientAccessPath, oauthHandlers.HandleAccessRequest)
+}
+
+// Create the individual API (app) specs based on live configurations and assign middleware
+func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
+	// load the APi defs
+	log.Info("Loading API configurations.")
+
+	for _, spec := range APISpecs {
+		// Create a new handler for each API spec
+		remote, err := url.Parse(spec.APIDefinition.Proxy.TargetURL)
+		if err != nil {
+			log.Error("Culdn't parse target URL")
+			log.Error(err)
+		}
+
+		if spec.UseOauth2 {
+			addOAuthHandlers(spec, Muxer, false)
+		}
+
+		proxy := httputil.NewSingleHostReverseProxy(remote)
+
+		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+		tykMiddleware := TykMiddleware{spec, proxy}
+
+		chain := alice.New(
+			VersionCheck{tykMiddleware}.New(),
+			KeyExists{tykMiddleware}.New(),
+			Oauth2KeyExists{tykMiddleware}.New(),
+			KeyExpired{tykMiddleware}.New(),
+			AccessRightsCheck{tykMiddleware}.New(),
+			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+		Muxer.Handle(spec.Proxy.ListenPath, chain)
+	}
+}
+
+// ReloadURLStructure will create a new muxer, reload all the app configs for an
+// instance and then replace the DefaultServeMux with the new one, this enables a
+// reconfiguration to take place without stopping any requests from being handled.
+func ReloadURLStructure() {
+	newMuxes := http.NewServeMux()
+	loadAPIEndpoints(newMuxes)
+	specs := getAPISpecs()
+	loadApps(specs, newMuxes)
+
+	http.DefaultServeMux = newMuxes
+	log.Info("Reload complete")
+}
+
 func init() {
+	intro()
+
 	usage := `Tyk API Gateway.
 
 	Usage:
@@ -134,123 +258,7 @@ func init() {
 
 }
 
-func intro() {
-	fmt.Print("\n\n")
-	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v0.1", goterm.GREEN)))
-	fmt.Println(goterm.Bold(goterm.Color("=======================", goterm.GREEN)))
-	fmt.Print("Copyright Jively Ltd. 2014")
-	fmt.Print("\nhttp://www.tyk.io\n\n")
-}
-
-func loadAPIEndpoints(Muxer *http.ServeMux) {
-	// set up main API handlers
-	Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
-	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
-	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
-	Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
-	Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
-}
-
-func getAPISpecs() []APISpec {
-	var APISpecs []APISpec
-	thisAPILoader := APIDefinitionLoader{}
-
-	if config.UseDBAppConfigs {
-		log.Info("Using App Configuration from Mongo DB")
-		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
-	} else {
-		APISpecs = thisAPILoader.LoadDefinitions("./apps/")
-	}
-
-	return APISpecs
-}
-
-func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux) {
-	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
-	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
-	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
-
-	serverConfig := osin.NewServerConfig()
-	serverConfig.ErrorStatusCode = 403
-	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes //osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
-	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes // osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
-
-	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
-	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
-	storageManager.Connect()
-	osinStorage := RedisOsinStorageInterface{&storageManager}
-
-	// TODO: Remove this
-	log.Warning("Adding test client")
-	testClient := &osin.Client{
-		Id:          "1234",
-		Secret:      "aabbccdd",
-		RedirectUri: "http://client.oauth.com",
-	}
-	osinStorage.SetClient(testClient.Id, testClient, false)
-	log.Warning("Test client added")
-
-	osinServer := osin.NewServer(serverConfig, osinStorage)
-	osinServer.AccessTokenGen = &AccessTokenGenTyk{}
-
-	oauthManager := OAuthManager{spec, osinServer}
-	oauthHandlers := OAuthHandlers{oauthManager}
-
-	log.Warning("Configuration", spec.NotificationsDetails)
-
-	Muxer.HandleFunc(apiAuthorizePath, CheckIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
-	Muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
-	Muxer.HandleFunc(clientAccessPath, oauthHandlers.HandleAccessRequest)
-}
-
-func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
-	// load the APi defs
-	log.Info("Loading API configurations.")
-
-	for _, spec := range APISpecs {
-		// Create a new handler for each API spec
-		remote, err := url.Parse(spec.APIDefinition.Proxy.TargetURL)
-		if err != nil {
-			log.Error("Culdn't parse target URL")
-			log.Error(err)
-		}
-
-		// TODO: Remove this, testing only
-		if spec.UseOauth2 {
-			addOAuthHandlers(spec, Muxer)
-		}
-
-		proxy := httputil.NewSingleHostReverseProxy(remote)
-
-		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
-		tykMiddleware := TykMiddleware{spec, proxy}
-
-		chain := alice.New(
-			VersionCheck{tykMiddleware}.New(),
-			KeyExists{tykMiddleware}.New(),
-			Oauth2KeyExists{tykMiddleware}.New(),
-			KeyExpired{tykMiddleware}.New(),
-			AccessRightsCheck{tykMiddleware}.New(),
-			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
-		Muxer.Handle(spec.Proxy.ListenPath, chain)
-	}
-}
-
-// ReloadURLStructure will create a new muxer, reload all the app configs for an
-// instance and then replace the DefaultServeMux with the new one, this enables a
-// reconfiguration to take place without stopping any requests from being handled.
-func ReloadURLStructure() {
-	newMuxes := http.NewServeMux()
-	loadAPIEndpoints(newMuxes)
-	specs := getAPISpecs()
-	loadApps(specs, newMuxes)
-
-	http.DefaultServeMux = newMuxes
-	log.Info("Reload complete")
-}
-
 func main() {
-	intro()
 	displayConfig()
 
 	if doMemoryProfile {
