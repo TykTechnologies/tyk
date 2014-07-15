@@ -137,6 +137,8 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 		resp := o.Manager.HandleAuthorisation(r, false, "")
 		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
 		if resp.IsError {
+			log.Error("There was an error with the request")
+			log.Error(resp)
 			// Something went wrong, write out the error details and kill the response
 			w.WriteHeader(resp.ErrorStatusCode)
 			responseMessage = createError(resp.StatusText)
@@ -144,18 +146,19 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 			return
 		}
 
-		// TODO: Redirect to our client login page
-		log.Warning("At this point I should redirect if everything is valid")
+		w.Header().Add("Location", o.Manager.Api.Oauth2Meta.AuthorizeLoginRedirect)
+		w.WriteHeader(307)
 
 
 	} else {
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
+		w.WriteHeader(code)
+		fmt.Fprintf(w, string(responseMessage))
 	}
 
-	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+
 }
 
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {

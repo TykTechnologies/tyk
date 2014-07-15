@@ -40,6 +40,7 @@ func createOauthAppDefinition() APISpec {
 
 	thisDef.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
 	thisDef.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{osin.CODE, osin.TOKEN}
+	thisDef.Oauth2Meta.AuthorizeLoginRedirect = "http://posttestserver.com/post.php?dir=gateway_authorization"
 
 	thisDef.Proxy.ListenPath = "/APIID/"
 	thisDef.Proxy.TargetURL = "http://lonelycode.com"
@@ -106,8 +107,8 @@ func TestAuthCodeRedirect(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
 
-	if recorder.Code != 301 {
-		t.Error("Request should have redirected, code should have been 301 but is: ", recorder.Code)
+	if recorder.Code != 307 {
+		t.Error("Request should have redirected, code should have been 307 but is: ", recorder.Code)
 		t.Error(recorder.Body)
 		t.Error(req.Body)
 	}

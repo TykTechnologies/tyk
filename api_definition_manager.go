@@ -23,6 +23,7 @@ type APIDefinition struct {
 	Oauth2Meta struct {
 		AllowedAccessTypes []osin.AccessRequestType `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
+		AuthorizeLoginRedirect string `bson:"auth_login_redirect" json:"auth_login_redirect"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
 	NotificationsDetails NotificationsManager `bson:"notifications" json:"notifications"`
 	VersionDefinition struct {
