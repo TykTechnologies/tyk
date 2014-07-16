@@ -438,6 +438,9 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 		return unmarshalErr
 	}
 
+	// Set the client ID for analytics
+	newSession.OauthClientID = accessData.Client.Id
+
 	// Override timeouts so that we can be in sync with Osin
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
 
