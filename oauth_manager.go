@@ -7,7 +7,6 @@ import (
 	"github.com/RangelReale/osin"
 	"github.com/nu7hatch/gouuid"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -259,12 +258,6 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	}
 
 	return resp
-}
-
-// IsRequestValid will check if a key is valid or not
-func (o *OAuthManager) IsRequestValid(r *http.Request) bool {
-	// TODO: Integrate this
-	return true
 }
 
 // These enums fix the prefix to use when storing various OAuth keys and data, since we
@@ -533,7 +526,6 @@ func (r RedisOsinStorageInterface) RemoveRefresh(token string) error {
 	return nil
 }
 
-// TODO: This should be centralised
 // AccessTokenGenTyk is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
 type AccessTokenGenTyk struct {
 }
@@ -541,7 +533,7 @@ type AccessTokenGenTyk struct {
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
 func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken string, refreshtoken string, err error) {
 	log.Info("Generating new token")
-	u5, err := uuid.NewV4()
+
 	var newSession SessionState
 	marshalErr := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
 
@@ -551,13 +543,11 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 		return "", "", marshalErr
 	}
 
-	cleanSting := strings.Replace(u5.String(), "-", "", -1)
-	accesstoken = expandKey(newSession.OrgID, cleanSting)
+	accesstoken = authManager.GenerateAuthKey(newSession.OrgID)
 
 	if generaterefresh {
 		u6, _ := uuid.NewV4()
-		refreshtoken = strings.Replace(u6.String(), "-", "", -1)
-		refreshtoken = base64.StdEncoding.EncodeToString([]byte(refreshtoken))
+		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
 	}
 	return
 }

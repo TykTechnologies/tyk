@@ -32,6 +32,7 @@ func (a AccessRightsCheck) New() func(http.Handler) http.Handler {
 						"path":   r.URL.Path,
 						"origin": r.RemoteAddr,
 						"key":    authHeaderValue,
+						"api_found": false,
 					}).Info("Attempted access to unauthorised API.")
 					handler := ErrorHandler{a.TykMiddleware}
 					handler.HandleError(w, r, "Access to this API has been disallowed", 403)
@@ -40,18 +41,26 @@ func (a AccessRightsCheck) New() func(http.Handler) http.Handler {
 
 				// Find the version in their key access details
 				found := false
-				for _, vInfo := range versionList.Versions {
-					if vInfo == accessingVersion {
-						found = true
-						break
+				if a.Spec.VersionData.NotVersioned {
+					// Not versioned, no point checking version access rights
+					found = true
+				} else {
+					for _, vInfo := range versionList.Versions {
+						if vInfo == accessingVersion {
+							found = true
+							break
+						}
 					}
 				}
+
 				if !found {
 					// Not found? Bounce
 					log.WithFields(logrus.Fields{
 						"path":   r.URL.Path,
 						"origin": r.RemoteAddr,
 						"key":    authHeaderValue,
+						"api_found": true,
+						"version_found": false,
 					}).Info("Attempted access to unauthorised API version.")
 					handler := ErrorHandler{a.TykMiddleware}
 					handler.HandleError(w, r, "Access to this API has been disallowed", 403)

@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"time"
+	"github.com/nu7hatch/gouuid"
+	"strings"
 )
 
 // AuthorisationHandler is used to validate a session key,
@@ -79,4 +81,13 @@ func (b AuthorisationManager) GetSessionDetail(keyName string) (SessionState, bo
 // GetSessions returns all sessions in the key store that match a filter key (a prefix)
 func (b AuthorisationManager) GetSessions(filter string) []string {
 	return b.Store.GetKeys(filter)
+}
+
+// GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
+func (b AuthorisationManager) GenerateAuthKey(OrgID string) string {
+	u5, _ := uuid.NewV4()
+	cleanSting := strings.Replace(u5.String(), "-", "", -1)
+	newAuthKey := expandKey(OrgID, cleanSting)
+
+	return newAuthKey
 }

@@ -280,9 +280,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			log.Error(err)
 
 		} else {
-			u5, err := uuid.NewV4()
-			cleanSting := strings.Replace(u5.String(), "-", "", -1)
-			newKey := expandKey(newSession.OrgID, cleanSting)
+			newKey := authManager.GenerateAuthKey(newSession.OrgID)
 
 			if err != nil {
 				code = 400
@@ -291,10 +289,9 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				responseMessage = createError("Request malformed")
 
 			} else {
-				keyName := newKey
-				authManager.UpdateSession(keyName, newSession)
+				authManager.UpdateSession(newKey, newSession)
 				responseObj.Action = "create"
-				responseObj.Key = keyName
+				responseObj.Key = newKey
 				responseObj.Status = "ok"
 
 				responseMessage, err = json.Marshal(&responseObj)
@@ -306,7 +303,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					code = 500
 				} else {
 					log.WithFields(logrus.Fields{
-						"key": keyName,
+						"key": newKey,
 					}).Info("Generated new key - success.")
 				}
 
