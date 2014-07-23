@@ -140,7 +140,6 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 	osinStorage := RedisOsinStorageInterface{&storageManager}
 
 	if test {
-		// TODO: Remove this
 		log.Warning("Adding test client")
 		testClient := &osin.Client{
 			Id:          "1234",
@@ -155,8 +154,6 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
-
-	log.Warning("Configuration", spec.NotificationsDetails)
 
 	Muxer.HandleFunc(apiAuthorizePath, CheckIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
 	Muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
@@ -186,10 +183,10 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		tykMiddleware := TykMiddleware{spec, proxy}
 
 		chain := alice.New(
-			VersionCheck{tykMiddleware}.New(),
 			KeyExists{tykMiddleware}.New(),
 			Oauth2KeyExists{tykMiddleware}.New(),
 			KeyExpired{tykMiddleware}.New(),
+			VersionCheck{tykMiddleware}.New(),
 			AccessRightsCheck{tykMiddleware}.New(),
 			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
 		Muxer.Handle(spec.Proxy.ListenPath, chain)

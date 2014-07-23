@@ -34,7 +34,12 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			r.URL.Path = strings.Replace(r.URL.Path, e.TykMiddleware.Spec.Proxy.ListenPath, "", 1)
 		}
 
-		thisSessionState := context.Get(r, SessionData).(SessionState)
+		OauthClientID := ""
+		thisSessionState := context.Get(r, SessionData)
+
+		if thisSessionState != nil {
+			OauthClientID = thisSessionState.(SessionState).OauthClientID
+		}
 
 		thisRecord := AnalyticsRecord{
 			r.Method,
@@ -52,7 +57,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			e.Spec.APIDefinition.Name,
 			e.Spec.APIDefinition.APIID,
 			e.Spec.APIDefinition.OrgID,
-			thisSessionState.OauthClientID}
+			OauthClientID}
 		analytics.RecordHit(thisRecord)
 	}
 
