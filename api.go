@@ -54,7 +54,11 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		// Update our session object (create it)
 		if newSession.BasicAuthData.Password != "" {
 			// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
-			keyName = newSession.OrgID + keyName
+			// Only if it's NEW
+			if r.Method == "POST" {
+				keyName = newSession.OrgID + keyName
+			}
+
 		}
 		authManager.UpdateSession(keyName, newSession)
 		log.WithFields(logrus.Fields{
