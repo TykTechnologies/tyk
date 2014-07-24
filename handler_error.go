@@ -24,7 +24,14 @@ type ErrorHandler struct {
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
 	if config.EnableAnalytics {
 		t := time.Now()
-		keyName := r.Header.Get(e.Spec.APIDefinition.Auth.AuthHeaderName)
+
+		// Track the key ID if it exists
+		authHeaderValue := context.Get(r, AuthHeaderValue)
+		keyName := ""
+		if authHeaderValue != nil {
+			keyName = authHeaderValue.(string)
+		}
+
 		version := e.Spec.getVersionFromRequest(r)
 		if version == "" {
 			version = "Non Versioned"

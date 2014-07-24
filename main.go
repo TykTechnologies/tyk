@@ -182,14 +182,22 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 		tykMiddleware := TykMiddleware{spec, proxy}
 
-		chain := alice.New(
-			KeyExists{tykMiddleware}.New(),
-			Oauth2KeyExists{tykMiddleware}.New(),
-			KeyExpired{tykMiddleware}.New(),
-			VersionCheck{tykMiddleware}.New(),
-			AccessRightsCheck{tykMiddleware}.New(),
-			RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
-		Muxer.Handle(spec.Proxy.ListenPath, chain)
+		if spec.APIDefinition.UseKeylessAccess {
+			// for KeyLessAccess we can't support rate limiting, versioning or access rules
+			chain := alice.New().Then(proxyHandler)
+			Muxer.Handle(spec.Proxy.ListenPath, chain)
+
+		} else {
+			chain := alice.New(
+				KeyExists{tykMiddleware}.New(),
+				Oauth2KeyExists{tykMiddleware}.New(),
+				KeyExpired{tykMiddleware}.New(),
+				VersionCheck{tykMiddleware}.New(),
+				AccessRightsCheck{tykMiddleware}.New(),
+				RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+			Muxer.Handle(spec.Proxy.ListenPath, chain)
+		}
+
 	}
 }
 
