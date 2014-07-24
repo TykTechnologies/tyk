@@ -52,6 +52,10 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		responseMessage = createError("Request malformed")
 	} else {
 		// Update our session object (create it)
+		if newSession.BasicAuthData.Password != "" {
+			// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
+			keyName = newSession.OrgID + keyName
+		}
 		authManager.UpdateSession(keyName, newSession)
 		log.WithFields(logrus.Fields{
 			"key": keyName,

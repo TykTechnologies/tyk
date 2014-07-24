@@ -26,7 +26,10 @@ type SessionState struct {
 	QuotaRenewalRate int64                       `json:"quota_renewal_rate"`
 	AccessRights     map[string]AccessDefinition `json:"access_rights"`
 	OrgID            string                      `json:"org_id"`
-	OauthClientID	 string			     `json:"oauth_client_id"`
+	OauthClientID    string                      `json:"oauth_client_id"`
+	BasicAuthData    struct {
+		Password string `json:"password"`
+	} `json:"basic_auth_data"`
 }
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to

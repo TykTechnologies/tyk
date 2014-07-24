@@ -188,9 +188,23 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			Muxer.Handle(spec.Proxy.ListenPath, chain)
 
 		} else {
+
+			// Select the keying method to use for setting session states
+			var keyCheck func(http.Handler) http.Handler
+
+			if spec.APIDefinition.UseOauth2 {
+				// Oauth2
+				keyCheck = Oauth2KeyExists{tykMiddleware}.New()
+			} else if spec.APIDefinition.UseBasicAuth {
+				// Basic Auth
+				keyCheck = BasicAuthKeyIsValid{tykMiddleware}.New()
+			} else {
+				// Auth key
+				keyCheck = KeyExists{tykMiddleware}.New()
+			}
+
 			chain := alice.New(
-				KeyExists{tykMiddleware}.New(),
-				Oauth2KeyExists{tykMiddleware}.New(),
+				keyCheck,
 				KeyExpired{tykMiddleware}.New(),
 				VersionCheck{tykMiddleware}.New(),
 				AccessRightsCheck{tykMiddleware}.New(),
@@ -260,6 +274,8 @@ func init() {
 	}
 
 	doMemoryProfile, _ = arguments["--memprofile"].(bool)
+
+	log.Level = logrus.Debug
 
 }
 
