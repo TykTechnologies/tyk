@@ -28,7 +28,11 @@ func (k BasicAuthKeyIsValid) New() func(http.Handler) http.Handler {
 				}).Info("Attempted access with malformed header, no auth header found.")
 
 				handler := ErrorHandler{k.TykMiddleware}
-				handler.HandleError(w, r, "Authorisation field missing", 400)
+
+				authReply := "Basic realm=\"" + k.TykMiddleware.Spec.Name + "\""
+
+				w.Header().Add("WWW-Authenticate", authReply)
+				handler.HandleError(w, r, "Authorisation field missing", 401)
 				return
 			}
 

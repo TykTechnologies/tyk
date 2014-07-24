@@ -68,9 +68,10 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		go analytics.RecordHit(thisRecord)
 	}
 
-	w.WriteHeader(errCode)
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("X-Generator", "tyk.io")
+	log.Debug("Returning error header")
+	w.WriteHeader(errCode)
 	thisError := APIError{fmt.Sprintf("%s", err)}
 	templates.ExecuteTemplate(w, "error.json", &thisError)
 	if doMemoryProfile {
