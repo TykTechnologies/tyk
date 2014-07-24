@@ -58,7 +58,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			e.Spec.APIDefinition.APIID,
 			e.Spec.APIDefinition.OrgID,
 			OauthClientID}
-		analytics.RecordHit(thisRecord)
+		go analytics.RecordHit(thisRecord)
 	}
 
 	w.WriteHeader(errCode)

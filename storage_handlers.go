@@ -72,7 +72,6 @@ func (s InMemoryStorageManager) GetKeysAndValues() map[string]string {
 	return s.Sessions
 }
 
-
 // GetKeysAndValuesWithFilter does nothing here
 func (s InMemoryStorageManager) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	log.Warning("NOT IMPLEMENTED")
@@ -149,7 +148,7 @@ func (r *RedisStorageManager) cleanKey(keyName string) string {
 func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	db := r.pool.Get()
 	defer db.Close()
-	log.Info("Getting key: ", r.fixKey(keyName))
+	log.Debug("Getting key: ", r.fixKey(keyName))
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
@@ -171,7 +170,7 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
 	db := r.pool.Get()
 	defer db.Close()
-	log.Info("Setting key: ", r.fixKey(keyName))
+	log.Debug("Setting key: ", r.fixKey(keyName))
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()

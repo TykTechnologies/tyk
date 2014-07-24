@@ -49,7 +49,6 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		thisSessionState := context.Get(r, SessionData).(SessionState)
 
-
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
@@ -67,7 +66,8 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.Spec.APIDefinition.APIID,
 			s.Spec.APIDefinition.OrgID,
 			thisSessionState.OauthClientID}
-		analytics.RecordHit(thisRecord)
+
+		go analytics.RecordHit(thisRecord)
 	}
 
 	s.Proxy.ServeHTTP(w, r)
