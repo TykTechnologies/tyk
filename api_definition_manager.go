@@ -32,6 +32,7 @@ type APIDefinition struct {
 		Location string `bson:"location" json:"location"`
 		Key      string `bson:"key" json:"key"`
 	} `bson:"definition" json:"definition"`
+	EnableSignatureChecking bool `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	VersionData struct {
 		NotVersioned bool                   `bson:"not_versioned" json:"not_versioned"`
 		Versions     map[string]VersionInfo `bson:"versions" json:"versions"`

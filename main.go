@@ -198,6 +198,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			} else if spec.APIDefinition.UseBasicAuth {
 				// Basic Auth
 				keyCheck = BasicAuthKeyIsValid{tykMiddleware}.New()
+			} else if spec.EnableSignatureChecking {
+				// HMAC Auth
+				keyCheck = HMACMiddleware{tykMiddleware}.New()
 			} else {
 				// Auth key
 				keyCheck = KeyExists{tykMiddleware}.New()

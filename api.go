@@ -290,31 +290,27 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			newKey := authManager.GenerateAuthKey(newSession.OrgID)
 
+			// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
+			if newSession.HMACEnabled {
+				newSession.HmacSecret = authManager.GenerateHMACSecret()
+			}
+
+			authManager.UpdateSession(newKey, newSession)
+			responseObj.Action = "create"
+			responseObj.Key = newKey
+			responseObj.Status = "ok"
+
+			responseMessage, err = json.Marshal(&responseObj)
+
 			if err != nil {
-				code = 400
-				log.Error("Couldn't decode body")
+				log.Error("Marshalling failed")
 				log.Error(err)
-				responseMessage = createError("Request malformed")
-
+				responseMessage = []byte(E_SYSTEM_ERROR)
+				code = 500
 			} else {
-				authManager.UpdateSession(newKey, newSession)
-				responseObj.Action = "create"
-				responseObj.Key = newKey
-				responseObj.Status = "ok"
-
-				responseMessage, err = json.Marshal(&responseObj)
-
-				if err != nil {
-					log.Error("Marshalling failed")
-					log.Error(err)
-					responseMessage = []byte(E_SYSTEM_ERROR)
-					code = 500
-				} else {
-					log.WithFields(logrus.Fields{
-						"key": newKey,
-					}).Info("Generated new key - success.")
-				}
-
+				log.WithFields(logrus.Fields{
+					"key": newKey,
+				}).Info("Generated new key - success.")
 			}
 		}
 

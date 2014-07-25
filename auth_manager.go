@@ -5,6 +5,7 @@ import (
 	"time"
 	"github.com/nu7hatch/gouuid"
 	"strings"
+	"encoding/base64"
 )
 
 // AuthorisationHandler is used to validate a session key,
@@ -90,4 +91,14 @@ func (b AuthorisationManager) GenerateAuthKey(OrgID string) string {
 	newAuthKey := expandKey(OrgID, cleanSting)
 
 	return newAuthKey
+}
+
+// GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
+func (b AuthorisationManager) GenerateHMACSecret() string {
+	u5, _ := uuid.NewV4()
+	cleanSting := strings.Replace(u5.String(), "-", "", -1)
+	newSecret := base64.StdEncoding.EncodeToString([]byte(cleanSting))
+
+
+	return newSecret
 }
