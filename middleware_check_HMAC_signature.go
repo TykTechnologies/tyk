@@ -11,11 +11,15 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
+	"time"
+	"math"
 )
 
 // Test key: 53ac07777cbb8c2d530000021a42331a43bd45555d5c923bdb36fc8a
 
-const DateHeaderSpec string = "X-Date"
+// TODO: change these to real values
+const DateHeaderSpec string = "X-Date"  // "Date"
+const HMACClockSkewLimitInMs float64 = 300000000000  // 300
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
@@ -50,6 +54,18 @@ func (hm HMACMiddleware) New() func(http.Handler) http.Handler {
 			if r.Header.Get(DateHeaderSpec) == "" {
 				log.Debug("Date missing")
 				hm.authorizationError(w, r)
+				return
+			}
+
+			isOutOftime := hm.checkClockSkew(r.Header.Get(DateHeaderSpec))
+			if isOutOftime == false {
+				log.WithFields(logrus.Fields{
+					"path":   r.URL.Path,
+					"origin": r.RemoteAddr,
+				}).Info("Date is out of allowed range.")
+
+				handler := ErrorHandler{hm.TykMiddleware}
+				handler.HandleError(w, r, "Date is out of allowed range.", 400)
 				return
 			}
 
@@ -233,4 +249,30 @@ func (hm HMACMiddleware) generateSignatureFromRequest(r *http.Request, secret st
 
 	// Return as base64
 	return encodedString
+}
+
+func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
+	// Reference layout for parsing time: "Mon Jan 2 15:04:05 MST 2006"
+
+	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+
+	tim, err := time.Parse(refDate, dateHeaderValue)
+
+	if err != nil {
+		log.Error("Date parsing failed")
+		return false
+	}
+
+	inSec := tim.UnixNano()
+	now := time.Now().UnixNano()
+
+	diff := now - inSec
+
+	in_ms := diff / 1000000
+	if math.Abs(float64(in_ms)) > HMACClockSkewLimitInMs {
+		log.Debug("Difference is: ", math.Abs(float64(in_ms)))
+		return false
+	}
+
+	return true
 }
