@@ -244,6 +244,7 @@ func init() {
 		--conf=FILE    Load a named configuration file
 		--port=PORT    Listen on PORT (overrides confg file)
 		--memprofile   Generate a memory profile
+		--debug		   Enable Debug output
 
 	`
 
@@ -278,7 +279,13 @@ func init() {
 
 	doMemoryProfile, _ = arguments["--memprofile"].(bool)
 
-	log.Level = logrus.Debug
+	doDebug, _ := arguments["--debug"]
+	log.Level = logrus.Info
+	if doDebug == true {
+		log.Level = logrus.Debug
+		log.Debug("Enabling debug-level output")
+	}
+
 
 }
 

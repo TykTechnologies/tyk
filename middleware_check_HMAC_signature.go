@@ -18,8 +18,8 @@ import (
 // Test key: 53ac07777cbb8c2d530000021a42331a43bd45555d5c923bdb36fc8a
 
 // TODO: change these to real values
-const DateHeaderSpec string = "X-Date"  // "Date"
-const HMACClockSkewLimitInMs float64 = 300000000000  // 300
+const DateHeaderSpec string = "Date"
+const HMACClockSkewLimitInMs float64 = 300
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
