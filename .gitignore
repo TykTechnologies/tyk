@@ -8,3 +8,4 @@ test.conf
 apps/test.json
 logs
 lint_results.txt
+build/
