@@ -35,6 +35,12 @@ type SuccessHandler struct {
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	// Make sure we get the correct target URL
+	if s.Spec.APIDefinition.Proxy.StripListenPath {
+		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
+	}
+
 	if config.EnableAnalytics {
 		t := time.Now()
 
@@ -49,11 +55,6 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		version := s.Spec.getVersionFromRequest(r)
 		if version == "" {
 			version = "Non Versioned"
-		}
-
-		// Make sure we get the correct target URL
-		if s.Spec.APIDefinition.Proxy.StripListenPath {
-			r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 		}
 
 		// If OAuth, we need to grab it from the session, which may or may not exist

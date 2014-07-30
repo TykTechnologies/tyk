@@ -11,7 +11,6 @@ import (
 	"html/template"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"strconv"
@@ -107,7 +106,7 @@ func getAPISpecs() []APISpec {
 		log.Info("Using App Configuration from Mongo DB")
 		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
 	} else {
-		APISpecs = thisAPILoader.LoadDefinitions("./apps/")
+		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
 	}
 
 	return APISpecs
@@ -177,7 +176,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			addOAuthHandlers(spec, Muxer, false)
 		}
 
-		proxy := httputil.NewSingleHostReverseProxy(remote)
+		proxy := TykNewSingleHostReverseProxy(remote)
+		spec.target = remote
 
 		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 		tykMiddleware := TykMiddleware{spec, proxy}

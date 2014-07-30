@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"net/url"
 )
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
@@ -101,6 +102,7 @@ type APISpec struct {
 	APIDefinition
 	RxPaths          map[string][]URLSpec
 	WhiteListEnabled map[string]bool
+	target *url.URL
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()

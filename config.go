@@ -11,6 +11,7 @@ type Config struct {
 	Secret          string `json:"secret"`
 	TemplatePath    string `json:"template_path"`
 	UseDBAppConfigs bool   `json:"use_db_app_configs"`
+	AppPath			string `json:"app_path"`
 	Storage         struct {
 		Type     string `json:"type"`
 		Host     string `json:"host"`
@@ -35,6 +36,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Secret = "352d20ee67be67f6340b4c0605b044b7"
 	configStruct.TemplatePath = "/etc/tyk/templates"
 	configStruct.Storage.Type = "memory"
+	configStruct.AppPath = "/etc/tyk/apps/"
 	configStruct.Storage.Host = "localhost"
 	configStruct.Storage.Username = "user"
 	configStruct.Storage.Password = "password"
