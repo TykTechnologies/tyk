@@ -265,7 +265,12 @@ func init() {
 
 	loadConfig(filename, &config)
 
+	if config.Storage.Type != "redis" {
+		log.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
+	}
+
 	setupGlobals()
+
 	port, _ := arguments["--port"]
 	if port != nil {
 		portNum, err := strconv.Atoi(port.(string))
