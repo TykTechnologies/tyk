@@ -37,7 +37,7 @@ const (
 // Display introductory details
 func intro() {
 	fmt.Print("\n\n")
-	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v0.1", goterm.GREEN)))
+	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v1.0", goterm.GREEN)))
 	fmt.Println(goterm.Bold(goterm.Color("=======================", goterm.GREEN)))
 	fmt.Print("Copyright Jively Ltd. 2014")
 	fmt.Print("\nhttp://www.tyk.io\n\n")
@@ -254,7 +254,7 @@ func init() {
 		log.Fatal(err)
 	}
 
-	filename := "tyk.conf"
+	filename := "/etc/tyk/tyk.conf"
 	value, _ := arguments["--conf"]
 	if value != nil {
 		log.Info(fmt.Sprintf("Using %s for configuration", value.(string)))
