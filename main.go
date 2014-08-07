@@ -291,7 +291,6 @@ func init() {
 		log.Debug("Enabling debug-level output")
 	}
 
-
 }
 
 func main() {

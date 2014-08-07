@@ -30,8 +30,8 @@ type SessionState struct {
 	BasicAuthData    struct {
 		Password string `json:"password"`
 	} `json:"basic_auth_data"`
-	HMACEnabled bool `json:"hmac_enabled"`
-	HmacSecret string `json:"hmac_string"`
+	HMACEnabled bool   `json:"hmac_enabled"`
+	HmacSecret  string `json:"hmac_string"`
 }
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to

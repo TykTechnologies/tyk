@@ -29,9 +29,9 @@ func (a AccessRightsCheck) New() func(http.Handler) http.Handler {
 				versionList, apiExists := thisSessionState.AccessRights[a.Spec.APIID]
 				if !apiExists {
 					log.WithFields(logrus.Fields{
-						"path":   r.URL.Path,
-						"origin": r.RemoteAddr,
-						"key":    authHeaderValue,
+						"path":      r.URL.Path,
+						"origin":    r.RemoteAddr,
+						"key":       authHeaderValue,
 						"api_found": false,
 					}).Info("Attempted access to unauthorised API.")
 					handler := ErrorHandler{a.TykMiddleware}
@@ -56,10 +56,10 @@ func (a AccessRightsCheck) New() func(http.Handler) http.Handler {
 				if !found {
 					// Not found? Bounce
 					log.WithFields(logrus.Fields{
-						"path":   r.URL.Path,
-						"origin": r.RemoteAddr,
-						"key":    authHeaderValue,
-						"api_found": true,
+						"path":          r.URL.Path,
+						"origin":        r.RemoteAddr,
+						"key":           authHeaderValue,
+						"api_found":     true,
 						"version_found": false,
 					}).Info("Attempted access to unauthorised API version.")
 					handler := ErrorHandler{a.TykMiddleware}

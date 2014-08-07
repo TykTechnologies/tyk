@@ -7,11 +7,11 @@ import (
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
-	"net/url"
 )
 
 // APIDefinition represents the configuration for a single proxied API and it's versions.
@@ -34,7 +34,7 @@ type APIDefinition struct {
 		Key      string `bson:"key" json:"key"`
 	} `bson:"definition" json:"definition"`
 	EnableSignatureChecking bool `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	VersionData struct {
+	VersionData             struct {
 		NotVersioned bool                   `bson:"not_versioned" json:"not_versioned"`
 		Versions     map[string]VersionInfo `bson:"versions" json:"versions"`
 	} `bson:"version_data" json:"version_data"`
@@ -102,7 +102,7 @@ type APISpec struct {
 	APIDefinition
 	RxPaths          map[string][]URLSpec
 	WhiteListEnabled map[string]bool
-	target *url.URL
+	target           *url.URL
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()

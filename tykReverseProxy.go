@@ -8,11 +8,10 @@ package main
 
 import (
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
-	"net/http/httputil"
 )
-
 
 // Copied form the original stdlib for ReverseProxy
 func singleJoiningSlash(a, b string) string {
@@ -48,4 +47,3 @@ func TykNewSingleHostReverseProxy(target *url.URL) *httputil.ReverseProxy {
 	}
 	return &httputil.ReverseProxy{Director: director}
 }
-

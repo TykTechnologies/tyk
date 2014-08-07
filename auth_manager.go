@@ -1,11 +1,11 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
-	"time"
 	"github.com/nu7hatch/gouuid"
 	"strings"
-	"encoding/base64"
+	"time"
 )
 
 // AuthorisationHandler is used to validate a session key,
@@ -98,7 +98,6 @@ func (b AuthorisationManager) GenerateHMACSecret() string {
 	u5, _ := uuid.NewV4()
 	cleanSting := strings.Replace(u5.String(), "-", "", -1)
 	newSecret := base64.StdEncoding.EncodeToString([]byte(cleanSting))
-
 
 	return newSecret
 }

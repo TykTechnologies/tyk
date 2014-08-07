@@ -51,11 +51,11 @@ const (
 // NewOAuthNotification is a notification sent to a
 // webhook when an access request or a refresh request comes in.
 type NewOAuthNotification struct {
-	AuthCode         string
-	NewOAuthToken    string
-	RefreshToken     string
-	OldRefreshToken  string
-	NotificationType OAuthNotificationType
+	AuthCode         string                `json:"auth_code"`
+	NewOAuthToken    string                `json:"new_oauth_token"`
+	RefreshToken     string                `json:"refresh_token"`
+	OldRefreshToken  string                `json:"old_refresh_token"`
+	NotificationType OAuthNotificationType `json:"notification_type"`
 }
 
 // OAuthHandlers are the HTTP Handlers that manage the Tyk OAuth flow
@@ -385,7 +385,6 @@ func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) e
 
 	}
 
-
 }
 
 // LoadAuthorize loads auth data from redis
@@ -446,8 +445,6 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 
 	authManager.UpdateSession(accessData.AccessToken, newSession)
 
-
-
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
 		if accessDataJSON, marshalErr := json.Marshal(&accessData); marshalErr != nil {
@@ -458,7 +455,6 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 			r.store.SetKey(key, string(accessDataJSON), int64(accessData.ExpiresIn))
 			return nil
 		}
-
 
 	}
 

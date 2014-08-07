@@ -3,16 +3,16 @@ package main
 import "net/http"
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
-	"strings"
-	"net/url"
-	"sort"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"time"
+	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/context"
 	"math"
+	"net/url"
+	"sort"
+	"strings"
+	"time"
 )
 
 // Test key: 53ac07777cbb8c2d530000021a42331a43bd45555d5c923bdb36fc8a
@@ -100,7 +100,7 @@ func (hm HMACMiddleware) New() func(http.Handler) http.Handler {
 			keyId := ""
 			algorithm := ""
 			signature := ""
-			for _, v := range(splitValues) {
+			for _, v := range splitValues {
 				splitKeyValuePair := strings.Split(v, "=")
 				if len(splitKeyValuePair) != 2 {
 					hm.authorizationError(w, r)
@@ -194,12 +194,12 @@ func (hm HMACMiddleware) parseFormParams(values url.Values) string {
 
 	log.Debug("Parsing header values")
 
-	for k, v := range(values) {
+	for k, v := range values {
 		log.Debug("Form parser - processing key: ", k)
 		log.Debug("Form parser - processing value: ", v)
 		encodedKey := url.QueryEscape(k)
 		encodedVals := []string{}
-		for _, raw_value := range(v) {
+		for _, raw_value := range v {
 			encodedVals = append(encodedVals, url.QueryEscape(raw_value))
 		}
 		joined_vals := strings.Join(encodedVals, "|")
@@ -213,7 +213,7 @@ func (hm HMACMiddleware) parseFormParams(values url.Values) string {
 	sortedKvs := []string{}
 
 	// Put the prepared key value params in order according to above sort
-	for _, sk := range(keys) {
+	for _, sk := range keys {
 		sortedKvs = append(sortedKvs, kvValues[sk])
 	}
 
