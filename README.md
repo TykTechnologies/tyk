@@ -42,3 +42,26 @@ All the documentation can be found on our main site at http://tyk.io/about/
 ## License ##
 
 Tyk is released under the MPL v2.0 please see the LICENSE.md file for a full version of the license.
+
+## Contribute / Build ##
+
+To get started contributing, clone the repo to your local go workspace, change into the new tyk directory and run `go get`, this should retrieve all the dependencies.
+
+We are orking to increae test coverage of features, currently the majority of auth methods and middleware are tested, however it could always be better.
+
+Any changes that are submitted with a pull request should come with a test and be in a separate branch. Basically, use this checklist:
+
+- Do your changes have tests?
+- Have you run the tests?
+- Did they pass?
+- Have you written a test for your feature?
+- Does it pass after merge?
+
+If you can answer yes to all of the above, feel free to submit a pull reuqest :-0)
+
+### A note on the tests
+
+Currently in order for tests to pass, a redis host is required. We know, this is terrible and shoul dbe handled with an interface, and it is, however
+in the current version there is a hard requirement for the application to have it's default memory setup to use redis as part of a deployment, this is
+to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement.
+

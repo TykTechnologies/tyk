@@ -34,9 +34,9 @@ type Config struct {
 func WriteDefaultConf(configStruct *Config) {
 	configStruct.ListenPort = 8080
 	configStruct.Secret = "352d20ee67be67f6340b4c0605b044b7"
-	configStruct.TemplatePath = "/etc/tyk/templates"
-	configStruct.Storage.Type = "memory"
-	configStruct.AppPath = "/etc/tyk/apps/"
+	configStruct.TemplatePath = "./templates"
+	configStruct.Storage.Type = "redis"
+	configStruct.AppPath = "./apps/"
 	configStruct.Storage.Host = "localhost"
 	configStruct.Storage.Username = "user"
 	configStruct.Storage.Password = "password"
