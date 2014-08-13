@@ -130,8 +130,8 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 
 	serverConfig := osin.NewServerConfig()
 	serverConfig.ErrorStatusCode = 403
-	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes       //osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
-	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes // osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
+	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
+	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
 	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
@@ -248,7 +248,7 @@ func init() {
 
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, "Tyk v1.0", false)
+	arguments, err := docopt.Parse(usage, nil, true, "v1.0", false)
 	if err != nil {
 		log.Println("Error while parsing arguments.")
 		log.Fatal(err)
