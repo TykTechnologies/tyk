@@ -57,7 +57,7 @@ Any changes that are submitted with a pull request should come with a test and b
 - Have you written a test for your feature?
 - Does it pass after merge?
 
-If you can answer yes to all of the above, feel free to submit a pull reuqest :-0)
+If you can answer yes to all of the above, feel free to submit a pull reuqest :-)
 
 ### A note on the tests
 
