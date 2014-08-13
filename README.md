@@ -38,3 +38,7 @@ simple and does one thing well - protecting your API from unauthorised access.
 ## Documentation ##
 
 All the documentation can be found on our main site at http://tyk.io/about/
+
+## License ##
+
+Tyk is released under the MPL v2.0 please see the LICENSE.md file for a full version of the license.
