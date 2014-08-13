@@ -87,7 +87,7 @@ cd $i386BINDIR
 
 # Create the packaging skeleton (debian/*)
 #dh_make -s --indep --createorig --yes
-dh_make --s --createorig --yes
+dh_make -s --indep --createorig --yes
 
 # Remove make calls
 grep -v makefile debian/rules > debian/rules.new
