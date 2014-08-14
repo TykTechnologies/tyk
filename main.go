@@ -194,7 +194,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 			if spec.APIDefinition.UseOauth2 {
 				// Oauth2
-				keyCheck = Oauth2KeyExists{tykMiddleware}.New()
+				keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
 			} else if spec.APIDefinition.UseBasicAuth {
 				// Basic Auth
 				keyCheck = BasicAuthKeyIsValid{tykMiddleware}.New()

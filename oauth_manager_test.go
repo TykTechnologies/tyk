@@ -85,7 +85,7 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 	tykMiddleware := TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
-		Oauth2KeyExists{tykMiddleware}.New(),
+		CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
