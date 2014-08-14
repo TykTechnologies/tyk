@@ -24,10 +24,10 @@ Tyk offers powerful, yet lightweight features that allow fine gained control ove
 * **Key Expiry** - Control how long keys are valid for
 * **API Versioning** - API Versions can be easily set and deprecated at a specific time and date
 * **Blacklist/Whitelist/Ignored endpoint access** - Enforce strict security models on a version-by-version basis to your access points
-* **Analyitcs logging** - Record detailed usage data on who is using your API's (raw data only)
+* **Analytics logging** - Record detailed usage data on who is using your API's (raw data only)
 * **Zero downtime restarts** - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
 
-Tyk is written in Go, which makes it fast and easy to set up. It's only dependencies are a Mongo database (for analytics) and Redis, 
+Tyk is written in Go, which makes it fast and easy to set up. Its only dependencies are a Mongo database (for analytics) and Redis, 
 though it can be deployed without wither (not recommended).
 
 ## Why? ##
@@ -47,7 +47,7 @@ Tyk is released under the MPL v2.0 please see the LICENSE.md file for a full ver
 
 To get started contributing, clone the repo to your local go workspace, change into the new tyk directory and run `go get`, this should retrieve all the dependencies.
 
-We are orking to increae test coverage of features, currently the majority of auth methods and middleware are tested, however it could always be better.
+We are working to increase test coverage of features, currently the majority of auth methods and middleware are tested, however it could always be better.
 
 Any changes that are submitted with a pull request should come with a test and be in a separate branch. Basically, use this checklist:
 
@@ -57,11 +57,11 @@ Any changes that are submitted with a pull request should come with a test and b
 - Have you written a test for your feature?
 - Does it pass after merge?
 
-If you can answer yes to all of the above, feel free to submit a pull reuqest :-)
+If you can answer yes to all of the above, feel free to submit a pull request :-)
 
 ### A note on the tests
 
-Currently in order for tests to pass, a redis host is required. We know, this is terrible and shoul dbe handled with an interface, and it is, however
-in the current version there is a hard requirement for the application to have it's default memory setup to use redis as part of a deployment, this is
+Currently in order for tests to pass, a redis host is required. We know, this is terrible and should be handled with an interface, and it is, however
+in the current version there is a hard requirement for the application to have its default memory setup to use redis as part of a deployment, this is
 to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement.
 
