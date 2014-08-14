@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/justinas/alice"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"testing"
 	"time"
-	"github.com/justinas/alice"
 )
 
 func createThrottledSession() SessionState {
@@ -102,7 +102,6 @@ func createNonVersionedDefinition() APISpec {
 
 }
 
-
 func TestThrottling(t *testing.T) {
 	spec := createNonVersionedDefinition()
 	thisSession := createThrottledSession()
@@ -121,7 +120,6 @@ func TestThrottling(t *testing.T) {
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
-
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)

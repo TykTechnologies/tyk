@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"math"
@@ -13,7 +14,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"errors"
 )
 
 // Test key: 53ac07777cbb8c2d530000021a42331a43bd45555d5c923bdb36fc8a
@@ -45,7 +45,7 @@ func (hm *HMACMiddleware) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	log.Debug("HMAC middleware activated")
 
 	authHeaderValue := r.Header.Get("Authorization")

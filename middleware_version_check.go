@@ -20,7 +20,7 @@ func (v *VersionCheck) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Check versioning, blacklist, whitelist and ignored status
 	requestValid, stat := v.TykMiddleware.Spec.IsRequestValid(r)
 	if requestValid == false {

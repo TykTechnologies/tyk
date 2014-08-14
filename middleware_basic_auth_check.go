@@ -4,10 +4,10 @@ import "net/http"
 
 import (
 	"encoding/base64"
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"strings"
-	"errors"
 )
 
 // BasicAuthKeyIsValid uses a username instead of
@@ -24,7 +24,7 @@ func (k *BasicAuthKeyIsValid) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	authHeaderValue := r.Header.Get("Authorization")
 	if authHeaderValue == "" {
 		// No header value, fail

@@ -3,10 +3,10 @@ package main
 import "net/http"
 
 import (
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
-	"errors"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -36,7 +36,7 @@ func (k *AuthKey) GetConfig() (interface{}, error) {
 	return thisModuleConfig, nil
 }
 
-func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	var thisConfig AuthKeyConfiguration
 	thisConfig = configuration.(AuthKeyConfiguration)
 

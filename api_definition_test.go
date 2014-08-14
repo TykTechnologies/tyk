@@ -1,11 +1,11 @@
 package main
 
 import (
-	"testing"
-	"net/url"
-	"net/http"
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
+	"net/url"
+	"testing"
 )
 
 var sampleDefiniton string = `
@@ -125,7 +125,6 @@ var nonExpiringMultiDef string = `
 
 `
 
-
 func createDefinitionFromString(defStr string) APISpec {
 	var thisLoader = APIDefinitionLoader{}
 
@@ -146,7 +145,6 @@ func writeDefToFile(configStruct APIDefinition) {
 		ioutil.WriteFile("app_sample.json", newConfig, 0644)
 	}
 }
-
 
 func TestExpiredRequest(t *testing.T) {
 	uri := "/v1/bananaphone"
@@ -186,7 +184,7 @@ func TestNotVersioned(t *testing.T) {
 	thisSpec := createDefinitionFromString(nonExpiringDef)
 	thisSpec.VersionData.NotVersioned = true
 
-//	writeDefToFile(thisSpec.APIDefinition)
+	//	writeDefToFile(thisSpec.APIDefinition)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok != true {
@@ -375,7 +373,6 @@ func TestIgnored(t *testing.T) {
 		t.Error(status)
 	}
 }
-
 
 func TestBlacklistLinksMulti(t *testing.T) {
 	uri := "v1/disallowed/blacklist/literal"

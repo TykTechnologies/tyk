@@ -7,7 +7,7 @@ import ()
 type TykMiddlewareImplementation interface {
 	New()
 	GetConfig() (interface{}, error)
-	ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) // Handles request
+	ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) // Handles request
 }
 
 // Generic middleware caller to make extension easier

@@ -3,10 +3,10 @@ package main
 import "net/http"
 
 import (
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"strings"
-	"errors"
 )
 
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,
@@ -24,13 +24,13 @@ func (k *Oauth2KeyExists) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
 	// We're using OAuth, start checking for access keys
 	authHeaderValue := r.Header.Get("Authorization")
 	parts := strings.Split(authHeaderValue, " ")
 	if len(parts) < 2 {
-			log.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
 		}).Info("Attempted access with malformed header, no auth header found.")

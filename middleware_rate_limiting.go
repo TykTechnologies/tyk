@@ -3,9 +3,9 @@ package main
 import "net/http"
 
 import (
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	"errors"
 )
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
@@ -23,7 +23,7 @@ func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	sessionLimiter := SessionLimiter{}
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
@@ -51,7 +51,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				"origin": r.RemoteAddr,
 				"key":    authHeaderValue,
 			}).Info("Key quota limit exceeded.")
-			return  errors.New("Quota exceeded"), 403
+			return errors.New("Quota exceeded"), 403
 		}
 		// Other reason? Still not allowed
 		return errors.New("Access denied"), 403

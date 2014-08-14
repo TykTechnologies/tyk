@@ -3,9 +3,9 @@ package main
 import "net/http"
 
 import (
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	"errors"
 )
 
 // AccessRightsCheck is a midleware that will check if the key bing used to access the API has
@@ -24,7 +24,7 @@ func (a *AccessRightsCheck) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	accessingVersion := a.Spec.getVersionFromRequest(r)
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue)
@@ -74,7 +74,6 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	return nil, 200
 }
-
 
 //// New creates a new HttpHandler for the alice middleware package
 //func (a AccessRightsCheck) New() func(http.Handler) http.Handler {

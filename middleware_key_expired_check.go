@@ -3,9 +3,9 @@ package main
 import "net/http"
 
 import (
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	"errors"
 )
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.
@@ -22,7 +22,7 @@ func (k *KeyExpired) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 	keyExpired := authManager.IsKeyExpired(&thisSessionState)

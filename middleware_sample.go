@@ -1,10 +1,13 @@
 package main
 
 import (
-	"net/http"
 	"errors"
 	"github.com/mitchellh/mapstructure"
+	"net/http"
 )
+
+// It's very easy to create custom middleware
+// TODO: Write the docs around this
 
 // ModifiedMiddleware is a sample custom middleware component, must inherit TykMiddleware
 // so you have access to spec and definition data
@@ -33,7 +36,7 @@ func (m *ModifiedMiddleware) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (m *ModifiedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+func (m *ModifiedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	var thisConfig ModifiedMiddlewareConfig
 	thisConfig = configuration.(ModifiedMiddlewareConfig)
 	log.Info("Custom configuration: ", thisConfig.CustomConfigVar)
