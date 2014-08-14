@@ -211,7 +211,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
-				AccessRightsCheck{tykMiddleware}.New(),
+				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
 
 			Muxer.Handle(spec.Proxy.ListenPath, chain)

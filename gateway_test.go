@@ -54,7 +54,7 @@ func getChain(spec APISpec) http.Handler {
 		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		AccessRightsCheck{tykMiddleware}.New(),
+		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 		RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
 
 	return chain
