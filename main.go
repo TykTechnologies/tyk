@@ -194,24 +194,26 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 			if spec.APIDefinition.UseOauth2 {
 				// Oauth2
-				keyCheck = Oauth2KeyExists{tykMiddleware}.New()
+				keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
 			} else if spec.APIDefinition.UseBasicAuth {
 				// Basic Auth
-				keyCheck = BasicAuthKeyIsValid{tykMiddleware}.New()
+				keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
 			} else if spec.EnableSignatureChecking {
 				// HMAC Auth
-				keyCheck = HMACMiddleware{tykMiddleware}.New()
+				keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
 			} else {
 				// Auth key
-				keyCheck = KeyExists{tykMiddleware}.New()
+				keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
 			}
 
+			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 			chain := alice.New(
 				keyCheck,
-				KeyExpired{tykMiddleware}.New(),
-				VersionCheck{tykMiddleware}.New(),
-				AccessRightsCheck{tykMiddleware}.New(),
-				RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+
 			Muxer.Handle(spec.Proxy.ListenPath, chain)
 		}
 

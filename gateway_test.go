@@ -51,48 +51,55 @@ func getChain(spec APISpec) http.Handler {
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 	tykMiddleware := TykMiddleware{spec, proxy}
 	chain := alice.New(
-		VersionCheck{tykMiddleware}.New(),
-		KeyExists{tykMiddleware}.New(),
-		KeyExpired{tykMiddleware}.New(),
-		AccessRightsCheck{tykMiddleware}.New(),
-		RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
 	return chain
 }
 
+var nonExpiringDefNoWhiteList string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "1",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"v1": {
+					"name": "v1",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"black_list": [],
+						"white_list": []
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
 func createNonVersionedDefinition() APISpec {
-	var thisDef = APIDefinition{}
-	var v1 = VersionInfo{}
-	var thisSpec = APISpec{}
-	var thisLoader = APIDefinitionLoader{}
 
-	thisDef.Name = "Test API"
-	thisDef.VersionDefinition.Key = "version"
-	thisDef.VersionDefinition.Location = "header"
-	thisDef.VersionData.NotVersioned = true
+	return createDefinitionFromString(nonExpiringDefNoWhiteList)
 
-	v1.Name = "v1"
-	thisDef.Auth.AuthHeaderName = "authorisation"
-	v1.Expires = "2106-01-02 15:04"
-	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetURL = "http://lonelycode.com"
-	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
-	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
-
-	thisDef.VersionData.Versions = make(map[string]VersionInfo)
-	thisDef.VersionData.Versions[v1.Name] = v1
-
-	thisSpec.APIDefinition = thisDef
-
-	thisSpec.RxPaths = make(map[string][]URLSpec)
-	thisSpec.WhiteListEnabled = make(map[string]bool)
-
-	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
-	thisSpec.RxPaths[v1.Name] = pathSpecs
-
-	thisSpec.WhiteListEnabled[v1.Name] = whiteListSpecs
-
-	return thisSpec
 }
 
 
@@ -106,7 +113,7 @@ func TestThrottling(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorisation", "1234")
+	req.Header.Add("authorization", "1234")
 
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +158,7 @@ func TestQuota(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorisation", "4321")
+	req.Header.Add("authorization", "4321")
 
 	if err != nil {
 		t.Fatal(err)

@@ -5,6 +5,7 @@ import "net/http"
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"errors"
 )
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
@@ -13,53 +14,49 @@ type RateLimitAndQuotaCheck struct {
 	TykMiddleware
 }
 
-// New creates a new HttpHandler for the alice middleware package
-func (k RateLimitAndQuotaCheck) New() func(http.Handler) http.Handler {
-	aliceHandler := func(h http.Handler) http.Handler {
-		thisHandler := func(w http.ResponseWriter, r *http.Request) {
-			sessionLimiter := SessionLimiter{}
-			thisSessionState := context.Get(r, SessionData).(SessionState)
-			authHeaderValue := context.Get(r, AuthHeaderValue).(string)
-			forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
+// New lets you do any initialisations for the object can be done here
+func (k *RateLimitAndQuotaCheck) New() {}
 
-			// Ensure quota and rate data for this session are recorded
-			authManager.UpdateSession(authHeaderValue, thisSessionState)
+// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
+func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
+	return nil, nil
+}
 
-			log.Debug("SessionState: ", thisSessionState)
+// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+	sessionLimiter := SessionLimiter{}
+	thisSessionState := context.Get(r, SessionData).(SessionState)
+	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
+	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
 
-			if !forwardMessage {
-				// TODO Use an Enum!
-				if reason == 1 {
-					log.WithFields(logrus.Fields{
-						"path":   r.URL.Path,
-						"origin": r.RemoteAddr,
-						"key":    authHeaderValue,
-					}).Info("Key rate limit exceeded.")
+	// Ensure quota and rate data for this session are recorded
+	authManager.UpdateSession(authHeaderValue, thisSessionState)
 
-					handler := ErrorHandler{k.TykMiddleware}
-					handler.HandleError(w, r, "Rate limit exceeded", 403)
-					return
+	log.Debug("SessionState: ", thisSessionState)
 
-				} else if reason == 2 {
-					log.WithFields(logrus.Fields{
-						"path":   r.URL.Path,
-						"origin": r.RemoteAddr,
-						"key":    authHeaderValue,
-					}).Info("Key quota limit exceeded.")
-					handler := ErrorHandler{k.TykMiddleware}
-					handler.HandleError(w, r, "Quota exceeded", 403)
-					return
-				}
-				// Other reason? Still not allowed
-				return
-			}
+	if !forwardMessage {
+		// TODO Use an Enum!
+		if reason == 1 {
+			log.WithFields(logrus.Fields{
+				"path":   r.URL.Path,
+				"origin": r.RemoteAddr,
+				"key":    authHeaderValue,
+			}).Info("Key rate limit exceeded.")
 
-			// Request is valid, carry on
-			h.ServeHTTP(w, r)
+			return errors.New("Rate limit exceeded"), 403
+
+		} else if reason == 2 {
+			log.WithFields(logrus.Fields{
+				"path":   r.URL.Path,
+				"origin": r.RemoteAddr,
+				"key":    authHeaderValue,
+			}).Info("Key quota limit exceeded.")
+			return  errors.New("Quota exceeded"), 403
 		}
-
-		return http.HandlerFunc(thisHandler)
+		// Other reason? Still not allowed
+		return errors.New("Access denied"), 403
 	}
 
-	return aliceHandler
+	// Request is valid, carry on
+	return nil, 200
 }
