@@ -88,7 +88,7 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 		Oauth2KeyExists{tykMiddleware}.New(),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
 	Muxer.Handle(spec.Proxy.ListenPath, chain)
 }

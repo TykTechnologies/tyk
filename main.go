@@ -212,7 +212,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-				RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
 			Muxer.Handle(spec.Proxy.ListenPath, chain)
 		}
