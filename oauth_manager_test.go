@@ -72,45 +72,7 @@ var oauthDefinition string = `
 `
 
 func createOauthAppDefinition() APISpec {
-
 	return createDefinitionFromString(oauthDefinition)
-
-//	var thisDef = APIDefinition{}
-//	var v1 = VersionInfo{}
-//	var thisSpec = APISpec{}
-//	var thisLoader = APIDefinitionLoader{}
-//
-//	thisDef.Name = "OAUTH Test API"
-//	thisDef.APIID = "999999"
-//	thisDef.VersionData.NotVersioned = true
-//	thisDef.UseOauth2 = true
-//
-//	thisDef.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
-//	thisDef.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{osin.CODE, osin.TOKEN}
-//	thisDef.Oauth2Meta.AuthorizeLoginRedirect = "http://posttestserver.com/post.php?dir=gateway_authorization"
-//
-//	thisDef.Proxy.ListenPath = "/APIID/"
-//	thisDef.Proxy.TargetURL = "http://lonelycode.com"
-//
-//	v1.Name = "Default"
-//	v1.Expires = "2100-01-02 15:04"
-//	v1.Paths.Ignored = []string{}
-//	v1.Paths.BlackList = []string{}
-//	v1.Paths.WhiteList = []string{}
-//
-//	thisDef.VersionData.Versions = make(map[string]VersionInfo)
-//	thisDef.VersionData.Versions[v1.Name] = v1
-//
-//	thisSpec.APIDefinition = thisDef
-//	thisSpec.RxPaths = make(map[string][]URLSpec)
-//	thisSpec.WhiteListEnabled = make(map[string]bool)
-//
-//	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
-//	thisSpec.RxPaths[v1.Name] = pathSpecs
-//
-//	thisSpec.WhiteListEnabled[v1.Name] = whiteListSpecs
-//
-//	return thisSpec
 }
 
 func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
@@ -124,7 +86,7 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 	chain := alice.New(
 		VersionCheck{tykMiddleware}.New(),
 		Oauth2KeyExists{tykMiddleware}.New(),
-		KeyExpired{tykMiddleware}.New(),
+		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 		AccessRightsCheck{tykMiddleware}.New(),
 		RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
 

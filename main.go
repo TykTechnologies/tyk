@@ -209,7 +209,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 			chain := alice.New(
 				keyCheck,
-				KeyExpired{tykMiddleware}.New(),
+				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				VersionCheck{tykMiddleware}.New(),
 				AccessRightsCheck{tykMiddleware}.New(),
 				RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)

@@ -5,6 +5,7 @@ import "net/http"
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"errors"
 )
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.
@@ -12,32 +13,29 @@ type KeyExpired struct {
 	TykMiddleware
 }
 
-// New creates a new HttpHandler for the alice middleware package
-func (k KeyExpired) New() func(http.Handler) http.Handler {
-	aliceHandler := func(h http.Handler) http.Handler {
-		thisHandler := func(w http.ResponseWriter, r *http.Request) {
+// New lets you do any initialisations for the object can be done here
+func (k *KeyExpired) New() {}
 
-			thisSessionState := context.Get(r, SessionData).(SessionState)
-			authHeaderValue := context.Get(r, AuthHeaderValue).(string)
-			keyExpired := authManager.IsKeyExpired(&thisSessionState)
+// GetConfig retrieves the configuration from the API config - Not used for this middleware
+func (k *KeyExpired) GetConfig() (interface{}, error) {
+	return nil, nil
+}
 
-			if keyExpired {
-				log.WithFields(logrus.Fields{
-					"path":   r.URL.Path,
-					"origin": r.RemoteAddr,
-					"key":    authHeaderValue,
-				}).Info("Attempted access from expired key.")
-				handler := ErrorHandler{k.TykMiddleware}
-				handler.HandleError(w, r, "Key has expired, please renew", 403)
-				return
-			}
+// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+	thisSessionState := context.Get(r, SessionData).(SessionState)
+	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
+	keyExpired := authManager.IsKeyExpired(&thisSessionState)
 
-			// Request is valid, carry on
-			h.ServeHTTP(w, r)
-		}
+	if keyExpired {
+		log.WithFields(logrus.Fields{
+			"path":   r.URL.Path,
+			"origin": r.RemoteAddr,
+			"key":    authHeaderValue,
+		}).Info("Attempted access from expired key.")
 
-		return http.HandlerFunc(thisHandler)
+		return errors.New("Key has expired, please renew"), 403
 	}
 
-	return aliceHandler
+	return nil, 200
 }
