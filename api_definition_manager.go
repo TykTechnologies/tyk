@@ -29,11 +29,11 @@ type APIDefinition struct {
 	} `bson:"oauth_meta" json:"oauth_meta"`
 	UseBasicAuth         bool                 `bson:"use_basic_auth" json:"use_basic_auth"`
 	NotificationsDetails NotificationsManager `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking bool `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	VersionDefinition    struct {
 		Location string `bson:"location" json:"location"`
 		Key      string `bson:"key" json:"key"`
 	} `bson:"definition" json:"definition"`
-	EnableSignatureChecking bool `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	VersionData             struct {
 		NotVersioned bool                   `bson:"not_versioned" json:"not_versioned"`
 		Versions     map[string]VersionInfo `bson:"versions" json:"versions"`
@@ -43,9 +43,6 @@ type APIDefinition struct {
 		TargetURL       string `bson:"target_url" json:"target_url"`
 		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
 	} `bson:"proxy" json:"proxy"`
-//	Auth struct {
-//		AuthHeaderName string `bson:"auth_header_name" json:"auth_header_name"`
-//	} `bson:"auth" json:"auth"`
 	Active bool `bson:"active" json:"active"`
 	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
 }
