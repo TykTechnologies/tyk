@@ -210,7 +210,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			chain := alice.New(
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-				VersionCheck{tykMiddleware}.New(),
+				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				AccessRightsCheck{tykMiddleware}.New(),
 				RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
 

@@ -28,14 +28,19 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper TykMiddleware) 
 			}
 
 			// Process the Request
-			if reqErr, errCode := mw.ProcessRequest(w, r, thisMwConfiguration); reqErr != nil {
+			reqErr, errCode := mw.ProcessRequest(w, r, thisMwConfiguration)
+			if reqErr != nil {
 				handler := ErrorHandler{tykMwSuper}
 				handler.HandleError(w, r, reqErr.Error(), errCode)
 				return
 			}
 
-			// No error, carry on...
-			h.ServeHTTP(w, r)
+			// Special code, bypasses all other execution
+			if errCode != 666 {
+				// No error, carry on...
+				h.ServeHTTP(w, r)
+			}
+
 		}
 
 		return http.HandlerFunc(thisHandler)

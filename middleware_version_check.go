@@ -1,5 +1,7 @@
 package main
 
+import "errors"
+
 import "net/http"
 
 import ()
@@ -9,34 +11,28 @@ type VersionCheck struct {
 	TykMiddleware
 }
 
-// New creates a new HttpHandler for the alice middleware package
-func (s VersionCheck) New() func(http.Handler) http.Handler {
-	aliceHandler := func(h http.Handler) http.Handler {
-		thisHandler := func(w http.ResponseWriter, r *http.Request) {
+// New lets you do any initialisations for the object can be done here
+func (v *VersionCheck) New() {}
 
-			// Check versioning, blacklist, whitelist and ignored status
-			requestValid, stat := s.TykMiddleware.Spec.IsRequestValid(r)
-			if requestValid == false {
-				handler := ErrorHandler{s.TykMiddleware}
-				// stop execution
-				handler.HandleError(w, r, string(stat), 409)
-				return
-			}
+// GetConfig retrieves the configuration from the API config
+func (v *VersionCheck) GetConfig() (interface{}, error) {
+	return nil, nil
+}
 
-			if stat == StatusOkAndIgnore {
-				handler := SuccessHandler{s.TykMiddleware}
-				// Skip all other execution
-				handler.ServeHTTP(w, r)
-				return
-			}
-
-			// Request is valid, carry on
-			h.ServeHTTP(w, r)
-
-		}
-
-		return http.HandlerFunc(thisHandler)
+// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request,  configuration interface{}) (error, int) {
+	// Check versioning, blacklist, whitelist and ignored status
+	requestValid, stat := v.TykMiddleware.Spec.IsRequestValid(r)
+	if requestValid == false {
+		return errors.New(string(stat)), 409
 	}
 
-	return aliceHandler
+	if stat == StatusOkAndIgnore {
+		handler := SuccessHandler{v.TykMiddleware}
+		// Skip all other execution
+		handler.ServeHTTP(w, r)
+		return nil, 666
+	}
+
+	return nil, 200
 }
