@@ -8,74 +8,131 @@ import (
 	"io/ioutil"
 )
 
-func createDefinition() APISpec {
-	var thisDef = APIDefinition{}
-	var v1 = VersionInfo{}
-	var thisSpec = APISpec{}
+var sampleDefiniton string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "1",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": false,
+			"versions": {
+				"v1": {
+					"name": "v1",
+					"expires": "2006-01-02 15:04",
+					"paths": {
+						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+						"white_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"],
+						"black_list": ["v1/disallowed/whitelist/literal", "v1/disallowed/whitelist/{id}"]
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
+var nonExpiringDef string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "1",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": false,
+			"versions": {
+				"v1": {
+					"name": "v1",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+						"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
+						"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
+var nonExpiringMultiDef string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "1",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": false,
+			"versions": {
+				"v1": {
+					"name": "v1",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+						"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
+						"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
+					}
+				},
+				"v2": {
+					"name": "v2",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+						"white_list": [],
+						"black_list": ["v1/disallowed/blacklist/literal"]
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
+
+func createDefinitionFromString(defStr string) APISpec {
 	var thisLoader = APIDefinitionLoader{}
 
-	thisDef.Name = "Test API"
-	thisDef.VersionDefinition.Key = "version"
-	thisDef.VersionDefinition.Location = "header"
-	thisDef.VersionData.NotVersioned = false
-
-	v1.Name = "v1"
-	thisDef.Auth.AuthHeaderName = "authorization"
-	v1.Expires = "2006-01-02 15:04" //TODO: Change this
-	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetURL = "http://lonelycode.com"
-	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
-	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
-	v1.Paths.WhiteList = []string{"v1/disallowed/whitelist/literal", "v1/disallowed/whitelist/{id}"}
-
-	thisDef.VersionData.Versions = make(map[string]VersionInfo)
-	thisDef.VersionData.Versions[v1.Name] = v1
-
+	thisDef, thisRawDef := thisLoader.ParseDefinition([]byte(defStr))
+	thisDef.RawData = thisRawDef
+	thisSpec := thisLoader.MakeSpec(thisDef)
 	thisSpec.APIDefinition = thisDef
-
-	thisSpec.RxPaths = make(map[string][]URLSpec)
-	thisSpec.WhiteListEnabled = make(map[string]bool)
-
-	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
-	thisSpec.RxPaths[v1.Name] = pathSpecs
-
-	thisSpec.WhiteListEnabled[v1.Name] = whiteListSpecs
-
-	return thisSpec
-}
-
-func createNonExpiringDefinition() APISpec {
-	var thisDef = APIDefinition{}
-	var v1 = VersionInfo{}
-	var thisSpec = APISpec{}
-	var thisLoader = APIDefinitionLoader{}
-
-	thisDef.Name = "Test API"
-	thisDef.VersionDefinition.Key = "version"
-	thisDef.VersionDefinition.Location = "header"
-	thisDef.VersionData.NotVersioned = false
-
-	v1.Name = "v1"
-	thisDef.Auth.AuthHeaderName = "authorization"
-	v1.Expires = "3000-01-02 15:04" //TODO: Change this
-	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetURL = "http://lonelycode.com"
-	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
-	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
-	v1.Paths.WhiteList = []string{"v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"}
-
-	thisDef.VersionData.Versions = make(map[string]VersionInfo)
-	thisDef.VersionData.Versions[v1.Name] = v1
-
-	thisSpec.APIDefinition = thisDef
-
-	thisSpec.RxPaths = make(map[string][]URLSpec)
-	thisSpec.WhiteListEnabled = make(map[string]bool)
-
-	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
-	thisSpec.RxPaths[v1.Name] = pathSpecs
-
-	thisSpec.WhiteListEnabled[v1.Name] = whiteListSpecs
 
 	return thisSpec
 }
@@ -90,56 +147,6 @@ func writeDefToFile(configStruct APIDefinition) {
 	}
 }
 
-func createNonExpiringMultiDefinition() APISpec {
-	var thisDef = APIDefinition{}
-	var v1 = VersionInfo{}
-	var v2 = VersionInfo{}
-	var thisSpec = APISpec{}
-	var thisLoader = APIDefinitionLoader{}
-
-	thisDef.Name = "Test API"
-	thisDef.VersionDefinition.Key = "version"
-	thisDef.VersionDefinition.Location = "header"
-	thisDef.VersionData.NotVersioned = false
-
-	v1.Name = "v1"
-	thisDef.Auth.AuthHeaderName = "authorization"
-	v1.Expires = "3000-01-02 15:04"
-	thisDef.Proxy.ListenPath = "/v1"
-	thisDef.Proxy.TargetURL = "http://lonelycode.com"
-	v1.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
-	v1.Paths.BlackList = []string{"v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"}
-	v1.Paths.WhiteList = []string{"v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"}
-
-	v2.Name = "v2"
-	thisDef.Auth.AuthHeaderName = "authorization"
-	v2.Expires = "3000-01-02 15:04"
-	thisDef.Proxy.ListenPath = "/v2"
-	thisDef.Proxy.TargetURL = "http://lonelycode.com"
-	v2.Paths.Ignored = []string{"/v1/ignored/noregex", "/v1/ignored/with_id/{id}"}
-	v2.Paths.BlackList = []string{"v1/disallowed/blacklist/literal"}
-	v2.Paths.WhiteList = []string{}
-
-	thisDef.VersionData.Versions = make(map[string]VersionInfo)
-	thisDef.VersionData.Versions[v1.Name] = v1
-	thisDef.VersionData.Versions[v2.Name] = v2
-
-	thisSpec.APIDefinition = thisDef
-
-	thisSpec.RxPaths = make(map[string][]URLSpec)
-	thisSpec.WhiteListEnabled = make(map[string]bool)
-
-	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
-	pathSpecs2, whiteListSpecs2 := thisLoader.getPathSpecs(v2)
-
-	thisSpec.RxPaths[v1.Name] = pathSpecs
-	thisSpec.WhiteListEnabled[v1.Name] = whiteListSpecs
-
-	thisSpec.RxPaths[v2.Name] = pathSpecs2
-	thisSpec.WhiteListEnabled[v2.Name] = whiteListSpecs2
-
-	return thisSpec
-}
 
 func TestExpiredRequest(t *testing.T) {
 	uri := "/v1/bananaphone"
@@ -152,7 +159,7 @@ func TestExpiredRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	thisSpec := createDefinition()
+	thisSpec := createDefinitionFromString(sampleDefiniton)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok == true {
@@ -176,10 +183,10 @@ func TestNotVersioned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	thisSpec := createNonExpiringDefinition()
+	thisSpec := createDefinitionFromString(nonExpiringDef)
 	thisSpec.VersionData.NotVersioned = true
 
-	writeDefToFile(thisSpec.APIDefinition)
+//	writeDefToFile(thisSpec.APIDefinition)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok != true {
@@ -202,7 +209,7 @@ func TestMissingVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	thisSpec := createDefinition()
+	thisSpec := createDefinitionFromString(sampleDefiniton)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok == true {
@@ -226,7 +233,7 @@ func TestWrongVersion(t *testing.T) {
 	}
 	req.Header.Add("version", "v2")
 
-	thisSpec := createDefinition()
+	thisSpec := createDefinitionFromString(sampleDefiniton)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok == true {
@@ -249,7 +256,7 @@ func TestBlacklistLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createNonExpiringDefinition()
+	thisSpec := createDefinitionFromString(nonExpiringDef)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok == true {
@@ -291,7 +298,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createNonExpiringDefinition()
+	thisSpec := createDefinitionFromString(nonExpiringDef)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok != true {
@@ -333,7 +340,7 @@ func TestWhiteListBlock(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createNonExpiringDefinition()
+	thisSpec := createDefinitionFromString(nonExpiringDef)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok == true {
@@ -356,7 +363,7 @@ func TestIgnored(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createNonExpiringDefinition()
+	thisSpec := createDefinitionFromString(nonExpiringDef)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok != true {
@@ -380,7 +387,7 @@ func TestBlacklistLinksMulti(t *testing.T) {
 	}
 	req.Header.Add("version", "v2")
 
-	thisSpec := createNonExpiringMultiDefinition()
+	thisSpec := createDefinitionFromString(nonExpiringMultiDef)
 
 	ok, status := thisSpec.IsRequestValid(req)
 	if ok == true {

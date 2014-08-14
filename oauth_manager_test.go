@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/RangelReale/osin"
 	"github.com/justinas/alice"
 	"io/ioutil"
 	"net/http"
@@ -27,43 +26,91 @@ var keyRules = `
 {     "last_check": 1402492859,     "org_id": "53ac07777cbb8c2d53000002",     "allowance": 0,     "rate": 1,     "per": 1,     "expires": 0,     "quota_max": -1,     "quota_renews": 1399567002,     "quota_remaining": 10,     "quota_renewal_rate": 300 }
 `
 
+var oauthDefinition string = `
+	{
+		"name": "OAUTH Test API",
+		"api_id": "999999",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"use_oauth2": true,
+		"oauth_meta": {
+			"allowed_access_types": [
+				"authorization_code",
+				"refresh_token"
+			],
+			"allowed_authorize_types": [
+				"code",
+				"token"
+			],
+			"auth_login_redirect": "http://posttestserver.com/post.php?dir=gateway_authorization"
+		},
+		"notifications": {
+			"shared_secret": "9878767657654343123434556564444",
+			"oauth_on_keychange_url": "http://posttestserver.com/post.php?dir=oauth_notifications"
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"Default": {
+					"name": "efault",
+					"expires": "3000-01-02 15:04"
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/APIID/",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+`
+
 func createOauthAppDefinition() APISpec {
-	var thisDef = APIDefinition{}
-	var v1 = VersionInfo{}
-	var thisSpec = APISpec{}
-	var thisLoader = APIDefinitionLoader{}
 
-	thisDef.Name = "OAUTH Test API"
-	thisDef.APIID = "999999"
-	thisDef.VersionData.NotVersioned = true
-	thisDef.UseOauth2 = true
+	return createDefinitionFromString(oauthDefinition)
 
-	thisDef.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
-	thisDef.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{osin.CODE, osin.TOKEN}
-	thisDef.Oauth2Meta.AuthorizeLoginRedirect = "http://posttestserver.com/post.php?dir=gateway_authorization"
-
-	thisDef.Proxy.ListenPath = "/APIID/"
-	thisDef.Proxy.TargetURL = "http://lonelycode.com"
-
-	v1.Name = "Default"
-	v1.Expires = "2100-01-02 15:04"
-	v1.Paths.Ignored = []string{}
-	v1.Paths.BlackList = []string{}
-	v1.Paths.WhiteList = []string{}
-
-	thisDef.VersionData.Versions = make(map[string]VersionInfo)
-	thisDef.VersionData.Versions[v1.Name] = v1
-
-	thisSpec.APIDefinition = thisDef
-	thisSpec.RxPaths = make(map[string][]URLSpec)
-	thisSpec.WhiteListEnabled = make(map[string]bool)
-
-	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
-	thisSpec.RxPaths[v1.Name] = pathSpecs
-
-	thisSpec.WhiteListEnabled[v1.Name] = whiteListSpecs
-
-	return thisSpec
+//	var thisDef = APIDefinition{}
+//	var v1 = VersionInfo{}
+//	var thisSpec = APISpec{}
+//	var thisLoader = APIDefinitionLoader{}
+//
+//	thisDef.Name = "OAUTH Test API"
+//	thisDef.APIID = "999999"
+//	thisDef.VersionData.NotVersioned = true
+//	thisDef.UseOauth2 = true
+//
+//	thisDef.Oauth2Meta.AllowedAccessTypes = []osin.AccessRequestType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
+//	thisDef.Oauth2Meta.AllowedAuthorizeTypes = []osin.AuthorizeRequestType{osin.CODE, osin.TOKEN}
+//	thisDef.Oauth2Meta.AuthorizeLoginRedirect = "http://posttestserver.com/post.php?dir=gateway_authorization"
+//
+//	thisDef.Proxy.ListenPath = "/APIID/"
+//	thisDef.Proxy.TargetURL = "http://lonelycode.com"
+//
+//	v1.Name = "Default"
+//	v1.Expires = "2100-01-02 15:04"
+//	v1.Paths.Ignored = []string{}
+//	v1.Paths.BlackList = []string{}
+//	v1.Paths.WhiteList = []string{}
+//
+//	thisDef.VersionData.Versions = make(map[string]VersionInfo)
+//	thisDef.VersionData.Versions[v1.Name] = v1
+//
+//	thisSpec.APIDefinition = thisDef
+//	thisSpec.RxPaths = make(map[string][]URLSpec)
+//	thisSpec.WhiteListEnabled = make(map[string]bool)
+//
+//	pathSpecs, whiteListSpecs := thisLoader.getPathSpecs(v1)
+//	thisSpec.RxPaths[v1.Name] = pathSpecs
+//
+//	thisSpec.WhiteListEnabled[v1.Name] = whiteListSpecs
+//
+//	return thisSpec
 }
 
 func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
@@ -76,7 +123,6 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 	tykMiddleware := TykMiddleware{spec, proxy}
 	chain := alice.New(
 		VersionCheck{tykMiddleware}.New(),
-		KeyExists{tykMiddleware}.New(),
 		Oauth2KeyExists{tykMiddleware}.New(),
 		KeyExpired{tykMiddleware}.New(),
 		AccessRightsCheck{tykMiddleware}.New(),

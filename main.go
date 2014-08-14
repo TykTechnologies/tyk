@@ -203,15 +203,17 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				keyCheck = HMACMiddleware{tykMiddleware}.New()
 			} else {
 				// Auth key
-				keyCheck = KeyExists{tykMiddleware}.New()
+				keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
 			}
 
+			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 			chain := alice.New(
 				keyCheck,
 				KeyExpired{tykMiddleware}.New(),
 				VersionCheck{tykMiddleware}.New(),
 				AccessRightsCheck{tykMiddleware}.New(),
 				RateLimitAndQuotaCheck{tykMiddleware}.New()).Then(proxyHandler)
+
 			Muxer.Handle(spec.Proxy.ListenPath, chain)
 		}
 

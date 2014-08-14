@@ -43,10 +43,11 @@ type APIDefinition struct {
 		TargetURL       string `bson:"target_url" json:"target_url"`
 		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
 	} `bson:"proxy" json:"proxy"`
-	Auth struct {
-		AuthHeaderName string `bson:"auth_header_name" json:"auth_header_name"`
-	} `bson:"auth" json:"auth"`
+//	Auth struct {
+//		AuthHeaderName string `bson:"auth_header_name" json:"auth_header_name"`
+//	} `bson:"auth" json:"auth"`
 	Active bool `bson:"active" json:"active"`
+	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
 }
 
 // VersionInfo encapsulates all the data for a specific api_version, elements in the
@@ -149,6 +150,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 	}
 
 	var APIDefinitions = []APIDefinition{}
+	var StringDefs = make([]bson.M, 0)
 	mongoErr := apiCollection.Find(search).All(&APIDefinitions)
 
 	if mongoErr != nil {
@@ -156,12 +158,30 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 		return APISpecs
 	}
 
-	for _, thisAppConfig := range APIDefinitions {
-		// Got the configuration, build the spec!
+	apiCollection.Find(search).All(&StringDefs)
+
+	for i, thisAppConfig := range APIDefinitions {
+		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
+
 		newAppSpec := a.MakeSpec(thisAppConfig)
 		APISpecs = append(APISpecs, newAppSpec)
 	}
 	return APISpecs
+}
+
+func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (APIDefinition, map[string]interface{}) {
+	thisAppConfig := APIDefinition{}
+	err := json.Unmarshal(apiDef, &thisAppConfig)
+	if err != nil {
+		log.Error("Couldn't unmarshal api configuration")
+		log.Error(err)
+	}
+
+	// Got the structured version - now lets get a raw copy for modules
+	thisRawConfig := make(map[string]interface{})
+	json.Unmarshal(apiDef, &thisRawConfig)
+
+	return thisAppConfig, thisRawConfig
 }
 
 // LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
@@ -175,21 +195,16 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []APISpec {
 			filePath := filepath.Join(dir, f.Name())
 			log.Info("Loading API Specification from ", filePath)
 			appConfig, err := ioutil.ReadFile(filePath)
+			thisAppConfig, thisRawConfig := a.ParseDefinition(appConfig)
 			if err != nil {
 				log.Error("Couldn't load app configuration file")
 				log.Error(err)
-			} else {
-				thisAppConfig := APIDefinition{}
-				err := json.Unmarshal(appConfig, &thisAppConfig)
-				if err != nil {
-					log.Error("Couldn't unmarshal api configuration")
-					log.Error(err)
-				} else {
-					// Got the configuration, build the spec!
-					newAppSpec := a.MakeSpec(thisAppConfig)
-					APISpecs = append(APISpecs, newAppSpec)
-				}
 			}
+
+			thisAppConfig.RawData = thisRawConfig // Lets keep a copy for plugable modules
+			newAppSpec := a.MakeSpec(thisAppConfig)
+			APISpecs = append(APISpecs, newAppSpec)
+
 		}
 	}
 
