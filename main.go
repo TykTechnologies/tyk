@@ -200,7 +200,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
 			} else if spec.EnableSignatureChecking {
 				// HMAC Auth
-				keyCheck = HMACMiddleware{tykMiddleware}.New()
+				keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
 			} else {
 				// Auth key
 				keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
