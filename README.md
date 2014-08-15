@@ -65,3 +65,5 @@ Currently in order for tests to pass, a redis host is required. We know, this is
 in the current version there is a hard requirement for the application to have its default memory setup to use redis as part of a deployment, this is
 to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement.
 
+The simplest way to get the tests to run is to install local redis, or (what I do) have a vagrant instance that is running redis, then you can just `vagrant up`
+when you need redis and kill it later. Just make sure you are forwarding the default ports 1:1.
