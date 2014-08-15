@@ -31,9 +31,9 @@ func (hm *HMACMiddleware) authorizationError(w http.ResponseWriter, r *http.Requ
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
 		"origin": r.RemoteAddr,
-	}).Info("Authorisation field missing or malformed")
+	}).Info("Authorization field missing or malformed")
 
-	return errors.New("Authorisation field missing, malformed or invalid"), 400
+	return errors.New("Authorization field missing, malformed or invalid"), 400
 }
 
 // New lets you do any initialisations for the object can be done here

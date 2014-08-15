@@ -35,7 +35,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			"origin": r.RemoteAddr,
 		}).Info("Attempted access with malformed header, no auth header found.")
 
-		return errors.New("Authorisation field missing"), 400
+		return errors.New("Authorization field missing"), 400
 	}
 
 	if strings.ToLower(parts[0]) != "bearer" {

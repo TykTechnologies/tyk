@@ -36,7 +36,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		authReply := "Basic realm=\"" + k.TykMiddleware.Spec.Name + "\""
 
 		w.Header().Add("WWW-Authenticate", authReply)
-		return errors.New("Authorisation field missing"), 401
+		return errors.New("Authorization field missing"), 401
 	}
 
 	bits := strings.Split(authHeaderValue, " ")
