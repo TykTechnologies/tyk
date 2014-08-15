@@ -140,12 +140,12 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 
 	if test {
 		log.Warning("Adding test client")
-		testClient := &osin.Client{
+		testClient := osin.DefaultClient{
 			Id:          "1234",
 			Secret:      "aabbccdd",
 			RedirectUri: "http://client.oauth.com",
 		}
-		osinStorage.SetClient(testClient.Id, testClient, false)
+		osinStorage.SetClient(testClient.Id, &testClient, false)
 		log.Warning("Test client added")
 	}
 	osinServer := osin.NewServer(serverConfig, osinStorage)

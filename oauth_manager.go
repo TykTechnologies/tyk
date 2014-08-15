@@ -275,8 +275,14 @@ type RedisOsinStorageInterface struct {
 	store StorageHandler
 }
 
+func (r RedisOsinStorageInterface) Clone() osin.Storage {
+	return r
+}
+
+func (r RedisOsinStorageInterface) Close() {}
+
 // GetClient will retrieve client data
-func (r RedisOsinStorageInterface) GetClient(id string) (*osin.Client, error) {
+func (r RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := CLIENT_PREFIX + id
 
 	clientJSON, storeErr := r.store.GetKey(key)
@@ -287,18 +293,18 @@ func (r RedisOsinStorageInterface) GetClient(id string) (*osin.Client, error) {
 		return nil, storeErr
 	}
 
-	thisClient := osin.Client{}
+	thisClient := new(osin.DefaultClient)
 	if marshalErr := json.Unmarshal([]byte(clientJSON), &thisClient); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth client object")
 		log.Error(marshalErr)
 	}
 
-	return &thisClient, nil
+	return thisClient, nil
 }
 
 // GetClientNoPrefix will retrieve client data, but not asign a prefix - this is an unfortunate hack,
 // but we don't want to change the signature in Osin for GetClient to support the odd Redis prefixing
-func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (*osin.Client, error) {
+func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, error) {
 
 	key := id
 
@@ -310,17 +316,17 @@ func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (*osin.Client, e
 		return nil, storeErr
 	}
 
-	thisClient := osin.Client{}
+	thisClient := new(osin.DefaultClient)
 	if marshalErr := json.Unmarshal([]byte(clientJSON), &thisClient); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth client object")
 		log.Error(marshalErr)
 	}
 
-	return &thisClient, nil
+	return thisClient, nil
 }
 
 // GetClients will retreive a list of clients for a prefix
-func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) (*[]osin.Client, error) {
+func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]osin.Client, error) {
 	key := CLIENT_PREFIX + filter
 	if ignorePrefix {
 		key = filter
@@ -331,20 +337,20 @@ func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) 
 	theseClients := []osin.Client{}
 
 	for _, clientJSON := range clientJSON {
-		thisClient := osin.Client{}
+		thisClient := new(osin.DefaultClient)
 		if marshalErr := json.Unmarshal([]byte(clientJSON), &thisClient); marshalErr != nil {
 			log.Error("Couldn't unmarshal OAuth client object")
 			log.Error(marshalErr)
-			return &theseClients, marshalErr
+			return theseClients, marshalErr
 		}
 		theseClients = append(theseClients, thisClient)
 	}
 
-	return &theseClients, nil
+	return theseClients, nil
 }
 
 // SetClient creates client data
-func (r RedisOsinStorageInterface) SetClient(id string, client *osin.Client, ignorePrefix bool) error {
+func (r RedisOsinStorageInterface) SetClient(id string, client osin.Client, ignorePrefix bool) error {
 	clientDataJSON, err := json.Marshal(client)
 
 	if err != nil {
@@ -438,7 +444,7 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 	}
 
 	// Set the client ID for analytics
-	newSession.OauthClientID = accessData.Client.Id
+	newSession.OauthClientID = accessData.Client.GetId()
 
 	// Override timeouts so that we can be in sync with Osin
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
