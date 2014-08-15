@@ -406,8 +406,9 @@ func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeDa
 	}
 
 	thisAuthData := osin.AuthorizeData{}
+	thisAuthData.Client = new(osin.DefaultClient)
 	if marshalErr := json.Unmarshal([]byte(authJSON), &thisAuthData); marshalErr != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object")
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadAuthorize)")
 		log.Error(marshalErr)
 		return nil, marshalErr
 	}
@@ -480,8 +481,9 @@ func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, e
 	}
 
 	thisAccessData := osin.AccessData{}
+	thisAccessData.Client = new(osin.DefaultClient)
 	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisAccessData); marshalErr != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object")
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadAccess)")
 		log.Error(marshalErr)
 		return nil, marshalErr
 	}
@@ -514,9 +516,16 @@ func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, 
 		return nil, storeErr
 	}
 
+	// new interface means having to make this nested... ick.
 	thisAccessData := osin.AccessData{}
+	thisAccessData.Client = new(osin.DefaultClient)
+	thisAccessData.AuthorizeData = &osin.AuthorizeData{}
+	thisAccessData.AuthorizeData.Client = new(osin.DefaultClient)
+
+	log.Warning("REFRESH DATA: ", accessJSON)
+
 	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisAccessData); marshalErr != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object")
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh)")
 		log.Error(marshalErr)
 		return nil, marshalErr
 	}
