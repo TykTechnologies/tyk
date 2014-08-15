@@ -522,8 +522,6 @@ func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, 
 	thisAccessData.AuthorizeData = &osin.AuthorizeData{}
 	thisAccessData.AuthorizeData.Client = new(osin.DefaultClient)
 
-	log.Warning("REFRESH DATA: ", accessJSON)
-
 	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisAccessData); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh)")
 		log.Error(marshalErr)
