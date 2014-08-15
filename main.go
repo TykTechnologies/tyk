@@ -287,9 +287,9 @@ func init() {
 	doMemoryProfile, _ = arguments["--memprofile"].(bool)
 
 	doDebug, _ := arguments["--debug"]
-	log.Level = logrus.Info
+	log.Level = logrus.InfoLevel
 	if doDebug == true {
-		log.Level = logrus.Debug
+		log.Level = logrus.DebugLevel
 		log.Debug("Enabling debug-level output")
 	}
 
