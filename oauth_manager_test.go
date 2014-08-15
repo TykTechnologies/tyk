@@ -136,7 +136,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	param.Set("client_id", T_CLIENT_ID)
 	param.Set("key_rules", keyRules)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
-	req.Header.Set("x-tyk-authorisation", "352d20ee67be67f6340b4c0605b044b7")
+	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	if err != nil {
@@ -167,7 +167,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	param.Set("client_id", T_CLIENT_ID)
 	param.Set("key_rules", keyRules)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
-	req.Header.Set("x-tyk-authorisation", "352d20ee67be67f6340b4c0605b044b7")
+	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	if err != nil {
@@ -198,7 +198,7 @@ func GetAuthCode() map[string]string {
 	param.Set("client_id", T_CLIENT_ID)
 	param.Set("key_rules", keyRules)
 	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
-	req.Header.Set("x-tyk-authorisation", "352d20ee67be67f6340b4c0605b044b7")
+	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	recorder := httptest.NewRecorder()
