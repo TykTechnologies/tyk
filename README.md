@@ -59,6 +59,15 @@ Any changes that are submitted with a pull request should come with a test and b
 
 If you can answer yes to all of the above, feel free to submit a pull request :-)
 
+## Roadmap
+
+To coordinate development and be completely transparent as to where the project is going, the version roadmap for the next version, as well as proposed features
+and adopted proposals can be viewed on our public Trello board:
+
+[https://trello.com/b/59d5kAZ5/tyk-api-gateway-roadmap](https://trello.com/b/59d5kAZ5/tyk-api-gateway-roadmap)
+
+Any proposals can be made in the Github issue tracker, proposals that are adopted will be placed into the trello and then moved according to their status.
+
 ### A note on the tests
 
 Currently in order for tests to pass, a redis host is required. We know, this is terrible and should be handled with an interface, and it is, however
