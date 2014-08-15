@@ -356,12 +356,13 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		u5Secret, err := uuid.NewV4()
 		secret := base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
 
-		newClient := osin.Client{}
-		newClient.Id = cleanSting
-		newClient.RedirectUri = newOauthClient.ClientRedirectURI
-		newClient.Secret = secret
+		newClient := osin.DefaultClient{
+			Id:          cleanSting,
+			RedirectUri: newOauthClient.ClientRedirectURI,
+			Secret:      secret,
+		}
 
-		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.Id)
+		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.GetId())
 		storeErr := genericOsinStorage.SetClient(storageID, &newClient, true)
 
 		if storeErr != nil {
@@ -370,9 +371,9 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 
 		reportableClientData := OAuthClient{
-			ClientID:          newClient.Id,
-			ClientSecret:      newClient.Secret,
-			ClientRedirectURI: newClient.RedirectUri,
+			ClientID:          newClient.GetId(),
+			ClientSecret:      newClient.GetSecret(),
+			ClientRedirectURI: newClient.GetRedirectUri(),
 		}
 
 		responseMessage, err = json.Marshal(&reportableClientData)
@@ -384,7 +385,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			code = 500
 		} else {
 			log.WithFields(logrus.Fields{
-				"key": newClient.Id,
+				"key": newClient.GetId(),
 			}).Info("New OAuth Client registered successfully.")
 		}
 
@@ -456,9 +457,9 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		success = false
 	} else {
 		reportableClientData := OAuthClient{
-			ClientID:          thisClientData.Id,
-			ClientSecret:      thisClientData.Secret,
-			ClientRedirectURI: thisClientData.RedirectUri,
+			ClientID:          thisClientData.GetId(),
+			ClientSecret:      thisClientData.GetSecret(),
+			ClientRedirectURI: thisClientData.GetRedirectUri(),
 		}
 		responseMessage, err = json.Marshal(&reportableClientData)
 		if err != nil {
@@ -530,11 +531,11 @@ func getOauthClients(APIID string) ([]byte, int) {
 		success = false
 	} else {
 		clients := []OAuthClient{}
-		for _, osinClient := range *thisClientData {
+		for _, osinClient := range thisClientData {
 			reportableClientData := OAuthClient{
-				ClientID:          osinClient.Id,
-				ClientSecret:      osinClient.Secret,
-				ClientRedirectURI: osinClient.RedirectUri,
+				ClientID:          osinClient.GetId(),
+				ClientSecret:      osinClient.GetSecret(),
+				ClientRedirectURI: osinClient.GetRedirectUri(),
 			}
 			clients = append(clients, reportableClientData)
 		}

@@ -140,12 +140,12 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 
 	if test {
 		log.Warning("Adding test client")
-		testClient := &osin.Client{
+		testClient := osin.DefaultClient{
 			Id:          "1234",
 			Secret:      "aabbccdd",
 			RedirectUri: "http://client.oauth.com",
 		}
-		osinStorage.SetClient(testClient.Id, testClient, false)
+		osinStorage.SetClient(testClient.Id, &testClient, false)
 		log.Warning("Test client added")
 	}
 	osinServer := osin.NewServer(serverConfig, osinStorage)
@@ -287,9 +287,9 @@ func init() {
 	doMemoryProfile, _ = arguments["--memprofile"].(bool)
 
 	doDebug, _ := arguments["--debug"]
-	log.Level = logrus.Info
+	log.Level = logrus.InfoLevel
 	if doDebug == true {
-		log.Level = logrus.Debug
+		log.Level = logrus.DebugLevel
 		log.Debug("Enabling debug-level output")
 	}
 
