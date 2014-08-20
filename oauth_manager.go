@@ -273,6 +273,7 @@ const (
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
 type RedisOsinStorageInterface struct {
 	store StorageHandler
+	sessionManager SessionHandler
 }
 
 func (r RedisOsinStorageInterface) Clone() osin.Storage {
@@ -450,7 +451,7 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 	// Override timeouts so that we can be in sync with Osin
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
 
-	authManager.UpdateSession(accessData.AccessToken, newSession)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -497,10 +498,8 @@ func (r RedisOsinStorageInterface) RemoveAccess(token string) error {
 	r.store.DeleteKey(key)
 
 	// remove the access token from central storage too
-	authDeleted := authManager.Store.DeleteKey(token)
-	if !authDeleted {
-		log.Error("Couldn't remove from authManager!")
-	}
+	r.sessionManager.RemoveSession(token)
+
 	return nil
 }
 
@@ -540,6 +539,7 @@ func (r RedisOsinStorageInterface) RemoveRefresh(token string) error {
 
 // AccessTokenGenTyk is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
 type AccessTokenGenTyk struct {
+	sessionManager SessionHandler
 }
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
@@ -555,7 +555,7 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 		return "", "", marshalErr
 	}
 
-	accesstoken = authManager.GenerateAuthKey(newSession.OrgID)
+	accesstoken = a.sessionManager.GenerateAuthKey(newSession.OrgID)
 
 	if generaterefresh {
 		u6, _ := uuid.NewV4()

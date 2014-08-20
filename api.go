@@ -36,6 +36,20 @@ func createError(errorMsg string) []byte {
 	return responseMsg
 }
 
+func GetSpecForApi(apiID string) *APISpec {
+	spec, ok := ApiSpecRegister[apiId]
+	if !ok {
+		return nil
+	}
+
+	return spec
+}
+
+// TODO: This changes the URL structure of the API completely
+// ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
+// remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
+// need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
+
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	success := true
 	decoder := json.NewDecoder(r.Body)
@@ -60,7 +74,19 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			}
 
 		}
-		authManager.UpdateSession(keyName, newSession)
+
+		for apiId, _ := range(newSession.AccessRights) {
+			thisAPISpec := GetSpecForApi(apiId)
+			if thisAPISpec != nil {
+				thisAPISpec.SessionManager.UpdateSession(keyName, newSession)
+			} else {
+				log.WithFields(logrus.Fields{
+					"key": keyName,
+					"apiID": apiId,
+				}).Error("Could not add key for this API ID, API doesn't exist.")
+			}
+		}
+
 		log.WithFields(logrus.Fields{
 			"key": keyName,
 		}).Info("New key added or updated.")
@@ -92,13 +118,20 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleGetDetail(sessionKey string) ([]byte, int) {
+func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
 	code := 200
 
-	thisSession, ok := authManager.GetSessionDetail(sessionKey)
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "API not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	thisSession, ok := thiSpec.SessionManager.GetSessionDetail(sessionKey)
 	if !ok {
 		success = false
 	} else {
@@ -164,10 +197,18 @@ type APIStatusMessage struct {
 	Message string `json:"message"`
 }
 
-func handleDeleteKey(keyName string) ([]byte, int) {
+func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
-	authManager.Store.DeleteKey(keyName)
+
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "API not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	thiSpec.SessionManager.RemoveSession(keyName)
 	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
@@ -294,6 +335,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			if newSession.HMACEnabled {
 				newSession.HmacSecret = authManager.GenerateHMACSecret()
 			}
+
+
 
 			authManager.UpdateSession(newKey, newSession)
 			responseObj.Action = "create"

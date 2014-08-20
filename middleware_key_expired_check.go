@@ -25,7 +25,7 @@ func (k *KeyExpired) GetConfig() (interface{}, error) {
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
-	keyExpired := authManager.IsKeyExpired(&thisSessionState)
+	keyExpired := k.Spec.AuthManager.IsKeyExpired(&thisSessionState)
 
 	if keyExpired {
 		log.WithFields(logrus.Fields{

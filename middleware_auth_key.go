@@ -52,7 +52,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	// Check if API key valid
-	keyExists, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
+	keyExists, thisSessionState := k.Spec.AuthManager.IsKeyAuthorised(authHeaderValue)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,

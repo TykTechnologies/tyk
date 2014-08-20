@@ -74,7 +74,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Check if API key valid
 	keyName := k.TykMiddleware.Spec.OrgID + authValues[0]
-	keyExists, thisSessionState := authManager.IsKeyAuthorised(keyName)
+	keyExists, thisSessionState := k.Spec.AuthManager.IsKeyAuthorised(keyName)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,

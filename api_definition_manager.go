@@ -101,6 +101,8 @@ type APISpec struct {
 	RxPaths          map[string][]URLSpec
 	WhiteListEnabled map[string]bool
 	target           *url.URL
+	AuthManager AuthorisationHandler
+	SessionManager SessionHandler
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -124,6 +126,10 @@ func (a *APIDefinitionLoader) Connect() {
 func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
 	newAppSpec := APISpec{}
 	newAppSpec.APIDefinition = thisAppConfig
+	// Create the auth manager and session manager so we can support multiple IdP's
+	newAppSpec.AuthManager = &AuthorisationManager{}
+	newAppSpec.SessionManager = &SessionManager{}
+
 	newAppSpec.RxPaths = make(map[string][]URLSpec)
 	newAppSpec.WhiteListEnabled = make(map[string]bool)
 	for _, v := range thisAppConfig.VersionData.Versions {
@@ -243,6 +249,11 @@ func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus
 	}
 
 	return thisURLSpec
+}
+
+func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler) {
+	a.AuthManager.Init(AuthStore)
+	a.SessionManager.Init(SessionStore)
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.

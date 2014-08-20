@@ -18,13 +18,14 @@ import (
 )
 
 var log = logrus.New()
-var authManager = AuthorisationManager{}
+//var authManager = AuthorisationManager{}
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
 var profileFile = &os.File{}
 var doMemoryProfile bool
 var genericOsinStorage *RedisOsinStorageInterface
+var ApiSpecRegister = make(map[string]*APISpec)
 
 // Generic system error
 const (
@@ -53,18 +54,19 @@ func displayConfig() {
 
 // Create all globals and init connection handlers
 func setupGlobals() {
-	if config.Storage.Type == "memory" {
-		log.Warning("Using in-memory storage. Warning: this is not scalable.")
-		authManager = AuthorisationManager{
-			&InMemoryStorageManager{
-				map[string]string{}}}
-	} else if config.Storage.Type == "redis" {
-		log.Info("Using Redis storage manager.")
-		authManager = AuthorisationManager{
-			&RedisStorageManager{KeyPrefix: "apikey-"}}
-
-		authManager.Store.Connect()
-	}
+	// TODO: Remove this
+//	if config.Storage.Type == "memory" {
+//		log.Warning("Using in-memory storage. Warning: this is not scalable.")
+//		authManager = AuthorisationManager{
+//			&InMemoryStorageManager{
+//				map[string]string{}}}
+//	} else if config.Storage.Type == "redis" {
+//		log.Info("Using Redis storage manager.")
+//		authManager = AuthorisationManager{
+//			&RedisStorageManager{KeyPrefix: "apikey-"}}
+//
+//		authManager.Store.Connect()
+//	}
 
 	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
 		log.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
@@ -136,7 +138,7 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
 	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager.Connect()
-	osinStorage := RedisOsinStorageInterface{&storageManager}
+	osinStorage := RedisOsinStorageInterface{&storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
 	if test {
 		log.Warning("Adding test client")
@@ -163,14 +165,19 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
 	log.Info("Loading API configurations.")
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 
 	for _, spec := range APISpecs {
 		// Create a new handler for each API spec
+
 		remote, err := url.Parse(spec.APIDefinition.Proxy.TargetURL)
 		if err != nil {
 			log.Error("Culdn't parse target URL")
 			log.Error(err)
 		}
+
+		// Initialise the auth and session managers (use Redis for now)
+		spec.Init(&redisStore, &redisStore)
 
 		if spec.UseOauth2 {
 			addOAuthHandlers(spec, Muxer, false)
@@ -216,6 +223,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 			Muxer.Handle(spec.Proxy.ListenPath, chain)
 		}
+
+		ApiSpecRegister[spec.APIDefinition.APIID] = &spec
 
 	}
 }

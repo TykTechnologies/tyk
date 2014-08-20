@@ -48,7 +48,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	accessToken := parts[1]
-	keyExists, thisSessionState := authManager.IsKeyAuthorised(accessToken)
+	keyExists, thisSessionState := k.Spec.AuthManager.IsKeyAuthorised(accessToken)
 
 	if !keyExists {
 		log.WithFields(logrus.Fields{
