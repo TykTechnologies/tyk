@@ -18,7 +18,6 @@ import (
 )
 
 var log = logrus.New()
-//var authManager = AuthorisationManager{}
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
@@ -170,14 +169,13 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		}
 
 		// Initialise the auth and session managers (use Redis for now)
+		// TODO: Make this configurable
 		referenceSpec.Init(&redisStore, &redisStore)
 
 		if referenceSpec.UseOauth2 {
 			thisOauthManager := addOAuthHandlers(&referenceSpec, Muxer, false)
 			referenceSpec.OAuthManager = thisOauthManager
 		}
-
-
 
 		proxy := TykNewSingleHostReverseProxy(remote)
 		referenceSpec.target = remote

@@ -14,6 +14,23 @@ import (
 	"time"
 )
 
+type AuthProviderCode string
+type SessionProviderCode string
+const (
+	DefaultAuthProvider AuthProviderCode = "default"
+	DefaultSessionProvider SessionProviderCode = "default"
+)
+
+type AuthProviderMeta struct {
+	Name AuthProviderCode	`bson:"name" json:"name"`
+	Meta interface{}		`bson:"meta" json:"meta"`
+}
+
+type SessionProviderMeta struct {
+	Name SessionProviderCode	`bson:"name" json:"name"`
+	Meta interface{}			`bson:"meta" json:"meta"`
+}
+
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 type APIDefinition struct {
 	ID               bson.ObjectId `bson:"_id,omitempty" json:"id"`
@@ -44,6 +61,8 @@ type APIDefinition struct {
 		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
 	} `bson:"proxy" json:"proxy"`
 	Active  bool                   `bson:"active" json:"active"`
+	AuthProvider AuthProviderMeta	`bson:"auth_provider" json:"auth_provider"`
+	SessionProvider SessionProviderMeta	`bson:"session_provider" json:"session_provider"`
 	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
 }
 
@@ -127,9 +146,26 @@ func (a *APIDefinitionLoader) Connect() {
 func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
 	newAppSpec := APISpec{}
 	newAppSpec.APIDefinition = thisAppConfig
-	// Create the auth manager and session manager so we can support multiple IdP's
-	newAppSpec.AuthManager = &AuthorisationManager{}
-	newAppSpec.SessionManager = &SessionManager{}
+
+	// Add any new session managers or auth handlers here
+	if newAppSpec.APIDefinition.AuthProvider.Name != "" {
+		switch newAppSpec.APIDefinition.AuthProvider.Name {
+			case DefaultAuthProvider: newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+			default: newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+		}
+	} else {
+		newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+	}
+
+	if newAppSpec.APIDefinition.SessionProvider.Name != "" {
+		switch newAppSpec.APIDefinition.SessionProvider.Name {
+			case DefaultSessionProvider: newAppSpec.SessionManager = &DefaultSessionManager{}
+			default: newAppSpec.SessionManager = &DefaultSessionManager{}
+		}
+	} else {
+		newAppSpec.SessionManager = &DefaultSessionManager{}
+	}
+
 
 	newAppSpec.RxPaths = make(map[string][]URLSpec)
 	newAppSpec.WhiteListEnabled = make(map[string]bool)

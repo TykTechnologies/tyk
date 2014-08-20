@@ -255,7 +255,7 @@ func GetToken() tokenData {
 
 	var thisResponse = tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-	fmt.Println(string(body))
+//	fmt.Println(string(body))
 	err := json.Unmarshal(body, &thisResponse)
 	if err != nil {
 		fmt.Println(err)

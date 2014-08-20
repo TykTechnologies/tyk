@@ -26,7 +26,6 @@ type SessionHandler interface {
 	RemoveSession(keyName string)
 	GetSessionDetail(keyName string) (SessionState, bool)
 	GetSessions(filter string) []string
-
 }
 
 type KeyGenerator interface {
@@ -34,23 +33,23 @@ type KeyGenerator interface {
 	GenerateHMACSecret() string
 }
 
-// AuthorisationManager implements AuthorisationHandler,
+// DefaultAuthorisationManager implements AuthorisationHandler,
 // requires a StorageHandler to interact with key store
-type AuthorisationManager struct {
+type DefaultAuthorisationManager struct {
 	Store StorageHandler
 }
 
-type SessionManager struct {
+type DefaultSessionManager struct {
 	Store StorageHandler
 }
 
-func (b *AuthorisationManager) Init(store StorageHandler) {
+func (b *DefaultAuthorisationManager) Init(store StorageHandler) {
 	b.Store = store
 	b.Store.Connect()
 }
 
 // IsKeyAuthorised checks if key exists and can be read into a SessionState object
-func (b AuthorisationManager) IsKeyAuthorised(keyName string) (bool, SessionState) {
+func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (bool, SessionState) {
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var newSession SessionState
 	if err != nil {
@@ -68,7 +67,7 @@ func (b AuthorisationManager) IsKeyAuthorised(keyName string) (bool, SessionStat
 }
 
 // IsKeyExpired checks if a key has expired, if the value of SessionState.Expires is 0, it will be ignored
-func (b AuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
+func (b DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
 	if newSession.Expires >= 1 {
 		diff := newSession.Expires - time.Now().Unix()
 		if diff > 0 {
@@ -79,25 +78,25 @@ func (b AuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
 	return false
 }
 
-func (b *SessionManager) Init(store StorageHandler) {
+func (b *DefaultSessionManager) Init(store StorageHandler) {
 	b.Store = store
 	b.Store.Connect()
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b SessionManager) UpdateSession(keyName string, session SessionState) {
+func (b DefaultSessionManager) UpdateSession(keyName string, session SessionState) {
 	v, _ := json.Marshal(session)
 	keyExp := (session.Expires - time.Now().Unix()) + 300 // Add 5 minutes to key expiry, just in case
 
 	b.Store.SetKey(keyName, string(v), keyExp)
 }
 
-func (b SessionManager) RemoveSession(keyName string) {
+func (b DefaultSessionManager) RemoveSession(keyName string) {
 	b.Store.DeleteKey(keyName)
 }
 
 // GetSessionDetail returns the session detail using the storage engine (either in memory or Redis)
-func (b SessionManager) GetSessionDetail(keyName string) (SessionState, bool) {
+func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, bool) {
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var thisSession SessionState
 	if err != nil {
@@ -115,7 +114,7 @@ func (b SessionManager) GetSessionDetail(keyName string) (SessionState, bool) {
 }
 
 // GetSessions returns all sessions in the key store that match a filter key (a prefix)
-func (b SessionManager) GetSessions(filter string) []string {
+func (b DefaultSessionManager) GetSessions(filter string) []string {
 	return b.Store.GetKeys(filter)
 }
 

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -116,8 +114,5 @@ func createSampleSession() SessionState {
 	thisSession.AccessRights = map[string]AccessDefinition{}
 	thisSession.AccessRights["1"] = simpleDef
 
-	b, _ := json.Marshal(thisSession)
-
-	fmt.Println(string(b))
 	return thisSession
 }
