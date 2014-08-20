@@ -9,6 +9,51 @@ import (
 	"testing"
 )
 
+var testDef string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "1",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": false,
+			"versions": {
+				"Default": {
+					"name": "Default",
+					"expires": "3006-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"white_list": [],
+						"black_list": []
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
+func MakeSampleAPI() *APISpec {
+	thisSpec := createDefinitionFromString(testDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
+	ReloadURLStructure()
+
+	return &thisSpec
+}
+
 type Success struct {
 	Key    string `json:"key"`
 	Status string `json:"status"`
@@ -23,6 +68,9 @@ func TestKeyHandlerNewKey(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
+
+	MakeSampleAPI()
+	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
 	if err != nil {
@@ -54,6 +102,8 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
+	MakeSampleAPI()
+	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
 	if err != nil {
@@ -93,11 +143,13 @@ func createKey() {
 func TestKeyHandlerDeleteKey(t *testing.T) {
 	createKey()
 
-	uri := "/tyk/keys/1234"
+	uri := "/tyk/keys/1234?"
 	method := "DELETE"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
+	MakeSampleAPI()
+	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
 	if err != nil {
@@ -113,7 +165,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 		t.Error("Could not unmarshal success message:\n", err)
 	} else {
 		if newSuccess.Status != "ok" {
-			t.Error("key not created, status error:\n", recorder.Body.String())
+			t.Error("key not deleted, status error:\n", recorder.Body.String())
 		}
 		if newSuccess.Action != "deleted" {
 			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
@@ -132,6 +184,8 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
+	MakeSampleAPI()
+	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
 	if err != nil {

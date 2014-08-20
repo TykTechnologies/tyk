@@ -108,6 +108,14 @@ func createSampleSession() SessionState {
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = 10
 
+	simpleDef := AccessDefinition{
+		APIiName: "Test",
+		APIID: "1",
+		Versions: []string{"Default"},
+	}
+	thisSession.AccessRights = map[string]AccessDefinition{}
+	thisSession.AccessRights["1"] = simpleDef
+
 	b, _ := json.Marshal(thisSession)
 
 	fmt.Println(string(b))

@@ -26,6 +26,10 @@ type SessionHandler interface {
 	RemoveSession(keyName string)
 	GetSessionDetail(keyName string) (SessionState, bool)
 	GetSessions(filter string) []string
+
+}
+
+type KeyGenerator interface {
 	GenerateAuthKey(OrgID string) string
 	GenerateHMACSecret() string
 }
@@ -115,8 +119,12 @@ func (b SessionManager) GetSessions(filter string) []string {
 	return b.Store.GetKeys(filter)
 }
 
+type DefaultKeyGenerator struct {
+
+}
+
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
-func (b SessionManager) GenerateAuthKey(OrgID string) string {
+func (b DefaultKeyGenerator) GenerateAuthKey(OrgID string) string {
 	u5, _ := uuid.NewV4()
 	cleanSting := strings.Replace(u5.String(), "-", "", -1)
 	newAuthKey := expandKey(OrgID, cleanSting)
@@ -125,7 +133,7 @@ func (b SessionManager) GenerateAuthKey(OrgID string) string {
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
-func (b SessionManager) GenerateHMACSecret() string {
+func (b DefaultKeyGenerator) GenerateHMACSecret() string {
 	u5, _ := uuid.NewV4()
 	cleanSting := strings.Replace(u5.String(), "-", "", -1)
 	newSecret := base64.StdEncoding.EncodeToString([]byte(cleanSting))

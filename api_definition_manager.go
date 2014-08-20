@@ -103,6 +103,7 @@ type APISpec struct {
 	target           *url.URL
 	AuthManager AuthorisationHandler
 	SessionManager SessionHandler
+	OAuthManager *OAuthManager
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()

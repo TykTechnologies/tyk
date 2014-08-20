@@ -78,7 +78,9 @@ func createOauthAppDefinition() APISpec {
 func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(Muxer)
-	addOAuthHandlers(spec, Muxer, true)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	spec.Init(&redisStore, &redisStore)
+	addOAuthHandlers(&spec, Muxer, true)
 	remote, _ := url.Parse("http://lonelycode.com/")
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -95,6 +97,8 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 
 func TestAuthCodeRedirect(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
 	testMuxer := http.NewServeMux()
 	getOAuthChain(thisSpec, testMuxer)
 
@@ -124,6 +128,8 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
 	testMuxer := http.NewServeMux()
 	getOAuthChain(thisSpec, testMuxer)
 
@@ -155,6 +161,8 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 
 func TestAPIClientAuthorizeToken(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
 	testMuxer := http.NewServeMux()
 	getOAuthChain(thisSpec, testMuxer)
 
@@ -186,6 +194,8 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 
 func GetAuthCode() map[string]string {
 	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
 	testMuxer := http.NewServeMux()
 	getOAuthChain(thisSpec, testMuxer)
 
@@ -223,6 +233,8 @@ func GetToken() tokenData {
 	authData := GetAuthCode()
 
 	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
 	testMuxer := http.NewServeMux()
 	getOAuthChain(thisSpec, testMuxer)
 
@@ -257,6 +269,8 @@ func TestClientAccessRequest(t *testing.T) {
 	authData := GetAuthCode()
 
 	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
 	testMuxer := http.NewServeMux()
 	getOAuthChain(thisSpec, testMuxer)
 
@@ -292,6 +306,8 @@ func TestClientRefreshRequest(t *testing.T) {
 	tokenData := GetToken()
 
 	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	thisSpec.Init(&redisStore, &redisStore)
 	testMuxer := http.NewServeMux()
 	getOAuthChain(thisSpec, testMuxer)
 
