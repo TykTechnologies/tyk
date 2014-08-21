@@ -76,3 +76,9 @@ to make it easier to install the application for the end-user. Future versions w
 
 The simplest way to get the tests to run is to install local redis, or (what I do) have a vagrant instance that is running redis, then you can just `vagrant up`
 when you need redis and kill it later. Just make sure you are forwarding the default ports 1:1.
+
+### Dev versus stable
+
+The master branch is NOT the stable releases, check the tags for stable releases that can be patched, please se the CHANGELOG for breaking changes or to see how things stand.
+
+Documentation is currently valid for the 1.1 release.
