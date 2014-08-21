@@ -14,7 +14,7 @@ import (
 // a SessionState object (deserialised JSON)
 type AuthorisationHandler interface {
 	Init(StorageHandler)
-	IsKeyAuthorised(string) (bool, SessionState)
+	IsKeyAuthorised(string) (SessionState, bool)
 	IsKeyExpired(*SessionState) bool
 }
 
@@ -22,7 +22,7 @@ type AuthorisationHandler interface {
 // SessionState objects, not identity
 type SessionHandler interface {
 	Init(store StorageHandler)
-	UpdateSession(keyName string, session SessionState)
+	UpdateSession(keyName string, session SessionState, resetTTLTo int64)
 	RemoveSession(keyName string)
 	GetSessionDetail(keyName string) (SessionState, bool)
 	GetSessions(filter string) []string
@@ -49,21 +49,21 @@ func (b *DefaultAuthorisationManager) Init(store StorageHandler) {
 }
 
 // IsKeyAuthorised checks if key exists and can be read into a SessionState object
-func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (bool, SessionState) {
+func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionState, bool) {
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var newSession SessionState
 	if err != nil {
 		log.Warning("Invalid key detected, not found in storage engine")
-		return false, newSession
+		return newSession, false
 	}
 
 	if marshalErr := json.Unmarshal([]byte(jsonKeyVal), &newSession); marshalErr != nil {
 		log.Error("Couldn't unmarshal session object")
 		log.Error(marshalErr)
-		return false, newSession
+		return newSession, false
 	}
 
-	return true, newSession
+	return newSession, true
 }
 
 // IsKeyExpired checks if a key has expired, if the value of SessionState.Expires is 0, it will be ignored
@@ -84,11 +84,28 @@ func (b *DefaultSessionManager) Init(store StorageHandler) {
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b DefaultSessionManager) UpdateSession(keyName string, session SessionState) {
+func (b DefaultSessionManager) UpdateSession(keyName string, session SessionState, resetTTLTo int64) {
 	v, _ := json.Marshal(session)
-	keyExp := (session.Expires - time.Now().Unix()) + 300 // Add 5 minutes to key expiry, just in case
+	var ttl int64
+	var err error
 
-	b.Store.SetKey(keyName, string(v), keyExp)
+	if resetTTLTo == 0 {
+		ttl, err = b.Store.GetExp(keyName)
+
+		if err != nil {
+			log.Error("Failed to get TTL for key: ", err)
+			return
+		}
+	} else {
+		// Used on create, we update the TTL of the key
+		ttl = resetTTLTo
+	}
+
+	// by default expire the key if we get a nil value based on the session
+	// keyExp = (session.Expires - time.Now().Unix()) + 300 // Add 5 minutes to key expiry, just in case
+
+	// Keep the TTL
+	b.Store.SetKey(keyName, string(v), int64(ttl))
 }
 
 func (b DefaultSessionManager) RemoveSession(keyName string) {

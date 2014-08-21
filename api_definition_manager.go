@@ -60,6 +60,7 @@ type APIDefinition struct {
 		TargetURL       string `bson:"target_url" json:"target_url"`
 		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
 	} `bson:"proxy" json:"proxy"`
+	SessionLifetime int64 `bson:"session_lifetime" json:"session_lifetime"`
 	Active  bool                   `bson:"active" json:"active"`
 	AuthProvider AuthProviderMeta	`bson:"auth_provider" json:"auth_provider"`
 	SessionProvider SessionProviderMeta	`bson:"session_provider" json:"session_provider"`

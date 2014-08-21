@@ -533,7 +533,8 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 	// Override timeouts so that we can be in sync with Osin
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
 
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession)
+	// Use the default session expiry here as this is OAuth
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, newSession.Expires)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {

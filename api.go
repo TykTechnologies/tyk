@@ -78,7 +78,8 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		for apiId, _ := range(newSession.AccessRights) {
 			thisAPISpec := GetSpecForApi(apiId)
 			if thisAPISpec != nil {
-				thisAPISpec.SessionManager.UpdateSession(keyName, newSession)
+				// Lets reset keys if they are edited by admin
+				thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
 			} else {
 				log.WithFields(logrus.Fields{
 					"key": keyName,
@@ -360,7 +361,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				thisAPISpec := GetSpecForApi(apiId)
 				if thisAPISpec != nil {
 					// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
-					thisAPISpec.SessionManager.UpdateSession(newKey, newSession)
+					thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
 				} else {
 					log.WithFields(logrus.Fields{
 					"apiID": apiId,

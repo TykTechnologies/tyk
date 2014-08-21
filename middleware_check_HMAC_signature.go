@@ -129,7 +129,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	log.Debug("signature isn't empty: ", signature)
 
 	// Check if API key valid
-	keyExists, thisSessionState :=hm.Spec.AuthManager.IsKeyAuthorised(keyId)
+	thisSessionState, keyExists :=hm.TykMiddleware.CheckSessionAndIdentityForValidKey(keyId)
 	if !keyExists {
 		return hm.authorizationError(w, r)
 	}

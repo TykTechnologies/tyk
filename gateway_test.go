@@ -109,7 +109,7 @@ func TestThrottling(t *testing.T) {
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	spec.Init(&redisStore, &redisStore)
 	thisSession := createThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession)
+	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
@@ -155,7 +155,7 @@ func TestQuota(t *testing.T) {
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	spec.Init(&redisStore, &redisStore)
 	thisSession := createQuotaSession()
-	spec.SessionManager.UpdateSession("4321", thisSession)
+	spec.SessionManager.UpdateSession("4321", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
