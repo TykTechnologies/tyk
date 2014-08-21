@@ -154,6 +154,8 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
 	log.Info("Loading API configurations.")
+
+	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 
 	// Create a new handler for each API spec
@@ -169,8 +171,20 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		}
 
 		// Initialise the auth and session managers (use Redis for now)
-		// TODO: Make this configurable
-		referenceSpec.Init(&redisStore, &redisStore)
+		var authStore StorageHandler
+		var sessionStore StorageHandler
+
+		switch referenceSpec.AuthProvider.StorageEngine {
+			case DefaultStorageEngine: authStore = &redisStore
+			default: authStore = &redisStore
+		}
+
+		switch referenceSpec.SessionProvider.StorageEngine {
+		case DefaultStorageEngine: sessionStore = &redisStore
+		default: sessionStore = &redisStore
+		}
+
+		referenceSpec.Init(authStore, sessionStore)
 
 		if referenceSpec.UseOauth2 {
 			thisOauthManager := addOAuthHandlers(&referenceSpec, Muxer, false)

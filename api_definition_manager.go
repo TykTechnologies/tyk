@@ -16,18 +16,23 @@ import (
 
 type AuthProviderCode string
 type SessionProviderCode string
+type StorageEngineCode string
+
 const (
 	DefaultAuthProvider AuthProviderCode = "default"
 	DefaultSessionProvider SessionProviderCode = "default"
+	DefaultStorageEngine StorageEngineCode = "redis"
 )
 
 type AuthProviderMeta struct {
 	Name AuthProviderCode	`bson:"name" json:"name"`
+	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
 	Meta interface{}		`bson:"meta" json:"meta"`
 }
 
 type SessionProviderMeta struct {
 	Name SessionProviderCode	`bson:"name" json:"name"`
+	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
 	Meta interface{}			`bson:"meta" json:"meta"`
 }
 
