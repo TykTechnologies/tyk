@@ -36,6 +36,20 @@ func createError(errorMsg string) []byte {
 	return responseMsg
 }
 
+func GetSpecForApi(APIID string) *APISpec {
+	spec, ok := ApiSpecRegister[APIID]
+	if !ok {
+		return nil
+	}
+
+	return spec
+}
+
+// ---- TODO: This changes the URL structure of the API completely ----
+// ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
+// remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
+// need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
+
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	success := true
 	decoder := json.NewDecoder(r.Body)
@@ -60,7 +74,20 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			}
 
 		}
-		authManager.UpdateSession(keyName, newSession)
+
+		for apiId, _ := range(newSession.AccessRights) {
+			thisAPISpec := GetSpecForApi(apiId)
+			if thisAPISpec != nil {
+				// Lets reset keys if they are edited by admin
+				thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+			} else {
+				log.WithFields(logrus.Fields{
+					"key": keyName,
+					"apiID": apiId,
+				}).Error("Could not add key for this API ID, API doesn't exist.")
+			}
+		}
+
 		log.WithFields(logrus.Fields{
 			"key": keyName,
 		}).Info("New key added or updated.")
@@ -92,13 +119,20 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleGetDetail(sessionKey string) ([]byte, int) {
+func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
 	code := 200
 
-	thisSession, ok := authManager.GetSessionDetail(sessionKey)
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "API not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	thisSession, ok := thiSpec.SessionManager.GetSessionDetail(sessionKey)
 	if !ok {
 		success = false
 	} else {
@@ -131,14 +165,21 @@ type APIAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func handleGetAllKeys(filter string) ([]byte, int) {
+func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	code := 200
 
 	var err error
 
-	sessions := authManager.GetSessions(filter)
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "API not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	sessions := thiSpec.SessionManager.GetSessions(filter)
 	sessionsObj := APIAllKeys{sessions}
 
 	responseMessage, err = json.Marshal(&sessionsObj)
@@ -164,10 +205,31 @@ type APIStatusMessage struct {
 	Message string `json:"message"`
 }
 
-func handleDeleteKey(keyName string) ([]byte, int) {
+func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
-	authManager.Store.DeleteKey(keyName)
+
+	if APIID == "-1" {
+		// Go through ALL managed API's and delete the key
+		for _, spec := range(ApiSpecRegister) {
+			spec.SessionManager.RemoveSession(keyName)
+		}
+
+		log.WithFields(logrus.Fields{
+			"key": keyName,
+		}).Info("Attempted key deletion across all managed API's - success.")
+
+		return responseMessage, 200
+	}
+
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "API not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	thiSpec.SessionManager.RemoveSession(keyName)
 	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
@@ -211,6 +273,7 @@ func handleURLReload() ([]byte, int) {
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := r.URL.Path[len("/tyk/keys/"):]
 	filter := r.FormValue("filter")
+	APIID := r.FormValue("api_id")
 	var responseMessage []byte
 	var code int
 
@@ -220,15 +283,15 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "GET" {
 		if keyName != "" {
 			// Return single key detail
-			responseMessage, code = handleGetDetail(keyName)
+			responseMessage, code = handleGetDetail(keyName, APIID)
 		} else {
 			// Return list of keys
-			responseMessage, code = handleGetAllKeys(filter)
+			responseMessage, code = handleGetAllKeys(filter, APIID)
 		}
 
 	} else if r.Method == "DELETE" {
 		// Remove a key
-		responseMessage, code = handleDeleteKey(keyName)
+		responseMessage, code = handleDeleteKey(keyName, APIID)
 
 	} else {
 		// Return Not supported message (and code)
@@ -288,14 +351,25 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			log.Error(err)
 
 		} else {
-			newKey := authManager.GenerateAuthKey(newSession.OrgID)
 
-			// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
+			newKey := keyGen.GenerateAuthKey(newSession.OrgID)
 			if newSession.HMACEnabled {
-				newSession.HmacSecret = authManager.GenerateHMACSecret()
+				newSession.HmacSecret = keyGen.GenerateHMACSecret()
 			}
 
-			authManager.UpdateSession(newKey, newSession)
+			for apiId, _ := range(newSession.AccessRights) {
+				thisAPISpec := GetSpecForApi(apiId)
+				if thisAPISpec != nil {
+					// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
+					thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+				} else {
+					log.WithFields(logrus.Fields{
+					"apiID": apiId,
+				}).Error("Could not create key for this API ID, API doesn't exist.")
+				}
+			}
+
+
 			responseObj.Action = "create"
 			responseObj.Key = newKey
 			responseObj.Status = "ok"
@@ -363,7 +437,14 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 
 		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.GetId())
-		storeErr := genericOsinStorage.SetClient(storageID, &newClient, true)
+		thisAPISpec := GetSpecForApi(newOauthClient.APIID)
+		if thisAPISpec == nil {
+			log.WithFields(logrus.Fields{
+				"apiID": newOauthClient.APIID,
+			}).Error("Could not create key for this API ID, API doesn't exist.")
+		}
+
+		storeErr := thisAPISpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
 
 		if storeErr != nil {
 			log.Error("Failed to save new client data: ", storeErr)
@@ -452,7 +533,18 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 	code := 200
 
 	storageID := createOauthClientStorageID(APIID, keyName)
-	thisClientData, getClientErr := genericOsinStorage.GetClientNoPrefix(storageID)
+	thisAPISpec := GetSpecForApi(APIID)
+	if thisAPISpec == nil {
+		log.WithFields(logrus.Fields{
+			"apiID": APIID,
+		}).Error("Could ot get Client Details, API doesn't exist.")
+		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		code = 404
+		return responseMessage, code
+	}
+
+	thisClientData, getClientErr := thisAPISpec.OAuthManager.OsinServer.Storage.GetClientNoPrefix(storageID)
 	if getClientErr != nil {
 		success = false
 	} else {
@@ -491,7 +583,19 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 	var err error
 
 	storageID := createOauthClientStorageID(APIID, keyName)
-	osinErr := genericOsinStorage.DeleteClient(storageID, true)
+
+	thisAPISpec := GetSpecForApi(APIID)
+	if thisAPISpec == nil {
+		log.WithFields(logrus.Fields{
+			"apiID": APIID,
+		}).Error("Could ot get Client Details, API doesn't exist.")
+		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+
+		return responseMessage, 400
+	}
+
+	osinErr := thisAPISpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, true)
 
 	code := 200
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
@@ -526,7 +630,19 @@ func getOauthClients(APIID string) ([]byte, int) {
 	code := 200
 
 	filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
-	thisClientData, getClientsErr := genericOsinStorage.GetClients(filterID, true)
+
+	thisAPISpec := GetSpecForApi(APIID)
+	if thisAPISpec == nil {
+		log.WithFields(logrus.Fields{
+		"apiID": APIID,
+	}).Error("Could ot get Client Details, API doesn't exist.")
+		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+
+		return responseMessage, 400
+	}
+
+	thisClientData, getClientsErr := thisAPISpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
 	if getClientsErr != nil {
 		success = false
 	} else {
@@ -566,11 +682,14 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 // MakeNewOsinServer creates a generic osinStorage object, used primarily by the API to create and get keys outside of an APISpec context.
 // This is not ideal, but is only used in the Tyk API and nowhere else.
-func MakeNewOsinServer() *RedisOsinStorageInterface {
-	log.Info("Creating generic redis OAuth connection")
-	storageManager := RedisStorageManager{KeyPrefix: ""}
-	storageManager.Connect()
-	osinStorage := &RedisOsinStorageInterface{&storageManager}
 
-	return osinStorage
-}
+// TODO: Remove this, as we can use the APISpec to do this instead
+
+//func MakeNewOsinServer() *RedisOsinStorageInterface {
+//	log.Info("Creating generic redis OAuth connection")
+//	storageManager := RedisStorageManager{KeyPrefix: ""}
+//	storageManager.Connect()
+//	osinStorage := &RedisOsinStorageInterface{&storageManager}
+//
+//	return osinStorage
+//}

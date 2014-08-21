@@ -14,6 +14,28 @@ import (
 	"time"
 )
 
+type AuthProviderCode string
+type SessionProviderCode string
+type StorageEngineCode string
+
+const (
+	DefaultAuthProvider AuthProviderCode = "default"
+	DefaultSessionProvider SessionProviderCode = "default"
+	DefaultStorageEngine StorageEngineCode = "redis"
+)
+
+type AuthProviderMeta struct {
+	Name AuthProviderCode	`bson:"name" json:"name"`
+	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
+	Meta interface{}		`bson:"meta" json:"meta"`
+}
+
+type SessionProviderMeta struct {
+	Name SessionProviderCode	`bson:"name" json:"name"`
+	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
+	Meta interface{}			`bson:"meta" json:"meta"`
+}
+
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 type APIDefinition struct {
 	ID               bson.ObjectId `bson:"_id,omitempty" json:"id"`
@@ -43,7 +65,10 @@ type APIDefinition struct {
 		TargetURL       string `bson:"target_url" json:"target_url"`
 		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
 	} `bson:"proxy" json:"proxy"`
+	SessionLifetime int64 `bson:"session_lifetime" json:"session_lifetime"`
 	Active  bool                   `bson:"active" json:"active"`
+	AuthProvider AuthProviderMeta	`bson:"auth_provider" json:"auth_provider"`
+	SessionProvider SessionProviderMeta	`bson:"session_provider" json:"session_provider"`
 	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
 }
 
@@ -101,6 +126,9 @@ type APISpec struct {
 	RxPaths          map[string][]URLSpec
 	WhiteListEnabled map[string]bool
 	target           *url.URL
+	AuthManager AuthorisationHandler
+	SessionManager SessionHandler
+	OAuthManager *OAuthManager
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -124,6 +152,27 @@ func (a *APIDefinitionLoader) Connect() {
 func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
 	newAppSpec := APISpec{}
 	newAppSpec.APIDefinition = thisAppConfig
+
+	// Add any new session managers or auth handlers here
+	if newAppSpec.APIDefinition.AuthProvider.Name != "" {
+		switch newAppSpec.APIDefinition.AuthProvider.Name {
+			case DefaultAuthProvider: newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+			default: newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+		}
+	} else {
+		newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+	}
+
+	if newAppSpec.APIDefinition.SessionProvider.Name != "" {
+		switch newAppSpec.APIDefinition.SessionProvider.Name {
+			case DefaultSessionProvider: newAppSpec.SessionManager = &DefaultSessionManager{}
+			default: newAppSpec.SessionManager = &DefaultSessionManager{}
+		}
+	} else {
+		newAppSpec.SessionManager = &DefaultSessionManager{}
+	}
+
+
 	newAppSpec.RxPaths = make(map[string][]URLSpec)
 	newAppSpec.WhiteListEnabled = make(map[string]bool)
 	for _, v := range thisAppConfig.VersionData.Versions {
@@ -243,6 +292,11 @@ func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus
 	}
 
 	return thisURLSpec
+}
+
+func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler) {
+	a.AuthManager.Init(AuthStore)
+	a.SessionManager.Init(SessionStore)
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.

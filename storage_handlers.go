@@ -19,6 +19,7 @@ func (e KeyError) Error() string {
 type StorageHandler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
 	SetKey(string, string, int64)  // Second input string is expected to be a JSON object (SessionState)
+	GetExp(string) (int64, error) // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	Connect() bool
@@ -53,6 +54,10 @@ func (s InMemoryStorageManager) GetKey(keyName string) (string, error) {
 // SetKey updates the in-memory key
 func (s InMemoryStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
 	s.Sessions[keyName] = sessionState
+}
+
+func (s InMemoryStorageManager) GetExp(keyName string) (int64, error) {
+	return 0, nil
 }
 
 // GetKeys will retreive multiple keys based on a filter (prefix, e.g. tyk.keys)
@@ -164,6 +169,26 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	}
 
 	return "", KeyError{}
+}
+
+func (r *RedisStorageManager) GetExp(keyName string) (int64, error) {
+	db := r.pool.Get()
+	defer db.Close()
+	log.Debug("Getting exp for key: ", r.fixKey(keyName))
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.GetExp(keyName)
+	}
+
+	value, err := redis.Int64(db.Do("TTL", r.fixKey(keyName)))
+	if err != nil {
+		log.Error("Error trying to get TTL: ", err)
+	} else {
+		return value, nil
+	}
+
+	return 0, KeyError{}
 }
 
 // SetKey will create (or update) a key value in the store

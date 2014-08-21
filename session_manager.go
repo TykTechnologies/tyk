@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -108,8 +106,13 @@ func createSampleSession() SessionState {
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = 10
 
-	b, _ := json.Marshal(thisSession)
+	simpleDef := AccessDefinition{
+		APIiName: "Test",
+		APIID: "1",
+		Versions: []string{"Default"},
+	}
+	thisSession.AccessRights = map[string]AccessDefinition{}
+	thisSession.AccessRights["1"] = simpleDef
 
-	fmt.Println(string(b))
 	return thisSession
 }

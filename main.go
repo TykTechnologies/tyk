@@ -18,14 +18,14 @@ import (
 )
 
 var log = logrus.New()
-var authManager = AuthorisationManager{}
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
 var profileFile = &os.File{}
 var doMemoryProfile bool
-var genericOsinStorage *RedisOsinStorageInterface
-
+//var genericOsinStorage *RedisOsinStorageInterface
+var ApiSpecRegister = make(map[string]*APISpec)
+var keyGen = DefaultKeyGenerator{}
 // Generic system error
 const (
 	E_SYSTEM_ERROR          string = "{\"status\": \"system error, please contact administrator\"}"
@@ -53,18 +53,6 @@ func displayConfig() {
 
 // Create all globals and init connection handlers
 func setupGlobals() {
-	if config.Storage.Type == "memory" {
-		log.Warning("Using in-memory storage. Warning: this is not scalable.")
-		authManager = AuthorisationManager{
-			&InMemoryStorageManager{
-				map[string]string{}}}
-	} else if config.Storage.Type == "redis" {
-		log.Info("Using Redis storage manager.")
-		authManager = AuthorisationManager{
-			&RedisStorageManager{KeyPrefix: "apikey-"}}
-
-		authManager.Store.Connect()
-	}
 
 	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
 		log.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
@@ -91,7 +79,7 @@ func setupGlobals() {
 		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
 	}
 
-	genericOsinStorage = MakeNewOsinServer()
+	//genericOsinStorage = MakeNewOsinServer()
 
 	templateFile := fmt.Sprintf("%s/error.json", config.TemplatePath)
 	templates = template.Must(template.ParseFiles(templateFile))
@@ -123,7 +111,7 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 }
 
 // Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
+func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthManager{
 	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
 	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
@@ -136,7 +124,7 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
 	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager.Connect()
-	osinStorage := RedisOsinStorageInterface{&storageManager}
+	osinStorage := RedisOsinStorageInterface{&storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
 	if test {
 		log.Warning("Adding test client")
@@ -148,7 +136,8 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 		osinStorage.SetClient(testClient.Id, &testClient, false)
 		log.Warning("Test client added")
 	}
-	osinServer := osin.NewServer(serverConfig, osinStorage)
+
+	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 	osinServer.AccessTokenGen = &AccessTokenGenTyk{}
 
 	oauthManager := OAuthManager{spec, osinServer}
@@ -157,6 +146,8 @@ func addOAuthHandlers(spec APISpec, Muxer *http.ServeMux, test bool) {
 	Muxer.HandleFunc(apiAuthorizePath, CheckIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
 	Muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
 	Muxer.HandleFunc(clientAccessPath, oauthHandlers.HandleAccessRequest)
+
+	return &oauthManager
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -164,41 +155,65 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
 	log.Info("Loading API configurations.")
 
-	for _, spec := range APISpecs {
-		// Create a new handler for each API spec
-		remote, err := url.Parse(spec.APIDefinition.Proxy.TargetURL)
+	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+
+	// Create a new handler for each API spec
+	for apiIndex, _ := range APISpecs {
+		// We need a reference to this as we change it on the go and re-use it in a global index
+		referenceSpec := APISpecs[apiIndex]
+		log.Info("Loading API Spec for: ", referenceSpec.APIDefinition.Name)
+
+		remote, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
 		if err != nil {
 			log.Error("Culdn't parse target URL")
 			log.Error(err)
 		}
 
-		if spec.UseOauth2 {
-			addOAuthHandlers(spec, Muxer, false)
+		// Initialise the auth and session managers (use Redis for now)
+		var authStore StorageHandler
+		var sessionStore StorageHandler
+
+		switch referenceSpec.AuthProvider.StorageEngine {
+			case DefaultStorageEngine: authStore = &redisStore
+			default: authStore = &redisStore
+		}
+
+		switch referenceSpec.SessionProvider.StorageEngine {
+		case DefaultStorageEngine: sessionStore = &redisStore
+		default: sessionStore = &redisStore
+		}
+
+		referenceSpec.Init(authStore, sessionStore)
+
+		if referenceSpec.UseOauth2 {
+			thisOauthManager := addOAuthHandlers(&referenceSpec, Muxer, false)
+			referenceSpec.OAuthManager = thisOauthManager
 		}
 
 		proxy := TykNewSingleHostReverseProxy(remote)
-		spec.target = remote
+		referenceSpec.target = remote
 
-		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
-		tykMiddleware := TykMiddleware{spec, proxy}
+		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
+		tykMiddleware := TykMiddleware{referenceSpec, proxy}
 
-		if spec.APIDefinition.UseKeylessAccess {
+		if referenceSpec.APIDefinition.UseKeylessAccess {
 			// for KeyLessAccess we can't support rate limiting, versioning or access rules
 			chain := alice.New().Then(proxyHandler)
-			Muxer.Handle(spec.Proxy.ListenPath, chain)
+			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 
 		} else {
 
 			// Select the keying method to use for setting session states
 			var keyCheck func(http.Handler) http.Handler
 
-			if spec.APIDefinition.UseOauth2 {
+			if referenceSpec.APIDefinition.UseOauth2 {
 				// Oauth2
 				keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
-			} else if spec.APIDefinition.UseBasicAuth {
+			} else if referenceSpec.APIDefinition.UseBasicAuth {
 				// Basic Auth
 				keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
-			} else if spec.EnableSignatureChecking {
+			} else if referenceSpec.EnableSignatureChecking {
 				// HMAC Auth
 				keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
 			} else {
@@ -214,10 +229,13 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
-			Muxer.Handle(spec.Proxy.ListenPath, chain)
+			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 		}
 
+		ApiSpecRegister[referenceSpec.APIDefinition.APIID] = &referenceSpec
+
 	}
+
 }
 
 // ReloadURLStructure will create a new muxer, reload all the app configs for an

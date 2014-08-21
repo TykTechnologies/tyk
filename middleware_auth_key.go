@@ -52,7 +52,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	// Check if API key valid
-	keyExists, thisSessionState := authManager.IsKeyAuthorised(authHeaderValue)
+	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(authHeaderValue)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -62,6 +62,8 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 
 		return errors.New("Key not authorised"), 403
 	}
+
+
 
 	// Set session state on context, we will need it later
 	context.Set(r, SessionData, thisSessionState)

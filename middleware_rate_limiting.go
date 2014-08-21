@@ -30,7 +30,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
 
 	// Ensure quota and rate data for this session are recorded
-	authManager.UpdateSession(authHeaderValue, thisSessionState)
+	k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
 
 	log.Debug("SessionState: ", thisSessionState)
 

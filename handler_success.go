@@ -26,6 +26,31 @@ type TykMiddleware struct {
 	Proxy *httputil.ReverseProxy
 }
 
+// CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
+// the Auth Handler, if not found it will fail
+func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
+	// Try and get the session from the session store
+	var thisSession SessionState
+	var found bool
+
+	thisSession, found = t.Spec.SessionManager.GetSessionDetail(key)
+	if found {
+		// If exists, assume it has been authorized and pass on
+		return thisSession, true
+	}
+
+	// TODO: 2. If not there, get it from the AuthorizationHandler
+
+	thisSession, found = t.Spec.AuthManager.IsKeyAuthorised(key)
+	if found {
+		// If not in Session, and got it from AuthHandler, create a session with a new TTL
+		log.Info("Recreating session for key: ", key)
+		t.Spec.SessionManager.UpdateSession(key, thisSession, t.Spec.APIDefinition.SessionLifetime)
+	}
+
+	return thisSession, found
+}
+
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
 	TykMiddleware
