@@ -18,6 +18,7 @@ type Config struct {
 		Port     int    `json:"port"`
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Database int    `json:"database"`
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
@@ -40,6 +41,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Host = "localhost"
 	configStruct.Storage.Username = "user"
 	configStruct.Storage.Password = "password"
+	configStruct.Storage.Database = 0
 	configStruct.Storage.Port = 6379
 	configStruct.EnableAnalytics = false
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"

@@ -107,7 +107,7 @@ type RedisStorageManager struct {
 	KeyPrefix string
 }
 
-func (r *RedisStorageManager) newPool(server, password string) *redis.Pool {
+func (r *RedisStorageManager) newPool(server, password string, database int) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     3,
 		IdleTimeout: 240 * time.Second,
@@ -118,6 +118,12 @@ func (r *RedisStorageManager) newPool(server, password string) *redis.Pool {
 			}
 			if password != "" {
 				if _, err := c.Do("AUTH", password); err != nil {
+					c.Close()
+					return nil, err
+				}
+			}
+			if database > 0 {
+				if _, err := c.Do("SELECT", database); err != nil {
 					c.Close()
 					return nil, err
 				}
@@ -136,7 +142,7 @@ func (r *RedisStorageManager) Connect() bool {
 
 	fullPath := config.Storage.Host + ":" + strconv.Itoa(config.Storage.Port)
 	log.Info("Connecting to redis on: ", fullPath)
-	r.pool = r.newPool(fullPath, config.Storage.Password)
+	r.pool = r.newPool(fullPath, config.Storage.Password, config.Storage.Database)
 
 	return true
 }
