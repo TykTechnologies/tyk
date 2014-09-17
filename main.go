@@ -62,21 +62,26 @@ func setupGlobals() {
 		AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
 		log.Info("Setting up analytics DB connection")
 
+		analytics = RedisAnalyticsHandler{
+			Store: &AnalyticsStore,
+		}
+
 		if config.AnalyticsConfig.Type == "csv" {
 			log.Info("Using CSV cache purge")
-			analytics = RedisAnalyticsHandler{
-				Store: &AnalyticsStore,
-				Clean: &CSVPurger{&AnalyticsStore}}
+			analytics.Clean = &CSVPurger{&AnalyticsStore}
 
 		} else if config.AnalyticsConfig.Type == "mongo" {
 			log.Info("Using MongoDB cache purge")
-			analytics = RedisAnalyticsHandler{
-				Store: &AnalyticsStore,
-				Clean: &MongoPurger{&AnalyticsStore, nil}}
+			analytics.Clean = &MongoPurger{&AnalyticsStore, nil}
 		}
 
 		analytics.Store.Connect()
-		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
+
+		if config.AnalyticsConfig.PurgeDelay >= 0 {
+			go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
+		} else {
+			log.Warn("Cache purge turned off, you are responsible for Redis storage maintenance.")
+		}
 	}
 
 	//genericOsinStorage = MakeNewOsinServer()
