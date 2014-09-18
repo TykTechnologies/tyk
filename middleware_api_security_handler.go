@@ -14,7 +14,7 @@ func CheckIsAPIOwner(handler func(http.ResponseWriter, *http.Request)) func(http
 			// Error
 			log.Warning("Attempted administrative access with invalid or missing key!")
 
-			responseMessage := createError("Method not supported")
+			responseMessage := createError("Forbidden")
 			w.WriteHeader(403)
 			fmt.Fprintf(w, string(responseMessage))
 
