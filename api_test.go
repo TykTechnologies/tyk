@@ -9,10 +9,11 @@ import (
 	"testing"
 )
 
-var testDef string = `
+var apiTestDef string = `
 
 	{
-		"name": "Tyk Test API",
+		"id": "507f1f77bcf86cd799439011",
+		"name": "Tyk Test API ONE",
 		"api_id": "1",
 		"org_id": "default",
 		"definition": {
@@ -46,10 +47,18 @@ var testDef string = `
 `
 
 func MakeSampleAPI() *APISpec {
-	thisSpec := createDefinitionFromString(testDef)
+	log.Warning("CREATING TEMPORARY API")
+	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	thisSpec.Init(&redisStore, &redisStore)
-	ReloadURLStructure()
+
+	specs := []APISpec{thisSpec}
+	newMuxes := http.NewServeMux()
+	loadAPIEndpoints(newMuxes)
+	loadApps(specs, newMuxes)
+
+	http.DefaultServeMux = newMuxes
+	log.Warning("TEST Reload complete")
 
 	return &thisSpec
 }
@@ -58,6 +67,54 @@ type Success struct {
 	Key    string `json:"key"`
 	Status string `json:"status"`
 	Action string `json:"action"`
+}
+
+type testAPIDefinition struct {
+	APIDefinition
+	ID               string `json:"id"`
+
+}
+
+func init() {
+	// Clean up our API list
+	log.Warning("Setting up Empty API path")
+	config.AppPath = "./test/"
+}
+
+func TestApiHandler(t *testing.T) {
+	uri := "/tyk/apis/"
+	method := "GET"
+	sampleKey := createSampleSession()
+	body, _ := json.Marshal(&sampleKey)
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+
+	MakeSampleAPI()
+
+	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	apiHandler(recorder, req)
+
+	// We can't deserialize BSON ObjectID's if they are not in th test base!
+	var ApiList []testAPIDefinition
+	err = json.Unmarshal([]byte(recorder.Body.String()), &ApiList)
+
+	if err != nil {
+		t.Error("Could not unmarshal API List:\n", err, recorder.Body.String())
+	} else {
+		if len(ApiList) != 1 {
+			t.Error("API's not returned, len was: \n", len(ApiList), recorder.Body.String())
+		} else {
+			if ApiList[0].APIID != "1" {
+				t.Error("Response is incorrect - no APi ID value in sruct :\n", recorder.Body.String())
+			}
+		}
+	}
 }
 
 func TestKeyHandlerNewKey(t *testing.T) {
@@ -93,6 +150,8 @@ func TestKeyHandlerNewKey(t *testing.T) {
 		}
 	}
 }
+
+
 
 func TestKeyHandlerUpdateKey(t *testing.T) {
 	uri := "/tyk/keys/1234"

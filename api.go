@@ -36,6 +36,12 @@ func createError(errorMsg string) []byte {
 	return responseMsg
 }
 
+func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	fmt.Fprintf(w, string(responseMessage))
+}
+
 func GetSpecForApi(APIID string) *APISpec {
 	spec, ok := ApiSpecRegister[APIID]
 	if !ok {
@@ -270,6 +276,54 @@ func handleURLReload() ([]byte, int) {
 	return responseMessage, code
 }
 
+
+func HandleGetAPIList() ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	var thisAPIIDList []APIDefinition
+	thisAPIIDList = make([]APIDefinition, len(ApiSpecRegister))
+
+	c := 0
+	for _, apiSpec := range(ApiSpecRegister) {
+		thisAPIIDList[c] = apiSpec.APIDefinition
+		thisAPIIDList[c].RawData = nil
+		c++
+	}
+
+	responseMessage, err = json.Marshal(&thisAPIIDList)
+
+	if err != nil {
+		log.Error("Marshalling failed: ", err)
+		return []byte(E_SYSTEM_ERROR), 500
+	}
+
+	return responseMessage, 200
+}
+
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+	APIID := r.URL.Path[len("/tyk/apis/"):]
+	var responseMessage []byte
+	var code int
+
+	if r.Method == "GET" {
+		if APIID != "" {
+			code = 405
+			responseMessage = createError("Method not supported")
+		} else {
+			log.Info("Requesting API list")
+			responseMessage, code = HandleGetAPIList()
+		}
+
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	DoJSONWrite(w, code, responseMessage)
+}
+
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := r.URL.Path[len("/tyk/keys/"):]
 	filter := r.FormValue("filter")
@@ -281,12 +335,17 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage, code = handleAddOrUpdate(keyName, r)
 
 	} else if r.Method == "GET" {
-		if keyName != "" {
-			// Return single key detail
-			responseMessage, code = handleGetDetail(keyName, APIID)
+		if APIID == "" {
+			code = 405
+			responseMessage = createError("Missing required parameter 'api_id' in request")
 		} else {
-			// Return list of keys
-			responseMessage, code = handleGetAllKeys(filter, APIID)
+			if keyName != "" {
+				// Return single key detail
+				responseMessage, code = handleGetDetail(keyName, APIID)
+			} else {
+				// Return list of keys
+				responseMessage, code = handleGetAllKeys(filter, APIID)
+			}
 		}
 
 	} else if r.Method == "DELETE" {
@@ -299,8 +358,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	DoJSONWrite(w, code, responseMessage)
 }
 
 func resetHandler(w http.ResponseWriter, r *http.Request) {
@@ -316,8 +374,7 @@ func resetHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	DoJSONWrite(w, code, responseMessage)
 }
 
 func expandKey(orgID, key string) string {
@@ -393,8 +450,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	DoJSONWrite(w, code, responseMessage)
 }
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
@@ -475,8 +531,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	DoJSONWrite(w, code, responseMessage)
 }
 
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -497,8 +552,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
-		w.WriteHeader(code)
-		fmt.Fprintf(w, string(responseMessage))
+		DoJSONWrite(w, code, responseMessage)
 		return
 	}
 
@@ -521,8 +575,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	DoJSONWrite(w, code, responseMessage)
 }
 
 // Get client details
