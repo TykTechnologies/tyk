@@ -53,6 +53,7 @@ func getChain(spec APISpec) http.Handler {
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 	tykMiddleware := TykMiddleware{spec, proxy}
 	chain := alice.New(
+		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
