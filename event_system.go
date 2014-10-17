@@ -5,57 +5,46 @@ import (
 	"errors"
 )
 
-/*
-Event lifecycle:
-1. Trigger occurs
-2. Create event object
-3. go NotifyEvent(eventObj) as goroutine so inbound request doesn't block
-4. NotifyEvent runs through all of the EventHandlers (interface) with the event, these run as a goroutine and quit on their own
-5. Event handlers are configurable on a per-api basis in an event_handlers section
-6. For each event type, there is a list of handler_code and metadata (e.g. a webhook target URL and a template to use)
+type TykEvent string	// A type so we can ENUM event types easily, e.g. EVENT_QuotaExceeded
+type TykEventHandlerName string // A type for handler codes in API definitions
 
-On API Def load:
-- Init the handlers from the config
-- Create the event handler hash map
-- Add event handler hash map to the Api Definition
-
-Event starts
-- Get event handlers for API
--- Get event handlers for this event
----- Loop through list and fire off handler functions with metadata
- */
-
-type TykEvent string
-type TykEventHandlerName string
-
+// The name for event handlers as defined in the API Definition JSON/BSON format
 const (
 	EH_LogHandler TykEventHandlerName = "eh_log_handler"
 )
 
+// Register new event types here
 const (
 	EVENT_QuotaExceeded TykEvent = "QuotaExceeded"
 )
 
+// EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
+// easily extending event metadata objects
 type EventMetaDefault struct {
 	Message string
-	// TODO: Extend this
 }
 
+// EVENT_QuotaExceededMeta is the metadata structure for a quota exceeded event (EVENT_QuotaExceeded)
 type EVENT_QuotaExceededMeta struct {
 	EventMetaDefault
+	Path string
+	Origin string
+	Key string
 }
 
+// EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
 	EventType TykEvent
 	EventMetaData interface{}
 }
 
+// TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
 type TykEventHandler interface {
 	New(interface{}) TykEventHandler
 	HandleEvent(EventMessage)
 }
 
-
+// GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
 func GetEventHandlerByName(handlerConf EventHandlerTriggerConfig) (TykEventHandler, error) {
 	switch handlerConf.Handler {
 		case EH_LogHandler: return LogMessageEventHandler{}.New(handlerConf.HandlerMeta), nil
@@ -67,7 +56,7 @@ func GetEventHandlerByName(handlerConf EventHandlerTriggerConfig) (TykEventHandl
 // FireEvent is added to the tykMiddleware object so it is available across the entire stack
 func (t TykMiddleware) FireEvent(eventName TykEvent, eventMetaData interface{}) {
 
-	log.Debu("EVENT FIRED")
+	log.Debug("EVENT FIRED")
 
 	handlers, handlerExists := t.Spec.EventPaths[eventName]
 
@@ -84,25 +73,32 @@ func (t TykMiddleware) FireEvent(eventName TykEvent, eventMetaData interface{}) 
 	}
 }
 
-// Sample Event Handler
+// LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
 	conf map[string]interface{}
 }
 
+
+// New enables the intitialisation of event handler instances when they are created on ApiSpec creation
 func (l LogMessageEventHandler) New(handlerConf interface{}) TykEventHandler {
 	thisHandler := LogMessageEventHandler{}
-	log.Error(handlerConf)
 	thisHandler.conf = handlerConf.(map[string]interface{})
 
 	return thisHandler
 }
-
+// HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l LogMessageEventHandler) HandleEvent(em EventMessage) {
 	var msgConf EVENT_QuotaExceededMeta
+	// type assert the metadata and then use it however you like
 	msgConf = em.EventMetaData.(EVENT_QuotaExceededMeta)
 
 	var formattedMsgString string
-	formattedMsgString = fmt.Sprintf("%s:\t %s", l.conf["prefix"].(string), msgConf.Message)
+	formattedMsgString = fmt.Sprintf("%s:%s:%s", l.conf["prefix"].(string), em.EventType, msgConf.Message)
+
+	// We can handle specific event types easily
+	if em.EventType == EVENT_QuotaExceeded {
+		formattedMsgString = fmt.Sprintf("%s:%s:%s:%s", formattedMsgString, msgConf.Key, msgConf.Origin, msgConf.Path)
+	}
 
 	log.Warning(formattedMsgString)
 }

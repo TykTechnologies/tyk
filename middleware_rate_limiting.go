@@ -52,8 +52,14 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				"key":    authHeaderValue,
 			}).Info("Key quota limit exceeded.")
 
-			// TESTING ------
-			go k.TykMiddleware.FireEvent(EVENT_QuotaExceeded, EVENT_QuotaExceededMeta{EventMetaDefault{Message: "QUOTA EXCEEDED EVENT FIRED"}})
+			// Fire a quota exceeded event
+			go k.TykMiddleware.FireEvent(EVENT_QuotaExceeded,
+				EVENT_QuotaExceededMeta{
+					EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded"},
+					Path: r.URL.Path,
+					Origin: r.RemoteAddr,
+					Key: authHeaderValue,
+			})
 
 			return errors.New("Quota exceeded"), 403
 		}

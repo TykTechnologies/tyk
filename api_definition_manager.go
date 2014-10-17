@@ -189,7 +189,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
 	for eventName, eventHandlerConfs := range(thisAppConfig.EventHandlers.Events) {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range(eventHandlerConfs) {
-			log.Error("CREATING EVENT HANDLERS")
+			log.Debug("CREATING EVENT HANDLERS")
 			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf)
 
 			if getHandlerErr != nil {
