@@ -39,7 +39,7 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 		return thisSession, true
 	}
 
-	// TODO: 2. If not there, get it from the AuthorizationHandler
+	// 2. If not there, get it from the AuthorizationHandler
 
 	thisSession, found = t.Spec.AuthManager.IsKeyAuthorised(key)
 	if found {

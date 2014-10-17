@@ -36,6 +36,15 @@ type SessionProviderMeta struct {
 	Meta interface{}			`bson:"meta" json:"meta"`
 }
 
+type EventHandlerTriggerConfig struct {
+	Handler TykEventHandlerName	`bson:"handler_name" json:"handler_name"`
+	HandlerMeta interface{} `bson:"handler_meta" json:"handler_meta"`
+}
+
+type EventHandlerMetaConfig struct {
+	Events map[TykEvent][]EventHandlerTriggerConfig `bson:"events" json:"events"`
+}
+
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 type APIDefinition struct {
 	ID               bson.ObjectId `bson:"_id,omitempty" json:"id"`
@@ -69,6 +78,7 @@ type APIDefinition struct {
 	Active  bool                   `bson:"active" json:"active"`
 	AuthProvider AuthProviderMeta	`bson:"auth_provider" json:"auth_provider"`
 	SessionProvider SessionProviderMeta	`bson:"session_provider" json:"session_provider"`
+	EventHandlers EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
 	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
 }
 
@@ -129,6 +139,7 @@ type APISpec struct {
 	AuthManager AuthorisationHandler
 	SessionManager SessionHandler
 	OAuthManager *OAuthManager
+	EventPaths map[TykEvent][]TykEventHandler
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -170,6 +181,25 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
 		}
 	} else {
 		newAppSpec.SessionManager = &DefaultSessionManager{}
+	}
+
+	// Set up Event Handlers
+	log.Debug("INITIALISING EVENT HANDLERS")
+	newAppSpec.EventPaths = make(map[TykEvent][]TykEventHandler)
+	for eventName, eventHandlerConfs := range(thisAppConfig.EventHandlers.Events) {
+		log.Debug("FOUND EVENTS TO INIT")
+		for _, handlerConf := range(eventHandlerConfs) {
+			log.Error("CREATING EVENT HANDLERS")
+			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf)
+
+			if getHandlerErr != nil {
+				log.Error("Failed to init event handler: ", getHandlerErr)
+			} else {
+				log.Info("Init Event Handler: ", eventName)
+				newAppSpec.EventPaths[eventName] = append(newAppSpec.EventPaths[eventName], thisEventHandlerInstance)
+			}
+
+		}
 	}
 
 

@@ -90,6 +90,24 @@ var nonExpiringDefNoWhiteList string = `
 				}
 			}
 		},
+		"event_handlers": {
+			"events": {
+				"QuotaExceeded": [
+					{
+						"handler_name":"eh_log_handler",
+						"handler_meta": {
+							"prefix": "LOG-HANDLER-PREFIX"
+						}
+					},
+					{
+						"handler_name":"eh_log_handler",
+						"handler_meta": {
+							"prefix": "ANOTHER-LOG-HANDLER-PREFIX"
+						}
+					}
+				]
+			}
+		},
 		"proxy": {
 			"listen_path": "/v1",
 			"target_url": "http://lonelycode.com",
