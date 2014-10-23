@@ -45,16 +45,21 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		return nil, 200
 	}
 
+	var remoteIP net.IP
+
 	// Enabled, check incoming IP address
 	for _, ip := range(ipConfig.AllowedIPs) {
 		allowedIP := net.ParseIP(ip)
-		remoteIP := net.ParseIP(r.RemoteAddr)
+		remoteIP = net.ParseIP(r.RemoteAddr)
 		// We parse the IP to manage IPv4 and IPv6 easily
 		if allowedIP.String() == remoteIP.String() {
 			// matched, pass through
 			return nil, 200
 		}
 	}
+
+	// Fire Authfailed Event
+	AuthFailed(i.TykMiddleware, r, remoteIP.String())
 
 	// Not matched, fail
 	return errors.New("Access from this IP has been disallowed"), 403

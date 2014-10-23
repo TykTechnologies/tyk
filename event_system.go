@@ -17,6 +17,7 @@ const (
 const (
 	EVENT_QuotaExceeded TykEvent = "QuotaExceeded"
 	EVENT_RateLimitExceeded TykEvent = "RatelimitExceeded"
+	EVENT_AuthFailure TykEvent = "AuthFailure"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -35,6 +36,14 @@ type EVENT_QuotaExceededMeta struct {
 
 // EVENT_RateLimitExceededMeta is the metadata structure for a rate limit exceeded event (EVENT_QuotaExceeded)
 type EVENT_RateLimitExceededMeta struct {
+	EventMetaDefault
+	Path string
+	Origin string
+	Key string
+}
+
+// EVENT_RateLimitExceededMeta is the metadata structure for a rate limit exceeded event (EVENT_QuotaExceeded)
+type EVENT_AuthFailureMeta struct {
 	EventMetaDefault
 	Path string
 	Origin string
