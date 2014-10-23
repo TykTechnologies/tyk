@@ -19,6 +19,7 @@ const (
 	EVENT_RateLimitExceeded TykEvent = "RatelimitExceeded"
 	EVENT_AuthFailure TykEvent = "AuthFailure"
 	EVENT_KeyExpired TykEvent = "KeyExpired"
+	EVENT_VersionFailure TykEvent = "VersionFailure"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -57,6 +58,15 @@ type EVENT_KeyExpiredMeta struct {
 	Path string
 	Origin string
 	Key string
+}
+
+// EVENT_VersionFailureMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
+type EVENT_VersionFailureMeta struct {
+	EventMetaDefault
+	Path string
+	Origin string
+	Key string
+	Reason string
 }
 
 // EventMessage is a standard form to send event data to handlers

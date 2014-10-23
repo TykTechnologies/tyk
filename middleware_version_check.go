@@ -24,6 +24,15 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 	// Check versioning, blacklist, whitelist and ignored status
 	requestValid, stat := v.TykMiddleware.Spec.IsRequestValid(r)
 	if requestValid == false {
+		// Fire a versioning failure event
+		go v.TykMiddleware.FireEvent(EVENT_VersionFailure,
+			EVENT_VersionFailureMeta{
+			EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path."},
+			Path: r.URL.Path,
+			Origin: r.RemoteAddr,
+			Key: "",
+			Reason: string(stat),
+		})
 		return errors.New(string(stat)), 409
 	}
 
