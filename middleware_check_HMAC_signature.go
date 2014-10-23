@@ -167,6 +167,9 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			"origin": r.RemoteAddr,
 		}).Info("Request signature is invalid")
 
+		// Fire Authfailed Event
+		AuthFailed(hm.TykMiddleware, r, keyId)
+
 		return errors.New("Request signature is invalid"), 400
 	}
 

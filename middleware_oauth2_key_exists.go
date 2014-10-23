@@ -57,6 +57,9 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			"key":    accessToken,
 		}).Info("Attempted access with non-existent key.")
 
+		// Fire Authfailed Event
+		AuthFailed(k.TykMiddleware, r, accessToken)
+
 		return errors.New("Key not authorised"), 403
 	}
 

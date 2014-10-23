@@ -60,6 +60,9 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 			"key":    authHeaderValue,
 		}).Info("Attempted access with non-existent key.")
 
+		// Fire Authfailed Event
+		AuthFailed(k.TykMiddleware, r, authHeaderValue)
+
 		return errors.New("Key not authorised"), 403
 	}
 
@@ -70,4 +73,14 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	context.Set(r, AuthHeaderValue, authHeaderValue)
 
 	return nil, 200
+}
+
+func AuthFailed (m TykMiddleware, r *http.Request, authHeaderValue string) {
+	go m.FireEvent(EVENT_AuthFailure,
+		EVENT_AuthFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
+		Path: r.URL.Path,
+		Origin: r.RemoteAddr,
+		Key: authHeaderValue,
+	})
 }

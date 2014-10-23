@@ -82,6 +82,10 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			"key":    keyName,
 		}).Info("Attempted access with non-existent user.")
 
+		// Fire Authfailed Event
+		AuthFailed(k.TykMiddleware, r, authHeaderValue)
+
+
 		return errors.New("User not authorised"), 403
 	}
 
@@ -92,6 +96,9 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			"origin": r.RemoteAddr,
 			"key":    keyName,
 		}).Info("Attempted access with existing user but failed password check.")
+
+		// Fire Authfailed Event
+		AuthFailed(k.TykMiddleware, r, authHeaderValue)
 
 		return errors.New("User not authorised"), 403
 	}
