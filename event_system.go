@@ -13,7 +13,7 @@ const (
 	EH_LogHandler TykEventHandlerName = "eh_log_handler"
 )
 
-// Register new event types here
+// Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
 	EVENT_QuotaExceeded TykEvent = "QuotaExceeded"
 	EVENT_RateLimitExceeded TykEvent = "RatelimitExceeded"
