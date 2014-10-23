@@ -34,6 +34,15 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 			"key":    authHeaderValue,
 		}).Info("Attempted access from expired key.")
 
+		// Fire a key expired event
+		go k.TykMiddleware.FireEvent(EVENT_KeyExpired,
+			EVENT_KeyExpiredMeta{
+			EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
+			Path: r.URL.Path,
+			Origin: r.RemoteAddr,
+			Key: authHeaderValue,
+		})
+
 		return errors.New("Key has expired, please renew"), 403
 	}
 
