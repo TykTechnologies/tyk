@@ -43,6 +43,15 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				"key":    authHeaderValue,
 			}).Info("Key rate limit exceeded.")
 
+			// Fire a rate limit exceeded event
+			go k.TykMiddleware.FireEvent(EVENT_RateLimitExceeded,
+				EVENT_RateLimitExceededMeta{
+				EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded"},
+				Path: r.URL.Path,
+				Origin: r.RemoteAddr,
+				Key: authHeaderValue,
+			})
+
 			return errors.New("Rate limit exceeded"), 403
 
 		} else if reason == 2 {
