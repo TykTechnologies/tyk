@@ -36,7 +36,7 @@ const (
 // Display introductory details
 func intro() {
 	fmt.Print("\n\n")
-	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v1.0", goterm.GREEN)))
+	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v1.1.1", goterm.GREEN)))
 	fmt.Println(goterm.Bold(goterm.Color("=======================", goterm.GREEN)))
 	fmt.Print("Copyright Jively Ltd. 2014")
 	fmt.Print("\nhttp://www.tyk.io\n\n")
@@ -88,7 +88,11 @@ func setupGlobals() {
 		}
 
 		analytics.Store.Connect()
-		go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
+		if config.AnalyticsConfig.PurgeDelay >= 0 {
+			go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
+		} else {
+			log.Warn("Cache purge turned off, you are responsible for Redis storage maintenance.")
+		}
 	}
 
 	genericOsinStorage = MakeNewOsinServer()
@@ -208,9 +212,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 			chain := alice.New(
+				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
@@ -250,7 +254,7 @@ func init() {
 
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, "v1.0", false)
+	arguments, err := docopt.Parse(usage, nil, true, "v1.1.1", false)
 	if err != nil {
 		log.Println("Error while parsing arguments.")
 		log.Fatal(err)
