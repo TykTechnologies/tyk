@@ -205,7 +205,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 		if referenceSpec.APIDefinition.UseKeylessAccess {
 			// for KeyLessAccess we can't support rate limiting, versioning or access rules
-			chain := alice.New(CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+			chain := alice.New(CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 
 		} else {
@@ -230,9 +231,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 			chain := alice.New(
 				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
