@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"crypto/md5"
 	"io"
+	"io/ioutil"
+	"encoding/hex"
 )
 
 type WebHookRequestMethod string
@@ -58,12 +60,12 @@ func (w WebHookHandler) New(handlerConf interface{}) TykEventHandler {
 	// Pre-load template on init
 	webHookTemplate, tErr := template.ParseFiles(thisHandler.conf.TemplatePath)
 	if tErr != nil {
-		log.Error("Failed to load webhook template!: ", tErr)
-		webHookTemplate = template.New("Default Tyk Webhook Template\n\n Type: {.EventType}\n Message: {.EventMetaDefault.Message}\n")
+		log.Error("Failed to load webhook template! Using defult. Error was: ", tErr)
+		webHookTemplate, _ = template.ParseFiles("templates/default_webhook.json")
 	}
 	thisHandler.template = webHookTemplate
 
-	if !w.checkURL(w.conf.TargetPath) {
+	if !thisHandler.checkURL(thisHandler.conf.TargetPath) {
 		log.Error("Init failed for this webhook, invalid URL, URL must be absolute")
 	}
 
@@ -72,10 +74,11 @@ func (w WebHookHandler) New(handlerConf interface{}) TykEventHandler {
 }
 
 // hookFired checks if an event has been fired within the EventTimeout setting
-func (w WebHookHandler) wasHookFired(checksum string) bool {
+func (w WebHookHandler) WasHookFired(checksum string) bool {
 	_, keyErr := w.store.GetKey(checksum)
 	if keyErr != nil {
 		// Key not found, so hook is in limit
+		log.Info("Event can fire, no duplicates found")
 		return false
 	}
 
@@ -84,6 +87,7 @@ func (w WebHookHandler) wasHookFired(checksum string) bool {
 
 // setHookFired will create an expiring key for the checksum of the event
 func (w WebHookHandler) setHookFired(checksum string) {
+	log.Warning("Setting Webhook Checksum: ", checksum)
 	w.store.SetKey(checksum, "1", w.conf.EventTimeout)
 }
 
@@ -99,50 +103,86 @@ func (w WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 }
 
 func (w WebHookHandler) checkURL(r string) bool {
+	log.Debug("Checking URL: ", r)
 	_, urlErr := url.ParseRequestURI(r)
 	if urlErr != nil {
-		log.Error("Failed to parse URL! ", urlErr)
+		log.Error("Failed to parse URL! ", urlErr, r)
 		return false
 	}
 	return true
 }
 
-// HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (w WebHookHandler) HandleEvent(em EventMessage) {
+func (w WebHookHandler) GetChecksum(reqBody string) (string, error) {
+	var rawRequest bytes.Buffer
+	// We do this twice because fuck it.
+	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
 
-	// Inject event message into template, render to string
-	var reqBody bytes.Buffer
-	w.template.Execute(&reqBody, em)
+	localRequest.Write(&rawRequest)
+	h := md5.New()
+	io.WriteString(h, rawRequest.String())
 
-	// Construct request (method, body, params)
-	req, reqErr := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, &reqBody)
+	reqChecksum := hex.EncodeToString(h.Sum(nil))
+
+	return reqChecksum, nil
+}
+
+func (w WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
+	req, reqErr := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
 	if reqErr != nil {
 		log.Error("Failed to create request object: ", reqErr)
+		return nil, reqErr
 	}
 
 	for key, val := range (w.conf.HeaderList) {
 		req.Header.Add(key, val)
 	}
 
-	// Generate signature for request
-	var rawRequest bytes.Buffer
-	req.Write(&rawRequest)
-	h := md5.New()
-	io.WriteString(h, rawRequest.String())
-	reqChecksum := string(h.Sum(nil))
-
-	// Check request velocity for this hook (wasHookFired())
-	if !w.wasHookFired(reqChecksum) {
-		// Fire web hook as go routine (setHookFired())
-		go w.doRequest(req)
-		w.setHookFired(reqChecksum)
-	}
+	return req, nil
 }
 
-func (w WebHookHandler) doRequest(req *http.Request) {
-	client := &http.Client{}
-	_, doReqErr := client.Do(req)
-	if doReqErr != nil {
-		log.Error("Webhook request failed: ", doReqErr)
+func (w WebHookHandler) CreateBody(em EventMessage) (string, error) {
+	var reqBody bytes.Buffer
+	w.template.Execute(&reqBody, em)
+
+	return reqBody.String(), nil
+}
+
+// HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
+func (w WebHookHandler) HandleEvent(em EventMessage) {
+
+	// Inject event message into template, render to string
+	reqBody, _ := w.CreateBody(em)
+
+	// Construct request (method, body, params)
+	req, reqErr := w.BuildRequest(reqBody)
+	if reqErr != nil {
+		return
+	}
+
+	// Generate signature for request
+
+	//TODO: this breaks because we lose all our body data!
+	reqChecksum, _ := w.GetChecksum(reqBody)
+
+	// Check request velocity for this hook (wasHookFired())
+	if !w.WasHookFired(reqChecksum) {
+		// Fire web hook routine (setHookFired())
+
+		client := &http.Client{}
+		resp, doReqErr := client.Do(req)
+
+		if doReqErr != nil {
+			log.Error("Webhook request failed: ", doReqErr)
+		} else {
+			defer resp.Body.Close()
+			content, readErr := ioutil.ReadAll(resp.Body)
+			if readErr == nil {
+				log.Warning(string(content))
+			} else {
+				log.Error(readErr)
+			}
+		}
+
+		w.setHookFired(reqChecksum)
 	}
 }
