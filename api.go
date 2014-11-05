@@ -81,18 +81,28 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 
 		}
 
-		for apiId, _ := range(newSession.AccessRights) {
-			thisAPISpec := GetSpecForApi(apiId)
-			if thisAPISpec != nil {
-				// Lets reset keys if they are edited by admin
-				thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
-			} else {
-				log.WithFields(logrus.Fields{
+		if len(newSession.AccessRights) > 0 {
+			// We have a specific list of access rules, only add / update those
+			for apiId, _ := range(newSession.AccessRights) {
+				thisAPISpec := GetSpecForApi(apiId)
+				if thisAPISpec != nil {
+					// Lets reset keys if they are edited by admin
+					thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+				} else {
+					log.WithFields(logrus.Fields{
 					"key": keyName,
 					"apiID": apiId,
 				}).Error("Could not add key for this API ID, API doesn't exist.")
+				}
+			}
+		} else {
+			// nothing defined, add key to ALL
+			log.Warning("No API Access Rights set, adding key to ALL.")
+			for _, spec := range ApiSpecRegister {
+				spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
 			}
 		}
+
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
@@ -414,18 +424,25 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				newSession.HmacSecret = keyGen.GenerateHMACSecret()
 			}
 
-			for apiId, _ := range(newSession.AccessRights) {
-				thisAPISpec := GetSpecForApi(apiId)
-				if thisAPISpec != nil {
-					// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
-					thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
-				} else {
-					log.WithFields(logrus.Fields{
-					"apiID": apiId,
-				}).Error("Could not create key for this API ID, API doesn't exist.")
+			if len(newSession.AccessRights) > 0 {
+				for apiId, _ := range (newSession.AccessRights) {
+					thisAPISpec := GetSpecForApi(apiId)
+					if thisAPISpec != nil {
+						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
+						thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+					} else {
+						log.WithFields(logrus.Fields{
+						"apiID": apiId,
+					}).Error("Could not create key for this API ID, API doesn't exist.")
+					}
+				}
+			} else {
+				// nothing defined, add key to ALL
+				log.Warning("No API Access Rights set, adding key to ALL.")
+				for _, spec := range ApiSpecRegister {
+					spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
 				}
 			}
-
 
 			responseObj.Action = "create"
 			responseObj.Key = newKey
