@@ -17,7 +17,12 @@ func TestGet(t *testing.T) {
 
 	eventMessage := EventMessage{}
 	eventMessage.EventType = EVENT_KeyExpired
-	eventMessage.EventMetaData = EVENT_AuthFailureMeta{EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"}}
+	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
+		Path:"/banana",
+		Origin:"tyk.io",
+		Key:"123456789",
+	}
 
 	thisBody, _ := myEventHandler.CreateBody(eventMessage)
 
@@ -36,7 +41,7 @@ func TestGet(t *testing.T) {
 
 func TestPost(t *testing.T) {
 	eventHandlerConf := WebHookHandlerConf{}
-	eventHandlerConf.TargetPath = "http://httpbin.org/post"
+	eventHandlerConf.TargetPath = "http://posttestserver.com/post.php?dir=tyk"
 	eventHandlerConf.Method = "POST"
 	eventHandlerConf.EventTimeout = 10
 	eventHandlerConf.TemplatePath = "templates/default_webhook.json"
@@ -47,7 +52,12 @@ func TestPost(t *testing.T) {
 
 	eventMessage := EventMessage{}
 	eventMessage.EventType = EVENT_KeyExpired
-	eventMessage.EventMetaData = EVENT_AuthFailureMeta{EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"}}
+	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
+		Path:"/banana",
+		Origin:"tyk.io",
+		Key:"123456789",
+	}
 
 	thisBody, _ := myEventHandler.CreateBody(eventMessage)
 
