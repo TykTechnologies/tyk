@@ -8,3 +8,4 @@
 - Added IP white listing middleware, completely self-contained, very rudimentary, only explicit IP's allowed (doesn't handle subnets etc.), hould work with IPv4 and IPv6
 - Added an Event subsystem and framework for extending and creating custom event handlers (e.g. for webhooks)
 - Moved path checking to be before key checks in both Open and Closed API definitions (adopted from hotfix v1.1.1)
+- Webhook event handler now exists, works like any other event handler, can be templated specifically for any output format and tailored to any method type.
