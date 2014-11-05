@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"encoding/hex"
+	"encoding/json"
 )
 
 type WebHookRequestMethod string
@@ -19,14 +20,17 @@ const (
 	WH_POST WebHookRequestMethod = "POST"
 	WH_DELETE WebHookRequestMethod = "DELETE"
 	WH_PATCH WebHookRequestMethod = "PATCH"
+
+	// Define the Event Handler name so we can register it
+	EH_WebHook	TykEventHandlerName = "eh_web_hook_handler"
 )
 
 type WebHookHandlerConf struct {
-	Method string
-	TargetPath string
-	TemplatePath string
-	HeaderList map[string]string
-	EventTimeout int64
+	Method string	`bson:"method" json:"method"`
+	TargetPath string	`bson:"target_path" json:"target_path"`
+	TemplatePath string	`bson:"template_path" json:"template_path"`
+	HeaderList map[string]string	`bson:"header_map" json:"header_map"`
+	EventTimeout int64	`bson:"event_timeout" json:"event_timeout"`
 }
 
 // WebHookHandler is an event handler that triggers web hooks
@@ -49,10 +53,23 @@ func GetRedisInterfacePointer() *RedisStorageManager {
 	return WebHookRedisStorePointer
 }
 
+// createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
+// specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
+func (w WebHookHandler) createConfigObject(handlerConf interface{}) WebHookHandlerConf {
+	newConf := WebHookHandlerConf{}
+
+	asJSON, _ := json.Marshal(handlerConf)
+	if err := json.Unmarshal(asJSON, &newConf); err != nil {
+		log.Error("Format of webhook configuration is incorrect: ", err)
+	}
+
+	return newConf
+}
+
 // New enables the init of event handler instances when they are created on ApiSpec creation
 func (w WebHookHandler) New(handlerConf interface{}) TykEventHandler {
 	thisHandler := WebHookHandler{}
-	thisHandler.conf = handlerConf.(WebHookHandlerConf)
+	thisHandler.conf = w.createConfigObject(handlerConf)
 
 	// Get a storage reference
 	thisHandler.store = GetRedisInterfacePointer()
@@ -132,6 +149,8 @@ func (w WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 		log.Error("Failed to create request object: ", reqErr)
 		return nil, reqErr
 	}
+
+	req.Header.Add("User-Agent", "Tyk-Hookshot")
 
 	for key, val := range (w.conf.HeaderList) {
 		req.Header.Add(key, val)

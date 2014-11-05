@@ -100,9 +100,13 @@ var nonExpiringDefNoWhiteList string = `
 						}
 					},
 					{
-						"handler_name":"eh_log_handler",
+						"handler_name":"eh_web_hook_handler",
 						"handler_meta": {
-							"prefix": "ANOTHER-LOG-HANDLER-PREFIX"
+							"method": "POST",
+							"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
+							"template_path": "templates/default_webhook.json",
+							"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+							"event_timeout": 10
 						}
 					}
 				]

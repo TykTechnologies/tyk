@@ -85,6 +85,7 @@ type TykEventHandler interface {
 func GetEventHandlerByName(handlerConf EventHandlerTriggerConfig) (TykEventHandler, error) {
 	switch handlerConf.Handler {
 		case EH_LogHandler: return LogMessageEventHandler{}.New(handlerConf.HandlerMeta), nil
+		case EH_WebHook: return WebHookHandler{}.New(handlerConf.HandlerMeta), nil
 	}
 
 	return nil, errors.New("Handler not found")
