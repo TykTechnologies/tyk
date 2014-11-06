@@ -156,6 +156,12 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	return &oauthManager
 }
 
+func addBatchEndpoint(spec *APISpec, Muxer *http.ServeMux) {
+	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
+	thisBatchHandler := BatchRequestHandler{API: spec}
+	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
@@ -191,6 +197,10 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		}
 
 		referenceSpec.Init(authStore, sessionStore)
+
+		if referenceSpec.EnableBatchRequestSupport {
+			addBatchEndpoint(&referenceSpec, Muxer)
+		}
 
 		if referenceSpec.UseOauth2 {
 			thisOauthManager := addOAuthHandlers(&referenceSpec, Muxer, false)

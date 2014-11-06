@@ -1,6 +1,6 @@
 {
     "name": "Tyk Test API",
-    "api_id": "1",
+    "api_id": "3",
     "org_id": "default",
     "definition": {
         "location": "",

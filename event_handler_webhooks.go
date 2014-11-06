@@ -179,8 +179,6 @@ func (w WebHookHandler) HandleEvent(em EventMessage) {
 	}
 
 	// Generate signature for request
-
-	//TODO: this breaks because we lose all our body data!
 	reqChecksum, _ := w.GetChecksum(reqBody)
 
 	// Check request velocity for this hook (wasHookFired())

@@ -4,7 +4,7 @@ tyk.conf
 tyk
 tyk_linux_amd64
 logs/
-test.conf
+test.*.conf
 *.mprof
 apps/test.json
 logs

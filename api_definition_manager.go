@@ -79,6 +79,7 @@ type APIDefinition struct {
 	AuthProvider AuthProviderMeta	`bson:"auth_provider" json:"auth_provider"`
 	SessionProvider SessionProviderMeta	`bson:"session_provider" json:"session_provider"`
 	EventHandlers EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
+	EnableBatchRequestSupport bool	`bson:"enable_batch_request_support" json:"enable_batch_request_support"`
 	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
 }
 
