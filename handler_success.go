@@ -66,7 +66,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 	}
 
-	if config.EnableAnalytics {
+	if StoreAnalytics(&config, r) {
 		t := time.Now()
 
 		// Track the key ID if it exists

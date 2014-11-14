@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net"
+	"net/http"
 )
 
 // Config is the configuration object used by tyk to set up various parameters.
@@ -28,6 +30,8 @@ type Config struct {
 		MongoDbName     string `json:"mongo_db_name"`
 		MongoCollection string `json:"mongo_collection"`
 		PurgeDelay      int    `json:"purge_delay"`
+		IgnoredIPs      []string `json:"ignored_ips"`
+		ignoredIPsCompiled map[string]bool
 	} `json:"analytics_config"`
 }
 
@@ -46,6 +50,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.EnableAnalytics = false
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"
 	configStruct.AnalyticsConfig.Type = "csv"
+	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
@@ -76,4 +81,18 @@ func loadConfig(filePath string, configStruct *Config) {
 			log.Error(err)
 		}
 	}
+}
+
+func loadIgnoredIPs(configStruct *Config) {
+	configStruct.AnalyticsConfig.ignoredIPsCompiled = make(map[string]bool, len(configStruct.AnalyticsConfig.IgnoredIPs))
+	for _, ip := range configStruct.AnalyticsConfig.IgnoredIPs {
+		configStruct.AnalyticsConfig.ignoredIPsCompiled[ip] = true;
+	}
+}
+
+func StoreAnalytics(configStruct *Config, r *http.Request) (bool) {
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	_, ignore := configStruct.AnalyticsConfig.ignoredIPsCompiled[ip]
+
+	return !ignore
 }
