@@ -28,6 +28,7 @@ type Config struct {
 		MongoDbName     string `json:"mongo_db_name"`
 		MongoCollection string `json:"mongo_collection"`
 		PurgeDelay      int    `json:"purge_delay"`
+		IgnoredIPs      map[string]bool `json:"ignored_ips"`
 	} `json:"analytics_config"`
 }
 
@@ -46,6 +47,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.EnableAnalytics = false
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"
 	configStruct.AnalyticsConfig.Type = "csv"
+	configStruct.AnalyticsConfig.IgnoredIPs = make(map[string]bool);
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")

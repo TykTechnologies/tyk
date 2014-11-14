@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/gorilla/context"
+	"net"
 	"net/http"
 	"runtime/pprof"
 	"strings"
@@ -22,7 +23,12 @@ type ErrorHandler struct {
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
-	if config.EnableAnalytics {
+
+	// Check if we should create analytics data for this request
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	_, ignore := config.AnalyticsConfig.IgnoredIPs[ip]
+
+	if config.EnableAnalytics && !ignore {
 		t := time.Now()
 
 		// Track the key ID if it exists

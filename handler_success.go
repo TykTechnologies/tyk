@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gorilla/context"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"runtime/pprof"
@@ -66,7 +67,11 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 	}
 
-	if config.EnableAnalytics {
+	// Check if we should create analytics data for this request
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	_, ignore := config.AnalyticsConfig.IgnoredIPs[ip]
+
+	if config.EnableAnalytics && !ignore {
 		t := time.Now()
 
 		// Track the key ID if it exists
