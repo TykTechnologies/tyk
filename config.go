@@ -91,6 +91,10 @@ func loadIgnoredIPs(configStruct *Config) {
 }
 
 func StoreAnalytics(configStruct *Config, r *http.Request) (bool) {
+	if !configStruct.EnableAnalytics {
+		return false;
+	}
+
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	_, ignore := configStruct.AnalyticsConfig.ignoredIPsCompiled[ip]
 
