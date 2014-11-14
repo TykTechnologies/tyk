@@ -83,20 +83,24 @@ func loadConfig(filePath string, configStruct *Config) {
 	}
 }
 
-func loadIgnoredIPs(configStruct *Config) {
-	configStruct.AnalyticsConfig.ignoredIPsCompiled = make(map[string]bool, len(configStruct.AnalyticsConfig.IgnoredIPs))
-	for _, ip := range configStruct.AnalyticsConfig.IgnoredIPs {
-		configStruct.AnalyticsConfig.ignoredIPsCompiled[ip] = true;
+func (c *Config) loadIgnoredIPs() {
+	c.AnalyticsConfig.ignoredIPsCompiled = make(map[string]bool, len(c.AnalyticsConfig.IgnoredIPs))
+	for _, ip := range c.AnalyticsConfig.IgnoredIPs {
+		c.AnalyticsConfig.ignoredIPsCompiled[ip] = true;
 	}
 }
 
-func StoreAnalytics(configStruct *Config, r *http.Request) (bool) {
-	if !configStruct.EnableAnalytics {
+func (c *Config) TestShowIPs() {
+	log.Warning(c.AnalyticsConfig.ignoredIPsCompiled)
+}
+
+func (c Config) StoreAnalytics(r *http.Request) (bool) {
+	if !c.EnableAnalytics {
 		return false;
 	}
 
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	_, ignore := configStruct.AnalyticsConfig.ignoredIPsCompiled[ip]
+	_, ignore := c.AnalyticsConfig.ignoredIPsCompiled[ip]
 
 	return !ignore
 }

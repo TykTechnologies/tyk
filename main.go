@@ -59,7 +59,7 @@ func setupGlobals() {
 	}
 
 	if config.EnableAnalytics {
-		loadIgnoredIPs(&config)
+		config.loadIgnoredIPs()
 		AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
 		log.Info("Setting up analytics DB connection")
 
