@@ -112,7 +112,7 @@ type RequestStatus string
 // Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
 const (
 	VersionNotFound                RequestStatus = "Version information not found"
-	VersionDoesNotExist            RequestStatus = "This API version doesn't seem to exist"
+	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
 	VersionPathsNotFound           RequestStatus = "Path information could not be found for version"
 	VersionWhiteListStatusNotFound               = "WhiteListStatus for path not found"
 	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
