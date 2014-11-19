@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/lonelycode/tyk.svg?branch=master)](https://travis-ci.org/lonelycode/tyk)
+
 # Tyk API Gateway ##
 
 Tyk is a lightweight, open source API Gateway and enables you to control who accesses your API, when they access it and how they access it. Tyk will
