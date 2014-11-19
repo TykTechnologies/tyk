@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 )
 
 // Config is the configuration object used by tyk to set up various parameters.
@@ -100,6 +101,13 @@ func (c Config) StoreAnalytics(r *http.Request) (bool) {
 	}
 
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+
+	forwarded := r.Header.Get("X-FORWARDED-FOR")
+	if forwarded != "" {
+		ips := strings.Split(forwarded, ", ")
+		ip = ips[0]
+	}
+
 	_, ignore := c.AnalyticsConfig.ignoredIPsCompiled[ip]
 
 	return !ignore
