@@ -43,8 +43,8 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Type = "redis"
 	configStruct.AppPath = "./apps/"
 	configStruct.Storage.Host = "localhost"
-	configStruct.Storage.Username = "user"
-	configStruct.Storage.Password = "password"
+	configStruct.Storage.Username = ""
+	configStruct.Storage.Password = ""
 	configStruct.Storage.Database = 0
 	configStruct.Storage.Port = 6379
 	configStruct.EnableAnalytics = false

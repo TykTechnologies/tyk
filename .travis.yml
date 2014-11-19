@@ -8,4 +8,3 @@ script: go test
 services:
   - redis-server
   - mongodb
-  
