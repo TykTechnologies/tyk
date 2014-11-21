@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/lonelycode/tykcommon"
 )
 
 type WebHookRequestMethod string
@@ -22,7 +23,7 @@ const (
 	WH_PATCH WebHookRequestMethod = "PATCH"
 
 	// Define the Event Handler name so we can register it
-	EH_WebHook	TykEventHandlerName = "eh_web_hook_handler"
+	EH_WebHook	tykcommon.TykEventHandlerName = "eh_web_hook_handler"
 )
 
 type WebHookHandlerConf struct {

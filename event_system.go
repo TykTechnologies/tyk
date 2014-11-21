@@ -3,23 +3,21 @@ package main
 import (
 	"fmt"
 	"errors"
+	"github.com/lonelycode/tykcommon"
 )
-
-type TykEvent string	// A type so we can ENUM event types easily, e.g. EVENT_QuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
 const (
-	EH_LogHandler TykEventHandlerName = "eh_log_handler"
+	EH_LogHandler tykcommon.TykEventHandlerName = "eh_log_handler"
 )
 
 // Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
-	EVENT_QuotaExceeded TykEvent = "QuotaExceeded"
-	EVENT_RateLimitExceeded TykEvent = "RatelimitExceeded"
-	EVENT_AuthFailure TykEvent = "AuthFailure"
-	EVENT_KeyExpired TykEvent = "KeyExpired"
-	EVENT_VersionFailure TykEvent = "VersionFailure"
+	EVENT_QuotaExceeded tykcommon.TykEvent = "QuotaExceeded"
+	EVENT_RateLimitExceeded tykcommon.TykEvent = "RatelimitExceeded"
+	EVENT_AuthFailure tykcommon.TykEvent = "AuthFailure"
+	EVENT_KeyExpired tykcommon.TykEvent = "KeyExpired"
+	EVENT_VersionFailure tykcommon.TykEvent = "VersionFailure"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -71,7 +69,7 @@ type EVENT_VersionFailureMeta struct {
 
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
-	EventType TykEvent
+	EventType tykcommon.TykEvent
 	EventMetaData interface{}
 }
 
@@ -82,7 +80,7 @@ type TykEventHandler interface {
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
-func GetEventHandlerByName(handlerConf EventHandlerTriggerConfig) (TykEventHandler, error) {
+func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (TykEventHandler, error) {
 	switch handlerConf.Handler {
 		case EH_LogHandler: return LogMessageEventHandler{}.New(handlerConf.HandlerMeta), nil
 		case EH_WebHook: return WebHookHandler{}.New(handlerConf.HandlerMeta), nil
@@ -92,7 +90,7 @@ func GetEventHandlerByName(handlerConf EventHandlerTriggerConfig) (TykEventHandl
 }
 
 // FireEvent is added to the tykMiddleware object so it is available across the entire stack
-func (t TykMiddleware) FireEvent(eventName TykEvent, eventMetaData interface{}) {
+func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
 
 	log.Debug("EVENT FIRED")
 

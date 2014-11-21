@@ -9,6 +9,7 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"net/http"
 	"strings"
+	"github.com/lonelycode/tykcommon"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -291,8 +292,8 @@ func HandleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	var thisAPIIDList []APIDefinition
-	thisAPIIDList = make([]APIDefinition, len(ApiSpecRegister))
+	var thisAPIIDList []tykcommon.APIDefinition
+	thisAPIIDList = make([]tykcommon.APIDefinition, len(ApiSpecRegister))
 
 	c := 0
 	for _, apiSpec := range(ApiSpecRegister) {

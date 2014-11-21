@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/RangelReale/osin"
+//	"github.com/RangelReale/osin"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -12,88 +12,89 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"github.com/lonelycode/tykcommon"
 )
 
-type AuthProviderCode string
-type SessionProviderCode string
-type StorageEngineCode string
-
+//type AuthProviderCode string
+//type SessionProviderCode string
+//type StorageEngineCode string
+//
 const (
-	DefaultAuthProvider AuthProviderCode = "default"
-	DefaultSessionProvider SessionProviderCode = "default"
-	DefaultStorageEngine StorageEngineCode = "redis"
+	DefaultAuthProvider tykcommon.AuthProviderCode = "default"
+	DefaultSessionProvider tykcommon.SessionProviderCode = "default"
+	DefaultStorageEngine tykcommon.StorageEngineCode = "redis"
 )
-
-type AuthProviderMeta struct {
-	Name AuthProviderCode	`bson:"name" json:"name"`
-	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
-	Meta interface{}		`bson:"meta" json:"meta"`
-}
-
-type SessionProviderMeta struct {
-	Name SessionProviderCode	`bson:"name" json:"name"`
-	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
-	Meta interface{}			`bson:"meta" json:"meta"`
-}
-
-type EventHandlerTriggerConfig struct {
-	Handler TykEventHandlerName	`bson:"handler_name" json:"handler_name"`
-	HandlerMeta interface{} `bson:"handler_meta" json:"handler_meta"`
-}
-
-type EventHandlerMetaConfig struct {
-	Events map[TykEvent][]EventHandlerTriggerConfig `bson:"events" json:"events"`
-}
-
-// APIDefinition represents the configuration for a single proxied API and it's versions.
-type APIDefinition struct {
-	ID               bson.ObjectId `bson:"_id,omitempty" json:"id"`
-	Name             string        `bson:"name" json:"name"`
-	APIID            string        `bson:"api_id" json:"api_id"`
-	OrgID            string        `bson:"org_id" json:"org_id"`
-	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
-	Oauth2Meta       struct {
-		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
-		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
-		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
-	} `bson:"oauth_meta" json:"oauth_meta"`
-	UseBasicAuth            bool                 `bson:"use_basic_auth" json:"use_basic_auth"`
-	NotificationsDetails    NotificationsManager `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	VersionDefinition       struct {
-		Location string `bson:"location" json:"location"`
-		Key      string `bson:"key" json:"key"`
-	} `bson:"definition" json:"definition"`
-	VersionData struct {
-		NotVersioned bool                   `bson:"not_versioned" json:"not_versioned"`
-		Versions     map[string]VersionInfo `bson:"versions" json:"versions"`
-	} `bson:"version_data" json:"version_data"`
-	Proxy struct {
-		ListenPath      string `bson:"listen_path" json:"listen_path"`
-		TargetURL       string `bson:"target_url" json:"target_url"`
-		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
-	} `bson:"proxy" json:"proxy"`
-	SessionLifetime int64 `bson:"session_lifetime" json:"session_lifetime"`
-	Active  bool                   `bson:"active" json:"active"`
-	AuthProvider AuthProviderMeta	`bson:"auth_provider" json:"auth_provider"`
-	SessionProvider SessionProviderMeta	`bson:"session_provider" json:"session_provider"`
-	EventHandlers EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
-	EnableBatchRequestSupport bool	`bson:"enable_batch_request_support" json:"enable_batch_request_support"`
-	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
-}
-
-// VersionInfo encapsulates all the data for a specific api_version, elements in the
-// Paths array are checked as part of the proxy routing.
-type VersionInfo struct {
-	Name    string `bson:"name" json:"name"`
-	Expires string `bson:"expires" json:"expires"`
-	Paths   struct {
-		Ignored   []string `bson:"ignored" json:"ignored"`
-		WhiteList []string `bson:"white_list" json:"white_list"`
-		BlackList []string `bson:"black_list" json:"black_list"`
-	} `bson:"paths" json:"paths"`
-}
+//
+//type AuthProviderMeta struct {
+//	Name AuthProviderCode	`bson:"name" json:"name"`
+//	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
+//	Meta interface{}		`bson:"meta" json:"meta"`
+//}
+//
+//type SessionProviderMeta struct {
+//	Name SessionProviderCode	`bson:"name" json:"name"`
+//	StorageEngine StorageEngineCode `bson:"storage_engine" json:"storage_engine"`
+//	Meta interface{}			`bson:"meta" json:"meta"`
+//}
+//
+//type EventHandlerTriggerConfig struct {
+//	Handler TykEventHandlerName	`bson:"handler_name" json:"handler_name"`
+//	HandlerMeta interface{} `bson:"handler_meta" json:"handler_meta"`
+//}
+//
+//type EventHandlerMetaConfig struct {
+//	Events map[TykEvent][]EventHandlerTriggerConfig `bson:"events" json:"events"`
+//}
+//
+//// APIDefinition represents the configuration for a single proxied API and it's versions.
+//type APIDefinition struct {
+//	ID               bson.ObjectId `bson:"_id,omitempty" json:"id"`
+//	Name             string        `bson:"name" json:"name"`
+//	APIID            string        `bson:"api_id" json:"api_id"`
+//	OrgID            string        `bson:"org_id" json:"org_id"`
+//	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
+//	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
+//	Oauth2Meta       struct {
+//		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
+//		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
+//		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
+//	} `bson:"oauth_meta" json:"oauth_meta"`
+//	UseBasicAuth            bool                 `bson:"use_basic_auth" json:"use_basic_auth"`
+//	NotificationsDetails    NotificationsManager `bson:"notifications" json:"notifications"`
+//	EnableSignatureChecking bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
+//	VersionDefinition       struct {
+//		Location string `bson:"location" json:"location"`
+//		Key      string `bson:"key" json:"key"`
+//	} `bson:"definition" json:"definition"`
+//	VersionData struct {
+//		NotVersioned bool                   `bson:"not_versioned" json:"not_versioned"`
+//		Versions     map[string]VersionInfo `bson:"versions" json:"versions"`
+//	} `bson:"version_data" json:"version_data"`
+//	Proxy struct {
+//		ListenPath      string `bson:"listen_path" json:"listen_path"`
+//		TargetURL       string `bson:"target_url" json:"target_url"`
+//		StripListenPath bool   `bson:"strip_listen_path" json:"strip_listen_path"`
+//	} `bson:"proxy" json:"proxy"`
+//	SessionLifetime int64 `bson:"session_lifetime" json:"session_lifetime"`
+//	Active  bool                   `bson:"active" json:"active"`
+//	AuthProvider AuthProviderMeta	`bson:"auth_provider" json:"auth_provider"`
+//	SessionProvider SessionProviderMeta	`bson:"session_provider" json:"session_provider"`
+//	EventHandlers EventHandlerMetaConfig `bson:"event_handlers" json:"event_handlers"`
+//	EnableBatchRequestSupport bool	`bson:"enable_batch_request_support" json:"enable_batch_request_support"`
+//	RawData map[string]interface{} `bson:"raw_data,omitempty" json:"raw_data,omitempty"` // Not used in actual configuration, loaded by config for plugable arc
+//}
+//
+//// VersionInfo encapsulates all the data for a specific api_version, elements in the
+//// Paths array are checked as part of the proxy routing.
+//type VersionInfo struct {
+//	Name    string `bson:"name" json:"name"`
+//	Expires string `bson:"expires" json:"expires"`
+//	Paths   struct {
+//		Ignored   []string `bson:"ignored" json:"ignored"`
+//		WhiteList []string `bson:"white_list" json:"white_list"`
+//		BlackList []string `bson:"black_list" json:"black_list"`
+//	} `bson:"paths" json:"paths"`
+//}
 
 // URLStatus is a custom enum type to avoid collisions
 type URLStatus int
@@ -133,14 +134,14 @@ type URLSpec struct {
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
-	APIDefinition
+	tykcommon.APIDefinition
 	RxPaths          map[string][]URLSpec
 	WhiteListEnabled map[string]bool
 	target           *url.URL
 	AuthManager AuthorisationHandler
 	SessionManager SessionHandler
 	OAuthManager *OAuthManager
-	EventPaths map[TykEvent][]TykEventHandler
+	EventPaths map[tykcommon.TykEvent][]TykEventHandler
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -161,7 +162,7 @@ func (a *APIDefinitionLoader) Connect() {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
+func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) APISpec {
 	newAppSpec := APISpec{}
 	newAppSpec.APIDefinition = thisAppConfig
 
@@ -186,7 +187,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig APIDefinition) APISpec {
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
-	newAppSpec.EventPaths = make(map[TykEvent][]TykEventHandler)
+	newAppSpec.EventPaths = make(map[tykcommon.TykEvent][]TykEventHandler)
 	for eventName, eventHandlerConfs := range(thisAppConfig.EventHandlers.Events) {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range(eventHandlerConfs) {
@@ -226,7 +227,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 		"active": true,
 	}
 
-	var APIDefinitions = []APIDefinition{}
+	var APIDefinitions = []tykcommon.APIDefinition{}
 	var StringDefs = make([]bson.M, 0)
 	mongoErr := apiCollection.Find(search).All(&APIDefinitions)
 
@@ -246,8 +247,8 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 	return APISpecs
 }
 
-func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (APIDefinition, map[string]interface{}) {
-	thisAppConfig := APIDefinition{}
+func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
+	thisAppConfig := tykcommon.APIDefinition{}
 	err := json.Unmarshal(apiDef, &thisAppConfig)
 	if err != nil {
 		log.Error("Couldn't unmarshal api configuration")
@@ -288,7 +289,7 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []APISpec {
 	return APISpecs
 }
 
-func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef VersionInfo) ([]URLSpec, bool) {
+func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
 	ignoredPaths := a.compilePathSpec(apiVersionDef.Paths.Ignored, Ignored)
 	blackListPaths := a.compilePathSpec(apiVersionDef.Paths.BlackList, BlackList)
 	whiteListPaths := a.compilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList)
@@ -390,7 +391,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 }
 
 // IsThisAPIVersionExpired checks if an API version (during a proxied request) is expired
-func (a *APISpec) IsThisAPIVersionExpired(versionDef VersionInfo) bool {
+func (a *APISpec) IsThisAPIVersionExpired(versionDef tykcommon.VersionInfo) bool {
 	// Never expires
 	if versionDef.Expires == "-1" {
 		return false
@@ -451,8 +452,8 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus) {
 
 // GetVersionData attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
-func (a *APISpec) GetVersionData(r *http.Request) (VersionInfo, []URLSpec, bool, RequestStatus) {
-	var thisVersion = VersionInfo{}
+func (a *APISpec) GetVersionData(r *http.Request) (tykcommon.VersionInfo, []URLSpec, bool, RequestStatus) {
+	var thisVersion = tykcommon.VersionInfo{}
 	var versionKey string
 	var versionRxPaths = []URLSpec{}
 	var versionWLStatus bool

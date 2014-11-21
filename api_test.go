@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"github.com/lonelycode/tykcommon"
 )
 
 var apiTestDef string = `
@@ -70,7 +71,7 @@ type Success struct {
 }
 
 type testAPIDefinition struct {
-	APIDefinition
+	tykcommon.APIDefinition
 	ID               string `json:"id"`
 
 }

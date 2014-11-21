@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"github.com/lonelycode/tykcommon"
 )
 
 var sampleDefiniton string = `
@@ -136,7 +137,7 @@ func createDefinitionFromString(defStr string) APISpec {
 	return thisSpec
 }
 
-func writeDefToFile(configStruct APIDefinition) {
+func writeDefToFile(configStruct tykcommon.APIDefinition) {
 	newConfig, err := json.Marshal(configStruct)
 	if err != nil {
 		log.Error("Problem marshalling configuration!")
