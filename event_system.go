@@ -6,6 +6,7 @@ import (
 	"github.com/lonelycode/tykcommon"
 	"encoding/json"
 	"labix.org/v2/mgo/bson"
+	"time"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
@@ -73,6 +74,7 @@ type EVENT_VersionFailureMeta struct {
 type EventMessage struct {
 	EventType tykcommon.TykEvent
 	EventMetaData interface{}
+	TimeStamp string
 }
 
 // TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
@@ -112,7 +114,6 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (Tyk
 func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
 
 	log.Debug("EVENT FIRED")
-
 	handlers, handlerExists := t.Spec.EventPaths[eventName]
 
 	if handlerExists {
@@ -120,6 +121,7 @@ func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData int
 		eventMessage := EventMessage{}
 		eventMessage.EventMetaData = eventMetaData
 		eventMessage.EventType = eventName
+		eventMessage.TimeStamp = time.Now().Local().String()
 
 		for _, handler := range(handlers) {
 			log.Debug("FIRING HANDLER")
