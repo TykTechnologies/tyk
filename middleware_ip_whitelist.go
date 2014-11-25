@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net"
+	"strings"
 )
 
 
@@ -34,7 +35,14 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	// Enabled, check incoming IP address
 	for _, ip := range(ipConfig.AllowedIPs) {
 		allowedIP := net.ParseIP(ip)
-		remoteIP = net.ParseIP(r.RemoteAddr)
+		splitIP := strings.Split(r.RemoteAddr, ":")
+		remoteIPString := splitIP[0]
+		if len(splitIP) > 2 {
+			// Might be an IPv6 address, don't mess with it
+			remoteIPString = r.RemoteAddr
+		}
+		remoteIP = net.ParseIP(remoteIPString)
+
 		// We parse the IP to manage IPv4 and IPv6 easily
 		if allowedIP.String() == remoteIP.String() {
 			// matched, pass through
