@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"errors"
 	"github.com/lonelycode/tykcommon"
+	"encoding/json"
+	"labix.org/v2/mgo/bson"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
@@ -81,9 +83,26 @@ type TykEventHandler interface {
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
 func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (TykEventHandler, error) {
+
+	var thisConf interface{}
+	switch handlerConf.HandlerMeta.(type) {
+	case bson.M:
+		asByte, ok := json.Marshal(handlerConf.HandlerMeta)
+		if ok != nil {
+			log.Error("Failed to unmarshal handler meta! ", ok)
+		}
+		mErr := json.Unmarshal(asByte, &thisConf)
+		if mErr != nil {
+			log.Error("Return conversion failed, ", mErr)
+		}
+	default:
+		thisConf = handlerConf.HandlerMeta
+	}
+
+
 	switch handlerConf.Handler {
-		case EH_LogHandler: return LogMessageEventHandler{}.New(handlerConf.HandlerMeta), nil
-		case EH_WebHook: return WebHookHandler{}.New(handlerConf.HandlerMeta), nil
+		case EH_LogHandler: return LogMessageEventHandler{}.New(thisConf), nil
+		case EH_WebHook: return WebHookHandler{}.New(thisConf), nil
 	}
 
 	return nil, errors.New("Handler not found")
