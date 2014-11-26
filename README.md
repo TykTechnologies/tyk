@@ -27,6 +27,8 @@ Tyk offers powerful, yet lightweight features that allow fine gained control ove
 * **API Versioning** - API Versions can be easily set and deprecated at a specific time and date
 * **Blacklist/Whitelist/Ignored endpoint access** - Enforce strict security models on a version-by-version basis to your access points
 * **Analytics logging** - Record detailed usage data on who is using your API's (raw data only)
+* **Webhooks** - Trigger webhooks against events such as Quota Violations and Authentication failures
+* **IP Whitelisting** - Block access to non-trusted IP addresses for more secure interactions
 * **Zero downtime restarts** - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
 
 Tyk is written in Go, which makes it fast and easy to set up. Its only dependencies are a Mongo database (for analytics) and Redis, 
