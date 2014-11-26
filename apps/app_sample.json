@@ -12,8 +12,8 @@
     "version_data": {
         "not_versioned": true,
         "versions": {
-            "v1": {
-                "name": "v1",
+            "Default": {
+                "name": "Default",
                 "expires": "3000-01-02 15:04",
                 "paths": {
                     "ignored": [],
