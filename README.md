@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/lonelycode/tyk.svg?branch=master)](https://travis-ci.org/lonelycode/tyk)
+[![Build Status](https://travis-ci.org/lonelycode/tyk.svg?branch=master)](https://travis-ci.org/lonelycode/tyk) [![Coverage Status](https://img.shields.io/coveralls/lonelycode/tyk.svg)](https://coveralls.io/r/lonelycode/tyk?branch=testing%2Fcoverage)
 
 # Tyk API Gateway ##
 
