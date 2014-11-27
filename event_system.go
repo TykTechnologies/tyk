@@ -79,7 +79,7 @@ type EventMessage struct {
 
 // TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
 type TykEventHandler interface {
-	New(interface{}) TykEventHandler
+	New(interface{}) (TykEventHandler, error)
 	HandleEvent(EventMessage)
 }
 
@@ -103,8 +103,8 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (Tyk
 
 
 	switch handlerConf.Handler {
-		case EH_LogHandler: return LogMessageEventHandler{}.New(thisConf), nil
-		case EH_WebHook: return WebHookHandler{}.New(thisConf), nil
+		case EH_LogHandler: return LogMessageEventHandler{}.New(thisConf)
+		case EH_WebHook: return WebHookHandler{}.New(thisConf)
 	}
 
 	return nil, errors.New("Handler not found")
@@ -137,11 +137,11 @@ type LogMessageEventHandler struct {
 
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l LogMessageEventHandler) New(handlerConf interface{}) TykEventHandler {
+func (l LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 	thisHandler := LogMessageEventHandler{}
 	thisHandler.conf = handlerConf.(map[string]interface{})
 
-	return thisHandler
+	return thisHandler, nil
 }
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l LogMessageEventHandler) HandleEvent(em EventMessage) {

@@ -56,21 +56,28 @@ func GetRedisInterfacePointer() *RedisStorageManager {
 
 // createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
 // specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
-func (w WebHookHandler) createConfigObject(handlerConf interface{}) WebHookHandlerConf {
+func (w WebHookHandler) createConfigObject(handlerConf interface{}) (WebHookHandlerConf, error) {
 	newConf := WebHookHandlerConf{}
 
 	asJSON, _ := json.Marshal(handlerConf)
 	if err := json.Unmarshal(asJSON, &newConf); err != nil {
 		log.Error("Format of webhook configuration is incorrect: ", err)
+		return newConf, err
 	}
 
-	return newConf
+	return newConf, nil
 }
 
 // New enables the init of event handler instances when they are created on ApiSpec creation
-func (w WebHookHandler) New(handlerConf interface{}) TykEventHandler {
+func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 	thisHandler := WebHookHandler{}
-	thisHandler.conf = w.createConfigObject(handlerConf)
+	var confErr error
+	thisHandler.conf, confErr = w.createConfigObject(handlerConf)
+
+	if confErr != nil {
+		log.Error("Problem getting configuration, skipping. ", confErr)
+		return thisHandler, confErr
+	}
 
 	// Get a storage reference
 	thisHandler.store = GetRedisInterfacePointer()
@@ -88,7 +95,7 @@ func (w WebHookHandler) New(handlerConf interface{}) TykEventHandler {
 	}
 
 
-	return thisHandler
+	return thisHandler, nil
 }
 
 // hookFired checks if an event has been fired within the EventTimeout setting
