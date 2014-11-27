@@ -287,10 +287,9 @@ func init() {
 
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, "v1.2.1", false)
+	arguments, err := docopt.Parse(usage, nil, true, "v1.2.1", false, false)
 	if err != nil {
-		log.Println("Error while parsing arguments.")
-		log.Fatal(err)
+		log.Warning("Error while parsing arguments: ", err)
 	}
 
 	filename := "/etc/tyk/tyk.conf"
