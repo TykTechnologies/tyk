@@ -1,7 +1,7 @@
 .idea/
 .vagrant/
 tyk.conf
-tyk
+./tyk
 tyk_linux_amd64
 logs/
 test.*.conf
