@@ -4,12 +4,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/RangelReale/osin"
-	"github.com/Sirupsen/logrus"
-	"github.com/nu7hatch/gouuid"
 	"net/http"
 	"strings"
+
+	"github.com/RangelReale/osin"
+	"github.com/Sirupsen/logrus"
 	"github.com/lonelycode/tykcommon"
+	"github.com/nu7hatch/gouuid"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -84,16 +85,16 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 
 		if len(newSession.AccessRights) > 0 {
 			// We have a specific list of access rules, only add / update those
-			for apiId, _ := range(newSession.AccessRights) {
+			for apiId, _ := range newSession.AccessRights {
 				thisAPISpec := GetSpecForApi(apiId)
 				if thisAPISpec != nil {
 					// Lets reset keys if they are edited by admin
 					thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
 				} else {
 					log.WithFields(logrus.Fields{
-					"key": keyName,
-					"apiID": apiId,
-				}).Error("Could not add key for this API ID, API doesn't exist.")
+						"key":   keyName,
+						"apiID": apiId,
+					}).Error("Could not add key for this API ID, API doesn't exist.")
 				}
 			}
 		} else {
@@ -103,7 +104,6 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 				spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
 			}
 		}
-
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
@@ -228,7 +228,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 
 	if APIID == "-1" {
 		// Go through ALL managed API's and delete the key
-		for _, spec := range(ApiSpecRegister) {
+		for _, spec := range ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 		}
 
@@ -287,7 +287,6 @@ func handleURLReload() ([]byte, int) {
 	return responseMessage, code
 }
 
-
 func HandleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
@@ -296,7 +295,7 @@ func HandleGetAPIList() ([]byte, int) {
 	thisAPIIDList = make([]tykcommon.APIDefinition, len(ApiSpecRegister))
 
 	c := 0
-	for _, apiSpec := range(ApiSpecRegister) {
+	for _, apiSpec := range ApiSpecRegister {
 		thisAPIIDList[c] = apiSpec.APIDefinition
 		thisAPIIDList[c].RawData = nil
 		c++
@@ -312,6 +311,33 @@ func HandleGetAPIList() ([]byte, int) {
 	return responseMessage, 200
 }
 
+func HandleGetAPI(APIID string) ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	for _, apiSpec := range ApiSpecRegister {
+		if apiSpec.APIDefinition.APIID == APIID {
+
+			responseMessage, err = json.Marshal(apiSpec.APIDefinition)
+
+			if err != nil {
+				log.Error("Marshalling failed: ", err)
+				return []byte(E_SYSTEM_ERROR), 500
+			}
+
+			return responseMessage, 200
+		}
+	}
+
+	log.WithFields(logrus.Fields{
+		"apiID": APIID,
+	}).Error("API doesn't exist.")
+	notFound := APIStatusMessage{"error", "API not found"}
+	responseMessage, _ = json.Marshal(&notFound)
+	code := 404
+	return responseMessage, code
+}
+
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	APIID := r.URL.Path[len("/tyk/apis/"):]
 	var responseMessage []byte
@@ -319,8 +345,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		if APIID != "" {
-			code = 405
-			responseMessage = createError("Method not supported")
+			log.Info("Requesting API definition for", APIID)
+			responseMessage, code = HandleGetAPI(APIID)
 		} else {
 			log.Info("Requesting API list")
 			responseMessage, code = HandleGetAPIList()
@@ -426,15 +452,15 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if len(newSession.AccessRights) > 0 {
-				for apiId, _ := range (newSession.AccessRights) {
+				for apiId, _ := range newSession.AccessRights {
 					thisAPISpec := GetSpecForApi(apiId)
 					if thisAPISpec != nil {
 						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 						thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
 					} else {
 						log.WithFields(logrus.Fields{
-						"apiID": apiId,
-					}).Error("Could not create key for this API ID, API doesn't exist.")
+							"apiID": apiId,
+						}).Error("Could not create key for this API ID, API doesn't exist.")
 					}
 				}
 			} else {
@@ -705,8 +731,8 @@ func getOauthClients(APIID string) ([]byte, int) {
 	thisAPISpec := GetSpecForApi(APIID)
 	if thisAPISpec == nil {
 		log.WithFields(logrus.Fields{
-		"apiID": APIID,
-	}).Error("Could ot get Client Details, API doesn't exist.")
+			"apiID": APIID,
+		}).Error("Could ot get Client Details, API doesn't exist.")
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
 	"github.com/lonelycode/tykcommon"
 )
 
@@ -72,8 +73,7 @@ type Success struct {
 
 type testAPIDefinition struct {
 	tykcommon.APIDefinition
-	ID               string `json:"id"`
-
+	ID string `json:"id"`
 }
 
 func init() {
@@ -112,8 +112,41 @@ func TestApiHandler(t *testing.T) {
 			t.Error("API's not returned, len was: \n", len(ApiList), recorder.Body.String())
 		} else {
 			if ApiList[0].APIID != "1" {
-				t.Error("Response is incorrect - no APi ID value in sruct :\n", recorder.Body.String())
+				t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
 			}
+		}
+	}
+}
+
+func TestApiHandlerGetSingle(t *testing.T) {
+	log.Info("TEST GET SINGLE API DEFINITION")
+	uri := "/tyk/apis/1"
+	method := "GET"
+	sampleKey := createSampleSession()
+	body, _ := json.Marshal(&sampleKey)
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+
+	MakeSampleAPI()
+
+	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	apiHandler(recorder, req)
+
+	// We can't deserialize BSON ObjectID's if they are not in th test base!
+	var ApiDefinition testAPIDefinition
+	err = json.Unmarshal([]byte(recorder.Body.String()), &ApiDefinition)
+
+	if err != nil {
+		t.Error("Could not unmarshal API Definition:\n", err, recorder.Body.String())
+	} else {
+		if ApiDefinition.APIID != "1" {
+			t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
 		}
 	}
 }
@@ -151,8 +184,6 @@ func TestKeyHandlerNewKey(t *testing.T) {
 		}
 	}
 }
-
-
 
 func TestKeyHandlerUpdateKey(t *testing.T) {
 	uri := "/tyk/keys/1234"
