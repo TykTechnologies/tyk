@@ -37,7 +37,7 @@ const (
 func intro() {
 	fmt.Print("\n\n")
 	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v1.2.1", goterm.GREEN)))
-	fmt.Println(goterm.Bold(goterm.Color("=======================", goterm.GREEN)))
+	fmt.Println(goterm.Bold(goterm.Color("=========================", goterm.GREEN)))
 	fmt.Print("Copyright Jively Ltd. 2014")
 	fmt.Print("\nhttp://www.tyk.io\n\n")
 }
