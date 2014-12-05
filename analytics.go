@@ -29,6 +29,7 @@ type AnalyticsRecord struct {
 	APIID         string
 	OrgID         string
 	OauthID       string
+	RequestTime   int64
 }
 
 // AnalyticsError is an error for when writing to the storage engine fails

@@ -61,10 +61,21 @@ type SuccessHandler struct {
 // Spec states the path is Ignored
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+
+
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 	}
+
+
+
+	t1 := time.Now()
+	s.Proxy.ServeHTTP(w, r)
+	t2 := time.Now()
+
+	millisec := float64(t2.UnixNano() - t1.UnixNano()) * 0.000001
+	log.Info("Upstream request took (ms): ", millisec)
 
 	if config.StoreAnalytics(r) {
 		t := time.Now()
@@ -106,12 +117,11 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.Spec.APIDefinition.Name,
 			s.Spec.APIDefinition.APIID,
 			s.Spec.APIDefinition.OrgID,
-			OauthClientID}
+			OauthClientID,
+			int64(millisec)}
 
 		go analytics.RecordHit(thisRecord)
 	}
-
-	s.Proxy.ServeHTTP(w, r)
 
 	if doMemoryProfile {
 		pprof.WriteHeapProfile(profileFile)
