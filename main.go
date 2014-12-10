@@ -197,7 +197,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		default: sessionStore = &redisStore
 		}
 
-		referenceSpec.Init(authStore, sessionStore)
+		healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+
+		referenceSpec.Init(authStore, sessionStore, healthStore)
 
 		if referenceSpec.EnableBatchRequestSupport {
 			addBatchEndpoint(&referenceSpec, Muxer)

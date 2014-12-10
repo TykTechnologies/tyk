@@ -777,6 +777,35 @@ func getOauthClients(APIID string) ([]byte, int) {
 	return responseMessage, code
 }
 
+func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
+	var responseMessage []byte
+	var code int
+
+	if r.Method == "GET" {
+		APIID := r.FormValue("api_id")
+
+		if APIID != "" {
+			code = 405
+			responseMessage = createError("missing api_id parameter")
+		} else {
+			thisAPISpec := GetSpecForApi(APIID)
+			health, _ := thisAPISpec.Health.GetApiHealthValues()
+			var jsonErr error
+			responseMessage, jsonErr = json.Marshal(health)
+			if jsonErr != nil {
+				code = 405
+				responseMessage = createError("Failed to encode data")
+			}
+		}
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	DoJSONWrite(w, code, responseMessage)
+}
+
 // MakeNewOsinServer creates a generic osinStorage object, used primarily by the API to create and get keys outside of an APISpec context.
 // This is not ideal, but is only used in the Tyk API and nowhere else.
 

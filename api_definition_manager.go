@@ -142,6 +142,7 @@ type APISpec struct {
 	SessionManager SessionHandler
 	OAuthManager *OAuthManager
 	EventPaths map[tykcommon.TykEvent][]TykEventHandler
+	Health HealthChecker
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -165,6 +166,11 @@ func (a *APIDefinitionLoader) Connect() {
 func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) APISpec {
 	newAppSpec := APISpec{}
 	newAppSpec.APIDefinition = thisAppConfig
+
+	// We'll push the default HealthChecker:
+	newAppSpec.Health = &DefaultHealthChecker{
+		APIID: newAppSpec.APIID,
+	}
 
 	// Add any new session managers or auth handlers here
 	if newAppSpec.APIDefinition.AuthProvider.Name != "" {
@@ -326,9 +332,10 @@ func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus
 	return thisURLSpec
 }
 
-func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler) {
+func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler, healthStorageHandler StorageHandler) {
 	a.AuthManager.Init(AuthStore)
 	a.SessionManager.Init(SessionStore)
+	a.Health.Init(healthStorageHandler)
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
