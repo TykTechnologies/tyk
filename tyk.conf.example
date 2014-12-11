@@ -21,5 +21,9 @@
     "mongo_collection": "",
     "purge_delay": -1,
     "ignored_ips": []
+  },
+  "health_check": {
+    "enable_health_checks": true,
+    "health_check_value_timeouts": 60.0
   }
 }

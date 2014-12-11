@@ -7,7 +7,6 @@ import (
 )
 
 type HealthPrefix string
-var SampleTimeout int64 = 0 //TODO: Make this editable
 
 const (
 	Throttle HealthPrefix = "Throttle"
@@ -39,7 +38,10 @@ type DefaultHealthChecker struct {
 }
 
 func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
-	log.Info("Health Checker initialised.")
+	if config.HealthCheck.EnableHealthChecks {
+		log.Info("Health Checker initialised.")
+	}
+
 	h.storage = storeType
 	h.storage.Connect()
 }
@@ -61,9 +63,11 @@ func ReportHealthCheckValue(checker HealthChecker, counter HealthPrefix, value s
 }
 
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
-	searchStr := h.CreateKeyName(counterType)
-	log.Warning("Adding Healthcheck to: ", searchStr)
-	h.storage.SetKey(searchStr, value, SampleTimeout)
+	if config.HealthCheck.EnableHealthChecks {
+		searchStr := h.CreateKeyName(counterType)
+		log.Warning("Adding Healthcheck to: ", searchStr)
+		h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
+	}
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
@@ -73,7 +77,7 @@ func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	log.Debug("Found ", keys)
 	var count int64
 	count = int64(len(keys))
-	divisor := float64(SampleTimeout)
+	divisor := float64(config.HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
 		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
 		divisor = 60.0

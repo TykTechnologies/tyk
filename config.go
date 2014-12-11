@@ -34,6 +34,10 @@ type Config struct {
 		IgnoredIPs      []string `json:"ignored_ips"`
 		ignoredIPsCompiled map[string]bool
 	} `json:"analytics_config"`
+	HealthCheck struct {
+		EnableHealthChecks bool	`json:"enable_health_checks"`
+		HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
+	} `json:"health_check"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
@@ -49,6 +53,8 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Database = 0
 	configStruct.Storage.Port = 6379
 	configStruct.EnableAnalytics = false
+	configStruct.HealthCheck.EnableHealthChecks = true
+	configStruct.HealthCheck.HealthCheckValueTimeout = 60
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"
 	configStruct.AnalyticsConfig.Type = "csv"
 	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
