@@ -782,25 +782,30 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	var code int = 200
 
 	if r.Method == "GET" {
-		APIID := r.FormValue("api_id")
-		if APIID == "" {
-			code = 405
-			responseMessage = createError("missing api_id parameter")
-		} else {
-			thisAPISpec := GetSpecForApi(APIID)
-			if thisAPISpec != nil {
-				health, _ := thisAPISpec.Health.GetApiHealthValues()
-				var jsonErr error
-				responseMessage, jsonErr = json.Marshal(health)
-				if jsonErr != nil {
-					code = 405
-					responseMessage = createError("Failed to encode data")
-				}
-			} else {
+		if config.HealthCheck.EnableHealthChecks {
+			APIID := r.FormValue("api_id")
+			if APIID == "" {
 				code = 405
-				responseMessage = createError("API ID not found")
-			}
+				responseMessage = createError("missing api_id parameter")
+			} else {
+				thisAPISpec := GetSpecForApi(APIID)
+				if thisAPISpec != nil {
+					health, _ := thisAPISpec.Health.GetApiHealthValues()
+					var jsonErr error
+					responseMessage, jsonErr = json.Marshal(health)
+					if jsonErr != nil {
+						code = 405
+						responseMessage = createError("Failed to encode data")
+					}
+				} else {
+					code = 405
+					responseMessage = createError("API ID not found")
+				}
 
+			}
+		} else {
+			code = 405
+			responseMessage = createError("Health checks are not enabled for this node")
 		}
 	} else {
 		// Return Not supported message (and code)
