@@ -47,7 +47,8 @@ type TykErrorResponse struct {
 
 func getChain(spec APISpec) http.Handler {
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	spec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
 	remote, _ := url.Parse("http://lonelycode.com/")
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -130,7 +131,8 @@ func createNonVersionedDefinition() APISpec {
 func TestThrottling(t *testing.T) {
 	spec := createNonVersionedDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	spec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
@@ -176,7 +178,8 @@ func TestThrottling(t *testing.T) {
 func TestQuota(t *testing.T) {
 	spec := createNonVersionedDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	spec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
 	thisSession := createQuotaSession()
 	spec.SessionManager.UpdateSession("4321", thisSession, 60)
 	uri := "/about-lonelycoder/"

@@ -7,16 +7,16 @@ import (
 )
 
 type HealthPrefix string
+var SampleTimeout int64 = 0 //TODO: Make this editable
 
 const (
 	Throttle HealthPrefix = "Throttle"
 	QuotaViolation HealthPrefix = "QuotaViolation"
 	KeyFailure HealthPrefix = "KeyFailure"
-	UpstreamLatency HealthPrefix = "UpstreamLatency"
 	RequestLog HealthPrefix = "Request"
 	BlockedRequestLog HealthPrefix = "BlockedRequest"
 
-	SampleTimeout int64 = 60
+	HealthCheckRedisPrefix string = "apihealth"
 )
 
 type HealthChecker interface {
@@ -26,11 +26,11 @@ type HealthChecker interface {
 }
 
 type HealthCheckValues struct {
-	ThrottledRequestsPS int64	`bson:"throttle_reqests_per_second,omitempty" json:"throttle_reqests_per_second"`
-	QuotaViolationsPS int64 `bson:"quota_violations_per_second,omitempty" json:"quota_violations_per_second"`
-	KeyFailuresPS int64 `bson:"key_failures_per_second,omitempty" json:"key_failures_per_second"`
-	AvgUpstreamLatency int64 `bson:"average_upstream_latency,omitempty" json:"average_upstream_latency"`
-	AvgRequestsPS int64 `bson:"average_requests_per_second,omitempty" json:"average_requests_per_second"`
+	ThrottledRequestsPS float64	`bson:"throttle_reqests_per_second,omitempty" json:"throttle_reqests_per_second"`
+	QuotaViolationsPS float64 `bson:"quota_violations_per_second,omitempty" json:"quota_violations_per_second"`
+	KeyFailuresPS float64 `bson:"key_failures_per_second,omitempty" json:"key_failures_per_second"`
+	AvgUpstreamLatency float64 `bson:"average_upstream_latency,omitempty" json:"average_upstream_latency"`
+	AvgRequestsPS float64 `bson:"average_requests_per_second,omitempty" json:"average_requests_per_second"`
 }
 
 type DefaultHealthChecker struct {
@@ -56,22 +56,39 @@ func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
 
 // ReportHealthCheckValue is a shortcut we can use throughout the app to push a health check value
 func ReportHealthCheckValue(checker HealthChecker, counter HealthPrefix, value string) {
+	// TODO: Wrap this in a conditional so it can be deactivated
 	go checker.StoreCounterVal(counter, value)
 }
 
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
-	h.storage.SetKey(h.CreateKeyName(counterType), value, SampleTimeout)
+	searchStr := h.CreateKeyName(counterType)
+	log.Warning("Adding Healthcheck to: ", searchStr)
+	h.storage.SetKey(searchStr, value, SampleTimeout)
 }
 
-func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) int64 {
-	keys := h.storage.GetKeys(strings.Join([]string{h.APIID, string(prefix)}, "."))
+func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
+	searchStr := strings.Join([]string{h.APIID, string(prefix)}, ".")
+	log.Debug("Searching for: ", searchStr)
+	keys := h.storage.GetKeys(searchStr)
+	log.Debug("Found ", keys)
 	var count int64
 	count = int64(len(keys))
+	divisor := float64(SampleTimeout)
+	if divisor == 0 {
+		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
+		divisor = 60.0
+	}
 	if count > 0 {
-		return count / SampleTimeout
+		return roundValue(float64(count) / divisor)
 	}
 
-	return 0
+	return 0.00
+}
+
+func roundValue(untruncated float64) float64 {
+	truncated := float64(int(untruncated * 100)) / 100
+
+	return truncated
 }
 
 func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
@@ -84,7 +101,10 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	values.AvgRequestsPS = h.getAvgCount(RequestLog)
 
 	// Get the micro latency graph, an average upstream latency
-	kv := h.storage.GetKeysAndValuesWithFilter(strings.Join([]string{h.APIID, string(UpstreamLatency)}, "."))
+	searchStr := strings.Join([]string{h.APIID, string(RequestLog)}, ".")
+	log.Warning("Searching KV for: ", searchStr)
+	kv := h.storage.GetKeysAndValuesWithFilter(searchStr)
+	log.Debug("Found: " , kv)
 	var runningTotal int
 	if len(kv) > 0 {
 		for _, v := range kv {
@@ -95,7 +115,7 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 				runningTotal += vInt
 			}
 		}
-		values.AvgUpstreamLatency = int64(runningTotal / len(kv))
+		values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(kv)))
 	}
 
 	return values, nil

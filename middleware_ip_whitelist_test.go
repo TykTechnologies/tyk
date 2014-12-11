@@ -157,7 +157,8 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 	log.Warning("CREATING TEMPORARY API FOR IP WHITELIST")
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	thisSpec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore)
 
 	specs := []APISpec{thisSpec}
 	newMuxes := http.NewServeMux()
@@ -173,7 +174,8 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 func TestIpMiddlewareIPFail(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledFail)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	spec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
@@ -200,7 +202,8 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 func TestIpMiddlewareIPPass(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	spec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
@@ -227,7 +230,8 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 func TestIpMiddlewareIPMissing(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionMissing)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	spec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
@@ -254,7 +258,8 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 func TestIpMiddlewareIPDisabled(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionDisabled)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	spec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"

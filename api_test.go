@@ -52,7 +52,8 @@ func MakeSampleAPI() *APISpec {
 	log.Warning("CREATING TEMPORARY API")
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	thisSpec.Init(&redisStore, &redisStore)
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore)
 
 	specs := []APISpec{thisSpec}
 	newMuxes := http.NewServeMux()

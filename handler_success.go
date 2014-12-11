@@ -76,7 +76,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t2 := time.Now()
 
 	millisec := float64(t2.UnixNano() - t1.UnixNano()) * 0.000001
-	log.Info("Upstream request took (ms): ", millisec)
+	log.Debug("Upstream request took (ms): ", millisec)
 
 	if config.StoreAnalytics(r) {
 		t := time.Now()
@@ -123,9 +123,10 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		go analytics.RecordHit(thisRecord)
 
-		// Report in health check
-		ReportHealthCheckValue(s.Spec.Health, RequestLog, strconv.FormatInt(int64(millisec), 10))
 	}
+
+	// Report in health check
+	ReportHealthCheckValue(s.Spec.Health, RequestLog, strconv.FormatInt(int64(millisec), 10))
 
 	if doMemoryProfile {
 		pprof.WriteHeapProfile(profileFile)

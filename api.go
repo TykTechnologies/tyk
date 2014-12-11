@@ -779,23 +779,28 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
-	var code int
+	var code int = 200
 
 	if r.Method == "GET" {
 		APIID := r.FormValue("api_id")
-
-		if APIID != "" {
+		if APIID == "" {
 			code = 405
 			responseMessage = createError("missing api_id parameter")
 		} else {
 			thisAPISpec := GetSpecForApi(APIID)
-			health, _ := thisAPISpec.Health.GetApiHealthValues()
-			var jsonErr error
-			responseMessage, jsonErr = json.Marshal(health)
-			if jsonErr != nil {
+			if thisAPISpec != nil {
+				health, _ := thisAPISpec.Health.GetApiHealthValues()
+				var jsonErr error
+				responseMessage, jsonErr = json.Marshal(health)
+				if jsonErr != nil {
+					code = 405
+					responseMessage = createError("Failed to encode data")
+				}
+			} else {
 				code = 405
-				responseMessage = createError("Failed to encode data")
+				responseMessage = createError("API ID not found")
 			}
+
 		}
 	} else {
 		// Return Not supported message (and code)
@@ -805,17 +810,3 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 
 	DoJSONWrite(w, code, responseMessage)
 }
-
-// MakeNewOsinServer creates a generic osinStorage object, used primarily by the API to create and get keys outside of an APISpec context.
-// This is not ideal, but is only used in the Tyk API and nowhere else.
-
-// TODO: Remove this, as we can use the APISpec to do this instead
-
-//func MakeNewOsinServer() *RedisOsinStorageInterface {
-//	log.Info("Creating generic redis OAuth connection")
-//	storageManager := RedisStorageManager{KeyPrefix: ""}
-//	storageManager.Connect()
-//	osinStorage := &RedisOsinStorageInterface{&storageManager}
-//
-//	return osinStorage
-//}
