@@ -24,6 +24,6 @@
   },
   "health_check": {
     "enable_health_checks": true,
-    "health_check_value_timeouts": 60.0
+    "health_check_value_timeouts": 60
   }
 }

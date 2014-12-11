@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/gorilla/context"
 	"net/http"
-	"net/http/httputil"
+//	"net/http/httputil"
 	"runtime/pprof"
 	"strings"
 	"time"
@@ -24,7 +24,7 @@ const (
 // middleware handler, this can probably be handled better.
 type TykMiddleware struct {
 	Spec  APISpec
-	Proxy *httputil.ReverseProxy
+	Proxy *ReverseProxy
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try

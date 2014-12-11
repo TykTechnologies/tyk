@@ -65,7 +65,7 @@ func ReportHealthCheckValue(checker HealthChecker, counter HealthPrefix, value s
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
 	if config.HealthCheck.EnableHealthChecks {
 		searchStr := h.CreateKeyName(counterType)
-		log.Warning("Adding Healthcheck to: ", searchStr)
+		log.Debug("Adding Healthcheck to: ", searchStr)
 		h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
 	}
 }
@@ -106,7 +106,7 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 
 	// Get the micro latency graph, an average upstream latency
 	searchStr := strings.Join([]string{h.APIID, string(RequestLog)}, ".")
-	log.Warning("Searching KV for: ", searchStr)
+	log.Debug("Searching KV for: ", searchStr)
 	kv := h.storage.GetKeysAndValuesWithFilter(searchStr)
 	log.Debug("Found: " , kv)
 	var runningTotal int
