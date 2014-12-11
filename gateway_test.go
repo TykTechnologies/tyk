@@ -5,7 +5,6 @@ import (
 	"github.com/justinas/alice"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"net/url"
 	"testing"
 	"time"
@@ -50,7 +49,7 @@ func getChain(spec APISpec) http.Handler {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	spec.Init(&redisStore, &redisStore, healthStore)
 	remote, _ := url.Parse("http://lonelycode.com/")
-	proxy := httputil.NewSingleHostReverseProxy(remote)
+	proxy := TykNewSingleHostReverseProxy(remote)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 	tykMiddleware := TykMiddleware{spec, proxy}
 	chain := alice.New(

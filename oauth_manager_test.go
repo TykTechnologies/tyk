@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"net/url"
 	"testing"
 )
@@ -83,7 +82,7 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 spec.Init(&redisStore, &redisStore, healthStore)
 	addOAuthHandlers(&spec, Muxer, true)
 	remote, _ := url.Parse("http://lonelycode.com/")
-	proxy := httputil.NewSingleHostReverseProxy(remote)
+	proxy := TykNewSingleHostReverseProxy(remote)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 	tykMiddleware := TykMiddleware{spec, proxy}
 	chain := alice.New(
