@@ -44,6 +44,9 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 			Key: authHeaderValue.(string),
 		})
 
+		// Report in health check
+		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+
 		return errors.New("Key has expired, please renew"), 403
 	}
 

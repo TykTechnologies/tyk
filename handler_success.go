@@ -7,6 +7,7 @@ import (
 	"runtime/pprof"
 	"strings"
 	"time"
+	"strconv"
 )
 
 // ContextKey is a key type to avoid collisions
@@ -121,6 +122,9 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			int64(millisec)}
 
 		go analytics.RecordHit(thisRecord)
+
+		// Report in health check
+		ReportHealthCheckValue(s.Spec.Health, RequestLog, strconv.FormatInt(int64(millisec), 10))
 	}
 
 	if doMemoryProfile {

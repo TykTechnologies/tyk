@@ -85,6 +85,9 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Fire Authfailed Event
 		AuthFailed(k.TykMiddleware, r, authHeaderValue)
 
+		// Report in health check
+		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+
 
 		return errors.New("User not authorised"), 403
 	}
@@ -99,6 +102,9 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		// Fire Authfailed Event
 		AuthFailed(k.TykMiddleware, r, authHeaderValue)
+
+		// Report in health check
+		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
 
 		return errors.New("User not authorised"), 403
 	}

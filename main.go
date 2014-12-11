@@ -112,6 +112,7 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 	Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
 	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
 	Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
+	Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
 	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
 	Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
 	Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))

@@ -52,6 +52,9 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				Key: authHeaderValue,
 			})
 
+			// Report in health check
+			ReportHealthCheckValue(k.Spec.Health, Throttle, "1")
+
 			return errors.New("Rate limit exceeded"), 403
 
 		} else if reason == 2 {
@@ -69,6 +72,9 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					Origin: r.RemoteAddr,
 					Key: authHeaderValue,
 			})
+
+			// Report in health check
+			ReportHealthCheckValue(k.Spec.Health, QuotaViolation, "1")
 
 			return errors.New("Quota exceeded"), 403
 		}

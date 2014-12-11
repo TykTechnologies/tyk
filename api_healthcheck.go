@@ -14,8 +14,9 @@ const (
 	KeyFailure HealthPrefix = "KeyFailure"
 	UpstreamLatency HealthPrefix = "UpstreamLatency"
 	RequestLog HealthPrefix = "Request"
+	BlockedRequestLog HealthPrefix = "BlockedRequest"
 
-	SampleTimeout int64 = 20
+	SampleTimeout int64 = 60
 )
 
 type HealthChecker interface {
@@ -48,9 +49,14 @@ func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
 	now := time.Now().UnixNano()
 
 	// Key should be API-ID.SubKey.123456789
-	newKey = strings.Join([]string{h.APIID, string(subKey), string(now)}, ".")
+	newKey = strings.Join([]string{h.APIID, string(subKey), strconv.FormatInt(now, 10)}, ".")
 
 	return newKey
+}
+
+// ReportHealthCheckValue is a shortcut we can use throughout the app to push a health check value
+func ReportHealthCheckValue(checker HealthChecker, counter HealthPrefix, value string) {
+	go checker.StoreCounterVal(counter, value)
 }
 
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {

@@ -47,6 +47,9 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 		// Fire Authfailed Event
 		AuthFailed(k.TykMiddleware, r, authHeaderValue)
 
+		// Report in health check
+		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+
 		return errors.New("Key not authorised"), 403
 	}
 
