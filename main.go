@@ -198,8 +198,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		default: sessionStore = &redisStore
 		}
 
+		// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
 		healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-
 		referenceSpec.Init(authStore, sessionStore, healthStore)
 
 		if referenceSpec.EnableBatchRequestSupport {
