@@ -1,44 +1,45 @@
 package main
 
 import (
-	"html/template"
-	"net/http"
-	"strings"
-	"net/url"
 	"bytes"
 	"crypto/md5"
-	"io"
-	"io/ioutil"
 	"encoding/hex"
 	"encoding/json"
 	"github.com/lonelycode/tykcommon"
+	"html/template"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
 )
 
 type WebHookRequestMethod string
+
 const (
-	WH_GET WebHookRequestMethod = "GET"
-	WH_PUT WebHookRequestMethod = "PUT"
-	WH_POST WebHookRequestMethod = "POST"
+	WH_GET    WebHookRequestMethod = "GET"
+	WH_PUT    WebHookRequestMethod = "PUT"
+	WH_POST   WebHookRequestMethod = "POST"
 	WH_DELETE WebHookRequestMethod = "DELETE"
-	WH_PATCH WebHookRequestMethod = "PATCH"
+	WH_PATCH  WebHookRequestMethod = "PATCH"
 
 	// Define the Event Handler name so we can register it
-	EH_WebHook	tykcommon.TykEventHandlerName = "eh_web_hook_handler"
+	EH_WebHook tykcommon.TykEventHandlerName = "eh_web_hook_handler"
 )
 
 type WebHookHandlerConf struct {
-	Method string	`bson:"method" json:"method"`
-	TargetPath string	`bson:"target_path" json:"target_path"`
-	TemplatePath string	`bson:"template_path" json:"template_path"`
-	HeaderList map[string]string	`bson:"header_map" json:"header_map"`
-	EventTimeout int64	`bson:"event_timeout" json:"event_timeout"`
+	Method       string            `bson:"method" json:"method"`
+	TargetPath   string            `bson:"target_path" json:"target_path"`
+	TemplatePath string            `bson:"template_path" json:"template_path"`
+	HeaderList   map[string]string `bson:"header_map" json:"header_map"`
+	EventTimeout int64             `bson:"event_timeout" json:"event_timeout"`
 }
 
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
-	conf WebHookHandlerConf
+	conf     WebHookHandlerConf
 	template *template.Template
-	store *RedisStorageManager
+	store    *RedisStorageManager
 }
 
 // Not Pretty, but will avoi dmillions of connections
@@ -94,7 +95,6 @@ func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 		log.Error("Init failed for this webhook, invalid URL, URL must be absolute")
 	}
 
-
 	return thisHandler, nil
 }
 
@@ -118,12 +118,19 @@ func (w WebHookHandler) setHookFired(checksum string) {
 
 func (w WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 	switch strings.ToUpper(m) {
-		case "GET": return WH_GET
-		case "PUT": return WH_PUT
-		case "POST": return WH_POST
-		case "DELETE": return WH_DELETE
-		case "PATCH": return WH_DELETE
-		default: log.Warning("Method must be one of GET, PUT, POST, DELETE or PATCH, defaulting to GET"); return WH_GET
+	case "GET":
+		return WH_GET
+	case "PUT":
+		return WH_PUT
+	case "POST":
+		return WH_POST
+	case "DELETE":
+		return WH_DELETE
+	case "PATCH":
+		return WH_DELETE
+	default:
+		log.Warning("Method must be one of GET, PUT, POST, DELETE or PATCH, defaulting to GET")
+		return WH_GET
 	}
 }
 
@@ -160,7 +167,7 @@ func (w WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 
 	req.Header.Add("User-Agent", "Tyk-Hookshot")
 
-	for key, val := range (w.conf.HeaderList) {
+	for key, val := range w.conf.HeaderList {
 		req.Header.Add(key, val)
 	}
 

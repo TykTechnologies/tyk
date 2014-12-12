@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"errors"
-	"github.com/lonelycode/tykcommon"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/lonelycode/tykcommon"
 	"labix.org/v2/mgo/bson"
 	"time"
 )
@@ -16,11 +16,11 @@ const (
 
 // Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
-	EVENT_QuotaExceeded tykcommon.TykEvent = "QuotaExceeded"
+	EVENT_QuotaExceeded     tykcommon.TykEvent = "QuotaExceeded"
 	EVENT_RateLimitExceeded tykcommon.TykEvent = "RatelimitExceeded"
-	EVENT_AuthFailure tykcommon.TykEvent = "AuthFailure"
-	EVENT_KeyExpired tykcommon.TykEvent = "KeyExpired"
-	EVENT_VersionFailure tykcommon.TykEvent = "VersionFailure"
+	EVENT_AuthFailure       tykcommon.TykEvent = "AuthFailure"
+	EVENT_KeyExpired        tykcommon.TykEvent = "KeyExpired"
+	EVENT_VersionFailure    tykcommon.TykEvent = "VersionFailure"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -32,49 +32,49 @@ type EventMetaDefault struct {
 // EVENT_QuotaExceededMeta is the metadata structure for a quota exceeded event (EVENT_QuotaExceeded)
 type EVENT_QuotaExceededMeta struct {
 	EventMetaDefault
-	Path string
+	Path   string
 	Origin string
-	Key string
+	Key    string
 }
 
 // EVENT_RateLimitExceededMeta is the metadata structure for a rate limit exceeded event (EVENT_RateLimitExceeded)
 type EVENT_RateLimitExceededMeta struct {
 	EventMetaDefault
-	Path string
+	Path   string
 	Origin string
-	Key string
+	Key    string
 }
 
 // EVENT_AuthFailureMeta is the metadata structure for an auth failure (EVENT_AuthFailure)
 type EVENT_AuthFailureMeta struct {
 	EventMetaDefault
-	Path string
+	Path   string
 	Origin string
-	Key string
+	Key    string
 }
 
 // EVENT_KeyExpiredMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
 type EVENT_KeyExpiredMeta struct {
 	EventMetaDefault
-	Path string
+	Path   string
 	Origin string
-	Key string
+	Key    string
 }
 
 // EVENT_VersionFailureMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
 type EVENT_VersionFailureMeta struct {
 	EventMetaDefault
-	Path string
+	Path   string
 	Origin string
-	Key string
+	Key    string
 	Reason string
 }
 
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
-	EventType tykcommon.TykEvent
+	EventType     tykcommon.TykEvent
 	EventMetaData interface{}
-	TimeStamp string
+	TimeStamp     string
 }
 
 // TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
@@ -101,10 +101,11 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (Tyk
 		thisConf = handlerConf.HandlerMeta
 	}
 
-
 	switch handlerConf.Handler {
-		case EH_LogHandler: return LogMessageEventHandler{}.New(thisConf)
-		case EH_WebHook: return WebHookHandler{}.New(thisConf)
+	case EH_LogHandler:
+		return LogMessageEventHandler{}.New(thisConf)
+	case EH_WebHook:
+		return WebHookHandler{}.New(thisConf)
 	}
 
 	return nil, errors.New("Handler not found")
@@ -123,7 +124,7 @@ func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData int
 		eventMessage.EventType = eventName
 		eventMessage.TimeStamp = time.Now().Local().String()
 
-		for _, handler := range(handlers) {
+		for _, handler := range handlers {
 			log.Debug("FIRING HANDLER")
 			go handler.HandleEvent(eventMessage)
 		}
@@ -135,7 +136,6 @@ type LogMessageEventHandler struct {
 	conf map[string]interface{}
 }
 
-
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
 func (l LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 	thisHandler := LogMessageEventHandler{}
@@ -143,6 +143,7 @@ func (l LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, e
 
 	return thisHandler, nil
 }
+
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l LogMessageEventHandler) HandleEvent(em EventMessage) {
 	var msgConf EVENT_QuotaExceededMeta
@@ -159,4 +160,3 @@ func (l LogMessageEventHandler) HandleEvent(em EventMessage) {
 
 	log.Warning(formattedMsgString)
 }
-

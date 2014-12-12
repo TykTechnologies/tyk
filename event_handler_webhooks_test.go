@@ -1,8 +1,8 @@
 package main
 
 import (
-	"testing"
 	"strings"
+	"testing"
 )
 
 func CreateHookObj() WebHookHandler {
@@ -22,15 +22,15 @@ func CreateHookObj() WebHookHandler {
 	eventMessage.EventType = EVENT_KeyExpired
 	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
-		Path:"/banana",
-		Origin:"tyk.io",
-		Key:"123456789",
+		Path:             "/banana",
+		Origin:           "tyk.io",
+		Key:              "123456789",
 	}
 
 	return myEventHandler
 }
 
-func TestNewValid(t * testing.T) {
+func TestNewValid(t *testing.T) {
 
 	o := WebHookHandler{}
 	var conf = make(map[string]interface{})
@@ -48,7 +48,7 @@ func TestNewValid(t * testing.T) {
 	}
 }
 
-func TestNewInvlalid(t * testing.T) {
+func TestNewInvlalid(t *testing.T) {
 
 	o := WebHookHandler{}
 	var conf = make(map[string]interface{})
@@ -66,7 +66,7 @@ func TestNewInvlalid(t * testing.T) {
 	}
 }
 
-func TestGetChecksum(t * testing.T) {
+func TestGetChecksum(t *testing.T) {
 	rBody := `
 {
     "event": "QuotaExceeded",
@@ -92,7 +92,7 @@ func TestGetChecksum(t * testing.T) {
 	}
 }
 
-func TestBuildRequest(t * testing.T) {
+func TestBuildRequest(t *testing.T) {
 	hook := CreateHookObj()
 
 	rBody := `
@@ -128,7 +128,7 @@ func TestBuildRequest(t * testing.T) {
 
 }
 
-func TestCreateBody(t * testing.T) {
+func TestCreateBody(t *testing.T) {
 	em := EventMessage{}
 	em.EventType = EVENT_QuotaExceeded
 	em.TimeStamp = "0"
@@ -142,7 +142,7 @@ func TestCreateBody(t * testing.T) {
 	}
 
 	expectedBody := `"event": "QuotaExceeded"`
-	if !strings.Contains(body, expectedBody)  {
+	if !strings.Contains(body, expectedBody) {
 		t.Error("Body incorrect, is: ", body)
 	}
 
@@ -165,9 +165,9 @@ func TestGet(t *testing.T) {
 	eventMessage.EventType = EVENT_KeyExpired
 	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
-		Path:"/banana",
-		Origin:"tyk.io",
-		Key:"123456789",
+		Path:             "/banana",
+		Origin:           "tyk.io",
+		Key:              "123456789",
 	}
 
 	thisBody, _ := myEventHandler.CreateBody(eventMessage)
@@ -201,9 +201,9 @@ func TestPost(t *testing.T) {
 	eventMessage.EventType = EVENT_KeyExpired
 	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
-		Path:"/banana",
-		Origin:"tyk.io",
-		Key:"123456789",
+		Path:             "/banana",
+		Origin:           "tyk.io",
+		Key:              "123456789",
 	}
 
 	thisBody, _ := myEventHandler.CreateBody(eventMessage)

@@ -25,17 +25,17 @@ type Config struct {
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
-		Type            string `json:"type"`
-		CSVDir          string `json:"csv_dir"`
-		MongoURL        string `json:"mongo_url"`
-		MongoDbName     string `json:"mongo_db_name"`
-		MongoCollection string `json:"mongo_collection"`
-		PurgeDelay      int    `json:"purge_delay"`
-		IgnoredIPs      []string `json:"ignored_ips"`
+		Type               string   `json:"type"`
+		CSVDir             string   `json:"csv_dir"`
+		MongoURL           string   `json:"mongo_url"`
+		MongoDbName        string   `json:"mongo_db_name"`
+		MongoCollection    string   `json:"mongo_collection"`
+		PurgeDelay         int      `json:"purge_delay"`
+		IgnoredIPs         []string `json:"ignored_ips"`
 		ignoredIPsCompiled map[string]bool
 	} `json:"analytics_config"`
 	HealthCheck struct {
-		EnableHealthChecks bool	`json:"enable_health_checks"`
+		EnableHealthChecks      bool  `json:"enable_health_checks"`
 		HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 	} `json:"health_check"`
 }
@@ -93,7 +93,7 @@ func loadConfig(filePath string, configStruct *Config) {
 func (c *Config) loadIgnoredIPs() {
 	c.AnalyticsConfig.ignoredIPsCompiled = make(map[string]bool, len(c.AnalyticsConfig.IgnoredIPs))
 	for _, ip := range c.AnalyticsConfig.IgnoredIPs {
-		c.AnalyticsConfig.ignoredIPsCompiled[ip] = true;
+		c.AnalyticsConfig.ignoredIPsCompiled[ip] = true
 	}
 }
 
@@ -101,9 +101,9 @@ func (c *Config) TestShowIPs() {
 	log.Warning(c.AnalyticsConfig.ignoredIPsCompiled)
 }
 
-func (c Config) StoreAnalytics(r *http.Request) (bool) {
+func (c Config) StoreAnalytics(r *http.Request) bool {
 	if !c.EnableAnalytics {
-		return false;
+		return false
 	}
 
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)

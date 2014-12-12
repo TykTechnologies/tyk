@@ -129,7 +129,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	log.Debug("signature isn't empty: ", signature)
 
 	// Check if API key valid
-	thisSessionState, keyExists :=hm.TykMiddleware.CheckSessionAndIdentityForValidKey(keyId)
+	thisSessionState, keyExists := hm.TykMiddleware.CheckSessionAndIdentityForValidKey(keyId)
 	if !keyExists {
 		return hm.authorizationError(w, r)
 	}
@@ -180,7 +180,6 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Everything seems in order let the request through
 	return nil, 200
 }
-
 
 func (hm HMACMiddleware) parseFormParams(values url.Values) string {
 	kvValues := map[string]string{}

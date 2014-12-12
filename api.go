@@ -9,9 +9,9 @@ import (
 
 	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"github.com/nu7hatch/gouuid"
-	"github.com/gorilla/context"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful

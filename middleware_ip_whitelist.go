@@ -2,11 +2,10 @@ package main
 
 import (
 	"errors"
-	"net/http"
 	"net"
+	"net/http"
 	"strings"
 )
-
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream
 type IPWhiteListMiddleware struct {
@@ -33,7 +32,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	var remoteIP net.IP
 
 	// Enabled, check incoming IP address
-	for _, ip := range(ipConfig.AllowedIPs) {
+	for _, ip := range ipConfig.AllowedIPs {
 		allowedIP := net.ParseIP(ip)
 		splitIP := strings.Split(r.RemoteAddr, ":")
 		remoteIPString := splitIP[0]
@@ -58,5 +57,3 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	// Not matched, fail
 	return errors.New("Access from this IP has been disallowed"), 403
 }
-
-

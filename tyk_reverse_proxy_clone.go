@@ -7,15 +7,15 @@
 package main
 
 import (
+	"github.com/gorilla/context"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"github.com/gorilla/context"
-	"strconv"
 )
 
 // TykNewSingleHostReverseProxy returns a new ReverseProxy that rewrites
@@ -209,8 +209,8 @@ func (p *ReverseProxy) copyResponse(dst io.Writer, src io.Reader) {
 }
 
 type writeFlusher interface {
-io.Writer
-http.Flusher
+	io.Writer
+	http.Flusher
 }
 
 type maxLatencyWriter struct {

@@ -1,18 +1,18 @@
 package main
 
 import (
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 type HealthPrefix string
 
 const (
-	Throttle HealthPrefix = "Throttle"
-	QuotaViolation HealthPrefix = "QuotaViolation"
-	KeyFailure HealthPrefix = "KeyFailure"
-	RequestLog HealthPrefix = "Request"
+	Throttle          HealthPrefix = "Throttle"
+	QuotaViolation    HealthPrefix = "QuotaViolation"
+	KeyFailure        HealthPrefix = "KeyFailure"
+	RequestLog        HealthPrefix = "Request"
 	BlockedRequestLog HealthPrefix = "BlockedRequest"
 
 	HealthCheckRedisPrefix string = "apihealth"
@@ -25,16 +25,16 @@ type HealthChecker interface {
 }
 
 type HealthCheckValues struct {
-	ThrottledRequestsPS float64	`bson:"throttle_reqests_per_second,omitempty" json:"throttle_reqests_per_second"`
-	QuotaViolationsPS float64 `bson:"quota_violations_per_second,omitempty" json:"quota_violations_per_second"`
-	KeyFailuresPS float64 `bson:"key_failures_per_second,omitempty" json:"key_failures_per_second"`
-	AvgUpstreamLatency float64 `bson:"average_upstream_latency,omitempty" json:"average_upstream_latency"`
-	AvgRequestsPS float64 `bson:"average_requests_per_second,omitempty" json:"average_requests_per_second"`
+	ThrottledRequestsPS float64 `bson:"throttle_reqests_per_second,omitempty" json:"throttle_reqests_per_second"`
+	QuotaViolationsPS   float64 `bson:"quota_violations_per_second,omitempty" json:"quota_violations_per_second"`
+	KeyFailuresPS       float64 `bson:"key_failures_per_second,omitempty" json:"key_failures_per_second"`
+	AvgUpstreamLatency  float64 `bson:"average_upstream_latency,omitempty" json:"average_upstream_latency"`
+	AvgRequestsPS       float64 `bson:"average_requests_per_second,omitempty" json:"average_requests_per_second"`
 }
 
 type DefaultHealthChecker struct {
 	storage StorageHandler
-	APIID string
+	APIID   string
 }
 
 func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
@@ -90,7 +90,7 @@ func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 }
 
 func roundValue(untruncated float64) float64 {
-	truncated := float64(int(untruncated * 100)) / 100
+	truncated := float64(int(untruncated*100)) / 100
 
 	return truncated
 }
@@ -108,7 +108,7 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	searchStr := strings.Join([]string{h.APIID, string(RequestLog)}, ".")
 	log.Debug("Searching KV for: ", searchStr)
 	kv := h.storage.GetKeysAndValuesWithFilter(searchStr)
-	log.Debug("Found: " , kv)
+	log.Debug("Found: ", kv)
 	var runningTotal int
 	if len(kv) > 0 {
 		for _, v := range kv {
@@ -124,6 +124,3 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 
 	return values, nil
 }
-
-
-

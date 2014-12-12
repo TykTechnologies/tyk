@@ -46,11 +46,11 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 			// Fire a rate limit exceeded event
 			go k.TykMiddleware.FireEvent(EVENT_RateLimitExceeded,
 				EVENT_RateLimitExceededMeta{
-				EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded"},
-				Path: r.URL.Path,
-				Origin: r.RemoteAddr,
-				Key: authHeaderValue,
-			})
+					EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded"},
+					Path:             r.URL.Path,
+					Origin:           r.RemoteAddr,
+					Key:              authHeaderValue,
+				})
 
 			// Report in health check
 			ReportHealthCheckValue(k.Spec.Health, Throttle, "1")
@@ -68,10 +68,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 			go k.TykMiddleware.FireEvent(EVENT_QuotaExceeded,
 				EVENT_QuotaExceededMeta{
 					EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded"},
-					Path: r.URL.Path,
-					Origin: r.RemoteAddr,
-					Key: authHeaderValue,
-			})
+					Path:             r.URL.Path,
+					Origin:           r.RemoteAddr,
+					Key:              authHeaderValue,
+				})
 
 			// Report in health check
 			ReportHealthCheckValue(k.Spec.Health, QuotaViolation, "1")

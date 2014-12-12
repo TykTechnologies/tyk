@@ -53,8 +53,6 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 		return errors.New("Key not authorised"), 403
 	}
 
-
-
 	// Set session state on context, we will need it later
 	context.Set(r, SessionData, thisSessionState)
 	context.Set(r, AuthHeaderValue, authHeaderValue)
@@ -62,12 +60,12 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	return nil, 200
 }
 
-func AuthFailed (m TykMiddleware, r *http.Request, authHeaderValue string) {
+func AuthFailed(m TykMiddleware, r *http.Request, authHeaderValue string) {
 	go m.FireEvent(EVENT_AuthFailure,
 		EVENT_AuthFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
-		Path: r.URL.Path,
-		Origin: r.RemoteAddr,
-		Key: authHeaderValue,
-	})
+			EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
+			Path:             r.URL.Path,
+			Origin:           r.RemoteAddr,
+			Key:              authHeaderValue,
+		})
 }

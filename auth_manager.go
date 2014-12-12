@@ -136,7 +136,6 @@ func (b DefaultSessionManager) GetSessions(filter string) []string {
 }
 
 type DefaultKeyGenerator struct {
-
 }
 
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key

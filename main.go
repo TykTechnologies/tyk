@@ -23,9 +23,11 @@ var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
 var profileFile = &os.File{}
 var doMemoryProfile bool
+
 //var genericOsinStorage *RedisOsinStorageInterface
 var ApiSpecRegister = make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
+
 // Generic system error
 const (
 	E_SYSTEM_ERROR          string = "{\"status\": \"system error, please contact administrator\"}"
@@ -119,7 +121,7 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 }
 
 // Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthManager{
+func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthManager {
 	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
 	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
@@ -189,13 +191,17 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		var sessionStore StorageHandler
 
 		switch referenceSpec.AuthProvider.StorageEngine {
-			case DefaultStorageEngine: authStore = &redisStore
-			default: authStore = &redisStore
+		case DefaultStorageEngine:
+			authStore = &redisStore
+		default:
+			authStore = &redisStore
 		}
 
 		switch referenceSpec.SessionProvider.StorageEngine {
-		case DefaultStorageEngine: sessionStore = &redisStore
-		default: sessionStore = &redisStore
+		case DefaultStorageEngine:
+			sessionStore = &redisStore
+		default:
+			sessionStore = &redisStore
 		}
 
 		// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool

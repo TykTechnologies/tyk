@@ -79,7 +79,7 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 	loadAPIEndpoints(Muxer)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-spec.Init(&redisStore, &redisStore, healthStore)
+	spec.Init(&redisStore, &redisStore, healthStore)
 	addOAuthHandlers(&spec, Muxer, true)
 	remote, _ := url.Parse("http://lonelycode.com/")
 	proxy := TykNewSingleHostReverseProxy(remote)
@@ -260,7 +260,7 @@ func GetToken() tokenData {
 
 	var thisResponse = tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-//	fmt.Println(string(body))
+	//	fmt.Println(string(body))
 	err := json.Unmarshal(body, &thisResponse)
 	if err != nil {
 		fmt.Println(err)

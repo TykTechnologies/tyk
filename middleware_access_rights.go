@@ -74,4 +74,3 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	return nil, 200
 }
-

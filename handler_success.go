@@ -3,11 +3,11 @@ package main
 import (
 	"github.com/gorilla/context"
 	"net/http"
-//	"net/http/httputil"
+	//	"net/http/httputil"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 // ContextKey is a key type to avoid collisions
@@ -62,20 +62,16 @@ type SuccessHandler struct {
 // Spec states the path is Ignored
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-
-
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 	}
 
-
-
 	t1 := time.Now()
 	s.Proxy.ServeHTTP(w, r)
 	t2 := time.Now()
 
-	millisec := float64(t2.UnixNano() - t1.UnixNano()) * 0.000001
+	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if config.StoreAnalytics(r) {

@@ -88,7 +88,6 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
 
-
 		return errors.New("User not authorised"), 403
 	}
 

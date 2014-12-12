@@ -1,40 +1,40 @@
 package main
 
 import (
-	"net/http"
-	"encoding/json"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"strings"
+	"net/http"
 	"strconv"
+	"strings"
 )
 
 // RequestDefinition defines a batch request
 type RequestDefinition struct {
-	Method string	`json:"method"`
-	Headers map[string]string 	`json:"headers"`
-	Body string	`json:"body"`
-	RelativeURL string 	`json:"relative_url"`
+	Method      string            `json:"method"`
+	Headers     map[string]string `json:"headers"`
+	Body        string            `json:"body"`
+	RelativeURL string            `json:"relative_url"`
 }
 
 // BatchRequestStructure defines a batch request order
 type BatchRequestStructure struct {
-	Requests []RequestDefinition	`json:"requests"`
-	SuppressParallelExecution bool	`json:"suppress_parallel_execution"`
+	Requests                  []RequestDefinition `json:"requests"`
+	SuppressParallelExecution bool                `json:"suppress_parallel_execution"`
 }
 
 // BatchReplyUnit encodes a request suitable for replying to a batch request
 type BatchReplyUnit struct {
-	RelativeURL string	`json:"relative_url"`
-	Code int	`json:"code"`
-	Headers http.Header	`json:"headers"`
-	Body string	`json:"body"`
+	RelativeURL string      `json:"relative_url"`
+	Code        int         `json:"code"`
+	Headers     http.Header `json:"headers"`
+	Body        string      `json:"body"`
 }
 
 // BatchRequestHandler handles batch requests on /tyk/batch for any API Definition that has the feature enabled
 type BatchRequestHandler struct {
-	API        *APISpec
+	API *APISpec
 }
 
 // doAsyncRequest runs an async request and replies to a channel
@@ -56,9 +56,9 @@ func (b BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, ou
 
 	reply := BatchReplyUnit{
 		RelativeURL: relURL,
-		Code: resp.StatusCode,
-		Headers: resp.Header,
-		Body: string(content),
+		Code:        resp.StatusCode,
+		Headers:     resp.Header,
+		Body:        string(content),
 	}
 
 	out <- reply
@@ -84,9 +84,9 @@ func (b BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) Bat
 
 	reply := BatchReplyUnit{
 		RelativeURL: relURL,
-		Code: resp.StatusCode,
-		Headers: resp.Header,
-		Body: string(content),
+		Code:        resp.StatusCode,
+		Headers:     resp.Header,
+		Body:        string(content),
 	}
 
 	return reply
@@ -109,7 +109,7 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 		// Construct the requests
 		requestSet := []*http.Request{}
 
-		for i, requestDef := range(batchRequest.Requests) {
+		for i, requestDef := range batchRequest.Requests {
 			// We re-build the URL to ensure that the requested URL is actually for the API in question
 			// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
 			absUrlHeader := strings.Join([]string{"http://localhost", strconv.Itoa(config.ListenPort)}, ":")
@@ -124,7 +124,7 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 			}
 
 			// Add headers
-			for k, v := range(requestDef.Headers) {
+			for k, v := range requestDef.Headers {
 				thisRequest.Header.Add(k, v)
 			}
 
@@ -140,18 +140,18 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 
 		if !batchRequest.SuppressParallelExecution {
 			replies := make(chan BatchReplyUnit)
-			for index, req := range(requestSet) {
+			for index, req := range requestSet {
 				go b.doAsyncRequest(req, batchRequest.Requests[index].RelativeURL, replies)
 			}
 
 			for i := 0; i < len(batchRequest.Requests); i++ {
 				val := BatchReplyUnit{}
-				val = <- replies
+				val = <-replies
 
 				ReplySet = append(ReplySet, val)
 			}
 		} else {
-			for index, req := range(requestSet) {
+			for index, req := range requestSet {
 				reply := b.doSyncRequest(req, batchRequest.Requests[index].RelativeURL)
 				ReplySet = append(ReplySet, reply)
 			}

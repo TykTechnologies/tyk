@@ -19,7 +19,7 @@ func (e KeyError) Error() string {
 type StorageHandler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
 	SetKey(string, string, int64)  // Second input string is expected to be a JSON object (SessionState)
-	GetExp(string) (int64, error) // Returns expiry of a key
+	GetExp(string) (int64, error)  // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	Connect() bool

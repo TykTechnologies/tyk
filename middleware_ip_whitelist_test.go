@@ -2,9 +2,9 @@ package main
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
-	"net/http/httptest"
 )
 
 var ipMiddlewareTestDefinitionEnabledFail string = `
@@ -253,7 +253,6 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 		t.Error("Invalid response code, should be 200:  \n", recorder.Code, recorder.Body)
 	}
 }
-
 
 func TestIpMiddlewareIPDisabled(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionDisabled)

@@ -2,7 +2,8 @@ package main
 
 import (
 	"encoding/json"
-//	"github.com/RangelReale/osin"
+	//	"github.com/RangelReale/osin"
+	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -12,7 +13,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"github.com/lonelycode/tykcommon"
 )
 
 //type AuthProviderCode string
@@ -20,10 +20,11 @@ import (
 //type StorageEngineCode string
 //
 const (
-	DefaultAuthProvider tykcommon.AuthProviderCode = "default"
+	DefaultAuthProvider    tykcommon.AuthProviderCode    = "default"
 	DefaultSessionProvider tykcommon.SessionProviderCode = "default"
-	DefaultStorageEngine tykcommon.StorageEngineCode = "redis"
+	DefaultStorageEngine   tykcommon.StorageEngineCode   = "redis"
 )
+
 //
 //type AuthProviderMeta struct {
 //	Name AuthProviderCode	`bson:"name" json:"name"`
@@ -138,11 +139,11 @@ type APISpec struct {
 	RxPaths          map[string][]URLSpec
 	WhiteListEnabled map[string]bool
 	target           *url.URL
-	AuthManager AuthorisationHandler
-	SessionManager SessionHandler
-	OAuthManager *OAuthManager
-	EventPaths map[tykcommon.TykEvent][]TykEventHandler
-	Health HealthChecker
+	AuthManager      AuthorisationHandler
+	SessionManager   SessionHandler
+	OAuthManager     *OAuthManager
+	EventPaths       map[tykcommon.TykEvent][]TykEventHandler
+	Health           HealthChecker
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -175,8 +176,10 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 	// Add any new session managers or auth handlers here
 	if newAppSpec.APIDefinition.AuthProvider.Name != "" {
 		switch newAppSpec.APIDefinition.AuthProvider.Name {
-			case DefaultAuthProvider: newAppSpec.AuthManager = &DefaultAuthorisationManager{}
-			default: newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+		case DefaultAuthProvider:
+			newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+		default:
+			newAppSpec.AuthManager = &DefaultAuthorisationManager{}
 		}
 	} else {
 		newAppSpec.AuthManager = &DefaultAuthorisationManager{}
@@ -184,8 +187,10 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 
 	if newAppSpec.APIDefinition.SessionProvider.Name != "" {
 		switch newAppSpec.APIDefinition.SessionProvider.Name {
-			case DefaultSessionProvider: newAppSpec.SessionManager = &DefaultSessionManager{}
-			default: newAppSpec.SessionManager = &DefaultSessionManager{}
+		case DefaultSessionProvider:
+			newAppSpec.SessionManager = &DefaultSessionManager{}
+		default:
+			newAppSpec.SessionManager = &DefaultSessionManager{}
 		}
 	} else {
 		newAppSpec.SessionManager = &DefaultSessionManager{}
@@ -194,9 +199,9 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
 	newAppSpec.EventPaths = make(map[tykcommon.TykEvent][]TykEventHandler)
-	for eventName, eventHandlerConfs := range(thisAppConfig.EventHandlers.Events) {
+	for eventName, eventHandlerConfs := range thisAppConfig.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
-		for _, handlerConf := range(eventHandlerConfs) {
+		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
 			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf)
 
@@ -209,7 +214,6 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 
 		}
 	}
-
 
 	newAppSpec.RxPaths = make(map[string][]URLSpec)
 	newAppSpec.WhiteListEnabled = make(map[string]bool)

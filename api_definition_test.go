@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"testing"
-	"github.com/lonelycode/tykcommon"
 )
 
 var sampleDefiniton string = `

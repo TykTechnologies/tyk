@@ -34,13 +34,13 @@ type SessionState struct {
 
 type PublicSessionState struct {
 	Quota struct {
-		QuotaMax         int64                       `json:"quota_max"`
-		QuotaRemaining   int64                       `json:"quota_remaining"`
-		QuotaRenews      int64                       `json:"quota_renews"`
+		QuotaMax       int64 `json:"quota_max"`
+		QuotaRemaining int64 `json:"quota_remaining"`
+		QuotaRenews    int64 `json:"quota_renews"`
 	} `json:"quota"`
 	RateLimit struct {
-		Rate             float64                     `json:"requests"`
-		Per              float64                     `json:"per_unit"`
+		Rate float64 `json:"requests"`
+		Per  float64 `json:"per_unit"`
 	} `json:"rate_limit"`
 }
 
@@ -120,7 +120,7 @@ func createSampleSession() SessionState {
 
 	simpleDef := AccessDefinition{
 		APIiName: "Test",
-		APIID: "1",
+		APIID:    "1",
 		Versions: []string{"Default"},
 	}
 	thisSession.AccessRights = map[string]AccessDefinition{}

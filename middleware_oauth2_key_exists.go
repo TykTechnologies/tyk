@@ -72,4 +72,3 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Request is valid, carry on
 	return nil, 200
 }
-
