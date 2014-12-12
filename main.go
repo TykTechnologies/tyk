@@ -251,6 +251,15 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
+			userCheckHandler := http.HandlerFunc(UserRatesCheck())
+			simpleChain := alice.New(
+				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+				keyCheck,
+				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
+
+			Muxer.Handle("/tyk/rate-limits/", simpleChain)
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 		}
 

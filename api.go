@@ -11,6 +11,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/lonelycode/tykcommon"
 	"github.com/nu7hatch/gouuid"
+	"github.com/gorilla/context"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -814,4 +815,38 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	DoJSONWrite(w, code, responseMessage)
+}
+
+func UserRatesCheck() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := 200
+
+		thisSessionState := context.Get(r, SessionData)
+		if thisSessionState == nil {
+			code = 405
+			responseMessage := createError("Health checks are not enabled for this node")
+			DoJSONWrite(w, code, responseMessage)
+			return
+		}
+
+		userSession := thisSessionState.(SessionState)
+		returnSession := PublicSessionState{}
+		returnSession.Quota.QuotaRenews = userSession.QuotaRenews
+		returnSession.Quota.QuotaRemaining = userSession.QuotaRemaining
+		returnSession.Quota.QuotaMax = userSession.QuotaMax
+		returnSession.RateLimit.Rate = userSession.Rate
+		returnSession.RateLimit.Per = userSession.Per
+
+		responseMessage, jsonErr := json.Marshal(returnSession)
+		if jsonErr != nil {
+			code = 405
+			responseMessage = createError("Failed to encode data")
+			DoJSONWrite(w, code, responseMessage)
+			return
+		}
+
+		DoJSONWrite(w, code, responseMessage)
+
+		return
+	}
 }

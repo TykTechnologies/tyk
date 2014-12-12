@@ -32,6 +32,18 @@ type SessionState struct {
 	HmacSecret  string `json:"hmac_string"`
 }
 
+type PublicSessionState struct {
+	Quota struct {
+		QuotaMax         int64                       `json:"quota_max"`
+		QuotaRemaining   int64                       `json:"quota_remaining"`
+		QuotaRenews      int64                       `json:"quota_renews"`
+	} `json:"quota"`
+	RateLimit struct {
+		Rate             float64                     `json:"requests"`
+		Per              float64                     `json:"per_unit"`
+	} `json:"rate_limit"`
+}
+
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct{}
