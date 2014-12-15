@@ -122,6 +122,8 @@ const (
 	GeneralFailure                 RequestStatus = "An error occured that should have not been possible"
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
 	StatusOk                       RequestStatus = "Everything OK, passing"
+	StatusActionRedirect		   RequestStatus = "Found an Action, changing route"
+	StatusRedirectFlowByReply	   RequestStatus = "Exceptional action requested, redirecting flow!"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -130,6 +132,7 @@ const (
 type URLSpec struct {
 	Spec   *regexp.Regexp
 	Status URLStatus
+	MethodActions map[string]tykcommon.EndpointMethodMeta
 }
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
@@ -218,7 +221,16 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 	newAppSpec.RxPaths = make(map[string][]URLSpec)
 	newAppSpec.WhiteListEnabled = make(map[string]bool)
 	for _, v := range thisAppConfig.VersionData.Versions {
-		pathSpecs, whiteListSpecs := a.getPathSpecs(v)
+		var pathSpecs []URLSpec
+		var whiteListSpecs bool
+
+		// If we have transitioned to extended path specifications, we should use these now
+		if v.UseExtendedPaths {
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v)
+		} else {
+			log.Warning("Path-based version path list settings are being deprecated, please upgrade your defintitions to the new standard as soon as spossible")
+			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
+		}
 		newAppSpec.RxPaths[v.Name] = pathSpecs
 		newAppSpec.WhiteListEnabled[v.Name] = whiteListSpecs
 	}
@@ -336,44 +348,111 @@ func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileExtendedPathSpec(paths []tykcommon.EndPointMeta, specType URLStatus) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	apiLangIDsRegex, _ := regexp.Compile("{(.*?)}")
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec.Path, "(.*?)")
+		asRegex, _ := regexp.Compile(asRegexStr)
+
+		newSpec := URLSpec{}
+		newSpec.Spec = asRegex
+		newSpec.Status = specType
+		// Extend with method actions
+		newSpec.MethodActions = stringSpec.MethodActions
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
+func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
+	// TODO: New compiler here, needs to put data into a different structure
+
+	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.Ignored, Ignored)
+	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.BlackList, BlackList)
+	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
+
+	combinedPath := []URLSpec{}
+	combinedPath = append(combinedPath, ignoredPaths...)
+	combinedPath = append(combinedPath, blackListPaths...)
+	combinedPath = append(combinedPath, whiteListPaths...)
+
+	if len(whiteListPaths) > 0 {
+		return combinedPath, true
+	}
+
+	return combinedPath, false
+}
+
 func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler, healthStorageHandler StorageHandler) {
 	a.AuthManager.Init(AuthStore)
 	a.SessionManager.Init(SessionStore)
 	a.Health.Init(healthStorageHandler)
 }
 
+func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
+	switch stat {
+	case Ignored:
+		return StatusOkAndIgnore
+	case BlackList:
+		return EndPointNotAllowed
+	case WhiteList:
+		return StatusOk
+	default:
+		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
+		return EndPointNotAllowed
+	}
+}
+
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(url string, RxPaths []URLSpec, WhiteListStatus bool) (bool, bool) {
+func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) RequestStatus {
 	// Check if ignored
+
 	for _, v := range RxPaths {
 		match := v.Spec.MatchString(url)
 		if match {
-			if v.Status == Ignored {
-				// Let it pass, and do not check auth
-				return true, true
-			} else if v.Status == BlackList {
-				// Matched  a blacklist URL, disallow access and filter (irrelevant here)
-				return false, false
-			} else if v.Status == WhiteList {
-				// Matched whitelist, allow request but filter
-				return true, false
+			if v.MethodActions != nil {
+				// We are using an extended path set, check for the method
+				methodMeta, matchMethodOk := v.MethodActions[method]
+				if matchMethodOk {
+					// Matched the method, check what status it is:
+					if methodMeta.Action != tykcommon.NoAction {
+						// TODO: Extend here for additional reply options
+						switch methodMeta.Action {
+						case tykcommon.Reply:
+							return StatusRedirectFlowByReply
+						default:
+							log.Error("URL Method Action was not set to NoAction, blocking.")
+							return EndPointNotAllowed
+						}
+					}
+
+					// NoAction status means we're not treating this request in any special or exceptional way
+					return a.getURLStatus(v.Status)
+
+				}
+
+				// Method not matched in an extended set, means it can be passed through
+				return StatusOk
 			}
-
-			// Should not occur, something has gone wrong
-			log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
-			return false, false
-
+			// Using a legacy path, handle it raw.
+			return a.getURLStatus(v.Status)
 		}
 	}
 
 	// Nothing matched - should we still let it through?
 	if WhiteListStatus {
 		// We have a whitelist, nothing gets through unless specifically defined
-		return false, false
+		return EndPointNotAllowed
 	}
 
 	// No whitelist, but also not in any of the other lists, let it through and filter
-	return true, false
+	return StatusOk
 
 }
 
@@ -448,16 +527,13 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus) {
 	}
 
 	// not expired, let's check path info
-	allowURL, ignore := a.IsURLAllowedAndIgnored(r.URL.Path, versionPaths, whiteListStatus)
-	if !allowURL {
-		return false, EndPointNotAllowed
-	}
+	requestStatus := a.IsURLAllowedAndIgnored(r.Method, r.URL.Path, versionPaths, whiteListStatus)
 
-	if ignore {
-		return true, StatusOkAndIgnore
+	switch requestStatus {
+		case EndPointNotAllowed: return false, EndPointNotAllowed
+		case StatusOkAndIgnore: return true, StatusOkAndIgnore
+		default: return true, StatusOk
 	}
-
-	return true, StatusOk
 
 }
 
