@@ -265,7 +265,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
 
-			Muxer.Handle("/tyk/rate-limits/", simpleChain)
+			rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
+			log.Info("Rate limits available at: ", rateLimitPath)
+			Muxer.Handle(rateLimitPath, simpleChain)
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 		}
 

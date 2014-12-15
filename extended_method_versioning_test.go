@@ -78,6 +78,20 @@ var nonExpiringExtendedDef string = `
 								}
 							},
 							{
+								"path": "v1/allowed/whitelist/reply/{id}",
+								"method_actions": {
+									"GET": {
+										"action": "reply",
+										"code": 200,
+										"data": "flump",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							},
+							{
 								"path": "v1/allowed/whitelist/{id}",
 								"method_actions": {
 									"GET": {
@@ -175,6 +189,26 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 		t.Error("Request should return endpoint disallowed status for regex blacklists too!")
 		t.Error(status)
 	}
+
+	// Test wiht POST (it's a GET, should pass through)
+	uri = "v1/disallowed/blacklist/abacab12345"
+	method = "POST"
+	param = make(url.Values)
+	req, err = http.NewRequest(method, uri+param.Encode(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("version", "v1")
+
+	ok, status, _ = thisSpec.IsRequestValid(req)
+	if ok != true {
+		t.Error("Request should fail as URL (with dynamic ID) is blacklisted!")
+	}
+
+	if status != StatusOk {
+		t.Error("Request should return endpoint disallowed status for regex blacklists too!")
+		t.Error(status)
+	}
 }
 
 func TestExtendedWhiteLIstLinks(t *testing.T) {
@@ -261,6 +295,29 @@ func TestExtendedIgnored(t *testing.T) {
 
 	if status != StatusOkAndIgnore {
 		t.Error("Request should return StatusOkAndIgnore!")
+		t.Error(status)
+	}
+}
+
+func TestExtendedWhiteListWithRedirectedReply(t *testing.T) {
+	uri := "v1/allowed/whitelist/reply/12345"
+	method := "GET"
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("version", "v1")
+
+	thisSpec := createDefinitionFromString(nonExpiringExtendedDef)
+
+	ok, status, _ := thisSpec.IsRequestValid(req)
+	if ok != true {
+		t.Error("Request should be OK as URL is whitelisted! Status was: ", status)
+	}
+
+	if status != StatusRedirectFlowByReply {
+		t.Error("Request should return StatusRedirectFlowByReply! Returned: ", status)
 		t.Error(status)
 	}
 }
