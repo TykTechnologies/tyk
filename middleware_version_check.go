@@ -1,10 +1,9 @@
 package main
-
-import "errors"
-
-import "net/http"
-
-import ()
+import (
+	"github.com/lonelycode/tykcommon"
+	"errors"
+	"net/http"
+)
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
@@ -22,7 +21,7 @@ func (v *VersionCheck) GetConfig() (interface{}, error) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Check versioning, blacklist, whitelist and ignored status
-	requestValid, stat := v.TykMiddleware.Spec.IsRequestValid(r)
+	requestValid, stat, meta := v.TykMiddleware.Spec.IsRequestValid(r)
 	if requestValid == false {
 		// Fire a versioning failure event
 		go v.TykMiddleware.FireEvent(EVENT_VersionFailure,
@@ -40,6 +39,17 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 		handler := SuccessHandler{v.TykMiddleware}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
+		return nil, 666
+	}
+
+	if stat == StatusRedirectFlowByReply {
+		// Reply with some alternate data
+		thisMeta := meta.(tykcommon.EndpointMethodMeta)
+		responseMessage := []byte(thisMeta.Data)
+		for header, value := range(thisMeta.Headers) {
+			w.Header().Add(header, value)
+		}
+		DoJSONWrite(w, thisMeta.Code, responseMessage)
 		return nil, 666
 	}
 

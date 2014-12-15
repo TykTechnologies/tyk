@@ -160,7 +160,7 @@ func TestExpiredRequest(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(sampleDefiniton)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok == true {
 		t.Error("Request should fail as expiry date is in the past!")
 	}
@@ -187,7 +187,7 @@ func TestNotVersioned(t *testing.T) {
 
 	//	writeDefToFile(thisSpec.APIDefinition)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok != true {
 		t.Error("Request should pass as versioning not in play!")
 	}
@@ -210,7 +210,7 @@ func TestMissingVersion(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(sampleDefiniton)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok == true {
 		t.Error("Request should fail as there is no version number!")
 	}
@@ -234,7 +234,7 @@ func TestWrongVersion(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(sampleDefiniton)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok == true {
 		t.Error("Request should fail as version number is wrong!")
 	}
@@ -257,7 +257,7 @@ func TestBlacklistLinks(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(nonExpiringDef)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok == true {
 		t.Error("Request should fail as URL is blacklisted!")
 	}
@@ -276,7 +276,7 @@ func TestBlacklistLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	ok, status = thisSpec.IsRequestValid(req)
+	ok, status, _ = thisSpec.IsRequestValid(req)
 	if ok == true {
 		t.Error("Request should fail as URL (with dynamic ID) is blacklisted!")
 	}
@@ -299,7 +299,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(nonExpiringDef)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok != true {
 		t.Error("Request should be OK as URL is whitelisted!")
 	}
@@ -318,7 +318,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	ok, status = thisSpec.IsRequestValid(req)
+	ok, status, _ = thisSpec.IsRequestValid(req)
 	if ok != true {
 		t.Error("Request should be OK as URL is whitelisted (regex)!")
 	}
@@ -341,7 +341,7 @@ func TestWhiteListBlock(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(nonExpiringDef)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok == true {
 		t.Error("Request should fail as things not in whitelist should be rejected!")
 	}
@@ -364,7 +364,7 @@ func TestIgnored(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(nonExpiringDef)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok != true {
 		t.Error("Request should pass, URL is ignored")
 	}
@@ -387,7 +387,7 @@ func TestBlacklistLinksMulti(t *testing.T) {
 
 	thisSpec := createDefinitionFromString(nonExpiringMultiDef)
 
-	ok, status := thisSpec.IsRequestValid(req)
+	ok, status, _ := thisSpec.IsRequestValid(req)
 	if ok == true {
 		t.Error("Request should fail as URL is blacklisted!")
 	}
@@ -406,7 +406,7 @@ func TestBlacklistLinksMulti(t *testing.T) {
 	}
 	req.Header.Add("version", "v2")
 
-	ok, status = thisSpec.IsRequestValid(req)
+	ok, status, _ = thisSpec.IsRequestValid(req)
 	if ok != true {
 		t.Error("Request should be OK as in v2 this URL is not blacklisted")
 		t.Error(thisSpec.RxPaths["v2"])

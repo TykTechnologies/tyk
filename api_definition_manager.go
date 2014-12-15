@@ -410,7 +410,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) RequestStatus {
+func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
 
 	for _, v := range RxPaths {
@@ -425,34 +425,34 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 						// TODO: Extend here for additional reply options
 						switch methodMeta.Action {
 						case tykcommon.Reply:
-							return StatusRedirectFlowByReply
+							return StatusRedirectFlowByReply, methodMeta
 						default:
 							log.Error("URL Method Action was not set to NoAction, blocking.")
-							return EndPointNotAllowed
+							return EndPointNotAllowed, nil
 						}
 					}
 
 					// NoAction status means we're not treating this request in any special or exceptional way
-					return a.getURLStatus(v.Status)
+					return a.getURLStatus(v.Status), nil
 
 				}
 
 				// Method not matched in an extended set, means it can be passed through
-				return StatusOk
+				return StatusOk, nil
 			}
 			// Using a legacy path, handle it raw.
-			return a.getURLStatus(v.Status)
+			return a.getURLStatus(v.Status), nil
 		}
 	}
 
 	// Nothing matched - should we still let it through?
 	if WhiteListStatus {
 		// We have a whitelist, nothing gets through unless specifically defined
-		return EndPointNotAllowed
+		return EndPointNotAllowed, nil
 	}
 
 	// No whitelist, but also not in any of the other lists, let it through and filter
-	return StatusOk
+	return StatusOk, nil
 
 }
 
@@ -512,27 +512,28 @@ func (a *APISpec) IsThisAPIVersionExpired(versionDef tykcommon.VersionInfo) bool
 
 // IsRequestValid will check if an incoming request has valid version data and return a RequestStatus that
 // describes the status of the request
-func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus) {
+func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
 	versionMetaData, versionPaths, whiteListStatus, stat := a.GetVersionData(r)
 
 	// Screwed up version info - fail and pass through
 	if stat != StatusOk {
-		return false, stat
+		return false, stat, nil
 	}
 
 	// Is the API version expired?
 	if a.IsThisAPIVersionExpired(versionMetaData) == true {
 		// Expired - fail
-		return false, VersionExpired
+		return false, VersionExpired, nil
 	}
 
 	// not expired, let's check path info
-	requestStatus := a.IsURLAllowedAndIgnored(r.Method, r.URL.Path, versionPaths, whiteListStatus)
+	requestStatus, meta := a.IsURLAllowedAndIgnored(r.Method, r.URL.Path, versionPaths, whiteListStatus)
 
 	switch requestStatus {
-		case EndPointNotAllowed: return false, EndPointNotAllowed
-		case StatusOkAndIgnore: return true, StatusOkAndIgnore
-		default: return true, StatusOk
+		case EndPointNotAllowed: return false, EndPointNotAllowed, meta
+		case StatusOkAndIgnore: return true, StatusOkAndIgnore, meta
+		case StatusRedirectFlowByReply: return true, StatusRedirectFlowByReply, meta
+		default: return true, StatusOk, meta
 	}
 
 }
