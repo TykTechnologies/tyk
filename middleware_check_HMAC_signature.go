@@ -20,7 +20,7 @@ import (
 
 // TODO: change these to real values
 const DateHeaderSpec string = "Date"
-const HMACClockSkewLimitInMs float64 = 300
+const HMACClockSkewLimitInMs float64 = 1000
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
@@ -102,8 +102,9 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	signature := ""
 	for _, v := range splitValues {
 		splitKeyValuePair := strings.Split(v, "=")
-		if len(splitKeyValuePair) != 2 {
-			log.Debug("Equals length is wrong - got: ", splitKeyValuePair)
+
+		if len(splitKeyValuePair) < 2 {
+			log.Info("Equals length is wrong - got: ", splitKeyValuePair)
 			return hm.authorizationError(w, r)
 		}
 		if strings.ToLower(splitKeyValuePair[0]) == "keyid" {
@@ -113,7 +114,8 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			algorithm = strings.Trim(splitKeyValuePair[1], "\"")
 		}
 		if strings.ToLower(splitKeyValuePair[0]) == "signature" {
-			signature = strings.Trim(splitKeyValuePair[1], "\"")
+			combinedSig := strings.Join(splitKeyValuePair[1:], "")
+			signature = strings.Trim(combinedSig, "\"")
 		}
 	}
 
@@ -160,7 +162,8 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return hm.authorizationError(w, r)
 	}
 
-	log.Debug("Request Signature: ", compareTo)
+	log.Info("Request Signature: ", compareTo)
+	log.Info("Should be: ", ourSignature)
 	if ourSignature != compareTo {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
