@@ -103,7 +103,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	for _, v := range splitValues {
 		splitKeyValuePair := strings.Split(v, "=")
 
-		if len(splitKeyValuePair) < 2 {
+		if len(splitKeyValuePair) != 2 {
 			log.Info("Equals length is wrong - got: ", splitKeyValuePair)
 			return hm.authorizationError(w, r)
 		}
