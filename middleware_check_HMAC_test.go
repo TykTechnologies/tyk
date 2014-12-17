@@ -141,3 +141,171 @@ func TestHMACAuthSession(t *testing.T) {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
 	}
 }
+
+func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
+	spec := createDefinitionFromString(HMACAuthDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createHMACAuthSession()
+
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+
+
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+
+	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+
+
+	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
+
+	// Prep the signature string
+	tim := time.Now().Format(refDate)
+	req.Header.Add("Date", tim)
+	signatureString := strings.ToLower("Date") + ":" + url.QueryEscape(tim)
+	log.Debug("Signature string before encoding: ", signatureString)
+
+	// Encode it
+	key := []byte(thisSession.HmacSecret)
+	h := hmac.New(sha1.New, key)
+	h.Write([]byte(signatureString))
+
+	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	encodedString := url.QueryEscape(sigString)
+	log.Debug("Encoded signature string: ", encodedString)
+	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
+
+	log.Info("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+
+	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getHMACAuthChain(spec)
+	time.Sleep(time.Second * 2)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 400 {
+		t.Error("Request should have failed with out of date error!: \n", recorder.Code)
+	}
+}
+
+func TestHMACAuthSessionKeyMissing(t *testing.T) {
+	spec := createDefinitionFromString(HMACAuthDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createHMACAuthSession()
+
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+
+
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+
+	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+
+
+	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
+
+	// Prep the signature string
+	tim := time.Now().Format(refDate)
+	req.Header.Add("Date", tim)
+	signatureString := strings.ToLower("Date") + ":" + url.QueryEscape(tim)
+	log.Debug("Signature string before encoding: ", signatureString)
+
+	// Encode it
+	key := []byte(thisSession.HmacSecret)
+	h := hmac.New(sha1.New, key)
+	h.Write([]byte(signatureString))
+
+	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	encodedString := url.QueryEscape(sigString)
+	log.Debug("Encoded signature string: ", encodedString)
+	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
+
+	log.Info("Signature string: ", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+
+	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getHMACAuthChain(spec)
+	time.Sleep(time.Second * 2)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 400 {
+		t.Error("Request should have failed with key not found error!: \n", recorder.Code)
+	}
+}
+
+func TestHMACAuthSessionmalformedHeader(t *testing.T) {
+	spec := createDefinitionFromString(HMACAuthDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createHMACAuthSession()
+
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+
+
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+
+	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+
+
+	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
+
+	// Prep the signature string
+	tim := time.Now().Format(refDate)
+	req.Header.Add("Date", tim)
+	signatureString := strings.ToLower("Date") + ":" + url.QueryEscape(tim)
+	log.Debug("Signature string before encoding: ", signatureString)
+
+	// Encode it
+	key := []byte(thisSession.HmacSecret)
+	h := hmac.New(sha1.New, key)
+	h.Write([]byte(signatureString))
+
+	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	encodedString := url.QueryEscape(sigString)
+	log.Debug("Encoded signature string: ", encodedString)
+	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
+
+	log.Info("Signature string: ", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha1\", signature=\"%s\"", encodedString))
+
+	req.Header.Add("Authorization", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha256\", signature=\"%s\"", encodedString))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getHMACAuthChain(spec)
+	time.Sleep(time.Second * 2)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 400 {
+		t.Error("Request should have failed with key not found error!: \n", recorder.Code)
+	}
+}

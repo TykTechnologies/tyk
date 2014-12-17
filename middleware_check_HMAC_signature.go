@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-// Test key: 53ac07777cbb8c2d530000021a42331a43bd45555d5c923bdb36fc8a
-
 // TODO: change these to real values
 const DateHeaderSpec string = "Date"
 const HMACClockSkewLimitInMs float64 = 1000
