@@ -92,14 +92,76 @@ func (b BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) Bat
 	return reply
 }
 
+func (b BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestStructure, error) {
+	decoder := json.NewDecoder(r.Body)
+	var batchRequest BatchRequestStructure
+	decodeErr := decoder.Decode(&batchRequest)
+
+	return batchRequest, decodeErr
+}
+
+func (b BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure) ([]*http.Request, error) {
+	requestSet := []*http.Request{}
+
+	for i, requestDef := range batchRequest.Requests {
+		// We re-build the URL to ensure that the requested URL is actually for the API in question
+		// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
+		absUrlHeader := strings.Join([]string{"http://localhost", strconv.Itoa(config.ListenPort)}, ":")
+		absURL := strings.Join([]string{absUrlHeader, strings.Trim(b.API.Proxy.ListenPath, "/"), requestDef.RelativeURL}, "/")
+
+		thisRequest, createReqErr := http.NewRequest(requestDef.Method, absURL, bytes.NewBuffer([]byte(requestDef.Body)))
+		if createReqErr != nil {
+			log.Error("Failure generating batch request for request spec index: ", i)
+			return nil, createReqErr
+		}
+
+		// Add headers
+		for k, v := range requestDef.Headers {
+			thisRequest.Header.Add(k, v)
+		}
+
+		requestSet = append(requestSet, thisRequest)
+	}
+
+	return requestSet, nil
+}
+
+func (b BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, requestSet []*http.Request) []BatchReplyUnit {
+	ReplySet := []BatchReplyUnit{}
+
+	if len(batchRequest.Requests) != len(requestSet) {
+		log.Error("Something went wrong creating requests, they are of mismatched lengths!", len(batchRequest.Requests), len(requestSet))
+	}
+
+	if !batchRequest.SuppressParallelExecution {
+		replies := make(chan BatchReplyUnit)
+		for index, req := range requestSet {
+			go b.doAsyncRequest(req, batchRequest.Requests[index].RelativeURL, replies)
+		}
+
+		for i := 0; i < len(batchRequest.Requests); i++ {
+			val := BatchReplyUnit{}
+			val = <-replies
+
+			ReplySet = append(ReplySet, val)
+		}
+	} else {
+		for index, req := range requestSet {
+			reply := b.doSyncRequest(req, batchRequest.Requests[index].RelativeURL)
+			ReplySet = append(ReplySet, reply)
+		}
+	}
+
+	return ReplySet
+}
+
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
 func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "POST" {
-		decoder := json.NewDecoder(r.Body)
-		var batchRequest BatchRequestStructure
-		decodeErr := decoder.Decode(&batchRequest)
 
+		// Decode request
+		batchRequest, decodeErr := b.DecodeBatchRequest(r)
 		if decodeErr != nil {
 			log.Error("Could not decode batch request, decoding failed: ", decodeErr)
 			ReturnError("Batch request malformed", w)
@@ -107,55 +169,15 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 		}
 
 		// Construct the requests
-		requestSet := []*http.Request{}
-
-		for i, requestDef := range batchRequest.Requests {
-			// We re-build the URL to ensure that the requested URL is actually for the API in question
-			// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
-			absUrlHeader := strings.Join([]string{"http://localhost", strconv.Itoa(config.ListenPort)}, ":")
-			absURL := strings.Join([]string{absUrlHeader, strings.Trim(b.API.Proxy.ListenPath, "/"), requestDef.RelativeURL}, "/")
-
-			thisRequest, createReqErr := http.NewRequest(requestDef.Method, absURL, bytes.NewBuffer([]byte(requestDef.Body)))
-			if createReqErr != nil {
-				log.Error("Failure generating batch request for request spec index: ", i)
-				ReturnError(fmt.Sprintf("Batch request creation failed on request index %i", i), w)
-				return
-				return
-			}
-
-			// Add headers
-			for k, v := range requestDef.Headers {
-				thisRequest.Header.Add(k, v)
-			}
-
-			requestSet = append(requestSet, thisRequest)
+		requestSet, createReqErr := b.ConstructRequests(batchRequest)
+		if createReqErr != nil {
+			ReturnError(fmt.Sprintf("Batch request creation failed , request structure malformed"), w)
+			return
 		}
+
 
 		// Run requests and collate responses
-		ReplySet := []BatchReplyUnit{}
-
-		if len(batchRequest.Requests) != len(requestSet) {
-			log.Error("Something went wrong creating requests, they are of mismatched lengths!", len(batchRequest.Requests), len(requestSet))
-		}
-
-		if !batchRequest.SuppressParallelExecution {
-			replies := make(chan BatchReplyUnit)
-			for index, req := range requestSet {
-				go b.doAsyncRequest(req, batchRequest.Requests[index].RelativeURL, replies)
-			}
-
-			for i := 0; i < len(batchRequest.Requests); i++ {
-				val := BatchReplyUnit{}
-				val = <-replies
-
-				ReplySet = append(ReplySet, val)
-			}
-		} else {
-			for index, req := range requestSet {
-				reply := b.doSyncRequest(req, batchRequest.Requests[index].RelativeURL)
-				ReplySet = append(ReplySet, reply)
-			}
-		}
+		ReplySet := b.MakeRequests(batchRequest, requestSet)
 
 		// Encode responses
 		replyMessage, encErr := json.Marshal(&ReplySet)

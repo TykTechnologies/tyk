@@ -161,6 +161,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 }
 
 func addBatchEndpoint(spec *APISpec, Muxer *http.ServeMux) {
+	log.Info("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	thisBatchHandler := BatchRequestHandler{API: spec}
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
