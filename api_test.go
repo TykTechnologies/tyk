@@ -83,6 +83,38 @@ func init() {
 	config.AppPath = "./test/"
 }
 
+func TestHealthCheckEndpoint(t *testing.T) {
+	log.Info("TEST GET HEALTHCHECK")
+	uri := "/tyk/health/?api_id=1"
+	method := "GET"
+
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+
+	MakeSampleAPI()
+
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	healthCheckhandler(recorder, req)
+
+
+	var ApiHealthValues HealthCheckValues
+	err = json.Unmarshal([]byte(recorder.Body.String()), &ApiHealthValues)
+
+	if err != nil {
+		t.Error("Could not unmarshal API Health check:\n", err, recorder.Body.String())
+	}
+
+	if recorder.Code != 200 {
+		t.Error("Recorder should return 200 for health check")
+	}
+}
+
 func TestApiHandler(t *testing.T) {
 	uri := "/tyk/apis/"
 	method := "GET"
