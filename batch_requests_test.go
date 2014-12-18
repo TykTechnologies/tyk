@@ -160,3 +160,63 @@ func TestBatchSuccess(t *testing.T) {
 	}
 
 }
+
+func TestMakeSyncRequest(t *testing.T) {
+	spec := createDefinitionFromString(BatchTestDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+
+	batchHandler := BatchRequestHandler{API: &spec}
+
+
+	relURL := "/about-lonelycoder"
+	thisRequest, _ := http.NewRequest("GET", "http://lonelycode.com/about-lonelycoder", nil)
+
+
+	replyUnit := batchHandler.doSyncRequest(thisRequest, relURL)
+
+	if replyUnit.RelativeURL != relURL {
+		t.Error("Relativce URL in reply is wrong")
+	}
+
+	if replyUnit.Code != 200 {
+		t.Error("Repsonse reported a non-200 reponse (could be because lonelycode.com is down)")
+	}
+
+	if len(replyUnit.Body) < 1 {
+		t.Error("Reply body is too short, should be larger than 1!")
+	}
+
+}
+
+func TestMakeASyncRequest(t *testing.T) {
+	spec := createDefinitionFromString(BatchTestDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+
+	batchHandler := BatchRequestHandler{API: &spec}
+
+
+	relURL := "/about-lonelycoder"
+	thisRequest, _ := http.NewRequest("GET", "http://lonelycode.com/about-lonelycoder", nil)
+
+	replies := make(chan BatchReplyUnit)
+	go batchHandler.doAsyncRequest(thisRequest, relURL, replies)
+	replyUnit := BatchReplyUnit{}
+	replyUnit = <-replies
+
+	if replyUnit.RelativeURL != relURL {
+		t.Error("Relativce URL in reply is wrong")
+	}
+
+	if replyUnit.Code != 200 {
+		t.Error("Repsonse reported a non-200 reponse (could be because http://lonelycode.com/about-lonelycoder is down)")
+	}
+
+	if len(replyUnit.Body) < 1 {
+		t.Error("Reply body is too short, should be larger than 1!")
+	}
+
+}
