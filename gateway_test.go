@@ -40,6 +40,22 @@ func createQuotaSession() SessionState {
 	return thisSession
 }
 
+func createVersionedSession() SessionState {
+	var thisSession SessionState
+	thisSession.Rate = 10000
+	thisSession.Allowance = thisSession.Rate
+	thisSession.LastCheck = time.Now().Unix()
+	thisSession.Per = 60
+	thisSession.Expires = -1
+	thisSession.QuotaRenewalRate = 300 // 5 minutes
+	thisSession.QuotaRenews = time.Now().Unix()
+	thisSession.QuotaRemaining = 10
+	thisSession.QuotaMax = -1
+	thisSession.AccessRights = map[string]AccessDefinition{"9991":AccessDefinition{APIiName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
+
+	return thisSession
+}
+
 type TykErrorResponse struct {
 	Error string
 }
@@ -121,9 +137,73 @@ var nonExpiringDefNoWhiteList string = `
 
 `
 
+var VersionedDefinition string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "9991",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": false,
+			"versions": {
+				"v1": {
+					"name": "v1",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"black_list": [],
+						"white_list": []
+					}
+				}
+			}
+		},
+		"event_handlers": {
+			"events": {
+				"QuotaExceeded": [
+					{
+						"handler_name":"eh_log_handler",
+						"handler_meta": {
+							"prefix": "LOG-HANDLER-PREFIX"
+						}
+					},
+					{
+						"handler_name":"eh_web_hook_handler",
+						"handler_meta": {
+							"method": "POST",
+							"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
+							"template_path": "templates/default_webhook.json",
+							"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+							"event_timeout": 10
+						}
+					}
+				]
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
 func createNonVersionedDefinition() APISpec {
 
 	return createDefinitionFromString(nonExpiringDefNoWhiteList)
+
+}
+
+func createVersionedDefinition() APISpec {
+
+	return createDefinitionFromString(VersionedDefinition)
 
 }
 
@@ -171,6 +251,65 @@ func TestThrottling(t *testing.T) {
 
 	if newAPIError.Error != "Rate limit exceeded" {
 		t.Error("Third request returned invalid message, got: \n", thirdRecorder.Code)
+	}
+}
+
+func TestVersioningRequestOK(t *testing.T) {
+	spec := createVersionedDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createVersionedSession()
+	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	uri := "/about-lonelycoder/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("authorization", "1234")
+	req.Header.Add("version", "v1")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
+	}
+}
+
+func TestVersioningRequestFail(t *testing.T) {
+	spec := createVersionedDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createVersionedSession()
+	thisSession.AccessRights = map[string]AccessDefinition{"9991":AccessDefinition{APIiName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
+
+	// no version allowed
+	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	uri := "/about-lonelycoder/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("authorization", "1234")
+	req.Header.Add("version", "v1")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code == 200 {
+		t.Error("Request should have failed as version not defined for user: \n", recorder.Code)
 	}
 }
 
@@ -262,6 +401,58 @@ func TestWithAnalytics(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
+	}
+
+	results := analytics.Store.GetKeysAndValues()
+
+	if len(results) < 1 {
+		t.Error("Not enough results! Should be 1, is: ", len(results))
+	}
+
+}
+
+func TestWithAnalyticsErrorResponse(t *testing.T) {
+	config.EnableAnalytics = true
+
+	AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
+	log.Info("Setting up analytics DB connection")
+
+	analytics = RedisAnalyticsHandler{
+		Store: &AnalyticsStore,
+	}
+	analytics.Store.Connect()
+	analytics.Clean = &MockPurger{&AnalyticsStore}
+
+	// Clear it
+	analytics.Clean.PurgeCache()
+
+
+	spec := createNonVersionedDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createThrottledSession()
+	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	uri := "/about-lonelycoder/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("authorization", "4321")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code == 200 {
+		t.Error("Request failed with non-200 code: \n", recorder.Code)
 	}
 
 	results := analytics.Store.GetKeysAndValues()
