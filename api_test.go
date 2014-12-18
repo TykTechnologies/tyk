@@ -332,3 +332,48 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		}
 	}
 }
+
+func TestAPIAuthFail(t *testing.T) {
+
+	uri := "/tyk/health/?api_id=1"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("x-tyk-authorization", "12345")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	MakeSampleAPI()
+	CheckIsAPIOwner(healthCheckhandler)(recorder, req)
+
+	if recorder.Code == 200 {
+		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
+	}
+}
+
+
+func TestAPIAuthOk(t *testing.T) {
+
+	uri := "/tyk/health/?api_id=1"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	MakeSampleAPI()
+	CheckIsAPIOwner(healthCheckhandler)(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
+	}
+}
