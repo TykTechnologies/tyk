@@ -219,3 +219,55 @@ func TestQuota(t *testing.T) {
 		t.Error("Third request returned invalid message, got: \n", newAPIError.Error)
 	}
 }
+
+func TestWithAnalytics(t *testing.T) {
+	config.EnableAnalytics = true
+
+	AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
+	log.Info("Setting up analytics DB connection")
+
+	analytics = RedisAnalyticsHandler{
+		Store: &AnalyticsStore,
+	}
+	analytics.Store.Connect()
+	analytics.Clean = &MockPurger{&AnalyticsStore}
+
+	// Clear it
+	analytics.Clean.PurgeCache()
+
+
+	spec := createNonVersionedDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createThrottledSession()
+	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	uri := "/about-lonelycoder/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("authorization", "1234")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
+	}
+
+	results := analytics.Store.GetKeysAndValues()
+
+	if len(results) < 1 {
+		t.Error("Not enough results! Should be 1, is: ", len(results))
+	}
+
+}

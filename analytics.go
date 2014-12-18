@@ -209,3 +209,33 @@ func (m *MongoPurger) PurgeCache() {
 	}
 
 }
+
+type MockPurger struct {
+	Store     *RedisStorageManager
+}
+
+// Connect does nothing
+func (m *MockPurger) Connect() {}
+
+// StartPurgeLoop does nothing
+func (m MockPurger) StartPurgeLoop(nextCount int) {}
+
+// PurgeCache will just empty redis
+func (m *MockPurger) PurgeCache() {
+
+	KeyValueMap := m.Store.GetKeysAndValues()
+
+	if len(KeyValueMap) > 0 {
+		keyNames := make([]string, len(KeyValueMap), len(KeyValueMap))
+
+		i := 0
+		for k, _ := range KeyValueMap {
+			keyNames[i] = k
+			i++
+		}
+
+		m.Store.DeleteKeys(keyNames)
+	}
+
+
+}
