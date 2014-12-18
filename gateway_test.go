@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 	"time"
+	"io/ioutil"
 )
 
 func createThrottledSession() SessionState {
@@ -52,6 +53,21 @@ func createVersionedSession() SessionState {
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = -1
 	thisSession.AccessRights = map[string]AccessDefinition{"9991":AccessDefinition{APIiName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
+
+	return thisSession
+}
+
+func createStandardSession() SessionState {
+	var thisSession SessionState
+	thisSession.Rate = 10000
+	thisSession.Allowance = thisSession.Rate
+	thisSession.LastCheck = time.Now().Unix()
+	thisSession.Per = 60
+	thisSession.Expires = -1
+	thisSession.QuotaRenewalRate = 300 // 5 minutes
+	thisSession.QuotaRenews = time.Now().Unix()
+	thisSession.QuotaRemaining = 10
+	thisSession.QuotaMax = -1
 
 	return thisSession
 }
@@ -195,6 +211,156 @@ var VersionedDefinition string = `
 
 `
 
+var ExtendedPathGatewaySetup string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "1",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"Default": {
+					"name": "Default",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"white_list": [],
+						"black_list": []
+					},
+					"use_extended_paths": true,
+					"extended_paths": {
+						"ignored": [
+							{
+								"path": "/v1/ignored/noregex",
+								"method_actions": {
+									"GET": {
+										"action": "no_action",
+										"code": 200,
+										"data": "",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							},
+							{
+								"path": "/v1/ignored/with_id/{id}",
+								"method_actions": {
+									"GET": {
+										"action": "no_action",
+										"code": 200,
+										"data": "",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							}
+						],
+						"white_list": [
+							{
+								"path": "v1/allowed/whitelist/literal",
+								"method_actions": {
+									"GET": {
+										"action": "no_action",
+										"code": 200,
+										"data": "",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							},
+							{
+								"path": "v1/allowed/whitelist/reply/{id}",
+								"method_actions": {
+									"GET": {
+										"action": "reply",
+										"code": 200,
+										"data": "flump",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							},
+							{
+								"path": "v1/allowed/whitelist/{id}",
+								"method_actions": {
+									"GET": {
+										"action": "no_action",
+										"code": 200,
+										"data": "",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							}
+						],
+						"black_list": [
+							{
+								"path": "v1/disallowed/blacklist/literal",
+								"method_actions": {
+									"GET": {
+										"action": "no_action",
+										"code": 200,
+										"data": "",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							},
+							{
+								"path": "v1/disallowed/blacklist/{id}",
+								"method_actions": {
+									"GET": {
+										"action": "no_action",
+										"code": 200,
+										"data": "",
+										"headers": {
+											"x-tyk-override-test": "tyk-override",
+											"x-tyk-override-test-2": "tyk-override-2"
+										}
+									}
+								}
+							}
+						]
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://lonelycode.com",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
+
+func createExtendedDefinitionWithPaths() APISpec {
+
+	return createDefinitionFromString(ExtendedPathGatewaySetup)
+
+}
+
 func createNonVersionedDefinition() APISpec {
 
 	return createDefinitionFromString(nonExpiringDefNoWhiteList)
@@ -310,6 +476,67 @@ func TestVersioningRequestFail(t *testing.T) {
 
 	if recorder.Code == 200 {
 		t.Error("Request should have failed as version not defined for user: \n", recorder.Code)
+	}
+}
+
+func TestIgnoredPathRequestOK(t *testing.T) {
+	spec := createExtendedDefinitionWithPaths()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createStandardSession()
+
+	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	uri := "/v1/ignored/noregex"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+
+	// No auth information, it's an ignored path!
+//	req.Header.Add("authorization", "1234")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code == 200 {
+		t.Error("Request should have failed as version not defined for user: \n", recorder.Code)
+	}
+}
+
+func TestWhitelistRequestReply(t *testing.T) {
+	spec := createExtendedDefinitionWithPaths()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	thisSession := createStandardSession()
+
+	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	uri := "v1/allowed/whitelist/reply/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+
+	req.Header.Add("authorization", "1234")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	contents, _ := ioutil.ReadAll(recorder.Body)
+
+	if string(contents) != "flump" {
+		t.Error("Request body is incorrect! Is: ", string(contents))
 	}
 }
 
