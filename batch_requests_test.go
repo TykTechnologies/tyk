@@ -1,126 +1,162 @@
-//package main
-//
-//import (
-//	"github.com/justinas/alice"
-//	"net/http"
-//	"net/http/httptest"
-//	"net/url"
-//	"testing"
-//	"time"
-//	"bytes"
-//)
-//
-//func createBatchTestSession() SessionState {
-//	var thisSession SessionState
-//	thisSession.Rate = 1.0
-//	thisSession.Allowance = thisSession.Rate
-//	thisSession.LastCheck = time.Now().Unix()
-//	thisSession.Per = 100000
-//	thisSession.Expires = -1
-//	thisSession.QuotaRenewalRate = 30000000
-//	thisSession.QuotaRenews = time.Now().Unix()
-//	thisSession.QuotaRemaining = 10
-//	thisSession.QuotaMax = 10
-//
-//	return thisSession
-//}
-//
-//func getBatchTestChain(spec APISpec) http.Handler {
-//	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-//	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-//	spec.Init(&redisStore, &redisStore, healthStore)
-//	remote, _ := url.Parse("http://httpbin.org/")
-//	proxy := TykNewSingleHostReverseProxy(remote)
-//	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
-//	tykMiddleware := TykMiddleware{spec, proxy}
-//	chain := alice.New(
-//		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-//		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
-//		CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
-//		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-//		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-//		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
-//
-//	return chain
-//}
-//
-//var BatchTestDef string = `
-//
-//	{
-//		"name": "Tyk Test API",
-//		"api_id": "987999",
-//		"org_id": "default",
-//		"definition": {
-//			"location": "header",
-//			"key": "version"
-//		},
-//		"auth": {
-//			"auth_header_name": "authorization"
-//		},
-//		"version_data": {
-//			"not_versioned": true,
-//			"versions": {
-//				"Default": {
-//					"name": "Default",
-//					"expires": "3000-01-02 15:04",
-//					"paths": {
-//						"ignored": [],
-//						"black_list": [],
-//						"white_list": []
-//					}
-//				}
-//			}
-//		},
-//		"event_handlers": {
-//			"events": {}
-//		},
-//		"proxy": {
-//			"listen_path": "/v1/",
-//			"target_url": "http://httpbin.org",
-//			"strip_listen_path": true
-//		},
-//		"enable_batch_request_support": true
-//	}
-//
-//`
-//
-//var testBatchRequest string = `
-//
-//{
-//    "requests": [
-//        {
-//            "method": "GET",
-//            "headers": {
-//                "test-header-1": "test-1",
-//                "test-header-2": "test-2"
-//            },
-//            "body": "",
-//            "relative_url": "get/?param1=this"
-//        },
-//        {
-//            "method": "POST",
-//            "headers": {},
-//            "body": "TEST BODY",
-//            "relative_url": "post/"
-//        },
-//        {
-//            "method": "PUT",
-//            "headers": {},
-//            "body": "",
-//            "relative_url": "put/"
-//        }
-//    ],
-//    "suppress_parallel_execution": false
-//}
-//
-//`
-//
-//func TestBatchSuccess(t *testing.T) {
-//	spec := createDefinitionFromString(BatchTestDef)
-//	spec.Init(&redisStore, &redisStore, healthStore)
-//
-//
-//	batchHandler := BatchRequestHandler{API: &spec}
-//	batchHandler.HandleBatchRequest(recorder, req)
-//
-//}
+package main
+
+import (
+	"github.com/justinas/alice"
+	"net/http"
+	"net/url"
+	"testing"
+	"time"
+	"strings"
+	"fmt"
+)
+
+func createBatchTestSession() SessionState {
+	var thisSession SessionState
+	thisSession.Rate = 1.0
+	thisSession.Allowance = thisSession.Rate
+	thisSession.LastCheck = time.Now().Unix()
+	thisSession.Per = 100000
+	thisSession.Expires = -1
+	thisSession.QuotaRenewalRate = 30000000
+	thisSession.QuotaRenews = time.Now().Unix()
+	thisSession.QuotaRemaining = 10
+	thisSession.QuotaMax = 10
+
+	return thisSession
+}
+
+func getBatchTestChain(spec APISpec) http.Handler {
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+	remote, _ := url.Parse("http://httpbin.org/")
+	proxy := TykNewSingleHostReverseProxy(remote)
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	tykMiddleware := TykMiddleware{spec, proxy}
+	chain := alice.New(
+		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+
+	return chain
+}
+
+var BatchTestDef string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "987999",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"Default": {
+					"name": "Default",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"black_list": [],
+						"white_list": []
+					}
+				}
+			}
+		},
+		"event_handlers": {
+			"events": {}
+		},
+		"proxy": {
+			"listen_path": "/v1/",
+			"target_url": "http://httpbin.org",
+			"strip_listen_path": true
+		},
+		"enable_batch_request_support": true
+	}
+
+`
+
+var testBatchRequest string = `
+
+{
+    "requests": [
+        {
+            "method": "GET",
+            "headers": {
+                "test-header-1": "test-1",
+                "test-header-2": "test-2"
+            },
+            "body": "",
+            "relative_url": "get/?param1=this"
+        },
+        {
+            "method": "POST",
+            "headers": {},
+            "body": "TEST BODY",
+            "relative_url": "post/"
+        },
+        {
+            "method": "PUT",
+            "headers": {},
+            "body": "",
+            "relative_url": "put/"
+        }
+    ],
+    "suppress_parallel_execution": true
+}
+
+`
+
+func TestBatchSuccess(t *testing.T) {
+	spec := createDefinitionFromString(BatchTestDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	spec.Init(&redisStore, &redisStore, healthStore)
+
+	batchHandler := BatchRequestHandler{API: &spec}
+
+	r, _ := http.NewRequest("POST", "/vi/tyk/batch/", strings.NewReader(testBatchRequest))
+
+	// Test decode
+	batchRequest, decodeErr := batchHandler.DecodeBatchRequest(r)
+	if decodeErr != nil {
+		t.Error("Decode batch request body failed: ", decodeErr)
+	}
+
+	if len(batchRequest.Requests) != 3 {
+		t.Error("Decoded batchRequest object doesn;t have the right number of requests, should be 3, is: ", len(batchRequest.Requests))
+	}
+
+	if !batchRequest.SuppressParallelExecution {
+		t.Error("Parallel execution flag should be True, is: ", batchRequest.SuppressParallelExecution)
+	}
+
+	// Test request constructions:
+
+	requestSet, createReqErr := batchHandler.ConstructRequests(batchRequest)
+	if createReqErr != nil {
+		t.Error(fmt.Sprintf("Batch request creation failed , request structure malformed"))
+	}
+
+	if len(requestSet) != 3 {
+		t.Error("Request set length should be 3, is: ", len(requestSet))
+	}
+
+
+	if requestSet[0].URL.Host != "localhost:8080" {
+		t.Error("Request Host is wrong, is: ", requestSet[0].URL.Host )
+	}
+
+	if requestSet[0].URL.Path != "/v1/get/" {
+		t.Error("Request Path is wrong, is: ", requestSet[0].URL.Path )
+	}
+
+}
