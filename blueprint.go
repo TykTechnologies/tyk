@@ -16,7 +16,7 @@ const (
 type APIImporter interface {
 	ReadString(string) error
 	ConvertIntoApiVersion(bool) (tykcommon.VersionInfo, error)
-	InsertIntoAPIDefinitionAsVersion(tykcommon.VersionInfo, *tykcommon.APIDefinition, string) (*tykcommon.APIDefinition, error)
+	InsertIntoAPIDefinitionAsVersion(tykcommon.VersionInfo, *tykcommon.APIDefinition, string) error
 }
 
 func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
@@ -176,6 +176,13 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 	return thisVersionInfo, nil
 }
 
-func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(thisVersion tykcommon.VersionInfo, thisDefintition *tykcommon.APIDefinition, versionName string) (*tykcommon.APIDefinition, error) {
-	return thisDefintition, nil
+func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(thisVersion tykcommon.VersionInfo, thisDefinition *tykcommon.APIDefinition, versionName string) error {
+
+	thisDefinition.VersionData.NotVersioned = false
+	thisDefinition.VersionData.Versions[versionName] = thisVersion
+	return nil
+}
+
+func HandleImportMode() {
+
 }

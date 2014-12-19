@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
-	"github.com/buger/goterm"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
 	"github.com/rcrowley/goagain"
@@ -35,22 +34,9 @@ const (
 	OAUTH_PREFIX            string = "oauth-data."
 )
 
-// Display introductory details
-func intro() {
-	fmt.Print("\n\n")
-	fmt.Println(goterm.Bold(goterm.Color("Tyk.io Gateway API v1.2.1", goterm.GREEN)))
-	fmt.Println(goterm.Bold(goterm.Color("=========================", goterm.GREEN)))
-	fmt.Print("Copyright Jively Ltd. 2014")
-	fmt.Print("\nhttp://www.tyk.io\n\n")
-}
-
 // Display configuration options
 func displayConfig() {
-	configTable := goterm.NewTable(0, 10, 5, ' ', 0)
-	fmt.Fprintf(configTable, "Listening on port:\t%d\n", config.ListenPort)
-
-	fmt.Println(configTable)
-	fmt.Println("")
+	log.Info(fmt.Sprintf("Listening on port: ", config.ListenPort))
 }
 
 // Create all globals and init connection handlers
@@ -292,7 +278,6 @@ func ReloadURLStructure() {
 }
 
 func init() {
-	intro()
 
 	usage := `Tyk API Gateway.
 
@@ -300,17 +285,41 @@ func init() {
 		tyk [options]
 
 	Options:
-		-h --help      Show this screen
-		--conf=FILE    Load a named configuration file
-		--port=PORT    Listen on PORT (overrides confg file)
-		--memprofile   Generate a memory profile
-		--debug		   Enable Debug output
-
+		-h --help                    Show this screen
+		--conf=FILE                  Load a named configuration file
+		--port=PORT                  Listen on PORT (overrides confg file)
+		--memprofile                 Generate a memory profile
+		--debug                      Enable Debug output
+		--import-blueprint=<file>    Import an API Blueprint file
+		--create-api                 Creates a new API Definition from the blueprint
+		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
+		--upstream-target=<url>      Set the upstream target for the definition
+		--as-mock                    Creates the API as a mock based on example fields
 	`
 
 	arguments, err := docopt.Parse(usage, nil, true, "v1.2.1", false, false)
 	if err != nil {
 		log.Warning("Error while parsing arguments: ", err)
+	}
+
+	// Enable command mode
+	cmdMessage := "Command mode activated, this application will quite after operations are completed."
+	for k, _ := range(CommandModeOptions) {
+
+		v := arguments[k]
+
+		if v == true {
+			log.Info(cmdMessage)
+			HandleCommandModeArgs(arguments)
+			os.Exit(0)
+		}
+
+		if v != nil && v != false {
+			log.Info(cmdMessage)
+			HandleCommandModeArgs(arguments)
+			os.Exit(0)
+		}
+
 	}
 
 	filename := "/etc/tyk/tyk.conf"
