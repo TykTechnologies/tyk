@@ -437,6 +437,11 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 
 				}
 
+				if WhiteListStatus {
+					// We have a whitelist, nothing gets through unless specifically defined
+					return EndPointNotAllowed, nil
+				}
+
 				// Method not matched in an extended set, means it can be passed through
 				return StatusOk, nil
 			}

@@ -146,7 +146,12 @@ func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
 		return thisBlueprint.(*BluePrintAST), err
 	}
 
-	thisBlueprint.ReadString(string(bluePrintFileData))
+	readErr := thisBlueprint.ReadString(string(bluePrintFileData))
+	if readErr != nil {
+		log.Error("Failed to decode object")
+		return thisBlueprint.(*BluePrintAST), readErr
+	}
+
 	return thisBlueprint.(*BluePrintAST), nil
 }
 

@@ -75,7 +75,7 @@ type BluePrintAST struct {
 					Description string `json:"description"`
 					Example     string `json:"example"`
 					Name        string `json:"name"`
-					Required    string `json:"required"`
+					Required    bool   `json:"required"`
 					Type        string `json:"type"`
 					Values      []struct {
 						Value string `json:"value"`
@@ -99,7 +99,7 @@ type BluePrintAST struct {
 				Description string `json:"description"`
 				Example     string `json:"example"`
 				Name        string `json:"name"`
-				Required    string `json:"required"`
+				Required    bool `json:"required"`
 				Type        string `json:"type"`
 				Values      []struct {
 					Value string `json:"value"`
