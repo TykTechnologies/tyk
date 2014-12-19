@@ -6,3 +6,7 @@
 - Tyk now reports quote status in response headers (Issue #27)
 - Calling /{api-id}/tyk/rate-limits with an authorised header will return the rate limit for the current user without affecting them. Fixes issue #27
 - Extended path listing (issue #16) now enabled, legacy paths will still work. You can now create an extended path set which supports forced replies (for mocking) as well as limiting by method, so GET /widget/1234 will work and POST /windget/1234 will not.
+- You can now import API Blueprint files (JSON format) as new version definitions for your API, this includes mocking out responses. Blueprints can be added to existing API's as new versions or generate independent API definitions. 
+  - Create a new definition from blueprint: `./tyk --import-blueprint=blueprint.json --create-api --org-id=<id> --upstream-target="http://widgets.com/api/"`
+  - Add a version to a definition: `./tyk --import-blueprint=blueprint.json --for-api=<api_id> --as-version="2.0"`
+  - Create a mock for either: use the `--as-mock` parameter.
