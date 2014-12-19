@@ -36,7 +36,7 @@ const (
 
 // Display configuration options
 func displayConfig() {
-	log.Info(fmt.Sprintf("Listening on port: ", config.ListenPort))
+	log.Info("Listening on port: ", config.ListenPort)
 }
 
 // Create all globals and init connection handlers
@@ -295,6 +295,8 @@ func init() {
 		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
 		--upstream-target=<url>      Set the upstream target for the definition
 		--as-mock                    Creates the API as a mock based on example fields
+		--for-api=<path>             Adds blueprint to existing API Defintition as version
+		--as-version=<version>       The version number to use when inserting
 	`
 
 	arguments, err := docopt.Parse(usage, nil, true, "v1.2.1", false, false)
@@ -303,19 +305,16 @@ func init() {
 	}
 
 	// Enable command mode
-	cmdMessage := "Command mode activated, this application will quite after operations are completed."
 	for k, _ := range(CommandModeOptions) {
 
 		v := arguments[k]
 
 		if v == true {
-			log.Info(cmdMessage)
 			HandleCommandModeArgs(arguments)
 			os.Exit(0)
 		}
 
 		if v != nil && v != false {
-			log.Info(cmdMessage)
 			HandleCommandModeArgs(arguments)
 			os.Exit(0)
 		}

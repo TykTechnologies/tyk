@@ -5,6 +5,8 @@ import (
 	"github.com/lonelycode/tykcommon"
 	"code.google.com/p/go-uuid/uuid"
 	"strings"
+	"fmt"
+	"encoding/json"
 )
 
 var CommandModeOptions = map[string]bool{
@@ -13,6 +15,8 @@ var CommandModeOptions = map[string]bool{
 	"--org-id": true,
 	"--upstream-target": true,
 	"--as-mock": true,
+	"--for-api": true,
+	"--as-version": true,
 }
 
 // ./tyk --import-blueprint=blueprint.json --create-api --org-id=<id> --upstream-target="http://widgets.com/api/"`
@@ -25,8 +29,6 @@ func HandleCommandModeArgs(arguments map[string]interface{}) {
 }
 
 func handleBluePrintMode(arguments map[string]interface{}) {
-	log.Info("Importing Blueprint")
-
 	doCreate := arguments["--create-api"]
 	inputFile := arguments["--import-blueprint"]
 	if doCreate == true {
@@ -40,14 +42,69 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 				return
 			}
 
-			createDefFromBluePrint(bp, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
+			def, dErr := createDefFromBluePrint(bp, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
+			if dErr != nil {
+				log.Error("Failed to create API Defintition from file")
+				return
+			}
+
+			printDef(def)
+			return
 		}
 
 		log.Error("No upstream target or org ID defined, these are both required")
 
 	} else {
 		// Different branch, here we need an API Definition to modify
+		forApiPath := arguments["--for-api"]
+		if forApiPath == nil {
+			log.Error("If ading to an API, the path to the defintiton must be listed")
+			return
+		}
+
+		versionName := arguments["--as-version"]
+		if versionName == nil {
+			log.Error("No version defined for this import operation, please set an import ID using the --as-version flag")
+			return
+		}
+
+		thisDefFromFile, fileErr := apiDefLoadFile(forApiPath.(string))
+		if fileErr != nil {
+			log.Error("failed to load and decode file data for API Definition: ", fileErr)
+			return
+		}
+
+		bp, err := bluePrintLoadFile(inputFile.(string))
+		if err != nil {
+			log.Error("File load error: ", err)
+			return
+		}
+
+		versionData, err := bp.ConvertIntoApiVersion(arguments["--as-mock"].(bool))
+		if err != nil {
+			log.Error("onversion into API Def failed: ", err)
+		}
+
+		insertErr := bp.InsertIntoAPIDefinitionAsVersion(versionData, &thisDefFromFile, versionName.(string))
+		if insertErr != nil {
+			log.Error("Insertion failed: ", insertErr)
+			return
+		}
+
+		printDef(&thisDefFromFile)
+
 	}
+}
+
+func printDef(def *tykcommon.APIDefinition) {
+	asJson, err := json.MarshalIndent(def, "", "    ")
+	if err != nil {
+		log.Error("Marshalling failed: ", err)
+	}
+
+	// The id attribute is for BSON only and breaks the parser if it's empty, cull it here.
+	fixed := strings.Replace(string(asJson), "    \"id\": \"\",", "", 1)
+	fmt.Printf(fixed)
 }
 
 func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock bool) (*tykcommon.APIDefinition, error) {
@@ -59,6 +116,7 @@ func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock
 	thisAD.OrgID = orgId
 	thisAD.VersionDefinition.Key = "version"
 	thisAD.VersionDefinition.Location  ="header"
+	thisAD.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
 	thisAD.Proxy.ListenPath = "/" + thisAD.APIID + "/"
 	thisAD.Proxy.StripListenPath = true
 	thisAD.Proxy.TargetURL = upstreamURL
@@ -90,4 +148,23 @@ func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
 
 	thisBlueprint.ReadString(string(bluePrintFileData))
 	return thisBlueprint.(*BluePrintAST), nil
+}
+
+func apiDefLoadFile(filePath string) (tykcommon.APIDefinition, error) {
+	thisDef := tykcommon.APIDefinition{}
+
+	defFileData, err := ioutil.ReadFile(filePath)
+
+	if err != nil {
+		log.Error("Couldn't load API Definition file: ", err)
+		return thisDef, err
+	}
+
+	jsonErr := json.Unmarshal(defFileData, &thisDef)
+	if jsonErr != nil {
+		log.Error("Failed to unmarshal the JSON definition: ", jsonErr)
+		return thisDef, jsonErr
+	}
+
+	return thisDef, nil
 }

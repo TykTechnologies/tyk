@@ -3,6 +3,7 @@ import (
 	"github.com/lonelycode/tykcommon"
 	"errors"
 	"net/http"
+	"fmt"
 )
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
@@ -49,7 +50,9 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 		for header, value := range(thisMeta.Headers) {
 			w.Header().Add(header, value)
 		}
-		DoJSONWrite(w, thisMeta.Code, responseMessage)
+
+		w.WriteHeader(thisMeta.Code)
+		fmt.Fprintf(w, string(responseMessage))
 		return nil, 666
 	}
 
