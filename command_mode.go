@@ -117,6 +117,7 @@ func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock
 	thisAD.VersionDefinition.Key = "version"
 	thisAD.VersionDefinition.Location  ="header"
 	thisAD.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
+	thisAD.VersionData.NotVersioned = false
 	thisAD.Proxy.ListenPath = "/" + thisAD.APIID + "/"
 	thisAD.Proxy.StripListenPath = true
 	thisAD.Proxy.TargetURL = upstreamURL
