@@ -299,7 +299,7 @@ func init() {
 		--as-version=<version>       The version number to use when inserting
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, "v1.2.1", false, false)
+	arguments, err := docopt.Parse(usage, nil, true, "v1.3", false, false)
 	if err != nil {
 		log.Warning("Error while parsing arguments: ", err)
 	}
