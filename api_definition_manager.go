@@ -261,6 +261,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 	apiCollection.Find(search).All(&StringDefs)
 
 	for i, thisAppConfig := range APIDefinitions {
+		thisAppConfig.DecodeFromDB()
 		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
 
 		newAppSpec := a.MakeSpec(thisAppConfig)
