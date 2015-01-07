@@ -115,7 +115,11 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.Spec.APIDefinition.APIID,
 			s.Spec.APIDefinition.OrgID,
 			OauthClientID,
-			int64(millisec)}
+			int64(millisec),
+			time.Now(),
+		}
+
+		thisRecord.SetExpiry(s.Spec.ExpireAnalyticsAfter)
 
 		go analytics.RecordHit(thisRecord)
 

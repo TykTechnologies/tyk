@@ -30,6 +30,22 @@ type AnalyticsRecord struct {
 	OrgID         string
 	OauthID       string
 	RequestTime   int64
+	ExpireAt	  time.Time	`bson:"expireAt" json:"expireAt"`
+}
+
+func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
+	var expiry time.Duration
+
+	expiry = time.Duration(expiresInSeconds) * time.Second
+
+	if expiresInSeconds == 0 {
+		// Expiry is set to 100 years
+		expiry = (24 * time.Hour) * (365 * 100)
+	}
+
+	t := time.Now()
+	t2 := t.Add(expiry)
+	a.ExpireAt = t2
 }
 
 // AnalyticsError is an error for when writing to the storage engine fails

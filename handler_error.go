@@ -66,7 +66,10 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			e.Spec.APIDefinition.APIID,
 			e.Spec.APIDefinition.OrgID,
 			OauthClientID,
-			0}
+			0,
+			time.Now(),
+		}
+		thisRecord.SetExpiry(e.Spec.ExpireAnalyticsAfter)
 		go analytics.RecordHit(thisRecord)
 	}
 
