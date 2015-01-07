@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/gorilla/context"
 	"net/http"
-	//	"net/http/httputil"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -25,6 +24,20 @@ const (
 type TykMiddleware struct {
 	Spec  APISpec
 	Proxy *ReverseProxy
+}
+
+func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
+	// Try and get the session from the session store
+	var thisSession SessionState
+	var found bool
+
+	thisSession, found = t.Spec.OrgSessionManager.GetSessionDetail(key)
+	if found {
+		// If exists, assume it has been authorized and pass on
+		return thisSession, true
+	}
+
+	return thisSession, found
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try

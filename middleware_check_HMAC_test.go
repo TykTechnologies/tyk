@@ -71,7 +71,8 @@ func createHMACAuthSession() SessionState {
 func getHMACAuthChain(spec APISpec) http.Handler {
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse("http://lonelycode.com/")
 	proxy := TykNewSingleHostReverseProxy(remote)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -91,7 +92,8 @@ func TestHMACAuthSession(t *testing.T) {
 	spec := createDefinitionFromString(HMACAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
@@ -146,7 +148,8 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	spec := createDefinitionFromString(HMACAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
@@ -202,7 +205,8 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	spec := createDefinitionFromString(HMACAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
@@ -258,7 +262,8 @@ func TestHMACAuthSessionmalformedHeader(t *testing.T) {
 	spec := createDefinitionFromString(HMACAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.

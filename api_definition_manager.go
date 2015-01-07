@@ -145,6 +145,7 @@ type APISpec struct {
 	AuthManager      AuthorisationHandler
 	SessionManager   SessionHandler
 	OAuthManager     *OAuthManager
+	OrgSessionManager   SessionHandler
 	EventPaths       map[tykcommon.TykEvent][]TykEventHandler
 	Health           HealthChecker
 }
@@ -192,11 +193,14 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 		switch newAppSpec.APIDefinition.SessionProvider.Name {
 		case DefaultSessionProvider:
 			newAppSpec.SessionManager = &DefaultSessionManager{}
+			newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 		default:
 			newAppSpec.SessionManager = &DefaultSessionManager{}
+			newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 		}
 	} else {
 		newAppSpec.SessionManager = &DefaultSessionManager{}
+		newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 	}
 
 	// Set up Event Handlers
@@ -390,10 +394,11 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	return combinedPath, false
 }
 
-func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler, healthStorageHandler StorageHandler) {
+func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler, healthStorageHandler StorageHandler, orgStorageHandler StorageHandler) {
 	a.AuthManager.Init(AuthStore)
 	a.SessionManager.Init(SessionStore)
 	a.Health.Init(healthStorageHandler)
+	a.OrgSessionManager.Init(orgStorageHandler)
 }
 
 func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {

@@ -53,7 +53,8 @@ func MakeSampleAPI() *APISpec {
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	thisSpec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	specs := []APISpec{thisSpec}
 	newMuxes := http.NewServeMux()

@@ -97,6 +97,7 @@ func getAPISpecs() []APISpec {
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(Muxer *http.ServeMux) {
 	// set up main API handlers
+	Muxer.HandleFunc("/tyk/org/keys/", CheckIsAPIOwner(orgHandler))
 	Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
 	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
 	Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
@@ -160,6 +161,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	redisOrgStore := RedisStorageManager{KeyPrefix: "orgkey."}
 
 	// Create a new handler for each API spec
 	for apiIndex, _ := range APISpecs {
@@ -176,6 +178,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		// Initialise the auth and session managers (use Redis for now)
 		var authStore StorageHandler
 		var sessionStore StorageHandler
+		var orgStore StorageHandler
 
 		switch referenceSpec.AuthProvider.StorageEngine {
 		case DefaultStorageEngine:
@@ -187,13 +190,15 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		switch referenceSpec.SessionProvider.StorageEngine {
 		case DefaultStorageEngine:
 			sessionStore = &redisStore
+			orgStore = &redisOrgStore
 		default:
 			sessionStore = &redisStore
+			orgStore = &redisOrgStore
 		}
 
 		// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
 		healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-		referenceSpec.Init(authStore, sessionStore, healthStore)
+		referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
 		if referenceSpec.EnableBatchRequestSupport {
 			addBatchEndpoint(&referenceSpec, Muxer)
@@ -213,6 +218,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		if referenceSpec.APIDefinition.UseKeylessAccess {
 			// for KeyLessAccess we can't support rate limiting, versioning or access rules
 			chain := alice.New(CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 
@@ -238,6 +244,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 			chain := alice.New(
 				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
@@ -247,6 +254,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			userCheckHandler := http.HandlerFunc(UserRatesCheck())
 			simpleChain := alice.New(
 				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),

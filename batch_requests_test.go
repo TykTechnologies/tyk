@@ -28,7 +28,8 @@ func createBatchTestSession() SessionState {
 func getBatchTestChain(spec APISpec) http.Handler {
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse("http://httpbin.org/")
 	proxy := TykNewSingleHostReverseProxy(remote)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -119,7 +120,8 @@ func TestBatchSuccess(t *testing.T) {
 	spec := createDefinitionFromString(BatchTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	batchHandler := BatchRequestHandler{API: &spec}
 
@@ -165,7 +167,8 @@ func TestMakeSyncRequest(t *testing.T) {
 	spec := createDefinitionFromString(BatchTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	batchHandler := BatchRequestHandler{API: &spec}
 
@@ -194,7 +197,8 @@ func TestMakeASyncRequest(t *testing.T) {
 	spec := createDefinitionFromString(BatchTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	batchHandler := BatchRequestHandler{API: &spec}
 

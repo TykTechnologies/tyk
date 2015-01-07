@@ -21,6 +21,7 @@ const (
 	EVENT_AuthFailure       tykcommon.TykEvent = "AuthFailure"
 	EVENT_KeyExpired        tykcommon.TykEvent = "KeyExpired"
 	EVENT_VersionFailure    tykcommon.TykEvent = "VersionFailure"
+	EVENT_OrgQuotaExceeded  tykcommon.TykEvent = "OrgQuotaExceeded"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for

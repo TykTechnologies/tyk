@@ -158,7 +158,8 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	thisSpec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	specs := []APISpec{thisSpec}
 	newMuxes := http.NewServeMux()
@@ -175,7 +176,8 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledFail)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
@@ -203,7 +205,8 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
@@ -231,7 +234,8 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionMissing)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
@@ -258,7 +262,8 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionDisabled)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	spec.Init(&redisStore, &redisStore, healthStore)
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"

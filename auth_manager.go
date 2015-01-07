@@ -122,8 +122,7 @@ func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, b
 	}
 
 	if marshalErr := json.Unmarshal([]byte(jsonKeyVal), &thisSession); marshalErr != nil {
-		log.Error("Couldn't unmarshal session object")
-		log.Error(marshalErr)
+		log.Error("Couldn't unmarshal session object (may be cache miss): ", marshalErr)
 		return thisSession, false
 	}
 

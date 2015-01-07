@@ -168,15 +168,14 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 		return r.GetKey(keyName)
 	}
 
+	log.Debug("Getting: ", r.fixKey(keyName))
 	value, err := redis.String(db.Do("GET", r.fixKey(keyName)))
 	if err != nil {
-		log.Error("Error trying to get value:")
-		log.Error(err)
-	} else {
-		return value, nil
+		log.Error("Error trying to get value:", err)
+		return "", KeyError{}
 	}
 
-	return "", KeyError{}
+	return value, nil
 }
 
 func (r *RedisStorageManager) GetExp(keyName string) (int64, error) {

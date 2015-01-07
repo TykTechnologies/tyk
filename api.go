@@ -54,6 +54,19 @@ func GetSpecForApi(APIID string) *APISpec {
 	return spec
 }
 
+func GetSpecForOrg(APIID string) *APISpec {
+	var aKey string
+	for k, v := range(ApiSpecRegister) {
+		if v.OrgID == APIID {
+			return v
+		}
+		aKey = k
+	}
+
+	// If we can't find a spec, it doesn;t matter, because we default to Redis anyway, grab whatever you can find
+	return ApiSpecRegister[aKey]
+}
+
 // ---- TODO: This changes the URL structure of the API completely ----
 // ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
@@ -399,6 +412,200 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	DoJSONWrite(w, code, responseMessage)
 }
 
+func orgHandler(w http.ResponseWriter, r *http.Request) {
+	keyName := r.URL.Path[len("/tyk/org/keys/"):]
+	filter := r.FormValue("filter")
+	var responseMessage []byte
+	var code int
+
+	if r.Method == "POST" || r.Method == "PUT" {
+		responseMessage, code = handleOrgAddOrUpdate(keyName, r)
+
+	} else if r.Method == "GET" {
+
+		if keyName != "" {
+			// Return single org detail
+			responseMessage, code = handleGetOrgDetail(keyName)
+		} else {
+			// Return list of keys
+			responseMessage, code = handleGetAllOrgKeys(filter, "")
+		}
+
+
+	} else if r.Method == "DELETE" {
+		// Remove a key
+		responseMessage, code = handleDeleteOrgKey(keyName)
+
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	DoJSONWrite(w, code, responseMessage)
+}
+
+func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
+	success := true
+	decoder := json.NewDecoder(r.Body)
+	var responseMessage []byte
+	var newSession SessionState
+	err := decoder.Decode(&newSession)
+	code := 200
+
+	if err != nil {
+		log.Error("Couldn't decode new session object")
+		log.Error(err)
+		code = 400
+		success = false
+		responseMessage = createError("Request malformed")
+	} else {
+		// Update our session object (create it)
+
+		spec := GetSpecForOrg(keyName)
+		if spec == nil {
+			responseMessage = createError("No such organisation found in Active API list")
+			return responseMessage, 400
+		}
+
+		spec.OrgSessionManager.UpdateSession(keyName, newSession, 0)
+
+		log.WithFields(logrus.Fields{
+			"key": keyName,
+		}).Info("New key added or updated.")
+		success = true
+	}
+
+	var action string
+	if r.Method == "POST" {
+		action = "added"
+	} else {
+		action = "modified"
+	}
+
+	if success {
+		response := APIModifyKeySuccess{
+			keyName,
+			"ok",
+			action}
+
+		responseMessage, err = json.Marshal(&response)
+
+		if err != nil {
+			log.Error("Could not create response message")
+			log.Error(err)
+			code = 500
+			responseMessage = []byte(E_SYSTEM_ERROR)
+		}
+	}
+
+	return responseMessage, code
+}
+
+func handleGetOrgDetail(ORGID string) ([]byte, int) {
+	success := true
+	var responseMessage []byte
+	var err error
+	code := 200
+
+	thiSpec := GetSpecForOrg(ORGID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "Org not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	thisSession, ok := thiSpec.OrgSessionManager.GetSessionDetail(ORGID)
+	if !ok {
+		success = false
+	} else {
+		responseMessage, err = json.Marshal(&thisSession)
+		if err != nil {
+			log.Error("Marshalling failed")
+			log.Error(err)
+			success = false
+		}
+	}
+
+	if !success {
+		notFound := APIStatusMessage{"error", "Org not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		code = 404
+		log.WithFields(logrus.Fields{
+		"Org": ORGID,
+	}).Info("Attempted key retrieval - failure.")
+	} else {
+		log.WithFields(logrus.Fields{
+		"Org": ORGID,
+	}).Info("Attempted key retrieval - success.")
+	}
+
+	return responseMessage, code
+}
+
+func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
+	success := true
+	var responseMessage []byte
+	code := 200
+
+	var err error
+
+	thiSpec := GetSpecForOrg(ORGID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "ORG not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	sessions := thiSpec.OrgSessionManager.GetSessions(filter)
+	sessionsObj := APIAllKeys{sessions}
+
+	responseMessage, err = json.Marshal(&sessionsObj)
+	if err != nil {
+		log.Error("Marshalling failed")
+		log.Error(err)
+		success = false
+		code = 500
+	}
+
+	if success {
+		return responseMessage, code
+	}
+
+	log.Info("Attempted orgs retrieval - success.")
+	return []byte(E_SYSTEM_ERROR), code
+
+}
+
+func handleDeleteOrgKey(ORGID string) ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	thiSpec := GetSpecForOrg(ORGID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "Org not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	thiSpec.OrgSessionManager.RemoveSession(ORGID)
+	code := 200
+
+	statusObj := APIModifyKeySuccess{ORGID, "ok", "deleted"}
+	responseMessage, err = json.Marshal(&statusObj)
+
+	if err != nil {
+		log.Error("Marshalling failed")
+		log.Error(err)
+		return []byte(E_SYSTEM_ERROR), 500
+	}
+
+	log.WithFields(logrus.Fields{
+		"key": ORGID,
+	}).Info("Attempted org key deletion - success.")
+
+	return responseMessage, code
+}
 func resetHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
