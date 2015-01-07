@@ -27,6 +27,17 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	thisOrg := k.Spec.OrgID
 	thisSessionState, found := k.GetOrgSession(thisOrg)
+
+	if thisSessionState.IsInactive {
+		log.WithFields(logrus.Fields{
+			"path":   r.URL.Path,
+			"origin": r.RemoteAddr,
+			"key":    thisOrg,
+		}).Info("Organisation access is disabled.")
+
+		return errors.New("This organisation access has been disabled, please contact your API administrator."), 403
+	}
+
 	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
 
 	// Ensure quota and rate data for this session are recorded
