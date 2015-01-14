@@ -10,3 +10,5 @@ apps/test.json
 logs
 lint_results.txt
 build/
+test_apps/
+tyk.conf.bak

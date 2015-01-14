@@ -10,6 +10,12 @@ type TykMiddlewareImplementation interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) // Handles request
 }
 
+func CreateDynamicMiddleware(MiddlewareName string, IsPre bool, tykMwSuper TykMiddleware) func(http.Handler) http.Handler {
+    dMiddleware := &DynamicMiddleware{tykMwSuper, MiddlewareName, IsPre}
+    
+    return CreateMiddleware(dMiddleware, tykMwSuper)
+}
+
 // Generic middleware caller to make extension easier
 func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper TykMiddleware) func(http.Handler) http.Handler {
 	aliceHandler := func(h http.Handler) http.Handler {

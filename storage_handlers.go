@@ -171,7 +171,7 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	log.Debug("Getting: ", r.fixKey(keyName))
 	value, err := redis.String(db.Do("GET", r.fixKey(keyName)))
 	if err != nil {
-		log.Error("Error trying to get value:", err)
+		log.Debug("Error trying to get value:", err)
 		return "", KeyError{}
 	}
 

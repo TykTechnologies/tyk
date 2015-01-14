@@ -31,6 +31,7 @@ type SessionState struct {
 	HMACEnabled bool   `json:"hmac_enabled"`
 	HmacSecret  string `json:"hmac_string"`
 	IsInactive bool `json:"is_inactive"`
+    MetaData interface{} `json:"meta_data"`
 }
 
 type PublicSessionState struct {

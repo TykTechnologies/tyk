@@ -199,6 +199,23 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
 		healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 		referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
+        
+        //TODO: Add a VM AND LOAD MIDDLEWARE CLASSES here (TESTING)
+        mwPaths := []string{}
+        mwPreNames := []string{}
+        mwPostNames := []string{}
+        for _, mwObj := range(referenceSpec.APIDefinition.CustomMiddleware.Pre) {
+            mwPaths = append(mwPaths, mwObj.Path)
+            mwPreNames = append(mwPreNames, mwObj.Name)
+            log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+        }
+        for _, mwObj := range(referenceSpec.APIDefinition.CustomMiddleware.Post) {
+            mwPaths = append(mwPaths, mwObj.Path)
+            mwPostNames = append(mwPostNames, mwObj.Name)
+            log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+        }
+       
+        referenceSpec.JSVM = CreateJSVM(mwPaths)
 
 		if referenceSpec.EnableBatchRequestSupport {
 			addBatchEndpoint(&referenceSpec, Muxer)
@@ -240,16 +257,34 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				// Auth key
 				keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
 			}
+            
+            var chainArray = []alice.Constructor{}
 
-			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
-			chain := alice.New(
-				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+            var baseChainArray = []alice.Constructor{
+                CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
+            }
+            
+            // Add pre-process MW
+            for _, name := range(mwPreNames) {
+                chainArray = append(chainArray, CreateDynamicMiddleware(name, true, tykMiddleware))
+            }
+            
+            for _, baseMw := range(baseChainArray) {
+                chainArray = append(chainArray, baseMw)
+            }
+            
+            for _, name := range(mwPostNames) {
+                chainArray = append(chainArray, CreateDynamicMiddleware(name, false, tykMiddleware))
+            }
+            
+			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
+			chain := alice.New(chainArray...).Then(proxyHandler)
 
 			userCheckHandler := http.HandlerFunc(UserRatesCheck())
 			simpleChain := alice.New(

@@ -117,7 +117,7 @@ func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, b
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var thisSession SessionState
 	if err != nil {
-		log.Warning("Key does not exist")
+		log.Debug("Key does not exist")
 		return thisSession, false
 	}
 
