@@ -9,10 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-)
-
-const (
-	TYKJS_PATH string = "js/tyk.js"
+    "time"
 )
 
 // MiniRequestObject is marshalled to JSON string and pased into JSON middleware
@@ -44,6 +41,7 @@ type DynamicMiddleware struct {
 	TykMiddleware
 	MiddlewareClassName string
 	Pre                 bool
+    UseSession          bool
 }
 
 type DynamicMiddlewareConfig struct {
@@ -69,6 +67,8 @@ func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
+    t1 := time.Now().UnixNano()
+    
 	// Createthe proxy object
 	defer r.Body.Close()
 	originalBody, err := ioutil.ReadAll(r.Body)
@@ -98,8 +98,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre {
-		thisSessionState = context.Get(r, SessionData).(SessionState)
-		authHeaderValue = context.Get(r, AuthHeaderValue).(string)
+        if d.UseSession {
+            thisSessionState = context.Get(r, SessionData).(SessionState)
+		    authHeaderValue = context.Get(r, AuthHeaderValue).(string)    
+        }
 	}
 
 	sessionAsJsonObj, sessEncErr := json.Marshal(thisSessionState)
@@ -152,9 +154,13 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Save the sesison data (if modified)
 	if !d.Pre {
-		thisSessionState.MetaData = newRequestData.SessionMeta
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+        if d.UseSession {
+		    thisSessionState.MetaData = newRequestData.SessionMeta
+		    d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+        }
 	}
+    
+    log.Info("JSVM middleware execution took: (ns) ", time.Now().UnixNano() - t1)
 
 	return nil, 200
 }
@@ -164,7 +170,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 // CreateJSVM Creates a new VM object for an API to load middleware into
 func CreateJSVM(middlewarePaths []string) *otto.Otto {
 	vm := otto.New()
-	coreJs, _ := ioutil.ReadFile(TYKJS_PATH)
+	coreJs, _ := ioutil.ReadFile(config.TykJSPath)
 	// run core elements
 
 	vm.Set("log", func(call otto.FunctionCall) otto.Value {

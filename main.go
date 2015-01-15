@@ -7,6 +7,7 @@ import (
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
 	"github.com/rcrowley/goagain"
+    "github.com/lonelycode/tykcommon"
 	"html/template"
 	"net"
 	"net/http"
@@ -202,16 +203,16 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 		//TODO: Add a VM AND LOAD MIDDLEWARE CLASSES here (TESTING)
 		mwPaths := []string{}
-		mwPreNames := []string{}
-		mwPostNames := []string{}
+		mwPreFuncs := []tykcommon.MiddlewareDefinition{}
+		mwPostFuncs := []tykcommon.MiddlewareDefinition{}
 		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
 			mwPaths = append(mwPaths, mwObj.Path)
-			mwPreNames = append(mwPreNames, mwObj.Name)
+			mwPreFuncs = append(mwPreFuncs, mwObj)
 			log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 		}
 		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
 			mwPaths = append(mwPaths, mwObj.Path)
-			mwPostNames = append(mwPostNames, mwObj.Name)
+			mwPostFuncs = append(mwPostFuncs, mwObj)
 			log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 		}
 
@@ -271,16 +272,16 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			}
 
 			// Add pre-process MW
-			for _, name := range mwPreNames {
-				chainArray = append(chainArray, CreateDynamicMiddleware(name, true, tykMiddleware))
+			for _, obj := range mwPreFuncs {
+				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
 			}
 
 			for _, baseMw := range baseChainArray {
 				chainArray = append(chainArray, baseMw)
 			}
 
-			for _, name := range mwPostNames {
-				chainArray = append(chainArray, CreateDynamicMiddleware(name, false, tykMiddleware))
+			for _, obj := range mwPostFuncs {
+				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 			}
 
 			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware

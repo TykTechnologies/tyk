@@ -13,6 +13,7 @@ type Config struct {
 	ListenPort      int    `json:"listen_port"`
 	Secret          string `json:"secret"`
 	TemplatePath    string `json:"template_path"`
+    TykJSPath       string `json:"tyk_js_path"`
 	UseDBAppConfigs bool   `json:"use_db_app_configs"`
 	AppPath         string `json:"app_path"`
 	Storage         struct {
@@ -45,6 +46,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.ListenPort = 8080
 	configStruct.Secret = "352d20ee67be67f6340b4c0605b044b7"
 	configStruct.TemplatePath = "./templates"
+    configStruct.TykJSPath = "./js/tyk.js"
 	configStruct.Storage.Type = "redis"
 	configStruct.AppPath = "./apps/"
 	configStruct.Storage.Host = "localhost"
