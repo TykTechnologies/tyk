@@ -107,6 +107,10 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (Tyk
 		return LogMessageEventHandler{}.New(thisConf)
 	case EH_WebHook:
 		return WebHookHandler{}.New(thisConf)
+    case EH_JSVMHandler:
+        // Load the file here
+        GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})
+        return JSVMEventHandler{}.New(thisConf)
 	}
 
 	return nil, errors.New("Handler not found")

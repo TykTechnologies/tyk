@@ -5,6 +5,9 @@ var TykJS = {
             MiddlewareComponentMeta: function(configuration) {
                 this.configuration = configuration;
             }
+        },
+        TykEventHandlers: {
+                EventHandlerComponentMeta: function() {}
         }
 };
 
@@ -46,3 +49,29 @@ TykJS.TykMiddleware.NewMiddleware.prototype.ReturnData = function(request, sessi
 
 // ---- End middleware implementation for global context ----
 
+// -- Start Event Handler implementation ----
+
+TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.DoProcessEvent = function(event) {
+    // call the handler
+    log("Calling built - in handle")
+    this.Handle(event);
+    return
+};
+
+TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.Handle = function(request, session) {
+    log("Handler not implemented!");
+    return request;
+};
+
+// The user-level event handler component
+TykJS.TykEventHandlers.NewEventHandler = function() {
+    TykJS.TykEventHandlers.EventHandlerComponentMeta.call(this);
+};
+
+// Set up object inheritance for events
+TykJS.TykEventHandlers.NewEventHandler.prototype = Object.create(TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype);
+TykJS.TykEventHandlers.NewEventHandler.prototype.constructor = TykJS.TykEventHandlers.NewEventHandler;
+
+TykJS.TykEventHandlers.NewEventHandler.prototype.NewHandler = function(callback) {
+    this.Handle = callback;
+};

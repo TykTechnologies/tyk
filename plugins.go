@@ -113,7 +113,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
-	returnRaw, _ := d.Spec.JSVM.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+	returnRaw, _ := d.Spec.JSVM.VM.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
@@ -167,9 +167,13 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 // --- Utility functions during startup to ensure a sane VM is present for each API Def ----
 
-// CreateJSVM Creates a new VM object for an API to load middleware into
-func CreateJSVM(middlewarePaths []string) *otto.Otto {
-	vm := otto.New()
+type JSVM struct {
+    VM *otto.Otto
+}
+
+// Init creates the JSVM with the core library (tyk.js)
+func (j *JSVM) Init(coreJS string) {
+    vm := otto.New()
 	coreJs, _ := ioutil.ReadFile(config.TykJSPath)
 	// run core elements
 
@@ -179,16 +183,20 @@ func CreateJSVM(middlewarePaths []string) *otto.Otto {
 	})
 
 	vm.Run(coreJs)
+    
+    j.VM = vm
+}
 
-	for _, mwPath := range middlewarePaths {
+// LoadJSPaths will load JS classes and functionality in to the VM by file
+func (j *JSVM) LoadJSPaths(paths []string) {
+	for _, mwPath := range paths {
 		js, loadErr := ioutil.ReadFile(mwPath)
 		if loadErr != nil {
 			log.Error("Failed to load Middleware JS: ", loadErr)
 		} else {
 			// No error, load the JS into the VM
-			vm.Run(js)
+            log.Info("Loading JS File: mwPath")
+			j.VM.Run(js)
 		}
 	}
-
-	return vm
 }

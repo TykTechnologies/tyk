@@ -28,3 +28,6 @@ sampleMiddleware.NewProcessRequest(function(request, session) {
     // You MUST return both the request and session metadata    
     return sampleMiddleware.ReturnData(request, session.meta_data);
 });
+
+// Ensure init with a post-declaration log message
+log("Sample middleware initialised");

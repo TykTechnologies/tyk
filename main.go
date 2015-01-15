@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
+    "github.com/lonelycode/tykcommon"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
 	"github.com/rcrowley/goagain"
-    "github.com/lonelycode/tykcommon"
 	"html/template"
 	"net"
 	"net/http"
@@ -22,6 +22,7 @@ var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
 var profileFile = &os.File{}
+var GlobalEventsJSVM = &JSVM{}
 var doMemoryProfile bool
 
 //var genericOsinStorage *RedisOsinStorageInterface
@@ -78,6 +79,9 @@ func setupGlobals() {
 
 	templateFile := fmt.Sprintf("%s/error.json", config.TemplatePath)
 	templates = template.Must(template.ParseFiles(templateFile))
+    
+    // Set up global JSVM
+    GlobalEventsJSVM.Init(config.TykJSPath)
 }
 
 // Pull API Specs from configuration
@@ -201,22 +205,22 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 		referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
-		//TODO: Add a VM AND LOAD MIDDLEWARE CLASSES here (TESTING)
-		mwPaths := []string{}
-		mwPreFuncs := []tykcommon.MiddlewareDefinition{}
-		mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
-			mwPaths = append(mwPaths, mwObj.Path)
-			mwPreFuncs = append(mwPreFuncs, mwObj)
-			log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
-		}
-		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
-			mwPaths = append(mwPaths, mwObj.Path)
-			mwPostFuncs = append(mwPostFuncs, mwObj)
-			log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
-		}
-
-		referenceSpec.JSVM = CreateJSVM(mwPaths)
+        //Set up all the JSVM middleware
+        mwPaths := []string{}
+        mwPreFuncs := []tykcommon.MiddlewareDefinition{}
+        mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+        for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
+            mwPaths = append(mwPaths, mwObj.Path)
+            mwPreFuncs = append(mwPreFuncs, mwObj)
+            log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+        }
+        for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
+            mwPaths = append(mwPaths, mwObj.Path)
+            mwPostFuncs = append(mwPostFuncs, mwObj)
+            log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+        }
+        
+        referenceSpec.JSVM.LoadJSPaths(mwPaths)
 
 		if referenceSpec.EnableBatchRequestSupport {
 			addBatchEndpoint(&referenceSpec, Muxer)

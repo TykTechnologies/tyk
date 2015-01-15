@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"github.com/lonelycode/tykcommon"
-	"github.com/robertkrimen/otto"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -72,7 +71,7 @@ type APISpec struct {
 	OrgSessionManager SessionHandler
 	EventPaths        map[tykcommon.TykEvent][]TykEventHandler
 	Health            HealthChecker
-	JSVM              *otto.Otto
+	JSVM              *JSVM
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -127,6 +126,10 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 		newAppSpec.SessionManager = &DefaultSessionManager{}
 		newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 	}
+
+    // Create and init the virtual Machine
+    newAppSpec.JSVM = &JSVM{}
+    newAppSpec.JSVM.Init(config.TykJSPath)
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
