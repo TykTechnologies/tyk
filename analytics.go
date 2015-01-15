@@ -30,7 +30,7 @@ type AnalyticsRecord struct {
 	OrgID         string
 	OauthID       string
 	RequestTime   int64
-	ExpireAt	  time.Time	`bson:"expireAt" json:"expireAt"`
+	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
 
 func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
@@ -227,7 +227,7 @@ func (m *MongoPurger) PurgeCache() {
 }
 
 type MockPurger struct {
-	Store     *RedisStorageManager
+	Store *RedisStorageManager
 }
 
 // Connect does nothing
@@ -252,6 +252,5 @@ func (m *MockPurger) PurgeCache() {
 
 		m.Store.DeleteKeys(keyNames)
 	}
-
 
 }

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/lonelycode/tykcommon"
-	"errors"
 	"encoding/json"
+	"errors"
+	"github.com/lonelycode/tykcommon"
 	"strconv"
 )
 
@@ -21,7 +21,7 @@ type APIImporter interface {
 
 func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
 	// Extend to add new importers
-	switch source{
+	switch source {
 	case ApiaryBluePrint:
 		thisBluePrint := &BluePrintAST{}
 		return thisBluePrint, nil
@@ -54,8 +54,8 @@ type BluePrintAST struct {
 							Name  string `json:"name"`
 							Value string `json:"value"`
 						} `json:"headers"`
-							Name   string `json:"name"`
-							Schema string `json:"schema"`
+						Name   string `json:"name"`
+						Schema string `json:"schema"`
 					} `json:"requests"`
 					Responses []struct {
 						Body        string `json:"body"`
@@ -84,14 +84,14 @@ type BluePrintAST struct {
 			} `json:"actions"`
 			Description string `json:"description"`
 			Model       struct {
-					Body        string `json:"body"`
-					Description string `json:"description"`
-					Headers     []struct {
-						Name  string `json:"name"`
-						Value string `json:"value"`
-					} `json:"headers"`
-					Name   string `json:"name"`
-					Schema string `json:"schema"`
+				Body        string `json:"body"`
+				Description string `json:"description"`
+				Headers     []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				} `json:"headers"`
+				Name   string `json:"name"`
+				Schema string `json:"schema"`
 			} `json:"model"`
 			Name       string `json:"name"`
 			Parameters []struct {
@@ -99,7 +99,7 @@ type BluePrintAST struct {
 				Description string `json:"description"`
 				Example     string `json:"example"`
 				Name        string `json:"name"`
-				Required    bool `json:"required"`
+				Required    bool   `json:"required"`
 				Type        string `json:"type"`
 				Values      []struct {
 					Value string `json:"value"`
@@ -134,12 +134,12 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 			return thisVersionInfo, errors.New("No resourcs defined in the resource group.")
 		}
 
-		for _, resource := range(resourceGroup.Resources) {
+		for _, resource := range resourceGroup.Resources {
 			newMetaData := tykcommon.EndPointMeta{}
 			newMetaData.Path = resource.UriTemplate
 			newMetaData.MethodActions = make(map[string]tykcommon.EndpointMethodMeta)
 
-			for _, action := range(resource.Actions) {
+			for _, action := range resource.Actions {
 				if len(action.Examples) > 0 {
 					if len(action.Examples[0].Responses) > 0 {
 						thisEndPointMethodMeta := tykcommon.EndpointMethodMeta{}
@@ -156,7 +156,7 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 							thisEndPointMethodMeta.Action = tykcommon.NoAction
 						}
 
-						for _, h := range(action.Examples[0].Responses[0].Headers) {
+						for _, h := range action.Examples[0].Responses[0].Headers {
 							thisEndPointMethodMeta.Headers = make(map[string]string)
 							thisEndPointMethodMeta.Headers[h.Name] = h.Value
 						}

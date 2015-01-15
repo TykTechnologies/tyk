@@ -1,22 +1,22 @@
 package main
 
 import (
-	"io/ioutil"
-	"github.com/lonelycode/tykcommon"
 	"code.google.com/p/go-uuid/uuid"
-	"strings"
-	"fmt"
 	"encoding/json"
+	"fmt"
+	"github.com/lonelycode/tykcommon"
+	"io/ioutil"
+	"strings"
 )
 
 var CommandModeOptions = map[string]bool{
 	"--import-blueprint": true,
-	"--create-api": true,
-	"--org-id": true,
-	"--upstream-target": true,
-	"--as-mock": true,
-	"--for-api": true,
-	"--as-version": true,
+	"--create-api":       true,
+	"--org-id":           true,
+	"--upstream-target":  true,
+	"--as-mock":          true,
+	"--for-api":          true,
+	"--as-version":       true,
 }
 
 // ./tyk --import-blueprint=blueprint.json --create-api --org-id=<id> --upstream-target="http://widgets.com/api/"`
@@ -115,7 +115,7 @@ func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock
 	thisAD.APIID = uuid.NewUUID().String()
 	thisAD.OrgID = orgId
 	thisAD.VersionDefinition.Key = "version"
-	thisAD.VersionDefinition.Location  ="header"
+	thisAD.VersionDefinition.Location = "header"
 	thisAD.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
 	thisAD.VersionData.NotVersioned = false
 	thisAD.Proxy.ListenPath = "/" + thisAD.APIID + "/"

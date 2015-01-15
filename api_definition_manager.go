@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-    "github.com/robertkrimen/otto"
 	"github.com/lonelycode/tykcommon"
+	"github.com/robertkrimen/otto"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -20,7 +20,6 @@ const (
 	DefaultSessionProvider tykcommon.SessionProviderCode = "default"
 	DefaultStorageEngine   tykcommon.StorageEngineCode   = "redis"
 )
-
 
 // URLStatus is a custom enum type to avoid collisions
 type URLStatus int
@@ -47,16 +46,16 @@ const (
 	GeneralFailure                 RequestStatus = "An error occured that should have not been possible"
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
 	StatusOk                       RequestStatus = "Everything OK, passing"
-	StatusActionRedirect		   RequestStatus = "Found an Action, changing route"
-	StatusRedirectFlowByReply	   RequestStatus = "Exceptional action requested, redirecting flow!"
+	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
+	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
 // path is on any of the white, plack or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec   *regexp.Regexp
-	Status URLStatus
+	Spec          *regexp.Regexp
+	Status        URLStatus
 	MethodActions map[string]tykcommon.EndpointMethodMeta
 }
 
@@ -64,16 +63,16 @@ type URLSpec struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	tykcommon.APIDefinition
-	RxPaths          map[string][]URLSpec
-	WhiteListEnabled map[string]bool
-	target           *url.URL
-	AuthManager      AuthorisationHandler
-	SessionManager   SessionHandler
-	OAuthManager     *OAuthManager
-	OrgSessionManager   SessionHandler
-	EventPaths       map[tykcommon.TykEvent][]TykEventHandler
-	Health           HealthChecker
-    JSVM             *otto.Otto
+	RxPaths           map[string][]URLSpec
+	WhiteListEnabled  map[string]bool
+	target            *url.URL
+	AuthManager       AuthorisationHandler
+	SessionManager    SessionHandler
+	OAuthManager      *OAuthManager
+	OrgSessionManager SessionHandler
+	EventPaths        map[tykcommon.TykEvent][]TykEventHandler
+	Health            HealthChecker
+	JSVM              *otto.Otto
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -467,10 +466,14 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 	requestStatus, meta := a.IsURLAllowedAndIgnored(r.Method, r.URL.Path, versionPaths, whiteListStatus)
 
 	switch requestStatus {
-		case EndPointNotAllowed: return false, EndPointNotAllowed, meta
-		case StatusOkAndIgnore: return true, StatusOkAndIgnore, meta
-		case StatusRedirectFlowByReply: return true, StatusRedirectFlowByReply, meta
-		default: return true, StatusOk, meta
+	case EndPointNotAllowed:
+		return false, EndPointNotAllowed, meta
+	case StatusOkAndIgnore:
+		return true, StatusOkAndIgnore, meta
+	case StatusRedirectFlowByReply:
+		return true, StatusRedirectFlowByReply, meta
+	default:
+		return true, StatusOk, meta
 	}
 
 }

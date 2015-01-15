@@ -28,10 +28,10 @@ type SessionState struct {
 	BasicAuthData    struct {
 		Password string `json:"password"`
 	} `json:"basic_auth_data"`
-	HMACEnabled bool   `json:"hmac_enabled"`
-	HmacSecret  string `json:"hmac_string"`
-	IsInactive bool `json:"is_inactive"`
-    MetaData interface{} `json:"meta_data"`
+	HMACEnabled bool        `json:"hmac_enabled"`
+	HmacSecret  string      `json:"hmac_string"`
+	IsInactive  bool        `json:"is_inactive"`
+	MetaData    interface{} `json:"meta_data"`
 }
 
 type PublicSessionState struct {

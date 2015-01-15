@@ -175,7 +175,6 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 			return
 		}
 
-
 		// Run requests and collate responses
 		ReplySet := b.MakeRequests(batchRequest, requestSet)
 

@@ -11,9 +11,9 @@ type TykMiddlewareImplementation interface {
 }
 
 func CreateDynamicMiddleware(MiddlewareName string, IsPre bool, tykMwSuper TykMiddleware) func(http.Handler) http.Handler {
-    dMiddleware := &DynamicMiddleware{tykMwSuper, MiddlewareName, IsPre}
-    
-    return CreateMiddleware(dMiddleware, tykMwSuper)
+	dMiddleware := &DynamicMiddleware{tykMwSuper, MiddlewareName, IsPre}
+
+	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
 // Generic middleware caller to make extension easier

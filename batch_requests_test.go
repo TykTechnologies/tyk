@@ -1,13 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/justinas/alice"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
-	"strings"
-	"fmt"
 )
 
 func createBatchTestSession() SessionState {
@@ -152,13 +152,12 @@ func TestBatchSuccess(t *testing.T) {
 		t.Error("Request set length should be 3, is: ", len(requestSet))
 	}
 
-
 	if requestSet[0].URL.Host != "localhost:8080" {
-		t.Error("Request Host is wrong, is: ", requestSet[0].URL.Host )
+		t.Error("Request Host is wrong, is: ", requestSet[0].URL.Host)
 	}
 
 	if requestSet[0].URL.Path != "/v1/get/" {
-		t.Error("Request Path is wrong, is: ", requestSet[0].URL.Path )
+		t.Error("Request Path is wrong, is: ", requestSet[0].URL.Path)
 	}
 
 }
@@ -172,10 +171,8 @@ func TestMakeSyncRequest(t *testing.T) {
 
 	batchHandler := BatchRequestHandler{API: &spec}
 
-
 	relURL := "/about-lonelycoder"
 	thisRequest, _ := http.NewRequest("GET", "http://lonelycode.com/about-lonelycoder", nil)
-
 
 	replyUnit := batchHandler.doSyncRequest(thisRequest, relURL)
 
@@ -201,7 +198,6 @@ func TestMakeASyncRequest(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	batchHandler := BatchRequestHandler{API: &spec}
-
 
 	relURL := "/about-lonelycoder"
 	thisRequest, _ := http.NewRequest("GET", "http://lonelycode.com/about-lonelycoder", nil)

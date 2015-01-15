@@ -3,12 +3,12 @@ package main
 import (
 	"encoding/json"
 	"github.com/justinas/alice"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
-	"io/ioutil"
 )
 
 func createThrottledSession() SessionState {
@@ -52,7 +52,7 @@ func createVersionedSession() SessionState {
 	thisSession.QuotaRenews = time.Now().Unix()
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = -1
-	thisSession.AccessRights = map[string]AccessDefinition{"9991":AccessDefinition{APIiName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"9991": AccessDefinition{APIiName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
 
 	return thisSession
 }
@@ -355,7 +355,6 @@ var ExtendedPathGatewaySetup string = `
 
 `
 
-
 func createExtendedDefinitionWithPaths() APISpec {
 
 	return createDefinitionFromString(ExtendedPathGatewaySetup)
@@ -458,7 +457,7 @@ func TestVersioningRequestFail(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createVersionedSession()
-	thisSession.AccessRights = map[string]AccessDefinition{"9991":AccessDefinition{APIiName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"9991": AccessDefinition{APIiName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
 
 	// no version allowed
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
@@ -500,7 +499,7 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
 	// No auth information, it's an ignored path!
-//	req.Header.Add("authorization", "1234")
+	//	req.Header.Add("authorization", "1234")
 
 	if err != nil {
 		t.Fatal(err)
@@ -608,7 +607,6 @@ func TestWithAnalytics(t *testing.T) {
 	// Clear it
 	analytics.Clean.PurgeCache()
 
-
 	spec := createNonVersionedDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -660,7 +658,6 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 
 	// Clear it
 	analytics.Clean.PurgeCache()
-
 
 	spec := createNonVersionedDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}

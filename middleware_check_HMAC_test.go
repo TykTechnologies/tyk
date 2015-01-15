@@ -1,17 +1,17 @@
 package main
 
 import (
-	"time"
-	"net/http"
-	"net/url"
-	"testing"
-	"net/http/httptest"
-	"github.com/justinas/alice"
-	"strings"
+	"crypto/hmac"
+	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"crypto/sha1"
-	"crypto/hmac"
+	"github.com/justinas/alice"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
 )
 
 var HMACAuthDef string = `
@@ -99,7 +99,6 @@ func TestHMACAuthSession(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", thisSession, 60)
 
-
 	uri := "/"
 	method := "GET"
 
@@ -108,7 +107,6 @@ func TestHMACAuthSession(t *testing.T) {
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
-
 
 	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
 
@@ -155,7 +153,6 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", thisSession, 60)
 
-
 	uri := "/"
 	method := "GET"
 
@@ -164,7 +161,6 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
-
 
 	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
 
@@ -212,7 +208,6 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", thisSession, 60)
 
-
 	uri := "/"
 	method := "GET"
 
@@ -221,7 +216,6 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
-
 
 	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
 
@@ -269,7 +263,6 @@ func TestHMACAuthSessionmalformedHeader(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", thisSession, 60)
 
-
 	uri := "/"
 	method := "GET"
 
@@ -278,7 +271,6 @@ func TestHMACAuthSessionmalformedHeader(t *testing.T) {
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
-
 
 	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
 

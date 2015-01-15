@@ -1,15 +1,15 @@
 package main
 
 import (
-	"time"
-	"net/http"
-	"net/url"
-	"testing"
-	"net/http/httptest"
-	"github.com/justinas/alice"
-	"strings"
 	"encoding/base64"
 	"fmt"
+	"github.com/justinas/alice"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
 )
 
 var basicAuthDef string = `

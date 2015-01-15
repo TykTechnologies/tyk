@@ -89,7 +89,6 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	uri := "/tyk/health/?api_id=1"
 	method := "GET"
 
-
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 
@@ -102,7 +101,6 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	}
 
 	healthCheckhandler(recorder, req)
-
 
 	var ApiHealthValues HealthCheckValues
 	err = json.Unmarshal([]byte(recorder.Body.String()), &ApiHealthValues)
@@ -355,7 +353,6 @@ func TestAPIAuthFail(t *testing.T) {
 		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
 	}
 }
-
 
 func TestAPIAuthOk(t *testing.T) {
 

@@ -56,7 +56,7 @@ func GetSpecForApi(APIID string) *APISpec {
 
 func GetSpecForOrg(APIID string) *APISpec {
 	var aKey string
-	for k, v := range(ApiSpecRegister) {
+	for k, v := range ApiSpecRegister {
 		if v.OrgID == APIID {
 			return v
 		}
@@ -431,7 +431,6 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, code = handleGetAllOrgKeys(filter, "")
 		}
 
-
 	} else if r.Method == "DELETE" {
 		// Remove a key
 		responseMessage, code = handleDeleteOrgKey(keyName)
@@ -532,12 +531,12 @@ func handleGetOrgDetail(ORGID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
 		log.WithFields(logrus.Fields{
-		"Org": ORGID,
-	}).Info("Attempted key retrieval - failure.")
+			"Org": ORGID,
+		}).Info("Attempted key retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
-		"Org": ORGID,
-	}).Info("Attempted key retrieval - success.")
+			"Org": ORGID,
+		}).Info("Attempted key retrieval - success.")
 	}
 
 	return responseMessage, code

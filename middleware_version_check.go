@@ -1,9 +1,10 @@
 package main
+
 import (
-	"github.com/lonelycode/tykcommon"
 	"errors"
-	"net/http"
 	"fmt"
+	"github.com/lonelycode/tykcommon"
+	"net/http"
 )
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
@@ -47,7 +48,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 		// Reply with some alternate data
 		thisMeta := meta.(tykcommon.EndpointMethodMeta)
 		responseMessage := []byte(thisMeta.Data)
-		for header, value := range(thisMeta.Headers) {
+		for header, value := range thisMeta.Headers {
 			w.Header().Add(header, value)
 		}
 
