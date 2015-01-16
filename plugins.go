@@ -195,7 +195,7 @@ func (j *JSVM) LoadJSPaths(paths []string) {
 			log.Error("Failed to load Middleware JS: ", loadErr)
 		} else {
 			// No error, load the JS into the VM
-            log.Info("Loading JS File: mwPath")
+            log.Info("Loading JS File: ", mwPath)
 			j.VM.Run(js)
 		}
 	}
