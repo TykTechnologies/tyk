@@ -28,7 +28,7 @@ fbHandler.NewHandler(function(event) {
     };
     
     if (newRequest.Domain === "") {
-        log("Please sepcify a Firebase endpoint in the request...");
+        log("Please specify a Firebase endpoint in the request...");
         return
     }
     
