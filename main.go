@@ -82,6 +82,7 @@ func setupGlobals() {
     
     // Set up global JSVM
     GlobalEventsJSVM.Init(config.TykJSPath)
+    GlobalEventsJSVM.LoadTykJSApi()
 }
 
 // Pull API Specs from configuration

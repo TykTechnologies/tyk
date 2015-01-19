@@ -6,9 +6,12 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
+    _ "github.com/robertkrimen/otto/underscore"
 	"io"
 	"io/ioutil"
 	"net/http"
+    "net/url"
+    "fmt"
     "time"
 )
 
@@ -199,4 +202,112 @@ func (j *JSVM) LoadJSPaths(paths []string) {
 			j.VM.Run(js)
 		}
 	}
+}
+
+/*
+
+makeHttprequest({
+    "Method": "GET",
+    "bBody": "",
+    "hHeaders": {"header": "value"},
+    "URL": ""
+})
+
+*/
+
+type TykJSHttpRequest struct {
+    Method string
+    Body string
+    Headers map[string]string
+    Domain string
+    Resource string
+    FormData map[string]string
+}
+
+type TykJSHttpResponse struct {
+    Code int
+    Body string
+    Headers map[string][]string
+}
+
+func (j *JSVM) LoadTykJSApi() {
+    // Enable the creation of HTTP Requsts
+    j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
+		
+        jsonHRO := call.Argument(0).String()
+        HRO := TykJSHttpRequest{}
+        if jsonHRO != "undefined" {
+            jsonErr := json.Unmarshal([]byte(jsonHRO), &HRO)
+            if jsonErr != nil {
+                log.Error("JSVM: Failed to deserialise HTTP Request object")
+                return otto.Value{}
+            }
+            
+            // Make the request
+            domain := HRO.Domain
+            data := url.Values{}
+            for k, v := range(HRO.FormData) {
+                data.Set(k, v)
+            }
+
+            u, _ := url.ParseRequestURI(domain)
+            u.Path = HRO.Resource
+            urlStr := fmt.Sprintf("%v", u) // "https://api.com/user/"
+
+            client := &http.Client{}
+            
+            var d *string
+            if HRO.Body != "" {
+                d = &HRO.Body
+            } else {
+                if len(HRO.FormData) > 0 {
+                    thisD := data.Encode()    
+                    d = &thisD
+                } else {
+                    d = nil   
+                }
+                
+            } 
+            
+            r, _ := http.NewRequest(HRO.Method, urlStr, nil)
+            
+            if d != nil {
+                r, _ = http.NewRequest(HRO.Method, urlStr, bytes.NewBufferString(*d))    
+            }
+            
+            
+            for k, v := range(HRO.Headers) {
+                r.Header.Add(k, v)
+            }
+            r.Close = true
+            resp, respErr := client.Do(r)
+            
+            if respErr != nil {
+                log.Error("JSVM: Request failed: ", respErr)
+                return otto.Value{}
+            }
+            
+            body, _ := ioutil.ReadAll(resp.Body)
+            tykResp := TykJSHttpResponse{
+                Code: resp.StatusCode,
+                Body: string(body),
+                Headers: resp.Header,
+            }
+            
+            retAsStr, _ := json.Marshal(tykResp)
+            returnVal, retErr := j.VM.ToValue(string(retAsStr))
+            if retErr != nil {
+                log.Error("JSVM: Failed to encode return value: ", retErr)
+                return otto.Value{}
+            }
+            
+            return returnVal
+            
+        }
+        
+        // Nope, return nothing
+		return otto.Value{}
+	})
+    
+    
 }
