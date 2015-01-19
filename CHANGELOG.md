@@ -4,6 +4,8 @@
 - Added a JS Virtual Machine so dynamic JS middleware can be run PRE and POST middleware chain
 - Added a global JS VM
 - Added an `eh_dynamic_handler` event handler type that runs JS event handlers
+- Added Session management API and HttpRequest API to event handler JSVM.
+- Added JS samples
  
 
 # v1.3:
