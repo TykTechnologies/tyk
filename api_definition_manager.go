@@ -138,7 +138,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
-			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf)
+			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf, &newAppSpec)
 
 			if getHandlerErr != nil {
 				log.Error("Failed to init event handler: ", getHandlerErr)

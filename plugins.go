@@ -309,5 +309,41 @@ func (j *JSVM) LoadTykJSApi() {
 		return otto.Value{}
 	})
     
+    // Expose Setters and Getters in the REST API for a key:
+    
+    j.VM.Set("TykGetKeyData", func(call otto.FunctionCall) otto.Value {
+        apiKey := call.Argument(0).String()
+        apiId := call.Argument(1).String()
+
+        byteArray, _ := handleGetDetail(apiKey, apiId)
+        
+        returnVal, retErr := j.VM.ToValue(string(byteArray))
+        if retErr != nil {
+            log.Error("JSVM: Failed to encode return value: ", retErr)
+            return otto.Value{}
+        }
+
+        return returnVal
+    })
+    
+    j.VM.Set("TykSetKeyData", func(call otto.FunctionCall) otto.Value {
+        apiKey := call.Argument(0).String()
+        encoddedSession := call.Argument(1).String()
+        
+        newSession := SessionState{}
+        decErr := json.Unmarshal([]byte(encoddedSession), &newSession)
+        
+        if decErr != nil {
+            log.Error("Failed to decode the sesison data")
+            return otto.Value{}
+        }
+
+        doAddOrUpdate(apiKey, newSession)
+        
+        
+
+        return otto.Value{}
+    })
+    
     
 }

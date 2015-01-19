@@ -85,7 +85,7 @@ type TykEventHandler interface {
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
-func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (TykEventHandler, error) {
+func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec *APISpec) (TykEventHandler, error) {
 
 	var thisConf interface{}
 	switch handlerConf.HandlerMeta.(type) {
@@ -108,9 +108,12 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig) (Tyk
 	case EH_WebHook:
 		return WebHookHandler{}.New(thisConf)
     case EH_JSVMHandler:
-        // Load the file here
-        GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})
-        return JSVMEventHandler{}.New(thisConf)
+        // Load the globals and file here
+        thisJSVMEventHandler, jsvmErr := JSVMEventHandler{Spec: Spec}.New(thisConf)
+        if jsvmErr == nil {
+            GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})    
+        }
+        return thisJSVMEventHandler, jsvmErr
 	}
 
 	return nil, errors.New("Handler not found")

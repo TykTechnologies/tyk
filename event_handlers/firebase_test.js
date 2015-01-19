@@ -1,7 +1,7 @@
 // ---- Sample firebase middleware -----
 var fbHandler = new TykJS.TykEventHandlers.NewEventHandler({});
 
-fbHandler.NewHandler(function(event) {
+fbHandler.NewHandler(function(event, context) {
     // You can log to Tyk console output by calloing the built-in log() function:
     log("Running firebase JSVM Handler");
     

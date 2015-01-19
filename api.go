@@ -67,6 +67,34 @@ func GetSpecForOrg(APIID string) *APISpec {
 	return ApiSpecRegister[aKey]
 }
 
+func doAddOrUpdate(keyName string, newSession SessionState) {
+    if len(newSession.AccessRights) > 0 {
+        // We have a specific list of access rules, only add / update those
+        for apiId, _ := range newSession.AccessRights {
+            thisAPISpec := GetSpecForApi(apiId)
+            if thisAPISpec != nil {
+                // Lets reset keys if they are edited by admin
+                thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+            } else {
+                log.WithFields(logrus.Fields{
+                    "key":   keyName,
+                    "apiID": apiId,
+                }).Error("Could not add key for this API ID, API doesn't exist.")
+            }
+        }
+    } else {
+        // nothing defined, add key to ALL
+        log.Warning("No API Access Rights set, adding key to ALL.")
+        for _, spec := range ApiSpecRegister {
+            spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+        }
+    }
+
+    log.WithFields(logrus.Fields{
+        "key": keyName,
+    }).Info("New key added or updated.")
+}
+
 // ---- TODO: This changes the URL structure of the API completely ----
 // ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
@@ -87,42 +115,18 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		success = false
 		responseMessage = createError("Request malformed")
 	} else {
-		// Update our session object (create it)
-		if newSession.BasicAuthData.Password != "" {
-			// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
-			// Only if it's NEW
-			if r.Method == "POST" {
-				keyName = newSession.OrgID + keyName
-			}
+        // DO ADD OR UPDATE
+        // Update our session object (create it)
+        if newSession.BasicAuthData.Password != "" {
+            // If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
+            // Only if it's NEW
+            if r.Method == "POST" {
+                keyName = newSession.OrgID + keyName
+            }
 
-		}
-
-		if len(newSession.AccessRights) > 0 {
-			// We have a specific list of access rules, only add / update those
-			for apiId, _ := range newSession.AccessRights {
-				thisAPISpec := GetSpecForApi(apiId)
-				if thisAPISpec != nil {
-					// Lets reset keys if they are edited by admin
-					thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
-				} else {
-					log.WithFields(logrus.Fields{
-						"key":   keyName,
-						"apiID": apiId,
-					}).Error("Could not add key for this API ID, API doesn't exist.")
-				}
-			}
-		} else {
-			// nothing defined, add key to ALL
-			log.Warning("No API Access Rights set, adding key to ALL.")
-			for _, spec := range ApiSpecRegister {
-				spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
-			}
-		}
-
-		log.WithFields(logrus.Fields{
-			"key": keyName,
-		}).Info("New key added or updated.")
-	}
+        }
+        doAddOrUpdate(keyName, newSession)
+    }
 
 	var action string
 	if r.Method == "POST" {

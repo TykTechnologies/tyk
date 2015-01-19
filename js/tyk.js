@@ -51,14 +51,14 @@ TykJS.TykMiddleware.NewMiddleware.prototype.ReturnData = function(request, sessi
 
 // -- Start Event Handler implementation ----
 
-TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.DoProcessEvent = function(event) {
+TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.DoProcessEvent = function(event, context) {
     // call the handler
     log("Calling built - in handle")
-    this.Handle(event);
+    this.Handle(event, context);
     return
 };
 
-TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.Handle = function(request, session) {
+TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.Handle = function(request, context) {
     log("Handler not implemented!");
     return request;
 };
