@@ -219,7 +219,7 @@ type TykJSHttpResponse struct {
 
 func (j *JSVM) LoadTykJSApi() {
     // Enable a log
-    vm.Set("log", func(call otto.FunctionCall) otto.Value {
+    j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
 		log.Info("JSVM LOG: ", call.Argument(0).String())
 		return otto.Value{}
 	})
