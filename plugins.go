@@ -178,14 +178,12 @@ type JSVM struct {
 func (j *JSVM) Init(coreJS string) {
     vm := otto.New()
 	coreJs, _ := ioutil.ReadFile(config.TykJSPath)
-	// run core elements
-
-	vm.Set("log", func(call otto.FunctionCall) otto.Value {
-		log.Info("JSVM LOG: ", call.Argument(0).String())
-		return otto.Value{}
-	})
-
-	vm.Run(coreJs)
+	
+    // Add environment API
+    j.LoadTykJSApi()
+	
+    // Init TykJS namespace, constructors etc.
+    vm.Run(coreJs)
     
     j.VM = vm
 }
@@ -204,17 +202,6 @@ func (j *JSVM) LoadJSPaths(paths []string) {
 	}
 }
 
-/*
-
-makeHttprequest({
-    "Method": "GET",
-    "bBody": "",
-    "hHeaders": {"header": "value"},
-    "URL": ""
-})
-
-*/
-
 type TykJSHttpRequest struct {
     Method string
     Body string
@@ -231,6 +218,12 @@ type TykJSHttpResponse struct {
 }
 
 func (j *JSVM) LoadTykJSApi() {
+    // Enable a log
+    vm.Set("log", func(call otto.FunctionCall) otto.Value {
+		log.Info("JSVM LOG: ", call.Argument(0).String())
+		return otto.Value{}
+	})
+    
     // Enable the creation of HTTP Requsts
     j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 		
