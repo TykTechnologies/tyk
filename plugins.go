@@ -179,13 +179,13 @@ func (j *JSVM) Init(coreJS string) {
     vm := otto.New()
 	coreJs, _ := ioutil.ReadFile(config.TykJSPath)
 	
-    // Add environment API
-    j.LoadTykJSApi()
-	
     // Init TykJS namespace, constructors etc.
     vm.Run(coreJs)
     
     j.VM = vm
+    
+    // Add environment API
+    j.LoadTykJSApi()
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
