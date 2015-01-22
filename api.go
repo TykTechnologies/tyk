@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
+    "path"
+    "io/ioutil"
+    "os"
 	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
@@ -356,11 +358,121 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 	return responseMessage, code
 }
 
+func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
+	success := true
+	decoder := json.NewDecoder(r.Body)
+	var responseMessage []byte
+	var newDef tykcommon.APIDefinition
+	err := decoder.Decode(&newDef)
+	code := 200
+
+	if err != nil {
+        log.Error("Couldn't decode new API Definition object: ", err)
+		success = false
+        return createError("Request malformed"), 400
+	} 
+    
+    if APIID != "" {
+        if newDef.APIID != APIID {
+            log.Error("PUT operation on different APIIDs")
+            return createError("Request APIID does not match that in Definition! For Updtae operations these must match."), 400
+        }    
+    }
+    
+     
+    // Create a filename
+    defFilename := newDef.APIID + ".json"
+    defFilePath := path.Join(config.AppPath, defFilename)
+    
+    // If it exists, delete it
+    if _, err := os.Stat(defFilePath); err == nil {
+        log.Warning("API Definition with this ID already exists, deleting file...")
+        os.Remove(defFilePath)
+    }
+    
+    // unmarshal the object into the file
+    asByte, mErr := json.MarshalIndent(newDef, "", "  ")
+    if mErr != nil {
+        log.Error("Marshalling of API Definition failed: ", mErr)
+        return createError("Marshalling failed"), 500
+    }
+    
+    wErr := ioutil.WriteFile(defFilePath, asByte, 0644)
+    if wErr != nil {
+        log.Error("Failed to create file! - ", wErr)
+        success = false
+        return createError("File object creation failed, write error"), 500
+    }
+
+	var action string
+	if r.Method == "POST" {
+		action = "added"
+	} else {
+		action = "modified"
+	}
+
+	if success {
+		response := APIModifyKeySuccess{
+			newDef.APIID,
+			"ok",
+			action}
+
+		responseMessage, err = json.Marshal(&response)
+
+		if err != nil {
+			log.Error("Could not create response message")
+			log.Error(err)
+			code = 500
+			responseMessage = []byte(E_SYSTEM_ERROR)
+		}
+	}
+
+	return responseMessage, code
+}
+
+func HandleDeleteAPI(APIID string) ([]byte, int) {
+	success := true	
+	var responseMessage []byte
+	code := 200
+    
+    // Generate a filename
+    defFilename := APIID + ".json"
+    defFilePath := path.Join(config.AppPath, defFilename)
+    
+    // If it exists, delete it
+    if _, err := os.Stat(defFilePath); err != nil {
+        log.Warning("File does not exist! ", err)
+        return createError("Delete failed"), 500
+    }
+    
+    os.Remove(defFilePath)
+    
+    if success {
+		response := APIModifyKeySuccess{
+			APIID,
+			"ok",
+			"deleted"}
+        
+        var err error
+		responseMessage, err = json.Marshal(&response)
+
+		if err != nil {
+			log.Error("Could not create response message")
+			log.Error(err)
+			code = 500
+			responseMessage = []byte(E_SYSTEM_ERROR)
+		}
+	}
+
+	return responseMessage, code
+}
+
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	APIID := r.URL.Path[len("/tyk/apis/"):]
 	var responseMessage []byte
 	var code int
 
+    log.Warning(r.Method)
 	if r.Method == "GET" {
 		if APIID != "" {
 			log.Info("Requesting API definition for", APIID)
@@ -370,7 +482,22 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, code = HandleGetAPIList()
 		}
 
-	} else {
+    } else if r.Method == "POST" {
+        log.Info("Creating new definition file")
+        responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+    } else if r.Method == "PUT" {
+        log.Info("Updating existing API: ", APIID)
+        responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+    } else if r.Method == "DELETE" {
+        log.Info("Deleting existing API: ", APIID)
+        if APIID != "" {
+            log.Info("Deleting API definition for: ", APIID)
+			responseMessage, code = HandleDeleteAPI(APIID)
+		} else {
+            code = 400
+		    responseMessage = createError("Must specify an APIID to delete")
+        }
+    } else {
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
