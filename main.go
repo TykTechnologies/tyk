@@ -82,7 +82,6 @@ func setupGlobals() {
     
     // Set up global JSVM
     GlobalEventsJSVM.Init(config.TykJSPath)
-    GlobalEventsJSVM.LoadTykJSApi()
 }
 
 // Pull API Specs from configuration
@@ -317,6 +316,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
 func ReloadURLStructure() {
+    // Reset the JSVM
+    GlobalEventsJSVM.Init(config.TykJSPath)
+    
 	newMuxes := http.NewServeMux()
 	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()
