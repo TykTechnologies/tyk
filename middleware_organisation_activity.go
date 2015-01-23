@@ -37,8 +37,9 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		return errors.New("This organisation access has been disabled, please contact your API administrator."), 403
 	}
-
-	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState)
+    
+    storeRef := k.Spec.OrgSessionManager.GetStore()
+	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState, thisOrg, storeRef)
 
 	// Ensure quota and rate data for this session are recorded
 

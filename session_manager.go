@@ -2,6 +2,7 @@ package main
 
 import (
 	"time"
+    "strconv"
 )
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -52,7 +53,7 @@ type SessionLimiter struct{}
 
 // ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
-func (l SessionLimiter) ForwardMessage(currentSession *SessionState) (bool, int) {
+func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 
 	current := time.Now().Unix()
 
@@ -70,7 +71,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState) (bool, int)
 	}
 
 	currentSession.Allowance--
-	if !l.IsQuotaExceeded(currentSession) {
+	if !l.IsRedisQuotaExceeded(currentSession, key, store) {
 		return true, 0
 	}
 
@@ -104,6 +105,43 @@ func (l SessionLimiter) IsQuotaExceeded(currentSession *SessionState) bool {
 	}
 
 	return true
+
+}
+
+func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
+    
+    // Are they unlimited?
+    if currentSession.QuotaMax == -1 {
+		// No quota set
+		return false
+	}
+    
+    // Create the key
+    rawKey := "quota-" + key
+    quotaVal, rErr := store.GetKey(rawKey)
+    
+    if rErr != nil {
+        // Key not found, must have expired, set it to Max and expire when time to renew
+        store.SetKey(rawKey, strconv.Itoa(int(currentSession.QuotaMax)), currentSession.QuotaRenewalRate)
+        
+        // Quota has renewed, let them through and set quotmax for records
+        currentSession.QuotaRemaining = currentSession.QuotaMax
+        return false
+    }
+    
+    remaining, _ := strconv.Atoi(quotaVal)
+    
+    if remaining > 0 {
+        // Decrement the quota
+        store.Decrement(rawKey)
+        currentSession.QuotaRemaining = int64(remaining)
+        // Let them through
+        return false
+    }    
+  
+    // They have hit zero, none shall pass
+    currentSession.QuotaRemaining = 0
+    return true
 
 }
 

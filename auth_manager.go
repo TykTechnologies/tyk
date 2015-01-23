@@ -26,6 +26,7 @@ type SessionHandler interface {
 	RemoveSession(keyName string)
 	GetSessionDetail(keyName string) (SessionState, bool)
 	GetSessions(filter string) []string
+    GetStore() StorageHandler
 }
 
 type KeyGenerator interface {
@@ -81,6 +82,10 @@ func (b DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool
 func (b *DefaultSessionManager) Init(store StorageHandler) {
 	b.Store = store
 	b.Store.Connect()
+}
+
+func (b *DefaultSessionManager) GetStore() StorageHandler{
+	return b.Store
 }
 
 // UpdateSession updates the session state in the storage engine

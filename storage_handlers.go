@@ -26,6 +26,7 @@ type StorageHandler interface {
 	GetKeysAndValues() map[string]string
 	GetKeysAndValuesWithFilter(string) map[string]string
 	DeleteKeys([]string) bool
+    Decrement(string) 
 }
 
 // InMemoryStorageManager implements the StorageHandler interface,
@@ -35,7 +36,11 @@ type InMemoryStorageManager struct {
 	Sessions map[string]string
 }
 
-// Connect will establish a connection to the storage engine
+// Decrement is a dummy function
+func (s *InMemoryStorageManager) Decrement(n string) {
+    log.Warning("Not implemented!")
+}
+
 func (s *InMemoryStorageManager) Connect() bool {
 	return true
 }
@@ -219,6 +224,28 @@ func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeou
 		if err != nil {
 			log.Error("Error trying to set value:")
 			log.Error(err)
+		}
+	}
+}
+
+// Decrement will decrement a key in redis with a transaction
+func (r *RedisStorageManager) Decrement(keyName string) {
+	db := r.pool.Get()
+	defer db.Close()
+    
+    keyName = r.fixKey(keyName)
+	log.Debug("Decrementing key: ", keyName)
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		r.Decrement(keyName)
+	} else {
+		db.Send("MULTI")
+        db.Send("DECR", keyName)
+        _, err := db.Do("EXEC")
+        
+		if err != nil {
+			log.Error("Error trying to decrement value:", err)
 		}
 	}
 }
