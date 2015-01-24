@@ -13,7 +13,7 @@ import (
 
 func createThrottledSession() SessionState {
 	var thisSession SessionState
-	thisSession.Rate = 1.0
+	thisSession.Rate = 2.0
 	thisSession.Allowance = thisSession.Rate
 	thisSession.LastCheck = time.Now().Unix()
 	thisSession.Per = 1.0
