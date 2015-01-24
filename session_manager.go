@@ -49,6 +49,7 @@ type PublicSessionState struct {
 
 const (
     QuotaKeyPrefix string = "quota-"
+    RateLimitKeyPrefix string = "rate-limit-"
 )
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
@@ -59,21 +60,13 @@ type SessionLimiter struct{}
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 
-	current := time.Now().Unix()
-
-	timePassed := current - currentSession.LastCheck
-	currentSession.LastCheck = current
-	currentSession.Allowance += float64(timePassed) * (currentSession.Rate / currentSession.Per)
-
-	if currentSession.Allowance > currentSession.Rate {
-		// Throttle
-		currentSession.Allowance = currentSession.Rate
-	}
-
-	if currentSession.Allowance < 1.0 {
-		return false, 1
-	}
-
+    rateLimiterKey := RateLimitKeyPrefix + key
+    ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
+    
+    if ratePerPeriodNow >= int64(currentSession.Rate) {
+        return false, 1
+    }
+    
 	currentSession.Allowance--
 	if !l.IsRedisQuotaExceeded(currentSession, key, store) {
 		return true, 0
