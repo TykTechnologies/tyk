@@ -2,7 +2,7 @@ package main
 
 import (
 	"time"
-    "strconv"
+    
 )
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -46,6 +46,10 @@ type PublicSessionState struct {
 		Per  float64 `json:"per_unit"`
 	} `json:"rate_limit"`
 }
+
+const (
+    QuotaKeyPrefix string = "quota-"
+)
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
@@ -117,32 +121,26 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 	}
     
     // Create the key
-    rawKey := "quota-" + key
-    quotaVal, rErr := store.GetKey(rawKey)
+    rawKey := QuotaKeyPrefix + key
     
-    if rErr != nil {
-        // Key not found, must have expired, set it to Max and expire when time to renew
-        store.SetKey(rawKey, strconv.Itoa(int(currentSession.QuotaMax)), currentSession.QuotaRenewalRate)
-        
-        // Quota has renewed, let them through and set quotmax for records
-        currentSession.QuotaRemaining = currentSession.QuotaMax
-        return false
+    // INCR the key (If it equals 1 - set EXPIRE)
+    qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
+    
+    // if the returned val is >= quota: block
+//     qInt, _ := strconv.Atoi(qValStr)
+    if int64(qInt) >= currentSession.QuotaMax {
+        return true
     }
     
-    remaining, _ := strconv.Atoi(quotaVal)
+    // If not, pass and set the values of the session to quotamax - counter
+    remaining := currentSession.QuotaMax - int64(qInt)
     
-    if remaining > 0 {
-        // Decrement the quota
-        store.Decrement(rawKey)
-        currentSession.QuotaRemaining = int64(remaining)
-        // Let them through
-        return false
-    }    
-  
-    // They have hit zero, none shall pass
-    currentSession.QuotaRemaining = 0
-    return true
-
+    if remaining  < 0 {
+        currentSession.QuotaRemaining = 0     
+    } else {
+        currentSession.QuotaRemaining = remaining
+    }
+    return false
 }
 
 // createSampleSession is a debug function to create a mock session value

@@ -69,7 +69,7 @@ func GetSpecForOrg(APIID string) *APISpec {
 	return ApiSpecRegister[aKey]
 }
 
-func doAddOrUpdate(keyName string, newSession SessionState) {
+func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) {
     if len(newSession.AccessRights) > 0 {
         // We have a specific list of access rules, only add / update those
         for apiId, _ := range newSession.AccessRights {
@@ -77,6 +77,12 @@ func doAddOrUpdate(keyName string, newSession SessionState) {
             if thisAPISpec != nil {
                 // Lets reset keys if they are edited by admin
                 thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+                if !thisAPISpec.DontSetQuotasOnCreate {
+                    // Reset quote by default
+                    if !dontReset {
+                         thisAPISpec.SessionManager.ResetQuota(keyName, newSession)   
+                    }
+                }
             } else {
                 log.WithFields(logrus.Fields{
                     "key":   keyName,
@@ -127,7 +133,13 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
             }
 
         }
-        doAddOrUpdate(keyName, newSession)
+        dont_reset := r.FormValue("suppress_reset")
+        var suppress_reset bool = false
+        
+        if dont_reset == "1" {
+            suppress_reset = true
+        }
+        doAddOrUpdate(keyName, newSession, suppress_reset)
     }
 
 	var action string
@@ -795,6 +807,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					if thisAPISpec != nil {
 						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 						thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+                        if !thisAPISpec.DontSetQuotasOnCreate {
+                            // Reset quote by default
+                            thisAPISpec.SessionManager.ResetQuota(newKey, newSession)
+                        }
 					} else {
 						log.WithFields(logrus.Fields{
 							"apiID": apiId,
@@ -806,6 +822,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				log.Warning("No API Access Rights set, adding key to ALL.")
 				for _, spec := range ApiSpecRegister {
 					spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
+                    if !spec.DontSetQuotasOnCreate {
+                        // Reset quote by default
+                        spec.SessionManager.ResetQuota(newKey, newSession)
+                    }
 				}
 			}
 

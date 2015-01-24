@@ -6,6 +6,9 @@
 - Added an `eh_dynamic_handler` event handler type that runs JS event handlers
 - Added Session management API and HttpRequest API to event handler JSVM.
 - Added JS samples
+- Fixed a bug where requests that happened at identical times could influence the quota wrongly
+- Changed default quota behaviour: On create or update, key quotas are reset. *unless* a new param `?suppress_reset=1` accompanies the REST request. This way a key can be updated and have the quote in Redis reset to Max, OR it can be edited without affecting the quota
+
  
 
 # v1.3:
