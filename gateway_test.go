@@ -26,6 +26,21 @@ func createThrottledSession() SessionState {
 	return thisSession
 }
 
+func createNonThrottledSession() SessionState {
+	var thisSession SessionState
+	thisSession.Rate = 100.0
+	thisSession.Allowance = thisSession.Rate
+	thisSession.LastCheck = time.Now().Unix()
+	thisSession.Per = 1.0
+	thisSession.Expires = 0
+	thisSession.QuotaRenewalRate = 300 // 5 minutes
+	thisSession.QuotaRenews = time.Now().Unix()
+	thisSession.QuotaRemaining = 10
+	thisSession.QuotaMax = 10
+
+	return thisSession
+}
+
 func createQuotaSession() SessionState {
 	var thisSession SessionState
 	thisSession.Rate = 8.0
@@ -36,7 +51,7 @@ func createQuotaSession() SessionState {
 	thisSession.QuotaRenewalRate = 300 // 5 minutes
 	thisSession.QuotaRenews = time.Now().Unix() + 20
 	thisSession.QuotaRemaining = 1
-	thisSession.QuotaMax = 1
+	thisSession.QuotaMax = 2
 
 	return thisSession
 }
