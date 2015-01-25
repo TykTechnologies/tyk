@@ -63,7 +63,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
     rateLimiterKey := RateLimitKeyPrefix + key
     ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
     
-    if ratePerPeriodNow >= int64(currentSession.Rate) {
+    if ratePerPeriodNow >= (int64(currentSession.Rate)) {
         return false, 1
     }
     
@@ -120,8 +120,7 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
     qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
     
     // if the returned val is >= quota: block
-//     qInt, _ := strconv.Atoi(qValStr)
-    if int64(qInt) >= currentSession.QuotaMax {
+    if (int64(qInt)-1) >= currentSession.QuotaMax {
         return true
     }
     

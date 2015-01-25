@@ -562,6 +562,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	if r.Method == "POST" || r.Method == "PUT" {
+        
 		responseMessage, code = handleOrgAddOrUpdate(keyName, r)
 
 	} else if r.Method == "GET" {
@@ -611,10 +612,15 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		}
 
 		spec.OrgSessionManager.UpdateSession(keyName, newSession, 0)
+        
+        do_reset := r.FormValue("reset_quota")
+        if do_reset == "1" {
+            spec.OrgSessionManager.ResetQuota(keyName, newSession)
+        }
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
-		}).Info("New key added or updated.")
+		}).Info("New org key added or updated.")
 		success = true
 	}
 
@@ -748,6 +754,7 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 
 	return responseMessage, code
 }
+
 func resetHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
@@ -808,7 +815,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 						thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
                         if !thisAPISpec.DontSetQuotasOnCreate {
-                            // Reset quote by default
+                            // Reset quota by default
                             thisAPISpec.SessionManager.ResetQuota(newKey, newSession)
                         }
 					} else {

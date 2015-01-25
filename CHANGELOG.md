@@ -9,6 +9,7 @@
 - Fixed a bug where requests that happened at identical times could influence the quota wrongly
 - Changed default quota behaviour: On create or update, key quotas are reset. *unless* a new param `?suppress_reset=1` accompanies the REST request. This way a key can be updated and have the quote in Redis reset to Max, OR it can be edited without affecting the quota
 - Rate limiter now uses new Redis based rate limiting pattern
+- Added a `?reset_quota=1` parameter check to `/tyk/orgs/key` endpoint so that quotas can be reset for organisation-wide locks
  
 
 # v1.3:

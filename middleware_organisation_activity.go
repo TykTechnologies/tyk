@@ -28,7 +28,13 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	thisOrg := k.Spec.OrgID
 	thisSessionState, found := k.GetOrgSession(thisOrg)
 
-	if thisSessionState.IsInactive {
+	if !found {
+		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
+		return nil, 200
+	}
+    
+    // IOs it active?
+    if thisSessionState.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
@@ -38,15 +44,9 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("This organisation access has been disabled, please contact your API administrator."), 403
 	}
     
+    // We found a session, apply the quota limiter
     storeRef := k.Spec.OrgSessionManager.GetStore()
 	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState, thisOrg, storeRef)
-
-	// Ensure quota and rate data for this session are recorded
-
-	if !found {
-		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
-		return nil, 200
-	}
 
 	k.Spec.OrgSessionManager.UpdateSession(thisOrg, thisSessionState, 0)
 
