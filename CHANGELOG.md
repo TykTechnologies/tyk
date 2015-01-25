@@ -1,4 +1,4 @@
-# DEV
+# v1.4
 
 - Added expiry TTL to `tykcommon`, data expiry headers will be added to all analytics records, set `expire_analytics_after` to `0` to have data live indefinetely (currently 100 years), set to anything above zero for data in MongoDB to be removed after x seconds. **requirement**: You must create an expiry TTL index on the tyk_analytics collection manually (http://docs.mongodb.org/manual/tutorial/expire-data/). If you do not wish mongo to manage data warehousing at all, simply do not create the index.
 - Added a JS Virtual Machine so dynamic JS middleware can be run PRE and POST middleware chain
@@ -10,6 +10,8 @@
 - Changed default quota behaviour: On create or update, key quotas are reset. *unless* a new param `?suppress_reset=1` accompanies the REST request. This way a key can be updated and have the quote in Redis reset to Max, OR it can be edited without affecting the quota
 - Rate limiter now uses new Redis based rate limiting pattern
 - Added a `?reset_quota=1` parameter check to `/tyk/orgs/key` endpoint so that quotas can be reset for organisation-wide locks
+- Organisations can now have quotas
+- Keys and organisations can be made inactive without deleting
  
 
 # v1.3:

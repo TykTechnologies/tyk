@@ -229,7 +229,17 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 	}
 
 	sessions := thiSpec.SessionManager.GetSessions(filter)
-	sessionsObj := APIAllKeys{sessions}
+    
+    fixed_sessions := make([]string, 0)
+    for _, s := range(sessions) {
+        if !strings.Contains(s, QuotaKeyPrefix) {
+            if !strings.Contains(s, RateLimitKeyPrefix) {
+                fixed_sessions = append(fixed_sessions, s)
+            }
+        }
+    }
+    
+	sessionsObj := APIAllKeys{fixed_sessions}
 
 	responseMessage, err = json.Marshal(&sessionsObj)
 	if err != nil {
@@ -705,7 +715,15 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 	}
 
 	sessions := thiSpec.OrgSessionManager.GetSessions(filter)
-	sessionsObj := APIAllKeys{sessions}
+    fixed_sessions := make([]string, 0)
+    for _, s := range(sessions) {
+        if !strings.Contains(s, QuotaKeyPrefix) {
+            if !strings.Contains(s, RateLimitKeyPrefix) {
+                fixed_sessions = append(fixed_sessions, s)
+            }
+        }
+    }
+	sessionsObj := APIAllKeys{fixed_sessions}
 
 	responseMessage, err = json.Marshal(&sessionsObj)
 	if err != nil {

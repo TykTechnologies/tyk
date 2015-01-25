@@ -25,6 +25,30 @@ func (k *KeyExpired) GetConfig() (interface{}, error) {
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
+    
+    if thisSessionState.IsInactive {
+        log.WithFields(logrus.Fields{
+			"path":   r.URL.Path,
+			"origin": r.RemoteAddr,
+			"key":    authHeaderValue,
+		}).Info("Attempted access from inactive key.")
+
+		// Fire a key expired event
+		authHeaderValue := context.Get(r, AuthHeaderValue)
+		go k.TykMiddleware.FireEvent(EVENT_KeyExpired,
+			EVENT_KeyExpiredMeta{
+				EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key."},
+				Path:             r.URL.Path,
+				Origin:           r.RemoteAddr,
+				Key:              authHeaderValue.(string),
+			})
+
+		// Report in health check
+		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+
+		return errors.New("Key is inactive, please renew"), 403
+    }
+    
 	keyExpired := k.Spec.AuthManager.IsKeyExpired(&thisSessionState)
 
 	if keyExpired {
