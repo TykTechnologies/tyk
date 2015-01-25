@@ -95,6 +95,9 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) {
 		log.Warning("No API Access Rights set, adding key to ALL.")
 		for _, spec := range ApiSpecRegister {
 			spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+            if !dontReset {
+                spec.SessionManager.ResetQuota(keyName, newSession)
+            }
 		}
 	}
 
