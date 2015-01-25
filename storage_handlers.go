@@ -26,8 +26,8 @@ type StorageHandler interface {
 	GetKeysAndValues() map[string]string
 	GetKeysAndValuesWithFilter(string) map[string]string
 	DeleteKeys([]string) bool
-    Decrement(string) 
-    IncrememntWithExpire(string, int64) int64
+	Decrement(string)
+	IncrememntWithExpire(string, int64) int64
 }
 
 // InMemoryStorageManager implements the StorageHandler interface,
@@ -39,12 +39,12 @@ type InMemoryStorageManager struct {
 
 // Decrement is a dummy function
 func (s *InMemoryStorageManager) Decrement(n string) {
-    log.Warning("Not implemented!")
+	log.Warning("Not implemented!")
 }
 
 func (s *InMemoryStorageManager) IncrememntWithExpire(n string, i int64) int64 {
-    log.Warning("Not implemented!")
-    return 0
+	log.Warning("Not implemented!")
+	return 0
 }
 
 func (s *InMemoryStorageManager) Connect() bool {
@@ -234,20 +234,20 @@ func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeou
 	}
 }
 
-// Decrement will decrement a key in redis 
+// Decrement will decrement a key in redis
 func (r *RedisStorageManager) Decrement(keyName string) {
 	db := r.pool.Get()
 	defer db.Close()
-    
-    keyName = r.fixKey(keyName)
+
+	keyName = r.fixKey(keyName)
 	log.Debug("Decrementing key: ", keyName)
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		r.Decrement(keyName)
 	} else {
-        err := db.Send("DECR", keyName)
-        
+		err := db.Send("DECR", keyName)
+
 		if err != nil {
 			log.Error("Error trying to decrement value:", err)
 		}
@@ -258,25 +258,25 @@ func (r *RedisStorageManager) Decrement(keyName string) {
 func (r *RedisStorageManager) IncrememntWithExpire(keyName string, expire int64) int64 {
 	db := r.pool.Get()
 	defer db.Close()
-    
-    keyName = r.fixKey(keyName)
+
+	keyName = r.fixKey(keyName)
 	log.Debug("Incrementing key: ", keyName)
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		r.Decrement(keyName)
 	} else {
-        val, err := redis.Int64(db.Do("INCR", keyName))
-        if val == 1 {
-            log.Debug("Setting Expire")
-            db.Send("EXPIRE", keyName, expire)
-        }
+		val, err := redis.Int64(db.Do("INCR", keyName))
+		if val == 1 {
+			log.Debug("Setting Expire")
+			db.Send("EXPIRE", keyName, expire)
+		}
 		if err != nil {
 			log.Error("Error trying to increment value:", err)
 		}
-        return val
+		return val
 	}
-    return 0
+	return 0
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
-    "github.com/lonelycode/tykcommon"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
+	"github.com/lonelycode/tykcommon"
 	"github.com/rcrowley/goagain"
 	"html/template"
 	"net"
@@ -79,9 +79,9 @@ func setupGlobals() {
 
 	templateFile := fmt.Sprintf("%s/error.json", config.TemplatePath)
 	templates = template.Must(template.ParseFiles(templateFile))
-    
-    // Set up global JSVM
-    GlobalEventsJSVM.Init(config.TykJSPath)
+
+	// Set up global JSVM
+	GlobalEventsJSVM.Init(config.TykJSPath)
 }
 
 // Pull API Specs from configuration
@@ -205,22 +205,22 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 		referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
-        //Set up all the JSVM middleware
-        mwPaths := []string{}
-        mwPreFuncs := []tykcommon.MiddlewareDefinition{}
-        mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-        for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
-            mwPaths = append(mwPaths, mwObj.Path)
-            mwPreFuncs = append(mwPreFuncs, mwObj)
-            log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
-        }
-        for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
-            mwPaths = append(mwPaths, mwObj.Path)
-            mwPostFuncs = append(mwPostFuncs, mwObj)
-            log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
-        }
-        
-        referenceSpec.JSVM.LoadJSPaths(mwPaths)
+		//Set up all the JSVM middleware
+		mwPaths := []string{}
+		mwPreFuncs := []tykcommon.MiddlewareDefinition{}
+		mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
+			mwPaths = append(mwPaths, mwObj.Path)
+			mwPreFuncs = append(mwPreFuncs, mwObj)
+			log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		}
+		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
+			mwPaths = append(mwPaths, mwObj.Path)
+			mwPostFuncs = append(mwPostFuncs, mwObj)
+			log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		}
+
+		referenceSpec.JSVM.LoadJSPaths(mwPaths)
 
 		if referenceSpec.EnableBatchRequestSupport {
 			addBatchEndpoint(&referenceSpec, Muxer)
@@ -316,9 +316,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
 func ReloadURLStructure() {
-    // Reset the JSVM
-    GlobalEventsJSVM.Init(config.TykJSPath)
-    
+	// Reset the JSVM
+	GlobalEventsJSVM.Init(config.TykJSPath)
+
 	newMuxes := http.NewServeMux()
 	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()

@@ -27,15 +27,15 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	sessionLimiter := SessionLimiter{}
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
-    
-    storeRef := k.Spec.SessionManager.GetStore()
+
+	storeRef := k.Spec.SessionManager.GetStore()
 	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState, authHeaderValue, storeRef)
-    
+
 	// Ensure quota and rate data for this session are recorded
 	k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
-    
-    // Write it back to the context so we can pass it back in the header
-    context.Set(r, SessionData, thisSessionState)
+
+	// Write it back to the context so we can pass it back in the header
+	context.Set(r, SessionData, thisSessionState)
 
 	log.Debug("SessionState: ", thisSessionState)
 

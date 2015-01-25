@@ -4,16 +4,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
-    "path"
-    "io/ioutil"
-    "os"
 	"github.com/RangelReale/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"github.com/nu7hatch/gouuid"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path"
+	"strings"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -70,37 +70,37 @@ func GetSpecForOrg(APIID string) *APISpec {
 }
 
 func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) {
-    if len(newSession.AccessRights) > 0 {
-        // We have a specific list of access rules, only add / update those
-        for apiId, _ := range newSession.AccessRights {
-            thisAPISpec := GetSpecForApi(apiId)
-            if thisAPISpec != nil {
-                // Lets reset keys if they are edited by admin
-                thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
-                if !thisAPISpec.DontSetQuotasOnCreate {
-                    // Reset quote by default
-                    if !dontReset {
-                         thisAPISpec.SessionManager.ResetQuota(keyName, newSession)   
-                    }
-                }
-            } else {
-                log.WithFields(logrus.Fields{
-                    "key":   keyName,
-                    "apiID": apiId,
-                }).Error("Could not add key for this API ID, API doesn't exist.")
-            }
-        }
-    } else {
-        // nothing defined, add key to ALL
-        log.Warning("No API Access Rights set, adding key to ALL.")
-        for _, spec := range ApiSpecRegister {
-            spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
-        }
-    }
+	if len(newSession.AccessRights) > 0 {
+		// We have a specific list of access rules, only add / update those
+		for apiId, _ := range newSession.AccessRights {
+			thisAPISpec := GetSpecForApi(apiId)
+			if thisAPISpec != nil {
+				// Lets reset keys if they are edited by admin
+				thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+				if !thisAPISpec.DontSetQuotasOnCreate {
+					// Reset quote by default
+					if !dontReset {
+						thisAPISpec.SessionManager.ResetQuota(keyName, newSession)
+					}
+				}
+			} else {
+				log.WithFields(logrus.Fields{
+					"key":   keyName,
+					"apiID": apiId,
+				}).Error("Could not add key for this API ID, API doesn't exist.")
+			}
+		}
+	} else {
+		// nothing defined, add key to ALL
+		log.Warning("No API Access Rights set, adding key to ALL.")
+		for _, spec := range ApiSpecRegister {
+			spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+		}
+	}
 
-    log.WithFields(logrus.Fields{
-        "key": keyName,
-    }).Info("New key added or updated.")
+	log.WithFields(logrus.Fields{
+		"key": keyName,
+	}).Info("New key added or updated.")
 }
 
 // ---- TODO: This changes the URL structure of the API completely ----
@@ -123,24 +123,24 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		success = false
 		responseMessage = createError("Request malformed")
 	} else {
-        // DO ADD OR UPDATE
-        // Update our session object (create it)
-        if newSession.BasicAuthData.Password != "" {
-            // If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
-            // Only if it's NEW
-            if r.Method == "POST" {
-                keyName = newSession.OrgID + keyName
-            }
+		// DO ADD OR UPDATE
+		// Update our session object (create it)
+		if newSession.BasicAuthData.Password != "" {
+			// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
+			// Only if it's NEW
+			if r.Method == "POST" {
+				keyName = newSession.OrgID + keyName
+			}
 
-        }
-        dont_reset := r.FormValue("suppress_reset")
-        var suppress_reset bool = false
-        
-        if dont_reset == "1" {
-            suppress_reset = true
-        }
-        doAddOrUpdate(keyName, newSession, suppress_reset)
-    }
+		}
+		dont_reset := r.FormValue("suppress_reset")
+		var suppress_reset bool = false
+
+		if dont_reset == "1" {
+			suppress_reset = true
+		}
+		doAddOrUpdate(keyName, newSession, suppress_reset)
+	}
 
 	var action string
 	if r.Method == "POST" {
@@ -379,42 +379,41 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 	code := 200
 
 	if err != nil {
-        log.Error("Couldn't decode new API Definition object: ", err)
+		log.Error("Couldn't decode new API Definition object: ", err)
 		success = false
-        return createError("Request malformed"), 400
-	} 
-    
-    if APIID != "" {
-        if newDef.APIID != APIID {
-            log.Error("PUT operation on different APIIDs")
-            return createError("Request APIID does not match that in Definition! For Updtae operations these must match."), 400
-        }    
-    }
-    
-     
-    // Create a filename
-    defFilename := newDef.APIID + ".json"
-    defFilePath := path.Join(config.AppPath, defFilename)
-    
-    // If it exists, delete it
-    if _, err := os.Stat(defFilePath); err == nil {
-        log.Warning("API Definition with this ID already exists, deleting file...")
-        os.Remove(defFilePath)
-    }
-    
-    // unmarshal the object into the file
-    asByte, mErr := json.MarshalIndent(newDef, "", "  ")
-    if mErr != nil {
-        log.Error("Marshalling of API Definition failed: ", mErr)
-        return createError("Marshalling failed"), 500
-    }
-    
-    wErr := ioutil.WriteFile(defFilePath, asByte, 0644)
-    if wErr != nil {
-        log.Error("Failed to create file! - ", wErr)
-        success = false
-        return createError("File object creation failed, write error"), 500
-    }
+		return createError("Request malformed"), 400
+	}
+
+	if APIID != "" {
+		if newDef.APIID != APIID {
+			log.Error("PUT operation on different APIIDs")
+			return createError("Request APIID does not match that in Definition! For Updtae operations these must match."), 400
+		}
+	}
+
+	// Create a filename
+	defFilename := newDef.APIID + ".json"
+	defFilePath := path.Join(config.AppPath, defFilename)
+
+	// If it exists, delete it
+	if _, err := os.Stat(defFilePath); err == nil {
+		log.Warning("API Definition with this ID already exists, deleting file...")
+		os.Remove(defFilePath)
+	}
+
+	// unmarshal the object into the file
+	asByte, mErr := json.MarshalIndent(newDef, "", "  ")
+	if mErr != nil {
+		log.Error("Marshalling of API Definition failed: ", mErr)
+		return createError("Marshalling failed"), 500
+	}
+
+	wErr := ioutil.WriteFile(defFilePath, asByte, 0644)
+	if wErr != nil {
+		log.Error("Failed to create file! - ", wErr)
+		success = false
+		return createError("File object creation failed, write error"), 500
+	}
 
 	var action string
 	if r.Method == "POST" {
@@ -443,29 +442,29 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 }
 
 func HandleDeleteAPI(APIID string) ([]byte, int) {
-	success := true	
+	success := true
 	var responseMessage []byte
 	code := 200
-    
-    // Generate a filename
-    defFilename := APIID + ".json"
-    defFilePath := path.Join(config.AppPath, defFilename)
-    
-    // If it exists, delete it
-    if _, err := os.Stat(defFilePath); err != nil {
-        log.Warning("File does not exist! ", err)
-        return createError("Delete failed"), 500
-    }
-    
-    os.Remove(defFilePath)
-    
-    if success {
+
+	// Generate a filename
+	defFilename := APIID + ".json"
+	defFilePath := path.Join(config.AppPath, defFilename)
+
+	// If it exists, delete it
+	if _, err := os.Stat(defFilePath); err != nil {
+		log.Warning("File does not exist! ", err)
+		return createError("Delete failed"), 500
+	}
+
+	os.Remove(defFilePath)
+
+	if success {
 		response := APIModifyKeySuccess{
 			APIID,
 			"ok",
 			"deleted"}
-        
-        var err error
+
+		var err error
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
@@ -484,7 +483,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
 
-    log.Warning(r.Method)
+	log.Warning(r.Method)
 	if r.Method == "GET" {
 		if APIID != "" {
 			log.Info("Requesting API definition for", APIID)
@@ -494,22 +493,22 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, code = HandleGetAPIList()
 		}
 
-    } else if r.Method == "POST" {
-        log.Info("Creating new definition file")
-        responseMessage, code = HandleAddOrUpdateApi(APIID, r)
-    } else if r.Method == "PUT" {
-        log.Info("Updating existing API: ", APIID)
-        responseMessage, code = HandleAddOrUpdateApi(APIID, r)
-    } else if r.Method == "DELETE" {
-        log.Info("Deleting existing API: ", APIID)
-        if APIID != "" {
-            log.Info("Deleting API definition for: ", APIID)
+	} else if r.Method == "POST" {
+		log.Info("Creating new definition file")
+		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+	} else if r.Method == "PUT" {
+		log.Info("Updating existing API: ", APIID)
+		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+	} else if r.Method == "DELETE" {
+		log.Info("Deleting existing API: ", APIID)
+		if APIID != "" {
+			log.Info("Deleting API definition for: ", APIID)
 			responseMessage, code = HandleDeleteAPI(APIID)
 		} else {
-            code = 400
-		    responseMessage = createError("Must specify an APIID to delete")
-        }
-    } else {
+			code = 400
+			responseMessage = createError("Must specify an APIID to delete")
+		}
+	} else {
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
@@ -562,7 +561,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	if r.Method == "POST" || r.Method == "PUT" {
-        
+
 		responseMessage, code = handleOrgAddOrUpdate(keyName, r)
 
 	} else if r.Method == "GET" {
@@ -612,11 +611,11 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		}
 
 		spec.OrgSessionManager.UpdateSession(keyName, newSession, 0)
-        
-        do_reset := r.FormValue("reset_quota")
-        if do_reset == "1" {
-            spec.OrgSessionManager.ResetQuota(keyName, newSession)
-        }
+
+		do_reset := r.FormValue("reset_quota")
+		if do_reset == "1" {
+			spec.OrgSessionManager.ResetQuota(keyName, newSession)
+		}
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
@@ -814,10 +813,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					if thisAPISpec != nil {
 						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 						thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
-                        if !thisAPISpec.DontSetQuotasOnCreate {
-                            // Reset quota by default
-                            thisAPISpec.SessionManager.ResetQuota(newKey, newSession)
-                        }
+						if !thisAPISpec.DontSetQuotasOnCreate {
+							// Reset quota by default
+							thisAPISpec.SessionManager.ResetQuota(newKey, newSession)
+						}
 					} else {
 						log.WithFields(logrus.Fields{
 							"apiID": apiId,
@@ -829,10 +828,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				log.Warning("No API Access Rights set, adding key to ALL.")
 				for _, spec := range ApiSpecRegister {
 					spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
-                    if !spec.DontSetQuotasOnCreate {
-                        // Reset quote by default
-                        spec.SessionManager.ResetQuota(newKey, newSession)
-                    }
+					if !spec.DontSetQuotasOnCreate {
+						// Reset quote by default
+						spec.SessionManager.ResetQuota(newKey, newSession)
+					}
 				}
 			}
 

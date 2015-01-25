@@ -2,7 +2,6 @@ package main
 
 import (
 	"time"
-    
 )
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -48,8 +47,8 @@ type PublicSessionState struct {
 }
 
 const (
-    QuotaKeyPrefix string = "quota-"
-    RateLimitKeyPrefix string = "rate-limit-"
+	QuotaKeyPrefix     string = "quota-"
+	RateLimitKeyPrefix string = "rate-limit-"
 )
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
@@ -60,13 +59,13 @@ type SessionLimiter struct{}
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 
-    rateLimiterKey := RateLimitKeyPrefix + key
-    ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
-    
-    if ratePerPeriodNow >= (int64(currentSession.Rate)) {
-        return false, 1
-    }
-    
+	rateLimiterKey := RateLimitKeyPrefix + key
+	ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
+
+	if ratePerPeriodNow >= (int64(currentSession.Rate)) {
+		return false, 1
+	}
+
 	currentSession.Allowance--
 	if !l.IsRedisQuotaExceeded(currentSession, key, store) {
 		return true, 0
@@ -106,33 +105,33 @@ func (l SessionLimiter) IsQuotaExceeded(currentSession *SessionState) bool {
 }
 
 func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
-    
-    // Are they unlimited?
-    if currentSession.QuotaMax == -1 {
+
+	// Are they unlimited?
+	if currentSession.QuotaMax == -1 {
 		// No quota set
 		return false
 	}
-    
-    // Create the key
-    rawKey := QuotaKeyPrefix + key
-    
-    // INCR the key (If it equals 1 - set EXPIRE)
-    qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
-    
-    // if the returned val is >= quota: block
-    if (int64(qInt)-1) >= currentSession.QuotaMax {
-        return true
-    }
-    
-    // If not, pass and set the values of the session to quotamax - counter
-    remaining := currentSession.QuotaMax - int64(qInt)
-    
-    if remaining  < 0 {
-        currentSession.QuotaRemaining = 0     
-    } else {
-        currentSession.QuotaRemaining = remaining
-    }
-    return false
+
+	// Create the key
+	rawKey := QuotaKeyPrefix + key
+
+	// INCR the key (If it equals 1 - set EXPIRE)
+	qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
+
+	// if the returned val is >= quota: block
+	if (int64(qInt) - 1) >= currentSession.QuotaMax {
+		return true
+	}
+
+	// If not, pass and set the values of the session to quotamax - counter
+	remaining := currentSession.QuotaMax - int64(qInt)
+
+	if remaining < 0 {
+		currentSession.QuotaRemaining = 0
+	} else {
+		currentSession.QuotaRemaining = remaining
+	}
+	return false
 }
 
 // createSampleSession is a debug function to create a mock session value

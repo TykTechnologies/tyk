@@ -12,11 +12,11 @@ type TykMiddlewareImplementation interface {
 
 func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
-        TykMiddleware: tykMwSuper, 
-        MiddlewareClassName: MiddlewareName, 
-        Pre: IsPre,
-        UseSession: UseSession,
-    }
+		TykMiddleware:       tykMwSuper,
+		MiddlewareClassName: MiddlewareName,
+		Pre:                 IsPre,
+		UseSession:          UseSession,
+	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }

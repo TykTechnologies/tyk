@@ -3,16 +3,16 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
-    _ "github.com/robertkrimen/otto/underscore"
+	_ "github.com/robertkrimen/otto/underscore"
 	"io"
 	"io/ioutil"
 	"net/http"
-    "net/url"
-    "fmt"
-    "time"
+	"net/url"
+	"time"
 )
 
 // MiniRequestObject is marshalled to JSON string and pased into JSON middleware
@@ -44,7 +44,7 @@ type DynamicMiddleware struct {
 	TykMiddleware
 	MiddlewareClassName string
 	Pre                 bool
-    UseSession          bool
+	UseSession          bool
 }
 
 type DynamicMiddlewareConfig struct {
@@ -70,8 +70,8 @@ func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
-    t1 := time.Now().UnixNano()
-    
+	t1 := time.Now().UnixNano()
+
 	// Createthe proxy object
 	defer r.Body.Close()
 	originalBody, err := ioutil.ReadAll(r.Body)
@@ -101,10 +101,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre {
-        if d.UseSession {
-            thisSessionState = context.Get(r, SessionData).(SessionState)
-		    authHeaderValue = context.Get(r, AuthHeaderValue).(string)    
-        }
+		if d.UseSession {
+			thisSessionState = context.Get(r, SessionData).(SessionState)
+			authHeaderValue = context.Get(r, AuthHeaderValue).(string)
+		}
 	}
 
 	sessionAsJsonObj, sessEncErr := json.Marshal(thisSessionState)
@@ -157,13 +157,13 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Save the sesison data (if modified)
 	if !d.Pre {
-        if d.UseSession {
-		    thisSessionState.MetaData = newRequestData.SessionMeta
-		    d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
-        }
+		if d.UseSession {
+			thisSessionState.MetaData = newRequestData.SessionMeta
+			d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+		}
 	}
-    
-    log.Info("JSVM middleware execution took: (ns) ", time.Now().UnixNano() - t1)
+
+	log.Info("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
 	return nil, 200
 }
@@ -171,21 +171,21 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 // --- Utility functions during startup to ensure a sane VM is present for each API Def ----
 
 type JSVM struct {
-    VM *otto.Otto
+	VM *otto.Otto
 }
 
 // Init creates the JSVM with the core library (tyk.js)
 func (j *JSVM) Init(coreJS string) {
-    vm := otto.New()
+	vm := otto.New()
 	coreJs, _ := ioutil.ReadFile(config.TykJSPath)
-	
-    // Init TykJS namespace, constructors etc.
-    vm.Run(coreJs)
-    
-    j.VM = vm
-    
-    // Add environment API
-    j.LoadTykJSApi()
+
+	// Init TykJS namespace, constructors etc.
+	vm.Run(coreJs)
+
+	j.VM = vm
+
+	// Add environment API
+	j.LoadTykJSApi()
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
@@ -196,152 +196,148 @@ func (j *JSVM) LoadJSPaths(paths []string) {
 			log.Error("Failed to load Middleware JS: ", loadErr)
 		} else {
 			// No error, load the JS into the VM
-            log.Info("Loading JS File: ", mwPath)
+			log.Info("Loading JS File: ", mwPath)
 			j.VM.Run(js)
 		}
 	}
 }
 
 type TykJSHttpRequest struct {
-    Method string
-    Body string
-    Headers map[string]string
-    Domain string
-    Resource string
-    FormData map[string]string
+	Method   string
+	Body     string
+	Headers  map[string]string
+	Domain   string
+	Resource string
+	FormData map[string]string
 }
 
 type TykJSHttpResponse struct {
-    Code int
-    Body string
-    Headers map[string][]string
+	Code    int
+	Body    string
+	Headers map[string][]string
 }
 
 func (j *JSVM) LoadTykJSApi() {
-    // Enable a log
-    j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
+	// Enable a log
+	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
 		log.Info("JSVM LOG: ", call.Argument(0).String())
 		return otto.Value{}
 	})
-    
-    // Enable the creation of HTTP Requsts
-    j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
-		
-        jsonHRO := call.Argument(0).String()
-        HRO := TykJSHttpRequest{}
-        if jsonHRO != "undefined" {
-            jsonErr := json.Unmarshal([]byte(jsonHRO), &HRO)
-            if jsonErr != nil {
-                log.Error("JSVM: Failed to deserialise HTTP Request object")
-                return otto.Value{}
-            }
-            
-            // Make the request
-            domain := HRO.Domain
-            data := url.Values{}
-            for k, v := range(HRO.FormData) {
-                data.Set(k, v)
-            }
 
-            u, _ := url.ParseRequestURI(domain)
-            u.Path = HRO.Resource
-            urlStr := fmt.Sprintf("%v", u) // "https://api.com/user/"
+	// Enable the creation of HTTP Requsts
+	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 
-            client := &http.Client{}
-            
-            var d *string
-            if HRO.Body != "" {
-                d = &HRO.Body
-            } else {
-                if len(HRO.FormData) > 0 {
-                    thisD := data.Encode()    
-                    d = &thisD
-                } else {
-                    d = nil   
-                }
-                
-            } 
-            
-            r, _ := http.NewRequest(HRO.Method, urlStr, nil)
-            
-            if d != nil {
-                r, _ = http.NewRequest(HRO.Method, urlStr, bytes.NewBufferString(*d))    
-            }
-            
-            
-            for k, v := range(HRO.Headers) {
-                r.Header.Add(k, v)
-            }
-            r.Close = true
-            resp, respErr := client.Do(r)
-            
-            if respErr != nil {
-                log.Error("JSVM: Request failed: ", respErr)
-                return otto.Value{}
-            }
-            
-            body, _ := ioutil.ReadAll(resp.Body)
-            tykResp := TykJSHttpResponse{
-                Code: resp.StatusCode,
-                Body: string(body),
-                Headers: resp.Header,
-            }
-            
-            retAsStr, _ := json.Marshal(tykResp)
-            returnVal, retErr := j.VM.ToValue(string(retAsStr))
-            if retErr != nil {
-                log.Error("JSVM: Failed to encode return value: ", retErr)
-                return otto.Value{}
-            }
-            
-            return returnVal
-            
-        }
-        
-        // Nope, return nothing
+		jsonHRO := call.Argument(0).String()
+		HRO := TykJSHttpRequest{}
+		if jsonHRO != "undefined" {
+			jsonErr := json.Unmarshal([]byte(jsonHRO), &HRO)
+			if jsonErr != nil {
+				log.Error("JSVM: Failed to deserialise HTTP Request object")
+				return otto.Value{}
+			}
+
+			// Make the request
+			domain := HRO.Domain
+			data := url.Values{}
+			for k, v := range HRO.FormData {
+				data.Set(k, v)
+			}
+
+			u, _ := url.ParseRequestURI(domain)
+			u.Path = HRO.Resource
+			urlStr := fmt.Sprintf("%v", u) // "https://api.com/user/"
+
+			client := &http.Client{}
+
+			var d *string
+			if HRO.Body != "" {
+				d = &HRO.Body
+			} else {
+				if len(HRO.FormData) > 0 {
+					thisD := data.Encode()
+					d = &thisD
+				} else {
+					d = nil
+				}
+
+			}
+
+			r, _ := http.NewRequest(HRO.Method, urlStr, nil)
+
+			if d != nil {
+				r, _ = http.NewRequest(HRO.Method, urlStr, bytes.NewBufferString(*d))
+			}
+
+			for k, v := range HRO.Headers {
+				r.Header.Add(k, v)
+			}
+			r.Close = true
+			resp, respErr := client.Do(r)
+
+			if respErr != nil {
+				log.Error("JSVM: Request failed: ", respErr)
+				return otto.Value{}
+			}
+
+			body, _ := ioutil.ReadAll(resp.Body)
+			tykResp := TykJSHttpResponse{
+				Code:    resp.StatusCode,
+				Body:    string(body),
+				Headers: resp.Header,
+			}
+
+			retAsStr, _ := json.Marshal(tykResp)
+			returnVal, retErr := j.VM.ToValue(string(retAsStr))
+			if retErr != nil {
+				log.Error("JSVM: Failed to encode return value: ", retErr)
+				return otto.Value{}
+			}
+
+			return returnVal
+
+		}
+
+		// Nope, return nothing
 		return otto.Value{}
 	})
-    
-    // Expose Setters and Getters in the REST API for a key:
-    
-    j.VM.Set("TykGetKeyData", func(call otto.FunctionCall) otto.Value {
-        apiKey := call.Argument(0).String()
-        apiId := call.Argument(1).String()
 
-        byteArray, _ := handleGetDetail(apiKey, apiId)
-        
-        returnVal, retErr := j.VM.ToValue(string(byteArray))
-        if retErr != nil {
-            log.Error("JSVM: Failed to encode return value: ", retErr)
-            return otto.Value{}
-        }
+	// Expose Setters and Getters in the REST API for a key:
 
-        return returnVal
-    })
-    
-    j.VM.Set("TykSetKeyData", func(call otto.FunctionCall) otto.Value {
-        apiKey := call.Argument(0).String()
-        encoddedSession := call.Argument(1).String()
-        suppress_reset := call.Argument(2).String()
-        
-        newSession := SessionState{}
-        decErr := json.Unmarshal([]byte(encoddedSession), &newSession)
-        
-        if decErr != nil {
-            log.Error("Failed to decode the sesison data")
-            return otto.Value{}
-        }
+	j.VM.Set("TykGetKeyData", func(call otto.FunctionCall) otto.Value {
+		apiKey := call.Argument(0).String()
+		apiId := call.Argument(1).String()
 
-        var dont_reset bool = false
-        if suppress_reset == "1" {
-            dont_reset = true
-        }
-        doAddOrUpdate(apiKey, newSession, dont_reset)
-        
-        
+		byteArray, _ := handleGetDetail(apiKey, apiId)
 
-        return otto.Value{}
-    })
-    
-    
+		returnVal, retErr := j.VM.ToValue(string(byteArray))
+		if retErr != nil {
+			log.Error("JSVM: Failed to encode return value: ", retErr)
+			return otto.Value{}
+		}
+
+		return returnVal
+	})
+
+	j.VM.Set("TykSetKeyData", func(call otto.FunctionCall) otto.Value {
+		apiKey := call.Argument(0).String()
+		encoddedSession := call.Argument(1).String()
+		suppress_reset := call.Argument(2).String()
+
+		newSession := SessionState{}
+		decErr := json.Unmarshal([]byte(encoddedSession), &newSession)
+
+		if decErr != nil {
+			log.Error("Failed to decode the sesison data")
+			return otto.Value{}
+		}
+
+		var dont_reset bool = false
+		if suppress_reset == "1" {
+			dont_reset = true
+		}
+		doAddOrUpdate(apiKey, newSession, dont_reset)
+
+		return otto.Value{}
+	})
+
 }

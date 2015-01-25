@@ -127,9 +127,9 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 		newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 	}
 
-    // Create and init the virtual Machine
-    newAppSpec.JSVM = &JSVM{}
-    newAppSpec.JSVM.Init(config.TykJSPath)
+	// Create and init the virtual Machine
+	newAppSpec.JSVM = &JSVM{}
+	newAppSpec.JSVM.Init(config.TykJSPath)
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")

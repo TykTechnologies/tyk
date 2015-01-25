@@ -107,13 +107,13 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 		return LogMessageEventHandler{}.New(thisConf)
 	case EH_WebHook:
 		return WebHookHandler{}.New(thisConf)
-    case EH_JSVMHandler:
-        // Load the globals and file here
-        thisJSVMEventHandler, jsvmErr := JSVMEventHandler{Spec: Spec}.New(thisConf)
-        if jsvmErr == nil {
-            GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})    
-        }
-        return thisJSVMEventHandler, jsvmErr
+	case EH_JSVMHandler:
+		// Load the globals and file here
+		thisJSVMEventHandler, jsvmErr := JSVMEventHandler{Spec: Spec}.New(thisConf)
+		if jsvmErr == nil {
+			GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})
+		}
+		return thisJSVMEventHandler, jsvmErr
 	}
 
 	return nil, errors.New("Handler not found")

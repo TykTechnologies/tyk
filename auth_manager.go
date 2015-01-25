@@ -26,8 +26,8 @@ type SessionHandler interface {
 	RemoveSession(keyName string)
 	GetSessionDetail(keyName string) (SessionState, bool)
 	GetSessions(filter string) []string
-    GetStore() StorageHandler
-    ResetQuota(string, SessionState)
+	GetStore() StorageHandler
+	ResetQuota(string, SessionState)
 }
 
 type KeyGenerator interface {
@@ -85,14 +85,14 @@ func (b *DefaultSessionManager) Init(store StorageHandler) {
 	b.Store.Connect()
 }
 
-func (b *DefaultSessionManager) GetStore() StorageHandler{
+func (b *DefaultSessionManager) GetStore() StorageHandler {
 	return b.Store
 }
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState) {
-    log.Warning("Tracked quota reset for key: ", keyName)
+	log.Warning("Tracked quota reset for key: ", keyName)
 	rawKey := QuotaKeyPrefix + keyName
-    b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+	b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 }
 
 // UpdateSession updates the session state in the storage engine
