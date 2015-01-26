@@ -14,6 +14,7 @@ type Config struct {
 	Secret          string `json:"secret"`
 	TemplatePath    string `json:"template_path"`
 	TykJSPath       string `json:"tyk_js_path"`
+	MiddlewarePath  string `json:"middleware_path"`
 	UseDBAppConfigs bool   `json:"use_db_app_configs"`
 	AppPath         string `json:"app_path"`
 	Storage         struct {
@@ -47,6 +48,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Secret = "352d20ee67be67f6340b4c0605b044b7"
 	configStruct.TemplatePath = "./templates"
 	configStruct.TykJSPath = "./js/tyk.js"
+	configStruct.MiddlewarePath = "./middleware"
 	configStruct.Storage.Type = "redis"
 	configStruct.AppPath = "./apps/"
 	configStruct.Storage.Host = "localhost"

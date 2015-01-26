@@ -15,6 +15,10 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"path"
+	"path/filepath"
+	"strings"
+	"io/ioutil"
 )
 
 var log = logrus.New()
@@ -159,6 +163,73 @@ func addBatchEndpoint(spec *APISpec, Muxer *http.ServeMux) {
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
 }
 
+func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition) {
+	mwPaths := []string{}
+	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
+	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+
+	// Load form the configuration
+	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
+		mwPaths = append(mwPaths, mwObj.Path)
+		mwPreFuncs = append(mwPreFuncs, mwObj)
+		log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+	}
+	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
+		mwPaths = append(mwPaths, mwObj.Path)
+		mwPostFuncs = append(mwPostFuncs, mwObj)
+		log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+	}
+
+	// Load from folder
+
+	// Get PRE folder path
+	middlwareFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "pre")
+	files, _ := ioutil.ReadDir(middlwareFolderPath)
+	for _, f := range files {
+		if strings.Contains(f.Name(), ".js") {
+			filePath := filepath.Join(middlwareFolderPath, f.Name())
+			log.Info("Loading PRE-PROCESSOR file middleware from ", filePath)
+			middlewareObjectName := strings.Split(f.Name(), ".")[0]
+			log.Info("-- Middleware name ", middlewareObjectName)
+
+			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
+			log.Info("-- Middleware requires session: ", requiresSession)
+			thisMWDef := tykcommon.MiddlewareDefinition{}
+			thisMWDef.Name = middlewareObjectName
+			thisMWDef.Path = filePath
+			thisMWDef.RequireSession = requiresSession
+
+			mwPaths = append(mwPaths, filePath)
+			mwPreFuncs = append(mwPostFuncs, thisMWDef)
+		}
+	}
+
+	// Get POST folder path
+	middlewarePostFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post")
+	mwFiles, _ := ioutil.ReadDir(middlewarePostFolderPath)
+	for _, f := range mwFiles {
+		if strings.Contains(f.Name(), ".js") {
+			filePath := filepath.Join(middlewarePostFolderPath, f.Name())
+			log.Info("Loading POST-PROCESSOR file middleware from ", filePath)
+			middlewareObjectName := strings.Split(f.Name(), ".")[0]
+			log.Info("-- Middleware name ", middlewareObjectName)
+
+			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
+			log.Info("-- Middleware requires session: ", requiresSession)
+			thisMWDef := tykcommon.MiddlewareDefinition{}
+			thisMWDef.Name = middlewareObjectName
+			thisMWDef.Path = filePath
+			thisMWDef.RequireSession = requiresSession
+
+			mwPaths = append(mwPaths, filePath)
+			mwPreFuncs = append(mwPreFuncs, thisMWDef)
+		}
+	}
+
+	return mwPaths, mwPreFuncs, mwPostFuncs
+
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
@@ -209,16 +280,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		mwPaths := []string{}
 		mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 		mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
-			mwPaths = append(mwPaths, mwObj.Path)
-			mwPreFuncs = append(mwPreFuncs, mwObj)
-			log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
-		}
-		for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
-			mwPaths = append(mwPaths, mwObj.Path)
-			mwPostFuncs = append(mwPostFuncs, mwObj)
-			log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
-		}
+
+		log.Info("Loading Middleware")
+		mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
 
 		referenceSpec.JSVM.LoadJSPaths(mwPaths)
 
