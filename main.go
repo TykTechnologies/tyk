@@ -350,6 +350,7 @@ func init() {
 		--for-api=<path>             Adds blueprint to existing API Defintition as version
 		--as-version=<version>       The version number to use when inserting
 	`
+    
 
 	arguments, err := docopt.Parse(usage, nil, true, "v1.4", false, false)
 	if err != nil {
