@@ -39,9 +39,16 @@ fi
 
 echo "Preping TGZ Dirs"
 mkdir $i386TGZDIR/apps
+mkdir $i386TGZDIR/js
+mkdir $i386TGZDIR/middleware
+mkdir $i386TGZDIR/middleware/sample
+mkdir $i386TGZDIR/event_handlers
+mkdir $i386TGZDIR/event_handlers/sample
 mkdir $i386TGZDIR/templates
 cp $SOURCEBINPATH/apps/app_sample.json $i386TGZDIR/apps
 cp $SOURCEBINPATH/templates/error.json $i386TGZDIR/templates
+cp $SOURCEBINPATH/middleware/sample/*.js $i386TGZDIR/middleware/sample
+cp $SOURCEBINPATH/event_handlers/sample/*.js $i386TGZDIR/event_handlers/sample
 cp $SOURCEBINPATH/tyk.conf $i386TGZDIR
 
 cp -R $i386TGZDIR/* $amd64TGZDIR
