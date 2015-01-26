@@ -163,7 +163,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	log.Info("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
+	log.Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
 	return nil, 200
 }

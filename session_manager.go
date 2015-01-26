@@ -123,6 +123,12 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 		return true
 	}
 
+	// If this is a new Quota period, ensure we let the end user know
+	if int64(qInt) == 1 {
+		current := time.Now().Unix()
+		currentSession.QuotaRenews = current + currentSession.QuotaRenewalRate
+	}
+
 	// If not, pass and set the values of the session to quotamax - counter
 	remaining := currentSession.QuotaMax - int64(qInt)
 

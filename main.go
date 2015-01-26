@@ -206,8 +206,8 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 
 	// Get POST folder path
 	middlewarePostFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post")
-	mwFiles, _ := ioutil.ReadDir(middlewarePostFolderPath)
-	for _, f := range mwFiles {
+	mwPostFiles, _ := ioutil.ReadDir(middlewarePostFolderPath)
+	for _, f := range mwPostFiles {
 		if strings.Contains(f.Name(), ".js") {
 			filePath := filepath.Join(middlewarePostFolderPath, f.Name())
 			log.Info("Loading POST-PROCESSOR file middleware from ", filePath)
