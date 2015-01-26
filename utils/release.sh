@@ -45,7 +45,7 @@ mkdir $i386TGZDIR/event_handlers
 mkdir $i386TGZDIR/event_handlers/sample
 mkdir $i386TGZDIR/templates
 cp $SOURCEBINPATH/apps/app_sample.json $i386TGZDIR/apps
-cp $SOURCEBINPATH/templates/error.json $i386TGZDIR/templates
+cp $SOURCEBINPATH/templates/*.json $i386TGZDIR/templates
 cp $SOURCEBINPATH/middleware/*.js $i386TGZDIR/middleware
 cp $SOURCEBINPATH/event_handlers/sample/*.js $i386TGZDIR/event_handlers/sample
 cp $SOURCEBINPATH/js/*.js $i386TGZDIR/js
@@ -78,7 +78,7 @@ mv tyk_linux_arm $armBINDIR/$SOURCEBIN
 
 echo "Copying configuration files into distros"
 cp $SOURCEBINPATH/apps/app_sample.json $i386BINDIR
-cp $SOURCEBINPATH/templates/error.json $i386BINDIR
+cp $SOURCEBINPATH/templates/*.json $i386BINDIR
 cp $SOURCEBINPATH/tyk.conf.example $i386BINDIR/tyk.conf
 cp $SOURCEBINPATH/middleware/*.js $i386BINDIR
 cp $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
@@ -86,7 +86,7 @@ cp $SOURCEBINPATH/js/tyk.js $i386BINDIR
 
 
 cp $SOURCEBINPATH/apps/app_sample.json $amd64BINDIR
-cp $SOURCEBINPATH/templates/error.json $amd64BINDIR
+cp $SOURCEBINPATH/templates/*.json $amd64BINDIR
 cp $SOURCEBINPATH/tyk.conf.example $amd64BINDIR/tyk.conf
 cp -r $SOURCEBINPATH/middleware/*.js $amd64BINDIR
 cp -r $SOURCEBINPATH/event_handlers/sample/*.js $amd64BINDIR
@@ -94,7 +94,7 @@ cp -r $SOURCEBINPATH/js/tyk.js $amd64BINDIR
 
 
 cp $SOURCEBINPATH/apps/app_sample.json $armBINDIR
-cp $SOURCEBINPATH/templates/error.json $armBINDIR
+cp $SOURCEBINPATH/templates/*.json $armBINDIR
 cp $SOURCEBINPATH/tyk.conf.example $armBINDIR/tyk.conf
 cp $SOURCEBINPATH/middleware/*.js $armBINDIR
 cp $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
@@ -117,6 +117,7 @@ mv debian/rules.new debian/rules
 echo $SOURCEBIN usr/bin > debian/install
 echo "app_sample.json" etc/tyk/apps >> debian/install
 echo "error.json" etc/tyk/templates >> debian/install
+echo "default_webhook.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
 echo "tyk.js" etc/tyk/js >> debian/install
 echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
@@ -154,6 +155,7 @@ mv debian/rules.new debian/rules
 echo $SOURCEBIN usr/bin > debian/install
 echo "app_sample.json" etc/tyk/apps >> debian/install
 echo "error.json" etc/tyk/templates >> debian/install
+echo "default_webhook.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
 echo "tyk.js" etc/tyk/js >> debian/install
 echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
@@ -193,6 +195,7 @@ mv debian/rules.new debian/rules
 echo $SOURCEBIN usr/bin > debian/install
 echo "app_sample.json" etc/tyk/apps >> debian/install
 echo "error.json" etc/tyk/templates >> debian/install
+echo "default_webhook.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
 echo "tyk.js" etc/tyk/js >> debian/install
 echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install

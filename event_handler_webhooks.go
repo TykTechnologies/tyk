@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"path"
 )
 
 type WebHookRequestMethod string
@@ -86,10 +87,12 @@ func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 	// Pre-load template on init
 	webHookTemplate, tErr := template.ParseFiles(thisHandler.conf.TemplatePath)
 	if tErr != nil {
-		log.Error("Failed to load webhook template! Using defult. Error was: ", tErr)
-		webHookTemplate, _ = template.ParseFiles("templates/default_webhook.json")
+		log.Error("Failed to load webhook template! Using default. Error was: ", tErr)
+		defaultPath := path.Join(config.TemplatePath, "default_webhook.json")
+		webHookTemplate, _ = template.ParseFiles(defaultPath)
 	}
 	thisHandler.template = webHookTemplate
+	log.Warning("Timeout set to: ", thisHandler.conf.EventTimeout)
 
 	if !thisHandler.checkURL(thisHandler.conf.TargetPath) {
 		log.Error("Init failed for this webhook, invalid URL, URL must be absolute")
@@ -151,6 +154,9 @@ func (w WebHookHandler) GetChecksum(reqBody string) (string, error) {
 
 	localRequest.Write(&rawRequest)
 	h := md5.New()
+
+	log.Warning("REQUEST: \n", rawRequest.String())
+
 	io.WriteString(h, rawRequest.String())
 
 	reqChecksum := hex.EncodeToString(h.Sum(nil))

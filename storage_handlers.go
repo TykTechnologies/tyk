@@ -411,7 +411,7 @@ func (r *RedisStorageManager) DeleteKeys(keys []string) bool {
 			log.Error(err)
 		}
 	} else {
-		log.Info("RedisStorageManager called DEL - Nothing to delete")
+		log.Debug("RedisStorageManager called DEL - Nothing to delete")
 	}
 
 	return true
