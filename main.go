@@ -352,7 +352,7 @@ func init() {
 	`
     
 
-	arguments, err := docopt.Parse(usage, nil, true, "v1.4", false, false)
+	arguments, err := docopt.Parse(usage, nil, true, "v1.4.0", false, false)
 	if err != nil {
 		log.Warning("Error while parsing arguments: ", err)
 	}
