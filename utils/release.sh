@@ -71,15 +71,15 @@ mv tyk_linux_arm $armBINDIR/$SOURCEBIN
 echo "Copying configuration files into distros"
 cp $SOURCEBINPATH/apps/app_sample.json $i386BINDIR
 cp $SOURCEBINPATH/templates/error.json $i386BINDIR
-cp $SOURCEBINPATH/tyk.conf $i386BINDIR
+cp $SOURCEBINPATH/tyk.example.conf $i386BINDIR/tyk.conf
 
 cp $SOURCEBINPATH/apps/app_sample.json $amd64BINDIR
 cp $SOURCEBINPATH/templates/error.json $amd64BINDIR
-cp $SOURCEBINPATH/tyk.conf $amd64BINDIR
+cp $SOURCEBINPATH/tyk.example.conf $amd64BINDIR/tyk.conf
 
 cp $SOURCEBINPATH/apps/app_sample.json $armBINDIR
 cp $SOURCEBINPATH/templates/error.json $armBINDIR
-cp $SOURCEBINPATH/tyk.conf $armBINDIR
+cp $SOURCEBINPATH/tyk.example.conf $armBINDIR/tyk.conf
 
 # -------------------------------------------------------
 echo "Preparing i386"
