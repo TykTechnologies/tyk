@@ -264,7 +264,7 @@ func (r *RedisStorageManager) IncrememntWithExpire(keyName string, expire int64)
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
-		r.Decrement(keyName)
+		r.IncrememntWithExpire(keyName, expire)
 	} else {
 		val, err := redis.Int64(db.Do("INCR", keyName))
 		if val == 1 {
