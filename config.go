@@ -60,7 +60,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"
 	configStruct.AnalyticsConfig.Type = "csv"
 	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
-	newConfig, err := json.Marshal(configStruct)
+	newConfig, err := json.MarshalIndent(configStruct, "", "    ")
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
 		log.Error(err)

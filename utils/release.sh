@@ -49,7 +49,8 @@ cp $SOURCEBINPATH/apps/app_sample.json $i386TGZDIR/apps
 cp $SOURCEBINPATH/templates/error.json $i386TGZDIR/templates
 cp $SOURCEBINPATH/middleware/sample/*.js $i386TGZDIR/middleware/sample
 cp $SOURCEBINPATH/event_handlers/sample/*.js $i386TGZDIR/event_handlers/sample
-cp $SOURCEBINPATH/tyk.conf $i386TGZDIR
+cp $SOURCEBINPATH/js/*.js $i386TGZDIR/js
+cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR
 
 cp -R $i386TGZDIR/* $amd64TGZDIR
 cp -R $i386TGZDIR/* $armTGZDIR
@@ -78,15 +79,26 @@ mv tyk_linux_arm $armBINDIR/$SOURCEBIN
 echo "Copying configuration files into distros"
 cp $SOURCEBINPATH/apps/app_sample.json $i386BINDIR
 cp $SOURCEBINPATH/templates/error.json $i386BINDIR
-cp $SOURCEBINPATH/tyk.example.conf $i386BINDIR/tyk.conf
+cp $SOURCEBINPATH/tyk.conf.example $i386BINDIR/tyk.conf
+cp $SOURCEBINPATH/middleware/sample/*.js $i386BINDIR
+cp $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
+cp $SOURCEBINPATH/js/tyk.js $i386BINDIR
+
 
 cp $SOURCEBINPATH/apps/app_sample.json $amd64BINDIR
 cp $SOURCEBINPATH/templates/error.json $amd64BINDIR
-cp $SOURCEBINPATH/tyk.example.conf $amd64BINDIR/tyk.conf
+cp $SOURCEBINPATH/tyk.conf.example $amd64BINDIR/tyk.conf
+cp -r $SOURCEBINPATH/middleware/sample/*.js $amd64BINDIR
+cp -r $SOURCEBINPATH/event_handlers/sample/*.js $amd64BINDIR
+cp -r $SOURCEBINPATH/js/tyk.js $amd64BINDIR
+
 
 cp $SOURCEBINPATH/apps/app_sample.json $armBINDIR
 cp $SOURCEBINPATH/templates/error.json $armBINDIR
-cp $SOURCEBINPATH/tyk.example.conf $armBINDIR/tyk.conf
+cp $SOURCEBINPATH/tyk.conf.example $armBINDIR/tyk.conf
+cp $SOURCEBINPATH/middleware/sample/*.js $armBINDIR
+cp $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
+cp $SOURCEBINPATH/js/tyk.js $armBINDIR
 
 # -------------------------------------------------------
 echo "Preparing i386"
@@ -106,11 +118,16 @@ echo $SOURCEBIN usr/bin > debian/install
 echo "app_sample.json" etc/tyk/apps >> debian/install
 echo "error.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
+echo "tyk.js" etc/tyk/js >> debian/install
+echo "sample.js" etc/tyk/middleware/sample >> debian/install
+echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
+echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
+echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
 
-sed -i 's/.*Maintainer: Martin Buhr <martin@unknown>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
-sed -i 's/.*Homepage: <insert the upstream URL, if relevant>.*/Homepage: http://tyk.io/' debian/control
-sed -i 's/.*Description: <insert up to 60 chars description>.*/Description: A lightweight API gateway server/' debian/control
-sed -i 's/.* <insert long description, indented with spaces>.*/ A lightweight API gateway server written in Go/' debian/control
+sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
+sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
+sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
+sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
 
 # We don't want a quilt based package
 echo "1.0" > debian/source/format
@@ -138,11 +155,16 @@ echo $SOURCEBIN usr/bin > debian/install
 echo "app_sample.json" etc/tyk/apps >> debian/install
 echo "error.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
+echo "tyk.js" etc/tyk/js >> debian/install
+echo "sample.js" etc/tyk/middleware/sample >> debian/install
+echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
+echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
+echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
 
-sed -i 's/.*Maintainer: Martin Buhr <martin@unknown>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
-sed -i 's/.*Homepage: <insert the upstream URL, if relevant>.*/Homepage: http://tyk.io/' debian/control
-sed -i 's/.*Description: <insert up to 60 chars description>.*/Description: A lightweight API gateway server/' debian/control
-sed -i 's/.* <insert long description, indented with spaces>.*/ A lightweight API gateway server written in Go/' debian/control
+sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
+sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
+sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
+sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
 
 
 # We don't want a quilt based package
@@ -172,11 +194,16 @@ echo $SOURCEBIN usr/bin > debian/install
 echo "app_sample.json" etc/tyk/apps >> debian/install
 echo "error.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
+echo "tyk.js" etc/tyk/js >> debian/install
+echo "sample.js" etc/tyk/middleware/sample >> debian/install
+echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
+echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
+echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
 
-sed -i 's/.*Maintainer: Martin Buhr <martin@unknown>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
-sed -i 's/.*Homepage: <insert the upstream URL, if relevant>.*/Homepage: http://tyk.io/' debian/control
-sed -i 's/.*Description: <insert up to 60 chars description>.*/Description: A lightweight API gateway server/' debian/control
-sed -i 's/.* <insert long description, indented with spaces>.*/ A lightweight API gateway server written in Go/' debian/control
+sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
+sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
+sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
+sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
 
 
 # We don't want a quilt based package

@@ -15,7 +15,8 @@
             "Default": {
                 "name": "Default",
                 "expires": "3000-01-02 15:04",
-                "paths": {
+                "use_extended_paths": true,
+                "extended_paths": {
                     "ignored": [],
                     "white_list": [],
                     "black_list": []
