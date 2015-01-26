@@ -328,6 +328,7 @@ func ReloadURLStructure() {
 	log.Info("Reload complete")
 }
 
+
 func init() {
 
 	usage := `Tyk API Gateway.
