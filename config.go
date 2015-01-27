@@ -24,6 +24,7 @@ type Config struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Database int    `json:"database"`
+		MaxIdle int		`json:"optimisation_max_idle"`
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
@@ -40,6 +41,7 @@ type Config struct {
 		EnableHealthChecks      bool  `json:"enable_health_checks"`
 		HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 	} `json:"health_check"`
+	UseAsyncSessionWrite bool `json:"optimisations_use_async_session_write"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
@@ -55,6 +57,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Username = ""
 	configStruct.Storage.Password = ""
 	configStruct.Storage.Database = 0
+	configStruct.Storage.MaxIdle = 10
 	configStruct.Storage.Port = 6379
 	configStruct.EnableAnalytics = false
 	configStruct.HealthCheck.EnableHealthChecks = true
@@ -62,6 +65,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"
 	configStruct.AnalyticsConfig.Type = "csv"
 	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
+	configStruct.UseAsyncSessionWrite = true
 	newConfig, err := json.MarshalIndent(configStruct, "", "    ")
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")

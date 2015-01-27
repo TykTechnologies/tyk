@@ -119,8 +119,12 @@ type RedisStorageManager struct {
 }
 
 func (r *RedisStorageManager) newPool(server, password string, database int) *redis.Pool {
+	maxIdle := 30
+	if config.Storage.MaxIdle > 0 {
+		maxIdle = config.Storage.MaxIdle
+	}
 	return &redis.Pool{
-		MaxIdle:     3,
+		MaxIdle:     maxIdle,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", server)
