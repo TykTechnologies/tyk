@@ -57,7 +57,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.Storage.Username = ""
 	configStruct.Storage.Password = ""
 	configStruct.Storage.Database = 0
-	configStruct.Storage.MaxIdle = 10
+	configStruct.Storage.MaxIdle = 100
 	configStruct.Storage.Port = 6379
 	configStruct.EnableAnalytics = false
 	configStruct.HealthCheck.EnableHealthChecks = true

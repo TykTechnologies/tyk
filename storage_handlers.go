@@ -119,7 +119,7 @@ type RedisStorageManager struct {
 }
 
 func (r *RedisStorageManager) newPool(server, password string, database int) *redis.Pool {
-	maxIdle := 30
+	maxIdle := 100
 	if config.Storage.MaxIdle > 0 {
 		maxIdle = config.Storage.MaxIdle
 	}
