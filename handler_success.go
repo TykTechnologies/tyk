@@ -70,22 +70,7 @@ type SuccessHandler struct {
 	TykMiddleware
 }
 
-// ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
-// final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
-// Spec states the path is Ignored
-func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-	// Make sure we get the correct target URL
-	if s.Spec.APIDefinition.Proxy.StripListenPath {
-		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
-	}
-
-	t1 := time.Now()
-	s.Proxy.ServeHTTP(w, r)
-	t2 := time.Now()
-
-	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
-	log.Debug("Upstream request took (ms): ", millisec)
+func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64) {
 
 	if config.StoreAnalytics(r) {
 		t := time.Now()
@@ -128,22 +113,42 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.Spec.APIDefinition.APIID,
 			s.Spec.APIDefinition.OrgID,
 			OauthClientID,
-			int64(millisec),
+			timing,
 			time.Now(),
 		}
 
 		thisRecord.SetExpiry(s.Spec.ExpireAnalyticsAfter)
-
-		go analytics.RecordHit(thisRecord)
-
+		analytics.RecordHit(thisRecord)
 	}
 
 	// Report in health check
-	ReportHealthCheckValue(s.Spec.Health, RequestLog, strconv.FormatInt(int64(millisec), 10))
+	ReportHealthCheckValue(s.Spec.Health, RequestLog, strconv.FormatInt(int64(timing), 10))
 
 	if doMemoryProfile {
 		pprof.WriteHeapProfile(profileFile)
 	}
 
 	context.Clear(r)
+}
+
+// ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
+// final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
+// Spec states the path is Ignored
+func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
+
+	// Make sure we get the correct target URL
+	if s.Spec.APIDefinition.Proxy.StripListenPath {
+		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
+	}
+
+	t1 := time.Now()
+	inRes := s.Proxy.ServeHTTP(w, r)
+	t2 := time.Now()
+
+	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	log.Debug("Upstream request took (ms): ", millisec)
+
+	go s.RecordHit(w, r, int64(millisec))
+
+	return inRes
 }

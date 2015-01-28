@@ -29,6 +29,7 @@ const (
 	Ignored   URLStatus = 1
 	WhiteList URLStatus = 2
 	BlackList URLStatus = 3
+	Cached    URLStatus = 4
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -45,6 +46,7 @@ const (
 	GeneralFailure                 RequestStatus = "An error occured that should have not been possible"
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
 	StatusOk                       RequestStatus = "Everything OK, passing"
+	StatusCached                   RequestStatus = "Cached path"
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
 	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
 )
@@ -159,6 +161,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v)
+
 		} else {
 			log.Warning("Path-based version path list settings are being deprecated, please upgrade your defintitions to the new standard as soon as spossible")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
@@ -303,17 +306,42 @@ func (a *APIDefinitionLoader) compileExtendedPathSpec(paths []tykcommon.EndPoint
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	apiLangIDsRegex, _ := regexp.Compile("{(.*?)}")
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, "(.*?)")
+		asRegex, _ := regexp.Compile(asRegexStr)
+
+		newSpec := URLSpec{}
+		newSpec.Spec = asRegex
+		newSpec.Status = Cached
+		// Extend with method actions
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.Ignored, Ignored)
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.BlackList, BlackList)
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
+	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
+
+	log.Info(cachedPaths)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
 	combinedPath = append(combinedPath, blackListPaths...)
 	combinedPath = append(combinedPath, whiteListPaths...)
+	combinedPath = append(combinedPath, cachedPaths...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -337,6 +365,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return EndPointNotAllowed
 	case WhiteList:
 		return StatusOk
+	case Cached:
+		return StatusCached
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -346,10 +376,12 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
-
+	log.Info("PATHS", RxPaths)
 	for _, v := range RxPaths {
+		log.Info("Checking: ", v)
 		match := v.Spec.MatchString(url)
 		if match {
+			log.Info("Match found")
 			if v.MethodActions != nil {
 				// We are using an extended path set, check for the method
 				methodMeta, matchMethodOk := v.MethodActions[method]
@@ -475,6 +507,8 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 		return true, StatusOkAndIgnore, meta
 	case StatusRedirectFlowByReply:
 		return true, StatusRedirectFlowByReply, meta
+	case StatusCached:
+		return true, StatusCached, meta
 	default:
 		return true, StatusOk, meta
 	}

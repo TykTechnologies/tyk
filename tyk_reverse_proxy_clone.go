@@ -118,7 +118,15 @@ var hopHeaders = []string{
 	"Upgrade",
 }
 
-func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (p *ReverseProxy) ReturnRequestServeHttp(rw http.ResponseWriter, req *http.Request) *http.Request {
+	outreq := new(http.Request)
+
+	p.ServeHTTP(rw, req)
+
+	return outreq
+}
+
+func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
 	transport := p.Transport
 	if transport == nil {
 		transport = http.DefaultTransport
@@ -167,8 +175,12 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Printf("http: proxy error: %v", err)
 		rw.WriteHeader(http.StatusInternalServerError)
-		return
+		return nil
 	}
+
+	inres := new(http.Response)
+	*inres = *res // includes shallow copies of maps, but okay
+
 	defer res.Body.Close()
 
 	for _, h := range hopHeaders {
@@ -189,6 +201,8 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	rw.WriteHeader(res.StatusCode)
 	p.copyResponse(rw, res.Body)
+
+	return inres
 }
 
 func (p *ReverseProxy) copyResponse(dst io.Writer, src io.Reader) {

@@ -9,16 +9,16 @@ import (
 	"github.com/lonelycode/tykcommon"
 	"github.com/rcrowley/goagain"
 	"html/template"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
-	"time"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"io/ioutil"
+	"time"
 )
 
 var log = logrus.New()
@@ -329,6 +329,10 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 			var chainArray = []alice.Constructor{}
 
+			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
+			CacheStore := &RedisStorageManager{KeyPrefix: keyPrefix}
+			CacheStore.Connect()
+
 			var baseChainArray = []alice.Constructor{
 				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
@@ -337,6 +341,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
 			}
 
 			// Add pre-process MW
@@ -392,7 +397,6 @@ func ReloadURLStructure() {
 	log.Info("Reload complete")
 }
 
-
 func init() {
 
 	usage := `Tyk API Gateway.
@@ -414,7 +418,6 @@ func init() {
 		--for-api=<path>             Adds blueprint to existing API Defintition as version
 		--as-version=<version>       The version number to use when inserting
 	`
-    
 
 	arguments, err := docopt.Parse(usage, nil, true, "v1.4.0", false, false)
 	if err != nil {
