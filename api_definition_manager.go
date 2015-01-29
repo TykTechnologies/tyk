@@ -375,10 +375,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
 	for _, v := range RxPaths {
-		log.Info("Checking: ", v)
 		match := v.Spec.MatchString(url)
 		if match {
-			log.Info("Match found")
 			if v.MethodActions != nil {
 				// We are using an extended path set, check for the method
 				methodMeta, matchMethodOk := v.MethodActions[method]
