@@ -24,7 +24,7 @@ type Config struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Database int    `json:"database"`
-		MaxIdle int		`json:"optimisation_max_idle"`
+		MaxIdle  int    `json:"optimisation_max_idle"`
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
@@ -65,7 +65,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.AnalyticsConfig.CSVDir = "/tmp"
 	configStruct.AnalyticsConfig.Type = "csv"
 	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
-	configStruct.UseAsyncSessionWrite = true
+	configStruct.UseAsyncSessionWrite = false
 	newConfig, err := json.MarshalIndent(configStruct, "", "    ")
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")

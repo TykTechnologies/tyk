@@ -7,8 +7,10 @@
 package main
 
 import (
+	"bytes"
 	"github.com/gorilla/context"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -182,6 +184,17 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 	*inres = *res // includes shallow copies of maps, but okay
 
 	defer res.Body.Close()
+
+	// Buffer body data
+	var bodyBuffer bytes.Buffer
+	bodyBuffer2 := new(bytes.Buffer)
+
+	p.copyResponse(&bodyBuffer, res.Body)
+	*bodyBuffer2 = bodyBuffer
+
+	// Create new ReadClosers so we can split output
+	res.Body = ioutil.NopCloser(&bodyBuffer)
+	inres.Body = ioutil.NopCloser(bodyBuffer2)
 
 	for _, h := range hopHeaders {
 		res.Header.Del(h)

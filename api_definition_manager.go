@@ -335,8 +335,6 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
 
-	log.Info(cachedPaths)
-
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
 	combinedPath = append(combinedPath, blackListPaths...)
@@ -376,7 +374,6 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
-	log.Info("PATHS", RxPaths)
 	for _, v := range RxPaths {
 		log.Info("Checking: ", v)
 		match := v.Spec.MatchString(url)

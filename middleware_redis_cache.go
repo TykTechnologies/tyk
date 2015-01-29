@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/gorilla/context"
 	"io"
 	"net/http"
+	"strconv"
 )
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
@@ -16,17 +19,8 @@ type RedisCacheMiddleware struct {
 
 type RedisCacheMiddlewareConfig struct{}
 
-//type CachedResponse struct {
-//	Headers map[string]string
-//	Body    []byte
-//	Code    int
-//}
-
 // New lets you do any initialisations for the object can be done here
-func (m *RedisCacheMiddleware) New() {
-	log.Info("CACHING MIDDLEWARE INITIALISED")
-
-}
+func (m *RedisCacheMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
@@ -44,81 +38,60 @@ func (m RedisCacheMiddleware) CreateCheckSum(req *http.Request) string {
 	return cacheKey
 }
 
-func (m *RedisCacheMiddleware) DoResponse(rw http.ResponseWriter, res *http.Response) {
-	defer res.Body.Close()
-
-	for _, h := range hopHeaders {
-		res.Header.Del(h)
-	}
-
-	//	// Add resource headers
-	//	if sessVal != nil {
-	//		// We have found a session, lets report back
-	//		var thisSessionState SessionState
-	//		thisSessionState = sessVal.(SessionState)
-	//		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
-	//		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
-	//		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
-	//	}
-
-	copyHeader(rw.Header(), res.Header)
-
-	rw.WriteHeader(res.StatusCode)
-	m.TykMiddleware.Proxy.copyResponse(rw, res.Body)
-}
-
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	// Re-use versioning code here, same mechanic, only interested in cached status though
+
+	// Allow global cache disabe
+	if !m.Spec.APIDefinition.CacheOptions.EenableCache {
+		return nil, 200
+	}
+
+	// Only allow idempotent (safe) methods
+	if r.Method != "GET" || r.Method != "OPTIONS" || r.Method != "HEAD" {
+		return nil, 200
+	}
+
+	// We use the versioning middleware to get our status, this may be overkill
 	_, stat, _ := m.TykMiddleware.Spec.IsRequestValid(r)
 
+	// Cached route matched, let go
 	if stat == StatusCached {
-		log.Info("Cached request detected")
 		thisKey := m.CreateCheckSum(r)
 		retBlob, found := m.CacheStore.GetKey(thisKey)
 		if found != nil {
-			log.Info("Key not found, proxying and saving")
 			// Pass through to proxy AND CACHE RESULT
 			sNP := SuccessHandler{m.TykMiddleware}
 			reqVal := sNP.ServeHTTP(w, r)
 
-			log.Warning(reqVal)
+			var wireFormatReq bytes.Buffer
+			reqVal.Write(&wireFormatReq)
 
-			// Marshal this
-			asByte, encErr := msgpack.Marshal(reqVal)
-			if encErr != nil {
-				log.Error("Encoding FAILED")
-				return nil, 666
-			}
-
-			// This doesn't quite work
-			// TODO: Fix encoding of response objects
-			m.CacheStore.SetKey(thisKey, string(asByte), 10)
-
+			m.CacheStore.SetKey(thisKey, wireFormatReq.String(), m.Spec.APIDefinition.CacheOptions.CacheTimeout)
 			return nil, 666
 		}
 
-		// Decode retObj
-		retObj := new(http.Response)
-		decErr := msgpack.Unmarshal([]byte(retBlob), &retObj)
+		retObj := bytes.NewReader([]byte(retBlob))
 
-		if decErr != nil {
-			log.Error("Cache failure, could not decode cached object: ", decErr)
-			return nil, 200
+		asBufioReader := bufio.NewReader(retObj)
+		newRes, resErr := http.ReadResponse(asBufioReader, r)
+		if resErr != nil {
+			log.Error("Could not create response object: ", resErr)
 		}
 
-		//		if retObj.Headers != nil {
-		//			for k, v := range retObj.Headers {
-		//				w.Header().Add(k, v)
-		//			}
-		//		}
+		defer newRes.Body.Close()
+		for _, h := range hopHeaders {
+			newRes.Header.Del(h)
+		}
 
-		log.Info("Cache response being written")
-		w.Header().Add("x-tyk-cache-response", "1")
-		//		// Return cached request
-		//		w.Write(retObj.Body)
+		copyHeader(w.Header(), newRes.Header)
+		w.Header().Add("x-tyk-cached-response", "1")
+		thisSessionState := context.Get(r, SessionData).(SessionState)
+		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
+		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
+		w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
 
-		m.DoResponse(w, retObj)
+		w.WriteHeader(newRes.StatusCode)
+		m.Proxy.copyResponse(w, newRes.Body)
 
 		// Record analytics
 		sNP := SuccessHandler{m.TykMiddleware}
@@ -127,7 +100,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		// Stop any further execution
 		return nil, 666
 	}
-	log.Info("Not cached")
 
 	return nil, 200
 }
