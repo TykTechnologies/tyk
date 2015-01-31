@@ -878,7 +878,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
                 } else {
                     log.Error("Master keys disallowed in configuration, key not added.")
                     responseMessage = createError("Failed to create key, ensure security settings are correct.")
-                    code = 400
+                    code = 403
                     DoJSONWrite(w, code, responseMessage)
                     return
                 }
