@@ -15,6 +15,7 @@ import (
 	"path"
 	"strings"
 	"time"
+    "errors"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -70,7 +71,7 @@ func GetSpecForOrg(APIID string) *APISpec {
 	return ApiSpecRegister[aKey]
 }
 
-func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) {
+func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) error {
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
 		for apiId, _ := range newSession.AccessRights {
@@ -90,23 +91,31 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) {
 					"key":   keyName,
 					"apiID": apiId,
 				}).Error("Could not add key for this API ID, API doesn't exist.")
+                return errors.New("API must be active to add keys")
 			}
 		}
 	} else {
 		// nothing defined, add key to ALL
-		log.Warning("No API Access Rights set, adding key to ALL.")
-		for _, spec := range ApiSpecRegister {
-            if !dontReset {
-				spec.SessionManager.ResetQuota(keyName, newSession)
-				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-			}
-			spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
-		}
+        if config.AllowMasterKeys {
+            log.Warning("No API Access Rights set, adding key to ALL.")
+            for _, spec := range ApiSpecRegister {
+                if !dontReset {
+                    spec.SessionManager.ResetQuota(keyName, newSession)
+                    newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+                }
+                spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+            }    
+        } else {
+            log.Error("Master keys disallowed in configuration, key not added.")
+            return errors.New("Master keys not allowed")
+        }
+		
 	}
 
 	log.WithFields(logrus.Fields{
 		"key": keyName,
 	}).Info("New key added or updated.")
+    return nil
 }
 
 // ---- TODO: This changes the URL structure of the API completely ----
@@ -145,7 +154,11 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		if dont_reset == "1" {
 			suppress_reset = true
 		}
-		doAddOrUpdate(keyName, newSession, suppress_reset)
+        addUpdateErr := doAddOrUpdate(keyName, newSession, suppress_reset)
+        if addUpdateErr != nil {
+            success = false
+            responseMessage = createError("Failed to create key, ensure security settings are correct.")
+        }
 	}
 
 	var action string
@@ -851,16 +864,25 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			} else {
-				// nothing defined, add key to ALL
-				log.Warning("No API Access Rights set, adding key to ALL.")
-				for _, spec := range ApiSpecRegister {
-					if !spec.DontSetQuotasOnCreate {
-						// Reset quote by default
-						spec.SessionManager.ResetQuota(newKey, newSession)
-						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-					}
-					spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
-				}
+                if config.AllowMasterKeys {
+                    // nothing defined, add key to ALL
+                    log.Warning("No API Access Rights set, adding key to ALL.")
+                    for _, spec := range ApiSpecRegister {
+                        if !spec.DontSetQuotasOnCreate {
+                            // Reset quote by default
+                            spec.SessionManager.ResetQuota(newKey, newSession)
+                            newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+                        }
+                        spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
+                    }    
+                } else {
+                    log.Error("Master keys disallowed in configuration, key not added.")
+                    responseMessage = createError("Failed to create key, ensure security settings are correct.")
+                    code = 400
+                    DoJSONWrite(w, code, responseMessage)
+                    return
+                }
+				
 			}
 
 			responseObj.Action = "create"
