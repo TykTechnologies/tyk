@@ -14,6 +14,16 @@
             }
         ]
 
+- Added header transformation middleware, simple implementation, but will delte and add headers before request is outbound:
+
+        "transform_headers": [
+            {
+                "delete_headers": ["Content-Type", "authorization"],
+                "add_headers": {"x-tyk-test-inject": "new-value"},
+                "path": "/post"
+            }
+        ]
+        
 
 # v1.4
 

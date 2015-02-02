@@ -34,6 +34,7 @@ const (
 	BlackList URLStatus = 3
 	Cached    URLStatus = 4
     Transformed URLStatus = 5
+    HeaderInjected URLStatus = 6
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -53,6 +54,7 @@ const (
 	StatusOk                       RequestStatus = "Everything OK, passing"
 	StatusCached                   RequestStatus = "Cached path"
     StatusTransform                RequestStatus = "Transformed path"
+    StatusHeaderInjected RequestStatus = "Header injected"
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
 	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
 )
@@ -67,6 +69,7 @@ type URLSpec struct {
 	Status        URLStatus
 	MethodActions map[string]tykcommon.EndpointMethodMeta
     TransformAction TransformSpec
+    InjectHeaders tykcommon.HeaderInjectionMeta
 }
 
 type TransformSpec struct {
@@ -399,6 +402,23 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []tykcommon.HeaderInjectionMeta) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, HeaderInjected)
+		// Extend with method actions
+        newSpec.InjectHeaders = stringSpec
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -407,6 +427,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
     transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform)
+    headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader)
     
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -414,6 +435,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, whiteListPaths...)
 	combinedPath = append(combinedPath, cachedPaths...)
     combinedPath = append(combinedPath, transformPaths...)
+    combinedPath = append(combinedPath, headerTransformPaths...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -441,6 +463,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusCached
     case Transformed:
         return StatusTransform
+    case HeaderInjected:
+        return StatusHeaderInjected
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -485,6 +509,11 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
             
             if v.TransformAction.Template != nil {
                 return a.getURLStatus(v.Status), v.TransformAction
+            }
+            
+            // TODO: Fix, Not a great detection method
+            if len(v.InjectHeaders.Path) > 0 {
+                return a.getURLStatus(v.Status), v.InjectHeaders
             }
             
 			// Using a legacy path, handle it raw.
@@ -587,6 +616,8 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 		return true, StatusCached, meta
     case StatusTransform:
         return true, StatusTransform, meta
+    case StatusHeaderInjected:
+        return true, StatusHeaderInjected, meta    
 	default:
 		return true, StatusOk, meta
 	}
