@@ -13,6 +13,7 @@ import (
 	"strings"
     "errors"
     textTemplate "text/template"
+    b64 "encoding/base64"
 	"time"
 )
 
@@ -342,7 +343,15 @@ func (a *APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Templ
 }
 
 func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
-    return nil, nil
+    log.Info("-- Loading blob")
+    uDec, decErr := b64.URLEncoding.DecodeString(blob)
+    
+    if decErr != nil {
+        return nil, decErr
+    }
+    
+    thisT, tErr := textTemplate.New("blob").Parse(string(uDec))
+    return thisT, tErr
 }
 
 func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.TemplateMeta) []URLSpec {

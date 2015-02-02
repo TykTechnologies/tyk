@@ -13,3 +13,4 @@ lint_results.txt
 build/
 test_apps/
 tyk.conf.bak
+tyk.folder.conf
