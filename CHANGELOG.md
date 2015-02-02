@@ -1,6 +1,19 @@
 # DEV
 - Added caching middleware
 - Added optimisation settings for out-of-thread session updates and redis idle pool connections
+- Added cache option to cache safe requests, means individual paths need not be defined, but all GET, OPTIONS and HEAD requests will be cached
+- Added request transformation middleware, thus far only tested with JSON input. Add a golanfg template to the extended path config like so:
+
+        "transform": [
+            {
+                "path": "/",
+                "template_data": {
+                    "template_mode": "file",
+                    "template_source": "./templates/transform_test.tmpl"
+                }
+            }
+        ]
+
 
 # v1.4
 

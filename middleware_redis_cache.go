@@ -46,11 +46,17 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, 200
 	}
 
+    var stat RequestStatus
 	// Only allow idempotent (safe) methods
 	if r.Method == "GET" || r.Method == "OPTIONS" || r.Method == "HEAD" {
-		// We use the versioning middleware to get our status, this may be overkill
-		_, stat, _ := m.TykMiddleware.Spec.IsRequestValid(r)
-
+        // Lets see if we can throw a sledgehammer at this
+        if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
+            stat = StatusCached
+        } else {
+            // We use the versioning middleware to get our status, this may be overkill
+		    _, stat, _ = m.TykMiddleware.Spec.IsRequestValid(r)
+        }
+        
 		// Cached route matched, let go
 		if stat == StatusCached {
 			authHeaderValue := context.Get(r, AuthHeaderValue).(string)
