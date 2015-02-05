@@ -55,7 +55,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
         } else {
             // New request checker, more targetted, less likely to fail
             _, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
-            found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, versionPaths, Cached)
+            found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
             if found {
                 stat = StatusCached
             }

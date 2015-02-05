@@ -533,7 +533,7 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
-func (a *APISpec) CheckSpecMatchesStatus(url string, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
 	for _, v := range RxPaths {
 		match := v.Spec.MatchString(url)
@@ -550,9 +550,13 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, RxPaths []URLSpec, mode URL
                 case Cached:
                     return true, nil
                 case Transformed:
-                    return true, v.TransformAction
+                    if method != nil && method.(string) == v.TransformAction.TemplateMeta.Method {
+                        return true, v.TransformAction
+                    }
                 case HeaderInjected:
-                    return true, v.InjectHeaders
+                    if method != nil && method.(string) == v.InjectHeaders.Method {
+                        return true, v.TransformAction
+                    }
                 }
 		    }
 	    }

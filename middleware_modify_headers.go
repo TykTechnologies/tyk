@@ -29,7 +29,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
     var found bool
     
     _, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
-    found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, versionPaths, HeaderInjected)
+    found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, HeaderInjected)
     if found {
         stat = StatusHeaderInjected
     }

@@ -32,7 +32,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
     var found bool
     
     _, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
-    found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, versionPaths, Transformed)
+    found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Transformed)
     if found {
         stat = StatusTransform
     }
