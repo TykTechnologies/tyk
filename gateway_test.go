@@ -627,7 +627,7 @@ func TestWithAnalytics(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createThrottledSession()
+	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
@@ -679,7 +679,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createThrottledSession()
+	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
@@ -700,7 +700,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code == 200 {
-		t.Error("Request failed with non-200 code: \n", recorder.Code)
+		t.Error("Request failed with 200 code: \n", recorder.Code)
 	}
 
 	results := analytics.Store.GetKeysAndValues()
