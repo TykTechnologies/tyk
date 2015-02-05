@@ -53,8 +53,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
         if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
             stat = StatusCached
         } else {
-            // We use the versioning middleware to get our status, this may be overkill
-		    _, stat, _ = m.TykMiddleware.Spec.IsRequestValid(r)
+            // New request checker, more targetted, less likely to fail
+            _, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
+            found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, versionPaths, Cached)
+            if found {
+                stat = StatusCached
+            }
         }
         
 		// Cached route matched, let go

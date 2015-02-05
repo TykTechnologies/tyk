@@ -24,7 +24,16 @@ func (t *TransformHeaders) GetConfig() (interface{}, error) {
 func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	
     // Uee the request status validator to see if it's in our cache list
-    _, stat, meta := t.TykMiddleware.Spec.IsRequestValid(r)
+    var stat RequestStatus
+    var meta interface{}
+    var found bool
+    
+    _, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
+    found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, versionPaths, HeaderInjected)
+    if found {
+        stat = StatusHeaderInjected
+    }
+    
     if stat == StatusHeaderInjected {
         thisMeta := meta.(tykcommon.HeaderInjectionMeta)
         

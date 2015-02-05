@@ -532,6 +532,34 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 
 }
 
+// CheckSpecMatchesStatus checks if a url spec has a specific status
+func (a *APISpec) CheckSpecMatchesStatus(url string, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+	// Check if ignored
+	for _, v := range RxPaths {
+		match := v.Spec.MatchString(url)
+		if match {
+            // only return it it's what we are looking for
+            if mode == v.Status {
+                switch v.Status {
+                case Ignored:
+                    return true, nil
+                case BlackList:
+                    return true, nil
+                case WhiteList:
+                    return true, nil
+                case Cached:
+                    return true, nil
+                case Transformed:
+                    return true, v.TransformAction
+                case HeaderInjected:
+                    return true, v.InjectHeaders
+                }
+		    }
+	    }
+    }
+    return false, nil
+}
+
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	if a.APIDefinition.VersionDefinition.Location == "header" {
 		versionHeaderVal := r.Header.Get(a.APIDefinition.VersionDefinition.Key)
