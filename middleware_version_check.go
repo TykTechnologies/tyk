@@ -20,6 +20,19 @@ func (v *VersionCheck) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) () {
+    // Reply with some alternate data
+    thisMeta := meta.(tykcommon.EndpointMethodMeta)
+    responseMessage := []byte(thisMeta.Data)
+    for header, value := range thisMeta.Headers {
+        w.Header().Add(header, value)
+    }
+
+    w.WriteHeader(thisMeta.Code)
+    fmt.Fprintf(w, string(responseMessage))
+    return
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Check versioning, blacklist, whitelist and ignored status
@@ -36,24 +49,17 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 			})
 		return errors.New(string(stat)), 409
 	}
+    
+    // We handle redirects before ignores in case we aren't using a whitelist
+    if stat == StatusRedirectFlowByReply {
+		v.DoMockReply(w, meta)
+		return nil, 666
+	}
 
 	if stat == StatusOkAndIgnore {
 		handler := SuccessHandler{v.TykMiddleware}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
-		return nil, 666
-	}
-
-	if stat == StatusRedirectFlowByReply {
-		// Reply with some alternate data
-		thisMeta := meta.(tykcommon.EndpointMethodMeta)
-		responseMessage := []byte(thisMeta.Data)
-		for header, value := range thisMeta.Headers {
-			w.Header().Add(header, value)
-		}
-
-		w.WriteHeader(thisMeta.Code)
-		fmt.Fprintf(w, string(responseMessage))
 		return nil, 666
 	}
 
