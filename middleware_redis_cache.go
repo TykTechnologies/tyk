@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+    "strings"
 )
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
@@ -30,7 +31,8 @@ func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
 
 func (m RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {
 	h := md5.New()
-	io.WriteString(h, req.URL.RawQuery)
+    toEncode := strings.Join([]string{req.Method, req.URL.RawQuery}, "-")
+	io.WriteString(h, toEncode)
 	reqChecksum := hex.EncodeToString(h.Sum(nil))
 
 	cacheKey := m.Spec.APIDefinition.APIID + keyName + reqChecksum
