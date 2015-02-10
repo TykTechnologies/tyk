@@ -348,7 +348,7 @@ func (a *APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Templ
 
 func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
     log.Info("-- Loading blob")
-    uDec, decErr := b64.URLEncoding.DecodeString(blob)
+    uDec, decErr := b64.StdEncoding.DecodeString(blob)
     
     if decErr != nil {
         return nil, decErr
