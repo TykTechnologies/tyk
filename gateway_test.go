@@ -687,7 +687,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "76589854")
+	req.Header.Add("authorization", "4321")
 
 	if err != nil {
 		t.Fatal(err)
@@ -706,7 +706,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	results := analytics.Store.GetKeysAndValues()
 
 	if len(results) < 1 {
-		t.Error("Not enough results! Should be at least 1, is: ", len(results))
+		t.Error("Not enough results! Should be 1, is: ", len(results))
 	}
 
 }
