@@ -264,7 +264,7 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 
 	in_ms := diff / 1000000
     
-    if hm.TykMiddleware.Spec.HmacAllowedClockSkew >= 0 {
+    if hm.TykMiddleware.Spec.HmacAllowedClockSkew <= 0 {
         return true
     } 
     
