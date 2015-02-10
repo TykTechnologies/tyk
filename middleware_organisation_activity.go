@@ -61,7 +61,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			// Fire a quota exceeded event
 			go k.TykMiddleware.FireEvent(EVENT_OrgQuotaExceeded,
 				EVENT_QuotaExceededMeta{
-					EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded"},
+					EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 					Path:             r.URL.Path,
 					Origin:           r.RemoteAddr,
 					Key:              thisOrg,

@@ -37,7 +37,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		authHeaderValue := context.Get(r, AuthHeaderValue)
 		go k.TykMiddleware.FireEvent(EVENT_KeyExpired,
 			EVENT_KeyExpiredMeta{
-				EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key."},
+				EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
 				Origin:           r.RemoteAddr,
 				Key:              authHeaderValue.(string),

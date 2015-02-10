@@ -57,7 +57,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 			// Fire a rate limit exceeded event
 			go k.TykMiddleware.FireEvent(EVENT_RateLimitExceeded,
 				EVENT_RateLimitExceededMeta{
-					EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded"},
+					EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 					Path:             r.URL.Path,
 					Origin:           r.RemoteAddr,
 					Key:              authHeaderValue,
@@ -78,7 +78,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 			// Fire a quota exceeded event
 			go k.TykMiddleware.FireEvent(EVENT_QuotaExceeded,
 				EVENT_QuotaExceededMeta{
-					EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded"},
+					EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 					Path:             r.URL.Path,
 					Origin:           r.RemoteAddr,
 					Key:              authHeaderValue,

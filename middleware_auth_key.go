@@ -63,7 +63,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 func AuthFailed(m TykMiddleware, r *http.Request, authHeaderValue string) {
 	go m.FireEvent(EVENT_AuthFailure,
 		EVENT_AuthFailureMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
+            EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           r.RemoteAddr,
 			Key:              authHeaderValue,

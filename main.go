@@ -283,8 +283,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 		log.Info("Loading Middleware")
 		mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
-
-		referenceSpec.JSVM.LoadJSPaths(mwPaths)
+        
+        referenceSpec.JSVM.LoadJSPaths(mwPaths)
 
 		if referenceSpec.EnableBatchRequestSupport {
 			addBatchEndpoint(&referenceSpec, Muxer)

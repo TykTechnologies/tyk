@@ -1,7 +1,7 @@
 // ---- Sample middleware creation by end-user -----
 var sampleHandler = new TykJS.TykEventHandlers.NewEventHandler({});
 
-sampleHandler.NewHandler(function(event) {
+sampleHandler.NewHandler(function(event, context) {
     // You can log to Tyk console output by calloing the built-in log() function:
     log("Running sample JSVM Handler")
     
@@ -12,7 +12,8 @@ sampleHandler.NewHandler(function(event) {
             "Message": "MEvent descirption",
             "Path": "/{{api_id}}/{{path}}",
             "Origin": "1.1.1.1:PORT",
-            "Key": "{{Auth Key}}"
+            "Key": "{{Auth Key}}",
+            "OriginatingRequest": "" // B64 Encoded Request in wire protocol
         },
         "TimeStamp": "2015-01-15 17:21:15.111157073 +0000 UTC"
     }
