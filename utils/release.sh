@@ -80,9 +80,9 @@ echo "Copying configuration files into distros"
 cp $SOURCEBINPATH/apps/app_sample.json $i386BINDIR
 cp $SOURCEBINPATH/templates/*.json $i386BINDIR
 cp $SOURCEBINPATH/tyk.conf.example $i386BINDIR/tyk.conf
-cp $SOURCEBINPATH/middleware/*.js $i386BINDIR
-cp $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
-cp $SOURCEBINPATH/js/tyk.js $i386BINDIR
+cp -r $SOURCEBINPATH/middleware/*.js $i386BINDIR
+cp -r $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
+cp -r $SOURCEBINPATH/js/tyk.js $i386BINDIR
 
 
 cp $SOURCEBINPATH/apps/app_sample.json $amd64BINDIR
@@ -96,9 +96,9 @@ cp -r $SOURCEBINPATH/js/tyk.js $amd64BINDIR
 cp $SOURCEBINPATH/apps/app_sample.json $armBINDIR
 cp $SOURCEBINPATH/templates/*.json $armBINDIR
 cp $SOURCEBINPATH/tyk.conf.example $armBINDIR/tyk.conf
-cp $SOURCEBINPATH/middleware/*.js $armBINDIR
-cp $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
-cp $SOURCEBINPATH/js/tyk.js $armBINDIR
+cp -r $SOURCEBINPATH/middleware/*.js $armBINDIR
+cp -r $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
+cp -r $SOURCEBINPATH/js/tyk.js $armBINDIR
 
 # -------------------------------------------------------
 echo "Preparing i386"
