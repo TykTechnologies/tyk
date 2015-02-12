@@ -1,7 +1,9 @@
 package main
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
+	"errors"
 	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"labix.org/v2/mgo"
@@ -11,12 +13,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-    "errors"
-    textTemplate "text/template"
-    b64 "encoding/base64"
+	textTemplate "text/template"
 	"time"
 )
-
 
 const (
 	DefaultAuthProvider    tykcommon.AuthProviderCode    = "default"
@@ -30,17 +29,16 @@ type URLStatus int
 // Enums representing the various statuses for a VersionInfo Path match during a
 // proxy request
 const (
-	Ignored   URLStatus = 1
-	WhiteList URLStatus = 2
-	BlackList URLStatus = 3
-	Cached    URLStatus = 4
-    Transformed URLStatus = 5
-    HeaderInjected URLStatus = 6
+	Ignored        URLStatus = 1
+	WhiteList      URLStatus = 2
+	BlackList      URLStatus = 3
+	Cached         URLStatus = 4
+	Transformed    URLStatus = 5
+	HeaderInjected URLStatus = 6
 )
 
 // RequestStatus is a custom type to avoid collisions
 type RequestStatus string
-
 
 // Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
 const (
@@ -54,28 +52,26 @@ const (
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
 	StatusOk                       RequestStatus = "Everything OK, passing"
 	StatusCached                   RequestStatus = "Cached path"
-    StatusTransform                RequestStatus = "Transformed path"
-    StatusHeaderInjected RequestStatus = "Header injected"
+	StatusTransform                RequestStatus = "Transformed path"
+	StatusHeaderInjected           RequestStatus = "Header injected"
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
 	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
 )
-
-
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
 // path is on any of the white, plack or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec          *regexp.Regexp
-	Status        URLStatus
-	MethodActions map[string]tykcommon.EndpointMethodMeta
-    TransformAction TransformSpec
-    InjectHeaders tykcommon.HeaderInjectionMeta
+	Spec            *regexp.Regexp
+	Status          URLStatus
+	MethodActions   map[string]tykcommon.EndpointMethodMeta
+	TransformAction TransformSpec
+	InjectHeaders   tykcommon.HeaderInjectionMeta
 }
 
 type TransformSpec struct {
-    tykcommon.TemplateMeta
-    Template *textTemplate.Template
+	tykcommon.TemplateMeta
+	Template *textTemplate.Template
 }
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
@@ -282,12 +278,12 @@ func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef tykcommon.VersionInfo) 
 	return combinedPath, false
 }
 
-func (a *APIDefinitionLoader)  generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
-    apiLangIDsRegex, _ := regexp.Compile("{(.*?)}")
-    asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, "(.*?)")
-    asRegex, _ := regexp.Compile(asRegexStr)
-    newSpec.Status = specType
-    newSpec.Spec = asRegex
+func (a *APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
+	apiLangIDsRegex, _ := regexp.Compile("{(.*?)}")
+	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, "(.*?)")
+	asRegex, _ := regexp.Compile(asRegexStr)
+	newSpec.Status = specType
+	newSpec.Spec = asRegex
 }
 
 func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {
@@ -312,9 +308,9 @@ func (a *APIDefinitionLoader) compileExtendedPathSpec(paths []tykcommon.EndPoint
 	thisURLSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
-        newSpec := URLSpec{}
+		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, specType)
-        
+
 		// Extend with method actions
 		newSpec.MethodActions = stringSpec.MethodActions
 		thisURLSpec = append(thisURLSpec, newSpec)
@@ -340,22 +336,22 @@ func (a *APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
 }
 
 func (a *APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
-    log.Info("-- Loading template: ", path)
-    thisT, tErr := textTemplate.ParseFiles(path)
-    
-    return thisT, tErr
+	log.Info("-- Loading template: ", path)
+	thisT, tErr := textTemplate.ParseFiles(path)
+
+	return thisT, tErr
 }
 
 func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
-    log.Info("-- Loading blob")
-    uDec, decErr := b64.StdEncoding.DecodeString(blob)
-    
-    if decErr != nil {
-        return nil, decErr
-    }
-    
-    thisT, tErr := textTemplate.New("blob").Parse(string(uDec))
-    return thisT, tErr
+	log.Info("-- Loading blob")
+	uDec, decErr := b64.StdEncoding.DecodeString(blob)
+
+	if decErr != nil {
+		return nil, decErr
+	}
+
+	thisT, tErr := textTemplate.New("blob").Parse(string(uDec))
+	return thisT, tErr
 }
 
 func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.TemplateMeta) []URLSpec {
@@ -364,40 +360,39 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 	// This way we can iterate the whole array once, on match we break with status
 	thisURLSpec := []URLSpec{}
 
-    log.Info("Checking for transform paths...")
+	log.Info("Checking for transform paths...")
 	for _, stringSpec := range paths {
-        log.Info("-- Generating path")
+		log.Info("-- Generating path")
 		newSpec := URLSpec{}
-        a.generateRegex(stringSpec.Path, &newSpec, Transformed)
+		a.generateRegex(stringSpec.Path, &newSpec, Transformed)
 		// Extend with template actions
-        
-        newTransformSpec := TransformSpec{TemplateMeta: stringSpec}
-        
-        // Load the templates
-        var templErr error
-        
-        switch stringSpec.TemplateData.Mode {
-        case tykcommon.UseFile: 
-            log.Info("-- Using File mode")
-            newTransformSpec.Template, templErr = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
-        case tykcommon.UseBlob:
-            log.Info("-- Blob mode")
-            newTransformSpec.Template, templErr = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
-        default:
-            log.Info("-- No mode defined! Found: ", stringSpec.TemplateData.Mode)
-            templErr = errors.New("No valid template mode defined, must be either 'file' or 'blob'.") 
-        }
-        
-        newSpec.TransformAction = newTransformSpec
-		
-        if templErr == nil {
-            thisURLSpec = append(thisURLSpec, newSpec)
-            log.Info("-- Loaded")
-        } else {
-            log.Error("Template load failure! Skipping transformation: ", templErr)
-        }
-        
-        
+
+		newTransformSpec := TransformSpec{TemplateMeta: stringSpec}
+
+		// Load the templates
+		var templErr error
+
+		switch stringSpec.TemplateData.Mode {
+		case tykcommon.UseFile:
+			log.Info("-- Using File mode")
+			newTransformSpec.Template, templErr = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
+		case tykcommon.UseBlob:
+			log.Info("-- Blob mode")
+			newTransformSpec.Template, templErr = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
+		default:
+			log.Info("-- No mode defined! Found: ", stringSpec.TemplateData.Mode)
+			templErr = errors.New("No valid template mode defined, must be either 'file' or 'blob'.")
+		}
+
+		newSpec.TransformAction = newTransformSpec
+
+		if templErr == nil {
+			thisURLSpec = append(thisURLSpec, newSpec)
+			log.Info("-- Loaded")
+		} else {
+			log.Error("Template load failure! Skipping transformation: ", templErr)
+		}
+
 	}
 
 	return thisURLSpec
@@ -413,7 +408,7 @@ func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []tykcommon.Header
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, HeaderInjected)
 		// Extend with method actions
-        newSpec.InjectHeaders = stringSpec
+		newSpec.InjectHeaders = stringSpec
 		thisURLSpec = append(thisURLSpec, newSpec)
 	}
 
@@ -427,16 +422,16 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.BlackList, BlackList)
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
-    transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform)
-    headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader)
-    
+	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform)
+	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader)
+
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
 	combinedPath = append(combinedPath, blackListPaths...)
 	combinedPath = append(combinedPath, whiteListPaths...)
 	combinedPath = append(combinedPath, cachedPaths...)
-    combinedPath = append(combinedPath, transformPaths...)
-    combinedPath = append(combinedPath, headerTransformPaths...)
+	combinedPath = append(combinedPath, transformPaths...)
+	combinedPath = append(combinedPath, headerTransformPaths...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -462,10 +457,10 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusOk
 	case Cached:
 		return StatusCached
-    case Transformed:
-        return StatusTransform
-    case HeaderInjected:
-        return StatusHeaderInjected
+	case Transformed:
+		return StatusTransform
+	case HeaderInjected:
+		return StatusHeaderInjected
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -493,7 +488,7 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 							return EndPointNotAllowed, nil
 						}
 					}
-                    
+
 					// NoAction status means we're not treating this request in any special or exceptional way
 					return a.getURLStatus(v.Status), nil
 
@@ -507,16 +502,16 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 				// Method not matched in an extended set, means it can be passed through
 				return StatusOk, nil
 			}
-            
-            if v.TransformAction.Template != nil {
-                return a.getURLStatus(v.Status), v.TransformAction
-            }
-            
-            // TODO: Fix, Not a great detection method
-            if len(v.InjectHeaders.Path) > 0 {
-                return a.getURLStatus(v.Status), v.InjectHeaders
-            }
-            
+
+			if v.TransformAction.Template != nil {
+				return a.getURLStatus(v.Status), v.TransformAction
+			}
+
+			// TODO: Fix, Not a great detection method
+			if len(v.InjectHeaders.Path) > 0 {
+				return a.getURLStatus(v.Status), v.InjectHeaders
+			}
+
 			// Using a legacy path, handle it raw.
 			return a.getURLStatus(v.Status), nil
 		}
@@ -539,30 +534,30 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 	for _, v := range RxPaths {
 		match := v.Spec.MatchString(url)
 		if match {
-            // only return it it's what we are looking for
-            if mode == v.Status {
-                switch v.Status {
-                case Ignored:
-                    return true, nil
-                case BlackList:
-                    return true, nil
-                case WhiteList:
-                    return true, nil
-                case Cached:
-                    return true, nil
-                case Transformed:
-                    if method != nil && method.(string) == v.TransformAction.TemplateMeta.Method {
-                        return true, v.TransformAction
-                    }
-                case HeaderInjected:
-                    if method != nil && method.(string) == v.InjectHeaders.Method {
-                        return true, v.TransformAction
-                    }
-                }
-		    }
-	    }
-    }
-    return false, nil
+			// only return it it's what we are looking for
+			if mode == v.Status {
+				switch v.Status {
+				case Ignored:
+					return true, nil
+				case BlackList:
+					return true, nil
+				case WhiteList:
+					return true, nil
+				case Cached:
+					return true, nil
+				case Transformed:
+					if method != nil && method.(string) == v.TransformAction.TemplateMeta.Method {
+						return true, v.TransformAction
+					}
+				case HeaderInjected:
+					if method != nil && method.(string) == v.InjectHeaders.Method {
+						return true, v.InjectHeaders
+					}
+				}
+			}
+		}
+	}
+	return false, nil
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
@@ -647,10 +642,10 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 		return true, StatusRedirectFlowByReply, meta
 	case StatusCached:
 		return true, StatusCached, meta
-    case StatusTransform:
-        return true, StatusTransform, meta
-    case StatusHeaderInjected:
-        return true, StatusHeaderInjected, meta    
+	case StatusTransform:
+		return true, StatusTransform, meta
+	case StatusHeaderInjected:
+		return true, StatusHeaderInjected, meta
 	default:
 		return true, StatusOk, meta
 	}
