@@ -1,4 +1,7 @@
 # DEV
+- Added LDAP StorageHandler, enables basic key lookups from an LDAP service
+
+# v1.5
 - Added caching middleware
 - Added optimisation settings for out-of-thread session updates and redis idle pool connections
 - Added cache option to cache safe requests, means individual paths need not be defined, but all GET, OPTIONS and HEAD requests will be cached
