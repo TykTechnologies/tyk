@@ -259,6 +259,10 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		switch referenceSpec.AuthProvider.StorageEngine {
 		case DefaultStorageEngine:
 			authStore = &redisStore
+		case LDAPStorageEngine:
+			thisStorageEngine := LDAPStorageHandler{}
+			thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
+			authStore = &thisStorageEngine
 		default:
 			authStore = &redisStore
 		}
