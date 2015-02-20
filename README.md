@@ -31,6 +31,7 @@ Tyk offers powerful, yet lightweight features that allow fine gained control ove
 * **IP Whitelisting** - Block access to non-trusted IP addresses for more secure interactions
 * **Zero downtime restarts** - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
 
+
 Tyk is written in Go, which makes it fast and easy to set up. Its only dependencies are a Mongo database (for analytics) and Redis, 
 though it can be deployed without either (not recommended).
 
