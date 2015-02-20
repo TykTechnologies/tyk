@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/lonelycode/osin"
+	osin "github.com/lonelycode/osin"
 	"github.com/nu7hatch/gouuid"
 	"net/http"
 	"time"

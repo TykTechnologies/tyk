@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
- 	"github.com/lonelycode/osin"
+ 	osin "github.com/lonelycode/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
