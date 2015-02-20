@@ -57,7 +57,7 @@ var oauthDefinition string = `
 			"not_versioned": true,
 			"versions": {
 				"Default": {
-					"name": "efault",
+					"name": "Default",
 					"expires": "3000-01-02 15:04"
 				}
 			}

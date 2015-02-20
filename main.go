@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/RangelReale/osin"
+ 	osin "github.com/lonelycode/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
@@ -259,6 +259,10 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		switch referenceSpec.AuthProvider.StorageEngine {
 		case DefaultStorageEngine:
 			authStore = &redisStore
+		case LDAPStorageEngine:
+			thisStorageEngine := LDAPStorageHandler{}
+			thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
+			authStore = &thisStorageEngine
 		default:
 			authStore = &redisStore
 		}
