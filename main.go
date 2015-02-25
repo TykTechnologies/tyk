@@ -28,6 +28,7 @@ var analytics = RedisAnalyticsHandler{}
 var profileFile = &os.File{}
 var GlobalEventsJSVM = &JSVM{}
 var doMemoryProfile bool
+var Policies = make(map[string]Policy)
 
 //var genericOsinStorage *RedisOsinStorageInterface
 var ApiSpecRegister = make(map[string]*APISpec)
@@ -101,6 +102,21 @@ func getAPISpecs() []APISpec {
 	}
 
 	return APISpecs
+}
+
+func getPolicies() {
+	log.Info("Loading policies")
+	if config.Policies.PolicyRecordName == "" {
+		log.Info("No policy record name defined, skipping...")
+		return
+	}
+	
+	if config.Policies.PolicySource == "mongo" {
+		log.Info("Using Policies from Mongo DB")
+		Policies = LoadPoliciesFromMongo(config.Policies.PolicyRecordName)
+	} else {
+		Policies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
+	}
 }
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
@@ -345,6 +361,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
                 CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
                 CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
@@ -398,6 +415,9 @@ func ReloadURLStructure() {
 	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()
 	loadApps(specs, newMuxes)
+	
+	// Load the API Policies
+	getPolicies()
 
 	http.DefaultServeMux = newMuxes
 	log.Info("Reload complete")
@@ -512,6 +532,7 @@ func main() {
 		// Accept connections in a new goroutine.
 		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
+		getPolicies()
 		go http.Serve(l, nil)
 
 	} else {
@@ -520,6 +541,7 @@ func main() {
 		log.Println("Resuming listening on", l.Addr())
 		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
+		getPolicies()
 		go http.Serve(l, nil)
 
 		// Kill the parent, now that the child has started successfully.

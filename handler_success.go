@@ -40,6 +40,28 @@ func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	return thisSession, found
 }
 
+// ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
+func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState) {
+	if thisSession.ApplyPolicyID != "" {
+		log.Debug("Session has policy, checking")
+		policy, ok := Policies[thisSession.ApplyPolicyID]
+		if ok {
+			log.Debug("Found policy, applying")
+			thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+			thisSession.Rate = policy.Rate
+			thisSession.Per = policy.Per
+			thisSession.QuotaMax = policy.QuotaMax
+			thisSession.QuotaRenewalRate = policy.QuotaRenewalRate
+			thisSession.AccessRights = policy.AccessRights
+			thisSession.HMACEnabled = policy.HMACEnabled
+			
+			// Update the session in the session manager in case it gets called again
+			t.Spec.SessionManager.UpdateSession(key, *thisSession, t.Spec.APIDefinition.SessionLifetime)
+			log.Debug("Policy applied to key")
+		}
+	}
+}
+
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
@@ -50,6 +72,9 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	thisSession, found = t.Spec.SessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
+		
+		// Check for a policy, if there is a policy, pull it and overwrite the session values
+		t.ApplyPolicyIfExists(key, &thisSession)
 		return thisSession, true
 	}
 
@@ -59,9 +84,11 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	if found {
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		log.Info("Recreating session for key: ", key)
+		// Check for a policy, if there is a policy, pull it and overwrite the session values
+		t.ApplyPolicyIfExists(key, &thisSession)
 		t.Spec.SessionManager.UpdateSession(key, thisSession, t.Spec.APIDefinition.SessionLifetime)
 	}
-
+	
 	return thisSession, found
 }
 
