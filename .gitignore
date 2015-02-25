@@ -15,4 +15,5 @@ test_apps/
 tyk.conf.bak
 tyk.folder.conf
 tyk.db.conf
+tyk.compose.conf
 run.sh
