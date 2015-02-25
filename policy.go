@@ -10,6 +10,7 @@ import (
 type Policy struct {
 	MID				 bson.ObjectId 				 `bson:"_id,omitempty" json:"id"`
 	ID  			 string 				  	 `bson:"id,omitempty" json:"id"`
+	OrgID			 string						 `bson:"org_id" json:"org_id"`
 	Rate             float64                     `bson:"rate" json:"rate"`
 	Per              float64                     `bson:"per" json:"per"`
 	QuotaMax         int64                       `bson:"quota_max" json:"quota_max"`
