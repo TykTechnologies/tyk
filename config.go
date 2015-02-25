@@ -15,6 +15,10 @@ type Config struct {
 	TemplatePath    string `json:"template_path"`
 	TykJSPath       string `json:"tyk_js_path"`
 	MiddlewarePath  string `json:"middleware_path"`
+	Policies struct {
+		PolicySource string	`json:"policy_source"`
+		PolicyRecordName string	`json:"policy_record_name"`
+	} `json:"policies"`
 	UseDBAppConfigs bool   `json:"use_db_app_configs"`
 	AppPath         string `json:"app_path"`
 	Storage         struct {

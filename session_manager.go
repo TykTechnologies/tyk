@@ -4,11 +4,17 @@ import (
 	"time"
 )
 
+// AccessSpecs define what URLS a user has access to an what methods are enabled
+type AccessSpec struct {
+	Methods []string `json:"methods"`
+}
+
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
 	APIiName string   `json:"api_name"`
 	APIID    string   `json:"api_id"`
 	Versions []string `json:"versions"`
+	AllowedURLs map[string]AccessSpec `json:"allowed_urls"` // mapped string MUST be a valid regex
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
@@ -31,6 +37,7 @@ type SessionState struct {
 	HMACEnabled bool        `json:"hmac_enabled"`
 	HmacSecret  string      `json:"hmac_string"`
 	IsInactive  bool        `json:"is_inactive"`
+	ApplyPolicyID	string  `json:"apply_policy_id"`
 	MetaData    interface{} `json:"meta_data"`
 }
 

@@ -1,5 +1,67 @@
 # DEV
 - Added LDAP StorageHandler, enables basic key lookups from an LDAP service
+- Added Policies feature, you can now define key policies for keys you generate:
+    - Create a policies/policies.json file
+    - Set the appropriate arguments in tyk.conf file:
+
+		"policies": {
+			"policy_source": "file",
+			"policy_record_name": "./policies/policies.json"
+		}
+
+	- Create a policy, they look like this:
+	
+		{
+			"default": {
+				"rate": 1000,
+				"per": 1,
+				"quota_max": 100,
+				"quota_renewal_rate": 60,
+				"access_rights": {
+					"41433797848f41a558c1573d3e55a410": {
+						"api_name": "My API",
+						"api_id": "41433797848f41a558c1573d3e55a410",
+						"versions": [
+							"Default"
+						]
+					}
+				},
+				"org_id": "54de205930c55e15bd000001",
+				"hmac_enabled": false
+			}
+		}
+	
+	- Add a `apply_policy_id` field to your Session object when you create a key with your policy ID (in this case the ID is `default`)
+	- Reload Tyk
+	- Policies will be applied to Keys when they are loaded form Redis, and the updated i nRedis so they can be ueried if necessary
+
+- Added granular path white-list: It is now possible to define at the key level what access permissions a key has, this is a white-list of regex keys and apply to a whole API definition. Granular permissions are applied *after* version-based (global) ones in the api-definition. These granular permissions take the form a new field in the access rights field in either a policy definition or a session object in the new `allowed_urls` field:
+
+	{
+		"default": {
+			"rate": 1000,
+			"per": 1,
+			"quota_max": 100,
+			"quota_renewal_rate": 60,
+			"access_rights": {
+				"41433797848f41a558c1573d3e55a410": {
+					"api_name": "My API",
+					"api_id": "41433797848f41a558c1573d3e55a410",
+					"versions": [
+						"Default"
+					],
+					"allowed_urls": {
+						"/resource/(.*)": {
+							"methods": ["GET", "POST"] 
+						}
+					}
+				}
+			},
+			"org_id": "54de205930c55e15bd000001",
+			"hmac_enabled": false
+		}
+	}
+	 
 
 # v1.5
 - Added caching middleware
