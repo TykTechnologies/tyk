@@ -8,7 +8,8 @@ import (
 )
 
 type Policy struct {
-	ID  			 string 				  	 `bson:"_id, ommitempty" json:"id"`
+	MID				 bson.ObjectId 				 `bson:"_id,omitempty" json:"id"`
+	ID  			 string 				  	 `bson:"id,omitempty" json:"id"`
 	Rate             float64                     `bson:"rate" json:"rate"`
 	Per              float64                     `bson:"per" json:"per"`
 	QuotaMax         int64                       `bson:"quota_max" json:"quota_max"`
@@ -37,6 +38,7 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 
 // LoadPoliciesFromMongo will connect and download POlicies from a Mongo DB instance.
 func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
+	dbPolicyList := make([]Policy, 0)
 	policies := make(map[string]Policy)
 
 	dbSession, dErr := mgo.Dial(config.AnalyticsConfig.MongoURL)
@@ -44,17 +46,25 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 		log.Error("Mongo connection failed:", dErr)
 	}
 	
+	log.Debug("Searching in collection: ", collectionName)
 	policyCollection := dbSession.DB("").C(collectionName)
 
 	search := bson.M{
 		"active": true,
 	}
 
-	mongoErr := policyCollection.Find(search).All(&policies)
+	mongoErr := policyCollection.Find(search).All(&dbPolicyList)
 
 	if mongoErr != nil {
-		log.Error("Could not find any policy configs!")
+		log.Error("Could not find any policy configs! ", mongoErr)
 		return policies
+	}
+	
+	log.Info("Policies found: ", len(dbPolicyList))
+	for _, p := range(dbPolicyList) {
+		p.ID = p.MID.Hex()
+		policies[p.MID.Hex()] = p
+		log.Debug("Processing policy ID: ", p.ID)
 	}
 
 	return policies
