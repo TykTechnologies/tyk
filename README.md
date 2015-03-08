@@ -42,7 +42,7 @@ simple and does one thing well - protecting your API from unauthorised access.
 
 ## Documentation ##
 
-All the documentation can be found on our main site at http://tyk.io/about/
+All the documentation can be found on our main site at http://tyk.io/
 
 ## License ##
 
