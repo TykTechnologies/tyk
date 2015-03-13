@@ -418,6 +418,10 @@ func TestThrottling(t *testing.T) {
 	secondRecorder := httptest.NewRecorder()
 	chain.ServeHTTP(secondRecorder, req)
 
+	if secondRecorder.Code != 200 {
+		t.Error("Second request failed with non-200 code: \n", secondRecorder.Code)
+	}
+
 	thirdRecorder := httptest.NewRecorder()
 	chain.ServeHTTP(thirdRecorder, req)
 

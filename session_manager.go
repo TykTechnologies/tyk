@@ -69,7 +69,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	rateLimiterKey := RateLimitKeyPrefix + key
 	ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
 
-	if ratePerPeriodNow >= (int64(currentSession.Rate)) {
+	if ratePerPeriodNow > (int64(currentSession.Rate)) {
 		return false, 1
 	}
 
