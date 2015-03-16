@@ -16,7 +16,7 @@ func createThrottledSession() SessionState {
 	thisSession.Rate = 2.0
 	thisSession.Allowance = thisSession.Rate
 	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
+	thisSession.Per = 4
 	thisSession.Expires = 0
 	thisSession.QuotaRenewalRate = 300 // 5 minutes
 	thisSession.QuotaRenews = time.Now().Unix()
