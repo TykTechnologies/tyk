@@ -162,7 +162,7 @@ var nonExpiringDefNoWhiteList string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://tyk.io",
+			"target_url": "http://google.com",
 			"strip_listen_path": false
 		}
 	}
