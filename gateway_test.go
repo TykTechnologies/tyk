@@ -162,7 +162,7 @@ var nonExpiringDefNoWhiteList string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://tyk.io",
 			"strip_listen_path": false
 		}
 	}
