@@ -424,12 +424,19 @@ func TestThrottling(t *testing.T) {
 
 	thirdRecorder := httptest.NewRecorder()
 	chain.ServeHTTP(thirdRecorder, req)
-
-	if thirdRecorder.Code == 200 {
-		t.Error("Third request failed, should not be 200!: \n", thirdRecorder.Code)
+	
+	if thirdRecorder.Code != 200 {
+		t.Error("Third request failed with non-200 code: \n", thirdRecorder.Code)
 	}
-	if thirdRecorder.Code != 403 {
-		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
+	
+	fourthRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(fourthRecorder, req)
+
+	if fourthRecorder.Code == 200 {
+		t.Error("Third request failed, should not be 200!: \n", fourthRecorder.Code)
+	}
+	if fourthRecorder.Code != 403 {
+		t.Error("Third request returned invalid code, should 403, got: \n", fourthRecorder.Code)
 	}
 
 	newAPIError := TykErrorResponse{}
