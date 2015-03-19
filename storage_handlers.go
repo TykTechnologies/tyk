@@ -7,6 +7,7 @@ import (
 	"github.com/spaolacci/murmur3"
 	"time"
 	"hash"
+	"encoding/hex"
 )
 
 // KeyError is a standard error for when a key is not found in the storage engine
@@ -168,8 +169,11 @@ func (r *RedisStorageManager) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + keyName
 	var h64 hash.Hash64 = murmur3.New64()
 	h64.Write([]byte(setKeyName))
+	retKey := hex.EncodeToString(h64.Sum(nil))
 	
-	return string(h64.Sum64())
+	log.Debug("Input key was: ", setKeyName)
+	log.Debug("Hashed key is: ", retKey)
+	return retKey
 }
 
 func (r *RedisStorageManager) cleanKey(keyName string) string {
