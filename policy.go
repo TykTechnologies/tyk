@@ -50,6 +50,8 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 	log.Debug("Searching in collection: ", collectionName)
 	policyCollection := dbSession.DB("").C(collectionName)
 
+	 //TODO: Should check by OrgID
+	log.Warning("POLICIES NOT BEING CHECKED BY ORGID")
 	search := bson.M{
 		"active": true,
 	}
