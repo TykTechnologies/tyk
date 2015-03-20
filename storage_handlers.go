@@ -170,7 +170,7 @@ func getHash(in string) string {
 		// Not hashing? Return the raw key
 		return in
 	}
-	var h hash.Hash32 = murmur3.New32()
+	var h hash.Hash64 = murmur3.New64()
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }
@@ -292,7 +292,7 @@ func (r *RedisStorageManager) IncrememntWithExpire(keyName string, expire int64)
 		val, err := redis.Int64(db.Do("INCR", fixedKey))
 		log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
 		if val == 1 {
-			log.Info("--> Setting Expire")
+			log.Debug("--> Setting Expire")
 			db.Send("EXPIRE", fixedKey, expire)
 		}
 		if err != nil {
