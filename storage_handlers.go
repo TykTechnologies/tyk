@@ -281,7 +281,7 @@ func (r *RedisStorageManager) IncrememntWithExpire(keyName string, expire int64)
 	db := r.pool.Get()
 	defer db.Close()
 
-	log.Info("Incrementing raw key: ", keyName)
+	log.Debug("Incrementing raw key: ", keyName)
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
@@ -290,7 +290,7 @@ func (r *RedisStorageManager) IncrememntWithExpire(keyName string, expire int64)
 		// This function uses a raw key, so we shouldn't call fixKey
 		fixedKey := keyName
 		val, err := redis.Int64(db.Do("INCR", fixedKey))
-		log.Info("Incremented key: ", fixedKey, ", val is: ", val)
+		log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
 		if val == 1 {
 			log.Info("--> Setting Expire")
 			db.Send("EXPIRE", fixedKey, expire)
@@ -430,7 +430,7 @@ func (r *RedisStorageManager) DeleteKeys(keys []string) bool {
 			asInterface[i] = interface{}(r.fixKey(v))
 		}
 		
-		log.Info("Deleting: ", asInterface)
+		log.Debug("Deleting: ", asInterface)
 		_, err := db.Do("DEL", asInterface...)
 		if err != nil {
 			log.Error("Error trying to delete keys:")
@@ -459,7 +459,7 @@ func (r *RedisStorageManager) DeleteRawKeys(keys []string, prefix string) bool {
 			asInterface[i] = interface{}(prefix + v)
 		}
 		
-		log.Info("Deleting: ", asInterface)
+		log.Debug("Deleting: ", asInterface)
 		_, err := db.Do("DEL", asInterface...)
 		if err != nil {
 			log.Error("Error trying to delete keys:")

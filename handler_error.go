@@ -24,6 +24,7 @@ type ErrorHandler struct {
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
 
 	if config.StoreAnalytics(r) {
+		
 		t := time.Now()
 
 		// Track the key ID if it exists
@@ -41,6 +42,9 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		if e.TykMiddleware.Spec.APIDefinition.Proxy.StripListenPath {
 			r.URL.Path = strings.Replace(r.URL.Path, e.TykMiddleware.Spec.Proxy.ListenPath, "", 1)
 		}
+		
+		// This is an odd bugfix, will need further testing
+		r.URL.Path = "/" + r.URL.Path
 
 		OauthClientID := ""
 		thisSessionState := context.Get(r, SessionData)
