@@ -429,6 +429,37 @@ func (r *RedisStorageManager) DeleteKeys(keys []string) bool {
 		for i, v := range keys {
 			asInterface[i] = interface{}(r.fixKey(v))
 		}
+		
+		log.Info("Deleting: ", asInterface)
+		_, err := db.Do("DEL", asInterface...)
+		if err != nil {
+			log.Error("Error trying to delete keys:")
+			log.Error(err)
+		}
+	} else {
+		log.Debug("RedisStorageManager called DEL - Nothing to delete")
+	}
+
+	return true
+}
+
+// DeleteKeys will remove a group of keys in bulk without a prefix handler
+func (r *RedisStorageManager) DeleteRawKeys(keys []string, prefix string) bool {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.DeleteKeys(keys)
+	}
+
+	if len(keys) > 0 {
+		asInterface := make([]interface{}, len(keys))
+		for i, v := range keys {
+			asInterface[i] = interface{}(prefix + v)
+		}
+		
+		log.Info("Deleting: ", asInterface)
 		_, err := db.Do("DEL", asInterface...)
 		if err != nil {
 			log.Error("Error trying to delete keys:")

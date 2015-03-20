@@ -222,7 +222,7 @@ func (m *MongoPurger) PurgeCache() {
 				log.Error("Problem inserting to mongo collection")
 				log.Error(err)
 			} else {
-				m.Store.DeleteKeys(keyNames)
+				m.Store.DeleteRawKeys(keyNames, "analytics-")
 			}
 		}
 	}
