@@ -66,7 +66,9 @@ type SessionLimiter struct{}
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 
+	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	rateLimiterKey := RateLimitKeyPrefix + getHash(key)
+	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
 
 	if ratePerPeriodNow > (int64(currentSession.Rate)) {
@@ -120,8 +122,9 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 	}
 
 	// Create the key
+	log.Debug("[QUOTA] Inbound raw key is: ", key)
 	rawKey := QuotaKeyPrefix + getHash(key)
-
+	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
 

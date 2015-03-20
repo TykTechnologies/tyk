@@ -8,8 +8,20 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"math/rand"
 	"time"
 )
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq(n int) string {
+	rand.Seed(time.Now().UTC().UnixNano())
+    b := make([]rune, n)
+    for i := range b {
+        b[i] = letters[rand.Intn(len(letters))]
+    }
+    return string(b)
+}
 
 func createThrottledSession() SessionState {
 	var thisSession SessionState
@@ -50,7 +62,7 @@ func createQuotaSession() SessionState {
 	thisSession.Expires = 0
 	thisSession.QuotaRenewalRate = 300 // 5 minutes
 	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 1
+	thisSession.QuotaRemaining = 2
 	thisSession.QuotaMax = 2
 
 	return thisSession
@@ -571,14 +583,15 @@ func TestQuota(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createQuotaSession()
-	spec.SessionManager.UpdateSession("4321", thisSession, 60)
+	keyId := randSeq(10)
+	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "4321")
+	req.Header.Add("authorization", keyId)
 
 	if err != nil {
 		t.Fatal(err)
@@ -588,7 +601,8 @@ func TestQuota(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
-		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
+		t.Error("Initial request failed with non-200 code: \n", recorder.Code, " Header:", recorder.HeaderMap)
+		
 	}
 
 	secondRecorder := httptest.NewRecorder()

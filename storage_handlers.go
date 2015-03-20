@@ -7,6 +7,7 @@ import (
 	"github.com/spaolacci/murmur3"
 	"time"
 	"encoding/hex"
+	"hash"
 )
 
 // KeyError is a standard error for when a key is not found in the storage engine
@@ -169,9 +170,9 @@ func getHash(in string) string {
 		// Not hashing? Return the raw key
 	// 	return in
 	// }
-	var h128 murmur3.Hash128 = murmur3.New128()
-	h128.Write([]byte(in))
-	return hex.EncodeToString(h128.Sum(nil))
+	var h hash.Hash32 = murmur3.New32()
+	h.Write([]byte(in))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (r *RedisStorageManager) fixKey(keyName string) string {
@@ -280,17 +281,19 @@ func (r *RedisStorageManager) IncrememntWithExpire(keyName string, expire int64)
 	db := r.pool.Get()
 	defer db.Close()
 
-	keyName = r.fixKey(keyName)
-	log.Debug("Incrementing key: ", keyName)
+	log.Info("Incrementing raw key: ", keyName)
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		r.IncrememntWithExpire(keyName, expire)
 	} else {
-		val, err := redis.Int64(db.Do("INCR", keyName))
+		// This function uses a raw key, so we shouldn;t call fixKey
+		fixedKey := keyName
+		val, err := redis.Int64(db.Do("INCR", fixedKey))
+		log.Info("Incremented key: ", fixedKey, ", val is: ", val)
 		if val == 1 {
-			log.Debug("Setting Expire")
-			db.Send("EXPIRE", keyName, expire)
+			log.Info("--> Setting Expire")
+			db.Send("EXPIRE", fixedKey, expire)
 		}
 		if err != nil {
 			log.Error("Error trying to increment value:", err)
