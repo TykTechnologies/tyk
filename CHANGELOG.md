@@ -61,7 +61,9 @@
 			"hmac_enabled": false
 		}
 	}
-	 
+
+- Added `hash_keys` config option. Setting this to `true` willc ause Tyk to store all keys in Redis in a hashed representation. This will also obfuscate keys in analytics data, using the hashed representation instead. Webhooks will cotuniue to make the full API key available. This change is not backwards compatible if enabled on an existing installation.
+
 
 # v1.5
 - Added caching middleware
