@@ -164,14 +164,14 @@ func (r *RedisStorageManager) Connect() bool {
 	return true
 }
 
-func (r *RedisStorageManager) getHash(in string) string {
+func getHash(in string) string {
 	var h128 murmur3.Hash128 = murmur3.New128()
 	h128.Write([]byte(in))
 	return hex.EncodeToString(h128.Sum(nil))
 }
 
 func (r *RedisStorageManager) fixKey(keyName string) string {
-	setKeyName := r.KeyPrefix + r.getHash(keyName)
+	setKeyName := r.KeyPrefix + getHash(keyName)
 	
 	
 	log.Debug("Input key was: ", setKeyName)
@@ -306,7 +306,7 @@ func (r *RedisStorageManager) GetKeys(filter string) []string {
 		return r.GetKeys(filter)
 	}
 
-	searchStr := r.KeyPrefix + r.getHash(filter) + "*"
+	searchStr := r.KeyPrefix + getHash(filter) + "*"
 	sessionsInterface, err := db.Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get all keys:")
@@ -334,7 +334,7 @@ func (r *RedisStorageManager) GetKeysAndValuesWithFilter(filter string) map[stri
 		return r.GetKeysAndValuesWithFilter(filter)
 	}
 
-	searchStr := r.KeyPrefix + r.getHash(filter) + "*"
+	searchStr := r.KeyPrefix + getHash(filter) + "*"
 	sessionsInterface, err := db.Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get filtered client keys:")
