@@ -170,7 +170,7 @@ func getHash(in string) string {
 		// Not hashing? Return the raw key
 		return in
 	}
-	var h hash.Hash64 = murmur3.New64()
+	var h hash.Hash32 = murmur3.New32()
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }
