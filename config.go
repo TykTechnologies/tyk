@@ -47,6 +47,7 @@ type Config struct {
 	} `json:"health_check"`
 	UseAsyncSessionWrite bool `json:"optimisations_use_async_session_write"`
     AllowMasterKeys bool `json:"allow_master_keys"`
+    HashKeys bool `json:"hash_keys"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

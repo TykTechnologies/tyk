@@ -165,6 +165,10 @@ func (r *RedisStorageManager) Connect() bool {
 }
 
 func getHash(in string) string {
+	// if !config.HashKeys {
+		// Not hashing? Return the raw key
+	// 	return in
+	// }
 	var h128 murmur3.Hash128 = murmur3.New128()
 	h128.Write([]byte(in))
 	return hex.EncodeToString(h128.Sum(nil))
