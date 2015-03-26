@@ -3,7 +3,6 @@
 testapps/
 tyk.conf
 /tyk
-tyk_linux_amd64
 logs/
 test.*.conf
 *.mprof
