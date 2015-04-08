@@ -18,6 +18,7 @@ type Policy struct {
 	AccessRights     map[string]AccessDefinition `bson:"access_rights" json:"access_rights"`
 	HMACEnabled      bool        				 `bson:"hmac_enabled" json:"hmac_enabled"`
 	Active bool `bson:"active" json:"active"`
+	IsInactive bool `bson:"is_inactive" json:"is_inactive"`
 }
 
 func LoadPoliciesFromFile(filePath string) map[string]Policy {
@@ -50,8 +51,6 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 	log.Debug("Searching in collection: ", collectionName)
 	policyCollection := dbSession.DB("").C(collectionName)
 
-	 //TODO: Should check by OrgID
-	log.Warning("POLICIES NOT BEING CHECKED BY ORGID")
 	search := bson.M{
 		"active": true,
 	}

@@ -61,6 +61,7 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 			thisSession.QuotaRenewalRate = policy.QuotaRenewalRate
 			thisSession.AccessRights = policy.AccessRights
 			thisSession.HMACEnabled = policy.HMACEnabled
+			thisSession.IsInactive = policy.IsInactive
 			
 			// Update the session in the session manager in case it gets called again
 			t.Spec.SessionManager.UpdateSession(key, *thisSession, t.Spec.APIDefinition.SessionLifetime)

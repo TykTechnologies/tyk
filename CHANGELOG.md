@@ -35,6 +35,8 @@
 	- Reload Tyk
 	- Policies will be applied to Keys when they are loaded form Redis, and the updated i nRedis so they can be ueried if necessary
 
+- Policies can invalidate whole keysets by copying over the InActive field, set this to true in a policy and all keys that have the policy set will be refused access.
+
 - Added granular path white-list: It is now possible to define at the key level what access permissions a key has, this is a white-list of regex keys and apply to a whole API definition. Granular permissions are applied *after* version-based (global) ones in the api-definition. These granular permissions take the form a new field in the access rights field in either a policy definition or a session object in the new `allowed_urls` field:
 
 	{
