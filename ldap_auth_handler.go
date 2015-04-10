@@ -120,6 +120,10 @@ func (l *LDAPStorageHandler) DeleteKey(cn string) bool {
 	return l.notifyReadOnly()
 }
 
+func (l *LDAPStorageHandler) DeleteRawKey(cn string) bool {
+	return l.notifyReadOnly()
+}
+
 func (l *LDAPStorageHandler) DeleteKeys(keys []string) bool {
 	return l.notifyReadOnly()
 }

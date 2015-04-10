@@ -25,6 +25,7 @@ type StorageHandler interface {
 	GetExp(string) (int64, error)  // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
+	DeleteRawKey(string) bool
 	Connect() bool
 	GetKeysAndValues() map[string]string
 	GetKeysAndValuesWithFilter(string) map[string]string
@@ -99,6 +100,12 @@ func (s InMemoryStorageManager) GetKeysAndValuesWithFilter(filter string) map[st
 
 // DeleteKey will remove a key from the storage engine
 func (s InMemoryStorageManager) DeleteKey(keyName string) bool {
+	delete(s.Sessions, keyName)
+	return true
+}
+
+// DeleteRawKey will remove a key from the storage engine
+func (s InMemoryStorageManager) DeleteRawKey(keyName string) bool {
 	delete(s.Sessions, keyName)
 	return true
 }
@@ -406,6 +413,25 @@ func (r *RedisStorageManager) DeleteKey(keyName string) bool {
 	}
 
 	_, err := db.Do("DEL", r.fixKey(keyName))
+	if err != nil {
+		log.Error("Error trying to delete key:")
+		log.Error(err)
+	}
+
+	return true
+}
+
+// DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
+func (r *RedisStorageManager) DeleteRawKey(keyName string) bool {
+	db := r.pool.Get()
+	defer db.Close()
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.DeleteRawKey(keyName)
+	}
+
+	_, err := db.Do("DEL", keyName)
 	if err != nil {
 		log.Error("Error trying to delete key:")
 		log.Error(err)

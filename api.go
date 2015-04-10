@@ -326,6 +326,53 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	return responseMessage, code
 }
 
+func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	if APIID == "-1" {
+		// Go through ALL managed API's and delete the key
+		for _, spec := range ApiSpecRegister {
+			spec.SessionManager.RemoveSession(keyName)
+		}
+
+		log.WithFields(logrus.Fields{
+			"key": keyName,
+		}).Info("Attempted key deletion across all managed API's - success.")
+
+		return responseMessage, 200
+	}
+
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "API not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+	
+	// This is so we bypass the hash function
+	sessStore := thiSpec.SessionManager.GetStore()
+	// TODO: This is pretty ugly
+	setKeyName := "apikey-" + keyName
+	sessStore.DeleteRawKey(setKeyName)
+	code := 200
+
+	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
+	responseMessage, err = json.Marshal(&statusObj)
+
+	if err != nil {
+		log.Error("Marshalling failed")
+		log.Error(err)
+		return []byte(E_SYSTEM_ERROR), 500
+	}
+
+	log.WithFields(logrus.Fields{
+		"key": keyName,
+	}).Info("Attempted key deletion - success.")
+
+	return responseMessage, code
+}
+
 func handleURLReload() ([]byte, int) {
 	var responseMessage []byte
 	var err error
@@ -571,8 +618,14 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else if r.Method == "DELETE" {
+		hashed := r.FormValue("hashed")
 		// Remove a key
-		responseMessage, code = handleDeleteKey(keyName, APIID)
+		if hashed == "" {
+			responseMessage, code = handleDeleteKey(keyName, APIID)
+		} else {
+			responseMessage, code = handleDeleteHashedKey(keyName, APIID)
+		}
+		
 
 	} else {
 		// Return Not supported message (and code)
