@@ -443,10 +443,14 @@ func (r RedisOsinStorageInterface) SetClient(id string, client osin.Client, igno
 	}
 
 	key := CLIENT_PREFIX + id
+	key =id
+	
 	if ignorePrefix {
 		key = id
 	}
-
+	
+	log.Warning("CREATING: ", key)
+	
 	r.store.SetKey(key, string(clientDataJSON), 0)
 	return nil
 }

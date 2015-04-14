@@ -126,6 +126,7 @@ func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 type RedisStorageManager struct {
 	pool      *redis.Pool
 	KeyPrefix string
+	HashKeys bool
 }
 
 func (r *RedisStorageManager) newPool(server, password string, database int) *redis.Pool {
@@ -172,19 +173,32 @@ func (r *RedisStorageManager) Connect() bool {
 	return true
 }
 
-func getHash(in string) string {
-	if !config.HashKeys {
-		// Not hashing? Return the raw key
-		return in
-	}
+func doHash(in string) string {
 	var h hash.Hash32 = murmur3.New32()
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (r *RedisStorageManager) fixKey(keyName string) string {
-	setKeyName := r.KeyPrefix + getHash(keyName)
+//Public function for use in classes that bypass elements of the storage manager
+func publicHash(in string) string {
+	if !config.HashKeys {
+		// Not hashing? Return the raw key
+		return in
+	}
 	
+	return doHash(in)
+}
+
+func (r *RedisStorageManager) hashKey(in string) string {
+	if !r.HashKeys {
+		// Not hashing? Return the raw key
+		return in
+	}
+	return doHash(in)
+}
+
+func (r *RedisStorageManager) fixKey(keyName string) string {
+	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 	
 	log.Debug("Input key was: ", setKeyName)
 	
@@ -201,14 +215,14 @@ func (r *RedisStorageManager) cleanKey(keyName string) string {
 func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	db := r.pool.Get()
 	defer db.Close()
-	log.Debug("Getting key: ", r.fixKey(keyName))
+	
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.GetKey(keyName)
 	}
 
-	log.Debug("Getting: ", r.fixKey(keyName))
+	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 	value, err := redis.String(db.Do("GET", r.fixKey(keyName)))
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
@@ -242,7 +256,9 @@ func (r *RedisStorageManager) GetExp(keyName string) (int64, error) {
 func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
 	db := r.pool.Get()
 	defer db.Close()
-	log.Debug("Setting key: ", r.fixKey(keyName))
+	log.Debug("[STORE] Raw key is: ", keyName)
+	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
+	
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
@@ -320,7 +336,7 @@ func (r *RedisStorageManager) GetKeys(filter string) []string {
 		return r.GetKeys(filter)
 	}
 
-	searchStr := r.KeyPrefix + getHash(filter) + "*"
+	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	sessionsInterface, err := db.Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get all keys:")
@@ -348,7 +364,8 @@ func (r *RedisStorageManager) GetKeysAndValuesWithFilter(filter string) map[stri
 		return r.GetKeysAndValuesWithFilter(filter)
 	}
 
-	searchStr := r.KeyPrefix + getHash(filter) + "*"
+	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
+	log.Debug("[STORE] Getting list by: ", searchStr)
 	sessionsInterface, err := db.Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get filtered client keys:")

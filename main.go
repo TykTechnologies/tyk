@@ -252,7 +252,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	log.Info("Loading API configurations.")
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 	redisOrgStore := RedisStorageManager{KeyPrefix: "orgkey."}
 
 	// Create a new handler for each API spec

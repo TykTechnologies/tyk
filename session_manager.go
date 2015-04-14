@@ -67,7 +67,7 @@ type SessionLimiter struct{}
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
-	rateLimiterKey := RateLimitKeyPrefix + getHash(key)
+	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
 
@@ -123,7 +123,7 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 
 	// Create the key
 	log.Debug("[QUOTA] Inbound raw key is: ", key)
-	rawKey := QuotaKeyPrefix + getHash(key)
+	rawKey := QuotaKeyPrefix + publicHash(key)
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)

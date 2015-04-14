@@ -559,7 +559,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
 
-	log.Warning(r.Method)
+	log.Debug(r.Method)
 	if r.Method == "GET" {
 		if APIID != "" {
 			log.Info("Requesting API definition for", APIID)
@@ -971,7 +971,8 @@ type NewClientRequest struct {
 }
 
 func createOauthClientStorageID(APIID string, clientID string) string {
-	storageID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX + clientID
+	// storageID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX + clientID
+	storageID := CLIENT_PREFIX + clientID
 	return storageID
 }
 
@@ -1004,6 +1005,8 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 
 		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.GetId())
+		log.Debug("Storage ID: ", storageID)
+		
 		thisAPISpec := GetSpecForApi(newOauthClient.APIID)
 		if thisAPISpec == nil {
 			log.WithFields(logrus.Fields{
@@ -1193,8 +1196,9 @@ func getOauthClients(APIID string) ([]byte, int) {
 	var err error
 	code := 200
 
-	filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
-
+	// filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
+	filterID := CLIENT_PREFIX
+	log.Debug("Filtering by: ", filterID)
 	thisAPISpec := GetSpecForApi(APIID)
 	if thisAPISpec == nil {
 		log.WithFields(logrus.Fields{
