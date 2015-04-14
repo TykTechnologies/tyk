@@ -443,7 +443,6 @@ func (r RedisOsinStorageInterface) SetClient(id string, client osin.Client, igno
 	}
 
 	key := CLIENT_PREFIX + id
-	key =id
 	
 	if ignorePrefix {
 		key = id
