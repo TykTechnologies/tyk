@@ -23,8 +23,12 @@ func (k *AuthKey) GetConfig() (interface{}, error) {
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
-
+	
 	authHeaderValue := r.Header.Get(thisConfig.AuthHeaderName)
+	if thisConfig.UseParam {
+		authHeaderValue = r.FormValue(thisConfig.AuthHeaderName)
+	}
+	
 	if authHeaderValue == "" {
 		// No header value, fail
 		log.WithFields(logrus.Fields{
