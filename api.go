@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/RangelReale/osin"
+	"github.com/lonelycode/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
@@ -918,7 +918,8 @@ type NewClientRequest struct {
 }
 
 func createOauthClientStorageID(APIID string, clientID string) string {
-	storageID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX + clientID
+	//storageID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX + clientID
+	storageID := CLIENT_PREFIX + clientID
 	return storageID
 }
 
@@ -1140,7 +1141,8 @@ func getOauthClients(APIID string) ([]byte, int) {
 	var err error
 	code := 200
 
-	filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
+	//filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
+	filterID := CLIENT_PREFIX
 
 	thisAPISpec := GetSpecForApi(APIID)
 	if thisAPISpec == nil {

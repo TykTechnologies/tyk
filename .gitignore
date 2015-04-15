@@ -3,7 +3,6 @@
 testapps/
 tyk.conf
 /tyk
-tyk_linux_amd64
 logs/
 test.*.conf
 *.mprof
@@ -14,3 +13,6 @@ build/
 test_apps/
 tyk.conf.bak
 tyk.folder.conf
+run.sh
+tyk.compose.conf
+tyk.db.conf
