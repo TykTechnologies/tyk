@@ -12,6 +12,11 @@ import (
     "strings"
 )
 
+const (
+	UPSTREAM_CACHE_HEADER_NAME = "x-tyk-cache-action-set"
+	UPSTREAM_CACHE_TTL_HEADER_NAME = "x-tyk-cache-action-set-ttl"
+)
+
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	TykMiddleware
@@ -69,15 +74,46 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			thisKey := m.CreateCheckSum(r, authHeaderValue)
 			retBlob, found := m.CacheStore.GetKey(thisKey)
 			if found != nil {
+				log.Debug("Cache enabled, but record not found")
 				// Pass through to proxy AND CACHE RESULT
 				sNP := SuccessHandler{m.TykMiddleware}
+				
+				// This passes through and will write the value to the writer, but spit out a copy for the cache
 				reqVal := sNP.ServeHTTP(w, r)
-
-				var wireFormatReq bytes.Buffer
-				reqVal.Write(&wireFormatReq)
-
-				m.CacheStore.SetKey(thisKey, wireFormatReq.String(), m.Spec.APIDefinition.CacheOptions.CacheTimeout)
+				
+				cacheThisRequest := true
+				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
+				// Are we using upstream cache control?
+				if m.Spec.APIDefinition.CacheOptions.EnableUpstreamCacheControl {
+					log.Debug("Upstream control enabled")
+					// Do we cache?
+					if reqVal.Header.Get(UPSTREAM_CACHE_HEADER_NAME) == "" {
+						log.Warning("Upstream cache action not found, not caching")
+						cacheThisRequest = false
+					}
+					// Do we override TTL?
+					ttl := reqVal.Header.Get(UPSTREAM_CACHE_TTL_HEADER_NAME)
+					if ttl != "" {
+						log.Debug("TTL Set upstream")
+						cacheAsInt, valErr := strconv.Atoi(ttl)
+						if valErr != nil {
+							log.Error("Failed to decode TTL cache value: ", valErr)
+							cacheTTL = m.Spec.APIDefinition.CacheOptions.CacheTimeout
+						}
+						cacheTTL = int64(cacheAsInt)
+					}
+				}
+				
+				if cacheThisRequest {
+					log.Debug("Caching request to redis")
+					var wireFormatReq bytes.Buffer
+					reqVal.Write(&wireFormatReq)
+					log.Debug("Cache TTL is:", cacheTTL)
+					m.CacheStore.SetKey(thisKey, wireFormatReq.String(), cacheTTL)
+					
+				}
 				return nil, 666
+				
 			}
 
 			retObj := bytes.NewReader([]byte(retBlob))
@@ -94,8 +130,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 
 			copyHeader(w.Header(), newRes.Header)
-			w.Header().Add("x-tyk-cached-response", "1")
 			thisSessionState := context.Get(r, SessionData).(SessionState)
+			w.Header().Add("x-tyk-cached-response", "1")
 			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
 			w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
 			w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
