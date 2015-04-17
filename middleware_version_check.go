@@ -47,7 +47,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 				Key:              "",
 				Reason:           string(stat),
 			})
-		return errors.New(string(stat)), 409
+		return errors.New(string(stat)), 403
 	}
     
     // We handle redirects before ignores in case we aren't using a whitelist
