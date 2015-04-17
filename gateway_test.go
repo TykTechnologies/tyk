@@ -440,7 +440,7 @@ func TestThrottling(t *testing.T) {
 	if thirdRecorder.Code == 200 {
 		t.Error("Third request failed, should not be 200!: \n", thirdRecorder.Code)
 	}
-	if thirdRecorder.Code != 403 {
+	if thirdRecorder.Code != 429 {
 		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
 	}
 

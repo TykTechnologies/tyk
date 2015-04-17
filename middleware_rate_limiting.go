@@ -66,7 +66,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 			// Report in health check
 			ReportHealthCheckValue(k.Spec.Health, Throttle, "1")
 
-			return errors.New("Rate limit exceeded"), 403
+			return errors.New("Rate limit exceeded"), 429
 
 		} else if reason == 2 {
 			log.WithFields(logrus.Fields{
