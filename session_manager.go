@@ -6,6 +6,7 @@ import (
 
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
+	URL string	`json:"url"`
 	Methods []string `json:"methods"`
 }
 
@@ -14,7 +15,7 @@ type AccessDefinition struct {
 	APIiName string   `json:"api_name"`
 	APIID    string   `json:"api_id"`
 	Versions []string `json:"versions"`
-	AllowedURLs map[string]AccessSpec `json:"allowed_urls"` // mapped string MUST be a valid regex
+	AllowedURLs []AccessSpec `json:"allowed_urls"` // mapped string MUST be a valid regex
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
