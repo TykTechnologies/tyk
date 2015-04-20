@@ -12,10 +12,10 @@ type AccessSpec struct {
 
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
-	APIiName string   `json:"api_name"`
+	APIName string   `json:"api_name"`
 	APIID    string   `json:"api_id"`
 	Versions []string `json:"versions"`
-	AllowedURLs []AccessSpec `json:"allowed_urls"` // mapped string MUST be a valid regex
+	AllowedURLs []AccessSpec `bson:"allowed_urls"  json:"allowed_urls"` // mapped string MUST be a valid regex
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
@@ -165,7 +165,7 @@ func createSampleSession() SessionState {
 	thisSession.QuotaMax = 10
 
 	simpleDef := AccessDefinition{
-		APIiName: "Test",
+		APIName: "Test",
 		APIID:    "1",
 		Versions: []string{"Default"},
 	}
