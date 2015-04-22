@@ -29,6 +29,7 @@ var profileFile = &os.File{}
 var GlobalEventsJSVM = &JSVM{}
 var doMemoryProfile bool
 var Policies = make(map[string]Policy)
+var MainNotifier = RedisNotifier{}
 
 //var genericOsinStorage *RedisOsinStorageInterface
 var ApiSpecRegister = make(map[string]*APISpec)
@@ -87,6 +88,11 @@ func setupGlobals() {
 
 	// Set up global JSVM
 	GlobalEventsJSVM.Init(config.TykJSPath)
+	
+	// Get the notifier ready
+	MainNotifierStore := RedisStorageManager{}
+	MainNotifierStore.Connect()
+	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
 }
 
 // Pull API Specs from configuration
@@ -127,6 +133,7 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
 	Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
 	Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
+	Muxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
 	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
 	Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
 	Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
@@ -517,6 +524,11 @@ func main() {
 
 	targetPort := fmt.Sprintf(":%d", config.ListenPort)
 	loadAPIEndpoints(http.DefaultServeMux)
+	
+	// Start listening for reload messages
+	if !config.SuppressRedisSignalReload {
+		go StartPubSubLoop()
+	}
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()

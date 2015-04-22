@@ -8,6 +8,7 @@ import (
 	"time"
 	"encoding/hex"
 	"hash"
+	"errors"
 )
 
 // KeyError is a standard error for when a key is not found in the storage engine
@@ -513,4 +514,43 @@ func (r *RedisStorageManager) DeleteRawKeys(keys []string, prefix string) bool {
 	}
 
 	return true
+}
+
+// StartPubSubHandler will listen for a signal and run the callback with the message
+func (r *RedisStorageManager) StartPubSubHandler(channel string, callback func(redis.Message)) error {
+	psc := redis.PubSubConn{r.pool.Get()}
+	psc.Subscribe(channel)
+	for {
+		switch v := psc.Receive().(type) {
+		case redis.Message:
+			callback(v)
+
+		case redis.Subscription:
+			log.Info("Subscription started: ", v.Channel)
+
+		case error:
+			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
+			
+			return v
+		}
+	}
+	return errors.New("Connection closed.")
+}
+
+func (r *RedisStorageManager) Publish(channel string, message string) error {
+	db := r.pool.Get()
+	defer db.Close()
+	if r.pool == nil {
+		log.Info("Connection dropped, Connecting..")
+		r.Connect()
+		r.Publish(channel, message)
+	} else {
+		_, err := db.Do("PUBLISH", channel, message)
+		if err != nil {
+			log.Error("Error trying to set value:")
+			log.Error(err)
+			return err
+		}
+	}
+	return nil
 }

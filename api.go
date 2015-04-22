@@ -395,6 +395,33 @@ func handleURLReload() ([]byte, int) {
 	return responseMessage, code
 }
 
+func signalGroupReload() ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	notice := Notification{
+		Command: NoticeGroupReload,
+	}
+	
+	// Signal to the group via redis
+	MainNotifier.Notify(notice)
+	
+	code := 200
+
+	statusObj := APIErrorMessage{"ok", ""}
+	responseMessage, err = json.Marshal(&statusObj)
+
+	if err != nil {
+		log.Error("Marshalling failed")
+		log.Error(err)
+		return []byte(E_SYSTEM_ERROR), 500
+	}
+
+	log.WithFields(logrus.Fields{}).Info("Reloaded URL Structure - Success")
+
+	return responseMessage, code
+}
+
 func HandleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
@@ -844,6 +871,24 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 	}).Info("Attempted org key deletion - success.")
 
 	return responseMessage, code
+}
+
+
+func groupResetHandler(w http.ResponseWriter, r *http.Request) {
+	var responseMessage []byte
+	var code int
+
+	if r.Method == "GET" {
+		log.Warning("Group reload activated: sending notification to pub/sub")
+		responseMessage, code = signalGroupReload()
+
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	DoJSONWrite(w, code, responseMessage)
 }
 
 func resetHandler(w http.ResponseWriter, r *http.Request) {
