@@ -29,5 +29,12 @@
     "enable_health_checks": true,
     "health_check_value_timeouts": 60
   },
-  "optimisations_use_async_session_write": true
+  "optimisations_use_async_session_write": true,
+  "allow_master_keys": false,
+  "policies": {
+    	"policy_source": "mongo",
+    	"policy_record_name": "tyk_policies"
+    },
+  "hash_keys": true,
+  "suppress_redis_signal_reload": false
 }

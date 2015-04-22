@@ -4,7 +4,7 @@
 
 VERSION=$1
 SOURCEBIN=tyk
-SOURCEBINPATH=~/code/go/src/github.com/lonelycode/tyk
+SOURCEBINPATH=~/tyk
 i386BINDIR=$SOURCEBINPATH/build/i386/tyk.linux.i386-$VERSION
 amd64BINDIR=$SOURCEBINPATH/build/amd64/tyk.linux.amd64-$VERSION
 armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm-$VERSION
@@ -44,11 +44,14 @@ mkdir $i386TGZDIR/middleware
 mkdir $i386TGZDIR/event_handlers
 mkdir $i386TGZDIR/event_handlers/sample
 mkdir $i386TGZDIR/templates
+mkdir $i386TGZDIR/policies
+
 cp $SOURCEBINPATH/apps/app_sample.json $i386TGZDIR/apps
 cp $SOURCEBINPATH/templates/*.json $i386TGZDIR/templates
 cp $SOURCEBINPATH/middleware/*.js $i386TGZDIR/middleware
 cp $SOURCEBINPATH/event_handlers/sample/*.js $i386TGZDIR/event_handlers/sample
 cp $SOURCEBINPATH/js/*.js $i386TGZDIR/js
+cp $SOURCEBINPATH/policies/*.json $i386TGZDIR/policies
 cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/
 cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/tyk.conf
 
@@ -83,6 +86,7 @@ cp $SOURCEBINPATH/tyk.conf.example $i386BINDIR/tyk.conf
 cp -r $SOURCEBINPATH/middleware/*.js $i386BINDIR
 cp -r $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
 cp -r $SOURCEBINPATH/js/tyk.js $i386BINDIR
+cp -r $SOURCEBINPATH/policies/policies.json $i386BINDIR
 
 
 cp $SOURCEBINPATH/apps/app_sample.json $amd64BINDIR
@@ -91,6 +95,7 @@ cp $SOURCEBINPATH/tyk.conf.example $amd64BINDIR/tyk.conf
 cp -r $SOURCEBINPATH/middleware/*.js $amd64BINDIR
 cp -r $SOURCEBINPATH/event_handlers/sample/*.js $amd64BINDIR
 cp -r $SOURCEBINPATH/js/tyk.js $amd64BINDIR
+cp -r $SOURCEBINPATH/policies/policies.json $amd64BINDIR
 
 
 cp $SOURCEBINPATH/apps/app_sample.json $armBINDIR
@@ -99,6 +104,7 @@ cp $SOURCEBINPATH/tyk.conf.example $armBINDIR/tyk.conf
 cp -r $SOURCEBINPATH/middleware/*.js $armBINDIR
 cp -r $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
 cp -r $SOURCEBINPATH/js/tyk.js $armBINDIR
+cp -r $SOURCEBINPATH/policies/policies.json $armBINDIR
 
 # -------------------------------------------------------
 echo "Preparing i386"
@@ -120,6 +126,7 @@ echo "error.json" etc/tyk/templates >> debian/install
 echo "default_webhook.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
 echo "tyk.js" etc/tyk/js >> debian/install
+echo "policies.json" etc/tyk/policies >> debian/install
 echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
 echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
 echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
@@ -158,6 +165,7 @@ echo "error.json" etc/tyk/templates >> debian/install
 echo "default_webhook.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
 echo "tyk.js" etc/tyk/js >> debian/install
+echo "policies.json" etc/tyk/policies >> debian/install
 echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
 echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
 echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
@@ -198,6 +206,7 @@ echo "error.json" etc/tyk/templates >> debian/install
 echo "default_webhook.json" etc/tyk/templates >> debian/install
 echo "tyk.conf" etc/tyk >> debian/install
 echo "tyk.js" etc/tyk/js >> debian/install
+echo "policies.json" etc/tyk/policies >> debian/install
 echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
 echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
 echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
