@@ -72,7 +72,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	ratePerPeriodNow := store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), int64(currentSession.Per))
 
-	log.Warning("Returned: ", ratePerPeriodNow)
+	log.Debug("Num Requests: ", ratePerPeriodNow)
 	
 	
 	// Subtract by 1 because of the delayed add
@@ -89,7 +89,8 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 
 }
 
-func (l SessionLimiter) OldForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
+// ForwardMessageNaiveKey is the old redis-key ttl-based Rate limit, it could be gamed.
+func (l SessionLimiter) ForwardMessageNaiveKey(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)

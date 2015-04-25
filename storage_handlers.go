@@ -572,11 +572,11 @@ func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire
 		r.Connect()
 		r.SetRollingWindow(keyName, per, expire)
 	} else {
-		log.Warning("keyName is: ", keyName)
+		log.Debug("keyName is: ", keyName)
 		now := time.Now()
-		log.Warning("Now is:", now)
+		log.Debug("Now is:", now)
 		onePeriodAgo := now.Add(time.Duration(-1 * per) * time.Second)
-		log.Warning("Then is: ", onePeriodAgo)
+		log.Debug("Then is: ", onePeriodAgo)
 		
 		db.Send("MULTI")
 		// Drop the last period so we get current bucket
@@ -591,7 +591,7 @@ func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire
 		
 		intVal := len(r[1].([]interface{}))
 		
-		log.Warning("Returned: ", intVal)
+		log.Debug("Returned: ", intVal)
 		
 		if err != nil {
 			log.Error("Multi command failed: ", err)
