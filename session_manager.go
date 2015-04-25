@@ -67,12 +67,12 @@ type SessionLimiter struct{}
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 
-	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
+	log.Warning("[RATELIMIT] Inbound raw key is: ", key)
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
-	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
+	log.Warning("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	ratePerPeriodNow := store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), int64(currentSession.Per))
 
-	log.Debug("Num Requests: ", ratePerPeriodNow)
+	log.Warning("Num Requests: ", ratePerPeriodNow)
 	
 	
 	// Subtract by 1 because of the delayed add

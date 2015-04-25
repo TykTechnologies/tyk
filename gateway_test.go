@@ -451,12 +451,22 @@ func TestThrottling(t *testing.T) {
 	if fourthRecorder.Code != 429 {
 		t.Error("Fourth request returned invalid code, should 403, got: \n", fourthRecorder.Code)
 	}
+	
+	fifthRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(fifthRecorder, req)
+
+	if fifthRecorder.Code == 200 {
+		t.Error("5th request passed, should not be 200!: \n", fifthRecorder.Code)
+	}
+	if fifthRecorder.Code != 429 {
+		t.Error("5th request returned invalid code, should 403, got: \n", fifthRecorder.Code)
+	}
 
 	newAPIError := TykErrorResponse{}
 	json.Unmarshal([]byte(thirdRecorder.Body.String()), &newAPIError)
 
 	if newAPIError.Error != "Rate limit exceeded" {
-		t.Error("Third request returned invalid message, got: \n", thirdRecorder.Code)
+		t.Error("Last request returned invalid message, got: \n", newAPIError.Error)
 	}
 }
 

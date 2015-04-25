@@ -580,11 +580,11 @@ func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire
 		
 		db.Send("MULTI")
 		// Drop the last period so we get current bucket
-		db.Send("ZREMRANGEBYSCORE", keyName, "-inf", onePeriodAgo.Unix())
+		db.Send("ZREMRANGEBYSCORE", keyName, "-inf", onePeriodAgo.UnixNano())
 		// Get the set
 		db.Send("ZRANGE", keyName, 0, -1)
 		// Add this request to the pile
-		db.Send("ZADD", keyName, now.Unix(), strconv.Itoa(int(now.Unix())))
+		db.Send("ZADD", keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano())))
 		// REset the TTL so the key lives as long as the requests pile in
 		db.Send("EXPIRE", keyName, per)
 		r, err := redis.Values(db.Do("EXEC"))
