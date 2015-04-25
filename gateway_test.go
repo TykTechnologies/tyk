@@ -25,10 +25,10 @@ func randSeq(n int) string {
 
 func createThrottledSession() SessionState {
 	var thisSession SessionState
-	thisSession.Rate = 2.0
+	thisSession.Rate = 3
 	thisSession.Allowance = thisSession.Rate
 	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 4
+	thisSession.Per = 10
 	thisSession.Expires = 0
 	thisSession.QuotaRenewalRate = 300 // 5 minutes
 	thisSession.QuotaRenews = time.Now().Unix()
