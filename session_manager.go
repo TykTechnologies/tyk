@@ -75,7 +75,8 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	log.Warning("Returned: ", ratePerPeriodNow)
 	
 	
-	if ratePerPeriodNow > int(currentSession.Rate) {
+	// Subtract by 1 because of the delayed add
+	if ratePerPeriodNow > (int(currentSession.Rate) -1) {
 		return false, 1
 	}
 
