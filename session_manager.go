@@ -75,7 +75,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	log.Debug("Num Requests: ", ratePerPeriodNow)
 	
 	
-	// Subtract by 1 because of the delayed add
+	// Subtract by 1 because of the delayed add in the window
 	if ratePerPeriodNow > (int(currentSession.Rate) -1) {
 		return false, 1
 	}
