@@ -141,3 +141,8 @@ func (l *LDAPStorageHandler) notifyReadOnly() bool {
 	log.Warning("LDAP storage is READ ONLY")
 	return false
 }
+
+func (s *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, expire int64) int {
+	log.Warning("Not Implemented!")
+	return 0
+}

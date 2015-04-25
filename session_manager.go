@@ -70,6 +70,29 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
+	ratePerPeriodNow := store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), int64(currentSession.Per))
+
+	log.Warning("Returned: ", ratePerPeriodNow)
+	
+	
+	if ratePerPeriodNow > int(currentSession.Rate) {
+		return false, 1
+	}
+
+	currentSession.Allowance--
+	if !l.IsRedisQuotaExceeded(currentSession, key, store) {
+		return true, 0
+	}
+
+	return false, 2
+
+}
+
+func (l SessionLimiter) OldForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
+
+	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
+	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
+	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
 
 	if ratePerPeriodNow > (int64(currentSession.Rate)) {

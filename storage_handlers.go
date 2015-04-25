@@ -33,6 +33,7 @@ type StorageHandler interface {
 	DeleteKeys([]string) bool
 	Decrement(string)
 	IncrememntWithExpire(string, int64) int64
+	SetRollingWindow(string, int64, int64) int
 }
 
 // InMemoryStorageManager implements the StorageHandler interface,
@@ -45,6 +46,11 @@ type InMemoryStorageManager struct {
 // Decrement is a dummy function
 func (s *InMemoryStorageManager) Decrement(n string) {
 	log.Warning("Not implemented!")
+}
+
+func (s *InMemoryStorageManager) SetRollingWindow(keyName string, per int64, expire int64) int {
+	log.Warning("Not Implemented!")
+	return 0
 }
 
 func (s *InMemoryStorageManager) IncrememntWithExpire(n string, i int64) int64 {
@@ -553,4 +559,45 @@ func (r *RedisStorageManager) Publish(channel string, message string) error {
 		}
 	}
 	return nil
+}
+
+// IncrementWithExpire will increment a key in redis
+func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire int64) int {
+	db := r.pool.Get()
+	defer db.Close()
+
+	log.Debug("Incrementing raw key: ", keyName)
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		r.SetRollingWindow(keyName, per, expire)
+	} else {
+		log.Warning("keyName is: ", keyName)
+		now := time.Now()
+		log.Warning("Now is:", now)
+		onePeriodAgo := now.Add(time.Duration(-1 * per) * time.Second)
+		log.Warning("Then is: ", onePeriodAgo)
+		
+		db.Send("MULTI")
+		// Drop the last period so we get current bucket
+		db.Send("ZREMRANGEBYSCORE", keyName, "-inf", onePeriodAgo.Unix())
+		// Get the set
+		db.Send("ZRANGE", keyName, 0, -1)
+		// Add this request to the pile
+		db.Send("ZADD", keyName, now.Unix(), strconv.Itoa(int(now.Unix())))
+		// REset the TTL so the key lives as long as the requests pile in
+		db.Send("EXPIRE", keyName, per)
+		r, err := redis.Values(db.Do("EXEC"))
+		
+		intVal := len(r[1].([]interface{}))
+		
+		log.Warning("Returned: ", intVal)
+		
+		if err != nil {
+			log.Error("Multi command failed: ", err)
+		}
+		
+		return intVal
+	}
+	return 0
 }
