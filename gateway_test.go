@@ -463,10 +463,10 @@ func TestThrottling(t *testing.T) {
 	}
 
 	newAPIError := TykErrorResponse{}
-	json.Unmarshal([]byte(thirdRecorder.Body.String()), &newAPIError)
+	json.Unmarshal([]byte(fifthRecorder.Body.String()), &newAPIError)
 
 	if newAPIError.Error != "Rate limit exceeded" {
-		t.Error("Last request returned invalid message, got: \n", newAPIError.Error)
+		t.Error("Last request returned invalid message, got: \n", fifthRecorder.Body.String())
 	}
 }
 
