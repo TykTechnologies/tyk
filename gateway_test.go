@@ -28,7 +28,7 @@ func createThrottledSession() SessionState {
 	thisSession.Rate = 3
 	thisSession.Allowance = thisSession.Rate
 	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 10
+	thisSession.Per = 60
 	thisSession.Expires = 0
 	thisSession.QuotaRenewalRate = 300 // 5 minutes
 	thisSession.QuotaRenews = time.Now().Unix()
@@ -407,14 +407,15 @@ func TestThrottling(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	keyId := randSeq(10)
+	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", keyId)
 
 	if err != nil {
 		t.Fatal(err)
@@ -437,11 +438,18 @@ func TestThrottling(t *testing.T) {
 	thirdRecorder := httptest.NewRecorder()
 	chain.ServeHTTP(thirdRecorder, req)
 
-	if thirdRecorder.Code == 200 {
-		t.Error("Third request failed, should not be 200!: \n", thirdRecorder.Code)
+	if thirdRecorder.Code != 200 {
+		t.Error("Third request failed, should be 200!: \n", thirdRecorder.Code)
 	}
-	if thirdRecorder.Code != 429 {
-		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
+	
+	fourthRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(fourthRecorder, req)
+
+	if fourthRecorder.Code == 200 {
+		t.Error("Fourth request passed, should not be 200!: \n", fourthRecorder.Code)
+	}
+	if fourthRecorder.Code != 429 {
+		t.Error("Fourth request returned invalid code, should 403, got: \n", fourthRecorder.Code)
 	}
 
 	newAPIError := TykErrorResponse{}
