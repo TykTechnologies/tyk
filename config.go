@@ -10,14 +10,14 @@ import (
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
-	ListenPort      int    `json:"listen_port"`
-	Secret          string `json:"secret"`
-	TemplatePath    string `json:"template_path"`
-	TykJSPath       string `json:"tyk_js_path"`
-	MiddlewarePath  string `json:"middleware_path"`
-	Policies struct {
-		PolicySource string	`json:"policy_source"`
-		PolicyRecordName string	`json:"policy_record_name"`
+	ListenPort     int    `json:"listen_port"`
+	Secret         string `json:"secret"`
+	TemplatePath   string `json:"template_path"`
+	TykJSPath      string `json:"tyk_js_path"`
+	MiddlewarePath string `json:"middleware_path"`
+	Policies       struct {
+		PolicySource     string `json:"policy_source"`
+		PolicyRecordName string `json:"policy_record_name"`
 	} `json:"policies"`
 	UseDBAppConfigs bool   `json:"use_db_app_configs"`
 	AppPath         string `json:"app_path"`
@@ -45,10 +45,10 @@ type Config struct {
 		EnableHealthChecks      bool  `json:"enable_health_checks"`
 		HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 	} `json:"health_check"`
-	UseAsyncSessionWrite bool `json:"optimisations_use_async_session_write"`
-    AllowMasterKeys bool `json:"allow_master_keys"`
-    HashKeys bool `json:"hash_keys"`
-    SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
+	UseAsyncSessionWrite      bool `json:"optimisations_use_async_session_write"`
+	AllowMasterKeys           bool `json:"allow_master_keys"`
+	HashKeys                  bool `json:"hash_keys"`
+	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

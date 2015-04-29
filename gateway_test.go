@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"github.com/justinas/alice"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
-	"math/rand"
 	"time"
 )
 
@@ -16,11 +16,11 @@ var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func randSeq(n int) string {
 	rand.Seed(time.Now().UTC().UnixNano())
-    b := make([]rune, n)
-    for i := range b {
-        b[i] = letters[rand.Intn(len(letters))]
-    }
-    return string(b)
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
 func createThrottledSession() SessionState {
@@ -441,7 +441,7 @@ func TestThrottling(t *testing.T) {
 	if thirdRecorder.Code != 200 {
 		t.Error("Third request failed, should be 200!: \n", thirdRecorder.Code)
 	}
-	
+
 	fourthRecorder := httptest.NewRecorder()
 	chain.ServeHTTP(fourthRecorder, req)
 
@@ -451,7 +451,7 @@ func TestThrottling(t *testing.T) {
 	if fourthRecorder.Code != 429 {
 		t.Error("Fourth request returned invalid code, should 403, got: \n", fourthRecorder.Code)
 	}
-	
+
 	fifthRecorder := httptest.NewRecorder()
 	chain.ServeHTTP(fifthRecorder, req)
 
@@ -620,7 +620,7 @@ func TestQuota(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code, " Header:", recorder.HeaderMap)
-		
+
 	}
 
 	secondRecorder := httptest.NewRecorder()

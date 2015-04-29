@@ -25,9 +25,9 @@ func (k *KeyExpired) GetConfig() (interface{}, error) {
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
-    
-    if thisSessionState.IsInactive {
-        log.WithFields(logrus.Fields{
+
+	if thisSessionState.IsInactive {
+		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
 			"key":    authHeaderValue,
@@ -47,8 +47,8 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
 
 		return errors.New("Key is inactive, please renew"), 403
-    }
-    
+	}
+
 	keyExpired := k.Spec.AuthManager.IsKeyExpired(&thisSessionState)
 
 	if keyExpired {

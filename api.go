@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	osin "github.com/lonelycode/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	osin "github.com/lonelycode/osin"
 	"github.com/lonelycode/tykcommon"
 	"github.com/nu7hatch/gouuid"
 	"io/ioutil"
@@ -15,7 +16,6 @@ import (
 	"path"
 	"strings"
 	"time"
-    "errors"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -91,31 +91,31 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 					"key":   keyName,
 					"apiID": apiId,
 				}).Error("Could not add key for this API ID, API doesn't exist.")
-                return errors.New("API must be active to add keys")
+				return errors.New("API must be active to add keys")
 			}
 		}
 	} else {
 		// nothing defined, add key to ALL
-        if config.AllowMasterKeys {
-            log.Warning("No API Access Rights set, adding key to ALL.")
-            for _, spec := range ApiSpecRegister {
-                if !dontReset {
-                    spec.SessionManager.ResetQuota(keyName, newSession)
-                    newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-                }
-                spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
-            }    
-        } else {
-            log.Error("Master keys disallowed in configuration, key not added.")
-            return errors.New("Master keys not allowed")
-        }
-		
+		if config.AllowMasterKeys {
+			log.Warning("No API Access Rights set, adding key to ALL.")
+			for _, spec := range ApiSpecRegister {
+				if !dontReset {
+					spec.SessionManager.ResetQuota(keyName, newSession)
+					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+				}
+				spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+			}
+		} else {
+			log.Error("Master keys disallowed in configuration, key not added.")
+			return errors.New("Master keys not allowed")
+		}
+
 	}
 
 	log.WithFields(logrus.Fields{
 		"key": keyName,
 	}).Info("New key added or updated.")
-    return nil
+	return nil
 }
 
 // ---- TODO: This changes the URL structure of the API completely ----
@@ -154,11 +154,11 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		if dont_reset == "1" {
 			suppress_reset = true
 		}
-        addUpdateErr := doAddOrUpdate(keyName, newSession, suppress_reset)
-        if addUpdateErr != nil {
-            success = false
-            responseMessage = createError("Failed to create key, ensure security settings are correct.")
-        }
+		addUpdateErr := doAddOrUpdate(keyName, newSession, suppress_reset)
+		if addUpdateErr != nil {
+			success = false
+			responseMessage = createError("Failed to create key, ensure security settings are correct.")
+		}
 	}
 
 	var action string
@@ -248,16 +248,16 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 	}
 
 	sessions := thiSpec.SessionManager.GetSessions(filter)
-    
-    fixed_sessions := make([]string, 0)
-    for _, s := range(sessions) {
-        if !strings.Contains(s, QuotaKeyPrefix) {
-            if !strings.Contains(s, RateLimitKeyPrefix) {
-                fixed_sessions = append(fixed_sessions, s)
-            }
-        }
-    }
-    
+
+	fixed_sessions := make([]string, 0)
+	for _, s := range sessions {
+		if !strings.Contains(s, QuotaKeyPrefix) {
+			if !strings.Contains(s, RateLimitKeyPrefix) {
+				fixed_sessions = append(fixed_sessions, s)
+			}
+		}
+	}
+
 	sessionsObj := APIAllKeys{fixed_sessions}
 
 	responseMessage, err = json.Marshal(&sessionsObj)
@@ -349,7 +349,7 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
 	}
-	
+
 	// This is so we bypass the hash function
 	sessStore := thiSpec.SessionManager.GetStore()
 	// TODO: This is pretty ugly
@@ -402,10 +402,10 @@ func signalGroupReload() ([]byte, int) {
 	notice := Notification{
 		Command: NoticeGroupReload,
 	}
-	
+
 	// Signal to the group via redis
 	MainNotifier.Notify(notice)
-	
+
 	code := 200
 
 	statusObj := APIErrorMessage{"ok", ""}
@@ -652,7 +652,6 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			responseMessage, code = handleDeleteHashedKey(keyName, APIID)
 		}
-		
 
 	} else {
 		// Return Not supported message (and code)
@@ -718,7 +717,6 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			responseMessage = createError("No such organisation found in Active API list")
 			return responseMessage, 400
 		}
-
 
 		do_reset := r.FormValue("reset_quota")
 		if do_reset == "1" {
@@ -816,14 +814,14 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 	}
 
 	sessions := thiSpec.OrgSessionManager.GetSessions(filter)
-    fixed_sessions := make([]string, 0)
-    for _, s := range(sessions) {
-        if !strings.Contains(s, QuotaKeyPrefix) {
-            if !strings.Contains(s, RateLimitKeyPrefix) {
-                fixed_sessions = append(fixed_sessions, s)
-            }
-        }
-    }
+	fixed_sessions := make([]string, 0)
+	for _, s := range sessions {
+		if !strings.Contains(s, QuotaKeyPrefix) {
+			if !strings.Contains(s, RateLimitKeyPrefix) {
+				fixed_sessions = append(fixed_sessions, s)
+			}
+		}
+	}
 	sessionsObj := APIAllKeys{fixed_sessions}
 
 	responseMessage, err = json.Marshal(&sessionsObj)
@@ -872,7 +870,6 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 
 	return responseMessage, code
 }
-
 
 func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
@@ -962,25 +959,25 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			} else {
-                if config.AllowMasterKeys {
-                    // nothing defined, add key to ALL
-                    log.Warning("No API Access Rights set, adding key to ALL.")
-                    for _, spec := range ApiSpecRegister {
-                        if !spec.DontSetQuotasOnCreate {
-                            // Reset quote by default
-                            spec.SessionManager.ResetQuota(newKey, newSession)
-                            newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-                        }
-                        spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
-                    }    
-                } else {
-                    log.Error("Master keys disallowed in configuration, key not added.")
-                    responseMessage = createError("Failed to create key, ensure security settings are correct.")
-                    code = 403
-                    DoJSONWrite(w, code, responseMessage)
-                    return
-                }
-				
+				if config.AllowMasterKeys {
+					// nothing defined, add key to ALL
+					log.Warning("No API Access Rights set, adding key to ALL.")
+					for _, spec := range ApiSpecRegister {
+						if !spec.DontSetQuotasOnCreate {
+							// Reset quote by default
+							spec.SessionManager.ResetQuota(newKey, newSession)
+							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+						}
+						spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
+					}
+				} else {
+					log.Error("Master keys disallowed in configuration, key not added.")
+					responseMessage = createError("Failed to create key, ensure security settings are correct.")
+					code = 403
+					DoJSONWrite(w, code, responseMessage)
+					return
+				}
+
 			}
 
 			responseObj.Action = "create"
@@ -1051,7 +1048,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 
 		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.GetId())
 		log.Debug("Storage ID: ", storageID)
-		
+
 		thisAPISpec := GetSpecForApi(newOauthClient.APIID)
 		if thisAPISpec == nil {
 			log.WithFields(logrus.Fields{

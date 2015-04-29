@@ -23,12 +23,12 @@ func (k *AuthKey) GetConfig() (interface{}, error) {
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
-	
+
 	authHeaderValue := r.Header.Get(thisConfig.AuthHeaderName)
 	if thisConfig.UseParam {
 		authHeaderValue = r.FormValue(thisConfig.AuthHeaderName)
 	}
-	
+
 	if authHeaderValue == "" {
 		// No header value, fail
 		log.WithFields(logrus.Fields{
@@ -67,7 +67,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 func AuthFailed(m TykMiddleware, r *http.Request, authHeaderValue string) {
 	go m.FireEvent(EVENT_AuthFailure,
 		EVENT_AuthFailureMeta{
-            EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
+			EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           r.RemoteAddr,
 			Key:              authHeaderValue,

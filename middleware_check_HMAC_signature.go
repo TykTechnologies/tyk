@@ -263,11 +263,11 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	diff := now - inSec
 
 	in_ms := diff / 1000000
-    
-    if hm.TykMiddleware.Spec.HmacAllowedClockSkew <= 0 {
-        return true
-    } 
-    
+
+	if hm.TykMiddleware.Spec.HmacAllowedClockSkew <= 0 {
+		return true
+	}
+
 	if math.Abs(float64(in_ms)) > hm.TykMiddleware.Spec.HmacAllowedClockSkew {
 		log.Debug("Difference is: ", math.Abs(float64(in_ms)))
 		return false

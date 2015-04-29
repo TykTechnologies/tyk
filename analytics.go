@@ -78,7 +78,7 @@ type RedisAnalyticsHandler struct {
 func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 	thisRecord.APIKey = publicHash(thisRecord.APIKey)
-	
+
 	encoded, err := msgpack.Marshal(thisRecord)
 	u5, _ := uuid.NewV4()
 

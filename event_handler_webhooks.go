@@ -11,8 +11,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 	"path"
+	"strings"
 )
 
 type WebHookRequestMethod string

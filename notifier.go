@@ -7,11 +7,11 @@ import (
 type NotificationCommand string
 
 const (
-	NoticeApiUpdated NotificationCommand = "ApiUpdated"
-	NoticeApiRemoved NotificationCommand = "ApiRemoved"
-	NoticeApiAdded   NotificationCommand = "ApiAdded"
-	NoticeGroupReload NotificationCommand = "GroupReload"
-	NoticePolicyChanged   NotificationCommand = "PolicyChanged"
+	NoticeApiUpdated    NotificationCommand = "ApiUpdated"
+	NoticeApiRemoved    NotificationCommand = "ApiRemoved"
+	NoticeApiAdded      NotificationCommand = "ApiAdded"
+	NoticeGroupReload   NotificationCommand = "GroupReload"
+	NoticePolicyChanged NotificationCommand = "PolicyChanged"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel

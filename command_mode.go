@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/lonelycode/go-uuid/uuid"
 	"encoding/json"
 	"fmt"
+	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"strings"

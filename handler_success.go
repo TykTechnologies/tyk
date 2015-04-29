@@ -46,13 +46,13 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 		log.Debug("Session has policy, checking")
 		policy, ok := Policies[thisSession.ApplyPolicyID]
 		if ok {
-			// Check ownership, policy org owner must be the same as API, 
+			// Check ownership, policy org owner must be the same as API,
 			// otherwise youcould overwrite a session key with a policy from a different org!
 			if policy.OrgID != t.Spec.APIDefinition.OrgID {
 				log.Error("Attempting to apply policy from different organisation to key, skipping")
 				return
 			}
-			
+
 			log.Debug("Found policy, applying")
 			thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 			thisSession.Rate = policy.Rate
@@ -62,7 +62,7 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 			thisSession.AccessRights = policy.AccessRights
 			thisSession.HMACEnabled = policy.HMACEnabled
 			thisSession.IsInactive = policy.IsInactive
-			
+
 			// Update the session in the session manager in case it gets called again
 			t.Spec.SessionManager.UpdateSession(key, *thisSession, t.Spec.APIDefinition.SessionLifetime)
 			log.Debug("Policy applied to key")
@@ -80,7 +80,7 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	thisSession, found = t.Spec.SessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
-		
+
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
 		return thisSession, true
@@ -96,7 +96,7 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 		t.ApplyPolicyIfExists(key, &thisSession)
 		t.Spec.SessionManager.UpdateSession(key, thisSession, t.Spec.APIDefinition.SessionLifetime)
 	}
-	
+
 	return thisSession, found
 }
 

@@ -1,14 +1,14 @@
 package main
 
 import (
+	"encoding/hex"
+	"errors"
 	"github.com/garyburd/redigo/redis"
+	"github.com/spaolacci/murmur3"
+	"hash"
 	"strconv"
 	"strings"
-	"github.com/spaolacci/murmur3"
 	"time"
-	"encoding/hex"
-	"hash"
-	"errors"
 )
 
 // KeyError is a standard error for when a key is not found in the storage engine
@@ -133,7 +133,7 @@ func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 type RedisStorageManager struct {
 	pool      *redis.Pool
 	KeyPrefix string
-	HashKeys bool
+	HashKeys  bool
 }
 
 func (r *RedisStorageManager) newPool(server, password string, database int) *redis.Pool {
@@ -192,7 +192,7 @@ func publicHash(in string) string {
 		// Not hashing? Return the raw key
 		return in
 	}
-	
+
 	return doHash(in)
 }
 
@@ -206,10 +206,9 @@ func (r *RedisStorageManager) hashKey(in string) string {
 
 func (r *RedisStorageManager) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
-	
+
 	log.Debug("Input key was: ", setKeyName)
-	
-	
+
 	return setKeyName
 }
 
@@ -222,7 +221,7 @@ func (r *RedisStorageManager) cleanKey(keyName string) string {
 func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	db := r.pool.Get()
 	defer db.Close()
-	
+
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
@@ -265,7 +264,7 @@ func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeou
 	defer db.Close()
 	log.Debug("[STORE] Raw key is: ", keyName)
 	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
-	
+
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
@@ -479,7 +478,7 @@ func (r *RedisStorageManager) DeleteKeys(keys []string) bool {
 		for i, v := range keys {
 			asInterface[i] = interface{}(r.fixKey(v))
 		}
-		
+
 		log.Debug("Deleting: ", asInterface)
 		_, err := db.Do("DEL", asInterface...)
 		if err != nil {
@@ -508,7 +507,7 @@ func (r *RedisStorageManager) DeleteRawKeys(keys []string, prefix string) bool {
 		for i, v := range keys {
 			asInterface[i] = interface{}(prefix + v)
 		}
-		
+
 		log.Debug("Deleting: ", asInterface)
 		_, err := db.Do("DEL", asInterface...)
 		if err != nil {
@@ -536,7 +535,7 @@ func (r *RedisStorageManager) StartPubSubHandler(channel string, callback func(r
 
 		case error:
 			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
-			
+
 			return v
 		}
 	}
@@ -575,9 +574,9 @@ func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire
 		log.Debug("keyName is: ", keyName)
 		now := time.Now()
 		log.Debug("Now is:", now)
-		onePeriodAgo := now.Add(time.Duration(-1 * per) * time.Second)
+		onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 		log.Debug("Then is: ", onePeriodAgo)
-		
+
 		db.Send("MULTI")
 		// Drop the last period so we get current bucket
 		db.Send("ZREMRANGEBYSCORE", keyName, "-inf", onePeriodAgo.UnixNano())
@@ -588,15 +587,15 @@ func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire
 		// REset the TTL so the key lives as long as the requests pile in
 		db.Send("EXPIRE", keyName, per)
 		r, err := redis.Values(db.Do("EXEC"))
-		
+
 		intVal := len(r[1].([]interface{}))
-		
+
 		log.Debug("Returned: ", intVal)
-		
+
 		if err != nil {
 			log.Error("Multi command failed: ", err)
 		}
-		
+
 		return intVal
 	}
 	return 0

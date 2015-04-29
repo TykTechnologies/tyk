@@ -1,9 +1,9 @@
 package main
 
 import (
-	"time"
-	"github.com/garyburd/redigo/redis"
 	"encoding/json"
+	"github.com/garyburd/redigo/redis"
+	"time"
 )
 
 const (
@@ -23,7 +23,7 @@ func StartPubSubLoop() {
 			CacheStore.Connect()
 			CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisReloadMsg)
 		}
-		
+
 	}
 }
 
@@ -33,8 +33,8 @@ func HandleRedisReloadMsg(message redis.Message) {
 	if err != nil {
 		log.Error("Unmarshalling message body failed, malformed: ", err)
 		return
-	} 
-	
+	}
+
 	log.Warning("Restart signal (redis) received, restarting muxers")
 	ReloadURLStructure()
 }

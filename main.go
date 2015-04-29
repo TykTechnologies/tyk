@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
- 	osin "github.com/lonelycode/osin"
 	"github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
+	osin "github.com/lonelycode/osin"
 	"github.com/lonelycode/tykcommon"
 	"github.com/rcrowley/goagain"
 	"html/template"
@@ -88,7 +88,7 @@ func setupGlobals() {
 
 	// Set up global JSVM
 	GlobalEventsJSVM.Init(config.TykJSPath)
-	
+
 	// Get the notifier ready
 	MainNotifierStore := RedisStorageManager{}
 	MainNotifierStore.Connect()
@@ -116,7 +116,7 @@ func getPolicies() {
 		log.Info("No policy record name defined, skipping...")
 		return
 	}
-	
+
 	if config.Policies.PolicySource == "mongo" {
 		log.Info("Using Policies from Mongo DB")
 		Policies = LoadPoliciesFromMongo(config.Policies.PolicyRecordName)
@@ -310,8 +310,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 		log.Info("Loading Middleware")
 		mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
-        
-        referenceSpec.JSVM.LoadJSPaths(mwPaths)
+
+		referenceSpec.JSVM.LoadJSPaths(mwPaths)
 
 		if referenceSpec.EnableBatchRequestSupport {
 			addBatchEndpoint(&referenceSpec, Muxer)
@@ -369,8 +369,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
-                CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
-                CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
 			}
 
@@ -422,7 +422,7 @@ func ReloadURLStructure() {
 	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()
 	loadApps(specs, newMuxes)
-	
+
 	// Load the API Policies
 	getPolicies()
 
@@ -524,7 +524,7 @@ func main() {
 
 	targetPort := fmt.Sprintf(":%d", config.ListenPort)
 	loadAPIEndpoints(http.DefaultServeMux)
-	
+
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
 		go StartPubSubLoop()

@@ -1,15 +1,15 @@
 package main
 
 import (
+	"bytes"
+	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/lonelycode/tykcommon"
 	"labix.org/v2/mgo/bson"
+	"net/http"
 	"time"
-    "net/http"
-    "bytes"
-    b64 "encoding/base64"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
@@ -30,8 +30,8 @@ const (
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
 // easily extending event metadata objects
 type EventMetaDefault struct {
-	Message string
-    OriginatingRequest string
+	Message            string
+	OriginatingRequest string
 }
 
 // EVENT_QuotaExceededMeta is the metadata structure for a quota exceeded event (EVENT_QuotaExceeded)
@@ -90,11 +90,11 @@ type TykEventHandler interface {
 
 // EncodeRequestToEvent will write the request out in wire protocol and encode it to b64 and store it in an Event object
 func EncodeRequestToEvent(r *http.Request) string {
-    var asBytes bytes.Buffer
-    r.Write(&asBytes)
-    
-    uEnc := b64.StdEncoding.EncodeToString(asBytes.Bytes())
-    return uEnc
+	var asBytes bytes.Buffer
+	r.Write(&asBytes)
+
+	uEnc := b64.StdEncoding.EncodeToString(asBytes.Bytes())
+	return uEnc
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition

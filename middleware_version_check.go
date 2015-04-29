@@ -20,17 +20,17 @@ func (v *VersionCheck) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) () {
-    // Reply with some alternate data
-    thisMeta := meta.(tykcommon.EndpointMethodMeta)
-    responseMessage := []byte(thisMeta.Data)
-    for header, value := range thisMeta.Headers {
-        w.Header().Add(header, value)
-    }
+func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
+	// Reply with some alternate data
+	thisMeta := meta.(tykcommon.EndpointMethodMeta)
+	responseMessage := []byte(thisMeta.Data)
+	for header, value := range thisMeta.Headers {
+		w.Header().Add(header, value)
+	}
 
-    w.WriteHeader(thisMeta.Code)
-    fmt.Fprintf(w, string(responseMessage))
-    return
+	w.WriteHeader(thisMeta.Code)
+	fmt.Fprintf(w, string(responseMessage))
+	return
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -49,9 +49,9 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 			})
 		return errors.New(string(stat)), 403
 	}
-    
-    // We handle redirects before ignores in case we aren't using a whitelist
-    if stat == StatusRedirectFlowByReply {
+
+	// We handle redirects before ignores in case we aren't using a whitelist
+	if stat == StatusRedirectFlowByReply {
 		v.DoMockReply(w, meta)
 		return nil, 666
 	}

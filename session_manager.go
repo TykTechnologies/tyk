@@ -6,15 +6,15 @@ import (
 
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
-	URL string	`json:"url"`
+	URL     string   `json:"url"`
 	Methods []string `json:"methods"`
 }
 
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
-	APIName string   `json:"api_name"`
-	APIID    string   `json:"api_id"`
-	Versions []string `json:"versions"`
+	APIName     string       `json:"api_name"`
+	APIID       string       `json:"api_id"`
+	Versions    []string     `json:"versions"`
 	AllowedURLs []AccessSpec `bson:"allowed_urls"  json:"allowed_urls"` // mapped string MUST be a valid regex
 }
 
@@ -35,11 +35,11 @@ type SessionState struct {
 	BasicAuthData    struct {
 		Password string `json:"password"`
 	} `json:"basic_auth_data"`
-	HMACEnabled bool        `json:"hmac_enabled"`
-	HmacSecret  string      `json:"hmac_string"`
-	IsInactive  bool        `json:"is_inactive"`
-	ApplyPolicyID	string  `json:"apply_policy_id"`
-	MetaData    interface{} `json:"meta_data"`
+	HMACEnabled   bool        `json:"hmac_enabled"`
+	HmacSecret    string      `json:"hmac_string"`
+	IsInactive    bool        `json:"is_inactive"`
+	ApplyPolicyID string      `json:"apply_policy_id"`
+	MetaData      interface{} `json:"meta_data"`
 }
 
 type PublicSessionState struct {
@@ -73,10 +73,9 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	ratePerPeriodNow := store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), int64(currentSession.Per))
 
 	log.Debug("Num Requests: ", ratePerPeriodNow)
-	
-	
+
 	// Subtract by 1 because of the delayed add in the window
-	if ratePerPeriodNow > (int(currentSession.Rate) -1) {
+	if ratePerPeriodNow > (int(currentSession.Rate) - 1) {
 		return false, 1
 	}
 
@@ -190,7 +189,7 @@ func createSampleSession() SessionState {
 	thisSession.QuotaMax = 10
 
 	simpleDef := AccessDefinition{
-		APIName: "Test",
+		APIName:  "Test",
 		APIID:    "1",
 		Versions: []string{"Default"},
 	}

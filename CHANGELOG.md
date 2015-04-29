@@ -3,14 +3,17 @@
 - Added Policies feature, you can now define key policies for keys you generate:
     - Create a policies/policies.json file
     - Set the appropriate arguments in tyk.conf file:
-
+		
+		```
 		"policies": {
 			"policy_source": "file",
 			"policy_record_name": "./policies/policies.json"
 		}
+		```
 
 	- Create a policy, they look like this:
 	
+		```
 		{
 			"default": {
 				"rate": 1000,
@@ -30,6 +33,7 @@
 				"hmac_enabled": false
 			}
 		}
+		```
 	
 	- Add a `apply_policy_id` field to your Session object when you create a key with your policy ID (in this case the ID is `default`)
 	- Reload Tyk
@@ -39,6 +43,7 @@
 
 - Added granular path white-list: It is now possible to define at the key level what access permissions a key has, this is a white-list of regex keys and apply to a whole API definition. Granular permissions are applied *after* version-based (global) ones in the api-definition. These granular permissions take the form a new field in the access rights field in either a policy definition or a session object in the new `allowed_urls` field:
 
+	```
 	{
 		"default": {
 			"rate": 1000,
@@ -64,6 +69,7 @@
 			"hmac_enabled": false
 		}
 	}
+	```
 
 - Added `hash_keys` config option. Setting this to `true` willc ause Tyk to store all keys in Redis in a hashed representation. This will also obfuscate keys in analytics data, using the hashed representation instead. Webhooks will cotuniue to make the full API key available. This change is not backwards compatible if enabled on an existing installation.
 - Added `cache_options.enable_upstream_cache_control` flag to API definitions

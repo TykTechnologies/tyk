@@ -9,11 +9,11 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-    "strings"
+	"strings"
 )
 
 const (
-	UPSTREAM_CACHE_HEADER_NAME = "x-tyk-cache-action-set"
+	UPSTREAM_CACHE_HEADER_NAME     = "x-tyk-cache-action-set"
 	UPSTREAM_CACHE_TTL_HEADER_NAME = "x-tyk-cache-action-set-ttl"
 )
 
@@ -36,7 +36,7 @@ func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
 
 func (m RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {
 	h := md5.New()
-    toEncode := strings.Join([]string{req.Method, req.URL.RawQuery}, "-")
+	toEncode := strings.Join([]string{req.Method, req.URL.RawQuery}, "-")
 	io.WriteString(h, toEncode)
 	reqChecksum := hex.EncodeToString(h.Sum(nil))
 
@@ -53,21 +53,21 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, 200
 	}
 
-    var stat RequestStatus
+	var stat RequestStatus
 	// Only allow idempotent (safe) methods
 	if r.Method == "GET" || r.Method == "OPTIONS" || r.Method == "HEAD" {
-        // Lets see if we can throw a sledgehammer at this
-        if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
-            stat = StatusCached
-        } else {
-            // New request checker, more targetted, less likely to fail
-            _, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
-            found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
-            if found {
-                stat = StatusCached
-            }
-        }
-        
+		// Lets see if we can throw a sledgehammer at this
+		if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
+			stat = StatusCached
+		} else {
+			// New request checker, more targetted, less likely to fail
+			_, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
+			found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
+			if found {
+				stat = StatusCached
+			}
+		}
+
 		// Cached route matched, let go
 		if stat == StatusCached {
 			authHeaderValue := context.Get(r, AuthHeaderValue).(string)
@@ -77,10 +77,10 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				log.Debug("Cache enabled, but record not found")
 				// Pass through to proxy AND CACHE RESULT
 				sNP := SuccessHandler{m.TykMiddleware}
-				
+
 				// This passes through and will write the value to the writer, but spit out a copy for the cache
 				reqVal := sNP.ServeHTTP(w, r)
-				
+
 				cacheThisRequest := true
 				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
 				// Are we using upstream cache control?
@@ -103,17 +103,17 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 						cacheTTL = int64(cacheAsInt)
 					}
 				}
-				
+
 				if cacheThisRequest {
 					log.Debug("Caching request to redis")
 					var wireFormatReq bytes.Buffer
 					reqVal.Write(&wireFormatReq)
 					log.Debug("Cache TTL is:", cacheTTL)
 					m.CacheStore.SetKey(thisKey, wireFormatReq.String(), cacheTTL)
-					
+
 				}
 				return nil, 666
-				
+
 			}
 
 			retObj := bytes.NewReader([]byte(retBlob))
