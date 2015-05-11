@@ -30,6 +30,7 @@ var GlobalEventsJSVM = &JSVM{}
 var doMemoryProfile bool
 var Policies = make(map[string]Policy)
 var MainNotifier = RedisNotifier{}
+var DefaultOrgStore = DefaultSessionManager{}
 
 //var genericOsinStorage *RedisOsinStorageInterface
 var ApiSpecRegister = make(map[string]*APISpec)
@@ -523,6 +524,13 @@ func main() {
 	}
 
 	targetPort := fmt.Sprintf(":%d", config.ListenPort)
+
+	// Set up a default org manager so we can traverse non-live paths
+	if !config.SupressDefaultOrgStore {
+		log.Info("Initialising default org store")
+		DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
+	}
+
 	loadAPIEndpoints(http.DefaultServeMux)
 
 	// Start listening for reload messages

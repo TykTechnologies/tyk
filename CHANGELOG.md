@@ -1,3 +1,6 @@
+# DEV
+- Added SupressDefaultOrgStore - uses a default redis connection to handle unfound Org lookups
+
 # v1.6
 - Added LDAP StorageHandler, enables basic key lookups from an LDAP service
 - Added Policies feature, you can now define key policies for keys you generate:

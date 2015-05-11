@@ -49,6 +49,7 @@ type Config struct {
 	AllowMasterKeys           bool `json:"allow_master_keys"`
 	HashKeys                  bool `json:"hash_keys"`
 	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
+	SupressDefaultOrgStore    bool `json:"suppress_default_org_store"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

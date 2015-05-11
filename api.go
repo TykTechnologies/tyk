@@ -713,18 +713,27 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		// Update our session object (create it)
 
 		spec := GetSpecForOrg(keyName)
+		var thisSessionManager SessionHandler
+
 		if spec == nil {
-			responseMessage = createError("No such organisation found in Active API list")
-			return responseMessage, 400
+			log.Warning("Couldn't find org session store in active API list")
+			if config.SupressDefaultOrgStore {
+				responseMessage = createError("No such organisation found in Active API list")
+				return responseMessage, 400
+			} else {
+				thisSessionManager = &DefaultOrgStore
+			}
+		} else {
+			thisSessionManager = spec.OrgSessionManager
 		}
 
 		do_reset := r.FormValue("reset_quota")
 		if do_reset == "1" {
-			spec.OrgSessionManager.ResetQuota(keyName, newSession)
+			thisSessionManager.ResetQuota(keyName, newSession)
 			newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 		}
 
-		spec.OrgSessionManager.UpdateSession(keyName, newSession, 0)
+		thisSessionManager.UpdateSession(keyName, newSession, 0)
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
