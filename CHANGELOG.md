@@ -1,5 +1,6 @@
 # DEV
 - Added SupressDefaultOrgStore - uses a default redis connection to handle unfound Org lookups
+- Added support for Sentry DSN
 
 # v1.6
 - Added LDAP StorageHandler, enables basic key lookups from an LDAP service
