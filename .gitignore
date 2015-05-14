@@ -16,3 +16,4 @@ tyk.folder.conf
 tyk.db.conf
 tyk.compose.conf
 run.sh
+utils/cloud_release.sh
