@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus/hooks/sentry"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
@@ -510,6 +511,20 @@ func init() {
 	if doDebug == true {
 		log.Level = logrus.DebugLevel
 		log.Debug("Enabling debug-level output")
+	}
+
+	if config.UseSentry {
+		log.Info("Enabling Sentry support")
+		hook, err := logrus_sentry.NewSentryHook(config.SentryCode, []logrus.Level{
+			logrus.PanicLevel,
+			logrus.FatalLevel,
+			logrus.ErrorLevel,
+		})
+
+		if err == nil {
+			log.Hooks.Add(hook)
+		}
+		log.Info("Sentry hook active")
 	}
 
 }

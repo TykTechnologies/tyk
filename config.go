@@ -45,11 +45,13 @@ type Config struct {
 		EnableHealthChecks      bool  `json:"enable_health_checks"`
 		HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 	} `json:"health_check"`
-	UseAsyncSessionWrite      bool `json:"optimisations_use_async_session_write"`
-	AllowMasterKeys           bool `json:"allow_master_keys"`
-	HashKeys                  bool `json:"hash_keys"`
-	SuppressRedisSignalReload bool `json:"suppress_redis_signal_reload"`
-	SupressDefaultOrgStore    bool `json:"suppress_default_org_store"`
+	UseAsyncSessionWrite      bool   `json:"optimisations_use_async_session_write"`
+	AllowMasterKeys           bool   `json:"allow_master_keys"`
+	HashKeys                  bool   `json:"hash_keys"`
+	SuppressRedisSignalReload bool   `json:"suppress_redis_signal_reload"`
+	SupressDefaultOrgStore    bool   `json:"suppress_default_org_store"`
+	SentryCode                string `json:"sentry_code"`
+	UseSentry                 bool   `json:"use_sentry"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
