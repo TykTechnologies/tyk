@@ -521,6 +521,8 @@ func init() {
 			logrus.ErrorLevel,
 		})
 
+		hook.Timeout = 0
+
 		if err == nil {
 			log.Hooks.Add(hook)
 		}
