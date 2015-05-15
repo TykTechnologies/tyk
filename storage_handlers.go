@@ -564,15 +564,15 @@ func (r *RedisStorageManager) GetAndDeleteSet(keyName string) []interface{} {
 	db := r.pool.Get()
 	defer db.Close()
 
-	log.Warning("Getting raw gkey set: ", keyName)
+	log.Debug("Getting raw gkey set: ", keyName)
 	if db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()
 		r.GetAndDeleteSet(keyName)
 	} else {
-		log.Warning("keyName is: ", keyName)
+		log.Debug("keyName is: ", keyName)
 		fixedKey := r.fixKey(keyName)
-		log.Warning("Fixed keyname is: ", fixedKey)
+		log.Debug("Fixed keyname is: ", fixedKey)
 		db.Send("MULTI")
 		// Get all the elements
 		db.Send("LRANGE", fixedKey, 0, -1)
@@ -583,7 +583,7 @@ func (r *RedisStorageManager) GetAndDeleteSet(keyName string) []interface{} {
 
 		vals := r[0].([]interface{})
 
-		log.Warning("Returned: ", vals)
+		log.Debug("Returned: ", vals)
 
 		if err != nil {
 			log.Error("Multi command failed: ", err)
@@ -598,7 +598,7 @@ func (r *RedisStorageManager) AppendToSet(keyName string, value string) {
 	db := r.pool.Get()
 	defer db.Close()
 
-	log.Warning("Pushing to raw key set: ", keyName)
+	log.Debug("Pushing to raw key set: ", keyName)
 	if db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()
@@ -607,8 +607,8 @@ func (r *RedisStorageManager) AppendToSet(keyName string, value string) {
 		_, err := db.Do("RPUSH", r.fixKey(keyName), value)
 
 		if err != nil {
-			log.Error("Error trying to delete keys:")
-			log.Error(err)
+			log.Debug("Error trying to delete keys:")
+			log.Debug(err)
 		}
 
 		return
