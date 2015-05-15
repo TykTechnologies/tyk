@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/nu7hatch/gouuid"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"labix.org/v2/mgo"
 	"os"
@@ -32,6 +31,10 @@ type AnalyticsRecord struct {
 	RequestTime   int64
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
+
+const (
+	ANALYTICS_KEYNAME string = "tyk-system-analytics"
+)
 
 func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 	var expiry time.Duration
@@ -80,9 +83,6 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	thisRecord.APIKey = publicHash(thisRecord.APIKey)
 
 	encoded, err := msgpack.Marshal(thisRecord)
-	u5, _ := uuid.NewV4()
-
-	keyName := fmt.Sprintf("%d%d%d%d-%s", thisRecord.Year, thisRecord.Month, thisRecord.Day, thisRecord.Hour, u5.String())
 
 	if err != nil {
 		log.Error("Error encoding analytics data:")
@@ -90,7 +90,7 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 		return AnalyticsError{}
 	}
 
-	r.Store.SetKey(keyName, string(encoded), 0)
+	r.Store.AppendToSet(ANALYTICS_KEYNAME, string(encoded))
 
 	return nil
 }
@@ -197,32 +197,28 @@ func (m *MongoPurger) PurgeCache() {
 		m.PurgeCache()
 	} else {
 		analyticsCollection := m.dbSession.DB("").C(config.AnalyticsConfig.MongoCollection)
-		KeyValueMap := m.Store.GetKeysAndValues()
 
-		if len(KeyValueMap) > 0 {
-			keys := make([]interface{}, len(KeyValueMap), len(KeyValueMap))
-			keyNames := make([]string, len(KeyValueMap), len(KeyValueMap))
+		AnalyticsValues := m.Store.GetAndDeleteSet(ANALYTICS_KEYNAME)
 
-			i := 0
-			for k, v := range KeyValueMap {
-				keyNames[i] = k
+		if len(AnalyticsValues) > 0 {
+			keys := make([]interface{}, len(AnalyticsValues), len(AnalyticsValues))
+
+			for i, v := range AnalyticsValues {
 				decoded := AnalyticsRecord{}
-				err := msgpack.Unmarshal([]byte(v), &decoded)
+				err := msgpack.Unmarshal(v.([]byte), &decoded)
+				log.Warning("Decoded Record: ", decoded)
 				if err != nil {
 					log.Error("Couldn't unmarshal analytics data:")
 					log.Error(err)
 				} else {
 					keys[i] = interface{}(decoded)
 				}
-				i++
 			}
 
 			err := analyticsCollection.Insert(keys...)
 			if err != nil {
 				log.Error("Problem inserting to mongo collection")
 				log.Error(err)
-			} else {
-				m.Store.DeleteRawKeys(keyNames, "analytics-")
 			}
 		}
 	}

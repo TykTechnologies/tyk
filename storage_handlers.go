@@ -560,6 +560,61 @@ func (r *RedisStorageManager) Publish(channel string, message string) error {
 	return nil
 }
 
+func (r *RedisStorageManager) GetAndDeleteSet(keyName string) []interface{} {
+	db := r.pool.Get()
+	defer db.Close()
+
+	log.Warning("Getting raw gkey set: ", keyName)
+	if db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.GetAndDeleteSet(keyName)
+	} else {
+		log.Warning("keyName is: ", keyName)
+		fixedKey := r.fixKey(keyName)
+		log.Warning("Fixed keyname is: ", fixedKey)
+		db.Send("MULTI")
+		// Get all the elements
+		db.Send("LRANGE", fixedKey, 0, -1)
+		// Trim it to zero
+		db.Send("DEL", fixedKey)
+		// Execute
+		r, err := redis.Values(db.Do("EXEC"))
+
+		vals := r[0].([]interface{})
+
+		log.Warning("Returned: ", vals)
+
+		if err != nil {
+			log.Error("Multi command failed: ", err)
+		}
+
+		return vals
+	}
+	return []interface{}{}
+}
+
+func (r *RedisStorageManager) AppendToSet(keyName string, value string) {
+	db := r.pool.Get()
+	defer db.Close()
+
+	log.Warning("Pushing to raw key set: ", keyName)
+	if db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.AppendToSet(keyName, value)
+	} else {
+		_, err := db.Do("RPUSH", r.fixKey(keyName), value)
+
+		if err != nil {
+			log.Error("Error trying to delete keys:")
+			log.Error(err)
+		}
+
+		return
+	}
+}
+
 // IncrementWithExpire will increment a key in redis
 func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire int64) int {
 	db := r.pool.Get()
