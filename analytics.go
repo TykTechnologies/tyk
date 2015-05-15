@@ -206,7 +206,7 @@ func (m *MongoPurger) PurgeCache() {
 			for i, v := range AnalyticsValues {
 				decoded := AnalyticsRecord{}
 				err := msgpack.Unmarshal(v.([]byte), &decoded)
-				log.Warning("Decoded Record: ", decoded)
+				log.Debug("Decoded Record: ", decoded)
 				if err != nil {
 					log.Error("Couldn't unmarshal analytics data:")
 					log.Error(err)
