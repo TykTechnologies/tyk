@@ -23,6 +23,14 @@ func (k *BasicAuthKeyIsValid) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+// requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
+func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter,msg string)(error,int){
+	authReply := "Basic realm=\"" + k.TykMiddleware.Spec.Name + "\""
+
+	w.Header().Add("WWW-Authenticate", authReply)
+	return errors.New(msg), 401
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	authHeaderValue := r.Header.Get("Authorization")
@@ -33,10 +41,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			"origin": r.RemoteAddr,
 		}).Info("Attempted access with malformed header, no auth header found.")
 
-		authReply := "Basic realm=\"" + k.TykMiddleware.Spec.Name + "\""
-
-		w.Header().Add("WWW-Authenticate", authReply)
-		return errors.New("Authorization field missing"), 401
+		return k.requestForBasicAuth(w, "Authorization field missing")
 	}
 
 	bits := strings.Split(authHeaderValue, " ")
@@ -88,7 +93,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
 
-		return errors.New("User not authorised"), 403
+		return k.requestForBasicAuth(w, "User not authorised")
 	}
 
 	// Ensure that the username and password match up
@@ -105,7 +110,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
 
-		return errors.New("User not authorised"), 403
+		return k.requestForBasicAuth(w, "User not authorised")
 	}
 
 	// Set session state on context, we will need it later

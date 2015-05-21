@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/justinas/alice"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
 )
 
 var basicAuthDef string = `
@@ -263,8 +264,12 @@ func TestBasicAuthWrongUser(t *testing.T) {
 		t.Error("Request should have failed and returned non-200 code!: \n", recorder.Code)
 	}
 
-	if recorder.Code != 403 {
-		t.Error("Request should have returned 403 code!: \n", recorder.Code)
+	if recorder.Code != 401 {
+		t.Error("Request should have returned 401 code!: \n", recorder.Code)
+	}
+
+	if recorder.Header().Get("WWW-Authenticate") == "" {
+		t.Error("Request should have returned WWW-Authenticate header!: \n")
 	}
 }
 
@@ -335,7 +340,11 @@ func TestBasicAuthWrongPassword(t *testing.T) {
 		t.Error("Request should have failed and returned non-200 code!: \n", recorder.Code)
 	}
 
-	if recorder.Code != 403 {
-		t.Error("Request should have returned 403 code!: \n", recorder.Code)
+	if recorder.Code != 401 {
+		t.Error("Request should have returned 401 code!: \n", recorder.Code)
+	}
+
+	if recorder.Header().Get("WWW-Authenticate") == "" {
+		t.Error("Request should have returned WWW-Authenticate header!: \n")
 	}
 }
