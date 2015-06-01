@@ -2,6 +2,7 @@
 - Added SupressDefaultOrgStore - uses a default redis connection to handle unfound Org lookups
 - Added support for Sentry DSN
 - Modification: Analyitcs purger (redis) now uses redis lists, much cleaner, and purge is a transaction which means multiple gateways can purge at the same time safely without risk of duplication
+- Added `enforce_org_data_age` config parameter that allows for setting the expireAt in seconds for analytics data on an organisation level. (Requires the addition of a `data_expires` filed in the Session object that is larger than 0)
 
 # v1.6
 - Added LDAP StorageHandler, enables basic key lookups from an LDAP service

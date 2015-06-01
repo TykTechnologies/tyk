@@ -52,6 +52,7 @@ type Config struct {
 	SupressDefaultOrgStore    bool   `json:"suppress_default_org_store"`
 	SentryCode                string `json:"sentry_code"`
 	UseSentry                 bool   `json:"use_sentry"`
+	EnforceOrgDataAge         bool   `json:"enforce_org_data_age"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

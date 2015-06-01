@@ -39,6 +39,7 @@ type SessionState struct {
 	HmacSecret    string      `json:"hmac_string"`
 	IsInactive    bool        `json:"is_inactive"`
 	ApplyPolicyID string      `json:"apply_policy_id"`
+	DataExpires   int64       `json:"data_expires"`
 	MetaData      interface{} `json:"meta_data"`
 }
 

@@ -73,7 +73,19 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			0,
 			time.Now(),
 		}
-		thisRecord.SetExpiry(e.Spec.ExpireAnalyticsAfter)
+
+		expiresAfter := e.Spec.ExpireAnalyticsAfter
+		if config.EnforceOrgDataAge {
+			thisOrg := e.Spec.OrgID
+			orgSessionState, found := e.GetOrgSession(thisOrg)
+			if found {
+				if orgSessionState.DataExpires > 0 {
+					expiresAfter = orgSessionState.DataExpires
+				}
+			}
+		}
+
+		thisRecord.SetExpiry(expiresAfter)
 		go analytics.RecordHit(thisRecord)
 	}
 

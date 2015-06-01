@@ -108,6 +108,7 @@ type SuccessHandler struct {
 func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64) {
 
 	if config.StoreAnalytics(r) {
+
 		t := time.Now()
 
 		// Track the key ID if it exists
@@ -152,7 +153,19 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			time.Now(),
 		}
 
-		thisRecord.SetExpiry(s.Spec.ExpireAnalyticsAfter)
+		expiresAfter := s.Spec.ExpireAnalyticsAfter
+		if config.EnforceOrgDataAge {
+			thisOrg := s.Spec.OrgID
+			orgSessionState, found := s.GetOrgSession(thisOrg)
+			if found {
+				if orgSessionState.DataExpires > 0 {
+					expiresAfter = orgSessionState.DataExpires
+				}
+			}
+		}
+
+		thisRecord.SetExpiry(expiresAfter)
+
 		analytics.RecordHit(thisRecord)
 	}
 
