@@ -981,7 +981,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				} else {
 					log.Error("Master keys disallowed in configuration, key not added.")
-					responseMessage = createError("Failed to create key, ensure security settings are correct.")
+					responseMessage = createError("Failed to create key, keys must have at least one Access Rights record set.")
 					code = 403
 					DoJSONWrite(w, code, responseMessage)
 					return
