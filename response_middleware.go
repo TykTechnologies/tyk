@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"errors"
-	"labix.org/v2/mgo/bson"
 )
 
 var RESPONSE_PROCESSORS map[string]TykResponseHandler = map[string]TykResponseHandler{
@@ -38,37 +37,3 @@ func (r ResponseChain) Go(chain *[]TykResponseHandler, rw http.ResponseWriter, r
 	return nil
 }
 
-type HeaderInjectorOptions struct {
-	HeaderMap map[string]string
-}
-
-type HeaderInjector struct{
-	Spec *APISpec
-	config HeaderInjectorOptions
-}
-
-func (h HeaderInjector) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	thisHandler := HeaderInjector{}
-	switch c.(type) {
-	case bson.M:
-		thisHandler.config = HeaderInjectorOptions{}
-		thisHandler.config.HeaderMap = make(map[string]string)
-		m := c.(bson.M)["HeaderMap"].(bson.M)
-		for h, v := range(m){
-			thisHandler.config.HeaderMap[h] = v.(string)
-		}
-	default: 
-		// This probably wont work
-		thisHandler.config = c.(HeaderInjectorOptions)
-	}
-	
-	thisHandler.Spec = spec
-
-	return thisHandler, nil
-}
-
-func (h HeaderInjector) HandleResponse(http.ResponseWriter, *http.Response, *SessionState) error {
-	log.Warning("Hi there")
-	log.Warning(h.config.HeaderMap)
-	return nil
-}
