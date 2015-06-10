@@ -196,26 +196,38 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 	res.Body = ioutil.NopCloser(&bodyBuffer)
 	inres.Body = ioutil.NopCloser(bodyBuffer2)
 
+	ses := SessionState{}
+	if sessVal != nil {
+		ses = sessVal.(SessionState)
+	}
+
+	// Middleware chain handling here - very simple, but should do the trick
+	responseHandler := ResponseChain{}
+	chain := []TykResponseHandler{TestHandler{}, p}
+
+	responseHandler.Go(&chain, rw, res, &ses)
+
+	return inres
+}
+
+func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
+
 	for _, h := range hopHeaders {
 		res.Header.Del(h)
 	}
 
 	// Add resource headers
-	if sessVal != nil {
+	if ses != nil {
 		// We have found a session, lets report back
-		var thisSessionState SessionState
-		thisSessionState = sessVal.(SessionState)
-		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
-		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
-		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
+		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
+		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
+		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)
 
 	rw.WriteHeader(res.StatusCode)
 	p.copyResponse(rw, res.Body)
-
-	return inres
 }
 
 func (p *ReverseProxy) copyResponse(dst io.Writer, src io.Reader) {
