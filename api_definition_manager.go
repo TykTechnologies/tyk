@@ -89,6 +89,7 @@ type APISpec struct {
 	EventPaths        map[tykcommon.TykEvent][]TykEventHandler
 	Health            HealthChecker
 	JSVM              *JSVM
+	ResponseChain	  *[]TykResponseHandler
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()

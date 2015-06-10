@@ -26,7 +26,7 @@ import (
 // the target request will be for /base/dir. This version modifies the
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
-func TykNewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
+func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
@@ -40,7 +40,7 @@ func TykNewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
 		}
 	}
 
-	return &ReverseProxy{Director: director}
+	return &ReverseProxy{Director: director, TykAPISpec: spec}
 }
 
 // onExitFlushLoop is a callback set by tests to detect the state of the
@@ -66,6 +66,8 @@ type ReverseProxy struct {
 	// response body.
 	// If zero, no periodic flushing is done.
 	FlushInterval time.Duration
+
+	TykAPISpec *APISpec
 }
 
 func singleJoiningSlash(a, b string) string {
@@ -126,6 +128,10 @@ func (p *ReverseProxy) ReturnRequestServeHttp(rw http.ResponseWriter, req *http.
 	p.ServeHTTP(rw, req)
 
 	return outreq
+}
+
+func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
+	return nil, nil
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
@@ -203,14 +209,16 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 
 	// Middleware chain handling here - very simple, but should do the trick
 	responseHandler := ResponseChain{}
-	chain := []TykResponseHandler{TestHandler{}, p}
-
-	responseHandler.Go(&chain, rw, res, &ses)
-
+	chainErr := responseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, &ses)
+	if chainErr != nil {
+		log.Error("Request chain failed! ", chainErr)
+		// Return whatever we have
+	}
+	p.HandleResponse(rw, res, &ses)
 	return inres
 }
 
-func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
+func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
 
 	for _, h := range hopHeaders {
 		res.Header.Del(h)
@@ -228,6 +236,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 	rw.WriteHeader(res.StatusCode)
 	p.copyResponse(rw, res.Body)
+	return nil
 }
 
 func (p *ReverseProxy) copyResponse(dst io.Writer, src io.Reader) {

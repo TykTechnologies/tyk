@@ -255,6 +255,21 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 
 }
 
+func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
+	// Create the response processors
+	responseChain := make([]TykResponseHandler, len(referenceSpec.APIDefinition.ResponseProcessors))
+	for i, processorDetail := range(referenceSpec.APIDefinition.ResponseProcessors) {
+		processorType, err := GetResponseProcessorByName(processorDetail.Name)
+		if err != nil {
+			log.Error("Failed to load processor! ", err)
+			return
+		}
+		thisProcessor, _ := processorType.New(processorDetail.Options, referenceSpec)
+		responseChain[i] = thisProcessor
+	}
+	referenceSpec.ResponseChain = &responseChain
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
@@ -324,8 +339,11 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			referenceSpec.OAuthManager = thisOauthManager
 		}
 
-		proxy := TykNewSingleHostReverseProxy(remote)
+		proxy := TykNewSingleHostReverseProxy(remote, &referenceSpec)
 		referenceSpec.target = remote
+
+		// Create the response processors
+		creeateResponseMiddlewareChain(&referenceSpec)
 
 		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
 		tykMiddleware := TykMiddleware{referenceSpec, proxy}
