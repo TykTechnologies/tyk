@@ -30,12 +30,13 @@ type URLStatus int
 // Enums representing the various statuses for a VersionInfo Path match during a
 // proxy request
 const (
-	Ignored        URLStatus = 1
-	WhiteList      URLStatus = 2
-	BlackList      URLStatus = 3
-	Cached         URLStatus = 4
-	Transformed    URLStatus = 5
-	HeaderInjected URLStatus = 6
+	Ignored                URLStatus = 1
+	WhiteList              URLStatus = 2
+	BlackList              URLStatus = 3
+	Cached                 URLStatus = 4
+	Transformed            URLStatus = 5
+	HeaderInjected         URLStatus = 6
+	HeaderInjectedResponse URLStatus = 7
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -55,6 +56,7 @@ const (
 	StatusCached                   RequestStatus = "Cached path"
 	StatusTransform                RequestStatus = "Transformed path"
 	StatusHeaderInjected           RequestStatus = "Header injected"
+	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
 	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
 )
@@ -63,11 +65,12 @@ const (
 // path is on any of the white, plack or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec            *regexp.Regexp
-	Status          URLStatus
-	MethodActions   map[string]tykcommon.EndpointMethodMeta
-	TransformAction TransformSpec
-	InjectHeaders   tykcommon.HeaderInjectionMeta
+	Spec                  *regexp.Regexp
+	Status                URLStatus
+	MethodActions         map[string]tykcommon.EndpointMethodMeta
+	TransformAction       TransformSpec
+	InjectHeaders         tykcommon.HeaderInjectionMeta
+	InjectHeadersResponse tykcommon.HeaderInjectionMeta
 }
 
 type TransformSpec struct {
@@ -89,7 +92,7 @@ type APISpec struct {
 	EventPaths        map[tykcommon.TykEvent][]TykEventHandler
 	Health            HealthChecker
 	JSVM              *JSVM
-	ResponseChain	  *[]TykResponseHandler
+	ResponseChain     *[]TykResponseHandler
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -286,6 +289,7 @@ func (a *APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec,
 	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
+
 }
 
 func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {
@@ -400,7 +404,7 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 	return thisURLSpec
 }
 
-func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []tykcommon.HeaderInjectionMeta) []URLSpec {
+func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []tykcommon.HeaderInjectionMeta, stat URLStatus) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -408,9 +412,14 @@ func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []tykcommon.Header
 
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, HeaderInjected)
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
-		newSpec.InjectHeaders = stringSpec
+		if stat == HeaderInjected {
+			newSpec.InjectHeaders = stringSpec
+		} else {
+			newSpec.InjectHeadersResponse = stringSpec
+		}
+
 		thisURLSpec = append(thisURLSpec, newSpec)
 	}
 
@@ -425,7 +434,8 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
 	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform)
-	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader)
+	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
+	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -434,6 +444,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, cachedPaths...)
 	combinedPath = append(combinedPath, transformPaths...)
 	combinedPath = append(combinedPath, headerTransformPaths...)
+	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -463,6 +474,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusTransform
 	case HeaderInjected:
 		return StatusHeaderInjected
+	case HeaderInjectedResponse:
+		return StatusHeaderInjectedResponse
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -555,7 +568,12 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 					if method != nil && method.(string) == v.InjectHeaders.Method {
 						return true, v.InjectHeaders
 					}
+				case HeaderInjectedResponse:
+					if method != nil && method.(string) == v.InjectHeadersResponse.Method {
+						return true, v.InjectHeadersResponse
+					}
 				}
+
 			}
 		}
 	}

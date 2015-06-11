@@ -1,8 +1,8 @@
 package main
 
 import (
-	"net/http"
 	"errors"
+	"net/http"
 )
 
 var RESPONSE_PROCESSORS map[string]TykResponseHandler = map[string]TykResponseHandler{
@@ -10,11 +10,11 @@ var RESPONSE_PROCESSORS map[string]TykResponseHandler = map[string]TykResponseHa
 }
 
 type TykResponseHandler interface {
-	HandleResponse(http.ResponseWriter, *http.Response, *SessionState) error
+	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *SessionState) error
 	New(interface{}, *APISpec) (TykResponseHandler, error)
 }
 
-func GetResponseProcessorByName(name string) (TykResponseHandler, error)   {
+func GetResponseProcessorByName(name string) (TykResponseHandler, error) {
 	processor, ok := RESPONSE_PROCESSORS[name]
 	if !ok {
 		return nil, errors.New("Not found")
@@ -26,9 +26,9 @@ func GetResponseProcessorByName(name string) (TykResponseHandler, error)   {
 
 type ResponseChain struct{}
 
-func (r ResponseChain) Go(chain *[]TykResponseHandler, rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+func (r ResponseChain) Go(chain *[]TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	for _, rh := range *chain {
-		mwErr := rh.HandleResponse(rw, res, ses)
+		mwErr := rh.HandleResponse(rw, res, req, ses)
 		if mwErr != nil {
 			return mwErr
 		}
@@ -36,4 +36,3 @@ func (r ResponseChain) Go(chain *[]TykResponseHandler, rw http.ResponseWriter, r
 
 	return nil
 }
-

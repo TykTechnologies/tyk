@@ -209,16 +209,16 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 
 	// Middleware chain handling here - very simple, but should do the trick
 	responseHandler := ResponseChain{}
-	chainErr := responseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, &ses)
+	chainErr := responseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
 	if chainErr != nil {
 		log.Error("Request chain failed! ", chainErr)
 		// Return whatever we have
 	}
-	p.HandleResponse(rw, res, &ses)
+	p.HandleResponse(rw, res, req, &ses)
 	return inres
 }
 
-func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 
 	for _, h := range hopHeaders {
 		res.Header.Del(h)

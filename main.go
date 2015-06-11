@@ -257,14 +257,16 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 
 func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 	// Create the response processors
+
 	responseChain := make([]TykResponseHandler, len(referenceSpec.APIDefinition.ResponseProcessors))
-	for i, processorDetail := range(referenceSpec.APIDefinition.ResponseProcessors) {
+	for i, processorDetail := range referenceSpec.APIDefinition.ResponseProcessors {
 		processorType, err := GetResponseProcessorByName(processorDetail.Name)
 		if err != nil {
 			log.Error("Failed to load processor! ", err)
 			return
 		}
 		thisProcessor, _ := processorType.New(processorDetail.Options, referenceSpec)
+		log.Info("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = thisProcessor
 	}
 	referenceSpec.ResponseChain = &responseChain
