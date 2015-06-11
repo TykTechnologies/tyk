@@ -6,7 +6,8 @@ import (
 )
 
 var RESPONSE_PROCESSORS map[string]TykResponseHandler = map[string]TykResponseHandler{
-	"header_injector": HeaderInjector{},
+	"header_injector":         HeaderInjector{},
+	"response_body_transform": ResponseTransformMiddleware{},
 }
 
 type TykResponseHandler interface {

@@ -214,6 +214,7 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 		log.Error("Request chain failed! ", chainErr)
 		// Return whatever we have
 	}
+
 	p.HandleResponse(rw, res, req, &ses)
 	return inres
 }

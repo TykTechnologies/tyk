@@ -37,6 +37,7 @@ const (
 	Transformed            URLStatus = 5
 	HeaderInjected         URLStatus = 6
 	HeaderInjectedResponse URLStatus = 7
+	TransformedResponse    URLStatus = 8
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -55,6 +56,7 @@ const (
 	StatusOk                       RequestStatus = "Everything OK, passing"
 	StatusCached                   RequestStatus = "Cached path"
 	StatusTransform                RequestStatus = "Transformed path"
+	StatusTransformResponse        RequestStatus = "Transformed response"
 	StatusHeaderInjected           RequestStatus = "Header injected"
 	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
@@ -65,12 +67,13 @@ const (
 // path is on any of the white, plack or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec                  *regexp.Regexp
-	Status                URLStatus
-	MethodActions         map[string]tykcommon.EndpointMethodMeta
-	TransformAction       TransformSpec
-	InjectHeaders         tykcommon.HeaderInjectionMeta
-	InjectHeadersResponse tykcommon.HeaderInjectionMeta
+	Spec                    *regexp.Regexp
+	Status                  URLStatus
+	MethodActions           map[string]tykcommon.EndpointMethodMeta
+	TransformAction         TransformSpec
+	TransformResponseAction TransformSpec
+	InjectHeaders           tykcommon.HeaderInjectionMeta
+	InjectHeadersResponse   tykcommon.HeaderInjectionMeta
 }
 
 type TransformSpec struct {
@@ -360,7 +363,7 @@ func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Templ
 	return thisT, tErr
 }
 
-func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.TemplateMeta) []URLSpec {
+func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.TemplateMeta, stat URLStatus) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -370,7 +373,7 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 	for _, stringSpec := range paths {
 		log.Info("-- Generating path")
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, Transformed)
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with template actions
 
 		newTransformSpec := TransformSpec{TemplateMeta: stringSpec}
@@ -390,7 +393,11 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 			templErr = errors.New("No valid template mode defined, must be either 'file' or 'blob'.")
 		}
 
-		newSpec.TransformAction = newTransformSpec
+		if stat == Transformed {
+			newSpec.TransformAction = newTransformSpec
+		} else {
+			newSpec.TransformResponseAction = newTransformSpec
+		}
 
 		if templErr == nil {
 			thisURLSpec = append(thisURLSpec, newSpec)
@@ -433,7 +440,8 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	blackListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.BlackList, BlackList)
 	whiteListPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.WhiteList, WhiteList)
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
-	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform)
+	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed)
+	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse)
 	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
 	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
 
@@ -443,6 +451,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, whiteListPaths...)
 	combinedPath = append(combinedPath, cachedPaths...)
 	combinedPath = append(combinedPath, transformPaths...)
+	combinedPath = append(combinedPath, transformResponsePaths...)
 	combinedPath = append(combinedPath, headerTransformPaths...)
 	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
 
@@ -476,6 +485,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusHeaderInjected
 	case HeaderInjectedResponse:
 		return StatusHeaderInjectedResponse
+	case TransformedResponse:
+		return StatusTransformResponse
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -571,6 +582,10 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 				case HeaderInjectedResponse:
 					if method != nil && method.(string) == v.InjectHeadersResponse.Method {
 						return true, v.InjectHeadersResponse
+					}
+				case TransformedResponse:
+					if method != nil && method.(string) == v.TransformResponseAction.TemplateMeta.Method {
+						return true, v.TransformResponseAction
 					}
 				}
 
