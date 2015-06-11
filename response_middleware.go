@@ -27,6 +27,11 @@ func GetResponseProcessorByName(name string) (TykResponseHandler, error) {
 type ResponseChain struct{}
 
 func (r ResponseChain) Go(chain *[]TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+
+	if chain == nil {
+		return nil
+	}
+
 	for _, rh := range *chain {
 		mwErr := rh.HandleResponse(rw, res, req, ses)
 		if mwErr != nil {
