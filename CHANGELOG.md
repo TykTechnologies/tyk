@@ -1,5 +1,20 @@
 # DEV
+- Added response body transforms (JSON only), uses the same syntax as regular transforms, must be placed into `transform_response" list and the trasnformer must be registered under `response_transforms`.
+	{
+      name: "response_body_transform",
+      options: {}
+    }
+
 - Added Response middleware chain and interface to handle response middleware. Response middleware must be declared under `response_processors` otherwise it is not loaded. Speciying options under the extended paths section will not be enough to enable response processors
+
+	{
+      name: "header_injector",
+      options: {
+      	"add_headers": {"name": "value"},
+      	"remove_headers": ["name"]
+  	  }
+    }
+
 - Added repsonse header injection (uses the same code as the regular injector), add your path definitions to the `extended_paths.transform_response_headers` filed, uses the same syntx as header injection
 - Added SupressDefaultOrgStore - uses a default redis connection to handle unfound Org lookups
 - Added support for Sentry DSN
