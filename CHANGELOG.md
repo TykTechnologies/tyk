@@ -1,4 +1,6 @@
 # DEV
+- Added Response middleware chain and interface to handle response middleware. Response middleware must be declared under `response_processors` otherwise it is not loaded. Speciying options under the extended paths section will not be enough to enable response processors
+- Added repsonse header injection (uses the same code as the regular injector), add your path definitions to the `extended_paths.transform_response_headers` filed, uses the same syntx as header injection
 - Added SupressDefaultOrgStore - uses a default redis connection to handle unfound Org lookups
 - Added support for Sentry DSN
 - Modification: Analyitcs purger (redis) now uses redis lists, much cleaner, and purge is a transaction which means multiple gateways can purge at the same time safely without risk of duplication
