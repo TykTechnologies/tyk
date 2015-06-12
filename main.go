@@ -32,6 +32,7 @@ var doMemoryProfile bool
 var Policies = make(map[string]Policy)
 var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
+var MonitoringHandler TykEventHandler
 
 //var genericOsinStorage *RedisOsinStorageInterface
 var ApiSpecRegister = make(map[string]*APISpec)
@@ -95,6 +96,14 @@ func setupGlobals() {
 	MainNotifierStore := RedisStorageManager{}
 	MainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
+
+	if config.Monitor.EnableTriggerMonitors {
+		var monitorErr error
+		MonitoringHandler, monitorErr = WebHookHandler{}.New(config.Monitor.Config)
+		if monitorErr != nil {
+			log.Error("Failed to initialise monitor! ", monitorErr)
+		}
+	}
 }
 
 // Pull API Specs from configuration

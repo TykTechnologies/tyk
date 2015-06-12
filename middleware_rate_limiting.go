@@ -40,9 +40,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		go context.Set(r, SessionData, thisSessionState)
 	}
 
-	// Write it back to the context so we can pass it back in the header
-	context.Set(r, SessionData, thisSessionState)
-
 	log.Debug("SessionState: ", thisSessionState)
 
 	if !forwardMessage {
@@ -91,6 +88,12 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		}
 		// Other reason? Still not allowed
 		return errors.New("Access denied"), 403
+	}
+
+	// Run the trigger monitor
+	if config.Monitor.MonitorUserKeys {
+		mon := Monitor{}
+		mon.Check(&thisSessionState, authHeaderValue)
 	}
 
 	// Request is valid, carry on

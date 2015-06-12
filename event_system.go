@@ -25,6 +25,7 @@ const (
 	EVENT_KeyExpired        tykcommon.TykEvent = "KeyExpired"
 	EVENT_VersionFailure    tykcommon.TykEvent = "VersionFailure"
 	EVENT_OrgQuotaExceeded  tykcommon.TykEvent = "OrgQuotaExceeded"
+	EVENT_TriggerExceeded   tykcommon.TykEvent = "TriggerExceeded"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -73,6 +74,14 @@ type EVENT_VersionFailureMeta struct {
 	Origin string
 	Key    string
 	Reason string
+}
+
+// EVENT_VersionFailureMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
+type EVENT_TriggerExceededMeta struct {
+	EventMetaDefault
+	Org          string
+	Key          string
+	TriggerLimit int64
 }
 
 // EventMessage is a standard form to send event data to handlers

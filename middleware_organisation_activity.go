@@ -33,7 +33,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, 200
 	}
 
-	// IOs it active?
+	// Is it active?
 	if thisSessionState.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -71,6 +71,11 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	if config.Monitor.MonitorOrgKeys {
+		// Run the trigger monitor
+		mon := Monitor{}
+		mon.Check(&thisSessionState, "")
+	}
 	// Request is valid, carry on
 	return nil, 200
 }

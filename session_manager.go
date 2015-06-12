@@ -35,12 +35,15 @@ type SessionState struct {
 	BasicAuthData    struct {
 		Password string `json:"password"`
 	} `json:"basic_auth_data"`
-	HMACEnabled   bool        `json:"hmac_enabled"`
-	HmacSecret    string      `json:"hmac_string"`
-	IsInactive    bool        `json:"is_inactive"`
-	ApplyPolicyID string      `json:"apply_policy_id"`
-	DataExpires   int64       `json:"data_expires"`
-	MetaData      interface{} `json:"meta_data"`
+	HMACEnabled   bool   `json:"hmac_enabled"`
+	HmacSecret    string `json:"hmac_string"`
+	IsInactive    bool   `json:"is_inactive"`
+	ApplyPolicyID string `json:"apply_policy_id"`
+	DataExpires   int64  `json:"data_expires"`
+	Monitor       struct {
+		TriggerLimits []float64 `json:"trigger_limits"`
+	} `json:"monitor"`
+	MetaData interface{} `json:"meta_data"`
 }
 
 type PublicSessionState struct {

@@ -53,6 +53,13 @@ type Config struct {
 	SentryCode                string `json:"sentry_code"`
 	UseSentry                 bool   `json:"use_sentry"`
 	EnforceOrgDataAge         bool   `json:"enforce_org_data_age"`
+	Monitor                   struct {
+		EnableTriggerMonitors bool               `json:"enable_trigger_monitors"`
+		Config                WebHookHandlerConf `json:"configuration"`
+		GlobalTriggerLimit    float64            `json:"global_trigger_limit"`
+		MonitorUserKeys       bool               `json:"monitor_user_keys"`
+		MonitorOrgKeys        bool               `json:"monitor_org_keys"`
+	}
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
