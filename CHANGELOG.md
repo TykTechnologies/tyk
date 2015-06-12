@@ -1,4 +1,36 @@
 # DEV
+- Created quota monitoring for orgs and user keys, uses a webhook. To configure update tyk.conf to include the gloabl check rate and target data:
+
+	"monitor": {
+        "enable_trigger_monitors": false,
+        "configuration": {
+        "method": "POST",
+            "target_path": "http://posttestserver.com/post.php?dir=tyk-monitor-test",
+            "template_path": "templates/monitor_template.json",
+            "header_map": {"x-tyk-monitor-secret": "12345"},
+            "event_timeout": 10
+        },
+        "global_trigger_limit": 80.0,
+        "monitor_user_keys": false,
+        "monitor_org_keys": true
+    }
+
+- It is also possible to add custom rate monitors on a per-key basis, SessionObject has been updated to include a "monitor" section which lets you define custom limits to trigger a quota event, add this to your key objects:
+
+	"monitor": {
+        "trigger_limits": [80.0, 60.0, 50.0]
+    }
+
+- If a cusotm limit is the same as a global oe the event will only fire once. The output will look like this:
+
+	{
+	    "event": "TriggerExceeded",
+	    "message": "Quota trigger reached",
+	    "org": "53ac07777cbb8c2d53000002",
+	    "key": "53ac07777cbb8c2d53000002c74f43ddd714489c73ea5c3fc83a6b1e",
+	    "trigger_limit": "80",
+	}
+
 - Added response body transforms (JSON only), uses the same syntax as regular transforms, must be placed into `transform_response" list and the trasnformer must be registered under `response_transforms`.
 	{
       name: "response_body_transform",
