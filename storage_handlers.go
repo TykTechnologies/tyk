@@ -227,7 +227,7 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 		r.Connect()
 		return r.GetKey(keyName)
 	}
-
+	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 	value, err := redis.String(db.Do("GET", r.fixKey(keyName)))
 	if err != nil {
@@ -262,7 +262,7 @@ func (r *RedisStorageManager) GetExp(keyName string) (int64, error) {
 func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
 	db := r.pool.Get()
 	defer db.Close()
-	log.Debug("[STORE] Raw key is: ", keyName)
+	log.Debug("[STORE] SET Raw key is: ", keyName)
 	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
 	if db == nil {
@@ -435,6 +435,8 @@ func (r *RedisStorageManager) DeleteKey(keyName string) bool {
 		return r.DeleteKey(keyName)
 	}
 
+	log.Debug("DEL Key was: ", keyName)
+	log.Debug("DEL Key became: ", r.fixKey(keyName))
 	_, err := db.Do("DEL", r.fixKey(keyName))
 	if err != nil {
 		log.Error("Error trying to delete key:")

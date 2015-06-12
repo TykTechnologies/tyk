@@ -32,6 +32,7 @@ var doMemoryProfile bool
 var Policies = make(map[string]Policy)
 var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
+var DefaultQuotaStore = DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 
 //var genericOsinStorage *RedisOsinStorageInterface
@@ -575,6 +576,7 @@ func main() {
 	if !config.SupressDefaultOrgStore {
 		log.Info("Initialising default org store")
 		DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
+		DefaultQuotaStore.Init(&RedisStorageManager{KeyPrefix: ""})
 	}
 
 	loadAPIEndpoints(http.DefaultServeMux)

@@ -3,5 +3,5 @@
     "message": "{{.EventMetaData.Message}}",
     "org": "{{.EventMetaData.Org}}",
     "key": "{{.EventMetaData.Key}}",
-    "trigger_limit": "{{.EventMetaData.TriggerLimit}}",
+    "trigger_limit": "{{.EventMetaData.TriggerLimit}}"
 }
