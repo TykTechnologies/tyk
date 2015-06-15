@@ -25,6 +25,9 @@ func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
 	case ApiaryBluePrint:
 		thisBluePrint := &BluePrintAST{}
 		return thisBluePrint, nil
+	case SwaggerSource:
+		thisSwaggerSource := &SwaggerAST{}
+		return thisSwaggerSource, nil
 	default:
 		return nil, errors.New("Source not matched, failing.")
 	}

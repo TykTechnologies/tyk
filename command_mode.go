@@ -11,6 +11,7 @@ import (
 
 var CommandModeOptions = map[string]bool{
 	"--import-blueprint": true,
+	"--import-swagger":   true,
 	"--create-api":       true,
 	"--org-id":           true,
 	"--upstream-target":  true,
@@ -24,6 +25,10 @@ func HandleCommandModeArgs(arguments map[string]interface{}) {
 
 	if arguments["--import-blueprint"] != nil {
 		handleBluePrintMode(arguments)
+	}
+
+	if arguments["--import-swagger"] != nil {
+		handleSwaggerMode(arguments)
 	}
 
 }

@@ -476,6 +476,7 @@ func init() {
 		--memprofile                 Generate a memory profile
 		--debug                      Enable Debug output
 		--import-blueprint=<file>    Import an API Blueprint file
+		--import-swagger=<file>      Import a Swagger file
 		--create-api                 Creates a new API Definition from the blueprint
 		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
 		--upstream-target=<url>      Set the upstream target for the definition
@@ -484,7 +485,7 @@ func init() {
 		--as-version=<version>       The version number to use when inserting
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, "v1.6", false, false)
+	arguments, err := docopt.Parse(usage, nil, true, "v1.7", false, false)
 	if err != nil {
 		log.Warning("Error while parsing arguments: ", err)
 	}
