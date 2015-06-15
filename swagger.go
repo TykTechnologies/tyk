@@ -82,7 +82,6 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, 
 	}
 
 	thisVersionInfo.UseExtendedPaths = true
-	log.Warning("Swagger versions not suported, imported version will be 'Default'")
 	thisVersionInfo.Name = s.Info.Version
 	thisVersionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
 

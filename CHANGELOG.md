@@ -1,4 +1,5 @@
 # DEV
+- Basic swagger file supoprt in command line, use `--import-swagger=petstore.json` to import a swagger definition, will create a Whitelisted API.
 - Created quota monitoring for orgs and user keys, uses a webhook. To configure update tyk.conf to include the gloabl check rate and target data:
 
 	"monitor": {
