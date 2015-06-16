@@ -40,7 +40,7 @@ func (m Monitor) Check(sessionData *SessionState, key string) {
 	remainder := sessionData.QuotaMax - sessionData.QuotaRemaining
 	usagePerc = (float64(remainder) / float64(sessionData.QuotaMax)) * 100.0
 
-	log.Warning("Perc is: ", usagePerc)
+	log.Debug("Perc is: ", usagePerc)
 
 	if config.Monitor.GlobalTriggerLimit > 0.0 {
 		if usagePerc >= config.Monitor.GlobalTriggerLimit {
