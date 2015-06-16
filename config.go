@@ -60,6 +60,7 @@ type Config struct {
 		MonitorUserKeys       bool               `json:"monitor_user_keys"`
 		MonitorOrgKeys        bool               `json:"monitor_org_keys"`
 	}
+	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

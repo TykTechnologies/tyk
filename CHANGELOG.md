@@ -1,4 +1,6 @@
 # DEV
+- Added `oauth_refresh_token_expire` setting in configuration, allows for customisation of refresh token expiry
+- Changed refresh token expiry to be 14 days by default
 - Basic swagger file supoprt in command line, use `--import-swagger=petstore.json` to import a swagger definition, will create a Whitelisted API.
 - Created quota monitoring for orgs and user keys, uses a webhook. To configure update tyk.conf to include the gloabl check rate and target data:
 

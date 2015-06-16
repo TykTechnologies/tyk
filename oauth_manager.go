@@ -546,7 +546,11 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 		} else {
 			key := REFRESH_PREFIX + accessData.RefreshToken
 			log.Debug("Saving REFRESH key: ", key)
-			r.store.SetKey(key, string(accessDataJSON), int64(accessData.ExpiresIn))
+			refreshExpire := int64(1209600) // 14 days
+			if config.OauthRefreshExpire != 0 {
+				refreshExpire = config.OauthRefreshExpire
+			}
+			r.store.SetKey(key, string(accessDataJSON), refreshExpire)
 			return nil
 		}
 
