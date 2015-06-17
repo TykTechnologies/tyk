@@ -22,6 +22,7 @@ const (
 	DefaultSessionProvider tykcommon.SessionProviderCode = "default"
 	DefaultStorageEngine   tykcommon.StorageEngineCode   = "redis"
 	LDAPStorageEngine      tykcommon.StorageEngineCode   = "ldap"
+	CloudStorageEngine     tykcommon.StorageEngineCode   = "cloud"
 )
 
 // URLStatus is a custom enum type to avoid collisions

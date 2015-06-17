@@ -94,6 +94,7 @@ func setupGlobals() {
 	GlobalEventsJSVM.Init(config.TykJSPath)
 
 	// Get the notifier ready
+	log.Warning("Notifier will not work in hybrid mode")
 	MainNotifierStore := RedisStorageManager{}
 	MainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
@@ -163,9 +164,10 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
-	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
+	//storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
+	storageManager := GetStorageHandler(CloudHandler, OAuthPrefix, false)
 	storageManager.Connect()
-	osinStorage := RedisOsinStorageInterface{&storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
+	osinStorage := RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
 	if test {
 		log.Warning("Adding test client")
@@ -315,6 +317,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			thisStorageEngine := LDAPStorageHandler{}
 			thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
 			authStore = &thisStorageEngine
+		case CloudStorageEngine:
+			thisStorageEngine := &CloudStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
+			authStore = thisStorageEngine
 		default:
 			authStore = &redisStore
 		}
@@ -323,6 +328,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		case DefaultStorageEngine:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
+		case CloudStorageEngine:
+			sessionStore = &CloudStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
+			orgStore = &CloudStorageHandler{KeyPrefix: "orgkey."}
 		default:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
@@ -562,6 +570,18 @@ func init() {
 
 }
 
+func GetStorageHandler(Name StorageHandlerName, KeyPrefix string, hashKeys bool) StorageHandler {
+	switch Name {
+	case RedisHandler:
+		return &RedisStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+	case CloudHandler:
+		return &CloudStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+	}
+
+	log.Error("No storage handler found!")
+	return nil
+}
+
 func main() {
 	displayConfig()
 
@@ -576,8 +596,10 @@ func main() {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
 		log.Info("Initialising default org store")
-		DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
-		DefaultQuotaStore.Init(&RedisStorageManager{KeyPrefix: ""})
+		//DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
+		DefaultOrgStore.Init(GetStorageHandler(CloudHandler, "orgkey.", false))
+		//DefaultQuotaStore.Init(GetStorageHandler(CloudHandler, "orgkey.", false))
+		DefaultQuotaStore.Init(GetStorageHandler(CloudHandler, "orgkey.", false))
 	}
 
 	loadAPIEndpoints(http.DefaultServeMux)
