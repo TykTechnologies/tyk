@@ -228,6 +228,43 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 	return APISpecs
 }
 
+// LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
+func (a *APIDefinitionLoader) LoadDefinitionsFromCloud(orgId string) []APISpec {
+	var APISpecs = []APISpec{}
+
+	store := CloudStorageHandler{}
+	store.Connect()
+
+	apiCollection := store.GetApiDefinitions(orgId)
+
+	store.Disconnect()
+
+	var APIDefinitions = []tykcommon.APIDefinition{}
+	var StringDefs = make([]map[string]interface{}, 0)
+
+	jErr1 := json.Unmarshal([]byte(apiCollection), &APIDefinitions)
+
+	if jErr1 != nil {
+		log.Error("Failed decode: ", jErr1)
+		return APISpecs
+	}
+
+	jErr2 := json.Unmarshal([]byte(apiCollection), &StringDefs)
+	if jErr2 != nil {
+		log.Error("Failed decode: ", jErr2)
+		return APISpecs
+	}
+
+	for i, thisAppConfig := range APIDefinitions {
+		thisAppConfig.DecodeFromDB()
+		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
+
+		newAppSpec := a.MakeSpec(thisAppConfig)
+		APISpecs = append(APISpecs, newAppSpec)
+	}
+	return APISpecs
+}
+
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
 	thisAppConfig := tykcommon.APIDefinition{}
 	err := json.Unmarshal(apiDef, &thisAppConfig)

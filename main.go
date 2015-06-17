@@ -116,6 +116,9 @@ func getAPISpecs() []APISpec {
 	if config.UseDBAppConfigs {
 		log.Info("Using App Configuration from Mongo DB")
 		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
+	} else if config.HybridOptions.UseHybrid {
+		log.Info("Using Cloud Configuration")
+		APISpecs = thisAPILoader.LoadDefinitionsFromCloud(config.HybridOptions.RegisteredOrg)
 	} else {
 		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
 	}
@@ -571,6 +574,14 @@ func init() {
 }
 
 func GetStorageHandler(Name StorageHandlerName, KeyPrefix string, hashKeys bool) StorageHandler {
+
+	// Override that crap and use the configuration system
+	if config.HybridOptions.UseHybrid {
+		Name = CloudHandler
+	} else {
+		Name = RedisHandler
+	}
+
 	switch Name {
 	case RedisHandler:
 		return &RedisStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}

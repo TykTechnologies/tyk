@@ -40,6 +40,12 @@ func (r *CloudStorageHandler) Connect() bool {
 	return true
 }
 
+func (r *CloudStorageHandler) Disconnect() bool {
+	r.RPCClient.Stop()
+
+	return true
+}
+
 func (r *CloudStorageHandler) hashKey(in string) string {
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
@@ -279,6 +285,14 @@ func (r *CloudStorageHandler) SetRollingWindow(keyName string, per int64, expire
 
 }
 
+// IncrementWithExpire will increment a key in redis
+func (r *CloudStorageHandler) GetApiDefinitions(orgId string) string {
+	defString, _ := r.Client.Call("GetApiDefinitions", orgId)
+
+	return defString.(string)
+
+}
+
 func GetDispatcher() *gorpc.Dispatcher {
 	var Dispatch *gorpc.Dispatcher = gorpc.NewDispatcher()
 
@@ -332,6 +346,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 
 	Dispatch.AddFunc("SetRollingWindow", func(ibd *InboundData) int {
 		return 0
+	})
+
+	Dispatch.AddFunc("GetApiDefinitions", func(orgId string) string {
+		return ""
 	})
 
 	return Dispatch
