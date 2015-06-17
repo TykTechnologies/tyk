@@ -2,6 +2,7 @@
 .vagrant/
 testapps/
 tyk.conf
+tyk.compose.rpc.conf
 /tyk
 logs/
 test.*.conf
