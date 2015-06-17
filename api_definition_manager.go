@@ -22,7 +22,7 @@ const (
 	DefaultSessionProvider tykcommon.SessionProviderCode = "default"
 	DefaultStorageEngine   tykcommon.StorageEngineCode   = "redis"
 	LDAPStorageEngine      tykcommon.StorageEngineCode   = "ldap"
-	CloudStorageEngine     tykcommon.StorageEngineCode   = "cloud"
+	RPCStorageEngine       tykcommon.StorageEngineCode   = "rpc"
 )
 
 // URLStatus is a custom enum type to avoid collisions
@@ -229,10 +229,10 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 }
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromCloud(orgId string) []APISpec {
+func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
 	var APISpecs = []APISpec{}
 
-	store := CloudStorageHandler{}
+	store := RPCStorageHandler{}
 	store.Connect()
 
 	apiCollection := store.GetApiDefinitions(orgId)

@@ -22,8 +22,8 @@ type KeysValuesPair struct {
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
-// CloudStorageHandler is a storage manager that uses the redis database.
-type CloudStorageHandler struct {
+// RPCStorageHandler is a storage manager that uses the redis database.
+type RPCStorageHandler struct {
 	RPCClient *gorpc.Client
 	Client    *gorpc.DispatcherClient
 	KeyPrefix string
@@ -31,7 +31,7 @@ type CloudStorageHandler struct {
 }
 
 // Connect will establish a connection to the DB
-func (r *CloudStorageHandler) Connect() bool {
+func (r *RPCStorageHandler) Connect() bool {
 	r.RPCClient = gorpc.NewTCPClient(":9090")
 	r.RPCClient.Start()
 	d := GetDispatcher()
@@ -40,13 +40,13 @@ func (r *CloudStorageHandler) Connect() bool {
 	return true
 }
 
-func (r *CloudStorageHandler) Disconnect() bool {
+func (r *RPCStorageHandler) Disconnect() bool {
 	r.RPCClient.Stop()
 
 	return true
 }
 
-func (r *CloudStorageHandler) hashKey(in string) string {
+func (r *RPCStorageHandler) hashKey(in string) string {
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
 		return in
@@ -54,7 +54,7 @@ func (r *CloudStorageHandler) hashKey(in string) string {
 	return doHash(in)
 }
 
-func (r *CloudStorageHandler) fixKey(keyName string) string {
+func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
 	log.Debug("Input key was: ", setKeyName)
@@ -62,13 +62,13 @@ func (r *CloudStorageHandler) fixKey(keyName string) string {
 	return setKeyName
 }
 
-func (r *CloudStorageHandler) cleanKey(keyName string) string {
+func (r *RPCStorageHandler) cleanKey(keyName string) string {
 	setKeyName := strings.Replace(keyName, r.KeyPrefix, "", 1)
 	return setKeyName
 }
 
 // GetKey will retreive a key from the database
-func (r *CloudStorageHandler) GetKey(keyName string) (string, error) {
+func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
@@ -82,7 +82,7 @@ func (r *CloudStorageHandler) GetKey(keyName string) (string, error) {
 	return value.(string), nil
 }
 
-func (r *CloudStorageHandler) GetExp(keyName string) (int64, error) {
+func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	value, err := r.Client.Call("GetExp", r.fixKey(keyName))
 
 	if err != nil {
@@ -95,7 +95,7 @@ func (r *CloudStorageHandler) GetExp(keyName string) (int64, error) {
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *CloudStorageHandler) SetKey(keyName string, sessionState string, timeout int64) {
+func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout int64) {
 	ibd := InboundData{
 		KeyName:      r.fixKey(keyName),
 		SessionState: sessionState,
@@ -107,12 +107,12 @@ func (r *CloudStorageHandler) SetKey(keyName string, sessionState string, timeou
 }
 
 // Decrement will decrement a key in redis
-func (r *CloudStorageHandler) Decrement(keyName string) {
+func (r *RPCStorageHandler) Decrement(keyName string) {
 	r.Client.Call("Decrement", keyName)
 }
 
 // IncrementWithExpire will increment a key in redis
-func (r *CloudStorageHandler) IncrememntWithExpire(keyName string, expire int64) int64 {
+func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) int64 {
 
 	ibd := InboundData{
 		KeyName: keyName,
@@ -126,7 +126,7 @@ func (r *CloudStorageHandler) IncrememntWithExpire(keyName string, expire int64)
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
-func (r *CloudStorageHandler) GetKeys(filter string) []string {
+func (r *RPCStorageHandler) GetKeys(filter string) []string {
 
 	log.Error("GetKeys Not Implemented")
 
@@ -134,7 +134,7 @@ func (r *CloudStorageHandler) GetKeys(filter string) []string {
 }
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
-func (r *CloudStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
+func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string]string {
 
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
@@ -151,7 +151,7 @@ func (r *CloudStorageHandler) GetKeysAndValuesWithFilter(filter string) map[stri
 }
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly
-func (r *CloudStorageHandler) GetKeysAndValues() map[string]string {
+func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 
 	searchStr := r.KeyPrefix + "*"
 	kvPair, _ := r.Client.Call("GetKeysAndValuesWithFilter", searchStr)
@@ -166,7 +166,7 @@ func (r *CloudStorageHandler) GetKeysAndValues() map[string]string {
 }
 
 // DeleteKey will remove a key from the database
-func (r *CloudStorageHandler) DeleteKey(keyName string) bool {
+func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
@@ -176,14 +176,14 @@ func (r *CloudStorageHandler) DeleteKey(keyName string) bool {
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
-func (r *CloudStorageHandler) DeleteRawKey(keyName string) bool {
+func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 	ok, _ := r.Client.Call("DeleteRawKey", keyName)
 
 	return ok.(bool)
 }
 
 // DeleteKeys will remove a group of keys in bulk
-func (r *CloudStorageHandler) DeleteKeys(keys []string) bool {
+func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 	if len(keys) > 0 {
 		asInterface := make([]string, len(keys))
 		for i, v := range keys {
@@ -195,7 +195,7 @@ func (r *CloudStorageHandler) DeleteKeys(keys []string) bool {
 
 		return ok.(bool)
 	} else {
-		log.Debug("CloudStorageHandler called DEL - Nothing to delete")
+		log.Debug("RPCStorageHandler called DEL - Nothing to delete")
 		return true
 	}
 
@@ -203,13 +203,13 @@ func (r *CloudStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk without a prefix handler
-func (r *CloudStorageHandler) DeleteRawKeys(keys []string, prefix string) bool {
+func (r *RPCStorageHandler) DeleteRawKeys(keys []string, prefix string) bool {
 	log.Error("DeleteRawKeys Not Implemented")
 	return false
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *CloudStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
 	// psc := redis.PubSubConn{r.pool.Get()}
 	// psc.Subscribe(channel)
 	// for {
@@ -233,7 +233,7 @@ func (r *CloudStorageHandler) StartPubSubHandler(channel string, callback func(r
 	return nil
 }
 
-func (r *CloudStorageHandler) Publish(channel string, message string) error {
+func (r *RPCStorageHandler) Publish(channel string, message string) error {
 	// db := r.pool.Get()
 	// defer db.Close()
 	// if r.pool == nil {
@@ -254,13 +254,13 @@ func (r *CloudStorageHandler) Publish(channel string, message string) error {
 	return nil
 }
 
-func (r *CloudStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
+func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
 	log.Error("GetAndDeleteSet Not implemented, please disable your purger")
 
 	return []interface{}{}
 }
 
-func (r *CloudStorageHandler) AppendToSet(keyName string, value string) {
+func (r *RPCStorageHandler) AppendToSet(keyName string, value string) {
 
 	ibd := InboundData{
 		KeyName: keyName,
@@ -271,8 +271,8 @@ func (r *CloudStorageHandler) AppendToSet(keyName string, value string) {
 
 }
 
-// IncrementWithExpire will increment a key in redis
-func (r *CloudStorageHandler) SetRollingWindow(keyName string, per int64, expire int64) int {
+// SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
+func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, expire int64) int {
 	ibd := InboundData{
 		KeyName: keyName,
 		Per:     per,
@@ -285,9 +285,17 @@ func (r *CloudStorageHandler) SetRollingWindow(keyName string, per int64, expire
 
 }
 
-// IncrementWithExpire will increment a key in redis
-func (r *CloudStorageHandler) GetApiDefinitions(orgId string) string {
+// GetAPIDefinitions will pull API definitions from the RPC server
+func (r *RPCStorageHandler) GetApiDefinitions(orgId string) string {
 	defString, _ := r.Client.Call("GetApiDefinitions", orgId)
+
+	return defString.(string)
+
+}
+
+// GetPolicies will pull Policies from the RPC server
+func (r *RPCStorageHandler) GetPolicies(orgId string) string {
+	defString, _ := r.Client.Call("GetPolicies", orgId)
 
 	return defString.(string)
 
@@ -349,6 +357,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 	})
 
 	Dispatch.AddFunc("GetApiDefinitions", func(orgId string) string {
+		return ""
+	})
+
+	Dispatch.AddFunc("GetPolicies", func(orgId string) string {
 		return ""
 	})
 

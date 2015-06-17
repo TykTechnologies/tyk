@@ -77,31 +77,6 @@ type RedisAnalyticsHandler struct {
 	Clean Purger
 }
 
-// HybridAnalyticsHandler implements AnalyticsHandler and will record analytics
-// data to Tyk Cloud back end as defined in the Config object
-type CloudAnalyticsHandler struct {
-	Store *CloudStorageHandler
-	Clean Purger
-}
-
-// RecordHit will store an AnalyticsRecord in Redis
-func (r CloudAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
-	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-	thisRecord.APIKey = publicHash(thisRecord.APIKey)
-
-	encoded, err := msgpack.Marshal(thisRecord)
-
-	if err != nil {
-		log.Error("Error encoding analytics data:")
-		log.Error(err)
-		return AnalyticsError{}
-	}
-
-	r.Store.AppendToSet(ANALYTICS_KEYNAME, string(encoded))
-
-	return nil
-}
-
 // RecordHit will store an AnalyticsRecord in Redis
 func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)

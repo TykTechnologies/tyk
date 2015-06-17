@@ -61,10 +61,10 @@ type Config struct {
 		MonitorOrgKeys        bool               `json:"monitor_org_keys"`
 	}
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
-	HybridOptions      struct {
-		UseHybrid     bool   `json:"use_hybrid"`
-		RegisteredOrg string `json:"organisation_id"`
-	} `json:"hybrid_options"`
+	SlaveOptions       struct {
+		UseRPC bool   `json:"use_rpc"`
+		RPCKey string `json:"rpc_key"`
+	} `json:"slave_options"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

@@ -116,9 +116,9 @@ func getAPISpecs() []APISpec {
 	if config.UseDBAppConfigs {
 		log.Info("Using App Configuration from Mongo DB")
 		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
-	} else if config.HybridOptions.UseHybrid {
-		log.Info("Using Cloud Configuration")
-		APISpecs = thisAPILoader.LoadDefinitionsFromCloud(config.HybridOptions.RegisteredOrg)
+	} else if config.SlaveOptions.UseRPC {
+		log.Info("Using RPC Configuration")
+		APISpecs = thisAPILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
 	}
@@ -136,6 +136,9 @@ func getPolicies() {
 	if config.Policies.PolicySource == "mongo" {
 		log.Info("Using Policies from Mongo DB")
 		Policies = LoadPoliciesFromMongo(config.Policies.PolicyRecordName)
+	} else if config.Policies.PolicySource == "rpc" {
+		log.Info("Using Policies from RPC")
+		Policies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		Policies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
 	}
@@ -168,7 +171,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
 	//storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
-	storageManager := GetStorageHandler(CloudHandler, OAuthPrefix, false)
+	storageManager := GetGlobalStorageHandler(OAuthPrefix, false)
 	storageManager.Connect()
 	osinStorage := RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
@@ -320,8 +323,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			thisStorageEngine := LDAPStorageHandler{}
 			thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
 			authStore = &thisStorageEngine
-		case CloudStorageEngine:
-			thisStorageEngine := &CloudStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
+		case RPCStorageEngine:
+			thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 			authStore = thisStorageEngine
 		default:
 			authStore = &redisStore
@@ -331,9 +334,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		case DefaultStorageEngine:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
-		case CloudStorageEngine:
-			sessionStore = &CloudStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
-			orgStore = &CloudStorageHandler{KeyPrefix: "orgkey."}
+		case RPCStorageEngine:
+			sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
+			orgStore = &RPCStorageHandler{KeyPrefix: "orgkey."}
 		default:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
@@ -573,20 +576,20 @@ func init() {
 
 }
 
-func GetStorageHandler(Name StorageHandlerName, KeyPrefix string, hashKeys bool) StorageHandler {
-
-	// Override that crap and use the configuration system
-	if config.HybridOptions.UseHybrid {
-		Name = CloudHandler
+func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
+	var Name tykcommon.StorageEngineCode
+	// Select configuration options
+	if config.SlaveOptions.UseRPC {
+		Name = RPCStorageEngine
 	} else {
-		Name = RedisHandler
+		Name = DefaultStorageEngine
 	}
 
 	switch Name {
-	case RedisHandler:
+	case DefaultStorageEngine:
 		return &RedisStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
-	case CloudHandler:
-		return &CloudStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+	case RPCStorageEngine:
+		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 	}
 
 	log.Error("No storage handler found!")
@@ -608,9 +611,9 @@ func main() {
 	if !config.SupressDefaultOrgStore {
 		log.Info("Initialising default org store")
 		//DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
-		DefaultOrgStore.Init(GetStorageHandler(CloudHandler, "orgkey.", false))
-		//DefaultQuotaStore.Init(GetStorageHandler(CloudHandler, "orgkey.", false))
-		DefaultQuotaStore.Init(GetStorageHandler(CloudHandler, "orgkey.", false))
+		DefaultOrgStore.Init(GetGlobalStorageHandler("orgkey.", false))
+		//DefaultQuotaStore.Init(GetGlobalStorageHandler(CloudHandler, "orgkey.", false))
+		DefaultQuotaStore.Init(GetGlobalStorageHandler("orgkey.", false))
 	}
 
 	loadAPIEndpoints(http.DefaultServeMux)
