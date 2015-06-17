@@ -62,8 +62,9 @@ type Config struct {
 	}
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
 	SlaveOptions       struct {
-		UseRPC bool   `json:"use_rpc"`
-		RPCKey string `json:"rpc_key"`
+		UseRPC                            bool   `json:"use_rpc"`
+		RPCKey                            string `json:"rpc_key"`
+		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
 	} `json:"slave_options"`
 }
 

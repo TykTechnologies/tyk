@@ -364,6 +364,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 		return ""
 	})
 
+	Dispatch.AddFunc("PurgeAnalyticsData", func(data string) {
+
+	})
+
 	return Dispatch
 
 }

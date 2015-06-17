@@ -74,6 +74,11 @@ func setupGlobals() {
 		} else if config.AnalyticsConfig.Type == "mongo" {
 			log.Info("Using MongoDB cache purge")
 			analytics.Clean = &MongoPurger{&AnalyticsStore, nil}
+		} else if config.AnalyticsConfig.Type == "rpc" {
+			log.Info("Using RPC cache purge")
+			thisPurger := RPCPurger{Store: &AnalyticsStore}
+			thisPurger.Connect()
+			analytics.Clean = &thisPurger
 		}
 
 		analytics.Store.Connect()
@@ -316,7 +321,12 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		var sessionStore StorageHandler
 		var orgStore StorageHandler
 
-		switch referenceSpec.AuthProvider.StorageEngine {
+		authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
+		if config.SlaveOptions.OverrideDefinitionStorageSettings {
+			authStorageEngineToUse = RPCStorageEngine
+		}
+
+		switch authStorageEngineToUse {
 		case DefaultStorageEngine:
 			authStore = &redisStore
 		case LDAPStorageEngine:
@@ -330,7 +340,12 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			authStore = &redisStore
 		}
 
-		switch referenceSpec.SessionProvider.StorageEngine {
+		SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
+		if config.SlaveOptions.OverrideDefinitionStorageSettings {
+			SessionStorageEngineToUse = RPCStorageEngine
+		}
+
+		switch SessionStorageEngineToUse {
 		case DefaultStorageEngine:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
