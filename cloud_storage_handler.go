@@ -32,9 +32,9 @@ type CloudStorageHandler struct {
 
 // Connect will establish a connection to the DB
 func (r *CloudStorageHandler) Connect() bool {
-
+	r.RPCClient = gorpc.NewTCPClient(":9090")
 	r.RPCClient.Start()
-	d := gorpc.NewDispatcher()
+	d := GetDispatcher()
 	r.Client = d.NewFuncClient(r.RPCClient)
 
 	return true
@@ -137,8 +137,8 @@ func (r *CloudStorageHandler) GetKeysAndValuesWithFilter(filter string) map[stri
 
 	returnValues := make(map[string]string)
 
-	for i, v := range kvPair.(KeysValuesPair).Keys {
-		returnValues[r.cleanKey(v)] = kvPair.(KeysValuesPair).Values[i]
+	for i, v := range kvPair.(*KeysValuesPair).Keys {
+		returnValues[r.cleanKey(v)] = kvPair.(*KeysValuesPair).Values[i]
 	}
 
 	return returnValues
@@ -151,8 +151,8 @@ func (r *CloudStorageHandler) GetKeysAndValues() map[string]string {
 	kvPair, _ := r.Client.Call("GetKeysAndValuesWithFilter", searchStr)
 
 	returnValues := make(map[string]string)
-	for i, v := range kvPair.(KeysValuesPair).Keys {
-		returnValues[r.cleanKey(v)] = kvPair.(KeysValuesPair).Values[i]
+	for i, v := range kvPair.(*KeysValuesPair).Keys {
+		returnValues[r.cleanKey(v)] = kvPair.(*KeysValuesPair).Values[i]
 	}
 
 	return returnValues
@@ -276,5 +276,64 @@ func (r *CloudStorageHandler) SetRollingWindow(keyName string, per int64, expire
 	intVal, _ := r.Client.Call("SetRollingWindow", ibd)
 
 	return intVal.(int)
+
+}
+
+func GetDispatcher() *gorpc.Dispatcher {
+	var Dispatch *gorpc.Dispatcher = gorpc.NewDispatcher()
+
+	Dispatch.AddFunc("GetKey", func(keyName string) (string, error) {
+		return "", nil
+	})
+
+	Dispatch.AddFunc("SetKey", func(ibd *InboundData) {
+
+	})
+
+	Dispatch.AddFunc("GetExp", func(keyName string) (int64, error) {
+		return 0, nil
+	})
+
+	Dispatch.AddFunc("GetKeys", func(keyName string) []string {
+		return []string{}
+	})
+
+	Dispatch.AddFunc("DeleteKey", func(keyName string) bool {
+		return true
+	})
+
+	Dispatch.AddFunc("DeleteRawKey", func(keyName string) bool {
+		return true
+	})
+
+	Dispatch.AddFunc("GetKeysAndValues", func(searchString string) *KeysValuesPair {
+		return nil
+	})
+
+	Dispatch.AddFunc("GetKeysAndValuesWithFilter", func(searchString string) *KeysValuesPair {
+		return nil
+	})
+
+	Dispatch.AddFunc("DeleteKeys", func(keys []string) bool {
+		return true
+	})
+
+	Dispatch.AddFunc("Decrement", func(keyName string) {
+
+	})
+
+	Dispatch.AddFunc("IncrememntWithExpire", func(ibd *InboundData) int64 {
+		return 0
+	})
+
+	Dispatch.AddFunc("AppendToSet", func(ibd *InboundData) {
+
+	})
+
+	Dispatch.AddFunc("SetRollingWindow", func(ibd *InboundData) int {
+		return 0
+	})
+
+	return Dispatch
 
 }
