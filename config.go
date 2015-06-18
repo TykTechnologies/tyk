@@ -64,6 +64,7 @@ type Config struct {
 	SlaveOptions       struct {
 		UseRPC                            bool   `json:"use_rpc"`
 		RPCKey                            string `json:"rpc_key"`
+		APIKey                            string `json:"api_key"`
 		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
 	} `json:"slave_options"`
 }

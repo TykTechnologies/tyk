@@ -76,7 +76,7 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 	dbPolicyList := make([]Policy, 0)
 	policies := make(map[string]Policy)
 
-	store := RPCStorageHandler{}
+	store := &RPCStorageHandler{UserKey: config.SlaveOptions.APIKey}
 	store.Connect()
 
 	rpcPolicies := store.GetPolicies(orgId)

@@ -232,7 +232,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
 	var APISpecs = []APISpec{}
 
-	store := RPCStorageHandler{}
+	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey}
 	store.Connect()
 
 	apiCollection := store.GetApiDefinitions(orgId)
