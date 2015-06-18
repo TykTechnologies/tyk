@@ -71,3 +71,31 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 
 	return policies
 }
+
+func LoadPoliciesFromRPC(orgId string) map[string]Policy {
+	dbPolicyList := make([]Policy, 0)
+	policies := make(map[string]Policy)
+
+	store := &RPCStorageHandler{UserKey: config.SlaveOptions.APIKey}
+	store.Connect()
+
+	rpcPolicies := store.GetPolicies(orgId)
+
+	store.Disconnect()
+
+	jErr1 := json.Unmarshal([]byte(rpcPolicies), &dbPolicyList)
+
+	if jErr1 != nil {
+		log.Error("Failed decode: ", jErr1)
+		return policies
+	}
+
+	log.Info("Policies found: ", len(dbPolicyList))
+	for _, p := range dbPolicyList {
+		p.ID = p.MID.Hex()
+		policies[p.MID.Hex()] = p
+		log.Debug("Processing policy ID: ", p.ID)
+	}
+
+	return policies
+}

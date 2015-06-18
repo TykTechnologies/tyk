@@ -22,6 +22,7 @@ const (
 	DefaultSessionProvider tykcommon.SessionProviderCode = "default"
 	DefaultStorageEngine   tykcommon.StorageEngineCode   = "redis"
 	LDAPStorageEngine      tykcommon.StorageEngineCode   = "ldap"
+	RPCStorageEngine       tykcommon.StorageEngineCode   = "rpc"
 )
 
 // URLStatus is a custom enum type to avoid collisions
@@ -216,6 +217,43 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 	}
 
 	apiCollection.Find(search).All(&StringDefs)
+
+	for i, thisAppConfig := range APIDefinitions {
+		thisAppConfig.DecodeFromDB()
+		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
+
+		newAppSpec := a.MakeSpec(thisAppConfig)
+		APISpecs = append(APISpecs, newAppSpec)
+	}
+	return APISpecs
+}
+
+// LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
+func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
+	var APISpecs = []APISpec{}
+
+	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey}
+	store.Connect()
+
+	apiCollection := store.GetApiDefinitions(orgId)
+
+	store.Disconnect()
+
+	var APIDefinitions = []tykcommon.APIDefinition{}
+	var StringDefs = make([]map[string]interface{}, 0)
+
+	jErr1 := json.Unmarshal([]byte(apiCollection), &APIDefinitions)
+
+	if jErr1 != nil {
+		log.Error("Failed decode: ", jErr1)
+		return APISpecs
+	}
+
+	jErr2 := json.Unmarshal([]byte(apiCollection), &StringDefs)
+	if jErr2 != nil {
+		log.Error("Failed decode: ", jErr2)
+		return APISpecs
+	}
 
 	for i, thisAppConfig := range APIDefinitions {
 		thisAppConfig.DecodeFromDB()

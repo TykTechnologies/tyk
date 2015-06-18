@@ -18,6 +18,13 @@ func (e KeyError) Error() string {
 	return "Key not found"
 }
 
+type StorageHandlerName string
+
+const (
+	RedisHandler StorageHandlerName = "redis"
+	CloudHandler StorageHandlerName = "cloud"
+)
+
 // StorageHandler is a standard interface to a storage backend,
 // used by AuthorisationManager to read and write key values to the backend
 type StorageHandler interface {

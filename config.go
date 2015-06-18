@@ -61,6 +61,12 @@ type Config struct {
 		MonitorOrgKeys        bool               `json:"monitor_org_keys"`
 	}
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
+	SlaveOptions       struct {
+		UseRPC                            bool   `json:"use_rpc"`
+		RPCKey                            string `json:"rpc_key"`
+		APIKey                            string `json:"api_key"`
+		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
+	} `json:"slave_options"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

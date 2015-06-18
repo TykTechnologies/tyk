@@ -74,6 +74,11 @@ func setupGlobals() {
 		} else if config.AnalyticsConfig.Type == "mongo" {
 			log.Info("Using MongoDB cache purge")
 			analytics.Clean = &MongoPurger{&AnalyticsStore, nil}
+		} else if config.AnalyticsConfig.Type == "rpc" {
+			log.Info("Using RPC cache purge")
+			thisPurger := RPCPurger{Store: &AnalyticsStore}
+			thisPurger.Connect()
+			analytics.Clean = &thisPurger
 		}
 
 		analytics.Store.Connect()
@@ -94,6 +99,7 @@ func setupGlobals() {
 	GlobalEventsJSVM.Init(config.TykJSPath)
 
 	// Get the notifier ready
+	log.Warning("Notifier will not work in hybrid mode")
 	MainNotifierStore := RedisStorageManager{}
 	MainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
@@ -115,6 +121,9 @@ func getAPISpecs() []APISpec {
 	if config.UseDBAppConfigs {
 		log.Info("Using App Configuration from Mongo DB")
 		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
+	} else if config.SlaveOptions.UseRPC {
+		log.Info("Using RPC Configuration")
+		APISpecs = thisAPILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
 	}
@@ -132,6 +141,9 @@ func getPolicies() {
 	if config.Policies.PolicySource == "mongo" {
 		log.Info("Using Policies from Mongo DB")
 		Policies = LoadPoliciesFromMongo(config.Policies.PolicyRecordName)
+	} else if config.Policies.PolicySource == "rpc" {
+		log.Info("Using Policies from RPC")
+		Policies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		Policies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
 	}
@@ -163,9 +175,10 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
-	storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
+	//storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
+	storageManager := GetGlobalStorageHandler(OAuthPrefix, false)
 	storageManager.Connect()
-	osinStorage := RedisOsinStorageInterface{&storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
+	osinStorage := RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
 	if test {
 		log.Warning("Adding test client")
@@ -308,21 +321,37 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		var sessionStore StorageHandler
 		var orgStore StorageHandler
 
-		switch referenceSpec.AuthProvider.StorageEngine {
+		authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
+		if config.SlaveOptions.OverrideDefinitionStorageSettings {
+			authStorageEngineToUse = RPCStorageEngine
+		}
+
+		switch authStorageEngineToUse {
 		case DefaultStorageEngine:
 			authStore = &redisStore
 		case LDAPStorageEngine:
 			thisStorageEngine := LDAPStorageHandler{}
 			thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
 			authStore = &thisStorageEngine
+		case RPCStorageEngine:
+			thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey}
+			authStore = thisStorageEngine
 		default:
 			authStore = &redisStore
 		}
 
-		switch referenceSpec.SessionProvider.StorageEngine {
+		SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
+		if config.SlaveOptions.OverrideDefinitionStorageSettings {
+			SessionStorageEngineToUse = RPCStorageEngine
+		}
+
+		switch SessionStorageEngineToUse {
 		case DefaultStorageEngine:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
+		case RPCStorageEngine:
+			sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey}
+			orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey}
 		default:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
@@ -562,6 +591,26 @@ func init() {
 
 }
 
+func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
+	var Name tykcommon.StorageEngineCode
+	// Select configuration options
+	if config.SlaveOptions.UseRPC {
+		Name = RPCStorageEngine
+	} else {
+		Name = DefaultStorageEngine
+	}
+
+	switch Name {
+	case DefaultStorageEngine:
+		return &RedisStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+	case RPCStorageEngine:
+		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey}
+	}
+
+	log.Error("No storage handler found!")
+	return nil
+}
+
 func main() {
 	displayConfig()
 
@@ -576,8 +625,10 @@ func main() {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
 		log.Info("Initialising default org store")
-		DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
-		DefaultQuotaStore.Init(&RedisStorageManager{KeyPrefix: ""})
+		//DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
+		DefaultOrgStore.Init(GetGlobalStorageHandler("orgkey.", false))
+		//DefaultQuotaStore.Init(GetGlobalStorageHandler(CloudHandler, "orgkey.", false))
+		DefaultQuotaStore.Init(GetGlobalStorageHandler("orgkey.", false))
 	}
 
 	loadAPIEndpoints(http.DefaultServeMux)
