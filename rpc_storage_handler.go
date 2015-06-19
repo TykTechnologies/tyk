@@ -44,7 +44,7 @@ func (r *RPCStorageHandler) Connect() bool {
 	r.cache = cache.New(30*time.Second, 15*time.Second)
 
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
-	r.RPCClient.Conns = 100
+	r.RPCClient.Conns = 10
 	r.RPCClient.Start()
 	d := GetDispatcher()
 	r.Client = d.NewFuncClient(r.RPCClient)
@@ -108,6 +108,8 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	// Check the cache first
 	cachedVal, found := r.cache.Get(r.fixKey(keyName))
 	if found {
+		elapsed := time.Since(start)
+		log.Info("GetKey took ", elapsed)
 		log.Debug(cachedVal.(string))
 		return cachedVal.(string), nil
 	}
@@ -134,6 +136,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
+	log.Info("GetExp called")
 	value, err := r.Client.Call("GetExp", r.fixKey(keyName))
 
 	if err != nil {
@@ -173,6 +176,7 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 
 // Decrement will decrement a key in redis
 func (r *RPCStorageHandler) Decrement(keyName string) {
+	log.Warning("Decrement called")
 	_, err := r.Client.Call("Decrement", keyName)
 	if r.IsAccessError(err) {
 		r.Login()
