@@ -334,7 +334,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
 			authStore = &thisStorageEngine
 		case RPCStorageEngine:
-			thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey}
+			thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 			authStore = thisStorageEngine
 		default:
 			authStore = &redisStore
@@ -350,8 +350,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
 		case RPCStorageEngine:
-			sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey}
-			orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey}
+			sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+			orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 		default:
 			sessionStore = &redisStore
 			orgStore = &redisOrgStore
@@ -604,7 +604,7 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 	case DefaultStorageEngine:
 		return &RedisStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 	case RPCStorageEngine:
-		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey}
+		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	}
 
 	log.Error("No storage handler found!")

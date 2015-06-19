@@ -32,11 +32,12 @@ type RPCStorageHandler struct {
 	KeyPrefix string
 	HashKeys  bool
 	UserKey   string
+	Address   string
 }
 
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
-	r.RPCClient = gorpc.NewTCPClient(":9090")
+	r.RPCClient = gorpc.NewTCPClient(r.Address)
 	r.RPCClient.Start()
 	d := GetDispatcher()
 	r.Client = d.NewFuncClient(r.RPCClient)

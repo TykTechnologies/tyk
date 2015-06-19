@@ -88,6 +88,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 		// Apply to template
 		var bodyBuffer bytes.Buffer
+		log.Warning("RUNNING TRANSFORM")
 		err = thisMeta.Template.Execute(&bodyBuffer, bodyData)
 
 		if err != nil {
