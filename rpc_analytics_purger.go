@@ -13,12 +13,13 @@ type RPCPurger struct {
 	Store     *RedisStorageManager
 	RPCClient *gorpc.Client
 	Client    *gorpc.DispatcherClient
+	Address   string
 }
 
 // Connect Connects to Mongo
 func (r *RPCPurger) Connect() {
 	log.Info("Connecting to RPC Analytics service")
-	r.RPCClient = gorpc.NewTCPClient(":9090")
+	r.RPCClient = gorpc.NewTCPClient(r.Address)
 	r.RPCClient.Start()
 	d := GetDispatcher()
 	r.Client = d.NewFuncClient(r.RPCClient)

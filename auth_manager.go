@@ -93,7 +93,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 	log.Warning("Tracked quota reset for key: ", keyName)
 	rawKey := QuotaKeyPrefix + keyName
 	log.Debug("Setting: ", rawKey)
-	b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+	go b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 }
 
 // UpdateSession updates the session state in the storage engine
@@ -118,7 +118,12 @@ func (b DefaultSessionManager) UpdateSession(keyName string, session SessionStat
 	// keyExp = (session.Expires - time.Now().Unix()) + 300 // Add 5 minutes to key expiry, just in case
 
 	// Keep the TTL
-	b.Store.SetKey(keyName, string(v), int64(ttl))
+	if config.UseAsyncSessionWrite {
+		go b.Store.SetKey(keyName, string(v), int64(ttl))
+	} else {
+		b.Store.SetKey(keyName, string(v), int64(ttl))
+	}
+
 }
 
 func (b DefaultSessionManager) RemoveSession(keyName string) {

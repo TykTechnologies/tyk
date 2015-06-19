@@ -4,7 +4,9 @@ import (
 	"errors"
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
+	"github.com/pmylund/go-cache"
 	"strings"
+	"time"
 )
 
 type InboundData struct {
@@ -33,16 +35,20 @@ type RPCStorageHandler struct {
 	HashKeys  bool
 	UserKey   string
 	Address   string
+	cache     *cache.Cache
 }
 
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
-	log.Warning("Connecting: ", r.Address)
+	// Set up the cache
+	r.cache = cache.New(30*time.Second, 15*time.Second)
+
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
+	r.RPCClient.Conns = 100
 	r.RPCClient.Start()
 	d := GetDispatcher()
 	r.Client = d.NewFuncClient(r.RPCClient)
-
+	log.Warning("Connected: ", r.Address)
 	r.Login()
 
 	return true
@@ -76,7 +82,7 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 }
 
 func (r *RPCStorageHandler) Login() {
-	log.Debug("[RPC Store] Login called!")
+	log.Info("[RPC Store] Login initiated")
 
 	if len(r.UserKey) == 0 {
 		log.Fatal("No API Key set!")
@@ -90,13 +96,23 @@ func (r *RPCStorageHandler) Login() {
 	if !ok.(bool) {
 		log.Fatal("RPC Login incorrect")
 	}
+	log.Info("[RPC Store] Login complete")
 }
 
 // GetKey will retreive a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
+	start := time.Now() // get current time
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
+	// Check the cache first
+	cachedVal, found := r.cache.Get(r.fixKey(keyName))
+	if found {
+		log.Debug(cachedVal.(string))
+		return cachedVal.(string), nil
+	}
+
+	// Not cached
 	value, err := r.Client.Call("GetKey", r.fixKey(keyName))
 
 	if err != nil {
@@ -108,6 +124,11 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 		log.Debug("Error trying to get value:", err)
 		return "", KeyError{}
 	}
+	elapsed := time.Since(start)
+	log.Info("GetKey took ", elapsed)
+
+	// Cache it
+	r.cache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
 
 	return value.(string), nil
 }
@@ -130,6 +151,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 
 // SetKey will create (or update) a key value in the store
 func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout int64) {
+	start := time.Now() // get current time
 	ibd := InboundData{
 		KeyName:      r.fixKey(keyName),
 		SessionState: sessionState,
@@ -137,11 +159,15 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 	}
 
 	_, err := r.Client.Call("SetKey", ibd)
+
 	if r.IsAccessError(err) {
 		r.Login()
 		r.SetKey(keyName, sessionState, timeout)
 		return
 	}
+
+	elapsed := time.Since(start)
+	log.Info("SetKey took ", elapsed)
 
 }
 
@@ -352,6 +378,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName string, value string) {
 
 // SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
 func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, expire int64) int {
+	start := time.Now() // get current time
 	ibd := InboundData{
 		KeyName: keyName,
 		Per:     per,
@@ -363,6 +390,9 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, expire i
 		r.Login()
 		return r.SetRollingWindow(keyName, per, expire)
 	}
+
+	elapsed := time.Since(start)
+	log.Info("SetRollingWindow took ", elapsed)
 
 	return intVal.(int)
 
@@ -388,7 +418,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string) string {
 			return r.GetApiDefinitions(orgId)
 		}
 	}
-
+	log.Info("API Definitions retrieved")
 	return defString.(string)
 
 }

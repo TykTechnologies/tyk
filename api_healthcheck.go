@@ -66,7 +66,7 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 	if config.HealthCheck.EnableHealthChecks {
 		searchStr := h.CreateKeyName(counterType)
 		log.Debug("Adding Healthcheck to: ", searchStr)
-		h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
+		go h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
 	}
 }
 

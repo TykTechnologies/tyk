@@ -109,7 +109,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 					var wireFormatReq bytes.Buffer
 					reqVal.Write(&wireFormatReq)
 					log.Debug("Cache TTL is:", cacheTTL)
-					m.CacheStore.SetKey(thisKey, wireFormatReq.String(), cacheTTL)
+					go m.CacheStore.SetKey(thisKey, wireFormatReq.String(), cacheTTL)
 
 				}
 				return nil, 666
@@ -141,7 +141,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			// Record analytics
 			sNP := SuccessHandler{m.TykMiddleware}
-			sNP.RecordHit(w, r, 0)
+			go sNP.RecordHit(w, r, 0)
 
 			// Stop any further execution
 			return nil, 666

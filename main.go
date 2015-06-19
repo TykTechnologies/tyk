@@ -76,7 +76,7 @@ func setupGlobals() {
 			analytics.Clean = &MongoPurger{&AnalyticsStore, nil}
 		} else if config.AnalyticsConfig.Type == "rpc" {
 			log.Info("Using RPC cache purge")
-			thisPurger := RPCPurger{Store: &AnalyticsStore}
+			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
 			thisPurger.Connect()
 			analytics.Clean = &thisPurger
 		}
