@@ -37,6 +37,7 @@ type RPCStorageHandler struct {
 
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
+	log.Warning("Connecting: ", r.Address)
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
 	r.RPCClient.Start()
 	d := GetDispatcher()
