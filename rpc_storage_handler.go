@@ -106,12 +106,14 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
 	// Check the cache first
-	cachedVal, found := r.cache.Get(r.fixKey(keyName))
-	if found {
-		elapsed := time.Since(start)
-		log.Info("GetKey took ", elapsed)
-		log.Debug(cachedVal.(string))
-		return cachedVal.(string), nil
+	if config.SlaveOptions.EnableRPCCache {
+		cachedVal, found := r.cache.Get(r.fixKey(keyName))
+		if found {
+			elapsed := time.Since(start)
+			log.Info("GetKey took ", elapsed)
+			log.Debug(cachedVal.(string))
+			return cachedVal.(string), nil
+		}
 	}
 
 	// Not cached
@@ -129,9 +131,11 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	elapsed := time.Since(start)
 	log.Info("GetKey took ", elapsed)
 
-	// Cache it
-	r.cache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
-
+	if config.SlaveOptions.EnableRPCCache {
+		// Cache it
+		r.cache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
+	}
+	
 	return value.(string), nil
 }
 

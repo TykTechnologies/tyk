@@ -67,6 +67,7 @@ type Config struct {
 		RPCKey                            string `json:"rpc_key"`
 		APIKey                            string `json:"api_key"`
 		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
+		EnableRPCCache bool `json:"enable_rpc_cache"`
 	} `json:"slave_options"`
 }
 
