@@ -28,6 +28,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 
+
+
 	storeRef := k.Spec.SessionManager.GetStore()
 	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState, authHeaderValue, storeRef)
 
