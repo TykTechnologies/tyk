@@ -389,11 +389,18 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
 		tykMiddleware := TykMiddleware{referenceSpec, proxy}
 
+		keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
+		CacheStore := &RedisStorageManager{KeyPrefix: keyPrefix}
+		CacheStore.Connect()
+
 		if referenceSpec.APIDefinition.UseKeylessAccess {
 			// for KeyLessAccess we can't support rate limiting, versioning or access rules
 			chain := alice.New(CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)).Then(proxyHandler)
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 
 		} else {
@@ -417,9 +424,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 			var chainArray = []alice.Constructor{}
 
-			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
-			CacheStore := &RedisStorageManager{KeyPrefix: keyPrefix}
-			CacheStore.Connect()
+			
 
 			var baseChainArray = []alice.Constructor{
 				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),

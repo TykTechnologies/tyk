@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"errors"
 )
 
 const (
@@ -45,6 +46,19 @@ func (m RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) 
 	return cacheKey
 }
 
+func GetIP(ip string) (string, error) {
+	IPWithoutPort := strings.Split(ip, ":")
+
+	if len(IPWithoutPort) > 1 {
+		ip = IPWithoutPort[0]
+	} else {
+		log.Warning("Strange IP found: ", ip)
+		return "", errors.New("IP Address malformed")
+	}
+
+	return ip, nil
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
@@ -70,7 +84,21 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 		// Cached route matched, let go
 		if stat == StatusCached {
-			authHeaderValue := context.Get(r, AuthHeaderValue).(string)
+			var authHeaderValue string
+			var ipErr error
+			authVal := context.Get(r, AuthHeaderValue)
+
+			// No authentication data? use the IP.
+			if authVal == nil {
+				authHeaderValue, ipErr = GetIP(r.RemoteAddr)
+				if ipErr != nil {
+					log.Error(ipErr)
+					return nil, 200 
+				}
+			} else {
+				authHeaderValue = authVal.(string)
+			}	
+			
 			thisKey := m.CreateCheckSum(r, authHeaderValue)
 			retBlob, found := m.CacheStore.GetKey(thisKey)
 			if found != nil {
@@ -130,12 +158,17 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 
 			copyHeader(w.Header(), newRes.Header)
-			thisSessionState := context.Get(r, SessionData).(SessionState)
-			w.Header().Add("x-tyk-cached-response", "1")
-			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
-			w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
-			w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
+			sessObj := context.Get(r, SessionData)
+			var thisSessionState SessionState
 
+			// Only add ratelimit data to keyed sessions
+			if sessObj != nil {
+				thisSessionState = sessObj.(SessionState)
+				w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
+				w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
+				w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
+			} 
+			w.Header().Add("x-tyk-cached-response", "1")
 			w.WriteHeader(newRes.StatusCode)
 			m.Proxy.copyResponse(w, newRes.Body)
 
