@@ -424,8 +424,6 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 			var chainArray = []alice.Constructor{}
 
-			
-
 			var baseChainArray = []alice.Constructor{
 				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
@@ -481,6 +479,11 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
 func ReloadURLStructure() {
+	// Kill RPC if available
+	if config.SlaveOptions.UseRPC {
+		ClearRPCClients()
+	}
+
 	// Reset the JSVM
 	GlobalEventsJSVM.Init(config.TykJSPath)
 
@@ -641,6 +644,13 @@ func main() {
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
 		go StartPubSubLoop()
+	}
+
+	if config.SlaveOptions.UseRPC {
+		log.Warning("Strting RPC reload listener!")
+		RPCListener := RPCStorageHandler{KeyPrefix: "rpc.listener.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		RPCListener.Connect()
+		go RPCListener.CheckForReload(config.SlaveOptions.RPCKey)
 	}
 
 	// Handle reload when SIGUSR2 is received

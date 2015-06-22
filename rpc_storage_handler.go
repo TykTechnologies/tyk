@@ -3,8 +3,10 @@ package main
 import (
 	"errors"
 	"github.com/garyburd/redigo/redis"
+	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/gorpc"
 	"github.com/pmylund/go-cache"
+	"io"
 	"strings"
 	"time"
 )
@@ -25,7 +27,32 @@ type KeysValuesPair struct {
 
 var ErrorDenied error = errors.New("Access Denied")
 
+// Global RPC Storage Objects
+// var sessionRPCStore *RPCStorageHandler
+// var orgStore *RPCStorageHandler
+// var DefaultOrgStore *RPCStorageHandler
+// var DefaultQuotaStore *RPCStorageHandler
+// var OAuthStorageManager *RPCStorageHandler
+
+// func InitRPCHandlers() {
+// 	DefaultOrgStore = &RPCStorageHandler{
+// 		KeyPrefix: "orgkey.",
+// 		UserKey:   config.SlaveOptions.APIKey,
+// 		Address:   config.SlaveOptions.ConnectionString}
+
+// 	DefaultQuotaStore = DefaultOrgStore
+
+// }
+
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
+
+var RPCClients = map[string]chan int{}
+
+func ClearRPCClients() {
+	for _, c := range RPCClients {
+		c <- 1
+	}
+}
 
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
@@ -36,27 +63,56 @@ type RPCStorageHandler struct {
 	UserKey   string
 	Address   string
 	cache     *cache.Cache
+	killChan  chan int
+	Connected bool
+	ID        string
+}
+
+func (r *RPCStorageHandler) Register() {
+	r.ID = uuid.NewUUID().String()
+	myChan := make(chan int)
+	RPCClients[r.ID] = myChan
+	r.killChan = myChan
+	log.Debug("RPC Client registered")
+}
+
+func (r *RPCStorageHandler) checkDisconnect() {
+	select {
+	case res := <-r.killChan:
+		log.Debug("RPC Client disconnecting: ", res)
+		r.Disconnect()
+	}
 }
 
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
 	// Set up the cache
 	r.cache = cache.New(30*time.Second, 15*time.Second)
-
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
+	r.RPCClient.OnConnect = r.OnConnectFunc
 	r.RPCClient.Conns = 10
 	r.RPCClient.Start()
 	d := GetDispatcher()
 	r.Client = d.NewFuncClient(r.RPCClient)
-	log.Warning("Connected: ", r.Address)
 	r.Login()
+
+	r.Register()
+	go r.checkDisconnect()
 
 	return true
 }
 
-func (r *RPCStorageHandler) Disconnect() bool {
-	r.RPCClient.Stop()
+func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+	r.Connected = true
+	return rwc, nil
+}
 
+func (r *RPCStorageHandler) Disconnect() bool {
+	if r.Connected {
+		r.RPCClient.Stop()
+		r.Connected = false
+		delete(RPCClients, r.ID)
+	}
 	return true
 }
 
@@ -135,7 +191,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 		// Cache it
 		r.cache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
 	}
-	
+
 	return value.(string), nil
 }
 
@@ -445,6 +501,25 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 
 }
 
+// GetPolicies will pull Policies from the RPC server
+func (r *RPCStorageHandler) CheckForReload(orgId string) {
+	for {
+		log.Warning("----- Calling CheckReload! -----")
+		reload, err := r.Client.CallTimeout("CheckReload", orgId, time.Second*60)
+		if err != nil {
+			if r.IsAccessError(err) {
+				r.Login()
+			}
+		} else {
+			if reload.(bool) {
+				// Do the reload!
+				log.Warning("[RPC STORE] Received Reload instruction!")
+				go ReloadURLStructure()
+			}
+		}
+	}
+}
+
 func GetDispatcher() *gorpc.Dispatcher {
 	var Dispatch *gorpc.Dispatcher = gorpc.NewDispatcher()
 
@@ -514,6 +589,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 
 	Dispatch.AddFunc("PurgeAnalyticsData", func(data string) error {
 		return nil
+	})
+
+	Dispatch.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
+		return false, nil
 	})
 
 	return Dispatch
