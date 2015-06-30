@@ -1,4 +1,4 @@
-# DEV
+# v1.7
 - Open APIs now support caching, body transforms and header transforms
 - Added RPC storage backend for cloud-based suport. RPC server is built in vayala/gorpc, signature for the methods that need to be provideda are in the rpc_storage_handler.go file (see the dispatcher).
 - Added `oauth_refresh_token_expire` setting in configuration, allows for customisation of refresh token expiry
