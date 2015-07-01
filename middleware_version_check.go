@@ -10,10 +10,13 @@ import (
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
 	TykMiddleware
+	sh SuccessHandler
 }
 
 // New lets you do any initialisations for the object can be done here
-func (v *VersionCheck) New() {}
+func (v *VersionCheck) New() {
+	v.sh = SuccessHandler{v.TykMiddleware}
+}
 
 // GetConfig retrieves the configuration from the API config
 func (v *VersionCheck) GetConfig() (interface{}, error) {
@@ -57,9 +60,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 	}
 
 	if stat == StatusOkAndIgnore {
-		handler := SuccessHandler{v.TykMiddleware}
-		// Skip all other execution
-		handler.ServeHTTP(w, r)
+		v.sh.ServeHTTP(w, r)
 		return nil, 666
 	}
 

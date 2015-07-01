@@ -22,17 +22,16 @@ func (i *IPWhiteListMiddleware) GetConfig() (interface{}, error) {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	ipConfig := i.TykMiddleware.Spec
 
 	// Disabled, pass through
-	if !ipConfig.EnableIpWhiteListing {
+	if !i.TykMiddleware.Spec.EnableIpWhiteListing {
 		return nil, 200
 	}
 
 	var remoteIP net.IP
 
 	// Enabled, check incoming IP address
-	for _, ip := range ipConfig.AllowedIPs {
+	for _, ip := range i.TykMiddleware.Spec.AllowedIPs {
 		allowedIP := net.ParseIP(ip)
 		splitIP := strings.Split(r.RemoteAddr, ":")
 		remoteIPString := splitIP[0]

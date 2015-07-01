@@ -386,7 +386,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		// Create the response processors
 		creeateResponseMiddlewareChain(&referenceSpec)
 
-		proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
+		//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
 		tykMiddleware := TykMiddleware{referenceSpec, proxy}
 
 		keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
@@ -395,9 +395,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 		if referenceSpec.APIDefinition.UseKeylessAccess {
 			// for KeyLessAccess we can't support rate limiting, versioning or access rules
-			chain := alice.New(CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+			chain := alice.New(CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
@@ -425,9 +425,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			var chainArray = []alice.Constructor{}
 
 			var baseChainArray = []alice.Constructor{
-				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
@@ -452,13 +452,13 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			}
 
 			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
-			chain := alice.New(chainArray...).Then(proxyHandler)
+			chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 
 			userCheckHandler := http.HandlerFunc(UserRatesCheck())
 			simpleChain := alice.New(
 				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&OrganizationMonitor{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+				CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 				keyCheck,
 				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)

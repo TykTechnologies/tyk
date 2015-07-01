@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"github.com/gorilla/context"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
-	"errors"
 )
 
 const (
@@ -22,12 +22,16 @@ const (
 type RedisCacheMiddleware struct {
 	TykMiddleware
 	CacheStore StorageHandler
+	sh         SuccessHandler
 }
 
-type RedisCacheMiddlewareConfig struct{}
+type RedisCacheMiddlewareConfig struct {
+}
 
 // New lets you do any initialisations for the object can be done here
-func (m *RedisCacheMiddleware) New() {}
+func (m *RedisCacheMiddleware) New() {
+	m.sh = SuccessHandler{m.TykMiddleware}
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
@@ -93,21 +97,20 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				authHeaderValue, ipErr = GetIP(r.RemoteAddr)
 				if ipErr != nil {
 					log.Error(ipErr)
-					return nil, 200 
+					return nil, 200
 				}
 			} else {
 				authHeaderValue = authVal.(string)
-			}	
-			
+			}
+
 			thisKey := m.CreateCheckSum(r, authHeaderValue)
 			retBlob, found := m.CacheStore.GetKey(thisKey)
 			if found != nil {
 				log.Debug("Cache enabled, but record not found")
 				// Pass through to proxy AND CACHE RESULT
-				sNP := SuccessHandler{m.TykMiddleware}
 
 				// This passes through and will write the value to the writer, but spit out a copy for the cache
-				reqVal := sNP.ServeHTTP(w, r)
+				reqVal := m.sh.ServeHTTP(w, r)
 
 				cacheThisRequest := true
 				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
@@ -167,14 +170,13 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
 				w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
 				w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
-			} 
+			}
 			w.Header().Add("x-tyk-cached-response", "1")
 			w.WriteHeader(newRes.StatusCode)
 			m.Proxy.copyResponse(w, newRes.Body)
 
 			// Record analytics
-			sNP := SuccessHandler{m.TykMiddleware}
-			go sNP.RecordHit(w, r, 0)
+			go m.sh.RecordHit(w, r, 0)
 
 			// Stop any further execution
 			return nil, 666

@@ -11,10 +11,15 @@ import (
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type OrganizationMonitor struct {
 	TykMiddleware
+	sessionlimiter SessionLimiter
+	mon            Monitor
 }
 
 // New lets you do any initialisations for the object can be done here
-func (k *OrganizationMonitor) New() {}
+func (k *OrganizationMonitor) New() {
+	k.sessionlimiter = SessionLimiter{}
+	k.mon = Monitor{}
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (k *OrganizationMonitor) GetConfig() (interface{}, error) {
@@ -23,10 +28,7 @@ func (k *OrganizationMonitor) GetConfig() (interface{}, error) {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	sessionLimiter := SessionLimiter{}
-
-	thisOrg := k.Spec.OrgID
-	thisSessionState, found := k.GetOrgSession(thisOrg)
+	thisSessionState, found := k.GetOrgSession(k.Spec.OrgID)
 
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
@@ -38,24 +40,23 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
-			"key":    thisOrg,
+			"key":    k.Spec.OrgID,
 		}).Info("Organisation access is disabled.")
 
 		return errors.New("This organisation access has been disabled, please contact your API administrator."), 403
 	}
 
 	// We found a session, apply the quota limiter
-	storeRef := k.Spec.OrgSessionManager.GetStore()
-	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState, thisOrg, storeRef)
+	forwardMessage, reason := k.sessionlimiter.ForwardMessage(&thisSessionState, k.Spec.OrgID, k.Spec.OrgSessionManager.GetStore())
 
-	k.Spec.OrgSessionManager.UpdateSession(thisOrg, thisSessionState, 0)
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, thisSessionState, 0)
 
 	if !forwardMessage {
 		if reason == 2 {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
 				"origin": r.RemoteAddr,
-				"key":    thisOrg,
+				"key":    k.Spec.OrgID,
 			}).Info("Organisation quota has been exceeded.")
 
 			// Fire a quota exceeded event
@@ -64,7 +65,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 					EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 					Path:             r.URL.Path,
 					Origin:           r.RemoteAddr,
-					Key:              thisOrg,
+					Key:              k.Spec.OrgID,
 				})
 
 			return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
@@ -73,8 +74,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if config.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
-		mon := Monitor{}
-		mon.Check(&thisSessionState, "")
+		k.mon.Check(&thisSessionState, "")
 	}
 	// Request is valid, carry on
 	return nil, 200
