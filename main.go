@@ -400,7 +400,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)).Then(proxyHandler)
+				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 
 		} else {

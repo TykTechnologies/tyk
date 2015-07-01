@@ -23,22 +23,21 @@ func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykM
 
 // Generic middleware caller to make extension easier
 func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper TykMiddleware) func(http.Handler) http.Handler {
+	// construct a new instance
+	mw.New()
+
+	// Pull the configuration
+	thisMwConfiguration, confErr := mw.GetConfig()
+
+	if confErr != nil {
+		log.Fatal("[Middleware] Configuration load failed")
+		//handler := ErrorHandler{tykMwSuper}
+		//handler.HandleError(w, r, confErr.Error(), 403)
+	}
+
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
 
-			// construct a new instance
-			mw.New()
-
-			// Pull the configuration
-			thisMwConfiguration, confErr := mw.GetConfig()
-
-			if confErr != nil {
-				handler := ErrorHandler{tykMwSuper}
-				handler.HandleError(w, r, confErr.Error(), 403)
-				return
-			}
-
-			// Process the Request
 			reqErr, errCode := mw.ProcessRequest(w, r, thisMwConfiguration)
 			if reqErr != nil {
 				handler := ErrorHandler{tykMwSuper}
