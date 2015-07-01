@@ -13,7 +13,7 @@
     "username": "",
     "password": "",
     "database": 0,
-    "optimisation_max_idle": 100
+    "optimisation_max_idle": 500
   },
   "enable_analytics": false,
   "analytics_config": {
