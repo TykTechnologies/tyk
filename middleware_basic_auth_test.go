@@ -78,7 +78,7 @@ func getBasicAuthChain(spec APISpec) http.Handler {
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&VersionCheck{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&VersionCheck{TykMiddleware:tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
