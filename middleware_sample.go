@@ -12,7 +12,7 @@ import (
 // ModifiedMiddleware is a sample custom middleware component, must inherit TykMiddleware
 // so you have access to spec and definition data
 type ModifiedMiddleware struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 type ModifiedMiddlewareConfig struct {

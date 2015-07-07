@@ -20,7 +20,7 @@ const (
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
-	TykMiddleware
+	*TykMiddleware
 	CacheStore StorageHandler
 	sh         SuccessHandler
 }

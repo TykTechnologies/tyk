@@ -387,7 +387,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		creeateResponseMiddlewareChain(&referenceSpec)
 
 		//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
-		tykMiddleware := TykMiddleware{referenceSpec, proxy}
+		tykMiddleware := &TykMiddleware{&referenceSpec, proxy}
 
 		keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
 		CacheStore := &RedisStorageManager{KeyPrefix: keyPrefix}

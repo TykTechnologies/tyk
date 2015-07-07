@@ -10,7 +10,7 @@ import (
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.
 type KeyExpired struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 // New lets you do any initialisations for the object can be done here

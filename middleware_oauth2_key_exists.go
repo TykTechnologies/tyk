@@ -12,7 +12,7 @@ import (
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type Oauth2KeyExists struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 // New lets you do any initialisations for the object can be done here

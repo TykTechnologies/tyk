@@ -10,7 +10,7 @@ import (
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key
 type GranularAccessMiddleware struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 type GranularAccessMiddlewareConfig struct{}

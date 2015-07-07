@@ -9,7 +9,7 @@ import (
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream
 type IPWhiteListMiddleware struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 // New lets you do any initialisations for the object can be done here

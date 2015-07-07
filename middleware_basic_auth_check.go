@@ -12,7 +12,7 @@ import (
 
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 // New lets you do any initialisations for the object can be done here
@@ -24,7 +24,7 @@ func (k *BasicAuthKeyIsValid) GetConfig() (interface{}, error) {
 }
 
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
-func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter,msg string)(error,int){
+func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {
 	authReply := "Basic realm=\"" + k.TykMiddleware.Spec.Name + "\""
 
 	w.Header().Add("WWW-Authenticate", authReply)

@@ -22,7 +22,7 @@ const (
 // TykMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type TykMiddleware struct {
-	Spec  APISpec
+	Spec  *APISpec
 	Proxy *ReverseProxy
 }
 
@@ -102,7 +102,7 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64) {

@@ -84,10 +84,10 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 	addOAuthHandlers(&spec, Muxer, true)
 	remote, _ := url.Parse("http://lonelycode.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
-	tykMiddleware := TykMiddleware{spec, proxy}
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
+	tykMiddleware := &TykMiddleware{&spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&VersionCheck{TykMiddleware:tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),

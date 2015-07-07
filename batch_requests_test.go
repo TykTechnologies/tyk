@@ -32,8 +32,8 @@ func getBatchTestChain(spec APISpec) http.Handler {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse("http://httpbin.org/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
-	tykMiddleware := TykMiddleware{spec, proxy}
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
+	tykMiddleware := &TykMiddleware{&spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),

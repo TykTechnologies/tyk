@@ -22,7 +22,7 @@ const HMACClockSkewLimitInMs float64 = 1000
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 func (hm *HMACMiddleware) authorizationError(w http.ResponseWriter, r *http.Request) (error, int) {

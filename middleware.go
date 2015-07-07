@@ -10,7 +10,7 @@ type TykMiddlewareImplementation interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) // Handles request
 }
 
-func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper TykMiddleware) func(http.Handler) http.Handler {
+func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		TykMiddleware:       tykMwSuper,
 		MiddlewareClassName: MiddlewareName,
@@ -22,7 +22,7 @@ func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykM
 }
 
 // Generic middleware caller to make extension easier
-func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper TykMiddleware) func(http.Handler) http.Handler {
+func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	// construct a new instance
 	mw.New()
 

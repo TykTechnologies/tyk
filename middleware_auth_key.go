@@ -11,7 +11,7 @@ import (
 // KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type AuthKey struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 func (k AuthKey) New() {}
@@ -64,7 +64,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	return nil, 200
 }
 
-func AuthFailed(m TykMiddleware, r *http.Request, authHeaderValue string) {
+func AuthFailed(m *TykMiddleware, r *http.Request, authHeaderValue string) {
 	go m.FireEvent(EVENT_AuthFailure,
 		EVENT_AuthFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},

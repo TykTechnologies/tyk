@@ -41,7 +41,7 @@ func (nopCloser) Close() error {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type DynamicMiddleware struct {
-	TykMiddleware
+	*TykMiddleware
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool

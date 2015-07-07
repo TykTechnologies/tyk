@@ -11,7 +11,7 @@ import (
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
-	TykMiddleware
+	*TykMiddleware
 }
 
 // New lets you do any initialisations for the object can be done here
@@ -27,8 +27,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	sessionLimiter := SessionLimiter{}
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
-
-
 
 	storeRef := k.Spec.SessionManager.GetStore()
 	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState, authHeaderValue, storeRef)
