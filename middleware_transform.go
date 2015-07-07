@@ -38,7 +38,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	if stat == StatusTransform {
-		thisMeta := meta.(TransformSpec)
+		thisMeta := meta.(*TransformSpec)
 
 		// Read the body:
 		defer r.Body.Close()

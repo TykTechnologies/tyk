@@ -35,7 +35,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	if stat == StatusHeaderInjected {
-		thisMeta := meta.(tykcommon.HeaderInjectionMeta)
+		thisMeta := meta.(*tykcommon.HeaderInjectionMeta)
 
 		for _, dKey := range thisMeta.DeleteHeaders {
 			r.Header.Del(dKey)

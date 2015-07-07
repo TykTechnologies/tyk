@@ -532,9 +532,9 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
+func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths *[]URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
-	for _, v := range RxPaths {
+	for _, v := range *RxPaths {
 		match := v.Spec.MatchString(url)
 		if match {
 			if v.MethodActions != nil {
@@ -546,7 +546,7 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 						// TODO: Extend here for additional reply options
 						switch methodMeta.Action {
 						case tykcommon.Reply:
-							return StatusRedirectFlowByReply, methodMeta
+							return StatusRedirectFlowByReply, &methodMeta
 						default:
 							log.Error("URL Method Action was not set to NoAction, blocking.")
 							return EndPointNotAllowed, nil
@@ -568,12 +568,12 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 			}
 
 			if v.TransformAction.Template != nil {
-				return a.getURLStatus(v.Status), v.TransformAction
+				return a.getURLStatus(v.Status), &v.TransformAction
 			}
 
 			// TODO: Fix, Not a great detection method
 			if len(v.InjectHeaders.Path) > 0 {
-				return a.getURLStatus(v.Status), v.InjectHeaders
+				return a.getURLStatus(v.Status), &v.InjectHeaders
 			}
 
 			// Using a legacy path, handle it raw.
@@ -593,9 +593,9 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
-func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths *[]URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
-	for _, v := range RxPaths {
+	for _, v := range *RxPaths {
 		match := v.Spec.MatchString(url)
 		if match {
 			// only return it it's what we are looking for
@@ -611,19 +611,19 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 					return true, nil
 				case Transformed:
 					if method != nil && method.(string) == v.TransformAction.TemplateMeta.Method {
-						return true, v.TransformAction
+						return true, &v.TransformAction
 					}
 				case HeaderInjected:
 					if method != nil && method.(string) == v.InjectHeaders.Method {
-						return true, v.InjectHeaders
+						return true, &v.InjectHeaders
 					}
 				case HeaderInjectedResponse:
 					if method != nil && method.(string) == v.InjectHeadersResponse.Method {
-						return true, v.InjectHeadersResponse
+						return true, &v.InjectHeadersResponse
 					}
 				case TransformedResponse:
 					if method != nil && method.(string) == v.TransformResponseAction.TemplateMeta.Method {
-						return true, v.TransformResponseAction
+						return true, &v.TransformResponseAction
 					}
 				}
 
@@ -658,7 +658,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 }
 
 // IsThisAPIVersionExpired checks if an API version (during a proxied request) is expired
-func (a *APISpec) IsThisAPIVersionExpired(versionDef tykcommon.VersionInfo) bool {
+func (a *APISpec) IsThisAPIVersionExpired(versionDef *tykcommon.VersionInfo) bool {
 	// Never expires
 	if versionDef.Expires == "-1" {
 		return false
@@ -727,7 +727,7 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 
 // GetVersionData attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
-func (a *APISpec) GetVersionData(r *http.Request) (tykcommon.VersionInfo, []URLSpec, bool, RequestStatus) {
+func (a *APISpec) GetVersionData(r *http.Request) (*tykcommon.VersionInfo, *[]URLSpec, bool, RequestStatus) {
 	var thisVersion = tykcommon.VersionInfo{}
 	var versionKey string
 	var versionRxPaths = []URLSpec{}
@@ -745,7 +745,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (tykcommon.VersionInfo, []URLS
 		// Extract Version Info
 		versionKey = a.getVersionFromRequest(r)
 		if versionKey == "" {
-			return thisVersion, versionRxPaths, versionWLStatus, VersionNotFound
+			return &thisVersion, &versionRxPaths, versionWLStatus, VersionNotFound
 		}
 	}
 
@@ -753,7 +753,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (tykcommon.VersionInfo, []URLS
 	var ok bool
 	thisVersion, ok = a.APIDefinition.VersionData.Versions[versionKey]
 	if !ok {
-		return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
+		return &thisVersion, &versionRxPaths, versionWLStatus, VersionDoesNotExist
 	}
 
 	// Load path data and whitelist data for version
@@ -763,17 +763,17 @@ func (a *APISpec) GetVersionData(r *http.Request) (tykcommon.VersionInfo, []URLS
 	if !rxOk {
 		log.Error("no RX Paths found for version")
 		log.Error(versionKey)
-		return thisVersion, versionRxPaths, versionWLStatus, VersionDoesNotExist
+		return &thisVersion, &versionRxPaths, versionWLStatus, VersionDoesNotExist
 	}
 
 	if !wlOk {
 		log.Error("No whitelist data found")
-		return thisVersion, versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
+		return &thisVersion, &versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
 	}
 
 	versionRxPaths = RxPaths
 	versionWLStatus = WhiteListStatus
 
-	return thisVersion, versionRxPaths, versionWLStatus, StatusOk
+	return &thisVersion, &versionRxPaths, versionWLStatus, StatusOk
 
 }

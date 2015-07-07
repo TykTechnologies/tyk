@@ -69,7 +69,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 
 	if stat == StatusTransformResponse {
-		thisMeta := meta.(TransformSpec)
+		thisMeta := meta.(*TransformSpec)
 
 		// Read the body:
 		defer res.Body.Close()

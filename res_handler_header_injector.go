@@ -48,7 +48,7 @@ func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respons
 	}
 
 	if stat == StatusHeaderInjected {
-		thisMeta := meta.(tykcommon.HeaderInjectionMeta)
+		thisMeta := meta.(*tykcommon.HeaderInjectionMeta)
 
 		for _, dKey := range thisMeta.DeleteHeaders {
 			res.Header.Del(dKey)

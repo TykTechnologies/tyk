@@ -25,7 +25,7 @@ func (v *VersionCheck) GetConfig() (interface{}, error) {
 
 func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 	// Reply with some alternate data
-	thisMeta := meta.(tykcommon.EndpointMethodMeta)
+	thisMeta := meta.(*tykcommon.EndpointMethodMeta)
 	responseMessage := []byte(thisMeta.Data)
 	for header, value := range thisMeta.Headers {
 		w.Header().Add(header, value)
