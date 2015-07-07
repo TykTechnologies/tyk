@@ -110,7 +110,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				// Pass through to proxy AND CACHE RESULT
 
 				// This passes through and will write the value to the writer, but spit out a copy for the cache
-				reqVal := m.sh.ServeHTTP(w, r)
+				reqVal := m.sh.ServeHTTPWithCache(w, r)
 
 				cacheThisRequest := true
 				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout

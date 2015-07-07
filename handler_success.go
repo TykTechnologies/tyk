@@ -190,7 +190,28 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	}
 
 	t1 := time.Now()
-	inRes := s.Proxy.ServeHTTP(w, r)
+	s.Proxy.ServeHTTP(w, r)
+	t2 := time.Now()
+
+	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
+	log.Debug("Upstream request took (ms): ", millisec)
+
+	go s.RecordHit(w, r, int64(millisec))
+	return nil
+}
+
+// ServeHTTPWithCache will store the request details in the analytics store if necessary and proxy the request to it's
+// final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
+// Spec states the path is Ignored Itwill also return a response object for the cache
+func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
+
+	// Make sure we get the correct target URL
+	if s.Spec.APIDefinition.Proxy.StripListenPath {
+		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
+	}
+
+	t1 := time.Now()
+	inRes := s.Proxy.ServeHTTPForCache(w, r)
 	t2 := time.Now()
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001

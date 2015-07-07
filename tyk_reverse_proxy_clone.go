@@ -67,7 +67,8 @@ type ReverseProxy struct {
 	// If zero, no periodic flushing is done.
 	FlushInterval time.Duration
 
-	TykAPISpec *APISpec
+	TykAPISpec      *APISpec
+	ResponseHandler ResponseChain
 }
 
 func singleJoiningSlash(a, b string) string {
@@ -135,6 +136,15 @@ func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, er
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
+	p.WrappedServeHTTP(rw, req, false)
+	return nil
+}
+
+func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) *http.Response {
+	return p.WrappedServeHTTP(rw, req, true)
+}
+
+func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	transport := p.Transport
 	if transport == nil {
 		transport = http.DefaultTransport
@@ -187,20 +197,22 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 	}
 
 	inres := new(http.Response)
-	*inres = *res // includes shallow copies of maps, but okay
+	if withCache {
+		*inres = *res // includes shallow copies of maps, but okay
 
-	defer res.Body.Close()
+		defer res.Body.Close()
 
-	// Buffer body data
-	var bodyBuffer bytes.Buffer
-	bodyBuffer2 := new(bytes.Buffer)
+		// Buffer body data
+		var bodyBuffer bytes.Buffer
+		bodyBuffer2 := new(bytes.Buffer)
 
-	p.copyResponse(&bodyBuffer, res.Body)
-	*bodyBuffer2 = bodyBuffer
+		p.copyResponse(&bodyBuffer, res.Body)
+		*bodyBuffer2 = bodyBuffer
 
-	// Create new ReadClosers so we can split output
-	res.Body = ioutil.NopCloser(&bodyBuffer)
-	inres.Body = ioutil.NopCloser(bodyBuffer2)
+		// Create new ReadClosers so we can split output
+		res.Body = ioutil.NopCloser(&bodyBuffer)
+		inres.Body = ioutil.NopCloser(bodyBuffer2)
+	}
 
 	ses := SessionState{}
 	if sessVal != nil {
@@ -208,11 +220,9 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 	}
 
 	// Middleware chain handling here - very simple, but should do the trick
-	responseHandler := ResponseChain{}
-	chainErr := responseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
+	chainErr := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
 	if chainErr != nil {
-		log.Error("Request chain failed! ", chainErr)
-		// Return whatever we have
+		log.Error("Response chain failed! ", chainErr)
 	}
 
 	p.HandleResponse(rw, res, req, &ses)

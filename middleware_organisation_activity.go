@@ -28,6 +28,12 @@ func (k *OrganizationMonitor) GetConfig() (interface{}, error) {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+
+	if !config.EnforceOrgQuotas {
+		// We aren;t enforcing quotas, so skip this altogether
+		return nil, 200
+	}
+
 	thisSessionState, found := k.GetOrgSession(k.Spec.OrgID)
 
 	if !found {

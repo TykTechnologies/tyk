@@ -217,8 +217,7 @@ func (m *MongoPurger) PurgeCache() {
 
 			err := analyticsCollection.Insert(keys...)
 			if err != nil {
-				log.Error("Problem inserting to mongo collection")
-				log.Error(err)
+				log.Error("Problem inserting to mongo collection: ", err)
 			}
 		}
 	}
