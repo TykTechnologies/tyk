@@ -234,6 +234,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	for _, h := range hopHeaders {
 		res.Header.Del(h)
 	}
+	defer res.Body.Close()
 
 	// Add resource headers
 	if ses != nil {
