@@ -680,7 +680,6 @@ func main() {
 		getPolicies()
 
 		// Use a custom server so we can control keepalives
-		log.Warning("YES? ", config.HttpServerOptions.OverrideDefaults)
 		if config.HttpServerOptions.OverrideDefaults {
 			log.Info("Server started.")
 			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
