@@ -1,3 +1,13 @@
+# DEV
+
+- It is now possible to configure the timeout parameters around the http server in the tyk.conf file:
+
+	"http_server_options": {
+        "override_defaults": true,
+        "read_timeout": 10,
+        "write_timeout": 10
+    }
+
 # v1.7
 - Open APIs now support caching, body transforms and header transforms
 - Added RPC storage backend for cloud-based suport. RPC server is built in vayala/gorpc, signature for the methods that need to be provideda are in the rpc_storage_handler.go file (see the dispatcher).
