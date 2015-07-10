@@ -622,6 +622,16 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 func main() {
 	displayConfig()
 
+	ReadTimeout := 120
+	WriteTimeout := 120
+	if config.HttpServerOptions.ReadTimeout > 0 {
+		ReadTimeout = config.HttpServerOptions.ReadTimeout
+	}
+
+	if config.HttpServerOptions.WriteTimeout > 0 {
+		WriteTimeout = config.HttpServerOptions.WriteTimeout
+	}
+
 	if doMemoryProfile {
 		log.Info("Memory profiling active")
 		profileFile, _ = os.Create("tyk.mprof")
@@ -668,7 +678,24 @@ func main() {
 		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
 		getPolicies()
-		go http.Serve(l, nil)
+
+		// Use a custom server so we can control keepalives
+		log.Warning("YES? ", config.HttpServerOptions.OverrideDefaults)
+		if config.HttpServerOptions.OverrideDefaults {
+			log.Info("Server started.")
+			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
+			s := &http.Server{
+				Addr:         ":" + targetPort,
+				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
+				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				Handler:      http.DefaultServeMux,
+			}
+
+			go s.Serve(l)
+		} else {
+			log.Info("Server started.")
+			go http.Serve(l, nil)
+		}
 
 	} else {
 
@@ -677,7 +704,22 @@ func main() {
 		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
 		getPolicies()
-		go http.Serve(l, nil)
+
+		if config.HttpServerOptions.OverrideDefaults {
+			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
+			s := &http.Server{
+				Addr:         ":" + targetPort,
+				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
+				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				Handler:      http.DefaultServeMux,
+			}
+
+			log.Info("Server started.")
+			go s.Serve(l)
+		} else {
+			log.Info("Server started.")
+			http.Serve(l, nil)
+		}
 
 		// Kill the parent, now that the child has started successfully.
 		if err := goagain.Kill(); nil != err {
