@@ -70,6 +70,11 @@ type Config struct {
 		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
 		EnableRPCCache                    bool   `json:"enable_rpc_cache"`
 	} `json:"slave_options"`
+	HttpServerOptions struct {
+		OverrideDefaults bool `json:"override_defaults"`
+		ReadTimeout      int  `json:"read_timeout"`
+		WriteTimeout     int  `json:"write_timeout"`
+	} `json:"http_server_options"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
