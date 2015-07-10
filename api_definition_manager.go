@@ -39,6 +39,7 @@ const (
 	HeaderInjected         URLStatus = 6
 	HeaderInjectedResponse URLStatus = 7
 	TransformedResponse    URLStatus = 8
+	HardTimeout            URLStatus = 9
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -62,6 +63,7 @@ const (
 	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
 	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
+	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -75,6 +77,7 @@ type URLSpec struct {
 	TransformResponseAction TransformSpec
 	InjectHeaders           tykcommon.HeaderInjectionMeta
 	InjectHeadersResponse   tykcommon.HeaderInjectionMeta
+	HardTimeout             tykcommon.HardTimeoutMeta
 }
 
 type TransformSpec struct {
@@ -471,6 +474,24 @@ func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []tykcommon.Header
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []tykcommon.HardTimeoutMeta, stat URLStatus) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.HardTimeout = stringSpec
+
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -482,6 +503,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse)
 	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
 	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
+	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -492,6 +514,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, transformResponsePaths...)
 	combinedPath = append(combinedPath, headerTransformPaths...)
 	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
+	combinedPath = append(combinedPath, hardTimeouts...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -525,6 +548,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusHeaderInjectedResponse
 	case TransformedResponse:
 		return StatusTransformResponse
+	case HardTimeout:
+		return StatusHardTimeout
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -624,6 +649,10 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 				case TransformedResponse:
 					if method != nil && method.(string) == v.TransformResponseAction.TemplateMeta.Method {
 						return true, &v.TransformResponseAction
+					}
+				case HardTimeout:
+					if method != nil && method.(string) == v.HardTimeout.Method {
+						return true, &v.HardTimeout.TimeOut
 					}
 				}
 

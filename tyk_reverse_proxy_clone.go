@@ -9,6 +9,7 @@ package main
 import (
 	"bytes"
 	"github.com/gorilla/context"
+	//"github.com/lonelycode/tykcommon"
 	"io"
 	"io/ioutil"
 	"net"
@@ -68,7 +69,37 @@ type ReverseProxy struct {
 	FlushInterval time.Duration
 
 	TykAPISpec      *APISpec
+	ErrorHandler    ErrorHandler
 	ResponseHandler ResponseChain
+}
+
+var TykDefaultTransport http.RoundTripper = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	Dial: (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).Dial,
+	TLSHandshakeTimeout: 10 * time.Second,
+}
+
+func GetTransport(timeOut int) http.RoundTripper {
+	if timeOut > 0 {
+		log.Debug("Setting timeout for outbound request to: ", timeOut)
+		var ModifiedTransport http.RoundTripper = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   time.Duration(timeOut) * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			ResponseHeaderTimeout: time.Duration(timeOut) * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+		}
+
+		return ModifiedTransport
+
+	}
+
+	return TykDefaultTransport
 }
 
 func singleJoiningSlash(a, b string) string {
@@ -132,6 +163,7 @@ func (p *ReverseProxy) ReturnRequestServeHttp(rw http.ResponseWriter, req *http.
 }
 
 func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
+	p.ErrorHandler = ErrorHandler{TykMiddleware: &TykMiddleware{spec, p}}
 	return nil, nil
 }
 
@@ -144,18 +176,42 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return p.WrappedServeHTTP(rw, req, true)
 }
 
+func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
+	var stat RequestStatus
+	var meta interface{}
+	var found bool
+
+	_, versionPaths, _, _ := spec.GetVersionData(req)
+	found, meta = spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HardTimeout)
+	if found {
+		stat = StatusHardTimeout
+	}
+
+	if stat == StatusHardTimeout {
+		thisMeta := meta.(*int)
+		log.Debug("HARD TIMEOUT ENFORCED: ", *thisMeta)
+		return true, *thisMeta
+	}
+
+	return false, 0
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	transport := p.Transport
 	if transport == nil {
-		transport = http.DefaultTransport
+		// 1. Check if timeouts are set for this endpoint
+		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		transport = GetTransport(timeout)
 	}
 
 	// Do this before we make a shallow copy
 	sessVal := context.Get(req, SessionData)
 
 	outreq := new(http.Request)
+	logreq := new(http.Request)
 	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
 	*outreq = *req // includes shallow copies of maps, but okay
+	*logreq = *req
 
 	p.Director(outreq)
 	outreq.Proto = "HTTP/1.1"
@@ -173,10 +229,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if outreq.Header.Get(h) != "" {
 			if !copiedHeaders {
 				outreq.Header = make(http.Header)
+				logreq.Header = make(http.Header)
 				copyHeader(outreq.Header, req.Header)
+				copyHeader(logreq.Header, req.Header)
 				copiedHeaders = true
 			}
 			outreq.Header.Del(h)
+			logreq.Header.Del(h)
 		}
 	}
 
@@ -193,6 +252,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	res, err := transport.RoundTrip(outreq)
 	if err != nil {
 		log.Printf("http: proxy error: %v", err)
+		if strings.Contains(err.Error(), "timeout awaiting response headers") {
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", 408)
+			return nil
+		}
 		rw.WriteHeader(http.StatusInternalServerError)
 		return nil
 	}

@@ -381,6 +381,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		}
 
 		proxy := TykNewSingleHostReverseProxy(remote, &referenceSpec)
+		// initialise the proxy
+		proxy.New(nil, &referenceSpec)
 		referenceSpec.target = remote
 
 		// Create the response processors

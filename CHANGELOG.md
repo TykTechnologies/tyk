@@ -8,6 +8,23 @@
         "write_timeout": 10
     }
 
+ - It is now possible to set hard timeouts on a path-by-path basis, e.g. if you have a long-running microservice, but do not want to hold up a dependent client should a query take too long, you can enforce a timeout for that path so the requesting client is not held up forever (or maange it's own timeout). To do so, add this to the extended_paths section of your APi definition:
+
+	 ...
+	 extended_paths: {
+          ...
+          transform_response_headers: [],
+          hard_timeouts: [
+            {
+              path: "delay/5",
+              method: "GET",
+              timeout: 3
+            }
+          ]
+    }
+    ...
+ 
+
 # v1.7
 - Open APIs now support caching, body transforms and header transforms
 - Added RPC storage backend for cloud-based suport. RPC server is built in vayala/gorpc, signature for the methods that need to be provideda are in the rpc_storage_handler.go file (see the dispatcher).
