@@ -154,6 +154,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	sessVal := context.Get(req, SessionData)
 
 	outreq := new(http.Request)
+	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
 	*outreq = *req // includes shallow copies of maps, but okay
 
 	p.Director(outreq)

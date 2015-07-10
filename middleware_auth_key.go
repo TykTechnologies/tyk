@@ -3,9 +3,12 @@ package main
 import "net/http"
 
 import (
+	"bytes"
 	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"io"
+	"io/ioutil"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -21,12 +24,31 @@ func (k *AuthKey) GetConfig() (interface{}, error) {
 	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
 }
 
+func (k *AuthKey) copyResponse(dst io.Writer, src io.Reader) {
+	io.Copy(dst, src)
+}
+
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
 
 	authHeaderValue := r.Header.Get(thisConfig.AuthHeaderName)
 	if thisConfig.UseParam {
-		authHeaderValue = r.FormValue(thisConfig.AuthHeaderName)
+		tempRes := new(http.Request)
+		*tempRes = *r
+
+		defer r.Body.Close()
+
+		// Buffer body data
+		var bodyBuffer bytes.Buffer
+		bodyBuffer2 := new(bytes.Buffer)
+
+		k.copyResponse(&bodyBuffer, r.Body)
+		*bodyBuffer2 = bodyBuffer
+
+		// Create new ReadClosers so we can split output
+		r.Body = ioutil.NopCloser(&bodyBuffer)
+		tempRes.Body = ioutil.NopCloser(bodyBuffer2)
+		authHeaderValue = tempRes.FormValue(thisConfig.AuthHeaderName)
 	}
 
 	if authHeaderValue == "" {

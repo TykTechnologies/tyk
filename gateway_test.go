@@ -85,6 +85,22 @@ func createVersionedSession() SessionState {
 	return thisSession
 }
 
+func createParamAuthSession() SessionState {
+	var thisSession SessionState
+	thisSession.Rate = 10000
+	thisSession.Allowance = thisSession.Rate
+	thisSession.LastCheck = time.Now().Unix()
+	thisSession.Per = 60
+	thisSession.Expires = -1
+	thisSession.QuotaRenewalRate = 300 // 5 minutes
+	thisSession.QuotaRenews = time.Now().Unix()
+	thisSession.QuotaRemaining = 10
+	thisSession.QuotaMax = -1
+	thisSession.AccessRights = map[string]AccessDefinition{"9992": AccessDefinition{APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
+
+	return thisSession
+}
+
 func createStandardSession() SessionState {
 	var thisSession SessionState
 	thisSession.Rate = 10000
@@ -109,7 +125,7 @@ func getChain(spec APISpec) http.Handler {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	remote, _ := url.Parse("http://lonelycode.com/")
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}
@@ -244,7 +260,7 @@ var PathBasedDefinition string = `
 
 	{
 		"name": "Tyk Test API",
-		"api_id": "9991",
+		"api_id": "9992",
 		"org_id": "default",
 		"definition": {
 			"location": "header",
@@ -270,9 +286,9 @@ var PathBasedDefinition string = `
 		},
 		"event_handlers": {},
 		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://httbin.org",
-			"strip_listen_path": false
+			"listen_path": "/pathBased/",
+			"target_url": "http://httpbin.org/",
+			"strip_listen_path": true
 		}
 	}
 
@@ -451,9 +467,9 @@ func TestParambasedAuth(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createVersionedSession()
+	thisSession := createParamAuthSession()
 	spec.SessionManager.UpdateSession("54321", thisSession, 60)
-	uri := "/post?authorization=54321"
+	uri := "/pathBased/post?authorization=54321"
 	method := "POST"
 
 	form := url.Values{}
@@ -475,6 +491,8 @@ func TestParambasedAuth(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: ", recorder.Code)
+		log.Error("URI: ", uri)
+		log.Error("Proxy To:", spec.Proxy.TargetURL)
 		t.Error(recorder.Body)
 	}
 
@@ -487,19 +505,19 @@ func TestParambasedAuth(t *testing.T) {
 		log.Error("JSON decoding failed")
 	}
 
-	if dat["args"].(map[string]string)["authorization"] != "54321" {
+	if dat["args"].(map[string]interface{})["authorization"].(string) != "54321" {
 		t.Error("Request params did not arrive")
 	}
 
-	if dat["form"].(map[string]string)["foo"] != "swiggetty" {
+	if dat["form"].(map[string]interface{})["foo"].(string) != "swiggetty" {
 		t.Error("Form param 1 did not arrive")
 	}
 
-	if dat["form"].(map[string]string)["bar"] != "swoggetty" {
+	if dat["form"].(map[string]interface{})["bar"].(string) != "swoggetty" {
 		t.Error("Form param 2 did not arrive")
 	}
 
-	if dat["form"].(map[string]string)["baz"] != "swoogetty" {
+	if dat["form"].(map[string]interface{})["baz"].(string) != "swoogetty" {
 		t.Error("Form param 3 did not arrive")
 	}
 
