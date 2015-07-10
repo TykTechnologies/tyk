@@ -38,7 +38,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 
 		defer r.Body.Close()
 
-		// Buffer body data
+		// Buffer body data - don't like thi but we would otherwise drain the request body
 		var bodyBuffer bytes.Buffer
 		bodyBuffer2 := new(bytes.Buffer)
 
@@ -48,6 +48,8 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 		// Create new ReadClosers so we can split output
 		r.Body = ioutil.NopCloser(&bodyBuffer)
 		tempRes.Body = ioutil.NopCloser(bodyBuffer2)
+
+		// Set hte header name
 		authHeaderValue = tempRes.FormValue(thisConfig.AuthHeaderName)
 	}
 
