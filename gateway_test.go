@@ -191,7 +191,7 @@ var nonExpiringDefNoWhiteList string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://google.com",
+			"target_url": "http://lonelycode.com/",
 			"strip_listen_path": false
 		}
 	}
@@ -249,7 +249,7 @@ var VersionedDefinition string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://lonelycode.com/",
 			"strip_listen_path": false
 		}
 	}
@@ -430,7 +430,7 @@ var ExtendedPathGatewaySetup string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://lonelycode.com/",
 			"strip_listen_path": false
 		}
 	}
