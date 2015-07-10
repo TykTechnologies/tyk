@@ -668,6 +668,7 @@ func main() {
 		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
 		getPolicies()
+
 		go http.Serve(l, nil)
 
 	} else {

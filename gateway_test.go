@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -239,6 +240,44 @@ var VersionedDefinition string = `
 
 `
 
+var PathBasedDefinition string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "9991",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"use_param": true, 
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"default": {
+					"name": "default",
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"black_list": [],
+						"white_list": []
+					}
+				}
+			}
+		},
+		"event_handlers": {},
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://httbin.org",
+			"strip_listen_path": false
+		}
+	}
+
+`
+
 var ExtendedPathGatewaySetup string = `
 
 	{
@@ -400,13 +439,79 @@ func createVersionedDefinition() APISpec {
 
 }
 
+func createPathBasedDefinition() APISpec {
+
+	return createDefinitionFromString(PathBasedDefinition)
+
+}
+
+func TestParambasedAuth(t *testing.T) {
+	spec := createPathBasedDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	thisSession := createVersionedSession()
+	spec.SessionManager.UpdateSession("54321", thisSession, 60)
+	uri := "/post?authorization=54321"
+	method := "POST"
+
+	form := url.Values{}
+	form.Add("foo", "swiggetty")
+	form.Add("bar", "swoggetty")
+	form.Add("baz", "swoogetty")
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(form.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code: ", recorder.Code)
+		t.Error(recorder.Body)
+	}
+
+	// Ensure the post data is still sent
+	contents, _ := ioutil.ReadAll(recorder.Body)
+	dat := make(map[string]interface{})
+	jErr := json.Unmarshal(contents, &dat)
+
+	if jErr != nil {
+		log.Error("JSON decoding failed")
+	}
+
+	if dat["args"].(map[string]string)["authorization"] != "54321" {
+		t.Error("Request params did not arrive")
+	}
+
+	if dat["form"].(map[string]string)["foo"] != "swiggetty" {
+		t.Error("Form param 1 did not arrive")
+	}
+
+	if dat["form"].(map[string]string)["bar"] != "swoggetty" {
+		t.Error("Form param 2 did not arrive")
+	}
+
+	if dat["form"].(map[string]string)["baz"] != "swoogetty" {
+		t.Error("Form param 3 did not arrive")
+	}
+
+}
+
 func TestThrottling(t *testing.T) {
 	spec := createNonVersionedDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createThrottledSession()
+	thisSession := createVersionedSession()
 	keyId := randSeq(10)
 	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
 	uri := "/about-lonelycoder/"
