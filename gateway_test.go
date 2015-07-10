@@ -126,6 +126,7 @@ func getChain(spec APISpec) http.Handler {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	//remote, _ := url.Parse("http://lonelycode.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}
@@ -529,7 +530,7 @@ func TestThrottling(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createVersionedSession()
+	thisSession := createThrottledSession()
 	keyId := randSeq(10)
 	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
 	uri := "/about-lonelycoder/"
