@@ -396,13 +396,33 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		CacheStore.Connect()
 
 		if referenceSpec.APIDefinition.UseKeylessAccess {
-			// for KeyLessAccess we can't support rate limiting, versioning or access rules
-			chain := alice.New(CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+
+			// Add pre-process MW
+			var chainArray = []alice.Constructor{}
+
+			var baseChainArray = []alice.Constructor{
+				CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
 				CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
+				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
+			}
+
+			for _, obj := range mwPreFuncs {
+				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+			}
+
+			for _, baseMw := range baseChainArray {
+				chainArray = append(chainArray, baseMw)
+			}
+
+			for _, obj := range mwPostFuncs {
+				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+			}
+
+			// for KeyLessAccess we can't support rate limiting, versioning or access rules
+			chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 
 		} else {

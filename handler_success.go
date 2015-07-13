@@ -183,10 +183,10 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
-
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
+		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
 
 	t1 := time.Now()
@@ -204,7 +204,6 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored Itwill also return a response object for the cache
 func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
-
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
