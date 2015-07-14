@@ -1,5 +1,6 @@
 # DEV
 
+- Fixed bug where version parameter on POST requests would empty request body
 - it is now possible to use JSVM middleware on Open (Keyless) APIs
 - It is now possible to configure the timeout parameters around the http server in the tyk.conf file:
 

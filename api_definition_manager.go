@@ -672,7 +672,8 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return ""
 
 	} else if a.APIDefinition.VersionDefinition.Location == "url-param" {
-		fromParam := r.FormValue(a.APIDefinition.VersionDefinition.Key)
+		tempRes := CopyRequest(r)
+		fromParam := tempRes.FormValue(a.APIDefinition.VersionDefinition.Key)
 		if fromParam != "" {
 			return fromParam
 		}

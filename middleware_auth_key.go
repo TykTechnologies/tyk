@@ -28,26 +28,32 @@ func (k *AuthKey) copyResponse(dst io.Writer, src io.Reader) {
 	io.Copy(dst, src)
 }
 
+func CopyRequest(r *http.Request) *http.Request {
+	tempRes := new(http.Request)
+	*tempRes = *r
+
+	defer r.Body.Close()
+
+	// Buffer body data - don't like thi but we would otherwise drain the request body
+	var bodyBuffer bytes.Buffer
+	bodyBuffer2 := new(bytes.Buffer)
+
+	io.Copy(&bodyBuffer, r.Body)
+	*bodyBuffer2 = bodyBuffer
+
+	// Create new ReadClosers so we can split output
+	r.Body = ioutil.NopCloser(&bodyBuffer)
+	tempRes.Body = ioutil.NopCloser(bodyBuffer2)
+
+	return tempRes
+}
+
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
 
 	authHeaderValue := r.Header.Get(thisConfig.AuthHeaderName)
 	if thisConfig.UseParam {
-		tempRes := new(http.Request)
-		*tempRes = *r
-
-		defer r.Body.Close()
-
-		// Buffer body data - don't like thi but we would otherwise drain the request body
-		var bodyBuffer bytes.Buffer
-		bodyBuffer2 := new(bytes.Buffer)
-
-		k.copyResponse(&bodyBuffer, r.Body)
-		*bodyBuffer2 = bodyBuffer
-
-		// Create new ReadClosers so we can split output
-		r.Body = ioutil.NopCloser(&bodyBuffer)
-		tempRes.Body = ioutil.NopCloser(bodyBuffer2)
+		tempRes := CopyRequest(r)
 
 		// Set hte header name
 		authHeaderValue = tempRes.FormValue(thisConfig.AuthHeaderName)
