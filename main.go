@@ -703,7 +703,7 @@ func main() {
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
-			log.Info("Server started.")
+			log.Info("Custom Server started.")
 			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
@@ -735,7 +735,7 @@ func main() {
 				Handler:      http.DefaultServeMux,
 			}
 
-			log.Info("Server started.")
+			log.Info("Custom server started.")
 			go s.Serve(l)
 		} else {
 			log.Info("Server started.")
