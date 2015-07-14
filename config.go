@@ -75,6 +75,9 @@ type Config struct {
 		ReadTimeout      int  `json:"read_timeout"`
 		WriteTimeout     int  `json:"write_timeout"`
 	} `json:"http_server_options"`
+	ServiceDiscovery struct {
+		DefaultCacheTimeout int `json:"default_cache_timeout"`
+	} `json:"service_discovery"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

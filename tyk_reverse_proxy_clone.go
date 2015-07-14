@@ -10,6 +10,9 @@ import (
 	"bytes"
 	"github.com/gorilla/context"
 	//"github.com/lonelycode/tykcommon"
+	"errors"
+	"github.com/lonelycode/gabs"
+	"github.com/pmylund/go-cache"
 	"io"
 	"io/ioutil"
 	"net"
@@ -21,6 +24,44 @@ import (
 	"time"
 )
 
+var ServiceCache *cache.Cache
+
+func GetURLFromService(spec *APISpec) (string, error) {
+	serviceURL, found := ServiceCache.Get(spec.APIID)
+	if found {
+		return serviceURL.(string), nil
+	}
+
+	// Not found? Query the service
+	resp, err := http.Get(spec.Proxy.ServiceDiscovery.QueryEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	contents, readErr := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", readErr
+	}
+
+	jsonParsed, pErr := gabs.ParseJSON(contents)
+	if pErr != nil {
+		return "", pErr
+	}
+
+	value, ok := jsonParsed.Path(spec.Proxy.ServiceDiscovery.DataPath).Data().(string)
+	if !ok {
+		return "", errors.New("Failed to traverse data path")
+	}
+
+	if ServiceCache != nil {
+		// Set the cached value for this API
+		ServiceCache.Set(spec.APIID, value, time.Duration(spec.Proxy.ServiceDiscovery.CacheTimeout))
+	}
+
+	return value, nil
+}
+
 // TykNewSingleHostReverseProxy returns a new ReverseProxy that rewrites
 // URLs to the scheme, host, and base path provided in target. If the
 // target's path is "/base" and the incoming request was for "/dir",
@@ -28,8 +69,36 @@ import (
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
+	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
+		log.Info("[PROXY] Service discovery enabled")
+		if ServiceCache != nil {
+			expiry := 120
+			if config.ServiceDiscovery.DefaultCacheTimeout > 0 {
+				expiry = config.ServiceDiscovery.DefaultCacheTimeout
+			}
+			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
+		}
+	}
+
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
+		if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
+			tempTargetURL, tErr := GetURLFromService(spec)
+			if tErr != nil {
+				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", tErr)
+			} else {
+				// No error, replace the target
+				remote, err := url.Parse(tempTargetURL)
+				if err != nil {
+					log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
+				} else {
+					// Only replace target if everything is OK
+					target = remote
+					targetQuery = target.RawQuery
+				}
+			}
+		}
+
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
 		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)

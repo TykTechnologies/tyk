@@ -220,7 +220,7 @@ type TykJSHttpResponse struct {
 func (j *JSVM) LoadTykJSApi() {
 	// Enable a log
 	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
-		log.Info("JSVM LOG: ", call.Argument(0).String())
+		log.Info("[JSVM] [LOG]: ", call.Argument(0).String())
 		return otto.Value{}
 	})
 
@@ -275,7 +275,7 @@ func (j *JSVM) LoadTykJSApi() {
 			resp, respErr := client.Do(r)
 
 			if respErr != nil {
-				log.Error("JSVM: Request failed: ", respErr)
+				log.Error("[JSVM]: Request failed: ", respErr)
 				return otto.Value{}
 			}
 
@@ -289,7 +289,7 @@ func (j *JSVM) LoadTykJSApi() {
 			retAsStr, _ := json.Marshal(tykResp)
 			returnVal, retErr := j.VM.ToValue(string(retAsStr))
 			if retErr != nil {
-				log.Error("JSVM: Failed to encode return value: ", retErr)
+				log.Error("[JSVM]: Failed to encode return value: ", retErr)
 				return otto.Value{}
 			}
 
@@ -311,7 +311,7 @@ func (j *JSVM) LoadTykJSApi() {
 
 		returnVal, retErr := j.VM.ToValue(string(byteArray))
 		if retErr != nil {
-			log.Error("JSVM: Failed to encode return value: ", retErr)
+			log.Error("[JSVM]: Failed to encode return value: ", retErr)
 			return otto.Value{}
 		}
 
@@ -327,7 +327,7 @@ func (j *JSVM) LoadTykJSApi() {
 		decErr := json.Unmarshal([]byte(encoddedSession), &newSession)
 
 		if decErr != nil {
-			log.Error("Failed to decode the sesison data")
+			log.Error("[JSVM]: Failed to decode the sesison data")
 			return otto.Value{}
 		}
 
