@@ -13,6 +13,10 @@ func (r *RoundRobin) SetMax(rp interface{}) {
 	if r.cur > r.max {
 		r.cur = 0
 	}
+
+	if r.pos > r.max {
+		r.pos = 0
+	}
 }
 
 func (r *RoundRobin) GetPos() int {
