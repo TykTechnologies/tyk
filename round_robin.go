@@ -8,6 +8,11 @@ type RoundRobin struct {
 
 func (r *RoundRobin) SetMax(rp interface{}) {
 	r.max = len(*rp.(*[]string))
+
+	// Can't have a new list substituted that's shorter
+	if r.cur > r.max {
+		r.cur = 0
+	}
 }
 
 func (r *RoundRobin) GetPos() int {
@@ -16,6 +21,6 @@ func (r *RoundRobin) GetPos() int {
 	if r.pos == (r.max) {
 		r.pos = 0
 	}
-	log.Warning("Returning index: ", r.cur)
+	log.Debug("[ROUND ROBIN] Returning index: ", r.cur)
 	return r.cur
 }
