@@ -426,9 +426,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	res, err := transport.RoundTrip(outreq)
 	if err != nil {
-		log.Printf("http: proxy error: %v", err)
+		log.Error("http: proxy error: ", err)
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", 408)
+
+			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
+				if ServiceCache != nil {
+					log.Warning("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+					ServiceCache.Delete(p.TykAPISpec.APIID)
+				}
+			}
 			return nil
 		}
 		rw.WriteHeader(http.StatusInternalServerError)
