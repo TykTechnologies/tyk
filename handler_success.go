@@ -15,8 +15,10 @@ type ContextKey int
 // Enums for keys to be stored in a session context - this is how gorilla expects
 // these to be implemented and is lifted pretty much from docs
 const (
-	SessionData     = 0
-	AuthHeaderValue = 1
+	SessionData       = 0
+	AuthHeaderValue   = 1
+	VersionData       = 2
+	VersionKeyContext = 3
 )
 
 // TykMiddleware wraps up the ApiSpec and Proxy objects to be included in a

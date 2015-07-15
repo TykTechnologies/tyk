@@ -4,6 +4,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"labix.org/v2/mgo"
@@ -100,7 +101,7 @@ type APISpec struct {
 	Health            HealthChecker
 	JSVM              *JSVM
 	ResponseChain     *[]TykResponseHandler
-	RoundRobin *RoundRobin
+	RoundRobin        *RoundRobin
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
@@ -764,27 +765,39 @@ func (a *APISpec) GetVersionData(r *http.Request) (*tykcommon.VersionInfo, *[]UR
 	var versionRxPaths = []URLSpec{}
 	var versionWLStatus bool
 
-	// Are we versioned?
-	if a.APIDefinition.VersionData.NotVersioned {
-		// Get the first one in the list
-		for k, v := range a.APIDefinition.VersionData.Versions {
-			versionKey = k
-			thisVersion = v
-			break
-		}
-	} else {
-		// Extract Version Info
-		versionKey = a.getVersionFromRequest(r)
-		if versionKey == "" {
-			return &thisVersion, &versionRxPaths, versionWLStatus, VersionNotFound
-		}
-	}
+	// try the context first
+	aVersion, foundInContext := context.GetOk(r, VersionData)
 
-	// Load Version Data - General
-	var ok bool
-	thisVersion, ok = a.APIDefinition.VersionData.Versions[versionKey]
-	if !ok {
-		return &thisVersion, &versionRxPaths, versionWLStatus, VersionDoesNotExist
+	if foundInContext {
+		thisVersion = aVersion.(tykcommon.VersionInfo)
+		versionKey = context.Get(r, VersionKeyContext).(string)
+	} else {
+		// Are we versioned?
+		if a.APIDefinition.VersionData.NotVersioned {
+			// Get the first one in the list
+			for k, v := range a.APIDefinition.VersionData.Versions {
+				versionKey = k
+				thisVersion = v
+				break
+			}
+		} else {
+			// Extract Version Info
+			versionKey = a.getVersionFromRequest(r)
+			if versionKey == "" {
+				return &thisVersion, &versionRxPaths, versionWLStatus, VersionNotFound
+			}
+		}
+
+		// Load Version Data - General
+		var ok bool
+		thisVersion, ok = a.APIDefinition.VersionData.Versions[versionKey]
+		if !ok {
+			return &thisVersion, &versionRxPaths, versionWLStatus, VersionDoesNotExist
+		}
+
+		// Lets save this for the future
+		context.Set(r, VersionData, thisVersion)
+		context.Set(r, VersionKeyContext, versionKey)
 	}
 
 	// Load path data and whitelist data for version
