@@ -100,6 +100,7 @@ type APISpec struct {
 	Health            HealthChecker
 	JSVM              *JSVM
 	ResponseChain     *[]TykResponseHandler
+	RoundRobin *RoundRobin
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()

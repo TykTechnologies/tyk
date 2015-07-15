@@ -1,5 +1,85 @@
 # DEV
 
+- Added round-robin load balancing support, to enable, set up in the API Definition under the `proxy` section:
+	
+	...
+	"enable_load_balancing": true,
+	"target_list": [
+		"http://server1", 
+		"http://server2", 
+		"http://server3"
+	],
+	...
+
+- Added REST-based Servcie discovery for both single and load balanced entries (tested with etcd, but anything that returns JSON should work), to enable add a service discovery section to your Proxy section:
+
+	```
+	// Solo
+	service_discovery : {
+      use_discovery_service: true,
+      query_endpoint: "http://127.0.0.1:4001/v2/keys/services/single",
+      use_nested_query: true,
+      parent_data_path: "node.value",
+      data_path: "hostname",
+      port_data_path: "port",
+      use_target_list: false,
+      cache_timeout: 10
+    },
+
+
+	// With LB
+	"enable_load_balancing": true,
+	service_discovery: {
+      use_discovery_service: true,
+      query_endpoint: "http://127.0.0.1:4001/v2/keys/services/multiobj",
+      use_nested_query: true,
+      parent_data_path: "node.value",
+      data_path: "array.hostname",
+      port_data_path: "array.port",
+      use_target_list: true,
+      cache_timeout: 10
+    },
+    ```
+
+- For service discovery, multiple assumptions are made:
+	- The response data is in JSON
+	- The response data can have a nested value set that will be an encoded JSON string, e.g. from etcd:
+
+	``` 
+	$ curl -L http://127.0.0.1:4001/v2/keys/services/solo
+	
+	{
+	    "action": "get",
+	    "node": {
+	        "key": "/services/single",
+	        "value": "{\"hostname\": \"http://httpbin.org\", \"port\": \"80\"}",
+	        "modifiedIndex": 6,
+	        "createdIndex": 6
+	    }
+	}
+	```
+
+	```
+	$ curl -L http://127.0.0.1:4001/v2/keys/services/multiobj
+	
+	{
+	    "action": "get",
+	    "node": {
+	        "key": "/services/multiobj",
+	        "value": "{\"array\":[{\"hostname\": \"http://httpbin.org\", \"port\": \"80\"},{\"hostname\": \"http://httpbin.org\", \"port\": \"80\"}]}",
+	        "modifiedIndex": 9,
+	        "createdIndex": 9
+	    }
+	}
+	```
+
+	Here the key value is actually an encoded JSON string, which needs to be decoded separately to get to the data. 
+
+	- In some cases port data will be separate from host data, if you specify a `port_data_path`, the values will be zipped together and concatenated into a valid proxy string.
+	- If use_target_list is enabled, then enable_load_balancing msut also be enabled, as Tyk will treat the list as a target list.
+	- The nested data object in a service registry key MUST be a JSON Object, **not just an Array**.
+
+
 - Fixed bug where version parameter on POST requests would empty request body, streamlined request copies in general.
 - it is now possible to use JSVM middleware on Open (Keyless) APIs
 - It is now possible to configure the timeout parameters around the http server in the tyk.conf file:

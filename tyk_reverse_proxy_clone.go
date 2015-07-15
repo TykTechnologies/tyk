@@ -26,40 +26,109 @@ import (
 
 var ServiceCache *cache.Cache
 
-func GetURLFromService(spec *APISpec) (string, error) {
+func GetURLFromService(spec *APISpec) (interface{}, error) {
+	log.Debug("[PROXY] [SERVICE DISCOVERY] [CACHE] Checking:", spec.APIID)
 	serviceURL, found := ServiceCache.Get(spec.APIID)
 	if found {
-		return serviceURL.(string), nil
+		log.Debug("[PROXY] [SERVICE DISCOVERY] [CACHE] Cached value returned")
+		return serviceURL, nil
 	}
 
 	// Not found? Query the service
 	resp, err := http.Get(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
 	contents, readErr := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", readErr
+		return nil, readErr
 	}
 
 	jsonParsed, pErr := gabs.ParseJSON(contents)
 	if pErr != nil {
-		return "", pErr
+		return nil, pErr
 	}
 
-	value, ok := jsonParsed.Path(spec.Proxy.ServiceDiscovery.DataPath).Data().(string)
-	if !ok {
-		return "", errors.New("Failed to traverse data path")
+	if spec.Proxy.ServiceDiscovery.UseNestedQuery {
+		// If this is a nested query, we need to extract the nested JSON string first
+		log.Debug("[PROXY] [SERVICE DISCOVERY] Data: ", string(contents))
+		log.Debug("[PROXY] [SERVICE DISCOVERY] Nested parent path: ", string(spec.Proxy.ServiceDiscovery.ParentDataPath))
+		nestedValueObject, nestedOk := jsonParsed.Path(spec.Proxy.ServiceDiscovery.ParentDataPath).Data().(string)
+		if !nestedOk {
+			return nil, errors.New("Nested path traversal failed")
+		}
+		var secondNestedErr error
+		jsonParsed, secondNestedErr = gabs.ParseJSON([]byte(nestedValueObject))
+		if secondNestedErr != nil {
+			log.Debug("[PROXY] [SERVICE DISCOVERY] Nested object parsing error, data was: ", nestedValueObject)
+			return nil, secondNestedErr
+		}
+	}
+
+	var value interface{}
+	// Check if we are getting a target list or just a single value
+	if spec.Proxy.ServiceDiscovery.UseTargetList {
+		var valErr error
+		value, valErr = jsonParsed.Path(spec.Proxy.ServiceDiscovery.DataPath).Children()
+		if valErr != nil {
+			log.Debug("Failed to get children!")
+			return nil, valErr
+		}
+		// Some servcies separate out port numbers, lets take this into account
+		if spec.Proxy.ServiceDiscovery.PortDataPath != "" {
+			newHostArray := make([]string, len(value.([]*gabs.Container)))
+			portsData, portsErr := jsonParsed.Path(spec.Proxy.ServiceDiscovery.PortDataPath).Children()
+			if portsErr != nil {
+				return nil, portsErr
+			}
+
+			// Zip them up
+			for i, v := range value.([]*gabs.Container) {
+				asString := v.Data().(string) + ":" + portsData[i].Data().(string)
+				newHostArray[i] = asString
+			}
+			value = newHostArray
+
+		}
+	} else {
+		var ok bool
+		value, ok = jsonParsed.Path(spec.Proxy.ServiceDiscovery.DataPath).Data().(string)
+		if !ok {
+			return nil, errors.New("Failed to traverse data path")
+		}
+
+		if spec.Proxy.ServiceDiscovery.PortDataPath != "" {
+			portsData, pOk := jsonParsed.Path(spec.Proxy.ServiceDiscovery.PortDataPath).Data().(string)
+			if !pOk {
+				return nil, errors.New("Failed to traverse port data path")
+			}
+			newHost := value.(string) + ":" + portsData
+			value = newHost
+		}
 	}
 
 	if ServiceCache != nil {
 		// Set the cached value for this API
-		ServiceCache.Set(spec.APIID, value, time.Duration(spec.Proxy.ServiceDiscovery.CacheTimeout))
+		log.Debug("SETTING SERVICE CACHE TIMEOUT TO: ", spec.Proxy.ServiceDiscovery.CacheTimeout)
+		ServiceCache.Set(spec.APIID, value, time.Duration(spec.Proxy.ServiceDiscovery.CacheTimeout)*time.Second)
 	}
 
 	return value, nil
+}
+
+func GetNextTarget(targetData interface{}, spec *APISpec) string {
+	if spec.Proxy.EnableLoadBalancing {
+		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
+		// Use a list
+		spec.RoundRobin.SetMax(targetData)
+		td := *targetData.(*[]string)
+		return td[spec.RoundRobin.GetPos()]
+	}
+	// Use standard target - might still be service data
+	log.Debug("TARGET DATA:", targetData)
+	return targetData.(string)
 }
 
 // TykNewSingleHostReverseProxy returns a new ReverseProxy that rewrites
@@ -69,9 +138,14 @@ func GetURLFromService(spec *APISpec) (string, error) {
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
+	// initalise round robin
+	spec.RoundRobin = &RoundRobin{}
+	spec.RoundRobin.SetMax(&[]string{})
+
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-		log.Info("[PROXY] Service discovery enabled")
-		if ServiceCache != nil {
+		log.Debug("[PROXY] Service discovery enabled")
+		if ServiceCache == nil {
+			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
 			if config.ServiceDiscovery.DefaultCacheTimeout > 0 {
 				expiry = config.ServiceDiscovery.DefaultCacheTimeout
@@ -82,23 +156,55 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
+		var targetSet bool
 		if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 			tempTargetURL, tErr := GetURLFromService(spec)
 			if tErr != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", tErr)
 			} else {
 				// No error, replace the target
-				remote, err := url.Parse(tempTargetURL)
-				if err != nil {
-					log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
+				if spec.Proxy.EnableLoadBalancing {
+					var targetPtr []string = tempTargetURL.([]string)
+					remote, err := url.Parse(GetNextTarget(&targetPtr, spec))
+					if err != nil {
+						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
+					} else {
+						// Only replace target if everything is OK
+						target = remote
+						targetQuery = target.RawQuery
+					}
+				} else {
+					var targetPtr string = tempTargetURL.(string)
+					remote, err := url.Parse(GetNextTarget(targetPtr, spec))
+					if err != nil {
+						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
+					} else {
+						// Only replace target if everything is OK
+						target = remote
+						targetQuery = target.RawQuery
+					}
+				}
+			}
+			// We've overriden remote now, don;t need to do it again
+			targetSet = true
+		}
+
+		if !targetSet {
+			// no override, better check if LB is enabled
+			if spec.Proxy.EnableLoadBalancing {
+				// it is, lets get that target data
+				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.TargetList, spec))
+				if lbErr != nil {
+					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
 					// Only replace target if everything is OK
-					target = remote
+					target = lbRemote
 					targetQuery = target.RawQuery
 				}
 			}
 		}
 
+		// No override, and no load balancing? Use the existing target
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
 		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
