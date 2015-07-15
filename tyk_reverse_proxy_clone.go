@@ -371,6 +371,26 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	return false, 0
 }
 
+func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Request) (bool, *ExtendedCircuitBreakerMeta) {
+	var stat RequestStatus
+	var meta interface{}
+	var found bool
+
+	_, versionPaths, _, _ := spec.GetVersionData(req)
+	found, meta = spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, CircuitBreaker)
+	if found {
+		stat = StatusCircuitBreaker
+	}
+
+	if stat == StatusCircuitBreaker {
+		thisMeta := meta.(*ExtendedCircuitBreakerMeta)
+		log.Warning("CIRCUIT BREAKER ENFORCED: ", *thisMeta)
+		return true, thisMeta
+	}
+
+	return false, nil
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	transport := p.Transport
 	if transport == nil {
@@ -424,7 +444,28 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		outreq.Header.Set("X-Forwarded-For", clientIP)
 	}
 
-	res, err := transport.RoundTrip(outreq)
+	// Circuit breaker
+	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
+	// TODO:
+	// 1. If the circuit breaker is active - wrap the RoundTrip call with a breaker function
+	// 2. when we init the APISpec, we need to create CBs for each monitored endpoint, this means extending the APISpec so we can store pointers
+	// 3. Set up monitoring functions and hook them up to the event handler
+
+	var res *http.Response
+	var err error
+	if breakerEnforced {
+		if breakerConf.CB.Ready() {
+			res, err = transport.RoundTrip(outreq)
+			if err != nil {
+				breakerConf.CB.Fail()
+			} else {
+				breakerConf.CB.Success()
+			}
+		}
+	} else {
+		res, err = transport.RoundTrip(outreq)
+	}
+
 	if err != nil {
 		log.Error("http: proxy error: ", err)
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {

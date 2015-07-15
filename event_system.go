@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lonelycode/tykcommon"
+	"github.com/rubyist/circuitbreaker"
 	"labix.org/v2/mgo/bson"
 	"net/http"
 	"time"
@@ -26,6 +27,7 @@ const (
 	EVENT_VersionFailure    tykcommon.TykEvent = "VersionFailure"
 	EVENT_OrgQuotaExceeded  tykcommon.TykEvent = "OrgQuotaExceeded"
 	EVENT_TriggerExceeded   tykcommon.TykEvent = "TriggerExceeded"
+	EVENT_BreakerTriggered  tykcommon.TykEvent = "BreakerTriggered"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -57,6 +59,14 @@ type EVENT_AuthFailureMeta struct {
 	Path   string
 	Origin string
 	Key    string
+}
+
+// EVENT_CurcuitBreakerMeta is the event status for a circuit breaker tripping
+type EVENT_CurcuitBreakerMeta struct {
+	EventMetaDefault
+	Path         string
+	APIID        string
+	CircuitEvent circuit.BreakerEvent
 }
 
 // EVENT_KeyExpiredMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
@@ -146,6 +156,25 @@ func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData int
 
 	log.Debug("EVENT FIRED")
 	handlers, handlerExists := t.Spec.EventPaths[eventName]
+
+	if handlerExists {
+		log.Debug("FOUND EVENT HANDLERS")
+		eventMessage := EventMessage{}
+		eventMessage.EventMetaData = eventMetaData
+		eventMessage.EventType = eventName
+		eventMessage.TimeStamp = time.Now().Local().String()
+
+		for _, handler := range handlers {
+			log.Debug("FIRING HANDLER")
+			go handler.HandleEvent(eventMessage)
+		}
+	}
+}
+
+func (s APISpec) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
+
+	log.Debug("EVENT FIRED")
+	handlers, handlerExists := s.EventPaths[eventName]
 
 	if handlerExists {
 		log.Debug("FOUND EVENT HANDLERS")

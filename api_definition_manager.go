@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
+	"github.com/rubyist/circuitbreaker"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -41,6 +42,7 @@ const (
 	HeaderInjectedResponse URLStatus = 7
 	TransformedResponse    URLStatus = 8
 	HardTimeout            URLStatus = 9
+	CircuitBreaker         URLStatus = 10
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -65,6 +67,7 @@ const (
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
 	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
 	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
+	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -79,11 +82,17 @@ type URLSpec struct {
 	InjectHeaders           tykcommon.HeaderInjectionMeta
 	InjectHeadersResponse   tykcommon.HeaderInjectionMeta
 	HardTimeout             tykcommon.HardTimeoutMeta
+	CircuitBreaker          ExtendedCircuitBreakerMeta
 }
 
 type TransformSpec struct {
 	tykcommon.TemplateMeta
 	Template *textTemplate.Template
+}
+
+type ExtendedCircuitBreakerMeta struct {
+	tykcommon.CircuitBreakerMeta
+	CB *circuit.Breaker
 }
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
@@ -188,7 +197,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v)
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, &newAppSpec)
 
 		} else {
 			log.Warning("Path-based version path list settings are being deprecated, please upgrade your defintitions to the new standard as soon as spossible")
@@ -494,7 +503,51 @@ func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []tykcommon.HardTimeo
 	return thisURLSpec
 }
 
-func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
+func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
+		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
+
+		events := newSpec.CircuitBreaker.CB.Subscribe()
+		go func() {
+			path := stringSpec.Path
+			spec := apiSpec
+			breakerPtr := newSpec.CircuitBreaker.CB
+			for {
+				e := <-events
+				spec.FireEvent(EVENT_BreakerTriggered,
+					EVENT_CurcuitBreakerMeta{
+						EventMetaDefault: EventMetaDefault{Message: "Breaker Tripped"},
+						CircuitEvent:     e,
+						Path:             path,
+						APIID:            spec.APIID,
+					})
+				switch e {
+				case circuit.BreakerTripped:
+					// Start a timer function
+					go func(timeout int, breaker *circuit.Breaker) {
+						time.Sleep(time.Duration(timeout) * time.Second)
+						breaker.Reset()
+					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
+				}
+			}
+		}()
+
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
+func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.Ignored, Ignored)
@@ -506,6 +559,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
 	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
+	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -517,6 +571,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, headerTransformPaths...)
 	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
 	combinedPath = append(combinedPath, hardTimeouts...)
+	combinedPath = append(combinedPath, circuitBreakers...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -552,6 +607,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusTransformResponse
 	case HardTimeout:
 		return StatusHardTimeout
+	case CircuitBreaker:
+		return StatusCircuitBreaker
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -656,6 +713,11 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 					if method != nil && method.(string) == v.HardTimeout.Method {
 						return true, &v.HardTimeout.TimeOut
 					}
+				case CircuitBreaker:
+					if method != nil && method.(string) == v.CircuitBreaker.Method {
+						return true, &v.CircuitBreaker
+					}
+
 				}
 
 			}
