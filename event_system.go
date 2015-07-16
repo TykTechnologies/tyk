@@ -205,16 +205,18 @@ func (l LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, e
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l LogMessageEventHandler) HandleEvent(em EventMessage) {
-	var msgConf EVENT_QuotaExceededMeta
-	// type assert the metadata and then use it however you like
-	msgConf = em.EventMetaData.(EVENT_QuotaExceededMeta)
-
 	var formattedMsgString string
-	formattedMsgString = fmt.Sprintf("%s:%s:%s", l.conf["prefix"].(string), em.EventType, msgConf.Message)
+	formattedMsgString = fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.EventType)
 
 	// We can handle specific event types easily
 	if em.EventType == EVENT_QuotaExceeded {
+		msgConf := em.EventMetaData.(EVENT_QuotaExceededMeta)
 		formattedMsgString = fmt.Sprintf("%s:%s:%s:%s", formattedMsgString, msgConf.Key, msgConf.Origin, msgConf.Path)
+	}
+
+	if em.EventType == EVENT_BreakerTriggered {
+		msgConf := em.EventMetaData.(EVENT_CurcuitBreakerMeta)
+		formattedMsgString = fmt.Sprintf("%s:%s:%s: [STATUS] %v", formattedMsgString, msgConf.APIID, msgConf.Path, msgConf.CircuitEvent)
 	}
 
 	log.Warning(formattedMsgString)

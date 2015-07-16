@@ -1,5 +1,62 @@
 # DEV
 
+- Added circuit breaker as a path-based option. To enable, add a new sectino to your versions `extended_paths` list:
+
+	circuit_breakers: [
+        {
+          path: "get",
+          method: "GET",
+          threshold_percent: 0.5,
+          samples: 5,
+          return_to_service_after: 60
+        }
+      ]
+
+Circuit breakers are individual on a singlie host, they do not centralise or pool back-end data, this is for speed. This means that in a load balanced environment where multiple Tyk nodes are used, some traffic can spill through as other nodes reach the sampling rate limit. This is for pure speed, adding a redis counter layer or data-store on every request to a servcie would jsut add latency.
+
+Circuit breakers use a thresh-old-breaker pattern, so of sample size x if y% requests fail, trip the breaker.
+
+The circuit breaker works across hosts (i.e. if you have multiple targets for an API, the samnple is across *all* upstream requests)
+
+When a circuit breaker trips, it will fire and event: `BreakerTriggered` which you can define actions for in the `event_handlers` section:
+	
+	```
+	event_handlers: {
+	    events: {
+	      BreakerTriggered: [
+	        {
+	          handler_name: "eh_log_handler",
+	          handler_meta: {
+	            prefix: "LOG-HANDLER-PREFIX"
+	          }
+	        },
+	        {
+	          handler_name: "eh_web_hook_handler",
+	          handler_meta: {
+	            method: "POST",
+	            target_path: "http://posttestserver.com/post.php?dir=tyk-event-test",
+	            template_path: "templates/breaker_webhook.json",
+	            header_map: {
+	              "X-Tyk-Test-Header": "Tyk v1.BANANA"
+	            },
+	            event_timeout: 10
+	          }
+	        }
+	      ]
+	    }
+	  },
+	```
+
+Status codes are:
+	
+	```
+	// BreakerTripped is sent when a breaker trips
+	BreakerTripped = 0
+
+	// BreakerReset is sent when a breaker resets
+	BreakerReset = 1
+	```
+	
 - Added round-robin load balancing support, to enable, set up in the API Definition under the `proxy` section:
 	
 	...

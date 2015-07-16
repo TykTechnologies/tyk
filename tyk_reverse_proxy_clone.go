@@ -384,7 +384,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 	if stat == StatusCircuitBreaker {
 		thisMeta := meta.(*ExtendedCircuitBreakerMeta)
-		log.Warning("CIRCUIT BREAKER ENFORCED: ", *thisMeta)
+		log.Debug("CB Enforced for path: ", *thisMeta)
 		return true, thisMeta
 	}
 
@@ -454,6 +454,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var res *http.Response
 	var err error
 	if breakerEnforced {
+		log.Debug("ON REQUEST: Breaker status: ", breakerConf.CB.Ready())
 		if breakerConf.CB.Ready() {
 			res, err = transport.RoundTrip(outreq)
 			if err != nil {
@@ -461,6 +462,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			} else {
 				breakerConf.CB.Success()
 			}
+		} else {
+			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
+			return nil
 		}
 	} else {
 		res, err = transport.RoundTrip(outreq)
@@ -473,7 +477,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
 				if ServiceCache != nil {
-					log.Warning("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
+					log.Debug("[PROXY] [SERVICE DISCOVERY] Upstream host failed, refreshing host list")
 					ServiceCache.Delete(p.TykAPISpec.APIID)
 				}
 			}

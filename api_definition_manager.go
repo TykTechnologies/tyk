@@ -421,7 +421,7 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 	// This way we can iterate the whole array once, on match we break with status
 	thisURLSpec := []URLSpec{}
 
-	log.Info("Checking for transform paths...")
+	log.Debug("Checking for transform paths...")
 	for _, stringSpec := range paths {
 		log.Info("-- Generating path")
 		newSpec := URLSpec{}
@@ -514,29 +514,57 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.Ci
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
+		log.Info("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
-
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func() {
 			path := stringSpec.Path
 			spec := apiSpec
 			breakerPtr := newSpec.CircuitBreaker.CB
+			timerActive := false
 			for {
 				e := <-events
-				spec.FireEvent(EVENT_BreakerTriggered,
-					EVENT_CurcuitBreakerMeta{
-						EventMetaDefault: EventMetaDefault{Message: "Breaker Tripped"},
-						CircuitEvent:     e,
-						Path:             path,
-						APIID:            spec.APIID,
-					})
 				switch e {
 				case circuit.BreakerTripped:
+					log.Warning("[PROXY] [CIRCUIT BREKER] Breaker tripped for path: ", path)
+					log.Debug("Breaker tripped: ", e)
 					// Start a timer function
-					go func(timeout int, breaker *circuit.Breaker) {
-						time.Sleep(time.Duration(timeout) * time.Second)
-						breaker.Reset()
-					}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
+
+					if !timerActive {
+						go func(timeout int, breaker *circuit.Breaker) {
+							log.Debug("-- Sleeping for (s): ", timeout)
+							time.Sleep(time.Duration(timeout) * time.Second)
+							log.Debug("-- Resetting breaker")
+							breaker.Reset()
+							timerActive = false
+						}(newSpec.CircuitBreaker.ReturnToServiceAfter, breakerPtr)
+						timerActive = true
+					}
+
+					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
+						if ServiceCache != nil {
+							log.Warning("[PROXY] [CIRCUIT BREKER] Refreshing host list")
+							ServiceCache.Delete(spec.APIID)
+						}
+					}
+
+					spec.FireEvent(EVENT_BreakerTriggered,
+						EVENT_CurcuitBreakerMeta{
+							EventMetaDefault: EventMetaDefault{Message: "Breaker Tripped"},
+							CircuitEvent:     e,
+							Path:             path,
+							APIID:            spec.APIID,
+						})
+
+				case circuit.BreakerReset:
+					spec.FireEvent(EVENT_BreakerTriggered,
+						EVENT_CurcuitBreakerMeta{
+							EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
+							CircuitEvent:     e,
+							Path:             path,
+							APIID:            spec.APIID,
+						})
+
 				}
 			}
 		}()
