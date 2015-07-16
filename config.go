@@ -67,8 +67,9 @@ type Config struct {
 		RPCKey                            string `json:"rpc_key"`
 		APIKey                            string `json:"api_key"`
 		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
-		EnableRPCCache bool `json:"enable_rpc_cache"`
+		EnableRPCCache                    bool   `json:"enable_rpc_cache"`
 	} `json:"slave_options"`
+	CloseConnections bool `json:"close_connections"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
