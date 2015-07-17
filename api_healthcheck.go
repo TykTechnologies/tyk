@@ -39,7 +39,7 @@ type DefaultHealthChecker struct {
 
 func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
 	if config.HealthCheck.EnableHealthChecks {
-		log.Info("Health Checker initialised.")
+		log.Debug("Health Checker initialised.")
 	}
 
 	h.storage = storeType

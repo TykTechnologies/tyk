@@ -35,6 +35,6 @@ func HandleRedisReloadMsg(message redis.Message) {
 		return
 	}
 
-	log.Warning("Restart signal (redis) received, restarting muxers")
+	log.Info("Reload signal received, reloading endpoints")
 	ReloadURLStructure()
 }

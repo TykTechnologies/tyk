@@ -62,7 +62,7 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 		return policies
 	}
 
-	log.Info("Policies found: ", len(dbPolicyList))
+	log.Printf("Loaded %v policies ", len(dbPolicyList))
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p

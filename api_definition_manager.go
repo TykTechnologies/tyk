@@ -182,7 +182,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 			if getHandlerErr != nil {
 				log.Error("Failed to init event handler: ", getHandlerErr)
 			} else {
-				log.Info("Init Event Handler: ", eventName)
+				log.Debug("Init Event Handler: ", eventName)
 				newAppSpec.EventPaths[eventName] = append(newAppSpec.EventPaths[eventName], thisEventHandlerInstance)
 			}
 
@@ -514,7 +514,7 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.Ci
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
 		newSpec.CircuitBreaker = ExtendedCircuitBreakerMeta{CircuitBreakerMeta: stringSpec}
-		log.Info("Initialising circuit breaker for: ", stringSpec.Path)
+		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func() {

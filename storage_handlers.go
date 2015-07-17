@@ -181,7 +181,7 @@ func (r *RedisStorageManager) newPool(server, password string, database int) *re
 func (r *RedisStorageManager) Connect() bool {
 
 	fullPath := config.Storage.Host + ":" + strconv.Itoa(config.Storage.Port)
-	log.Info("Connecting to redis on: ", fullPath)
+	log.Debug("Connecting to redis on: ", fullPath)
 	r.pool = r.newPool(fullPath, config.Storage.Password, config.Storage.Database)
 
 	return true
@@ -540,7 +540,7 @@ func (r *RedisStorageManager) StartPubSubHandler(channel string, callback func(r
 			callback(v)
 
 		case redis.Subscription:
-			log.Info("Subscription started: ", v.Channel)
+			log.Debug("Subscription started: ", v.Channel)
 
 		case error:
 			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)

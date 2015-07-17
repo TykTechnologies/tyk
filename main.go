@@ -61,21 +61,21 @@ func setupGlobals() {
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
 		AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
-		log.Info("Setting up analytics DB connection")
+		log.Debug("Setting up analytics DB connection")
 
 		analytics = RedisAnalyticsHandler{
 			Store: &AnalyticsStore,
 		}
 
 		if config.AnalyticsConfig.Type == "csv" {
-			log.Info("Using CSV cache purge")
+			log.Debug("Using CSV cache purge")
 			analytics.Clean = &CSVPurger{&AnalyticsStore}
 
 		} else if config.AnalyticsConfig.Type == "mongo" {
-			log.Info("Using MongoDB cache purge")
+			log.Debug("Using MongoDB cache purge")
 			analytics.Clean = &MongoPurger{&AnalyticsStore, nil}
 		} else if config.AnalyticsConfig.Type == "rpc" {
-			log.Info("Using RPC cache purge")
+			log.Debug("Using RPC cache purge")
 			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
 			thisPurger.Connect()
 			analytics.Clean = &thisPurger
@@ -99,7 +99,7 @@ func setupGlobals() {
 	GlobalEventsJSVM.Init(config.TykJSPath)
 
 	// Get the notifier ready
-	log.Warning("Notifier will not work in hybrid mode")
+	log.Debug("Notifier will not work in hybrid mode")
 	MainNotifierStore := RedisStorageManager{}
 	MainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
@@ -119,30 +119,31 @@ func getAPISpecs() []APISpec {
 	thisAPILoader := APIDefinitionLoader{}
 
 	if config.UseDBAppConfigs {
-		log.Info("Using App Configuration from Mongo DB")
+		log.Debug("Using App Configuration from Mongo DB")
 		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
 	} else if config.SlaveOptions.UseRPC {
-		log.Info("Using RPC Configuration")
+		log.Debug("Using RPC Configuration")
 		APISpecs = thisAPILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
 	}
 
+	log.Printf("Loaded %v APIs", len(APISpecs))
 	return APISpecs
 }
 
 func getPolicies() {
-	log.Info("Loading policies")
+	log.Debug("Loading policies")
 	if config.Policies.PolicyRecordName == "" {
-		log.Info("No policy record name defined, skipping...")
+		log.Debug("No policy record name defined, skipping...")
 		return
 	}
 
 	if config.Policies.PolicySource == "mongo" {
-		log.Info("Using Policies from Mongo DB")
+		log.Debug("Using Policies from Mongo DB")
 		Policies = LoadPoliciesFromMongo(config.Policies.PolicyRecordName)
 	} else if config.Policies.PolicySource == "rpc" {
-		log.Info("Using Policies from RPC")
+		log.Debug("Using Policies from RPC")
 		Policies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		Policies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
@@ -205,7 +206,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 }
 
 func addBatchEndpoint(spec *APISpec, Muxer *http.ServeMux) {
-	log.Info("Batch requests enabled for API")
+	log.Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	thisBatchHandler := BatchRequestHandler{API: spec}
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
@@ -220,12 +221,12 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
-		log.Info("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		log.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
-		log.Info("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		log.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
 
 	// Load from folder
@@ -236,12 +237,12 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 	for _, f := range files {
 		if strings.Contains(f.Name(), ".js") {
 			filePath := filepath.Join(middlwareFolderPath, f.Name())
-			log.Info("Loading PRE-PROCESSOR file middleware from ", filePath)
+			log.Debug("Loading PRE-PROCESSOR file middleware from ", filePath)
 			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.Info("-- Middleware name ", middlewareObjectName)
+			log.Debug("-- Middleware name ", middlewareObjectName)
 
 			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
-			log.Info("-- Middleware requires session: ", requiresSession)
+			log.Debug("-- Middleware requires session: ", requiresSession)
 			thisMWDef := tykcommon.MiddlewareDefinition{}
 			thisMWDef.Name = middlewareObjectName
 			thisMWDef.Path = filePath
@@ -258,12 +259,12 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 	for _, f := range mwPostFiles {
 		if strings.Contains(f.Name(), ".js") {
 			filePath := filepath.Join(middlewarePostFolderPath, f.Name())
-			log.Info("Loading POST-PROCESSOR file middleware from ", filePath)
+			log.Debug("Loading POST-PROCESSOR file middleware from ", filePath)
 			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.Info("-- Middleware name ", middlewareObjectName)
+			log.Debug("-- Middleware name ", middlewareObjectName)
 
 			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
-			log.Info("-- Middleware requires session: ", requiresSession)
+			log.Debug("-- Middleware requires session: ", requiresSession)
 			thisMWDef := tykcommon.MiddlewareDefinition{}
 			thisMWDef.Name = middlewareObjectName
 			thisMWDef.Path = filePath
@@ -289,7 +290,7 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 			return
 		}
 		thisProcessor, _ := processorType.New(processorDetail.Options, referenceSpec)
-		log.Info("Loading Response processor: ", processorDetail.Name)
+		log.Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = thisProcessor
 	}
 	referenceSpec.ResponseChain = &responseChain
@@ -298,7 +299,7 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
-	log.Info("Loading API configurations.")
+	log.Debug("Loading API configurations.")
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
@@ -308,7 +309,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	for apiIndex, _ := range APISpecs {
 		// We need a reference to this as we change it on the go and re-use it in a global index
 		referenceSpec := APISpecs[apiIndex]
-		log.Info("Loading API Spec for: ", referenceSpec.APIDefinition.Name)
+		log.Debug("Loading API Spec for: ", referenceSpec.APIDefinition.Name)
 
 		remote, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
 		if err != nil {
@@ -366,7 +367,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 		mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 		mwPostFuncs := []tykcommon.MiddlewareDefinition{}
 
-		log.Info("Loading Middleware")
+		log.Debug("Loading Middleware")
 		mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
 
 		referenceSpec.JSVM.LoadJSPaths(mwPaths)
@@ -486,7 +487,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
 
 			rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
-			log.Info("Rate limits available at: ", rateLimitPath)
+			log.Debug("Rate limits available at: ", rateLimitPath)
 			Muxer.Handle(rateLimitPath, simpleChain)
 			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 		}
@@ -569,10 +570,10 @@ func init() {
 	filename := "/etc/tyk/tyk.conf"
 	value, _ := arguments["--conf"]
 	if value != nil {
-		log.Info(fmt.Sprintf("Using %s for configuration", value.(string)))
+		log.Debug(fmt.Sprintf("Using %s for configuration", value.(string)))
 		filename = arguments["--conf"].(string)
 	} else {
-		log.Info("No configuration file defined, will try to use default (./tyk.conf)")
+		log.Debug("No configuration file defined, will try to use default (./tyk.conf)")
 	}
 
 	loadConfig(filename, &config)
@@ -604,7 +605,7 @@ func init() {
 	}
 
 	if config.UseSentry {
-		log.Info("Enabling Sentry support")
+		log.Debug("Enabling Sentry support")
 		hook, err := logrus_sentry.NewSentryHook(config.SentryCode, []logrus.Level{
 			logrus.PanicLevel,
 			logrus.FatalLevel,
@@ -616,7 +617,7 @@ func init() {
 		if err == nil {
 			log.Hooks.Add(hook)
 		}
-		log.Info("Sentry hook active")
+		log.Debug("Sentry hook active")
 	}
 
 }
@@ -655,7 +656,7 @@ func main() {
 	}
 
 	if doMemoryProfile {
-		log.Info("Memory profiling active")
+		log.Debug("Memory profiling active")
 		profileFile, _ = os.Create("tyk.mprof")
 		defer profileFile.Close()
 	}
@@ -664,7 +665,7 @@ func main() {
 
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
-		log.Info("Initialising default org store")
+		log.Debug("Initialising default org store")
 		//DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
 		DefaultOrgStore.Init(GetGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(GetGlobalStorageHandler(CloudHandler, "orgkey.", false))
@@ -694,7 +695,7 @@ func main() {
 		if nil != err {
 			log.Fatalln(err)
 		}
-		log.Println("Listening on", l.Addr())
+		//log.Println("Listening on", l.Addr())
 
 		// Accept connections in a new goroutine.
 		specs := getAPISpecs()
@@ -703,7 +704,7 @@ func main() {
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
-			log.Info("Custom Server started.")
+			log.Info("Custom Server started")
 			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
@@ -714,14 +715,14 @@ func main() {
 
 			go s.Serve(l)
 		} else {
-			log.Info("Server started.")
+			log.Info("Server started")
 			go http.Serve(l, nil)
 		}
 
 	} else {
 
 		// Resume accepting connections in a new goroutine.
-		log.Println("Resuming listening on", l.Addr())
+		log.Info("Resuming listening on", l.Addr())
 		specs := getAPISpecs()
 		loadApps(specs, http.DefaultServeMux)
 		getPolicies()
@@ -735,10 +736,10 @@ func main() {
 				Handler:      http.DefaultServeMux,
 			}
 
-			log.Info("Custom server started.")
+			log.Info("Custom server started")
 			go s.Serve(l)
 		} else {
-			log.Info("Server started.")
+			log.Info("Server started")
 			http.Serve(l, nil)
 		}
 
@@ -761,5 +762,5 @@ func main() {
 	if err := l.Close(); nil != err {
 		log.Fatalln(err)
 	}
-	time.Sleep(1e9)
+	//time.Sleep(1e9)
 }

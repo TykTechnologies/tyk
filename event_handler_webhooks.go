@@ -92,7 +92,7 @@ func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 		webHookTemplate, _ = template.ParseFiles(defaultPath)
 	}
 	thisHandler.template = webHookTemplate
-	log.Warning("Timeout set to: ", thisHandler.conf.EventTimeout)
+	log.Debug("[WEBHOOK] Timeout set to: ", thisHandler.conf.EventTimeout)
 
 	if !thisHandler.checkURL(thisHandler.conf.TargetPath) {
 		log.Error("Init failed for this webhook, invalid URL, URL must be absolute")

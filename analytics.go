@@ -192,7 +192,7 @@ func (m MongoPurger) StartPurgeLoop(nextCount int) {
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (m *MongoPurger) PurgeCache() {
 	if m.dbSession == nil {
-		log.Info("Not connected to analytics store, connecting...")
+		log.Debug("Connecting to analytics store")
 		m.Connect()
 		m.PurgeCache()
 	} else {
