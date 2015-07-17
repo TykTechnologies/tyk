@@ -519,7 +519,7 @@ func ReloadURLStructure() {
 	getPolicies()
 
 	http.DefaultServeMux = newMuxes
-	log.Info("Reload complete")
+	log.Info(">> API reload complete")
 }
 
 func init() {
