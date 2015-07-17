@@ -78,6 +78,7 @@ type Config struct {
 	ServiceDiscovery struct {
 		DefaultCacheTimeout int `json:"default_cache_timeout"`
 	} `json:"service_discovery"`
+	CloseConnections bool `json:"close_connections"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

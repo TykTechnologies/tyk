@@ -527,6 +527,11 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	}
 	defer res.Body.Close()
 
+	// Close connections
+	if config.CloseConnections {
+		res.Header.Set("Connection", "close")
+	}
+
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
