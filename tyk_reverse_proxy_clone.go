@@ -489,8 +489,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			}
 			return nil
 		}
-		rw.WriteHeader(http.StatusInternalServerError)
+		if strings.Contains(err.Error(), "no such host") {
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", 500)
+			return nil
+		}
+
+		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", 500)
 		return nil
+
 	}
 
 	inres := new(http.Response)
