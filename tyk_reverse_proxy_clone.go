@@ -280,11 +280,17 @@ func GetTransport(timeOut int) http.RoundTripper {
 func singleJoiningSlash(a, b string) string {
 	aslash := strings.HasSuffix(a, "/")
 	bslash := strings.HasPrefix(b, "/")
+
 	switch {
 	case aslash && bslash:
 		return a + b[1:]
 	case !aslash && !bslash:
-		return a + "/" + b
+		if len(b) > 0 {
+			return a + "/" + b
+		} else {
+			return a
+		}
+
 	}
 	return a + b
 }
