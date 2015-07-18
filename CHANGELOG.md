@@ -1,4 +1,5 @@
 # DEV
+
 - Cleaned up server output, use `--debug` to see more detailed debug data. Keeps log size down
 - TCP Errors now actually raise an error
 - Added circuit breaker as a path-based option. To enable, add a new sectino to your versions `extended_paths` list:
