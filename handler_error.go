@@ -47,10 +47,12 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		r.URL.Path = "/" + r.URL.Path
 
 		OauthClientID := ""
+		tags := make([]string, 0)
 		thisSessionState := context.Get(r, SessionData)
 
 		if thisSessionState != nil {
 			OauthClientID = thisSessionState.(SessionState).OauthClientID
+			tags = thisSessionState.(SessionState).Tags
 		}
 
 		thisRecord := AnalyticsRecord{
@@ -71,6 +73,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			e.Spec.APIDefinition.OrgID,
 			OauthClientID,
 			0,
+			tags,
 			time.Now(),
 		}
 

@@ -19,6 +19,7 @@ type Policy struct {
 	HMACEnabled      bool                        `bson:"hmac_enabled" json:"hmac_enabled"`
 	Active           bool                        `bson:"active" json:"active"`
 	IsInactive       bool                        `bson:"is_inactive" json:"is_inactive"`
+	Tags             []string                    `bson:"tags" json:"tags"`
 }
 
 func LoadPoliciesFromFile(filePath string) map[string]Policy {

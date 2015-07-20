@@ -64,6 +64,7 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 			thisSession.AccessRights = policy.AccessRights
 			thisSession.HMACEnabled = policy.HMACEnabled
 			thisSession.IsInactive = policy.IsInactive
+			thisSession.Tags = policy.Tags
 
 			// Update the session in the session manager in case it gets called again
 			t.Spec.SessionManager.UpdateSession(key, *thisSession, t.Spec.APIDefinition.SessionLifetime)
@@ -128,10 +129,12 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 
 		// If OAuth, we need to grab it from the session, which may or may not exist
 		OauthClientID := ""
+		tags := make([]string, 0)
 		thisSessionState := context.Get(r, SessionData)
 
 		if thisSessionState != nil {
 			OauthClientID = thisSessionState.(SessionState).OauthClientID
+			tags = thisSessionState.(SessionState).Tags
 		}
 
 		thisRecord := AnalyticsRecord{
@@ -152,6 +155,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			s.Spec.APIDefinition.OrgID,
 			OauthClientID,
 			timing,
+			tags,
 			time.Now(),
 		}
 

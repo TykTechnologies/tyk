@@ -44,6 +44,7 @@ type SessionState struct {
 		TriggerLimits []float64 `json:"trigger_limits"`
 	} `json:"monitor"`
 	MetaData interface{} `json:"meta_data"`
+	Tags     []string    `json:"tags"`
 }
 
 type PublicSessionState struct {
