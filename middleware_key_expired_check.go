@@ -23,10 +23,16 @@ func (k *KeyExpired) GetConfig() (interface{}, error) {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	thisSessionState := context.Get(r, SessionData).(SessionState)
-	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
+	sess, ok := context.GetOk(r, SessionData)
+
+	if !ok {
+		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied."), 403
+	}
+
+	thisSessionState := sess.(SessionState)
 
 	if thisSessionState.IsInactive {
+		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
@@ -34,13 +40,12 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		}).Info("Attempted access from inactive key.")
 
 		// Fire a key expired event
-		authHeaderValue := context.Get(r, AuthHeaderValue)
 		go k.TykMiddleware.FireEvent(EVENT_KeyExpired,
 			EVENT_KeyExpiredMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
 				Origin:           r.RemoteAddr,
-				Key:              authHeaderValue.(string),
+				Key:              authHeaderValue,
 			})
 
 		// Report in health check
@@ -52,6 +57,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 	keyExpired := k.Spec.AuthManager.IsKeyExpired(&thisSessionState)
 
 	if keyExpired {
+		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
@@ -59,13 +65,12 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		}).Info("Attempted access from expired key.")
 
 		// Fire a key expired event
-		authHeaderValue := context.Get(r, AuthHeaderValue)
 		go k.TykMiddleware.FireEvent(EVENT_KeyExpired,
 			EVENT_KeyExpiredMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
 				Path:             r.URL.Path,
 				Origin:           r.RemoteAddr,
-				Key:              authHeaderValue.(string),
+				Key:              authHeaderValue,
 			})
 
 		// Report in health check
