@@ -1,6 +1,6 @@
 # DEV
 
-- URL Rewrite in palce, you can specify URLs to rewrite in the `extended_paths` seciton f the API Definition like so:
+- URL Rewrite in place, you can specify URLs to rewrite in the `extended_paths` seciton f the API Definition like so:
 
 	```
 	"url_rewrites": [
