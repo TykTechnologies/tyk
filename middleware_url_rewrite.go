@@ -8,9 +8,51 @@ import (
 	"strings"
 )
 
+type URLRewriter struct{}
+
+func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (string, error) {
+	// Find all the matching groups:
+	mp, mpErr := regexp.Compile(thisMeta.MatchPattern)
+	if mpErr != nil {
+		log.Debug("Compilation error: ", mpErr)
+		return "", mpErr
+	}
+	result_slice := mp.FindAllStringSubmatch(path, -1)
+
+	// Make sure it matches the string
+	log.Debug("Rewriter checking matches, len is: ", len(result_slice))
+	if len(result_slice) > 0 {
+		newpath := thisMeta.RewriteTo
+		// get the indices for the replacements:
+		dollarMatch, _ := regexp.Compile(`\$\d`) // Prepare our regex
+		replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
+
+		log.Warning(result_slice)
+		log.Warning(replace_slice)
+
+		mapped_replace := make(map[string]string)
+		for mI, replacementVal := range result_slice[0] {
+			indexVal := "$" + strconv.Itoa(mI)
+			mapped_replace[indexVal] = replacementVal
+		}
+
+		for _, v := range replace_slice {
+			log.Debug("Replacing: ", v[0])
+			newpath = strings.Replace(newpath, string(v[0]), string(mapped_replace[v[0]]), -1)
+		}
+
+		log.Debug("URL Re-written to: ", newpath)
+		log.Debug("URL Re-written from: ", path)
+		// matched?? Set the modified path
+		return newpath, nil
+	}
+	return path, nil
+}
+
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
 type URLRewriteMiddleware struct {
 	*TykMiddleware
+	Rewriter *URLRewriter
 }
 
 type URLRewriteMiddlewareConfig struct{}
@@ -21,6 +63,7 @@ func (m *URLRewriteMiddleware) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {
 	log.Debug("URL Rewrite enabled")
+	m.Rewriter = &URLRewriter{}
 	return nil, nil
 }
 
@@ -42,43 +85,11 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if stat == StatusURLRewrite {
 		log.Debug("Rewriter active")
 		thisMeta := meta.(*tykcommon.URLRewriteMeta)
-
-		// Find all the matching groups:
-		mp, mpErr := regexp.Compile(thisMeta.MatchPattern)
-		if mpErr != nil {
-			log.Debug("Compilation error: ", mpErr)
-			return nil, 200
+		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.Path)
+		if pErr != nil {
+			return pErr, 500
 		}
-		result_slice := mp.FindAllStringSubmatch(r.URL.Path, -1)
-
-		// Make sure it matches the string
-		log.Debug("Rewriter checking matches, len is: ", len(result_slice))
-		if len(result_slice) > 0 {
-			newpath := thisMeta.RewriteTo
-			// get the indices for the replacements:
-			dollarMatch, _ := regexp.Compile(`\$\d`) // Prepare our regex
-			replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
-
-			log.Warning(result_slice)
-			log.Warning(replace_slice)
-
-			mapped_replace := make(map[string]string)
-			for mI, replacementVal := range result_slice[0] {
-				indexVal := "$" + strconv.Itoa(mI)
-				mapped_replace[indexVal] = replacementVal
-			}
-
-			for _, v := range replace_slice {
-				log.Debug("Replacing: ", v[0])
-				newpath = strings.Replace(newpath, string(v[0]), string(mapped_replace[v[0]]), -1)
-			}
-
-			log.Debug("URL Re-written to: ", newpath)
-			log.Debug("URL Re-written from: ", r.URL.Path)
-			// matched?? Set the modified path
-			r.URL.Path = newpath
-		}
-
+		r.URL.Path = p
 	}
 	return nil, 200
 }
