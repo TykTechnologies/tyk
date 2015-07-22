@@ -125,7 +125,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	if decErr != nil {
 		log.Error("Failed to decode middleware request data on return from VM: ", decErr)
-		log.Info(returnDataStr)
+		log.Debug(returnDataStr)
 		return nil, 200
 	}
 

@@ -482,7 +482,7 @@ func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) e
 // LoadAuthorize loads auth data from redis
 func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	key := AUTH_PREFIX + code
-	log.Info("Loading auth code: ", key)
+	log.Debug("Loading auth code: ", key)
 	authJSON, storeErr := r.store.GetKey(key)
 
 	if storeErr != nil {

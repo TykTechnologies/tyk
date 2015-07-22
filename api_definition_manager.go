@@ -624,8 +624,6 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, circuitBreakers...)
 	combinedPath = append(combinedPath, urlRewrites...)
 
-	log.Info(urlRewrites)
-
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
 	}

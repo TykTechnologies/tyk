@@ -127,7 +127,7 @@ func TestHMACAuthSession(t *testing.T) {
 	log.Debug("Encoded signature string: ", encodedString)
 	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
 
-	log.Info("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
@@ -181,7 +181,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	log.Debug("Encoded signature string: ", encodedString)
 	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
 
-	log.Info("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
@@ -236,7 +236,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	log.Debug("Encoded signature string: ", encodedString)
 	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
 
-	log.Info("Signature string: ", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
@@ -291,7 +291,7 @@ func TestHMACAuthSessionmalformedHeader(t *testing.T) {
 	log.Debug("Encoded signature string: ", encodedString)
 	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
 
-	log.Info("Signature string: ", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha1\", signature=\"%s\"", encodedString))
+	log.Debug("Signature string: ", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha1\", signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha256\", signature=\"%s\"", encodedString))
 
