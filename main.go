@@ -305,196 +305,210 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 	redisOrgStore := RedisStorageManager{KeyPrefix: "orgkey."}
 
+	listenPaths := make(map[string]bool)
+
 	// Create a new handler for each API spec
 	for apiIndex, _ := range APISpecs {
+		var skip bool
 		// We need a reference to this as we change it on the go and re-use it in a global index
 		referenceSpec := APISpecs[apiIndex]
-		log.Debug("Loading API Spec for: ", referenceSpec.APIDefinition.Name)
+		log.Info("--> Loading API: ", referenceSpec.APIDefinition.Name)
+
+		_, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
+		if listenPathExists {
+			log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
+			skip = true
+		}
 
 		remote, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
 		if err != nil {
-			log.Error("Culdn't parse target URL")
-			log.Error(err)
+			log.Error("Culdn't parse target URL: ", err)
 		}
 
-		// Initialise the auth and session managers (use Redis for now)
-		var authStore StorageHandler
-		var sessionStore StorageHandler
-		var orgStore StorageHandler
+		if !skip {
 
-		authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
-		if config.SlaveOptions.OverrideDefinitionStorageSettings {
-			authStorageEngineToUse = RPCStorageEngine
-		}
+			listenPaths[referenceSpec.Proxy.ListenPath] = true
+			// Initialise the auth and session managers (use Redis for now)
+			var authStore StorageHandler
+			var sessionStore StorageHandler
+			var orgStore StorageHandler
 
-		switch authStorageEngineToUse {
-		case DefaultStorageEngine:
-			authStore = &redisStore
-		case LDAPStorageEngine:
-			thisStorageEngine := LDAPStorageHandler{}
-			thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
-			authStore = &thisStorageEngine
-		case RPCStorageEngine:
-			thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-			authStore = thisStorageEngine
-		default:
-			authStore = &redisStore
-		}
-
-		SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
-		if config.SlaveOptions.OverrideDefinitionStorageSettings {
-			SessionStorageEngineToUse = RPCStorageEngine
-		}
-
-		switch SessionStorageEngineToUse {
-		case DefaultStorageEngine:
-			sessionStore = &redisStore
-			orgStore = &redisOrgStore
-		case RPCStorageEngine:
-			sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-			orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-		default:
-			sessionStore = &redisStore
-			orgStore = &redisOrgStore
-		}
-
-		// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
-		healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-		referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
-
-		//Set up all the JSVM middleware
-		mwPaths := []string{}
-		mwPreFuncs := []tykcommon.MiddlewareDefinition{}
-		mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-
-		log.Debug("Loading Middleware")
-		mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
-
-		referenceSpec.JSVM.LoadJSPaths(mwPaths)
-
-		if referenceSpec.EnableBatchRequestSupport {
-			addBatchEndpoint(&referenceSpec, Muxer)
-		}
-
-		if referenceSpec.UseOauth2 {
-			thisOauthManager := addOAuthHandlers(&referenceSpec, Muxer, false)
-			referenceSpec.OAuthManager = thisOauthManager
-		}
-
-		proxy := TykNewSingleHostReverseProxy(remote, &referenceSpec)
-		// initialise the proxy
-		proxy.New(nil, &referenceSpec)
-		referenceSpec.target = remote
-
-		// Create the response processors
-		creeateResponseMiddlewareChain(&referenceSpec)
-
-		//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
-		tykMiddleware := &TykMiddleware{&referenceSpec, proxy}
-
-		keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
-		CacheStore := &RedisStorageManager{KeyPrefix: keyPrefix}
-		CacheStore.Connect()
-
-		if referenceSpec.APIDefinition.UseKeylessAccess {
-
-			// Add pre-process MW
-			var chainArray = []alice.Constructor{}
-
-			var baseChainArray = []alice.Constructor{
-				CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
-				CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+			authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
+			if config.SlaveOptions.OverrideDefinitionStorageSettings {
+				authStorageEngineToUse = RPCStorageEngine
 			}
 
-			for _, obj := range mwPreFuncs {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+			switch authStorageEngineToUse {
+			case DefaultStorageEngine:
+				authStore = &redisStore
+			case LDAPStorageEngine:
+				thisStorageEngine := LDAPStorageHandler{}
+				thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
+				authStore = &thisStorageEngine
+			case RPCStorageEngine:
+				thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+				authStore = thisStorageEngine
+			default:
+				authStore = &redisStore
 			}
 
-			for _, baseMw := range baseChainArray {
-				chainArray = append(chainArray, baseMw)
+			SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
+			if config.SlaveOptions.OverrideDefinitionStorageSettings {
+				SessionStorageEngineToUse = RPCStorageEngine
 			}
 
-			for _, obj := range mwPostFuncs {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+			switch SessionStorageEngineToUse {
+			case DefaultStorageEngine:
+				sessionStore = &redisStore
+				orgStore = &redisOrgStore
+			case RPCStorageEngine:
+				sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+				orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+			default:
+				sessionStore = &redisStore
+				orgStore = &redisOrgStore
 			}
 
-			// for KeyLessAccess we can't support rate limiting, versioning or access rules
-			chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
-			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
+			// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
+			healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+			referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
-		} else {
+			//Set up all the JSVM middleware
+			mwPaths := []string{}
+			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
+			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
 
-			// Select the keying method to use for setting session states
-			var keyCheck func(http.Handler) http.Handler
+			log.Debug("Loading Middleware")
+			mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
 
-			if referenceSpec.APIDefinition.UseOauth2 {
-				// Oauth2
-				keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
-			} else if referenceSpec.APIDefinition.UseBasicAuth {
-				// Basic Auth
-				keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
-			} else if referenceSpec.EnableSignatureChecking {
-				// HMAC Auth
-				keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
+			referenceSpec.JSVM.LoadJSPaths(mwPaths)
+
+			if referenceSpec.EnableBatchRequestSupport {
+				addBatchEndpoint(&referenceSpec, Muxer)
+			}
+
+			if referenceSpec.UseOauth2 {
+				thisOauthManager := addOAuthHandlers(&referenceSpec, Muxer, false)
+				referenceSpec.OAuthManager = thisOauthManager
+			}
+
+			proxy := TykNewSingleHostReverseProxy(remote, &referenceSpec)
+			// initialise the proxy
+			proxy.New(nil, &referenceSpec)
+			referenceSpec.target = remote
+
+			// Create the response processors
+			creeateResponseMiddlewareChain(&referenceSpec)
+
+			//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
+			tykMiddleware := &TykMiddleware{&referenceSpec, proxy}
+
+			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
+			CacheStore := &RedisStorageManager{KeyPrefix: keyPrefix}
+			CacheStore.Connect()
+
+			if referenceSpec.APIDefinition.UseKeylessAccess {
+
+				// Add pre-process MW
+				var chainArray = []alice.Constructor{}
+
+				var baseChainArray = []alice.Constructor{
+					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
+					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+				}
+
+				for _, obj := range mwPreFuncs {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+				}
+
+				for _, baseMw := range baseChainArray {
+					chainArray = append(chainArray, baseMw)
+				}
+
+				for _, obj := range mwPostFuncs {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+				}
+
+				// for KeyLessAccess we can't support rate limiting, versioning or access rules
+				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
+				Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
+
 			} else {
-				// Auth key
-				keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
+
+				// Select the keying method to use for setting session states
+				var keyCheck func(http.Handler) http.Handler
+
+				if referenceSpec.APIDefinition.UseOauth2 {
+					// Oauth2
+					keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
+				} else if referenceSpec.APIDefinition.UseBasicAuth {
+					// Basic Auth
+					keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
+				} else if referenceSpec.EnableSignatureChecking {
+					// HMAC Auth
+					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
+				} else {
+					// Auth key
+					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
+				}
+
+				var chainArray = []alice.Constructor{}
+
+				var baseChainArray = []alice.Constructor{
+					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+					keyCheck,
+					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
+					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+				}
+
+				// Add pre-process MW
+				for _, obj := range mwPreFuncs {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+				}
+
+				for _, baseMw := range baseChainArray {
+					chainArray = append(chainArray, baseMw)
+				}
+
+				for _, obj := range mwPostFuncs {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+				}
+
+				// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
+				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
+
+				userCheckHandler := http.HandlerFunc(UserRatesCheck())
+				simpleChain := alice.New(
+					CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+					keyCheck,
+					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
+
+				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
+				log.Debug("Rate limits available at: ", rateLimitPath)
+				Muxer.Handle(rateLimitPath, simpleChain)
+				Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 			}
 
-			var chainArray = []alice.Constructor{}
+			ApiSpecRegister[referenceSpec.APIDefinition.APIID] = &referenceSpec
 
-			var baseChainArray = []alice.Constructor{
-				CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-				keyCheck,
-				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
-				CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-			}
-
-			// Add pre-process MW
-			for _, obj := range mwPreFuncs {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
-			}
-
-			for _, baseMw := range baseChainArray {
-				chainArray = append(chainArray, baseMw)
-			}
-
-			for _, obj := range mwPostFuncs {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
-			}
-
-			// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
-			chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
-
-			userCheckHandler := http.HandlerFunc(UserRatesCheck())
-			simpleChain := alice.New(
-				CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-				keyCheck,
-				CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-				CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
-
-			rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
-			log.Debug("Rate limits available at: ", rateLimitPath)
-			Muxer.Handle(rateLimitPath, simpleChain)
-			Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 		}
-
-		ApiSpecRegister[referenceSpec.APIDefinition.APIID] = &referenceSpec
+		
 
 	}
 

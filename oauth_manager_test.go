@@ -271,7 +271,7 @@ func GetToken() tokenData {
 	if err != nil {
 		fmt.Println(err)
 	}
-
+	log.Warning("TOKEN DATA: ", string(body))
 	return thisResponse
 }
 
@@ -351,4 +351,70 @@ func TestClientRefreshRequest(t *testing.T) {
 		t.Error(req.Body)
 		t.Error("CODE: ", tokenData.RefreshToken)
 	}
+}
+
+func TestClientRefreshRequestDouble(t *testing.T) {
+
+	tokenData := GetToken()
+
+	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	testMuxer := http.NewServeMux()
+	getOAuthChain(thisSpec, testMuxer)
+
+	uri := "/APIID/oauth/token/"
+	method := "POST"
+
+	// req 1
+	param := make(url.Values)
+	param.Set("grant_type", "refresh_token")
+	param.Set("redirect_uri", T_REDIRECT_URI)
+	param.Set("client_id", T_CLIENT_ID)
+	param.Set("refresh_token", tokenData.RefreshToken)
+	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+
+	responseData := make(map[string]interface{})
+
+	body, _ := ioutil.ReadAll(recorder.Body)
+	dErr := json.Unmarshal(body, &responseData)
+	if err != nil {
+		t.Error("Decode failed: ", dErr)
+	}
+	log.Error("Refresh token body", string(body))
+
+	param2 := make(url.Values)
+	param2.Set("grant_type", "refresh_token")
+	param2.Set("redirect_uri", T_REDIRECT_URI)
+	param2.Set("client_id", T_CLIENT_ID)
+
+	param2.Set("refresh_token", responseData["refresh_token"].(string))
+	req2, err2 := http.NewRequest(method, uri, bytes.NewBufferString(param2.Encode()))
+	req2.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
+	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err2 != nil {
+		t.Fatal(err2)
+	}
+
+	recorder2 := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder2, req2)
+
+	if recorder2.Code != 200 {
+		t.Error("Response code should have been 200 but is: ", recorder2.Code)
+		t.Error(recorder2.Body)
+		t.Error(req2.Body)
+	}	
+
 }

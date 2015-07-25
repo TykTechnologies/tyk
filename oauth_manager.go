@@ -518,6 +518,7 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 
 	key := ACCESS_PREFIX + accessData.AccessToken
 	log.Debug("Saving ACCESS key: ", key)
+
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
 
 	// Create a SessionState object and register it with the authmanager
@@ -541,7 +542,7 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
-		if accessDataJSON, marshalErr := json.Marshal(&accessData); marshalErr != nil {
+		if accessDataJSON, marshalErr := json.Marshal(accessData); marshalErr != nil {
 			return marshalErr
 		} else {
 			key := REFRESH_PREFIX + accessData.RefreshToken
@@ -551,6 +552,8 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 				refreshExpire = config.OauthRefreshExpire
 			}
 			r.store.SetKey(key, string(accessDataJSON), refreshExpire)
+			log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
+
 			return nil
 		}
 
@@ -605,15 +608,14 @@ func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, 
 		return nil, storeErr
 	}
 
+	
 	// new interface means having to make this nested... ick.
 	thisAccessData := osin.AccessData{}
 	thisAccessData.Client = new(osin.DefaultClient)
-	thisAccessData.AuthorizeData = &osin.AuthorizeData{}
-	thisAccessData.AuthorizeData.Client = new(osin.DefaultClient)
-
+		
 	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisAccessData); marshalErr != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh)")
-		log.Error(marshalErr)
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", marshalErr)
+		log.Error("Decoding:", accessJSON)
 		return nil, marshalErr
 	}
 
