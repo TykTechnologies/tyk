@@ -1,5 +1,5 @@
 # DEV
-
+- Added refresh tests for OAuth
 - URL Rewrite in place, you can specify URLs to rewrite in the `extended_paths` seciton f the API Definition like so:
 
 	```
