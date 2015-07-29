@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/context"
@@ -47,6 +48,10 @@ type VirtualEndpoint struct {
 // }
 
 func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
+	if j == nil {
+		log.Error("No JSVM loaded, cannot init methods")
+		return
+	}
 	if meta != nil {
 		if meta.FunctionSourceType == "file" {
 			js, loadErr := ioutil.ReadFile(meta.FunctionSourceURI)
@@ -54,7 +59,7 @@ func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
 				log.Error("Failed to load Endpoint JS: ", loadErr)
 			} else {
 				// No error, load the JS into the VM
-				log.Info("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+				log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
 				j.VM.Run(js)
 			}
 		} else {
@@ -93,6 +98,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	_, versionPaths, _, _ := d.TykMiddleware.Spec.GetVersionData(r)
 	found, meta = d.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+
 	if found {
 		stat = StatusVirtualPath
 	} else {
@@ -120,11 +126,10 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		URL:     r.URL.Path,
 	}
 
-	if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
-		thisRequestData.Params = r.PostForm
-	} else {
-		thisRequestData.Params = r.PostForm
-	}
+	// We need to copy the body _back_ for the decode
+	r.Body = nopCloser{bytes.NewBuffer(originalBody)}
+	r.ParseForm()
+	thisRequestData.Params = r.Form
 
 	asJsonRequestObj, encErr := json.Marshal(thisRequestData)
 	if encErr != nil {

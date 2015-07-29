@@ -800,6 +800,10 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 					if method != nil && method.(string) == v.URLRewrite.Method {
 						return true, &v.URLRewrite
 					}
+				case VirtualPath:
+					if method != nil && method.(string) == v.VirtualPathSpec.Method {
+						return true, &v.VirtualPathSpec
+					}
 				}
 
 			}

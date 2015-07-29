@@ -340,4 +340,11 @@ func (j *JSVM) LoadTykJSApi() {
 		return otto.Value{}
 	})
 
+	TykReturnFunc := `
+	function TykJsResponse(response, session_meta) {
+		return JSON.stringify({Response: response, SessionMeta: session_meta})
+	};`
+
+	j.VM.Run(TykReturnFunc)
+
 }

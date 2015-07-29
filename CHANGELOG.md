@@ -1,4 +1,53 @@
 # DEV
+
+- Added virtual path support, you can now have a JS Function respond to a request, makes mocking MUCh more flexible, TODO: expose batch methods to JSVM. To activate, add to extended paths:
+
+	```
+	virtual: [
+        {
+          response_function_name: "thisTest",
+          function_source_type: "file",
+          function_source_uri: "middleware/testVirtual.js",
+          path: "virtualtest",
+          method: "GET",
+          use_session: true
+        }
+    ]
+    ```
+
+- Virtual endpoint functions are pretty clean:
+	
+	```
+	function thisTest(request, session, config) {
+		log("Virtual Test running")
+
+		log("Request Body: ")
+		log(request.Body)
+
+		log("Session: ")
+		log(session)
+
+		log("Config:")
+		log(config)
+
+		log("param-1:")
+		log(request.Params["param1"])
+
+		var responseObject = {
+			Body: "THIS IS A  VIRTUAL RESPONSE"
+			Headers: {
+				"test": "virtual", 
+				"test-2": "virtual"
+			},
+			Code: 200
+		}
+
+		return TykJsResponse(responseObject, session.meta_data)
+		
+	}
+	log("Virtual Test initialised")
+	```
+
 - Added refresh tests for OAuth
 - URL Rewrite in place, you can specify URLs to rewrite in the `extended_paths` seciton f the API Definition like so:
 
