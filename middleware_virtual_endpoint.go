@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"github.com/mitchellh/mapstructure"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -34,6 +35,7 @@ type VMResponseObject struct {
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
 	*TykMiddleware
+	sh SuccessHandler
 }
 
 func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
@@ -62,7 +64,9 @@ type VirtualEndpointConfig struct {
 }
 
 // New lets you do any initialisations for the object can be done here
-func (d *VirtualEndpoint) New() {}
+func (d *VirtualEndpoint) New() {
+	d.sh = SuccessHandler{d.TykMiddleware}
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
@@ -176,7 +180,6 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	// Write to reply with some alternate data
 	responseMessage := []byte(newResponseData.Response.Body)
 
 	// Create an http.Response object so we can send it tot he cache middleware
@@ -184,17 +187,10 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Header = make(map[string][]string)
 
 	requestTime := time.Now().UTC().Format(http.TimeFormat)
-	w.Header().Add("Server", "tyk")
-	w.Header().Add("Date", requestTime)
 
 	for header, value := range newResponseData.Response.Headers {
-		w.Header().Add(header, value)
 		newResponse.Header.Add(header, value)
 	}
-
-	// Write to the client
-	w.WriteHeader(newResponseData.Response.Code)
-	fmt.Fprintf(w, string(responseMessage))
 
 	newResponse.ContentLength = int64(len(responseMessage))
 	newResponse.Body = ioutil.NopCloser(bytes.NewReader(responseMessage))
@@ -205,7 +201,37 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Header.Add("Server", "tyk")
 	newResponse.Header.Add("Date", requestTime)
 
-	return newResponse
+	// Handle response middleware
+	ResponseHandler := ResponseChain{}
+
+	chainErr := ResponseHandler.Go(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &thisSessionState)
+	if chainErr != nil {
+		log.Error("Response chain failed! ", chainErr)
+	}
+
+	// Clone the response so we can save it
+	copiedRes := new(http.Response)
+	*copiedRes = *newResponse // includes shallow copies of maps, but okay
+
+	defer newResponse.Body.Close()
+
+	// Buffer body data
+	var bodyBuffer bytes.Buffer
+	bodyBuffer2 := new(bytes.Buffer)
+
+	io.Copy(&bodyBuffer, newResponse.Body)
+	*bodyBuffer2 = bodyBuffer
+
+	// Create new ReadClosers so we can split output
+	newResponse.Body = ioutil.NopCloser(&bodyBuffer)
+	copiedRes.Body = ioutil.NopCloser(bodyBuffer2)
+
+	d.HandleResponse(w, newResponse, &thisSessionState)
+
+	// Record analytics
+	go d.sh.RecordHit(w, r, 0)
+
+	return copiedRes
 
 }
 
@@ -215,4 +241,28 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	d.ServeHTTPForCache(w, r)
 
 	return nil, 666
+}
+
+func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+
+	defer res.Body.Close()
+
+	// Close connections
+	if config.CloseConnections {
+		res.Header.Set("Connection", "close")
+	}
+
+	// Add resource headers
+	if ses != nil {
+		// We have found a session, lets report back
+		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
+		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
+		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
+	}
+
+	copyHeader(rw.Header(), res.Header)
+
+	rw.WriteHeader(res.StatusCode)
+	io.Copy(rw, res.Body)
+	return nil
 }

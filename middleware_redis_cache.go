@@ -115,7 +115,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 				if isVirtual {
 					log.Debug("This is a virtual function")
-					thisVP := VirtualEndpoint{m.TykMiddleware}
+					thisVP := VirtualEndpoint{TykMiddleware: m.TykMiddleware}
+					thisVP.New()
 					reqVal = thisVP.ServeHTTPForCache(w, r)
 				} else {
 					// This passes through and will write the value to the writer, but spit out a copy for the cache
