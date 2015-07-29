@@ -72,6 +72,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	var stat RequestStatus
+	var isVirtual bool
 	// Only allow idempotent (safe) methods
 	if r.Method == "GET" || r.Method == "OPTIONS" || r.Method == "HEAD" {
 		// Lets see if we can throw a sledgehammer at this
@@ -81,6 +82,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			// New request checker, more targetted, less likely to fail
 			_, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
 			found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
+			isVirtual, _ = m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
 			if found {
 				stat = StatusCached
 			}
@@ -109,8 +111,17 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				log.Debug("Cache enabled, but record not found")
 				// Pass through to proxy AND CACHE RESULT
 
-				// This passes through and will write the value to the writer, but spit out a copy for the cache
-				reqVal := m.sh.ServeHTTPWithCache(w, r)
+				reqVal := new(http.Response)
+
+				if isVirtual {
+					log.Debug("This is a virtual function")
+					thisVP := VirtualEndpoint{m.TykMiddleware}
+					reqVal = thisVP.ServeHTTPForCache(w, r)
+				} else {
+					// This passes through and will write the value to the writer, but spit out a copy for the cache
+					log.Debug("Not virtual, passing")
+					reqVal = m.sh.ServeHTTPWithCache(w, r)
+				}
 
 				cacheThisRequest := true
 				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
@@ -148,6 +159,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 
 			retObj := bytes.NewReader([]byte(retBlob))
+			log.Debug("Cache got: ", retBlob)
 
 			asBufioReader := bufio.NewReader(retObj)
 			newRes, resErr := http.ReadResponse(asBufioReader, r)

@@ -34,18 +34,7 @@ type VMResponseObject struct {
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
 	*TykMiddleware
-	MiddlewareClassName string
-	UseSession          bool
 }
-
-// type VirtualMeta struct {
-// 	ResponseFunctionName string `bson:"response_function_name" json:"response_function_name"`
-// 	FunctionSourceType   string `bson:"function_source_type" json:"function_source_type"`
-// 	FunctionSourceURI    string `bson:"function_source_uri" json:"function_source_uri"`
-// 	Path                 string `bson:"path" json:"path"`
-// 	Method               string `bson:"method" json:"method"`
-// 	UseSession           bool   `bson:"use_session" json:"use_session"`
-// }
 
 func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
 	if j == nil {
@@ -88,8 +77,7 @@ func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
 	return thisModuleConfig, nil
 }
 
-// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
 
 	// Check if we are even using this MW
 	var stat RequestStatus
@@ -102,11 +90,11 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if found {
 		stat = StatusVirtualPath
 	} else {
-		return nil, 200
+		return nil
 	}
 
 	if stat != StatusVirtualPath {
-		return nil, 200
+		return nil
 	}
 
 	t1 := time.Now().UnixNano()
@@ -117,7 +105,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	originalBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Error("Failed to read request body! ", err)
-		return nil, 200
+		return nil
 	}
 
 	thisRequestData := RequestObject{
@@ -134,7 +122,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	asJsonRequestObj, encErr := json.Marshal(thisRequestData)
 	if encErr != nil {
 		log.Error("Failed to encode request object for virtual endpoint: ", encErr)
-		return nil, 500
+		return nil
 	}
 
 	// Encode the configuration data too
@@ -147,7 +135,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	asJsonConfigData, encErr := json.Marshal(configData)
 	if encErr != nil {
 		log.Error("Failed to encode request object for virtual endpoint: ", encErr)
-		return nil, 500
+		return nil
 	}
 
 	var thisSessionState = SessionState{}
@@ -163,7 +151,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	if sessEncErr != nil {
 		log.Error("Failed to encode session for VM: ", sessEncErr)
-		return nil, 500
+		return nil
 	}
 
 	// Run the middleware
@@ -177,7 +165,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if decErr != nil {
 		log.Error("Failed to decode virtual endpoint response data on return from VM: ", decErr)
 		log.Error("--> Returned: ", returnDataStr)
-		return nil, 500
+		return nil
 	}
 
 	// Save the sesison data (if modified)
@@ -188,19 +176,43 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	d.DoDynamicReply(w, &newResponseData.Response)
+	// Write to reply with some alternate data
+	responseMessage := []byte(newResponseData.Response.Body)
 
-	return nil, 666
-}
+	// Create an http.Response object so we can send it tot he cache middleware
+	newResponse := new(http.Response)
+	newResponse.Header = make(map[string][]string)
 
-func (v *VirtualEndpoint) DoDynamicReply(w http.ResponseWriter, resp *ResponseObject) {
-	// Reply with some alternate data
-	responseMessage := []byte(resp.Body)
-	for header, value := range resp.Headers {
+	requestTime := time.Now().UTC().Format(http.TimeFormat)
+	w.Header().Add("Server", "tyk")
+	w.Header().Add("Date", requestTime)
+
+	for header, value := range newResponseData.Response.Headers {
 		w.Header().Add(header, value)
+		newResponse.Header.Add(header, value)
 	}
 
-	w.WriteHeader(resp.Code)
+	// Write to the client
+	w.WriteHeader(newResponseData.Response.Code)
 	fmt.Fprintf(w, string(responseMessage))
-	return
+
+	newResponse.ContentLength = int64(len(responseMessage))
+	newResponse.Body = ioutil.NopCloser(bytes.NewReader(responseMessage))
+	newResponse.StatusCode = newResponseData.Response.Code
+	newResponse.Proto = "HTTP/1.0"
+	newResponse.ProtoMajor = 1
+	newResponse.ProtoMinor = 0
+	newResponse.Header.Add("Server", "tyk")
+	newResponse.Header.Add("Date", requestTime)
+
+	return newResponse
+
+}
+
+// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+
+	d.ServeHTTPForCache(w, r)
+
+	return nil, 666
 }
