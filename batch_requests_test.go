@@ -143,7 +143,7 @@ func TestBatchSuccess(t *testing.T) {
 
 	// Test request constructions:
 
-	requestSet, createReqErr := batchHandler.ConstructRequests(batchRequest)
+	requestSet, createReqErr := batchHandler.ConstructRequests(batchRequest, false)
 	if createReqErr != nil {
 		t.Error(fmt.Sprintf("Batch request creation failed , request structure malformed"))
 	}
