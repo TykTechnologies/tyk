@@ -44,6 +44,7 @@ const (
 	HardTimeout            URLStatus = 9
 	CircuitBreaker         URLStatus = 10
 	URLRewrite             URLStatus = 11
+	VirtualPath            URLStatus = 12
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -70,6 +71,7 @@ const (
 	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
 	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
 	StatusURLRewrite               RequestStatus = "URL Rewritten"
+	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -86,6 +88,7 @@ type URLSpec struct {
 	HardTimeout             tykcommon.HardTimeoutMeta
 	CircuitBreaker          ExtendedCircuitBreakerMeta
 	URLRewrite              tykcommon.URLRewriteMeta
+	VirtualPathSpec         tykcommon.VirtualMeta
 }
 
 type TransformSpec struct {
@@ -596,6 +599,25 @@ func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []tykcommon.URLRe
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) cmpileVirtualPathspathSpec(paths []tykcommon.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.VirtualPathSpec = stringSpec
+		PreLoadVirtualMetaCode(&newSpec.VirtualPathSpec, apiSpec.JSVM)
+
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -610,6 +632,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
 	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
+	virtualPaths := a.cmpileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -623,6 +646,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, hardTimeouts...)
 	combinedPath = append(combinedPath, circuitBreakers...)
 	combinedPath = append(combinedPath, urlRewrites...)
+	combinedPath = append(combinedPath, virtualPaths...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -662,6 +686,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusCircuitBreaker
 	case URLRewrite:
 		return StatusURLRewrite
+	case VirtualPath:
+		return StatusVirtualPath
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed

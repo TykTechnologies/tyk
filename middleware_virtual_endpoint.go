@@ -48,13 +48,13 @@ type VirtualEndpoint struct {
 
 func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
 	if meta != nil {
-		if FunctionSourceType == "file" {
+		if meta.FunctionSourceType == "file" {
 			js, loadErr := ioutil.ReadFile(meta.FunctionSourceURI)
 			if loadErr != nil {
 				log.Error("Failed to load Endpoint JS: ", loadErr)
 			} else {
 				// No error, load the JS into the VM
-				log.Info("Loading JS File: ", mwPath)
+				log.Info("Loading JS Endpoint File: ", meta.FunctionSourceURI)
 				j.VM.Run(js)
 			}
 		} else {
@@ -96,6 +96,10 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if found {
 		stat = StatusVirtualPath
 	} else {
+		return nil, 200
+	}
+
+	if stat != StatusVirtualPath {
 		return nil, 200
 	}
 
