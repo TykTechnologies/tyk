@@ -1,5 +1,6 @@
 # DEV
 
+- JSVM now has access to a `TykBatchRequest` function to make batch requests in virtual paths. Use case: Create a virtual endpoint that interacts with multiple upstream APIs, gathers the data, processes the aggregates somehow and returns them as a single body. This can then be cached to save on load.
 - Added virtual path support, you can now have a JS Function respond to a request, makes mocking MUCh more flexible, TODO: expose batch methods to JSVM. To activate, add to extended paths:
 
 	```

@@ -100,14 +100,19 @@ func (b BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestSt
 	return batchRequest, decodeErr
 }
 
-func (b BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure) ([]*http.Request, error) {
+func (b BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure, unsafe bool) ([]*http.Request, error) {
 	requestSet := []*http.Request{}
 
 	for i, requestDef := range batchRequest.Requests {
 		// We re-build the URL to ensure that the requested URL is actually for the API in question
 		// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
-		absUrlHeader := strings.Join([]string{"http://localhost", strconv.Itoa(config.ListenPort)}, ":")
-		absURL := strings.Join([]string{absUrlHeader, strings.Trim(b.API.Proxy.ListenPath, "/"), requestDef.RelativeURL}, "/")
+		var absURL string
+		if !unsafe {
+			absUrlHeader := strings.Join([]string{"http://localhost", strconv.Itoa(config.ListenPort)}, ":")
+			absURL = strings.Join([]string{absUrlHeader, strings.Trim(b.API.Proxy.ListenPath, "/"), requestDef.RelativeURL}, "/")
+		} else {
+			absURL = requestDef.RelativeURL
+		}
 
 		thisRequest, createReqErr := http.NewRequest(requestDef.Method, absURL, bytes.NewBuffer([]byte(requestDef.Body)))
 		if createReqErr != nil {
@@ -169,7 +174,7 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 		}
 
 		// Construct the requests
-		requestSet, createReqErr := b.ConstructRequests(batchRequest)
+		requestSet, createReqErr := b.ConstructRequests(batchRequest, false)
 		if createReqErr != nil {
 			ReturnError(fmt.Sprintf("Batch request creation failed , request structure malformed"), w)
 			return
@@ -188,6 +193,39 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 		// Respond
 		DoJSONWrite(w, 200, replyMessage)
 	}
+
+}
+
+// HandleBatchRequest is the actual http handler for a batch request on an API definition
+func (b BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
+
+	// Decode request
+	var batchRequest BatchRequestStructure
+	decodeErr := json.Unmarshal(RequestObject, &batchRequest)
+
+	if decodeErr != nil {
+		log.Error("Could not decode batch request, decoding failed: ", decodeErr)
+		return []byte{}
+	}
+
+	// Construct the unsafe requests
+	requestSet, createReqErr := b.ConstructRequests(batchRequest, true)
+	if createReqErr != nil {
+		log.Error("Batch request creation failed , request structure malformed: ", createReqErr)
+		return []byte{}
+	}
+
+	// Run requests and collate responses
+	ReplySet := b.MakeRequests(batchRequest, requestSet)
+
+	// Encode responses
+	replyMessage, encErr := json.Marshal(&ReplySet)
+	if encErr != nil {
+		log.Error("Couldn't encode response to string! ", encErr)
+		return []byte{}
+	}
+
+	return replyMessage
 
 }
 

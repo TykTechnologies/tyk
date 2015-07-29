@@ -340,6 +340,23 @@ func (j *JSVM) LoadTykJSApi() {
 		return otto.Value{}
 	})
 
+	// Batch request method
+	unsafeBatchHandler := BatchRequestHandler{}
+	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
+		requestSet := call.Argument(0).String()
+		log.Debug("Batch input is: ", requestSet)
+
+		byteArray := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
+
+		returnVal, retErr := j.VM.ToValue(string(byteArray))
+		if retErr != nil {
+			log.Error("[JSVM]: Failed to encode return value: ", retErr)
+			return otto.Value{}
+		}
+
+		return returnVal
+	})
+
 	TykReturnFunc := `
 	function TykJsResponse(response, session_meta) {
 		return JSON.stringify({Response: response, SessionMeta: session_meta})
