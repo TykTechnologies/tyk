@@ -19,9 +19,13 @@ type Config struct {
 		PolicySource     string `json:"policy_source"`
 		PolicyRecordName string `json:"policy_record_name"`
 	} `json:"policies"`
-	UseDBAppConfigs bool   `json:"use_db_app_configs"`
-	AppPath         string `json:"app_path"`
-	Storage         struct {
+	UseDBAppConfigs  bool `json:"use_db_app_configs"`
+	DBAppConfOptions struct {
+		NodeIsSegmented bool     `json:"node_is_segmented"`
+		Tags            []string `json:"tags"`
+	} `json:"db_app_conf_options"`
+	AppPath string `json:"app_path"`
+	Storage struct {
 		Type     string `json:"type"`
 		Host     string `json:"host"`
 		Port     int    `json:"port"`

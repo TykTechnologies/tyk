@@ -1,5 +1,13 @@
 # DEV
 
+- You can now segment gateways that use a DB-backed configurations for example if you vae APIs in different regions, or only wish to service a segment of your APIs (e.g. "Health APIs", "Finance APIs"). So you can have a centralised API registry using the dashboard, and then Tag APIs according to their segment(s), then configure your Tyk nodes to only load those API endpoints, so node 1 may only serve health APIs, while node 2 might serve a mixture and node 3 will serve only finance APIs. To enable, simply configure your node and add to `tyk.conf` and `host_manager.conf` (if using):
+
+	"db_app_conf_options": {
+        "node_is_segmented": false,
+        "tags": ["test2"]
+    }
+
+- You will need to add a `tags: []` sectino to your API definition in the DB to enable this feature, or set it in the dashboard.
 - Dynamic endpoints support response middleware
 - Dynamic endpoints support caching
 - Dynamic endpoints also count towards analytics

@@ -227,6 +227,12 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 		"active": true,
 	}
 
+	// enable segments
+	if config.DBAppConfOptions.NodeIsSegmented {
+		log.Info("Segmented node, loading: ", config.DBAppConfOptions.Tags)
+		search["tags"] = bson.M{"$in": config.DBAppConfOptions.Tags}
+	}
+
 	var APIDefinitions = []tykcommon.APIDefinition{}
 	var StringDefs = make([]bson.M, 0)
 	mongoErr := apiCollection.Find(search).All(&APIDefinitions)
