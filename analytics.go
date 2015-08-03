@@ -83,6 +83,11 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 	thisRecord.APIKey = publicHash(thisRecord.APIKey)
 
+	if config.DBAppConfOptions.NodeIsSegmented {
+		// Extend tag list to include this data so wecan segment by node if necessary
+		thisRecord.Tags = append(thisRecord.Tags, config.DBAppConfOptions.Tags...)
+	}
+
 	encoded, err := msgpack.Marshal(thisRecord)
 
 	if err != nil {
