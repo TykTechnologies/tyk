@@ -136,6 +136,10 @@ func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 
 // ------------------- REDIS STORAGE MANAGER -------------------------------
 
+// We want to centralise this, this will minimise 
+// the number of connections we are running
+var poolSingleton *redis.Pool
+
 // RedisStorageManager is a storage manager that uses the redis database.
 type RedisStorageManager struct {
 	pool      *redis.Pool
@@ -143,12 +147,19 @@ type RedisStorageManager struct {
 	HashKeys  bool
 }
 
-func (r *RedisStorageManager) newPool(server, password string, database int) *redis.Pool {
+func NewRedisPool(server, password string, database int) *redis.Pool {
+	if poolSingleton != nil {
+		log.Debug("Redis pool already INITIALISED")
+		return poolSingleton
+	}
+
+	log.Debug("Creating new Redis connection pool")
+
 	maxIdle := 100
 	if config.Storage.MaxIdle > 0 {
 		maxIdle = config.Storage.MaxIdle
 	}
-	return &redis.Pool{
+	poolSingleton = &redis.Pool{
 		MaxIdle:     maxIdle,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
@@ -175,14 +186,19 @@ func (r *RedisStorageManager) newPool(server, password string, database int) *re
 			return err
 		},
 	}
+	return poolSingleton
 }
 
 // Connect will establish a connection to the DB
 func (r *RedisStorageManager) Connect() bool {
 
-	fullPath := config.Storage.Host + ":" + strconv.Itoa(config.Storage.Port)
-	log.Debug("Connecting to redis on: ", fullPath)
-	r.pool = r.newPool(fullPath, config.Storage.Password, config.Storage.Database)
+	if r.pool == nil {
+		fullPath := config.Storage.Host + ":" + strconv.Itoa(config.Storage.Port)
+		log.Debug("Connecting to redis on: ", fullPath)
+		r.pool = NewRedisPool(fullPath, config.Storage.Password, config.Storage.Database)
+	} else {
+		log.Debug("Storage Engine already initialised...")
+	}
 
 	return true
 }
