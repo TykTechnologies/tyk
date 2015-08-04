@@ -34,6 +34,7 @@ var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
 var DefaultQuotaStore = DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
+var VERSION string = "v1.8"
 
 //var genericOsinStorage *RedisOsinStorageInterface
 var ApiSpecRegister = make(map[string]*APISpec)
@@ -562,7 +563,7 @@ func init() {
 		--as-version=<version>       The version number to use when inserting
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, "v1.7.2", false, false)
+	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
 	if err != nil {
 		log.Warning("Error while parsing arguments: ", err)
 	}
@@ -732,7 +733,7 @@ func main() {
 
 			go s.Serve(l)
 		} else {
-			log.Info("Server started")
+			log.Printf("Server started (%v)", VERSION)
 			go http.Serve(l, nil)
 		}
 
@@ -756,7 +757,7 @@ func main() {
 			log.Info("Custom server started")
 			go s.Serve(l)
 		} else {
-			log.Info("Server started")
+			log.Printf("Server started (%v)", VERSION)
 			http.Serve(l, nil)
 		}
 
