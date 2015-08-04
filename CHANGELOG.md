@@ -1,4 +1,5 @@
 # DEV
+
 - Added CORS support, add a CORS section to your API definition:
 	 
 	 ```
