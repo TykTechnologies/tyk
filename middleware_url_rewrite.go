@@ -27,8 +27,8 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (s
 		dollarMatch, _ := regexp.Compile(`\$\d`) // Prepare our regex
 		replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
 
-		log.Warning(result_slice)
-		log.Warning(replace_slice)
+		log.Debug(result_slice)
+		log.Debug(replace_slice)
 
 		mapped_replace := make(map[string]string)
 		for mI, replacementVal := range result_slice[0] {

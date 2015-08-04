@@ -128,7 +128,7 @@ func getAPISpecs() []APISpec {
 		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
 	}
 
-	log.Printf("Loaded %v APIs", len(APISpecs))
+	log.Printf("Detected %v APIs", len(APISpecs))
 	return APISpecs
 }
 

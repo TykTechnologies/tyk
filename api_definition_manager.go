@@ -409,14 +409,14 @@ func (a *APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
 }
 
 func (a *APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
-	log.Info("-- Loading template: ", path)
+	log.Debug("-- Loading template: ", path)
 	thisT, tErr := textTemplate.ParseFiles(path)
 
 	return thisT, tErr
 }
 
 func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
-	log.Info("-- Loading blob")
+	log.Debug("-- Loading blob")
 	uDec, decErr := b64.StdEncoding.DecodeString(blob)
 
 	if decErr != nil {
@@ -435,7 +435,7 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 
 	log.Debug("Checking for transform paths...")
 	for _, stringSpec := range paths {
-		log.Info("-- Generating path")
+		log.Debug("-- Generating path")
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with template actions
@@ -447,13 +447,13 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 
 		switch stringSpec.TemplateData.Mode {
 		case tykcommon.UseFile:
-			log.Info("-- Using File mode")
+			log.Debug("-- Using File mode")
 			newTransformSpec.Template, templErr = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
 		case tykcommon.UseBlob:
-			log.Info("-- Blob mode")
+			log.Debug("-- Blob mode")
 			newTransformSpec.Template, templErr = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
 		default:
-			log.Info("-- No mode defined! Found: ", stringSpec.TemplateData.Mode)
+			log.Warning("[Transform Templates] No tempalte mode defined! Found: ", stringSpec.TemplateData.Mode)
 			templErr = errors.New("No valid template mode defined, must be either 'file' or 'blob'.")
 		}
 
@@ -465,7 +465,7 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 
 		if templErr == nil {
 			thisURLSpec = append(thisURLSpec, newSpec)
-			log.Info("-- Loaded")
+			log.Debug("-- Loaded")
 		} else {
 			log.Error("Template load failure! Skipping transformation: ", templErr)
 		}
@@ -605,7 +605,7 @@ func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []tykcommon.URLRe
 	return thisURLSpec
 }
 
-func (a *APIDefinitionLoader) cmpileVirtualPathspathSpec(paths []tykcommon.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []tykcommon.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -638,7 +638,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
 	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
-	virtualPaths := a.cmpileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
+	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
