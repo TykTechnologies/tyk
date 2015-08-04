@@ -59,6 +59,16 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 		authHeaderValue = tempRes.FormValue(thisConfig.AuthHeaderName)
 	}
 
+	if thisConfig.UseCookie {
+		tempRes := CopyRequest(r)
+		authCookie, notFoundErr := tempRes.Cookie(thisConfig.AuthHeaderName)
+		if notFoundErr != nil {
+			authHeaderValue = ""
+		} else {
+			authHeaderValue = authCookie.Value
+		}
+	}
+
 	if authHeaderValue == "" {
 		// No header value, fail
 		log.WithFields(logrus.Fields{

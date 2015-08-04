@@ -238,7 +238,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
-	d.ServeHTTPForCache(w, r)
+	res := d.ServeHTTPForCache(w, r)
+
+	if res == nil {
+		return nil, 200
+	}
 
 	return nil, 666
 }
