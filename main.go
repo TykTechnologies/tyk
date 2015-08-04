@@ -9,6 +9,7 @@ import (
 	osin "github.com/lonelycode/osin"
 	"github.com/lonelycode/tykcommon"
 	"github.com/rcrowley/goagain"
+	"github.com/rs/cors"
 	"html/template"
 	"io/ioutil"
 	"net"
@@ -297,6 +298,25 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 	referenceSpec.ResponseChain = &responseChain
 }
 
+func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
+
+	if spec.CORS.Enable {
+		log.Debug("CORS ENABLED")
+		c := cors.New(cors.Options{
+			AllowedOrigins: spec.CORS.AllowedOrigins,
+			AllowedMethods: spec.CORS.AllowedMethods,    
+			AllowedHeaders: spec.CORS.AllowedHeaders,    
+			ExposedHeaders: spec.CORS.ExposedHeaders,    
+			AllowCredentials: spec.CORS.AllowCredentials,
+			MaxAge: spec.CORS.MaxAge,
+			OptionsPassthrough: spec.CORS.OptionsPassthrough,
+			Debug: spec.CORS.Debug, 
+		})
+		
+		*chain = append(*chain, c.Handler)
+	}
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
@@ -412,6 +432,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 				// Add pre-process MW
 				var chainArray = []alice.Constructor{}
+				handleCORS(&chainArray, &referenceSpec)
 
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
@@ -461,6 +482,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 				var chainArray = []alice.Constructor{}
 
+				handleCORS(&chainArray, &referenceSpec)
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),

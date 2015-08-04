@@ -1,4 +1,31 @@
 # DEV
+- Added CORS support, add a CORS section to your API definition:
+	 
+	 ```
+	 CORS: {
+	    enable: false,
+	    allowed_origins: [
+	      "http://foo.com"
+	    ]
+	 },
+	 ```
+
+- Full CORS Options are:
+
+	```
+	CORS struct {
+		Enable             bool     `bson:"enable" json:"enable"`
+		AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins"`
+		AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods"`
+		AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers"`
+		ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers"`
+		AllowCredentials   bool     `bson:"allow_credentials" json:"allow_credentials"`
+		MaxAge             int      `bson:"max_age" json:"max_age"`
+		OptionsPassthrough bool     `bson:"options_pasthrough" json:"options_pasthrough"`
+		Debug              bool     `bson:"debug" json:"debug"`
+	} `bson:"CORS" json:"CORS"`
+	```
+
 - Fixed cache bug
 - When using node segments, tags will be transferred into analytics data as well as any token-level tags, so for example, you could tag each node independently, and then view the trafic that went through those nodes by ID or group them in aggregate
 - You can now segment gateways that use a DB-backed configurations for example if you vae APIs in different regions, or only wish to service a segment of your APIs (e.g. "Health APIs", "Finance APIs"). So you can have a centralised API registry using the dashboard, and then Tag APIs according to their segment(s), then configure your Tyk nodes to only load those API endpoints, so node 1 may only serve health APIs, while node 2 might serve a mixture and node 3 will serve only finance APIs. To enable, simply configure your node and add to `tyk.conf` and `host_manager.conf` (if using):
