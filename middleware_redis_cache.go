@@ -41,7 +41,8 @@ func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
 
 func (m RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {
 	h := md5.New()
-	toEncode := strings.Join([]string{req.Method, req.URL.RawQuery}, "-")
+	toEncode := strings.Join([]string{req.Method, req.URL.String()}, "-")
+	log.Debug("Cache encoding: ", toEncode)
 	io.WriteString(h, toEncode)
 	reqChecksum := hex.EncodeToString(h.Sum(nil))
 
