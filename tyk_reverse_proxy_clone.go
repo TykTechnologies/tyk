@@ -465,6 +465,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			res, err = transport.RoundTrip(outreq)
 			if err != nil {
 				breakerConf.CB.Fail()
+			} else if res.StatusCode == 500 {
+				breakerConf.CB.Fail()
 			} else {
 				breakerConf.CB.Success()
 			}
