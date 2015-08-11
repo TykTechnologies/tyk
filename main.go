@@ -303,16 +303,16 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 	if spec.CORS.Enable {
 		log.Debug("CORS ENABLED")
 		c := cors.New(cors.Options{
-			AllowedOrigins: spec.CORS.AllowedOrigins,
-			AllowedMethods: spec.CORS.AllowedMethods,    
-			AllowedHeaders: spec.CORS.AllowedHeaders,    
-			ExposedHeaders: spec.CORS.ExposedHeaders,    
-			AllowCredentials: spec.CORS.AllowCredentials,
-			MaxAge: spec.CORS.MaxAge,
+			AllowedOrigins:     spec.CORS.AllowedOrigins,
+			AllowedMethods:     spec.CORS.AllowedMethods,
+			AllowedHeaders:     spec.CORS.AllowedHeaders,
+			ExposedHeaders:     spec.CORS.ExposedHeaders,
+			AllowCredentials:   spec.CORS.AllowCredentials,
+			MaxAge:             spec.CORS.MaxAge,
 			OptionsPassthrough: spec.CORS.OptionsPassthrough,
-			Debug: spec.CORS.Debug, 
+			Debug:              spec.CORS.Debug,
 		})
-		
+
 		*chain = append(*chain, c.Handler)
 	}
 }
@@ -683,8 +683,6 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 }
 
 func main() {
-	displayConfig()
-
 	ReadTimeout := 120
 	WriteTimeout := 120
 	if config.HttpServerOptions.ReadTimeout > 0 {
@@ -744,7 +742,7 @@ func main() {
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
-			log.Info("Custom Server started")
+			log.Info("Custom gateway started")
 			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
@@ -754,9 +752,11 @@ func main() {
 			}
 
 			go s.Serve(l)
+			displayConfig()
 		} else {
-			log.Printf("Server started (%v)", VERSION)
+			log.Printf("Gateway started (%v)", VERSION)
 			go http.Serve(l, nil)
+			displayConfig()
 		}
 
 	} else {
@@ -776,10 +776,12 @@ func main() {
 				Handler:      http.DefaultServeMux,
 			}
 
-			log.Info("Custom server started")
+			log.Info("Custom gateway started")
 			go s.Serve(l)
+			displayConfig()
 		} else {
-			log.Printf("Server started (%v)", VERSION)
+			log.Printf("Gateway started (%v)", VERSION)
+			displayConfig()
 			http.Serve(l, nil)
 		}
 
