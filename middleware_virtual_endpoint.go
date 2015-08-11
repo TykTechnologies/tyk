@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	b64 "encoding/base64"
 	"encoding/json"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
@@ -53,8 +54,17 @@ func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
 				log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
 				j.VM.Run(js)
 			}
+		} else if meta.FunctionSourceType == "blob" {
+			js, loadErr := b64.StdEncoding.DecodeString(meta.FunctionSourceURI)
+			if loadErr != nil {
+				log.Error("Failed to load blob JS: ", loadErr)
+			} else {
+				// No error, load the JS into the VM
+				log.Debug("Loading JS blob")
+				j.VM.Run(js)
+			}
 		} else {
-			log.Error("Base64 Encoded functions are not supported yet!")
+			log.Error("Type must be either file or blob (b64)!")
 		}
 	}
 }
