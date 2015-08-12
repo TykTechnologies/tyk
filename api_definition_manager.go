@@ -130,8 +130,9 @@ func (a *APIDefinitionLoader) Connect() {
 	var err error
 	a.dbSession, err = mgo.Dial(config.AnalyticsConfig.MongoURL)
 	if err != nil {
-		log.Error("Mongo connection failed:")
-		log.Panic(err)
+		log.Error("Mongo connection failed:", err)
+		time.Sleep(5)
+		a.Connect()
 	}
 }
 

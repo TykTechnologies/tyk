@@ -182,8 +182,9 @@ func (m *MongoPurger) Connect() {
 	var err error
 	m.dbSession, err = mgo.Dial(config.AnalyticsConfig.MongoURL)
 	if err != nil {
-		log.Error("Mongo connection failed:")
-		log.Panic(err)
+		log.Error("Mongo connection failed:", err)
+		time.Sleep(5)
+		m.Connect()
 	}
 }
 

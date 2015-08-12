@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
+	"time"
 )
 
 type Policy struct {
@@ -47,6 +48,8 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 	dbSession, dErr := mgo.Dial(config.AnalyticsConfig.MongoURL)
 	if dErr != nil {
 		log.Error("Mongo connection failed:", dErr)
+		time.Sleep(5)
+		return LoadPoliciesFromMongo(collectionName)
 	}
 
 	log.Debug("Searching in collection: ", collectionName)
