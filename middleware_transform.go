@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"net/http"
@@ -53,6 +54,14 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			json.Unmarshal(body, &bodyData)
 		default:
 			json.Unmarshal(body, &bodyData)
+		}
+
+		if thisMeta.TemplateMeta.TemplateData.EnableSession {
+			ses := context.Get(r, SessionData).(SessionState)
+			switch bodyData.(type) {
+			case map[string]interface{}:
+				bodyData.(map[string]interface{})["_tyk_meta"] = ses.MetaData
+			}
 		}
 
 		// Apply to template

@@ -1,14 +1,18 @@
 package main
 
 import (
+	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"net/http"
+	"strings"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformHeaders struct {
 	*TykMiddleware
 }
+
+const TYK_META_LABEL string = "$tyk_meta."
 
 type TransformHeadersConfig struct{}
 
@@ -41,8 +45,36 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 			r.Header.Del(dKey)
 		}
 
+		ses, found := context.GetOk(r, SessionData)
+		var thisSessionState SessionState
+		if found {
+			thisSessionState = ses.(SessionState)
+		}
+
 		for nKey, nVal := range thisMeta.AddHeaders {
-			r.Header.Add(nKey, nVal)
+			if strings.Contains(nVal, TYK_META_LABEL) {
+				// Using meta_data key
+				log.Debug("Meta data key in use")
+				if found {
+					metaKey := strings.Replace(nVal, TYK_META_LABEL, "", 1)
+					if thisSessionState.MetaData != nil {
+						tempVal, ok := thisSessionState.MetaData.(map[string]interface{})[metaKey]
+						if ok {
+							nVal = tempVal.(string)
+							r.Header.Add(nKey, nVal)
+						} else {
+							log.Warning("Session Meta Data not found for key in map: ", metaKey)
+						}
+
+					} else {
+						log.Debug("Meta data object is nil! Skipping.")
+					}
+				}
+
+			} else {
+				r.Header.Add(nKey, nVal)
+			}
+
 		}
 
 	}
