@@ -1,5 +1,27 @@
 # DEV
 
+- Added session meta data variables to transform middleware: 
+
+	You can reference session metadata attached to a key in the header injector using: 
+
+	```
+	$tyk_meta.KEY_NAME
+	```
+
+	And in the body transform template through:
+
+	```
+	._tyk_meta.KEYNAME
+	```
+
+	You must enable sesison parsing in the TemplateData of the body tranform entry though by adding:
+
+	```
+	"enable_session": true
+	```
+
+	To the path entry
+
 - Added CORS support, add a CORS section to your API definition:
 	 
 	 ```
