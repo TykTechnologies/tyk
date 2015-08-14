@@ -36,8 +36,7 @@ func createError(errorMsg string) []byte {
 	responseMsg, err := json.Marshal(&errorObj)
 
 	if err != nil {
-		log.Error("Couldn't marshal error stats")
-		log.Error(err)
+		log.Error("Couldn't marshal error stats: ", err)
 	}
 
 	return responseMsg
@@ -114,7 +113,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 
 	log.WithFields(logrus.Fields{
 		"key": keyName,
-	}).Info("New key added or updated.")
+	}).Debug("New key added or updated.")
 	return nil
 }
 
@@ -132,8 +131,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	code := 200
 
 	if err != nil {
-		log.Error("Couldn't decode new session object")
-		log.Error(err)
+		log.Error("Couldn't decode new session object: ", err)
 		code = 400
 		success = false
 		responseMessage = createError("Request malformed")
@@ -177,8 +175,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
-			log.Error("Could not create response message")
-			log.Error(err)
+			log.Error("Could not create response message: ", err)
 			code = 500
 			responseMessage = []byte(E_SYSTEM_ERROR)
 		}
@@ -206,8 +203,7 @@ func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 	} else {
 		responseMessage, err = json.Marshal(&thisSession)
 		if err != nil {
-			log.Error("Marshalling failed")
-			log.Error(err)
+			log.Error("Marshalling failed: ", err)
 			success = false
 		}
 	}
@@ -218,11 +214,11 @@ func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"key": sessionKey,
-		}).Info("Attempted key retrieval - failure.")
+		}).Warning("Attempted key retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"key": sessionKey,
-		}).Info("Attempted key retrieval - success.")
+		}).Debug("Attempted key retrieval - success.")
 	}
 
 	return responseMessage, code
@@ -262,8 +258,7 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 
 	responseMessage, err = json.Marshal(&sessionsObj)
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		success = false
 		code = 500
 	}
@@ -272,7 +267,7 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 		return responseMessage, code
 	}
 
-	log.Info("Attempted keys retrieval - success.")
+	log.Debug("Attempted keys retrieval - success.")
 	return []byte(E_SYSTEM_ERROR), code
 
 }
@@ -295,7 +290,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
-		}).Info("Attempted key deletion across all managed API's - success.")
+		}).Debug("Attempted key deletion across all managed API's - success.")
 
 		return responseMessage, 200
 	}
@@ -314,14 +309,13 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"key": keyName,
-	}).Info("Attempted key deletion - success.")
+	}).Debug("Attempted key deletion - success.")
 
 	return responseMessage, code
 }
@@ -338,7 +332,7 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
-		}).Info("Attempted key deletion across all managed API's - success.")
+		}).Debug("Attempted key deletion across all managed API's - success.")
 
 		return responseMessage, 200
 	}
@@ -361,14 +355,13 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"key": keyName,
-	}).Info("Attempted key deletion - success.")
+	}).Debug("Attempted key deletion - success.")
 
 	return responseMessage, code
 }
@@ -385,8 +378,7 @@ func handleURLReload() ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
@@ -412,8 +404,7 @@ func signalGroupReload() ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
@@ -534,8 +525,7 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
-			log.Error("Could not create response message")
-			log.Error(err)
+			log.Error("Could not create response message: ", err)
 			code = 500
 			responseMessage = []byte(E_SYSTEM_ERROR)
 		}
@@ -571,8 +561,7 @@ func HandleDeleteAPI(APIID string) ([]byte, int) {
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
-			log.Error("Could not create response message")
-			log.Error(err)
+			log.Error("Could not create response message: ", err)
 			code = 500
 			responseMessage = []byte(E_SYSTEM_ERROR)
 		}
@@ -589,23 +578,23 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug(r.Method)
 	if r.Method == "GET" {
 		if APIID != "" {
-			log.Info("Requesting API definition for", APIID)
+			log.Debug("Requesting API definition for", APIID)
 			responseMessage, code = HandleGetAPI(APIID)
 		} else {
-			log.Info("Requesting API list")
+			log.Debug("Requesting API list")
 			responseMessage, code = HandleGetAPIList()
 		}
 
 	} else if r.Method == "POST" {
-		log.Info("Creating new definition file")
+		log.Debug("Creating new definition file")
 		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
 	} else if r.Method == "PUT" {
-		log.Info("Updating existing API: ", APIID)
+		log.Debug("Updating existing API: ", APIID)
 		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
 	} else if r.Method == "DELETE" {
-		log.Info("Deleting existing API: ", APIID)
+		log.Debug("Deleting existing API: ", APIID)
 		if APIID != "" {
-			log.Info("Deleting API definition for: ", APIID)
+			log.Debug("Deleting API definition for: ", APIID)
 			responseMessage, code = HandleDeleteAPI(APIID)
 		} else {
 			code = 400
@@ -704,8 +693,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	code := 200
 
 	if err != nil {
-		log.Error("Couldn't decode new session object")
-		log.Error(err)
+		log.Error("Couldn't decode new session object: ", err)
 		code = 400
 		success = false
 		responseMessage = createError("Request malformed")
@@ -741,7 +729,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
-		}).Info("New org key added or updated.")
+		}).Debug("New org key added or updated.")
 		success = true
 	}
 
@@ -761,8 +749,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
-			log.Error("Could not create response message")
-			log.Error(err)
+			log.Error("Could not create response message: ", err)
 			code = 500
 			responseMessage = []byte(E_SYSTEM_ERROR)
 		}
@@ -790,8 +777,7 @@ func handleGetOrgDetail(ORGID string) ([]byte, int) {
 	} else {
 		responseMessage, err = json.Marshal(&thisSession)
 		if err != nil {
-			log.Error("Marshalling failed")
-			log.Error(err)
+			log.Error("Marshalling failed: ", err)
 			success = false
 		}
 	}
@@ -802,11 +788,11 @@ func handleGetOrgDetail(ORGID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"Org": ORGID,
-		}).Info("Attempted key retrieval - failure.")
+		}).Debug("Attempted key retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"Org": ORGID,
-		}).Info("Attempted key retrieval - success.")
+		}).Debug("Attempted key retrieval - success.")
 	}
 
 	return responseMessage, code
@@ -839,8 +825,7 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 
 	responseMessage, err = json.Marshal(&sessionsObj)
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		success = false
 		code = 500
 	}
@@ -849,7 +834,7 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 		return responseMessage, code
 	}
 
-	log.Info("Attempted orgs retrieval - success.")
+	log.Debug("Attempted orgs retrieval - success.")
 	return []byte(E_SYSTEM_ERROR), code
 
 }
@@ -872,14 +857,13 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"key": ORGID,
-	}).Info("Attempted org key deletion - success.")
+	}).Debug("Attempted org key deletion - success.")
 
 	return responseMessage, code
 }
@@ -944,8 +928,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			responseMessage = []byte(E_SYSTEM_ERROR)
 			code = 500
-			log.Error("Couldn't decode body")
-			log.Error(err)
+			log.Error("Couldn't decode body: ", err)
 
 		} else {
 
@@ -1000,14 +983,13 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, err = json.Marshal(&responseObj)
 
 			if err != nil {
-				log.Error("Marshalling failed")
-				log.Error(err)
+				log.Error("Marshalling failed: ", err)
 				responseMessage = []byte(E_SYSTEM_ERROR)
 				code = 500
 			} else {
 				log.WithFields(logrus.Fields{
 					"key": newKey,
-				}).Info("Generated new key - success.")
+				}).Debug("Generated new key - success.")
 			}
 		}
 
@@ -1043,8 +1025,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			responseMessage = []byte(E_SYSTEM_ERROR)
 			code = 500
-			log.Error("Couldn't decode body")
-			log.Error(err)
+			log.Error("Couldn't decode body: ", err)
 
 		}
 
@@ -1085,14 +1066,13 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		responseMessage, err = json.Marshal(&reportableClientData)
 
 		if err != nil {
-			log.Error("Marshalling failed")
-			log.Error(err)
+			log.Error("Marshalling failed: ", err)
 			responseMessage = []byte(E_SYSTEM_ERROR)
 			code = 500
 		} else {
 			log.WithFields(logrus.Fields{
 				"key": newClient.GetId(),
-			}).Info("New OAuth Client registered successfully.")
+			}).Debug("New OAuth Client registered successfully.")
 		}
 
 	} else {
@@ -1177,8 +1157,7 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		}
 		responseMessage, err = json.Marshal(&reportableClientData)
 		if err != nil {
-			log.Error("Marshalling failed")
-			log.Error(err)
+			log.Error("Marshalling failed: ", err)
 			success = false
 		}
 	}
@@ -1189,11 +1168,11 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"key": keyName,
-		}).Info("Attempted oauth client retrieval - failure.")
+		}).Warning("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"key": keyName,
-		}).Info("Attempted oauth client retrieval - success.")
+		}).Debug("Attempted oauth client retrieval - success.")
 	}
 
 	return responseMessage, code
@@ -1232,14 +1211,13 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed")
-		log.Error(err)
+		log.Error("Marshalling failed: ", err)
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"key": keyName,
-	}).Info("Attempted OAuth client deletion - success.")
+	}).Debug("Attempted OAuth client deletion - success.")
 
 	return responseMessage, code
 }
@@ -1281,8 +1259,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 		responseMessage, err = json.Marshal(&clients)
 		if err != nil {
-			log.Error("Marshalling failed")
-			log.Error(err)
+			log.Error("Marshalling failed: ", err)
 			success = false
 		}
 	}
@@ -1293,11 +1270,11 @@ func getOauthClients(APIID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"API": APIID,
-		}).Info("Attempted oauth client retrieval - failure.")
+		}).Warning("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"API": APIID,
-		}).Info("Attempted oauth clients retrieval - success.")
+		}).Debug("Attempted oauth clients retrieval - success.")
 	}
 
 	return responseMessage, code
