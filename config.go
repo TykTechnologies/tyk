@@ -74,7 +74,8 @@ type Config struct {
 		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
 		EnableRPCCache                    bool   `json:"enable_rpc_cache"`
 	} `json:"slave_options"`
-	HttpServerOptions struct {
+	DisableVirtualPathBlobs bool `json:"disable_virtual_path_blobs"`
+	HttpServerOptions       struct {
 		OverrideDefaults bool `json:"override_defaults"`
 		ReadTimeout      int  `json:"read_timeout"`
 		WriteTimeout     int  `json:"write_timeout"`

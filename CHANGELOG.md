@@ -1,5 +1,6 @@
 # DEV
 
+- Security option added for shared nodes: Set `disable_virtual_path_blobs=true` to stop virtual paths from loading blob fields
 - Added session meta data variables to transform middleware: 
 
 	You can reference session metadata attached to a key in the header injector using: 

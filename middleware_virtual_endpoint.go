@@ -55,6 +55,11 @@ func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
 				j.VM.Run(js)
 			}
 		} else if meta.FunctionSourceType == "blob" {
+			if config.DisableVirtualPathBlobs {
+				log.Error("[JSVM] Blobs not allowerd on this node")
+				return
+			}
+
 			js, loadErr := b64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 			if loadErr != nil {
 				log.Error("Failed to load blob JS: ", loadErr)
