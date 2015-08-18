@@ -50,7 +50,7 @@ const (
 
 // Display configuration options
 func displayConfig() {
-	log.Info("Listening on port: ", config.ListenPort)
+	log.Info("--> Listening on port: ", config.ListenPort)
 }
 
 // Create all globals and init connection handlers
