@@ -262,7 +262,16 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
 	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	store.Connect()
 
-	apiCollection := store.GetApiDefinitions(orgId)
+	// enable segments
+	var tags []string
+	if config.DBAppConfOptions.NodeIsSegmented {
+		log.Info("Segmented node, loading: ", config.DBAppConfOptions.Tags)
+		tags = config.DBAppConfOptions.Tags
+	} else {
+		tags = make([]string, 0)
+	}
+
+	apiCollection := store.GetApiDefinitions(orgId, tags)
 
 	store.Disconnect()
 

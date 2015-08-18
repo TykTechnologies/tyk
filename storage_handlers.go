@@ -22,7 +22,6 @@ type StorageHandlerName string
 
 const (
 	RedisHandler StorageHandlerName = "redis"
-	CloudHandler StorageHandlerName = "cloud"
 )
 
 // StorageHandler is a standard interface to a storage backend,
@@ -136,7 +135,7 @@ func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 
 // ------------------- REDIS STORAGE MANAGER -------------------------------
 
-// We want to centralise this, this will minimise 
+// We want to centralise this, this will minimise
 // the number of connections we are running
 var poolSingleton *redis.Pool
 

@@ -20,29 +20,17 @@ type InboundData struct {
 	Expire       int64
 }
 
+type DefRequest struct {
+	OrgId string
+	Tags  []string
+}
+
 type KeysValuesPair struct {
 	Keys   []string
 	Values []string
 }
 
 var ErrorDenied error = errors.New("Access Denied")
-
-// Global RPC Storage Objects
-// var sessionRPCStore *RPCStorageHandler
-// var orgStore *RPCStorageHandler
-// var DefaultOrgStore *RPCStorageHandler
-// var DefaultQuotaStore *RPCStorageHandler
-// var OAuthStorageManager *RPCStorageHandler
-
-// func InitRPCHandlers() {
-// 	DefaultOrgStore = &RPCStorageHandler{
-// 		KeyPrefix: "orgkey.",
-// 		UserKey:   config.SlaveOptions.APIKey,
-// 		Address:   config.SlaveOptions.ConnectionString}
-
-// 	DefaultQuotaStore = DefaultOrgStore
-
-// }
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
@@ -138,7 +126,7 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 }
 
 func (r *RPCStorageHandler) Login() {
-	log.Info("[RPC Store] Login initiated")
+	log.Debug("[RPC Store] Login initiated")
 
 	if len(r.UserKey) == 0 {
 		log.Fatal("No API Key set!")
@@ -152,7 +140,7 @@ func (r *RPCStorageHandler) Login() {
 	if !ok.(bool) {
 		log.Fatal("RPC Login incorrect")
 	}
-	log.Info("[RPC Store] Login complete")
+	log.Debug("[RPC Store] Login complete")
 }
 
 // GetKey will retreive a key from the database
@@ -166,7 +154,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 		cachedVal, found := r.cache.Get(r.fixKey(keyName))
 		if found {
 			elapsed := time.Since(start)
-			log.Info("GetKey took ", elapsed)
+			log.Debug("GetKey took ", elapsed)
 			log.Debug(cachedVal.(string))
 			return cachedVal.(string), nil
 		}
@@ -185,7 +173,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 		return "", KeyError{}
 	}
 	elapsed := time.Since(start)
-	log.Info("GetKey took ", elapsed)
+	log.Debug("GetKey took ", elapsed)
 
 	if config.SlaveOptions.EnableRPCCache {
 		// Cache it
@@ -196,7 +184,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
-	log.Info("GetExp called")
+	log.Debug("GetExp called")
 	value, err := r.Client.Call("GetExp", r.fixKey(keyName))
 
 	if err != nil {
@@ -230,7 +218,7 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 	}
 
 	elapsed := time.Since(start)
-	log.Info("SetKey took ", elapsed)
+	log.Debug("SetKey took ", elapsed)
 
 }
 
@@ -374,46 +362,11 @@ func (r *RPCStorageHandler) DeleteRawKeys(keys []string, prefix string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
 func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
-	// psc := redis.PubSubConn{r.pool.Get()}
-	// psc.Subscribe(channel)
-	// for {
-	// 	switch v := psc.Receive().(type) {
-	// 	case redis.Message:
-	// 		callback(v)
-
-	// 	case redis.Subscription:
-	// 		log.Info("Subscription started: ", v.Channel)
-
-	// 	case error:
-	// 		log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
-
-	// 		return v
-	// 	}
-	// }
-	// return errors.New("Connection closed.")
-
-	//TODO: implement an alternative!
 	log.Warning("NO PUBSUB DEFINED")
 	return nil
 }
 
 func (r *RPCStorageHandler) Publish(channel string, message string) error {
-	// db := r.pool.Get()
-	// defer db.Close()
-	// if r.pool == nil {
-	// 	log.Info("Connection dropped, Connecting..")
-	// 	r.Connect()
-	// 	r.Publish(channel, message)
-	// } else {
-	// 	_, err := db.Do("PUBLISH", channel, message)
-	// 	if err != nil {
-	// 		log.Error("Error trying to set value:")
-	// 		log.Error(err)
-	// 		return err
-	// 	}
-	// }
-
-	// TODO: Implement alternative!
 	log.Warning("NO PUBSUB DEFINED")
 	return nil
 }
@@ -456,7 +409,7 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, expire i
 	}
 
 	elapsed := time.Since(start)
-	log.Info("SetRollingWindow took ", elapsed)
+	log.Debug("SetRollingWindow took ", elapsed)
 
 	return intVal.(int)
 
@@ -473,16 +426,21 @@ func (r RPCStorageHandler) IsAccessError(err error) bool {
 }
 
 // GetAPIDefinitions will pull API definitions from the RPC server
-func (r *RPCStorageHandler) GetApiDefinitions(orgId string) string {
-	defString, err := r.Client.Call("GetApiDefinitions", orgId)
+func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
+	dr := DefRequest{
+		OrgId: orgId,
+		Tags:  tags,
+	}
+
+	defString, err := r.Client.Call("GetApiDefinitions", dr)
 
 	if err != nil {
 		if r.IsAccessError(err) {
 			r.Login()
-			return r.GetApiDefinitions(orgId)
+			return r.GetApiDefinitions(orgId, tags)
 		}
 	}
-	log.Info("API Definitions retrieved")
+	log.Debug("API Definitions retrieved")
 	return defString.(string)
 
 }
@@ -504,7 +462,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) CheckForReload(orgId string) {
 	for {
-		log.Warning("----- Calling CheckReload! -----")
+		log.Debug("----- Calling CheckReload! -----")
 		reload, err := r.Client.CallTimeout("CheckReload", orgId, time.Second*60)
 		if err != nil {
 			if r.IsAccessError(err) {
@@ -578,6 +536,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 	Dispatch.AddFunc("SetRollingWindow", func(ibd *InboundData) (int, error) {
 		return 0, nil
 	})
+
+	// Dispatch.AddFunc("GetApiDefinitions", func(dr *DefRequest) (string, error) {
+	// 	return "", nil
+	// })
 
 	Dispatch.AddFunc("GetApiDefinitions", func(orgId string) (string, error) {
 		return "", nil

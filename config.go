@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -68,12 +69,11 @@ type Config struct {
 	}
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
 	SlaveOptions       struct {
-		UseRPC                            bool   `json:"use_rpc"`
-		ConnectionString                  string `json:"connection_string"`
-		RPCKey                            string `json:"rpc_key"`
-		APIKey                            string `json:"api_key"`
-		OverrideDefinitionStorageSettings bool   `json:"override_definition_storage_settings"`
-		EnableRPCCache                    bool   `json:"enable_rpc_cache"`
+		UseRPC           bool   `json:"use_rpc"`
+		ConnectionString string `json:"connection_string"`
+		RPCKey           string `json:"rpc_key"`
+		APIKey           string `json:"api_key"`
+		EnableRPCCache   bool   `json:"enable_rpc_cache"`
 	} `json:"slave_options"`
 	DisableVirtualPathBlobs bool `json:"disable_virtual_path_blobs"`
 	HttpServerOptions       struct {
@@ -85,6 +85,12 @@ type Config struct {
 		DefaultCacheTimeout int `json:"default_cache_timeout"`
 	} `json:"service_discovery"`
 	CloseConnections bool `json:"close_connections"`
+	AuthOverride     struct {
+		ForceAuthProvider    bool                          `json:"force_auth_provider"`
+		AuthProvider         tykcommon.AuthProviderMeta    `json:"auth_provider"`
+		ForceSessionProvider bool                          `json:"force_session_provider"`
+		SessionProvider      tykcommon.SessionProviderMeta `json:"session_provider"`
+	} `json:"auth_override"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

@@ -131,6 +131,19 @@ func getAPISpecs() []APISpec {
 	}
 
 	log.Printf("Detected %v APIs", len(APISpecs))
+
+	if config.AuthOverride.ForceAuthProvider {
+		for i, _ := range APISpecs {
+			APISpecs[i].AuthProvider = config.AuthOverride.AuthProvider
+		}
+	}
+
+	if config.AuthOverride.ForceSessionProvider {
+		for i, _ := range APISpecs {
+			APISpecs[i].SessionProvider = config.AuthOverride.SessionProvider
+		}
+	}
+
 	return APISpecs
 }
 
@@ -355,9 +368,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			var orgStore StorageHandler
 
 			authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
-			if config.SlaveOptions.OverrideDefinitionStorageSettings {
-				authStorageEngineToUse = RPCStorageEngine
-			}
+			// if config.SlaveOptions.OverrideDefinitionStorageSettings {
+			// 	authStorageEngineToUse = RPCStorageEngine
+			// }
 
 			switch authStorageEngineToUse {
 			case DefaultStorageEngine:
@@ -374,9 +387,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			}
 
 			SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
-			if config.SlaveOptions.OverrideDefinitionStorageSettings {
-				SessionStorageEngineToUse = RPCStorageEngine
-			}
+			// if config.SlaveOptions.OverrideDefinitionStorageSettings {
+			// 	SessionStorageEngineToUse = RPCStorageEngine
+			// }
 
 			switch SessionStorageEngineToUse {
 			case DefaultStorageEngine:
@@ -718,7 +731,7 @@ func main() {
 	}
 
 	if config.SlaveOptions.UseRPC {
-		log.Warning("Strting RPC reload listener!")
+		log.Debug("Starting RPC reload listener")
 		RPCListener := RPCStorageHandler{KeyPrefix: "rpc.listener.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 		RPCListener.Connect()
 		go RPCListener.CheckForReload(config.SlaveOptions.RPCKey)

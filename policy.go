@@ -9,7 +9,7 @@ import (
 )
 
 type Policy struct {
-	MID              bson.ObjectId               `bson:"_id,omitempty" json:"id"`
+	MID              bson.ObjectId               `bson:"_id,omitempty" json:"_id"`
 	ID               string                      `bson:"id,omitempty" json:"id"`
 	OrgID            string                      `bson:"org_id" json:"org_id"`
 	Rate             float64                     `bson:"rate" json:"rate"`
@@ -70,7 +70,7 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
-		log.Debug("Processing policy ID: ", p.ID)
+		log.Info("--> Processing policy ID: ", p.ID)
 	}
 
 	return policies
@@ -98,7 +98,7 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
-		log.Debug("Processing policy ID: ", p.ID)
+		log.Info("--> Processing policy ID: ", p.ID)
 	}
 
 	return policies
