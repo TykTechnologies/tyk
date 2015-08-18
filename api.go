@@ -873,7 +873,7 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	if r.Method == "GET" {
-		log.Warning("Group reload activated: sending notification to pub/sub")
+		log.Info("Group reload: sending to channel")
 		responseMessage, code = signalGroupReload()
 
 	} else {

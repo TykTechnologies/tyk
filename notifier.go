@@ -39,7 +39,7 @@ func (r *RedisNotifier) Notify(notification Notification) bool {
 		log.Error(err)
 		return false
 	} else {
-		log.Info("Sending notification", notification)
+		log.Debug("Sending notification", notification)
 		sentErr := r.store.Publish(r.channel, string(toSend))
 		if sentErr != nil {
 			log.Error("Could not send notification")
