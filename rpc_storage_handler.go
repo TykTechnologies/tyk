@@ -537,11 +537,7 @@ func GetDispatcher() *gorpc.Dispatcher {
 		return 0, nil
 	})
 
-	// Dispatch.AddFunc("GetApiDefinitions", func(dr *DefRequest) (string, error) {
-	// 	return "", nil
-	// })
-
-	Dispatch.AddFunc("GetApiDefinitions", func(orgId string) (string, error) {
+	Dispatch.AddFunc("GetApiDefinitions", func(dr *DefRequest) (string, error) {
 		return "", nil
 	})
 
