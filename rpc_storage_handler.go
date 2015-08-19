@@ -464,7 +464,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 
 // CheckForReload will start a long poll
 func (r *RPCStorageHandler) CheckForReload(orgId string) {
-	log.Info("[RPC STORE] Check Reload called...")
+	log.Debug("[RPC STORE] Check Reload called...")
 	reload, err := r.Client.CallTimeout("CheckReload", orgId, time.Second*60)
 	if err != nil {
 		if r.IsAccessError(err) {
@@ -472,7 +472,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			r.Login()
 		}
 	} else {
-		log.Info("[RPC STORE] CheckReload: Received response")
+		log.Debug("[RPC STORE] CheckReload: Received response")
 		if reload.(bool) {
 			// Do the reload!
 			log.Warning("[RPC STORE] Received Reload instruction!")
