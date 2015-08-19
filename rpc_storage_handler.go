@@ -44,16 +44,17 @@ func ClearRPCClients() {
 
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
-	RPCClient *gorpc.Client
-	Client    *gorpc.DispatcherClient
-	KeyPrefix string
-	HashKeys  bool
-	UserKey   string
-	Address   string
-	cache     *cache.Cache
-	killChan  chan int
-	Connected bool
-	ID        string
+	RPCClient        *gorpc.Client
+	Client           *gorpc.DispatcherClient
+	KeyPrefix        string
+	HashKeys         bool
+	UserKey          string
+	Address          string
+	cache            *cache.Cache
+	killChan         chan int
+	Connected        bool
+	ID               string
+	SuppressRegister bool
 }
 
 func (r *RPCStorageHandler) Register() {
@@ -84,8 +85,10 @@ func (r *RPCStorageHandler) Connect() bool {
 	r.Client = d.NewFuncClient(r.RPCClient)
 	r.Login()
 
-	r.Register()
-	go r.checkDisconnect()
+	if !r.SuppressRegister {
+		r.Register()
+		go r.checkDisconnect()
+	}
 
 	return true
 }
@@ -459,23 +462,24 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 
 }
 
-// GetPolicies will pull Policies from the RPC server
+// CheckForReload will start a long poll
 func (r *RPCStorageHandler) CheckForReload(orgId string) {
-	for {
-		log.Debug("----- Calling CheckReload! -----")
-		reload, err := r.Client.CallTimeout("CheckReload", orgId, time.Second*60)
-		if err != nil {
-			if r.IsAccessError(err) {
-				r.Login()
-			}
-		} else {
-			if reload.(bool) {
-				// Do the reload!
-				log.Warning("[RPC STORE] Received Reload instruction!")
-				go ReloadURLStructure()
-			}
+	log.Info("[RPC STORE] Check Reload called...")
+	reload, err := r.Client.CallTimeout("CheckReload", orgId, time.Second*60)
+	if err != nil {
+		if r.IsAccessError(err) {
+			log.Warning("[RPC STORE] CheckReload: Not logged in")
+			r.Login()
+		}
+	} else {
+		log.Info("[RPC STORE] CheckReload: Received response")
+		if reload.(bool) {
+			// Do the reload!
+			log.Warning("[RPC STORE] Received Reload instruction!")
+			go ReloadURLStructure()
 		}
 	}
+
 }
 
 func GetDispatcher() *gorpc.Dispatcher {

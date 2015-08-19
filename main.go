@@ -35,6 +35,7 @@ var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
 var DefaultQuotaStore = DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
+var RPCListener = RPCStorageHandler{}
 var VERSION string = "v1.8"
 
 //var genericOsinStorage *RedisOsinStorageInterface
@@ -551,6 +552,12 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 }
 
+func RPCReloadLoop(RPCKey string) {
+	for {
+		RPCListener.CheckForReload(config.SlaveOptions.RPCKey)
+	}
+}
+
 // ReloadURLStructure will create a new muxer, reload all the app configs for an
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
@@ -732,9 +739,14 @@ func main() {
 
 	if config.SlaveOptions.UseRPC {
 		log.Debug("Starting RPC reload listener")
-		RPCListener := RPCStorageHandler{KeyPrefix: "rpc.listener.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		RPCListener = RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			UserKey:          config.SlaveOptions.APIKey,
+			Address:          config.SlaveOptions.ConnectionString,
+			SuppressRegister: true,
+		}
 		RPCListener.Connect()
-		go RPCListener.CheckForReload(config.SlaveOptions.RPCKey)
+		go RPCReloadLoop(config.SlaveOptions.RPCKey)
 	}
 
 	// Handle reload when SIGUSR2 is received
