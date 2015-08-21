@@ -155,11 +155,17 @@ func NewRedisPool(server, password string, database int) *redis.Pool {
 	log.Debug("Creating new Redis connection pool")
 
 	maxIdle := 100
+	maxActive := 500
 	if config.Storage.MaxIdle > 0 {
 		maxIdle = config.Storage.MaxIdle
 	}
+
+	if config.Storage.MaxActive > 0 {
+		maxActive = config.Storage.MaxActive
+	}
 	poolSingleton = &redis.Pool{
 		MaxIdle:     maxIdle,
+		MaxActive:   maxActive,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", server)
