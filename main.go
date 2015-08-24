@@ -376,15 +376,20 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			switch authStorageEngineToUse {
 			case DefaultStorageEngine:
 				authStore = &redisStore
+				orgStore = &redisOrgStore
 			case LDAPStorageEngine:
 				thisStorageEngine := LDAPStorageHandler{}
 				thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
 				authStore = &thisStorageEngine
+				orgStore = &redisOrgStore
 			case RPCStorageEngine:
 				thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 				authStore = thisStorageEngine
+				orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+
 			default:
 				authStore = &redisStore
+				orgStore = &redisOrgStore
 			}
 
 			SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
@@ -395,13 +400,11 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			switch SessionStorageEngineToUse {
 			case DefaultStorageEngine:
 				sessionStore = &redisStore
-				orgStore = &redisOrgStore
+
 			case RPCStorageEngine:
 				sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-				orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 			default:
 				sessionStore = &redisStore
-				orgStore = &redisOrgStore
 			}
 
 			// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
