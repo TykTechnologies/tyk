@@ -472,7 +472,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			r.Login()
 		}
 	} else {
-		log.Info("[RPC STORE] CheckReload: Received response")
+		log.Debug("[RPC STORE] CheckReload: Received response")
 		if reload.(bool) {
 			// Do the reload!
 			log.Warning("[RPC STORE] Received Reload instruction!")
