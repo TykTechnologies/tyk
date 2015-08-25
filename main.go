@@ -386,6 +386,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 				authStore = thisStorageEngine
 				orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+				config.EnforceOrgDataAge = true
+				config.EnforceOrgQuotas = true
 
 			default:
 				authStore = &redisStore
