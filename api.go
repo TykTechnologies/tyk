@@ -658,7 +658,6 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	if r.Method == "POST" || r.Method == "PUT" {
-
 		responseMessage, code = handleOrgAddOrUpdate(keyName, r)
 
 	} else if r.Method == "GET" {

@@ -169,15 +169,20 @@ func getPolicies() {
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(Muxer *http.ServeMux) {
 	// set up main API handlers
-	Muxer.HandleFunc("/tyk/org/keys/", CheckIsAPIOwner(orgHandler))
-	Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
-	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
-	Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
-	Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
 	Muxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
 	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
-	Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
-	Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
+
+	if !IsRPCMode() {
+		Muxer.HandleFunc("/tyk/org/keys/", CheckIsAPIOwner(orgHandler))
+		Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
+		Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
+		Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
+		Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
+		Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
+		Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
+	} else {
+		log.Info("Node is slaved, REST API minimised")
+	}
 }
 
 // Create API-specific OAuth handlers and respective auth servers
@@ -329,6 +334,15 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 
 		*chain = append(*chain, c.Handler)
 	}
+}
+
+func IsRPCMode() bool {
+	if config.AuthOverride.ForceAuthProvider {
+		if config.AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine {
+			return true
+		}
+	}
+	return false
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
