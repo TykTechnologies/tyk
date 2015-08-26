@@ -175,14 +175,15 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 	if !IsRPCMode() {
 		Muxer.HandleFunc("/tyk/org/keys/", CheckIsAPIOwner(orgHandler))
 		Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
-		Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
 		Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
 		Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
 		Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
-		Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
 	} else {
 		log.Info("Node is slaved, REST API minimised")
 	}
+
+	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
+	Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
 }
 
 // Create API-specific OAuth handlers and respective auth servers
