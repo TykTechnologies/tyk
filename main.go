@@ -38,7 +38,6 @@ var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
 var VERSION string = "v1.8"
 
-//var genericOsinStorage *RedisOsinStorageInterface
 var ApiSpecRegister = make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
 
