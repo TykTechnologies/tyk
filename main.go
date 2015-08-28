@@ -766,6 +766,7 @@ func main() {
 		}
 		RPCListener.Connect()
 		go RPCReloadLoop(config.SlaveOptions.RPCKey)
+		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
 
 	// Handle reload when SIGUSR2 is received

@@ -482,6 +482,39 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 
 }
 
+func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
+	log.Info("Starting keyspace poller")
+
+	for {
+		r.CheckForKeyspaceChanges(orgId)
+		time.Sleep(30 * time.Second)
+	}
+}
+
+// CheckForKeyspaceChanges will poll for keysace changes
+func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
+	keys, err := r.Client.Call("GetKeySpaceUpdate", orgId)
+
+	if err != nil {
+		if r.IsAccessError(err) {
+			r.Login()
+			r.CheckForKeyspaceChanges(orgId)
+		}
+	}
+
+	if len(keys.([]string)) > 0 {
+		log.Info("Keyspace changes detected, updating local cache")
+		go r.ProcessKeySpaceChanges(keys.([]string))
+	}
+}
+
+func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
+	for _, key := range keys {
+		log.Info("--> removing cached key: ", key)
+		handleDeleteKey(key, "-1")
+	}
+}
+
 func GetDispatcher() *gorpc.Dispatcher {
 	var Dispatch *gorpc.Dispatcher = gorpc.NewDispatcher()
 
@@ -555,6 +588,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 
 	Dispatch.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
 		return false, nil
+	})
+
+	Dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr string, orgId string) ([]string, error) {
+		return []string{}, nil
 	})
 
 	return Dispatch
