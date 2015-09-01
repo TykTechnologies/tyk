@@ -611,6 +611,10 @@ func (r *RedisStorageManager) GetAndDeleteSet(keyName string) []interface{} {
 		// Execute
 		r, err := redis.Values(db.Do("EXEC"))
 
+		if len(r) == 0 {
+			return []interface{}{}
+		}
+
 		vals := r[0].([]interface{})
 
 		log.Debug("Returned: ", vals)
