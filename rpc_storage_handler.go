@@ -502,6 +502,11 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		}
 	}
 
+	if keys == nil {
+		log.Error("Keys returned nil object, skipping check")
+		return
+	}
+
 	if len(keys.([]string)) > 0 {
 		log.Info("Keyspace changes detected, updating local cache")
 		go r.ProcessKeySpaceChanges(keys.([]string))
