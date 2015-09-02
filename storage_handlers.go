@@ -27,9 +27,9 @@ const (
 // StorageHandler is a standard interface to a storage backend,
 // used by AuthorisationManager to read and write key values to the backend
 type StorageHandler interface {
-	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
-	SetKey(string, string, int64)  // Second input string is expected to be a JSON object (SessionState)
-	GetExp(string) (int64, error)  // Returns expiry of a key
+	GetKey(string) (string, error)      // Returned string is expected to be a JSON object (SessionState)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (SessionState)
+	GetExp(string) (int64, error)       // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	DeleteRawKey(string) bool
@@ -80,8 +80,9 @@ func (s InMemoryStorageManager) GetKey(keyName string) (string, error) {
 }
 
 // SetKey updates the in-memory key
-func (s InMemoryStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
+func (s InMemoryStorageManager) SetKey(keyName string, sessionState string, timeout int64) error {
 	s.Sessions[keyName] = sessionState
+	return nil
 }
 
 func (s InMemoryStorageManager) GetExp(keyName string) (int64, error) {
@@ -287,7 +288,7 @@ func (r *RedisStorageManager) GetExp(keyName string) (int64, error) {
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeout int64) {
+func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeout int64) error {
 	db := r.pool.Get()
 	defer db.Close()
 	log.Debug("[STORE] SET Raw key is: ", keyName)
@@ -296,21 +297,23 @@ func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeou
 	if db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
-		r.SetKey(keyName, sessionState, timeout)
+		return r.SetKey(keyName, sessionState, timeout)
 	} else {
 		_, err := db.Do("SET", r.fixKey(keyName), sessionState)
 		if timeout > 0 {
 			_, expErr := db.Do("EXPIRE", r.fixKey(keyName), timeout)
 			if expErr != nil {
-				log.Error("Could not EXPIRE key")
-				log.Error(expErr)
+				log.Error("Could not EXPIRE key: ", expErr)
+				return expErr
 			}
 		}
 		if err != nil {
-			log.Error("Error trying to set value:")
-			log.Error(err)
+			log.Error("Error trying to set value: ", err)
+			return err
 		}
 	}
+
+	return nil
 }
 
 // Decrement will decrement a key in redis

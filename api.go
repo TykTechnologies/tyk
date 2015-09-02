@@ -83,7 +83,10 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 						thisAPISpec.SessionManager.ResetQuota(keyName, newSession)
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 					}
-					thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+					if err != nil {
+						return err
+					}
 				}
 			} else {
 				log.WithFields(logrus.Fields{
@@ -102,7 +105,10 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 					spec.SessionManager.ResetQuota(keyName, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+				err := spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			log.Error("Master keys disallowed in configuration, key not added.")
@@ -724,7 +730,11 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			DefaultQuotaStore.RemoveSession(rawKey)
 		}
 
-		thisSessionManager.UpdateSession(keyName, newSession, 0)
+		err := thisSessionManager.UpdateSession(keyName, newSession, 0)
+		if err != nil {
+			responseMessage = createError("Error writing to key store " + err.Error())
+			return responseMessage, 400
+		}
 
 		log.WithFields(logrus.Fields{
 			"key": keyName,
@@ -946,11 +956,19 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 							thisAPISpec.SessionManager.ResetQuota(newKey, newSession)
 							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						}
-						thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+						err := thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+						if err != nil {
+							responseMessage = createError("Failed to create key - " + err.Error())
+							DoJSONWrite(w, 403, responseMessage)
+							return
+						}
 					} else {
 						log.WithFields(logrus.Fields{
 							"apiID": apiId,
 						}).Error("Could not create key for this API ID, API doesn't exist.")
+						responseMessage = createError("Could not create key for this API ID, API doesn't exist.")
+						DoJSONWrite(w, 403, responseMessage)
+						return
 					}
 				}
 			} else {
@@ -963,7 +981,12 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 							spec.SessionManager.ResetQuota(newKey, newSession)
 							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						}
-						spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
+						err := spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
+						if err != nil {
+							responseMessage = createError("Failed to create key - " + err.Error())
+							DoJSONWrite(w, 403, responseMessage)
+							return
+						}
 					}
 				} else {
 					log.Error("Master keys disallowed in configuration, key not added.")

@@ -204,7 +204,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout int64) {
+func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout int64) error {
 	start := time.Now() // get current time
 	ibd := InboundData{
 		KeyName:      r.fixKey(keyName),
@@ -216,12 +216,12 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 
 	if r.IsAccessError(err) {
 		r.Login()
-		r.SetKey(keyName, sessionState, timeout)
-		return
+		return r.SetKey(keyName, sessionState, timeout)
 	}
 
 	elapsed := time.Since(start)
 	log.Debug("SetKey took ", elapsed)
+	return nil
 
 }
 

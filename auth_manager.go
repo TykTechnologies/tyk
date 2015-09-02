@@ -22,7 +22,7 @@ type AuthorisationHandler interface {
 // SessionState objects, not identity
 type SessionHandler interface {
 	Init(store StorageHandler)
-	UpdateSession(keyName string, session SessionState, resetTTLTo int64)
+	UpdateSession(keyName string, session SessionState, resetTTLTo int64) error
 	RemoveSession(keyName string)
 	GetSessionDetail(keyName string) (SessionState, bool)
 	GetSessions(filter string) []string
@@ -97,34 +97,16 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b DefaultSessionManager) UpdateSession(keyName string, session SessionState, resetTTLTo int64) {
+func (b DefaultSessionManager) UpdateSession(keyName string, session SessionState, resetTTLTo int64) error {
 	v, _ := json.Marshal(session)
-	// var ttl int64
-	// var err error
-
-	// Why do we do this, it is handled in the storage handler!
-
-	// if resetTTLTo == 0 {
-	// 	ttl, err = b.Store.GetExp(keyName)
-
-	// 	if err != nil {
-	// 		log.Error("Failed to get TTL for key: ", err)
-	// 		return
-	// 	}
-	// } else {
-	// 	// Used on create, we update the TTL of the key
-	// 	ttl = resetTTLTo
-	// }
-
-	// by default expire the key if we get a nil value based on the session
-	// keyExp = (session.Expires - time.Now().Unix()) + 300 // Add 5 minutes to key expiry, just in case
 
 	// Keep the TTL
 	if config.UseAsyncSessionWrite {
 		go b.Store.SetKey(keyName, string(v), int64(resetTTLTo))
-	} else {
-		b.Store.SetKey(keyName, string(v), int64(resetTTLTo))
+		return nil
 	}
+	err := b.Store.SetKey(keyName, string(v), int64(resetTTLTo))
+	return err
 
 }
 

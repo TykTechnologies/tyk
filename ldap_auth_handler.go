@@ -112,8 +112,9 @@ func (l *LDAPStorageHandler) GetKeysAndValuesWithFilter(filter string) map[strin
 	return s
 }
 
-func (l *LDAPStorageHandler) SetKey(cn string, sessionState string, timeout int64) {
+func (l *LDAPStorageHandler) SetKey(cn string, sessionState string, timeout int64) error {
 	l.notifyReadOnly()
+	return nil
 }
 
 func (l *LDAPStorageHandler) DeleteKey(cn string) bool {
