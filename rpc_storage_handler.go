@@ -186,6 +186,12 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	return value.(string), nil
 }
 
+func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
+	log.Error("Not Implemented!")
+
+	return "", nil
+}
+
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
 	value, err := r.Client.Call("GetExp", r.fixKey(keyName))
@@ -223,6 +229,10 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 	log.Debug("SetKey took ", elapsed)
 	return nil
 
+}
+
+func (r *RPCStorageHandler) SetRawKey(keyName string, sessionState string, timeout int64) error {
+	return nil
 }
 
 // Decrement will decrement a key in redis

@@ -90,6 +90,12 @@ func (l *LDAPStorageHandler) GetKey(filter string) (string, error) {
 	return "", nil
 }
 
+func (l *LDAPStorageHandler) GetRawKey(filter string) (string, error) {
+	log.Warning("Not implementated")
+
+	return "", nil
+}
+
 func (l *LDAPStorageHandler) GetExp(cn string) (int64, error) {
 	log.Warning("Not implementated")
 	return 0, nil
@@ -113,6 +119,11 @@ func (l *LDAPStorageHandler) GetKeysAndValuesWithFilter(filter string) map[strin
 }
 
 func (l *LDAPStorageHandler) SetKey(cn string, sessionState string, timeout int64) error {
+	l.notifyReadOnly()
+	return nil
+}
+
+func (l *LDAPStorageHandler) SetRawKey(cn string, sessionState string, timeout int64) error {
 	l.notifyReadOnly()
 	return nil
 }

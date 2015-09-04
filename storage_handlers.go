@@ -27,9 +27,11 @@ const (
 // StorageHandler is a standard interface to a storage backend,
 // used by AuthorisationManager to read and write key values to the backend
 type StorageHandler interface {
-	GetKey(string) (string, error)      // Returned string is expected to be a JSON object (SessionState)
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
+	GetRawKey(string) (string, error)
 	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (SessionState)
-	GetExp(string) (int64, error)       // Returns expiry of a key
+	SetRawKey(string, string, int64) error
+	GetExp(string) (int64, error) // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool
 	DeleteRawKey(string) bool
@@ -79,8 +81,23 @@ func (s InMemoryStorageManager) GetKey(keyName string) (string, error) {
 
 }
 
+func (s InMemoryStorageManager) GetRawKey(keyName string) (string, error) {
+	value, ok := s.Sessions[keyName]
+	if !ok {
+		return "", KeyError{}
+	}
+
+	return value, nil
+
+}
+
 // SetKey updates the in-memory key
 func (s InMemoryStorageManager) SetKey(keyName string, sessionState string, timeout int64) error {
+	s.Sessions[keyName] = sessionState
+	return nil
+}
+
+func (s InMemoryStorageManager) SetRawKey(keyName string, sessionState string, timeout int64) error {
 	s.Sessions[keyName] = sessionState
 	return nil
 }
@@ -267,6 +284,24 @@ func (r *RedisStorageManager) GetKey(keyName string) (string, error) {
 	return value, nil
 }
 
+func (r *RedisStorageManager) GetRawKey(keyName string) (string, error) {
+	db := r.pool.Get()
+	defer db.Close()
+
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.GetRawKey(keyName)
+	}
+	value, err := redis.String(db.Do("GET", keyName))
+	if err != nil {
+		log.Debug("Error trying to get value:", err)
+		return "", KeyError{}
+	}
+
+	return value, nil
+}
+
 func (r *RedisStorageManager) GetExp(keyName string) (int64, error) {
 	db := r.pool.Get()
 	defer db.Close()
@@ -302,6 +337,32 @@ func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeou
 		_, err := db.Do("SET", r.fixKey(keyName), sessionState)
 		if timeout > 0 {
 			_, expErr := db.Do("EXPIRE", r.fixKey(keyName), timeout)
+			if expErr != nil {
+				log.Error("Could not EXPIRE key: ", expErr)
+				return expErr
+			}
+		}
+		if err != nil {
+			log.Error("Error trying to set value: ", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *RedisStorageManager) SetRawKey(keyName string, sessionState string, timeout int64) error {
+	db := r.pool.Get()
+	defer db.Close()
+
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.SetRawKey(keyName, sessionState, timeout)
+	} else {
+		_, err := db.Do("SET", keyName, sessionState)
+		if timeout > 0 {
+			_, expErr := db.Do("EXPIRE", keyName, timeout)
 			if expErr != nil {
 				log.Error("Could not EXPIRE key: ", expErr)
 				return expErr
