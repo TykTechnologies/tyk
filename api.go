@@ -657,6 +657,105 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	DoJSONWrite(w, code, responseMessage)
 }
 
+type PolicyUpdateObj struct {
+	Policy string `json:"policy"`
+}
+
+func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	log.Warning("Hashed key change request detected!")
+	keyName := r.URL.Path[len("/tyk/keys/policy/"):]
+	APIID := r.FormValue("api_id")
+	var responseMessage []byte
+	var code int
+
+	if r.Method == "POST" {
+		decoder := json.NewDecoder(r.Body)
+		var policRecord PolicyUpdateObj
+		err := decoder.Decode(&policRecord)
+
+		if err != nil {
+			decodeFail := APIStatusMessage{"error", "Couldn't decode instruction"}
+			responseMessage, _ = json.Marshal(&decodeFail)
+			DoJSONWrite(w, 400, responseMessage)
+			return
+		}
+
+		responseMessage, code = handleUpdateHashedKey(keyName, APIID, policRecord.Policy)
+
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	DoJSONWrite(w, code, responseMessage)
+}
+
+func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byte, int) {
+	var responseMessage []byte
+	var err error
+
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		notFound := APIStatusMessage{"error", "API not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	// This is so we bypass the hash function
+	sessStore := thiSpec.SessionManager.GetStore()
+	// TODO: This is pretty ugly
+	setKeyName := "apikey-" + keyName
+	rawSessionData, sessErr := sessStore.GetRawKey(setKeyName)
+
+	if sessErr != nil {
+		notFound := APIStatusMessage{"error", "Key not found"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	sess := SessionState{}
+	jsErr := json.Unmarshal([]byte(rawSessionData), &sess)
+	if jsErr != nil {
+		notFound := APIStatusMessage{"error", "Unmarshalling failed"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	// Set the policy
+	sess.ApplyPolicyID = policyId
+
+	sessAsJS, encErr := json.Marshal(sess)
+	if encErr != nil {
+		notFound := APIStatusMessage{"error", "Marshalling failed"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	setErr := sessStore.SetRawKey(setKeyName, string(sessAsJS), 0)
+	if setErr != nil {
+		notFound := APIStatusMessage{"error", "Could not write key data"}
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 400
+	}
+
+	code := 200
+
+	statusObj := APIModifyKeySuccess{keyName, "ok", "updated"}
+	responseMessage, err = json.Marshal(&statusObj)
+
+	if err != nil {
+		log.Error("Marshalling failed: ", err)
+		return []byte(E_SYSTEM_ERROR), 500
+	}
+
+	log.WithFields(logrus.Fields{
+		"key": keyName,
+	}).Debug("Attempted key deletion - success.")
+
+	return responseMessage, code
+}
+
 func orgHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := r.URL.Path[len("/tyk/org/keys/"):]
 	filter := r.FormValue("filter")

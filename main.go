@@ -173,6 +173,7 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 
 	if !IsRPCMode() {
 		Muxer.HandleFunc("/tyk/org/keys/", CheckIsAPIOwner(orgHandler))
+		Muxer.HandleFunc("/tyk/keys/policy/", CheckIsAPIOwner(policyUpdateHandler))
 		Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
 		Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
 		Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
