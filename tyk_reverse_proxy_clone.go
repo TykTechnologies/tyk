@@ -9,9 +9,6 @@ package main
 import (
 	"bytes"
 	"github.com/gorilla/context"
-	//"github.com/lonelycode/tykcommon"
-	"errors"
-	"github.com/lonelycode/gabs"
 	"github.com/pmylund/go-cache"
 	"io"
 	"io/ioutil"

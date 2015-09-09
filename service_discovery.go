@@ -40,7 +40,7 @@ func (s *ServiceDiscovery) New(spec *APISpec) {
 }
 
 func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
-	log.Info("Getting ", name)
+	log.Debug("Getting ", name)
 	resp, err := http.Get(s.spec.Proxy.ServiceDiscovery.QueryEndpoint)
 	if err != nil {
 		return "", err
@@ -62,16 +62,16 @@ func (s *ServiceDiscovery) decodeRawJsonString(value string) interface{} {
 }
 
 func (s *ServiceDiscovery) decodeToNameSpace(namespace string, jsonParsed *gabs.Container) interface{} {
-	log.Info("Namespace: ", namespace)
+	log.Debug("Namespace: ", namespace)
 	value := jsonParsed.Path(namespace).Data()
 	return value
 }
 
 func (s *ServiceDiscovery) decodeToNameSpaceAsArray(namespace string, jsonParsed *gabs.Container) *[]*gabs.Container {
-	log.Info("Array Namespace: ", namespace)
-	log.Info("Container: ", jsonParsed)
+	log.Debug("Array Namespace: ", namespace)
+	log.Debug("Container: ", jsonParsed)
 	value, _ := jsonParsed.Path(namespace).Children()
-	log.Info("Array value:", value)
+	log.Debug("Array value:", value)
 	return &value
 }
 
@@ -90,17 +90,17 @@ func (s *ServiceDiscovery) GetPortFromObject(host *string, obj *gabs.Container) 
 		}
 
 		*host += ":" + portToUse
-		log.Info("Host: ", *host)
+		log.Debug("Host: ", *host)
 	}
 }
 
 func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
-	log.Info("Parent Data: ", item)
+	log.Debug("Parent Data: ", item)
 	parentData := s.decodeToNameSpace(s.parentPath, item)
 	// Get the data path from the decoded object
 	subContainer := gabs.Container{}
 	s.ParseObject(parentData.(string), &subContainer)
-	log.Info("Parent SubContainer: ", subContainer)
+	log.Debug("Parent SubContainer: ", subContainer)
 	// Get the hostname
 	hostname := s.decodeToNameSpace(s.dataPath, &subContainer).(string)
 	// Get the port
@@ -141,7 +141,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 	if s.endpointReturnsList {
 		// pre-process the object since we've nested it
 		thisSet = s.decodeToNameSpaceAsArray(ARRAY_NAME, objList)
-		log.Info("thisSet: ", thisSet)
+		log.Debug("thisSet: ", thisSet)
 	} else {
 		// It's an object, but the value may be nested
 		if s.isNested {
@@ -152,14 +152,14 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 			// Now check if this string is a list
 			nestedString := parentData.(string)
 			if s.isList(nestedString) {
-				log.Warning("Yup, it's a list")
+				log.Debug("Yup, it's a list")
 				s.ConvertRawListToObj(&nestedString)
 				s.ParseObject(nestedString, &subContainer)
 				thisSet = s.decodeToNameSpaceAsArray(ARRAY_NAME, &subContainer)
 
 				// Hijack this here because we need to use a non-nested get
 				for _, item := range *thisSet {
-					log.Info("Child in list: ", item)
+					log.Debug("Child in list: ", item)
 					hostname = s.GetObject(item)
 					// Add to list
 					hostList = append(hostList, hostname)
@@ -167,17 +167,17 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 				return &hostList
 
 			} else {
-				log.Warning("Not a list")
+				log.Debug("Not a list")
 				s.ParseObject(parentData.(string), &subContainer)
 				thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-				log.Info("thisSet (object list): ", objList)
+				log.Debug("thisSet (object list): ", objList)
 			}
 		}
 
 	}
 
 	for _, item := range *thisSet {
-		log.Info("Child in list: ", item)
+		log.Debug("Child in list: ", item)
 		hostname = s.GetHostname(item)
 		// Add to list
 		hostList = append(hostList, hostname)
@@ -199,12 +199,13 @@ func (s *ServiceDiscovery) ConvertRawListToObj(RawData *string) {
 }
 
 func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Container) error {
-	log.Info("Parsing raw data: ", contents)
+	log.Debug("Parsing raw data: ", contents)
 	jp, pErr := gabs.ParseJSON([]byte(contents))
-	log.Error(pErr)
+	if pErr != nil {
+		log.Error(pErr)
+	}
 	*jsonParsed = *jp
-	log.Info("Got:", jsonParsed)
-	log.Error(pErr)
+	log.Debug("Got:", jsonParsed)
 	return pErr
 }
 
@@ -216,13 +217,18 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (interface{}, error) {
 	if s.endpointReturnsList {
 		// Convert to an object
 		s.ConvertRawListToObj(&rawData)
-		s.ParseObject(rawData, &jsonParsed)
-		log.Info("Parsed object list: ", jsonParsed)
+		err := s.ParseObject(rawData, &jsonParsed)
+		if err != nil {
+			log.Error("Parse object failed: ", err)
+			return nil, err
+		}
+
+		log.Debug("Parsed object list: ", jsonParsed)
 		// Treat JSON as a list and then apply the data path
 		if s.isTargetList {
 			// Get all values
 			hostlist = s.GetSubObjectFromList(&jsonParsed)
-			log.Info("Host list:", hostlist)
+			log.Debug("Host list:", hostlist)
 			return hostlist, nil
 		}
 
@@ -241,10 +247,10 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (interface{}, error) {
 	s.ParseObject(rawData, &jsonParsed)
 	if s.isTargetList {
 		// It's a list object
-		log.Warning("It's a target list - getting sub object from list")
-		log.Warning("Passing in: ", jsonParsed)
+		log.Debug("It's a target list - getting sub object from list")
+		log.Debug("Passing in: ", jsonParsed)
 		hostlist = s.GetSubObjectFromList(&jsonParsed)
-		log.Warning("Got from object: ", hostlist)
+		log.Debug("Got from object: ", hostlist)
 		return hostlist, nil
 	}
 
