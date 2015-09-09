@@ -846,6 +846,16 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 
 		return ""
 
+	} else if a.APIDefinition.VersionDefinition.Location == "url" {
+		thisURL := r.URL.String()
+		thisURL = strings.Replace(thisURL, a.Proxy.ListenPath, "", 1)
+
+		// Assume first param is the version ID
+		firstParamEndsAt := strings.Index(thisURL, "/")
+		thisVersion := thisURL[:firstParamEndsAt]
+
+		return thisVersion
+
 	} else {
 		return ""
 	}
