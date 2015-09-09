@@ -27,6 +27,14 @@ import (
 var ServiceCache *cache.Cache
 
 func GetURLFromService(spec *APISpec) (interface{}, error) {
+	sd := ServiceDiscovery{}
+	sd.New(spec)
+	data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
+
+	return data, err
+}
+
+func GetURLFromServiceLegacy(spec *APISpec) (interface{}, error) {
 	log.Debug("[PROXY] [SERVICE DISCOVERY] [CACHE] Checking:", spec.APIID)
 	serviceURL, found := ServiceCache.Get(spec.APIID)
 	if found {
@@ -118,17 +126,24 @@ func GetURLFromService(spec *APISpec) (interface{}, error) {
 	return value, nil
 }
 
+func EnsureTransport(host string) string {
+	if !strings.HasPrefix(host, "http://") {
+		host = "http://" + host
+	}
+	return host
+}
+
 func GetNextTarget(targetData interface{}, spec *APISpec) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a list
 		spec.RoundRobin.SetMax(targetData)
 		td := *targetData.(*[]string)
-		return td[spec.RoundRobin.GetPos()]
+		return EnsureTransport(td[spec.RoundRobin.GetPos()])
 	}
 	// Use standard target - might still be service data
 	log.Debug("TARGET DATA:", targetData)
-	return targetData.(string)
+	return EnsureTransport(targetData.(string))
 }
 
 // TykNewSingleHostReverseProxy returns a new ReverseProxy that rewrites
@@ -164,8 +179,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			} else {
 				// No error, replace the target
 				if spec.Proxy.EnableLoadBalancing {
-					var targetPtr []string = tempTargetURL.([]string)
-					remote, err := url.Parse(GetNextTarget(&targetPtr, spec))
+					var targetPtr *[]string = tempTargetURL.(*[]string)
+					remote, err := url.Parse(GetNextTarget(targetPtr, spec))
 					if err != nil {
 						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
 					} else {
