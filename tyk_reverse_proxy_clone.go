@@ -32,9 +32,16 @@ func GetURLFromService(spec *APISpec) (interface{}, error) {
 }
 
 func EnsureTransport(host string) string {
-	if !strings.HasPrefix(host, "http://") {
-		host = "http://" + host
+	if strings.HasPrefix(host, "https://") {
+		return host
 	}
+
+	if strings.HasPrefix(host, "http://") {
+		return host
+	}
+
+	// no prototcol, assum ehttp
+	host = "http://" + host
 	return host
 }
 
