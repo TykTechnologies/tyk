@@ -78,9 +78,13 @@ type Config struct {
 	} `json:"slave_options"`
 	DisableVirtualPathBlobs bool `json:"disable_virtual_path_blobs"`
 	HttpServerOptions       struct {
-		OverrideDefaults bool `json:"override_defaults"`
-		ReadTimeout      int  `json:"read_timeout"`
-		WriteTimeout     int  `json:"write_timeout"`
+		OverrideDefaults bool   `json:"override_defaults"`
+		ReadTimeout      int    `json:"read_timeout"`
+		WriteTimeout     int    `json:"write_timeout"`
+		UseSSL           bool   `json:"use_ssl"`
+		Certificates []CertData `json:"certificates"`
+		ServerName string `json:"server_name"`
+		MinVersion uint16 `json:"min_version"`
 	} `json:"http_server_options"`
 	ServiceDiscovery struct {
 		DefaultCacheTimeout int `json:"default_cache_timeout"`
@@ -92,6 +96,12 @@ type Config struct {
 		ForceSessionProvider bool                          `json:"force_session_provider"`
 		SessionProvider      tykcommon.SessionProviderMeta `json:"session_provider"`
 	} `json:"auth_override"`
+}
+
+type CertData struct {
+	Name string `json:"domain_name"`
+	CertFile         string `json:"cert_file"`
+	KeyFile          string `json:"key_file"`
 }
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"

@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"crypto/tls"
 	"time"
 )
 
@@ -775,11 +776,31 @@ func main() {
 	if nil != err {
 
 		// Listen on a TCP or a UNIX domain socket (TCP here).
-		l, err = net.Listen("tcp", targetPort)
-		if nil != err {
-			log.Fatalln(err)
+		log.Info("Setting up Server")
+		if config.HttpServerOptions.UseSSL {
+			log.Warning("--> Using SSL (https)")
+			certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
+			certNameMap := make(map[string]*tls.Certificate)
+			for i, certData := range(config.HttpServerOptions.Certificates) {
+				cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
+		        if err != nil {
+		                log.Fatalf("Server error: loadkeys: %s", err)
+		        }
+		        certs[i] = cert
+		        certNameMap[certData.Name] = &certs[i]
+			}
+			
+	        config := tls.Config{
+	        	Certificates: certs,
+	        	NameToCertificate :certNameMap, 
+	        	ServerName: config.HttpServerOptions.ServerName,
+	        	MinVersion: config.HttpServerOptions.MinVersion,
+	        }
+			l, err = tls.Listen("tcp", targetPort, &config)
+		} else {
+			log.Warning("--> Standard listener (http)")
+			l, err = net.Listen("tcp", targetPort)
 		}
-		//log.Println("Listening on", l.Addr())
 
 		// Accept connections in a new goroutine.
 		specs := getAPISpecs()

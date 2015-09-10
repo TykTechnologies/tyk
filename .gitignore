@@ -23,3 +23,7 @@ tyk.compose.rpc2.conf
 run.sh
 utils/cloud_release.sh
 petstore.json
+*.cert
+*.key
+*.pem
+*.csr

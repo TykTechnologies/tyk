@@ -1,4 +1,23 @@
-# DEV
+# Dev
+
+- SSL Now supported, add this to your `tyk.conf`:
+
+	```
+	"http_server_options": {
+        "use_ssl": true,
+        "server_name": "www.banana.com",
+        "min_version": "1.2",
+        "certificates": [
+            {
+                "domain_name": "*",
+                "cert_file": "new.cert.cert",
+                "key_file": "new.cert.key"
+            }
+        ]
+    },
+    ```
+
+# v1.8
 
 - Security option added for shared nodes: Set `disable_virtual_path_blobs=true` to stop virtual paths from loading blob fields
 - Added session meta data variables to transform middleware: 

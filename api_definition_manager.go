@@ -852,7 +852,12 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 
 		// Assume first param is the version ID
 		firstParamEndsAt := strings.Index(thisURL, "/")
+		if firstParamEndsAt == -1 {
+			return ""
+		}
+		
 		thisVersion := thisURL[:firstParamEndsAt]
+
 
 		return thisVersion
 
