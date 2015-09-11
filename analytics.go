@@ -74,7 +74,7 @@ type Purger interface {
 // RedisAnalyticsHandler implements AnalyticsHandler and will record analytics
 // data to a redis back end as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store *RedisStorageManager
+	Store *RedisClusterStorageManager
 	Clean Purger
 }
 
@@ -108,7 +108,7 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 
 // CSVPurger purges the in-memory analytics store to a CSV file as defined in the Config object
 type CSVPurger struct {
-	Store *RedisStorageManager
+	Store *RedisClusterStorageManager
 }
 
 // StartPurgeLoop is used as a goroutine to ensure that the cache is purged
@@ -178,7 +178,7 @@ func (c CSVPurger) PurgeCache() {
 // MongoPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type MongoPurger struct {
-	Store     *RedisStorageManager
+	Store     *RedisClusterStorageManager
 	dbSession *mgo.Session
 }
 

@@ -40,16 +40,16 @@ type WebHookHandlerConf struct {
 type WebHookHandler struct {
 	conf     WebHookHandlerConf
 	template *template.Template
-	store    *RedisStorageManager
+	store    *RedisClusterStorageManager
 }
 
 // Not Pretty, but will avoi dmillions of connections
-var WebHookRedisStorePointer *RedisStorageManager
+var WebHookRedisStorePointer *RedisClusterStorageManager
 
 // GetRedisInterfacePointer creates a reference to a redis connection pool that can be shared across all webhook instances
-func GetRedisInterfacePointer() *RedisStorageManager {
+func GetRedisInterfacePointer() *RedisClusterStorageManager {
 	if WebHookRedisStorePointer == nil {
-		WebHookRedisStorePointer = &RedisStorageManager{KeyPrefix: "webhook.cache."}
+		WebHookRedisStorePointer = &RedisClusterStorageManager{KeyPrefix: "webhook.cache."}
 		WebHookRedisStorePointer.Connect()
 	}
 

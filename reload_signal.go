@@ -11,7 +11,7 @@ const (
 )
 
 func StartPubSubLoop() {
-	CacheStore := RedisStorageManager{}
+	CacheStore := RedisClusterStorageManager{}
 	CacheStore.Connect()
 	// On message, synchronise
 	for {

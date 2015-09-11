@@ -10,7 +10,7 @@ import (
 // MongoPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type RPCPurger struct {
-	Store     *RedisStorageManager
+	Store     *RedisClusterStorageManager
 	RPCClient *gorpc.Client
 	Client    *gorpc.DispatcherClient
 	Address   string

@@ -27,7 +27,7 @@ type Notifier interface {
 
 // RedisNotifier implements Notifier and will use redis pub/sub channles to send notifications
 type RedisNotifier struct {
-	store   *RedisStorageManager
+	store   *RedisClusterStorageManager
 	channel string
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/Sirupsen/logrus/hooks/sentry"
@@ -20,7 +21,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"crypto/tls"
 	"time"
 )
 
@@ -63,7 +63,7 @@ func setupGlobals() {
 
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
-		AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
+		AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 		log.Debug("Setting up analytics DB connection")
 
 		analytics = RedisAnalyticsHandler{
@@ -103,7 +103,7 @@ func setupGlobals() {
 
 	// Get the notifier ready
 	log.Debug("Notifier will not work in hybrid mode")
-	MainNotifierStore := RedisStorageManager{}
+	MainNotifierStore := RedisClusterStorageManager{}
 	MainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
 
@@ -199,7 +199,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 
 	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
-	//storageManager := RedisStorageManager{KeyPrefix: OAuthPrefix}
+	//storageManager := RedisClusterStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager := GetGlobalStorageHandler(OAuthPrefix, false)
 	storageManager.Connect()
 	osinStorage := RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
@@ -353,8 +353,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	log.Debug("Loading API configurations.")
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
-	redisOrgStore := RedisStorageManager{KeyPrefix: "orgkey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
+	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
 
 	listenPaths := make(map[string]bool)
 
@@ -426,7 +426,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			}
 
 			// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
-			healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+			healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 			referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
 			//Set up all the JSVM middleware
@@ -460,7 +460,7 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			tykMiddleware := &TykMiddleware{&referenceSpec, proxy}
 
 			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
-			CacheStore := &RedisStorageManager{KeyPrefix: keyPrefix}
+			CacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix}
 			CacheStore.Connect()
 
 			if referenceSpec.APIDefinition.UseKeylessAccess {
@@ -714,7 +714,7 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 
 	switch Name {
 	case DefaultStorageEngine:
-		return &RedisStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+		return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 	case RPCStorageEngine:
 		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	}
@@ -745,7 +745,7 @@ func main() {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
 		log.Debug("Initialising default org store")
-		//DefaultOrgStore.Init(&RedisStorageManager{KeyPrefix: "orgkey."})
+		//DefaultOrgStore.Init(&RedisClusterStorageManager{KeyPrefix: "orgkey."})
 		DefaultOrgStore.Init(GetGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(GetGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(GetGlobalStorageHandler("orgkey.", false))
@@ -781,21 +781,21 @@ func main() {
 			log.Warning("--> Using SSL (https)")
 			certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
 			certNameMap := make(map[string]*tls.Certificate)
-			for i, certData := range(config.HttpServerOptions.Certificates) {
+			for i, certData := range config.HttpServerOptions.Certificates {
 				cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
-		        if err != nil {
-		                log.Fatalf("Server error: loadkeys: %s", err)
-		        }
-		        certs[i] = cert
-		        certNameMap[certData.Name] = &certs[i]
+				if err != nil {
+					log.Fatalf("Server error: loadkeys: %s", err)
+				}
+				certs[i] = cert
+				certNameMap[certData.Name] = &certs[i]
 			}
-			
-	        config := tls.Config{
-	        	Certificates: certs,
-	        	NameToCertificate :certNameMap, 
-	        	ServerName: config.HttpServerOptions.ServerName,
-	        	MinVersion: config.HttpServerOptions.MinVersion,
-	        }
+
+			config := tls.Config{
+				Certificates:      certs,
+				NameToCertificate: certNameMap,
+				ServerName:        config.HttpServerOptions.ServerName,
+				MinVersion:        config.HttpServerOptions.MinVersion,
+			}
 			l, err = tls.Listen("tcp", targetPort, &config)
 		} else {
 			log.Warning("--> Standard listener (http)")
