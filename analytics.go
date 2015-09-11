@@ -212,6 +212,8 @@ func (m *MongoPurger) PurgeCache() {
 
 		AnalyticsValues := m.Store.GetAndDeleteSet(ANALYTICS_KEYNAME)
 
+		log.Warning(AnalyticsValues)
+
 		if len(AnalyticsValues) > 0 {
 			keys := make([]interface{}, len(AnalyticsValues), len(AnalyticsValues))
 

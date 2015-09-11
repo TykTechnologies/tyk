@@ -465,15 +465,15 @@ func (r *RedisClusterStorageManager) Publish(channel string, message string) err
 
 func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface{} {
 
-	log.Debug("Getting raw gkey set: ", keyName)
+	log.Info("Getting raw gkey set: ", keyName)
 	if r.db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()
 		r.GetAndDeleteSet(keyName)
 	} else {
-		log.Debug("keyName is: ", keyName)
+		log.Info("keyName is: ", keyName)
 		fixedKey := r.fixKey(keyName)
-		log.Debug("Fixed keyname is: ", fixedKey)
+		log.Info("Fixed keyname is: ", fixedKey)
 		r.db.Send("MULTI")
 		// Get all the elements
 		r.db.Send("LRANGE", fixedKey, 0, -1)
@@ -482,6 +482,7 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 		// Execute
 		r, err := redis.Values(r.db.Do("EXEC"))
 
+		log.Warning("Analytics returned: ", r)
 		if len(r) == 0 {
 			return []interface{}{}
 		}
@@ -501,17 +502,20 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 
 func (r *RedisClusterStorageManager) AppendToSet(keyName string, value string) {
 
-	log.Debug("Pushing to raw key set: ", keyName)
+	log.Info("Pushing to raw key set: ", keyName)
+	log.Info("Pushing to fixed key set: ", r.fixKey(keyName))
 	if r.db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()
 		r.AppendToSet(keyName, value)
 	} else {
-		_, err := r.db.Do("RPUSH", r.fixKey(keyName), value)
+		ret, err := r.db.Do("RPUSH", r.fixKey(keyName), value)
+
+		log.Warning(ret)
 
 		if err != nil {
-			log.Debug("Error trying to delete keys:")
-			log.Debug(err)
+			log.Error("Error trying to delete keys:")
+			log.Error(err)
 		}
 
 		return
@@ -543,6 +547,8 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 		// REset the TTL so the key lives as long as the requests pile in
 		r.db.Send("EXPIRE", keyName, per)
 		r, err := redis.Values(r.db.Do("EXEC"))
+
+		log.Warning(r)
 
 		intVal := len(r[1].([]interface{}))
 
