@@ -237,7 +237,7 @@ func (m *MongoPurger) PurgeCache() {
 }
 
 type MockPurger struct {
-	Store *RedisStorageManager
+	Store *RedisClusterStorageManager
 }
 
 // Connect does nothing

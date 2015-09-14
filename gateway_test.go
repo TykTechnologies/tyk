@@ -121,9 +121,9 @@ type TykErrorResponse struct {
 }
 
 func getChain(spec APISpec) http.Handler {
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	//remote, _ := url.Parse("http://lonelycode.com/")
@@ -464,9 +464,9 @@ func createPathBasedDefinition() APISpec {
 
 func TestParambasedAuth(t *testing.T) {
 	spec := createPathBasedDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createParamAuthSession()
 	spec.SessionManager.UpdateSession("54321", thisSession, 60)
@@ -526,9 +526,9 @@ func TestParambasedAuth(t *testing.T) {
 
 func TestThrottling(t *testing.T) {
 	spec := createNonVersionedDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createThrottledSession()
 	keyId := randSeq(10)
@@ -596,9 +596,9 @@ func TestThrottling(t *testing.T) {
 
 func TestVersioningRequestOK(t *testing.T) {
 	spec := createVersionedDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createVersionedSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
@@ -625,9 +625,9 @@ func TestVersioningRequestOK(t *testing.T) {
 
 func TestVersioningRequestFail(t *testing.T) {
 	spec := createVersionedDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createVersionedSession()
 	thisSession.AccessRights = map[string]AccessDefinition{"9991": AccessDefinition{APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
@@ -657,9 +657,9 @@ func TestVersioningRequestFail(t *testing.T) {
 
 func TestIgnoredPathRequestOK(t *testing.T) {
 	spec := createExtendedDefinitionWithPaths()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createStandardSession()
 
@@ -688,9 +688,9 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 
 func TestWhitelistRequestReply(t *testing.T) {
 	spec := createExtendedDefinitionWithPaths()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createStandardSession()
 
@@ -720,9 +720,9 @@ func TestWhitelistRequestReply(t *testing.T) {
 
 func TestQuota(t *testing.T) {
 	spec := createNonVersionedDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createQuotaSession()
 	keyId := randSeq(10)
@@ -770,7 +770,7 @@ func TestQuota(t *testing.T) {
 func TestWithAnalytics(t *testing.T) {
 	config.EnableAnalytics = true
 
-	AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
+	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
 
 	analytics = RedisAnalyticsHandler{
@@ -783,9 +783,9 @@ func TestWithAnalytics(t *testing.T) {
 	analytics.Clean.PurgeCache()
 
 	spec := createNonVersionedDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
@@ -822,7 +822,7 @@ func TestWithAnalytics(t *testing.T) {
 func TestWithAnalyticsErrorResponse(t *testing.T) {
 	config.EnableAnalytics = true
 
-	AnalyticsStore := RedisStorageManager{KeyPrefix: "analytics-"}
+	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
 
 	analytics = RedisAnalyticsHandler{
@@ -835,9 +835,9 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	analytics.Clean.PurgeCache()
 
 	spec := createNonVersionedDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
