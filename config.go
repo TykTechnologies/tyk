@@ -87,6 +87,7 @@ type Config struct {
 		Certificates     []CertData `json:"certificates"`
 		ServerName       string     `json:"server_name"`
 		MinVersion       uint16     `json:"min_version"`
+		FlushInterval    int        `json:"flush_interval"`
 	} `json:"http_server_options"`
 	ServiceDiscovery struct {
 		DefaultCacheTimeout int `json:"default_cache_timeout"`

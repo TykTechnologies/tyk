@@ -1,21 +1,12 @@
 # Dev
 
-- SSL Now supported, add this to your `tyk.conf`:
+- Enable streaming endpoints by setting a flush interval in your tyk.conf ile:
 
-	```
-	"http_server_options": {
-        "use_ssl": true,
-        "server_name": "www.banana.com",
-        "min_version": "1.2",
-        "certificates": [
-            {
-                "domain_name": "*",
-                "cert_file": "new.cert.cert",
-                "key_file": "new.cert.key"
-            }
-        ]
-    },
-    ```
+    "http_server_options": {
+        "flush_interval": 1
+    }
+
+
 
 - Experimental Redis Cluster support, in tyk.conf: 
 
@@ -32,6 +23,25 @@
         "database": 0,
         "optimisation_max_idle": 100
     },
+
+# v1.8.3
+
+- SSL Now supported, add this to your `tyk.conf`:
+
+	```
+	"http_server_options": {
+        "use_ssl": true,
+        "server_name": "www.banana.com",
+        "min_version": "1.2",
+        "certificates": [
+            {
+                "domain_name": "*",
+                "cert_file": "new.cert.cert",
+                "key_file": "new.cert.key"
+            }
+        ]
+    },
+    ```
 
 # v1.8
 

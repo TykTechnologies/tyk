@@ -143,7 +143,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 	}
 
-	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: 1 * time.Second}
+	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(config.HttpServerOptions.FlushInterval) * time.Second}
 }
 
 // onExitFlushLoop is a callback set by tests to detect the state of the
@@ -490,7 +490,6 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 func (p *ReverseProxy) copyResponse(dst io.Writer, src io.Reader) {
 	if p.FlushInterval != 0 {
-
 		if wf, ok := dst.(writeFlusher); ok {
 			mlw := &maxLatencyWriter{
 				dst:     wf,
