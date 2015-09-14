@@ -1,5 +1,19 @@
 # Dev
 
+- Enabled password grant type in OAuth:
+
+	- Create new client
+	- Create a basic auth key for each user
+	- Set the `allowed_access_types` array to include `password`
+	- Generate a valid access request with the client_id:client_secret as a Basic auth header and the u/p in the form of the body.
+	- POST to: `/oauth/token/` endpoint on your OAuth-enabled API
+	- If successfull, the user will get: 
+
+	```
+	{"access_token":"4i0VmSYMQ2iN7ivX0LaYBw","expires_in":3600,"refresh_token":"B_99PjEmQquufNWs8QYbow","token_type":"bearer"}
+	```
+
+
 - Enable streaming endpoints by setting a flush interval in your tyk.conf ile:
 
     "http_server_options": {

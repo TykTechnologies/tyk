@@ -87,7 +87,7 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 }
 
 func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification) bool {
-	log.Info("Notifying client host")
+	log.Info("[OAuth] Notifying client host")
 	go o.Manager.API.NotificationsDetails.SendRequest(false, 0, notification)
 	return true
 }
@@ -113,8 +113,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
 		if resp.IsError {
 			code = resp.ErrorStatusCode
-			log.Error("OAuth response marked as error")
-			log.Error(resp)
+			log.Error("[OAuth] OAuth response marked as error: ", resp)
 		}
 
 	} else {
@@ -250,7 +249,33 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	resp := o.OsinServer.NewResponse()
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
-		ar.Authorized = true
+
+		if ar.Type == osin.PASSWORD {
+			username := r.Form.Get("username")
+			password := r.Form.Get("password")
+			keyName := o.API.OrgID + username
+			if config.HashKeys {
+				// HASHING? FIX THE KEY
+				keyName = doHash(keyName)
+			}
+			searchKey := "apikey-" + keyName
+			log.Debug("Getting: ", searchKey)
+			thisSessionState, keyErr := o.OsinServer.Storage.GetUser(searchKey)
+			if keyErr != nil {
+				log.Warning("Attempted access with non-existent user (OAuth password flow).")
+			} else {
+				if thisSessionState.BasicAuthData.Password == password {
+					ar.Authorized = true
+					// not ideal, but we need to copy the session state across
+					asString, _ := json.Marshal(thisSessionState)
+					ar.UserData = string(asString)
+				}
+			}
+		} else {
+			// Using a manual flow
+			ar.Authorized = true
+		}
+
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
 	}
 	if resp.IsError && resp.InternalError != nil {
@@ -322,6 +347,9 @@ type ExtendedOsinStorageInterface interface {
 
 	// RemoveRefresh revokes or deletes refresh AccessData.
 	RemoveRefresh(token string) error
+
+	// GetUser retrieves a Basic Access user token type from the key store
+	GetUser(string) (*SessionState, error)
 }
 
 // TykOsinServer subclasses osin.Server so we can add the SetClient method without wrecking the lbrary
@@ -367,6 +395,8 @@ func (r RedisOsinStorageInterface) Close() {}
 // GetClient will retrieve client data
 func (r RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := CLIENT_PREFIX + id
+
+	log.Debug("Getting client ID:", key)
 
 	clientJSON, storeErr := r.store.GetKey(key)
 
@@ -608,11 +638,10 @@ func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, 
 		return nil, storeErr
 	}
 
-	
 	// new interface means having to make this nested... ick.
 	thisAccessData := osin.AccessData{}
 	thisAccessData.Client = new(osin.DefaultClient)
-		
+
 	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisAccessData); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", marshalErr)
 		log.Error("Decoding:", accessJSON)
@@ -636,7 +665,7 @@ type AccessTokenGenTyk struct {
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
 func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken string, refreshtoken string, err error) {
-	log.Info("Generating new token")
+	log.Info("[OAuth] Generating new token")
 
 	var newSession SessionState
 	marshalErr := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
@@ -654,4 +683,27 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
 	}
 	return
+}
+
+// LoadRefresh will load access data from Redis
+func (r RedisOsinStorageInterface) GetUser(username string) (*SessionState, error) {
+	key := username
+	log.Debug("Loading User key: ", key)
+	accessJSON, storeErr := r.store.GetRawKey(key)
+
+	if storeErr != nil {
+		log.Error("Failure retreiving access token by key: ", storeErr)
+		return nil, storeErr
+	}
+
+	// new interface means having to make this nested... ick.
+	thisSession := SessionState{}
+
+	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisSession); marshalErr != nil {
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", marshalErr)
+		log.Error("Decoding:", accessJSON)
+		return nil, marshalErr
+	}
+
+	return &thisSession, nil
 }
