@@ -821,6 +821,7 @@ func TestWithAnalytics(t *testing.T) {
 
 func TestWithAnalyticsErrorResponse(t *testing.T) {
 	config.EnableAnalytics = true
+	config.AnalyticsConfig.PurgeDelay = -1
 
 	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
@@ -863,6 +864,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 		t.Error("Request failed with 200 code: \n", recorder.Code)
 	}
 
+	time.Sleep(1)
 	results := analytics.Store.GetKeysAndValues()
 
 	if len(results) < 1 {
