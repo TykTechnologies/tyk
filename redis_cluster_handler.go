@@ -61,7 +61,7 @@ func NewRedisClusterPool() *rediscluster.RedisCluster {
 		seed_redii = append(seed_redii, map[string]string{config.Storage.Host: strconv.Itoa(config.Storage.Port)})
 	}
 
-	thisInstance := rediscluster.NewRedisCluster(seed_redii, thisPoolConf, true)
+	thisInstance := rediscluster.NewRedisCluster(seed_redii, thisPoolConf, false)
 
 	redisClusterSingleton = &thisInstance
 
