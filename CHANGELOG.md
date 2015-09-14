@@ -14,6 +14,7 @@
 	```
 
 
+
 - Enable streaming endpoints by setting a flush interval in your tyk.conf ile:
 
     "http_server_options": {
