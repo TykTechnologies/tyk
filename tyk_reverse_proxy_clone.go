@@ -143,7 +143,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 	}
 
-	return &ReverseProxy{Director: director, TykAPISpec: spec}
+	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: 1 * time.Second}
 }
 
 // onExitFlushLoop is a callback set by tests to detect the state of the
@@ -238,7 +238,7 @@ func NewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
 	}
-	return &ReverseProxy{Director: director}
+	return &ReverseProxy{Director: director, FlushInterval: 1 * time.Second}
 }
 
 func copyHeader(dst, src http.Header) {
@@ -490,6 +490,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 
 func (p *ReverseProxy) copyResponse(dst io.Writer, src io.Reader) {
 	if p.FlushInterval != 0 {
+		log.Info("FLUSHING")
 		if wf, ok := dst.(writeFlusher); ok {
 			mlw := &maxLatencyWriter{
 				dst:     wf,
