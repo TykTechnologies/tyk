@@ -27,15 +27,16 @@ type Config struct {
 	} `json:"db_app_conf_options"`
 	AppPath string `json:"app_path"`
 	Storage struct {
-		Type      string            `json:"type"`
-		Host      string            `json:"host"`
-		Port      int               `json:"port"`
-		Hosts     map[string]string `json:"hosts"`
-		Username  string            `json:"username"`
-		Password  string            `json:"password"`
-		Database  int               `json:"database"`
-		MaxIdle   int               `json:"optimisation_max_idle"`
-		MaxActive int               `json:"optimisation_max_active"`
+		Type          string            `json:"type"`
+		Host          string            `json:"host"`
+		Port          int               `json:"port"`
+		Hosts         map[string]string `json:"hosts"`
+		Username      string            `json:"username"`
+		Password      string            `json:"password"`
+		Database      int               `json:"database"`
+		MaxIdle       int               `json:"optimisation_max_idle"`
+		MaxActive     int               `json:"optimisation_max_active"`
+		EnableCluster bool              `json:"enable_cluster"`
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {

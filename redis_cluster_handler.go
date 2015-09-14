@@ -38,12 +38,17 @@ func NewRedisClusterPool() *rediscluster.RedisCluster {
 		maxActive = config.Storage.MaxActive
 	}
 
+	if config.Storage.EnableCluster {
+		log.Info("Using clustered mode")
+	}
+
 	thisPoolConf := rediscluster.PoolConfig{
 		MaxIdle:     maxIdle,
 		MaxActive:   maxActive,
 		IdleTimeout: 240 * time.Second,
 		Database:    config.Storage.Database,
 		Password:    config.Storage.Password,
+		IsCluster:   config.Storage.EnableCluster,
 	}
 
 	seed_redii := []map[string]string{}
@@ -465,35 +470,37 @@ func (r *RedisClusterStorageManager) Publish(channel string, message string) err
 
 func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface{} {
 
-	log.Info("Getting raw gkey set: ", keyName)
+	log.Debug("Getting raw key set: ", keyName)
 	if r.db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()
 		r.GetAndDeleteSet(keyName)
 	} else {
-		log.Info("keyName is: ", keyName)
+		log.Debug("keyName is: ", keyName)
 		fixedKey := r.fixKey(keyName)
-		log.Info("Fixed keyname is: ", fixedKey)
-		r.db.Send("MULTI")
-		// Get all the elements
-		r.db.Send("LRANGE", fixedKey, 0, -1)
-		// Trim it to zero
-		r.db.Send("DEL", fixedKey)
-		// Execute
-		r, err := redis.Values(r.db.Do("EXEC"))
+		log.Debug("Fixed keyname is: ", fixedKey)
 
-		log.Warning("Analytics returned: ", r)
+		lrange := rediscluster.ClusterTransaction{}
+		lrange.Cmd = "LRANGE"
+		lrange.Args = []interface{}{fixedKey, 0, -1}
+
+		delCmd := rediscluster.ClusterTransaction{}
+		delCmd.Cmd = "DEL"
+		delCmd.Args = []interface{}{fixedKey}
+
+		r, err := redis.Values(r.db.DoTransaction([]rediscluster.ClusterTransaction{lrange, delCmd}))
+		if err != nil {
+			log.Error("Multi command failed: ", err)
+		}
+
+		log.Debug("Analytics returned: ", r)
 		if len(r) == 0 {
 			return []interface{}{}
 		}
 
 		vals := r[0].([]interface{})
 
-		log.Debug("Returned: ", vals)
-
-		if err != nil {
-			log.Error("Multi command failed: ", err)
-		}
+		log.Debug("Unpacked vals: ", vals)
 
 		return vals
 	}
@@ -502,16 +509,14 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 
 func (r *RedisClusterStorageManager) AppendToSet(keyName string, value string) {
 
-	log.Info("Pushing to raw key set: ", keyName)
-	log.Info("Pushing to fixed key set: ", r.fixKey(keyName))
+	log.Debug("Pushing to raw key set: ", keyName)
+	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
 	if r.db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()
 		r.AppendToSet(keyName, value)
 	} else {
-		ret, err := r.db.Do("RPUSH", r.fixKey(keyName), value)
-
-		log.Warning(ret)
+		_, err := r.db.Do("RPUSH", r.fixKey(keyName), value)
 
 		if err != nil {
 			log.Error("Error trying to delete keys:")
@@ -537,18 +542,23 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 		onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 		log.Debug("Then is: ", onePeriodAgo)
 
-		r.db.Send("MULTI")
-		// Drop the last period so we get current bucket
-		r.db.Send("ZREMRANGEBYSCORE", keyName, "-inf", onePeriodAgo.UnixNano())
-		// Get the set
-		r.db.Send("ZRANGE", keyName, 0, -1)
-		// Add this request to the pile
-		r.db.Send("ZADD", keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano())))
-		// REset the TTL so the key lives as long as the requests pile in
-		r.db.Send("EXPIRE", keyName, per)
-		r, err := redis.Values(r.db.Do("EXEC"))
+		ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
+		ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
+		ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
 
-		log.Warning(r)
+		ZRANGE := rediscluster.ClusterTransaction{}
+		ZRANGE.Cmd = "ZRANGE"
+		ZRANGE.Args = []interface{}{keyName, 0, -1}
+
+		ZADD := rediscluster.ClusterTransaction{}
+		ZADD.Cmd = "ZADD"
+		ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
+
+		EXPIRE := rediscluster.ClusterTransaction{}
+		EXPIRE.Cmd = "EXPIRE"
+		EXPIRE.Args = []interface{}{keyName, per}
+
+		r, err := redis.Values(r.db.DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
 
 		intVal := len(r[1].([]interface{}))
 

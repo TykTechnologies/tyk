@@ -17,6 +17,22 @@
     },
     ```
 
+- Experimental Redis Cluster support, in tyk.conf: 
+
+	"storage": {
+        "type": "redis",
+        "enable_cluster": true,
+        "hosts" : {
+            "server1": "6379",
+            "server2": "6379",
+            "server23: "6379",
+        },
+        "username": "",
+        "password": "",
+        "database": 0,
+        "optimisation_max_idle": 100
+    },
+
 # v1.8
 
 - Security option added for shared nodes: Set `disable_virtual_path_blobs=true` to stop virtual paths from loading blob fields
