@@ -2,7 +2,28 @@
 
 # Super hacky release script
 
-VERSION=$1
+# ----- SET THE VERSION NUMBER -----
+CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3\.$4"' version.go)
+
+echo "Current version is: " $CURRENTVERS
+
+echo -n "Major version [ENTER]: "
+read maj 
+echo -n "Minor version [ENTER]: "
+read min 
+echo -n "Patch version [ENTER]: "
+read patch 
+echo -n "Release version [ENTER]: "
+read rel 
+
+NEWVERSION="v$maj.$min.$patch.$rel"
+echo "Setting new version in source: " $NEWVERSION
+
+perl -pi -e 's/var VERSION string = \"(.*)\"/var VERSION string = \"'$NEWVERSION'\"/g' version.go
+
+# ----- END VERSION SETTING -----
+
+VERSION=$NEWVERSION
 SOURCEBIN=tyk
 SOURCEBINPATH=~/tyk
 i386BINDIR=$SOURCEBINPATH/build/i386/tyk.linux.i386-$VERSION
