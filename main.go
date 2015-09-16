@@ -36,7 +36,7 @@ var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
 var DefaultQuotaStore = DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
-var RPCListener = RPCStorageHandler{} //Version moved
+var RPCListener = RPCStorageHandler{}
 
 var ApiSpecRegister = make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
