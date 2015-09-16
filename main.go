@@ -37,7 +37,6 @@ var DefaultOrgStore = DefaultSessionManager{}
 var DefaultQuotaStore = DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
-var VERSION string = "v1.8.3.2"
 
 var ApiSpecRegister = make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
@@ -48,6 +47,27 @@ const (
 	OAUTH_AUTH_CODE_TIMEOUT int    = 60 * 60
 	OAUTH_PREFIX            string = "oauth-data."
 )
+
+func VERSION() string {
+	var maj, min, patch, rel string
+	maj = strconv.Itoa(MAJOR)
+	min = strconv.Itoa(MINOR)
+	patch = strconv.Itoa(PATCH)
+	rel = strconv.Itoa(RELEASE)
+
+	v := strings.Join([]string{
+		maj,
+		min,
+		patch,
+		rel,
+	}, ".")
+
+	if SUFFIX != "" {
+		v = strings.Join([]string{v, SUFFIX}, ".")
+	}
+
+	return v
+}
 
 // Display configuration options
 func displayConfig() {
@@ -626,7 +646,7 @@ func init() {
 		--as-version=<version>       The version number to use when inserting
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
+	arguments, err := docopt.Parse(usage, nil, true, VERSION(), false, false)
 	if err != nil {
 		log.Warning("Error while parsing arguments: ", err)
 	}
@@ -821,7 +841,7 @@ func main() {
 			go s.Serve(l)
 			displayConfig()
 		} else {
-			log.Printf("Gateway started (%v)", VERSION)
+			log.Printf("Gateway started (%v)", VERSION())
 			go http.Serve(l, nil)
 			displayConfig()
 		}
@@ -847,7 +867,7 @@ func main() {
 			go s.Serve(l)
 			displayConfig()
 		} else {
-			log.Printf("Gateway started (%v)", VERSION)
+			log.Printf("Gateway started (%v)", VERSION())
 			displayConfig()
 			http.Serve(l, nil)
 		}
