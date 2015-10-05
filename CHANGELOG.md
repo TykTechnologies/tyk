@@ -1,3 +1,7 @@
+# 1.8.3.4
+
+- Gateway Mongo Driver updated to be compatible with MongoDB v3.0
+
 # 1.8.3.2
 
 - Enabled password grant type in OAuth:
