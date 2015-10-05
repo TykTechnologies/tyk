@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/vmihailenco/msgpack.v2"
-	"labix.org/v2/mgo"
 	"os"
 	"strconv"
 	"time"

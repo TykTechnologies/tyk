@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/lonelycode/tykcommon"
 	"github.com/rubyist/circuitbreaker"
-	"labix.org/v2/mgo/bson"
+	"gopkg.in/mgo.v2/bson"
 	"net/http"
 	"time"
 )

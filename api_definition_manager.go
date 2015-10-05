@@ -7,9 +7,9 @@ import (
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"github.com/rubyist/circuitbreaker"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -855,9 +855,8 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		if firstParamEndsAt == -1 {
 			return ""
 		}
-		
-		thisVersion := thisURL[:firstParamEndsAt]
 
+		thisVersion := thisURL[:firstParamEndsAt]
 
 		return thisVersion
 
