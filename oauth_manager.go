@@ -288,10 +288,11 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 // These enums fix the prefix to use when storing various OAuth keys and data, since we
 // delegate everything to the osin framework
 const (
-	AUTH_PREFIX    string = "oauth-authorize."
-	CLIENT_PREFIX  string = "oauth-clientid."
-	ACCESS_PREFIX  string = "oauth-access."
-	REFRESH_PREFIX string = "oauth-refresh."
+	AUTH_PREFIX            string = "oauth-authorize."
+	CLIENT_PREFIX          string = "oauth-clientid."
+	ACCESS_PREFIX          string = "oauth-access."
+	REFRESH_PREFIX         string = "oauth-refresh."
+	OAUTH_CLIENTSET_PREFIX string = "oauth-clientset."
 )
 
 type ExtendedOsinStorageInterface interface {
@@ -445,7 +446,17 @@ func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) 
 		key = filter
 	}
 
-	clientJSON := r.store.GetKeysAndValuesWithFilter(key)
+	var clientJSON map[string]string
+	if !config.Storage.EnableCluster {
+		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
+	} else {
+		var getErr error
+		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
+		clientJSON, getErr = r.store.GetSet(KeyForSet)
+		if getErr != nil {
+			return []osin.Client{}, getErr
+		}
+	}
 
 	theseClients := []osin.Client{}
 
@@ -481,6 +492,11 @@ func (r RedisOsinStorageInterface) SetClient(id string, client osin.Client, igno
 	log.Warning("CREATING: ", key)
 
 	r.store.SetKey(key, string(clientDataJSON), 0)
+
+	log.Info("Storing copy in set")
+
+	KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
+	r.store.AddToSet(KeyForSet, string(clientDataJSON))
 	return nil
 }
 
@@ -491,7 +507,16 @@ func (r RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) er
 		key = id
 	}
 
+	// Get the raw vals:
+	clientJSON, storeErr := r.store.GetKey(key)
+	if storeErr == nil {
+		log.Info("Removing from set")
+		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
+		r.store.RemoveFromSet(KeyForSet, clientJSON)
+	}
+
 	r.store.DeleteKey(key)
+
 	return nil
 }
 

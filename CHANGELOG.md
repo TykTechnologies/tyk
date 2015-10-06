@@ -1,6 +1,7 @@
 # 1.8.3.3
 
 - Gateway Mongo Driver updated to be compatible with MongoDB v3.0
+- Fixed OAuth client listings with redis cluster
 
 # 1.8.3.2
 

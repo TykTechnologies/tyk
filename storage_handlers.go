@@ -42,6 +42,9 @@ type StorageHandler interface {
 	Decrement(string)
 	IncrememntWithExpire(string, int64) int64
 	SetRollingWindow(string, int64, int64) int
+	GetSet(string) (map[string]string, error)
+	AddToSet(string, string)
+	RemoveFromSet(string, string)
 }
 
 // InMemoryStorageManager implements the StorageHandler interface,
@@ -149,6 +152,19 @@ func (s InMemoryStorageManager) DeleteKeys(keys []string) bool {
 	}
 
 	return true
+}
+
+func (s InMemoryStorageManager) GetSet(keyName string) (map[string]string, error) {
+	log.Error("Not implemented")
+	return map[string]string{}, nil
+}
+
+func (s InMemoryStorageManager) AddToSet(keyName string, value string) {
+	log.Error("Not implemented")
+}
+
+func (s InMemoryStorageManager) RemoveFromSet(keyName string, value string) {
+	log.Error("Not implemented")
 }
 
 // ------------------- REDIS STORAGE MANAGER -------------------------------
@@ -752,4 +768,80 @@ func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire
 		return intVal
 	}
 	return 0
+}
+
+func (r *RedisStorageManager) GetSet(keyName string) (map[string]string, error) {
+	log.Debug("Getting from key set: ", keyName)
+	log.Info("Getting from fixed key set: ", r.fixKey(keyName))
+
+	db := r.pool.Get()
+	defer db.Close()
+
+	if db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.GetSet(keyName)
+	} else {
+		val, err := db.Do("SMEMBERS", r.fixKey(keyName))
+		if err != nil {
+			log.Error("Error trying to get key set:", err)
+			return map[string]string{}, err
+		}
+
+		asValues, _ := redis.Strings(val, err)
+
+		vals := make(map[string]string)
+		for i, value := range asValues {
+			vals[strconv.Itoa(i)] = value
+		}
+
+		return vals, nil
+	}
+	return map[string]string{}, nil
+}
+
+func (r *RedisStorageManager) AddToSet(keyName string, value string) {
+	log.Debug("Pushing to raw key set: ", keyName)
+	log.Info("Pushing to fixed key set: ", r.fixKey(keyName))
+
+	db := r.pool.Get()
+	defer db.Close()
+
+	if db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.AddToSet(keyName, value)
+	} else {
+		_, err := db.Do("SADD", r.fixKey(keyName), value)
+
+		if err != nil {
+			log.Error("Error trying to append keys:")
+			log.Error(err)
+		}
+
+		return
+	}
+}
+
+func (r *RedisStorageManager) RemoveFromSet(keyName string, value string) {
+	log.Debug("Removing from raw key set: ", keyName)
+	log.Info("Removing from fixed key set: ", r.fixKey(keyName))
+
+	db := r.pool.Get()
+	defer db.Close()
+
+	if db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.RemoveFromSet(keyName, value)
+	} else {
+		_, err := db.Do("SREM", r.fixKey(keyName), value)
+
+		if err != nil {
+			log.Error("Error trying to append keys:")
+			log.Error(err)
+		}
+
+		return
+	}
 }

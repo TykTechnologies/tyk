@@ -158,3 +158,16 @@ func (s *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, expire 
 	log.Warning("Not Implemented!")
 	return 0
 }
+
+func (s LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {
+	log.Error("Not implemented")
+	return map[string]string{}, nil
+}
+
+func (s LDAPStorageHandler) AddToSet(keyName string, value string) {
+	log.Error("Not implemented")
+}
+
+func (s LDAPStorageHandler) RemoveFromSet(keyName string, value string) {
+	log.Error("Not implemented")
+}

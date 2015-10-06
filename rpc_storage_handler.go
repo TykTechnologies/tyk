@@ -428,6 +428,19 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, expire i
 
 }
 
+func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
+	log.Error("Not implemented")
+	return map[string]string{}, nil
+}
+
+func (r RPCStorageHandler) AddToSet(keyName string, value string) {
+	log.Error("Not implemented")
+}
+
+func (r RPCStorageHandler) RemoveFromSet(keyName string, value string) {
+	log.Error("Not implemented")
+}
+
 func (r RPCStorageHandler) IsAccessError(err error) bool {
 	if err != nil {
 		if err.Error() == "Access Denied" {

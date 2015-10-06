@@ -508,9 +508,8 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 }
 
 func (r *RedisClusterStorageManager) AppendToSet(keyName string, value string) {
-
 	log.Debug("Pushing to raw key set: ", keyName)
-	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
+	log.Info("Pushing to fixed key set: ", r.fixKey(keyName))
 	if r.db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()
@@ -520,6 +519,70 @@ func (r *RedisClusterStorageManager) AppendToSet(keyName string, value string) {
 
 		if err != nil {
 			log.Error("Error trying to delete keys:")
+			log.Error(err)
+		}
+
+		return
+	}
+}
+
+func (r *RedisClusterStorageManager) GetSet(keyName string) (map[string]string, error) {
+	log.Debug("Getting from key set: ", keyName)
+	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
+	if r.db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.GetSet(keyName)
+	} else {
+		val, err := r.db.Do("SMEMBERS", r.fixKey(keyName))
+		if err != nil {
+			log.Error("Error trying to get key set:", err)
+			return map[string]string{}, err
+		}
+
+		asValues, _ := redis.Strings(val, err)
+
+		vals := make(map[string]string)
+		for i, value := range asValues {
+			vals[strconv.Itoa(i)] = value
+		}
+
+		return vals, nil
+	}
+	return map[string]string{}, nil
+}
+
+func (r *RedisClusterStorageManager) AddToSet(keyName string, value string) {
+	log.Debug("Pushing to raw key set: ", keyName)
+	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
+	if r.db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.AddToSet(keyName, value)
+	} else {
+		_, err := r.db.Do("SADD", r.fixKey(keyName), value)
+
+		if err != nil {
+			log.Error("Error trying to append keys:")
+			log.Error(err)
+		}
+
+		return
+	}
+}
+
+func (r *RedisClusterStorageManager) RemoveFromSet(keyName string, value string) {
+	log.Debug("Removing from raw key set: ", keyName)
+	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
+	if r.db == nil {
+		log.Warning("Connection dropped, connecting..")
+		r.Connect()
+		r.RemoveFromSet(keyName, value)
+	} else {
+		_, err := r.db.Do("SREM", r.fixKey(keyName), value)
+
+		if err != nil {
+			log.Error("Error trying to remove keys:")
 			log.Error(err)
 		}
 

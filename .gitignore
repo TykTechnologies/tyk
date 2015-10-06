@@ -4,6 +4,7 @@ testapps/
 tyk.conf
 tyk.compose.rpc.conf
 tyk.compose.local_rpc.conf
+tyk.compose.cluster.conf
 tyk.rpc.conf
 tyk.rpc.local.conf
 /tyk
