@@ -28,3 +28,5 @@ petstore.json
 *.key
 *.pem
 *.csr
+*.prof
+*.pdf

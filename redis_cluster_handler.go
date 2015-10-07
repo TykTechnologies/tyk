@@ -508,8 +508,8 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 }
 
 func (r *RedisClusterStorageManager) AppendToSet(keyName string, value string) {
-	log.Debug("Pushing to raw key set: ", keyName)
-	log.Info("Pushing to fixed key set: ", r.fixKey(keyName))
+	log.Debug("Pushing to raw key list: ", keyName)
+	log.Debug("Appending to fixed key list: ", r.fixKey(keyName))
 	if r.db == nil {
 		log.Warning("Connection dropped, connecting..")
 		r.Connect()

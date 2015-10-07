@@ -19,6 +19,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ var analytics = RedisAnalyticsHandler{}
 var profileFile = &os.File{}
 var GlobalEventsJSVM = &JSVM{}
 var doMemoryProfile bool
+var doCpuProfile bool
 var Policies = make(map[string]Policy)
 var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
@@ -614,6 +616,7 @@ func init() {
 		--conf=FILE                  Load a named configuration file
 		--port=PORT                  Listen on PORT (overrides confg file)
 		--memprofile                 Generate a memory profile
+		--cpuprofile                 Generate a cpu profile
 		--debug                      Enable Debug output
 		--import-blueprint=<file>    Import an API Blueprint file
 		--import-swagger=<file>      Import a Swagger file
@@ -676,6 +679,7 @@ func init() {
 	}
 
 	doMemoryProfile, _ = arguments["--memprofile"].(bool)
+	doCpuProfile, _ = arguments["--cpuprofile"].(bool)
 
 	doDebug, _ := arguments["--debug"]
 	log.Level = logrus.InfoLevel
@@ -737,6 +741,12 @@ func main() {
 		log.Debug("Memory profiling active")
 		profileFile, _ = os.Create("tyk.mprof")
 		defer profileFile.Close()
+	}
+	if doCpuProfile {
+		log.Info("Cpu profiling active")
+		profileFile, _ = os.Create("tyk.prof")
+		pprof.StartCPUProfile(profileFile)
+		defer pprof.StopCPUProfile()
 	}
 
 	targetPort := fmt.Sprintf(":%d", config.ListenPort)
