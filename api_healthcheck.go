@@ -3,7 +3,6 @@ package main
 import (
 	"strconv"
 	"strings"
-	"time"
 )
 
 type HealthPrefix string
@@ -48,10 +47,11 @@ func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
 
 func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
 	var newKey string
-	now := time.Now().UnixNano()
+	//now := time.Now().UnixNano()
 
 	// Key should be API-ID.SubKey.123456789
-	newKey = strings.Join([]string{h.APIID, string(subKey), strconv.FormatInt(now, 10)}, ".")
+	//newKey = strings.Join([]string{h.APIID, string(subKey), strconv.FormatInt(now, 10)}, ".")
+	newKey = strings.Join([]string{h.APIID, string(subKey)}, ".")
 
 	return newKey
 }
@@ -66,24 +66,29 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 	if config.HealthCheck.EnableHealthChecks {
 		searchStr := h.CreateKeyName(counterType)
 		log.Debug("Adding Healthcheck to: ", searchStr)
-		go h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
+		//go h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
+		valConv, _ := strconv.Atoi(value)
+		go h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, int64(valConv))
 	}
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
-	searchStr := strings.Join([]string{h.APIID, string(prefix)}, ".")
+	//searchStr := strings.Join([]string{h.APIID, string(prefix)}, ".")
+
+	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
-	keys := h.storage.GetKeys(searchStr)
-	log.Debug("Found ", keys)
-	var count int64
-	count = int64(len(keys))
+
+	var count int
+	count, _ = h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, 0)
+
+	//count = int64(len(keys))
 	divisor := float64(config.HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
 		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
 		divisor = 60.0
 	}
 	if count > 0 {
-		return roundValue(float64(count) / divisor)
+		return roundValue((float64(count) - 1) / divisor)
 	}
 
 	return 0.00
@@ -107,19 +112,21 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	// Get the micro latency graph, an average upstream latency
 	searchStr := strings.Join([]string{h.APIID, string(RequestLog)}, ".")
 	log.Debug("Searching KV for: ", searchStr)
-	kv := h.storage.GetKeysAndValuesWithFilter(searchStr)
-	log.Debug("Found: ", kv)
+	//kv := h.storage.GetKeysAndValuesWithFilter(searchStr)
+	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, 0)
+	log.Info("Found: ", vals)
 	var runningTotal int
-	if len(kv) > 0 {
-		for _, v := range kv {
-			vInt, cErr := strconv.Atoi(v)
+	if len(vals) > 0 {
+		for _, v := range vals {
+			log.Info("V is: ", string(v.([]byte)))
+			vInt, cErr := strconv.Atoi(string(v.([]byte)))
 			if cErr != nil {
 				log.Error("Couldn't convert tracked latency value to Int, vl is: ")
 			} else {
 				runningTotal += vInt
 			}
 		}
-		values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(kv)))
+		values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(vals)))
 	}
 
 	return values, nil

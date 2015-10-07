@@ -154,9 +154,9 @@ func (l *LDAPStorageHandler) notifyReadOnly() bool {
 	return false
 }
 
-func (s *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, expire int64) int {
+func (s *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, expire int64) (int, []interface{}) {
 	log.Warning("Not Implemented!")
-	return 0
+	return 0, []interface{}{}
 }
 
 func (s LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {

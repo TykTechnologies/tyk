@@ -590,14 +590,14 @@ func (r *RedisClusterStorageManager) RemoveFromSet(keyName string, value string)
 	}
 }
 
-// IncrementWithExpire will increment a key in redis
-func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, expire int64) int {
+// SetRollingWindow will append to a sorted set in redis and extract a timed window of values
+func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, value_override int64) (int, []interface{}) {
 
 	log.Debug("Incrementing raw key: ", keyName)
 	if r.db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
-		r.SetRollingWindow(keyName, per, expire)
+		r.SetRollingWindow(keyName, per, value_override)
 	} else {
 		log.Debug("keyName is: ", keyName)
 		now := time.Now()
@@ -615,7 +615,12 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 
 		ZADD := rediscluster.ClusterTransaction{}
 		ZADD.Cmd = "ZADD"
-		ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
+
+		if value_override != -1 {
+			ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(value_override))}
+		} else {
+			ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
+		}
 
 		EXPIRE := rediscluster.ClusterTransaction{}
 		EXPIRE.Cmd = "EXPIRE"
@@ -631,7 +636,7 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 			log.Error("Multi command failed: ", err)
 		}
 
-		return intVal
+		return intVal, r[1].([]interface{})
 	}
-	return 0
+	return 0, []interface{}{}
 }
