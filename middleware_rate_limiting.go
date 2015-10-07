@@ -8,6 +8,9 @@ import (
 	"github.com/gorilla/context"
 )
 
+var sessionLimiter = SessionLimiter{}
+var sessionMonitor = Monitor{}
+
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
@@ -24,7 +27,6 @@ func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	sessionLimiter := SessionLimiter{}
 	thisSessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 
@@ -92,8 +94,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	// Run the trigger monitor
 	if config.Monitor.MonitorUserKeys {
-		mon := Monitor{}
-		mon.Check(&thisSessionState, authHeaderValue)
+		sessionMonitor.Check(&thisSessionState, authHeaderValue)
 	}
 
 	// Request is valid, carry on

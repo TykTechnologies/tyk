@@ -68,12 +68,8 @@ const (
 // check if a message should pass through or not
 type SessionLimiter struct{}
 
-// ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
-// Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
-func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
-
+func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
-	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	ratePerPeriodNow := store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), int64(currentSession.Per))
 
@@ -81,8 +77,25 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 
 	// Subtract by 1 because of the delayed add in the window
 	if ratePerPeriodNow > (int(currentSession.Rate) - 1) {
+		// Set a sentinel value with expire
+		store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
+	}
+}
+
+// ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
+// Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
+func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
+	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
+	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
+	// Check sentinel
+	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
+	if sentinelActive == nil {
+		// Sentinel is set, fail
 		return false, 1
 	}
+
+	// if not - set rolling window (off thread)
+	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
 
 	currentSession.Allowance--
 	if !l.IsRedisQuotaExceeded(currentSession, key, store) {

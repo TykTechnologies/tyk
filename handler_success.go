@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gorilla/context"
+	"github.com/pmylund/go-cache"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -20,6 +21,8 @@ const (
 	VersionData       = 2
 	VersionKeyContext = 3
 )
+
+var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
 
 // TykMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
@@ -80,9 +83,21 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	var thisSession SessionState
 	var found bool
 
+	// Check in-memory cache
+	cachedVal, found := SessionCache.Get(key)
+	if found {
+		log.Debug("Key found in local cache")
+		thisSession = cachedVal.(SessionState)
+		t.ApplyPolicyIfExists(key, &thisSession)
+		return thisSession, true
+	}
+
+	// Check session store
 	thisSession, found = t.Spec.SessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
+		// cache it
+		go SessionCache.Set(key, thisSession, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
@@ -95,6 +110,10 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	if found {
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		log.Info("Recreating session for key: ", key)
+
+		// cache it
+		go SessionCache.Set(key, thisSession, cache.DefaultExpiration)
+
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
 		t.Spec.SessionManager.UpdateSession(key, thisSession, t.Spec.APIDefinition.SessionLifetime)
