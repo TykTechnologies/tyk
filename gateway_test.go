@@ -126,7 +126,7 @@ func getChain(spec APISpec) http.Handler {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	//remote, _ := url.Parse("http://lonelycode.com/")
+	//remote, _ := url.Parse("http://localhost/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}
@@ -192,7 +192,7 @@ var nonExpiringDefNoWhiteList string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com/",
+			"target_url": "http://localhost/",
 			"strip_listen_path": false
 		}
 	}
@@ -250,7 +250,7 @@ var VersionedDefinition string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com/",
+			"target_url": "http://localhost/",
 			"strip_listen_path": false
 		}
 	}
@@ -431,7 +431,7 @@ var ExtendedPathGatewaySetup string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com/",
+			"target_url": "http://localhost/",
 			"strip_listen_path": false
 		}
 	}
@@ -533,7 +533,7 @@ func TestThrottling(t *testing.T) {
 	thisSession := createThrottledSession()
 	keyId := randSeq(10)
 	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -602,7 +602,7 @@ func TestVersioningRequestOK(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createVersionedSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -634,7 +634,7 @@ func TestVersioningRequestFail(t *testing.T) {
 
 	// no version allowed
 	spec.SessionManager.UpdateSession("zz1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -727,7 +727,7 @@ func TestQuota(t *testing.T) {
 	thisSession := createQuotaSession()
 	keyId := randSeq(10)
 	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -789,7 +789,7 @@ func TestWithAnalytics(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -842,7 +842,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()

@@ -2,12 +2,13 @@ language: go
 sudo: false
 
 go:
-  - 1.3
+  - 1.5
 
 
 services:
   - redis-server
   - mongodb
+  - nginx
 
 install:
   - go get -d -v ./... && go build -v ./...
