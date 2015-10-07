@@ -87,8 +87,9 @@ func TestGetChecksum(t *testing.T) {
 		t.Error("Checksum should not have failed with good objet and body")
 	}
 
-	if checksum != "415be2cd1035bd73de25d78c292d741e" {
+	if checksum != "cb7594b9bd5cdbfdfa67b1b4e36756ca" {
 		t.Error("Checksum is incorrect")
+		t.Error(checksum)
 	}
 }
 

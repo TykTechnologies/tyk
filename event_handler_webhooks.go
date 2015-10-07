@@ -106,7 +106,7 @@ func (w WebHookHandler) WasHookFired(checksum string) bool {
 	_, keyErr := w.store.GetKey(checksum)
 	if keyErr != nil {
 		// Key not found, so hook is in limit
-		log.Info("Event can fire, no duplicates found")
+		log.Debug("Event can fire, no duplicates found")
 		return false
 	}
 
@@ -115,7 +115,7 @@ func (w WebHookHandler) WasHookFired(checksum string) bool {
 
 // setHookFired will create an expiring key for the checksum of the event
 func (w WebHookHandler) setHookFired(checksum string) {
-	log.Warning("Setting Webhook Checksum: ", checksum)
+	log.Debug("Setting Webhook Checksum: ", checksum)
 	w.store.SetKey(checksum, "1", w.conf.EventTimeout)
 }
 
@@ -155,7 +155,7 @@ func (w WebHookHandler) GetChecksum(reqBody string) (string, error) {
 	localRequest.Write(&rawRequest)
 	h := md5.New()
 
-	log.Warning("REQUEST: \n", rawRequest.String())
+	log.Debug("REQUEST: \n", rawRequest.String())
 
 	io.WriteString(h, rawRequest.String())
 
@@ -215,7 +215,7 @@ func (w WebHookHandler) HandleEvent(em EventMessage) {
 			defer resp.Body.Close()
 			content, readErr := ioutil.ReadAll(resp.Body)
 			if readErr == nil {
-				log.Warning(string(content))
+				log.Debug(string(content))
 			} else {
 				log.Error(readErr)
 			}

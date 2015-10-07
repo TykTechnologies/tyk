@@ -28,6 +28,7 @@ var sampleDefiniton string = `
 				"v1": {
 					"name": "v1",
 					"expires": "2006-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
 						"white_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"],

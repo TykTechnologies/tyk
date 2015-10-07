@@ -58,6 +58,7 @@ var oauthDefinition string = `
 			"versions": {
 				"Default": {
 					"name": "Default",
+					"use_extended_paths": true,
 					"expires": "3000-01-02 15:04"
 				}
 			}
@@ -271,7 +272,7 @@ func GetToken() tokenData {
 	if err != nil {
 		fmt.Println(err)
 	}
-	log.Warning("TOKEN DATA: ", string(body))
+	log.Debug("TOKEN DATA: ", string(body))
 	return thisResponse
 }
 
@@ -392,7 +393,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	if err != nil {
 		t.Error("Decode failed: ", dErr)
 	}
-	log.Error("Refresh token body", string(body))
+	log.Debug("Refresh token body", string(body))
 
 	param2 := make(url.Values)
 	param2.Set("grant_type", "refresh_token")
@@ -415,6 +416,6 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 		t.Error("Response code should have been 200 but is: ", recorder2.Code)
 		t.Error(recorder2.Body)
 		t.Error(req2.Body)
-	}	
+	}
 
 }

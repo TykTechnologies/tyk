@@ -31,6 +31,7 @@ var apiTestDef string = `
 				"Default": {
 					"name": "Default",
 					"expires": "3006-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"white_list": [],
@@ -49,7 +50,7 @@ var apiTestDef string = `
 `
 
 func MakeSampleAPI() *APISpec {
-	log.Warning("CREATING TEMPORARY API")
+	log.Debug("CREATING TEMPORARY API")
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -62,7 +63,7 @@ func MakeSampleAPI() *APISpec {
 	loadApps(specs, newMuxes)
 
 	http.DefaultServeMux = newMuxes
-	log.Warning("TEST Reload complete")
+	log.Debug("TEST Reload complete")
 
 	return &thisSpec
 }
@@ -80,12 +81,12 @@ type testAPIDefinition struct {
 
 func init() {
 	// Clean up our API list
-	log.Warning("Setting up Empty API path")
+	log.Debug("Setting up Empty API path")
 	config.AppPath = "./test/"
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
-	log.Info("TEST GET HEALTHCHECK")
+	log.Debug("TEST GET HEALTHCHECK")
 	uri := "/tyk/health/?api_id=1"
 	method := "GET"
 
@@ -151,7 +152,7 @@ func TestApiHandler(t *testing.T) {
 }
 
 func TestApiHandlerGetSingle(t *testing.T) {
-	log.Info("TEST GET SINGLE API DEFINITION")
+	log.Debug("TEST GET SINGLE API DEFINITION")
 	uri := "/tyk/apis/1"
 	method := "GET"
 	sampleKey := createSampleSession()

@@ -26,6 +26,7 @@ var ipMiddlewareTestDefinitionEnabledFail string = `
 				"v1": {
 					"name": "v1",
 					"expires": "2100-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"white_list": [],
@@ -63,6 +64,7 @@ var ipMiddlewareTestDefinitionEnabledPass string = `
 				"v1": {
 					"name": "v1",
 					"expires": "2100-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"white_list": [],
@@ -100,6 +102,7 @@ var ipMiddlewareTestDefinitionDisabled string = `
 				"v1": {
 					"name": "v1",
 					"expires": "2100-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"white_list": [],
@@ -137,6 +140,7 @@ var ipMiddlewareTestDefinitionMissing string = `
 				"v1": {
 					"name": "v1",
 					"expires": "2100-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"white_list": [],
@@ -154,7 +158,7 @@ var ipMiddlewareTestDefinitionMissing string = `
 `
 
 func MakeIPSampleAPI(apiTestDef string) *APISpec {
-	log.Warning("CREATING TEMPORARY API FOR IP WHITELIST")
+	log.Debug("CREATING TEMPORARY API FOR IP WHITELIST")
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -167,7 +171,7 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 	loadApps(specs, newMuxes)
 
 	http.DefaultServeMux = newMuxes
-	log.Warning("IP TEST Reload complete")
+	log.Debug("IP TEST Reload complete")
 
 	return &thisSpec
 }
@@ -179,7 +183,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("1234wer", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
@@ -187,7 +191,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 	req.RemoteAddr = "127.0.0.1"
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", "1234wer")
 
 	if err != nil {
 		t.Fatal(err)
@@ -208,7 +212,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
@@ -216,7 +220,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 	req.RemoteAddr = "127.0.0.1"
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", "gfgg1234")
 
 	if err != nil {
 		t.Fatal(err)
@@ -237,14 +241,14 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("1234rtyrty", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", "1234rtyrty")
 
 	if err != nil {
 		t.Fatal(err)
@@ -265,14 +269,14 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("1234iuouio", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", "1234iuouio")
 
 	if err != nil {
 		t.Fatal(err)

@@ -489,11 +489,11 @@ func (r RedisOsinStorageInterface) SetClient(id string, client osin.Client, igno
 		key = id
 	}
 
-	log.Warning("CREATING: ", key)
+	log.Debug("CREATING: ", key)
 
 	r.store.SetKey(key, string(clientDataJSON), 0)
 
-	log.Info("Storing copy in set")
+	log.Debug("Storing copy in set")
 
 	KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
 	r.store.AddToSet(KeyForSet, string(clientDataJSON))
@@ -510,7 +510,7 @@ func (r RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) er
 	// Get the raw vals:
 	clientJSON, storeErr := r.store.GetKey(key)
 	if storeErr == nil {
-		log.Info("Removing from set")
+		log.Debug("Removing from set")
 		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
 		r.store.RemoveFromSet(KeyForSet, clientJSON)
 	}

@@ -32,6 +32,7 @@ var basicAuthDef string = `
 			"versions": {
 				"Default": {
 					"name": "Default",
+					"use_extended_paths": true,
 					"expires": "3000-01-02 15:04",
 					"paths": {
 						"ignored": [],

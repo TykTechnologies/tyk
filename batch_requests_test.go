@@ -64,6 +64,7 @@ var BatchTestDef string = `
 				"Default": {
 					"name": "Default",
 					"expires": "3000-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"black_list": [],

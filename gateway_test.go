@@ -126,7 +126,7 @@ func getChain(spec APISpec) http.Handler {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	//remote, _ := url.Parse("http://google.com/")
+	//remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}
@@ -192,7 +192,7 @@ var nonExpiringDefNoWhiteList string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://google.com/",
+			"target_url": "http://example.com/",
 			"strip_listen_path": false
 		}
 	}
@@ -218,6 +218,7 @@ var VersionedDefinition string = `
 				"v1": {
 					"name": "v1",
 					"expires": "3000-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"black_list": [],
@@ -250,7 +251,7 @@ var VersionedDefinition string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://google.com/",
+			"target_url": "http://example.com/",
 			"strip_listen_path": false
 		}
 	}
@@ -277,6 +278,7 @@ var PathBasedDefinition string = `
 				"default": {
 					"name": "default",
 					"expires": "3000-01-02 15:04",
+					"use_extended_paths": true,
 					"paths": {
 						"ignored": [],
 						"black_list": [],
@@ -431,7 +433,7 @@ var ExtendedPathGatewaySetup string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://google.com/",
+			"target_url": "http://example.com/",
 			"strip_listen_path": false
 		}
 	}
@@ -601,14 +603,14 @@ func TestVersioningRequestOK(t *testing.T) {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createVersionedSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("96869686969", thisSession, 60)
 	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", "96869686969")
 	req.Header.Add("version", "v1")
 
 	if err != nil {
@@ -663,7 +665,7 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createStandardSession()
 
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("tyutyu345345dgh", thisSession, 60)
 	uri := "/v1/ignored/noregex"
 	method := "GET"
 
@@ -694,7 +696,9 @@ func TestWhitelistRequestReply(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createStandardSession()
 
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	keyId := randSeq(10)
+
+	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
 	uri := "v1/allowed/whitelist/reply/"
 	method := "GET"
 
@@ -702,7 +706,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", keyId)
 
 	if err != nil {
 		t.Fatal(err)
@@ -788,14 +792,14 @@ func TestWithAnalytics(t *testing.T) {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("ert1234ert", thisSession, 60)
 	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", "ert1234ert")
 
 	if err != nil {
 		t.Fatal(err)
@@ -841,14 +845,14 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("fgh561234", thisSession, 60)
 	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "4321")
+	req.Header.Add("authorization", "dfgjg345316ertdg")
 
 	if err != nil {
 		t.Fatal(err)
