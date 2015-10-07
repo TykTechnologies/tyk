@@ -126,7 +126,7 @@ func getChain(spec APISpec) http.Handler {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	//remote, _ := url.Parse("http://localhost/")
+	//remote, _ := url.Parse("http://google.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}
@@ -192,7 +192,7 @@ var nonExpiringDefNoWhiteList string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://localhost/",
+			"target_url": "http://google.com/",
 			"strip_listen_path": false
 		}
 	}
@@ -250,7 +250,7 @@ var VersionedDefinition string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://localhost/",
+			"target_url": "http://google.com/",
 			"strip_listen_path": false
 		}
 	}
@@ -431,7 +431,7 @@ var ExtendedPathGatewaySetup string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://localhost/",
+			"target_url": "http://google.com/",
 			"strip_listen_path": false
 		}
 	}
