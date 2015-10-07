@@ -207,7 +207,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, &newAppSpec)
 
 		} else {
-			log.Warning("Path-based version path list settings are being deprecated, please upgrade your defintitions to the new standard as soon as spossible")
+			log.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
 		}
 		newAppSpec.RxPaths[v.Name] = pathSpecs
