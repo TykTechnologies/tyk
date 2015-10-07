@@ -9,9 +9,10 @@ services:
   - redis-server
   - mongodb
 
-before_install:
-  - apt-get update -qq
-  - apt-get install -y nginx
+addons:
+  apt:
+    packages:
+    - nginx
 
 install:
   - go get -d -v ./... && go build -v ./...
