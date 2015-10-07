@@ -63,7 +63,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				})
 
 			// Report in health check
-			ReportHealthCheckValue(k.Spec.Health, Throttle, "1")
+			ReportHealthCheckValue(k.Spec.Health, Throttle, "-1")
 
 			return errors.New("Rate limit exceeded"), 429
 
@@ -84,7 +84,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				})
 
 			// Report in health check
-			ReportHealthCheckValue(k.Spec.Health, QuotaViolation, "1")
+			ReportHealthCheckValue(k.Spec.Health, QuotaViolation, "-1")
 
 			return errors.New("Quota exceeded"), 403
 		}

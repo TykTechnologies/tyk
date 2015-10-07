@@ -93,7 +93,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 	}
 
 	// Report in health check
-	ReportHealthCheckValue(e.Spec.Health, BlockedRequestLog, "1")
+	ReportHealthCheckValue(e.Spec.Health, BlockedRequestLog, "-1")
 
 	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("X-Generator", "tyk.io")

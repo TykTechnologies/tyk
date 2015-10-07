@@ -60,7 +60,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// Fire Authfailed Event
 		AuthFailed(k.TykMiddleware, r, accessToken)
 		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
 
 		return errors.New("Key not authorised"), 403
 	}

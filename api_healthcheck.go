@@ -3,6 +3,7 @@ package main
 import (
 	"strconv"
 	"strings"
+	"time"
 )
 
 type HealthPrefix string
@@ -66,9 +67,15 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 	if config.HealthCheck.EnableHealthChecks {
 		searchStr := h.CreateKeyName(counterType)
 		log.Debug("Adding Healthcheck to: ", searchStr)
+		log.Debug("Val is: ", value)
 		//go h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
-		valConv, _ := strconv.Atoi(value)
-		go h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, int64(valConv))
+		if value != "-1" {
+			// need to ensure uniqueness
+			now_string := strconv.Itoa(int(time.Now().UnixNano()))
+			value = now_string + "." + value
+			log.Debug("Set value to: ", value)
+		}
+		go h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, value)
 	}
 }
 
@@ -79,8 +86,8 @@ func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	log.Debug("Searching for: ", searchStr)
 
 	var count int
-	count, _ = h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, 0)
-
+	count, _ = h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
+	log.Debug("Count is: ", count)
 	//count = int64(len(keys))
 	divisor := float64(config.HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
@@ -113,18 +120,22 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	searchStr := strings.Join([]string{h.APIID, string(RequestLog)}, ".")
 	log.Debug("Searching KV for: ", searchStr)
 	//kv := h.storage.GetKeysAndValuesWithFilter(searchStr)
-	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, 0)
-	log.Info("Found: ", vals)
+	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
+	log.Debug("Found: ", vals)
 	var runningTotal int
 	if len(vals) > 0 {
 		for _, v := range vals {
-			log.Info("V is: ", string(v.([]byte)))
-			vInt, cErr := strconv.Atoi(string(v.([]byte)))
-			if cErr != nil {
-				log.Error("Couldn't convert tracked latency value to Int, vl is: ")
-			} else {
-				runningTotal += vInt
+			log.Debug("V is: ", string(v.([]byte)))
+			splitValues := strings.Split(string(v.([]byte)), ".")
+			if len(splitValues) > 1 {
+				vInt, cErr := strconv.Atoi(splitValues[1])
+				if cErr != nil {
+					log.Error("Couldn't convert tracked latency value to Int, vl is: ", cErr)
+				} else {
+					runningTotal += vInt
+				}
 			}
+
 		}
 		values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(vals)))
 	}

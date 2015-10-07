@@ -591,7 +591,7 @@ func (r *RedisClusterStorageManager) RemoveFromSet(keyName string, value string)
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
-func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, value_override int64) (int, []interface{}) {
+func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, value_override string) (int, []interface{}) {
 
 	log.Debug("Incrementing raw key: ", keyName)
 	if r.db == nil {
@@ -616,8 +616,8 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 		ZADD := rediscluster.ClusterTransaction{}
 		ZADD.Cmd = "ZADD"
 
-		if value_override != -1 {
-			ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(value_override))}
+		if value_override != "-1" {
+			ZADD.Args = []interface{}{keyName, now.UnixNano(), value_override}
 		} else {
 			ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
 		}

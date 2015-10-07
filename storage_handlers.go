@@ -41,7 +41,7 @@ type StorageHandler interface {
 	DeleteKeys([]string) bool
 	Decrement(string)
 	IncrememntWithExpire(string, int64) int64
-	SetRollingWindow(string, int64, int64) (int, []interface{})
+	SetRollingWindow(string, int64, string) (int, []interface{})
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	RemoveFromSet(string, string)
@@ -59,7 +59,7 @@ func (s *InMemoryStorageManager) Decrement(n string) {
 	log.Warning("Not implemented!")
 }
 
-func (s *InMemoryStorageManager) SetRollingWindow(keyName string, per int64, expire int64) (int, []interface{}) {
+func (s *InMemoryStorageManager) SetRollingWindow(keyName string, per int64, val string) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, []interface{}{}
 }
@@ -730,7 +730,7 @@ func (r *RedisStorageManager) AppendToSet(keyName string, value string) {
 }
 
 // IncrementWithExpire will increment a key in redis
-func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire int64) (int, []interface{}) {
+func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire string) (int, []interface{}) {
 	db := r.pool.Get()
 	defer db.Close()
 

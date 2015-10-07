@@ -171,7 +171,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// Fire Authfailed Event
 		AuthFailed(hm.TykMiddleware, r, keyId)
 		// Report in health check
-		ReportHealthCheckValue(hm.Spec.Health, KeyFailure, "1")
+		ReportHealthCheckValue(hm.Spec.Health, KeyFailure, "-1")
 
 		return errors.New("Request signature is invalid"), 400
 	}
