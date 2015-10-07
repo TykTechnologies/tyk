@@ -7,6 +7,7 @@
 - Test update to reduce number of errors, cleaner output
 - Healthcheck data now stored in a sorted set, much cleaner and faster, now works with redis cluster!
 
+
 # 1.8.3.2
 
 - Enabled password grant type in OAuth:
