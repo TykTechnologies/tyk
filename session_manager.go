@@ -75,8 +75,8 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 
 	log.Debug("Num Requests: ", ratePerPeriodNow)
 
-	// Subtract by 1 because of the delayed add in the window
-	if ratePerPeriodNow > (int(currentSession.Rate) - 1) {
+	// Subtract by 1 because of the delayed add in the window, and another subtraction because of the preemptive limit
+	if ratePerPeriodNow > (int(currentSession.Rate) - 2) {
 		// Set a sentinel value with expire
 		store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
 	}

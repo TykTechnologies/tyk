@@ -633,14 +633,14 @@ func TestVersioningRequestFail(t *testing.T) {
 	thisSession.AccessRights = map[string]AccessDefinition{"9991": AccessDefinition{APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
 
 	// no version allowed
-	spec.SessionManager.UpdateSession("1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("zz1234", thisSession, 60)
 	uri := "/about-lonelycoder/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", "1234")
+	req.Header.Add("authorization", "zz1234")
 	req.Header.Add("version", "v1")
 
 	if err != nil {
