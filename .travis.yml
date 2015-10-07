@@ -8,7 +8,10 @@ go:
 services:
   - redis-server
   - mongodb
-  - nginx
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -y nginx
 
 install:
   - go get -d -v ./... && go build -v ./...
