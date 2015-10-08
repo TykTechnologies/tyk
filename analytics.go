@@ -4,7 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"gopkg.in/vmihailenco/msgpack.v2"
-	"labix.org/v2/mgo"
+	"gopkg.in/mgo.v2"
 	"os"
 	"strconv"
 	"time"
