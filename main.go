@@ -797,7 +797,7 @@ func main() {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
 		log.Info("Setting up Server")
 		if config.HttpServerOptions.UseSSL {
-			log.Warning("--> Using SSL (https)")
+			log.Info("--> Using SSL (https)")
 			certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
 			certNameMap := make(map[string]*tls.Certificate)
 			for i, certData := range config.HttpServerOptions.Certificates {
@@ -817,7 +817,7 @@ func main() {
 			}
 			l, err = tls.Listen("tcp", targetPort, &config)
 		} else {
-			log.Warning("--> Standard listener (http)")
+			log.Info("--> Standard listener (http)")
 			l, err = net.Listen("tcp", targetPort)
 		}
 

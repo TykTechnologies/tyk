@@ -10,7 +10,8 @@ services:
   - mongodb
 
 install:
-  - go get -d -v ./... && go build -v ./...
+  - go get -d -v ./...
+  - go build -v ./...
   - go get golang.org/x/tools/cover
 
 
