@@ -71,6 +71,7 @@ type Config struct {
 		MonitorOrgKeys        bool               `json:"monitor_org_keys"`
 	}
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
+	OauthTokenExpire   int32 `json:"oauth_token_expire"`
 	SlaveOptions       struct {
 		UseRPC           bool   `json:"use_rpc"`
 		ConnectionString string `json:"connection_string"`

@@ -590,6 +590,11 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 	key := ACCESS_PREFIX + accessData.AccessToken
 	log.Debug("Saving ACCESS key: ", key)
 
+	// Overide default ExpiresIn:
+	if config.OauthTokenExpire != 0 {
+		accessData.ExpiresIn = config.OauthTokenExpire
+	}
+
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
 
 	// Create a SessionState object and register it with the authmanager

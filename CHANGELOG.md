@@ -7,6 +7,8 @@
 - Test update to reduce number of errors, cleaner output
 - Healthcheck data now stored in a sorted set, much cleaner and faster, now works with redis cluster!
 - Bug fixed: Empty or invalid listen path no longer crashes proxy
+- Bug fixed: Basic Auth (and Oauth BA) asswords are now hashed, this is backward compatible, plaintext passwords will still work
+- OAuth access token expiry can now be set (in seconds) in the `tyk.conf` file using `oauth_token_expire=3600`
 
 # 1.8.3.2
 
