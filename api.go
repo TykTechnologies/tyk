@@ -10,6 +10,7 @@ import (
 	osin "github.com/lonelycode/osin"
 	"github.com/lonelycode/tykcommon"
 	"github.com/nu7hatch/gouuid"
+	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -128,6 +129,28 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
+func SetSessionPassword(session *SessionState) {
+	session.BasicAuthData.Hash = HASH_BCrypt
+	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
+	if err != nil {
+		log.Error("Could not hash password, setting to plaintext, error was: ", err)
+		session.BasicAuthData.Hash = HASH_PlainText
+		return
+	}
+
+	session.BasicAuthData.Password = string(newPass)
+}
+
+func GetKeyDetail(key string, APIID string) (SessionState, bool) {
+	thiSpec := GetSpecForApi(APIID)
+	if thiSpec == nil {
+		log.Error("No API Spec found for this keyspace")
+		return SessionState{}, false
+	}
+
+	return thiSpec.SessionManager.GetSessionDetail(key)
+}
+
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	success := true
 	decoder := json.NewDecoder(r.Body)
@@ -149,6 +172,31 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			// Only if it's NEW
 			if r.Method == "POST" {
 				keyName = newSession.OrgID + keyName
+				// It's a create, so lets hash the password
+				SetSessionPassword(&newSession)
+			}
+
+			if r.Method == "PUT" {
+				// Ge the session
+				var originalKey SessionState
+				var found bool
+				for api_id, _ := range newSession.AccessRights {
+					originalKey, found = GetKeyDetail(keyName, api_id)
+					if found {
+						break
+					}
+				}
+
+				if found {
+					// Found the key
+					if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
+						// passwords dont match assume it's new, lets hash it
+						log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
+						log.Debug("New: newSession.BasicAuthData.Password")
+						log.Debug("Changing password")
+						SetSessionPassword(&newSession)
+					}
+				}
 			}
 
 		}

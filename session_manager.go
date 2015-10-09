@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+type HashType string
+
+const (
+	HASH_PlainText HashType = ""
+	HASH_BCrypt    HashType = "bcrypt"
+)
+
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
 	URL     string   `json:"url"`
@@ -33,7 +40,8 @@ type SessionState struct {
 	OrgID            string                      `json:"org_id"`
 	OauthClientID    string                      `json:"oauth_client_id"`
 	BasicAuthData    struct {
-		Password string `json:"password"`
+		Password string   `json:"password"`
+		Hash     HashType `json:"hash_type"`
 	} `json:"basic_auth_data"`
 	HMACEnabled   bool   `json:"hmac_enabled"`
 	HmacSecret    string `json:"hmac_string"`

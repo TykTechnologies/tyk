@@ -19,4 +19,3 @@ secure: "F3GrvKUQkuIJyzamGM3fw5tTZfYtSCmR+02t5KpqsqkBt1iBM2w4wlZjm+kMzisz8NDVZYf
 
 script:
   - go test -v -covermode=count -coverprofile=coverage.out
-  

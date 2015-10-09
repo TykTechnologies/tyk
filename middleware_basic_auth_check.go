@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"golang.org/x/crypto/bcrypt"
 	"strings"
 )
 
@@ -97,7 +98,22 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Ensure that the username and password match up
-	if thisSessionState.BasicAuthData.Password != authValues[1] {
+	var passMatch bool
+	if thisSessionState.BasicAuthData.Hash == HASH_BCrypt {
+		err := bcrypt.CompareHashAndPassword([]byte(thisSessionState.BasicAuthData.Password), []byte(authValues[1]))
+
+		if err == nil {
+			passMatch = true
+		}
+	}
+
+	if thisSessionState.BasicAuthData.Hash == HASH_PlainText {
+		if thisSessionState.BasicAuthData.Password == authValues[1] {
+			passMatch = true
+		}
+	}
+
+	if !passMatch {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,

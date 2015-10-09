@@ -6,6 +6,7 @@ import (
 	"fmt"
 	osin "github.com/lonelycode/osin"
 	"github.com/nu7hatch/gouuid"
+	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"time"
 )
@@ -264,7 +265,22 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			if keyErr != nil {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
-				if thisSessionState.BasicAuthData.Password == password {
+				var passMatch bool
+				if thisSessionState.BasicAuthData.Hash == HASH_BCrypt {
+					err := bcrypt.CompareHashAndPassword([]byte(thisSessionState.BasicAuthData.Password), []byte(password))
+
+					if err == nil {
+						passMatch = true
+					}
+				}
+
+				if thisSessionState.BasicAuthData.Hash == HASH_PlainText {
+					if thisSessionState.BasicAuthData.Password == password {
+						passMatch = true
+					}
+				}
+
+				if passMatch {
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
 					asString, _ := json.Marshal(thisSessionState)
