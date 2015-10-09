@@ -6,7 +6,7 @@
 - Key detection now checks a local in-memory cache before reaching out to Redis, keys are cached for 10 seconds, with a 5 second purge rate (so a maximum key existence of 15s). Policies will still tkake instant effect on keys
 - Test update to reduce number of errors, cleaner output
 - Healthcheck data now stored in a sorted set, much cleaner and faster, now works with redis cluster!
-
+- Bug fixed: Empty or invalid listen path no longer crashes proxy
 
 # 1.8.3.2
 
