@@ -372,6 +372,16 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			skip = true
 		}
 
+		if referenceSpec.Proxy.ListenPath == "" {
+			log.Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
+			skip = true
+		}
+
+		if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
+			log.Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
+			skip = true
+		}
+
 		remote, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
 		if err != nil {
 			log.Error("Culdn't parse target URL: ", err)
