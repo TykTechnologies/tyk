@@ -276,8 +276,8 @@ func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, er
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	p.WrappedServeHTTP(rw, req, false)
-	return nil
+	return p.WrappedServeHTTP(rw, req, false)
+	// return nil
 }
 
 func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) *http.Response {
@@ -457,6 +457,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		log.Error("Response chain failed! ", chainErr)
 	}
 
+	// We should at least copy the status code in
+	inres.StatusCode = res.StatusCode
+	inres.ContentLength = res.ContentLength
 	p.HandleResponse(rw, res, req, &ses)
 	return inres
 }

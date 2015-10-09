@@ -127,7 +127,7 @@ type SuccessHandler struct {
 	*TykMiddleware
 }
 
-func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64) {
+func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int) {
 
 	if config.StoreAnalytics(r) {
 
@@ -165,7 +165,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			t.Month(),
 			t.Year(),
 			t.Hour(),
-			200,
+			code,
 			keyName,
 			t,
 			version,
@@ -215,13 +215,13 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	}
 
 	t1 := time.Now()
-	s.Proxy.ServeHTTP(w, r)
+	resp := s.Proxy.ServeHTTP(w, r)
 	t2 := time.Now()
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	go s.RecordHit(w, r, int64(millisec))
+	go s.RecordHit(w, r, int64(millisec), resp.StatusCode)
 	return nil
 }
 
@@ -241,7 +241,7 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	go s.RecordHit(w, r, int64(millisec))
+	go s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
 
 	return inRes
 }

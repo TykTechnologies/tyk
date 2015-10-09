@@ -244,7 +244,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	d.HandleResponse(w, newResponse, &thisSessionState)
 
 	// Record analytics
-	go d.sh.RecordHit(w, r, 0)
+	go d.sh.RecordHit(w, r, 0, newResponse.StatusCode)
 
 	return copiedRes
 
