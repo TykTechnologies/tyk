@@ -17,7 +17,7 @@ func StartPubSubLoop() {
 	for {
 		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisReloadMsg)
 		if err != nil {
-			log.Error("Connection to Redis failed: err")
+			log.Error("Connection to Redis failed: ", err)
 			time.Sleep(10 * time.Second)
 			log.Warning("Reconnecting")
 			CacheStore.Connect()
