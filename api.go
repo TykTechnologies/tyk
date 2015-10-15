@@ -1252,6 +1252,58 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	DoJSONWrite(w, code, responseMessage)
 }
 
+func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
+	keyCombined := r.URL.Path[len("/tyk/oauth/refresh/"):]
+
+	if r.Method == "DELETE" {
+		APIID := r.FormValue("api_id")
+		if APIID == "" {
+			DoJSONWrite(w, 400, createError("Missing parameter api_id"))
+			return
+		}
+		thisAPISpec := GetSpecForApi(APIID)
+		log.Warning("Looking for refresh token in API ID: ", APIID)
+		if thisAPISpec == nil {
+			DoJSONWrite(w, 400, createError("API for this refresh token not found"))
+			return
+		}
+
+		if thisAPISpec.OAuthManager == nil {
+			DoJSONWrite(w, 400, createError("OAuth is not enabled on this API"))
+			return
+		}
+
+		storeErr := thisAPISpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
+
+		if storeErr != nil {
+			log.Error("Failed to invalidate refresh token: ", storeErr)
+			DoJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
+			return
+		}
+
+		success := APIModifyKeySuccess{
+			Key:    keyCombined,
+			Status: "ok",
+			Action: "deleted",
+		}
+
+		responseMessage, err := json.Marshal(&success)
+
+		if err != nil {
+			log.Error(err)
+			DoJSONWrite(w, 400, createError("Failed to marshal data"))
+			return
+		}
+
+		DoJSONWrite(w, 200, responseMessage)
+		return
+	}
+
+	DoJSONWrite(w, 405, createError("Method not supported"))
+	return
+
+}
+
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	keyCombined := r.URL.Path[len("/tyk/oauth/clients/"):]
 	var responseMessage []byte

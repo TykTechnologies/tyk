@@ -180,6 +180,7 @@ func loadAPIEndpoints(Muxer *http.ServeMux) {
 		Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
 		Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
 		Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
+		Muxer.HandleFunc("/tyk/oauth/refresh/", CheckIsAPIOwner(invalidateOauthRefresh))
 	} else {
 		log.Info("Node is slaved, REST API minimised")
 	}
