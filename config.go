@@ -80,7 +80,13 @@ type Config struct {
 		EnableRPCCache   bool   `json:"enable_rpc_cache"`
 	} `json:"slave_options"`
 	DisableVirtualPathBlobs bool `json:"disable_virtual_path_blobs"`
-	HttpServerOptions       struct {
+	LocalSessionCache       struct {
+		DisableCacheSessionState bool `json:"disable_cached_session_state"`
+		CachedSessionTimeout     int  `json:"cached_session_timeout"`
+		CacheSessionEviction     int  `json:"cached_session_eviction"`
+	} `json:"local_session_cache"`
+
+	HttpServerOptions struct {
 		OverrideDefaults bool       `json:"override_defaults"`
 		ReadTimeout      int        `json:"read_timeout"`
 		WriteTimeout     int        `json:"write_timeout"`

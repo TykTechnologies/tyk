@@ -31,6 +31,19 @@ type TykMiddleware struct {
 	Proxy *ReverseProxy
 }
 
+func SetUpSessionCache() *cache.Cache {
+	sessionLength := 10
+	evictionTime := 5
+	if config.LocalSessionCache.CachedSessionTimeout > 0 {
+		sessionLength = config.LocalSessionCache.CachedSessionTimeout
+	}
+	if config.LocalSessionCache.CacheSessionEviction > 0 {
+		evictionTime = config.LocalSessionCache.CacheSessionEviction
+	}
+
+	return cache.New(time.Duration(sessionLength)*time.Second, time.Duration(evictionTime)*time.Second)
+}
+
 func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	var thisSession SessionState
@@ -84,12 +97,14 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	var found bool
 
 	// Check in-memory cache
-	cachedVal, found := SessionCache.Get(key)
-	if found {
-		log.Debug("Key found in local cache")
-		thisSession = cachedVal.(SessionState)
-		t.ApplyPolicyIfExists(key, &thisSession)
-		return thisSession, true
+	if !config.LocalSessionCache.DisableCacheSessionState {
+		cachedVal, found := SessionCache.Get(key)
+		if found {
+			log.Debug("Key found in local cache")
+			thisSession = cachedVal.(SessionState)
+			t.ApplyPolicyIfExists(key, &thisSession)
+			return thisSession, true
+		}
 	}
 
 	// Check session store
