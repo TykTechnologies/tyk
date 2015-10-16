@@ -13,6 +13,7 @@
 - OAuth access token expiry can now be set (in seconds) in the `tyk.conf` file using `oauth_token_expire=3600`
 - Proxy now records accurate status codes for upstream requests for better error reporting
 - Added refresh token invalidation API: `DELETE /tyk/oauth/refresh/{key}?api_id={api_id}`
+- Global header injection now works, can be enabled on a er-version basis by adding `global_headers:{"header_name": "header value"}` to the version object in the API Definition, global injections also supports key metadata variables.
 
 # 1.8.3.2
 

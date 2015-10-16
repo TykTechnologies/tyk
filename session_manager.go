@@ -95,15 +95,16 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
+
+	// Set rolling window (off thread)
+	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
+
 	// Check sentinel
 	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
 	if sentinelActive == nil {
 		// Sentinel is set, fail
 		return false, 1
 	}
-
-	// if not - set rolling window (off thread)
-	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
 
 	currentSession.Allowance--
 	if !l.IsRedisQuotaExceeded(currentSession, key, store) {
