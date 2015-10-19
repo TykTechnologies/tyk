@@ -26,6 +26,7 @@
 
 - Request size limits can also be enforced globally, these are checked first, to implement, add `"global_size_limit": 30` to your version data.
 - Adding a `key_expires_in: seconds` property to a policy definition will cause any key that is created or added using this policy to have a finite lifetime, it will expire in `now()+key_expiry` seconds, handy for free trials
+- Dependency update (logrus)
 
 # 1.8.3.2
 
