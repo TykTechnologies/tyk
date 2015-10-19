@@ -1,4 +1,4 @@
-# 1.8.3.3
+# 1.8.4
 
 - Gateway Mongo Driver updated to be compatible with MongoDB v3.0
 - Fixed OAuth client listings with redis cluster
@@ -14,6 +14,17 @@
 - Proxy now records accurate status codes for upstream requests for better error reporting
 - Added refresh token invalidation API: `DELETE /tyk/oauth/refresh/{key}?api_id={api_id}`
 - Global header injection now works, can be enabled on a er-version basis by adding `global_headers:{"header_name": "header value"}` to the version object in the API Definition, global injections also supports key metadata variables.
+- Added request size limiter, request size limiter middleware will insist on content-length to be set, and check first against content-length value, and then actual request size value. To implement, add this to your version info:
+
+	"size_limits": [
+	    {
+	      "path": "widget/id",
+	      "method": "PUT",
+	      "size_limit": 25
+	    }
+	  ]
+
+- Request size limits can also be enforced globally, these are checked first, to implement, add `"global_size_limit": 30` to your version data.
 
 # 1.8.3.2
 
