@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/Sirupsen/logrus/hooks/sentry"
+	"github.com/evalphobia/logrus_sentry"
 	"github.com/docopt/docopt.go"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
