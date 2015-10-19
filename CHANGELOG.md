@@ -9,11 +9,11 @@
 - Test update to reduce number of errors, cleaner output
 - Healthcheck data now stored in a sorted set, much cleaner and faster, now works with redis cluster!
 - Bug fixed: Empty or invalid listen path no longer crashes proxy
-- Bug fixed: Basic Auth (and Oauth BA) asswords are now hashed, this is backward compatible, plaintext passwords will still work
-- OAuth access token expiry can now be set (in seconds) in the `tyk.conf` file using `oauth_token_expire=3600`
+- Bug fixed: Basic Auth (and Oauth BA) passwords are now hashed, this is backward compatible, plaintext passwords will still work
+- OAuth access token expiry can now be set (in seconds) in the `tyk.conf` file using `oauth_token_expire:3600`
 - Proxy now records accurate status codes for upstream requests for better error reporting
 - Added refresh token invalidation API: `DELETE /tyk/oauth/refresh/{key}?api_id={api_id}`
-- Global header injection now works, can be enabled on a er-version basis by adding `global_headers:{"header_name": "header value"}` to the version object in the API Definition, global injections also supports key metadata variables.
+- Global header injection now works, can be enabled on a per-version basis by adding `global_headers:{"header_name": "header value"}` to the version object in the API Definition, global injections also supports key metadata variables.
 - Added request size limiter, request size limiter middleware will insist on content-length to be set, and check first against content-length value, and then actual request size value. To implement, add this to your version info:
 
 	"size_limits": [
@@ -25,6 +25,7 @@
 	  ]
 
 - Request size limits can also be enforced globally, these are checked first, to implement, add `"global_size_limit": 30` to your version data.
+- Adding a `key_expires_in: seconds` property to a policy definition will cause any key that is created or added using this policy to have a finite lifetime, it will expire in `now()+key_expiry` seconds, handy for free trials
 
 # 1.8.3.2
 

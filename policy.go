@@ -21,6 +21,7 @@ type Policy struct {
 	Active           bool                        `bson:"active" json:"active"`
 	IsInactive       bool                        `bson:"is_inactive" json:"is_inactive"`
 	Tags             []string                    `bson:"tags" json:"tags"`
+	KeyExpiresIn     int64                       `bson:"key_expires_in" json:"key_expires_in"`
 }
 
 func LoadPoliciesFromFile(filePath string) map[string]Policy {

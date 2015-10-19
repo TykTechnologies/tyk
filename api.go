@@ -71,12 +71,34 @@ func GetSpecForOrg(APIID string) *APISpec {
 	return ApiSpecRegister[aKey]
 }
 
+func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionState) {
+	// Check the policy to see if we are forcing an expiry on the key
+	if newSession.ApplyPolicyID != "" {
+		thisPolicy, foundPolicy := Policies[newSession.ApplyPolicyID]
+		if foundPolicy {
+			// Are we foring an expiry?
+			if thisPolicy.KeyExpiresIn > 0 {
+				// We are, does the key exist?
+				_, found := GetKeyDetail(keyName, apiId)
+				if !found {
+					// this is a new key, lets expire it
+					newSession.Expires = time.Now().Unix() + thisPolicy.KeyExpiresIn
+				}
+
+			}
+		}
+	}
+}
+
 func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) error {
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
 		for apiId, _ := range newSession.AccessRights {
 			thisAPISpec := GetSpecForApi(apiId)
 			if thisAPISpec != nil {
+
+				checkAndApplyTrialPeriod(keyName, apiId, &newSession)
+
 				// Lets reset keys if they are edited by admin
 				if !thisAPISpec.DontSetQuotasOnCreate {
 					// Reset quote by default
@@ -84,6 +106,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 						thisAPISpec.SessionManager.ResetQuota(keyName, newSession)
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 					}
+
 					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
 					if err != nil {
 						return err
@@ -106,6 +129,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 					spec.SessionManager.ResetQuota(keyName, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
+				checkAndApplyTrialPeriod(keyName, spec.APIID, &newSession)
 				err := spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
 				if err != nil {
 					return err
@@ -119,7 +143,8 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 	}
 
 	log.WithFields(logrus.Fields{
-		"key": keyName,
+		"key":     keyName,
+		"expires": newSession.Expires,
 	}).Debug("New key added or updated.")
 	return nil
 }
@@ -1097,6 +1122,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				for apiId, _ := range newSession.AccessRights {
 					thisAPISpec := GetSpecForApi(apiId)
 					if thisAPISpec != nil {
+						checkAndApplyTrialPeriod(newKey, apiId, &newSession)
 						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 						if !thisAPISpec.DontSetQuotasOnCreate {
 							// Reset quota by default
@@ -1123,6 +1149,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					// nothing defined, add key to ALL
 					log.Warning("No API Access Rights set, adding key to ALL.")
 					for _, spec := range ApiSpecRegister {
+						checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
 						if !spec.DontSetQuotasOnCreate {
 							// Reset quote by default
 							spec.SessionManager.ResetQuota(newKey, newSession)
