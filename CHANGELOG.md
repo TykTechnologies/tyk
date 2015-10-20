@@ -27,6 +27,22 @@
 - Request size limits can also be enforced globally, these are checked first, to implement, add `"global_size_limit": 30` to your version data.
 - Adding a `key_expires_in: seconds` property to a policy definition will cause any key that is created or added using this policy to have a finite lifetime, it will expire in `now()+key_expiry` seconds, handy for free trials
 - Dependency update (logrus)
+- Added support for JSON Web Token (JWT), currently HMAC Signing and RSA Public/Private key signing is supported. To enable JWT on an API, add `"enable_jwt": true,` to your API Definition. Then set your tokens up with these new fields when you create them:
+
+	```
+	"jwt_data": {
+		"secret": "Secret"
+	}
+	```
+
+- HMAC JWT secrets can be any string, but the secret is shared. RSA secrets must be a PEM encoded PKCS1 or PKCS8 RSA private key, these can be generated on a linux box using:
+
+	> openssl genrsa -out key.rsa 
+	> openssl rsa -in key.rsa -pubout > key.rsa.pub
+
+- Tyk JWT's MUST use the "kid" header attribute, as this is the internal access token (when creating a key) that is used to set the rate limits, policies and quotas for the user. The benefit here is that if RSA is used, then al that is stored in a Tyk installatino that uses hashed keys is the hashed ID of the end user and their public key, and so very secure.
+
+
 
 # 1.8.3.2
 

@@ -43,6 +43,9 @@ type SessionState struct {
 		Password string   `json:"password"`
 		Hash     HashType `json:"hash_type"`
 	} `json:"basic_auth_data"`
+	JWTData struct {
+		Secret string `json:"secret"`
+	} `json:"jwt_data"`
 	HMACEnabled   bool   `json:"hmac_enabled"`
 	HmacSecret    string `json:"hmac_string"`
 	IsInactive    bool   `json:"is_inactive"`

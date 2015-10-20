@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/evalphobia/logrus_sentry"
 	"github.com/docopt/docopt.go"
+	"github.com/evalphobia/logrus_sentry"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
 	"github.com/lonelycode/tykcommon"
@@ -523,6 +523,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				} else if referenceSpec.EnableSignatureChecking {
 					// HMAC Auth
 					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
+				} else if referenceSpec.EnableJWT {
+					// JWT Auth
+					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
 				} else {
 					// Auth key
 					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
