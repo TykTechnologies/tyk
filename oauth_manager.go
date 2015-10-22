@@ -283,6 +283,8 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				if passMatch {
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
+					thisSessionState.BasicAuthData.Password = ""
+					thisSessionState.BasicAuthData.Hash = ""
 					asString, _ := json.Marshal(thisSessionState)
 					ar.UserData = string(asString)
 				}
@@ -292,6 +294,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			ar.Authorized = true
 		}
 
+		log.Debug("[OAuth] Finishing access request ")
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
 	}
 	if resp.IsError && resp.InternalError != nil {
@@ -385,13 +388,13 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 		Config:            config,
 		Storage:           storage,
 		AuthorizeTokenGen: &osin.AuthorizeTokenGenDefault{},
-		AccessTokenGen:    &osin.AccessTokenGenDefault{},
+		AccessTokenGen:    &AccessTokenGenTyk{},
 	}
 
 	overrideServer.Server.Config = config
 	overrideServer.Server.Storage = storage
 	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
-	overrideServer.Server.AccessTokenGen = overrideServer.AccessTokenGen
+	overrideServer.Server.AccessTokenGen = &AccessTokenGenTyk{}
 
 	return &overrideServer
 }

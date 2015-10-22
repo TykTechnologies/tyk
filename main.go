@@ -218,7 +218,8 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
-	osinServer.AccessTokenGen = &AccessTokenGenTyk{}
+	
+	// osinServer.AccessTokenGen = &AccessTokenGenTyk{}
 
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
@@ -353,6 +354,8 @@ func IsRPCMode() bool {
 func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// load the APi defs
 	log.Debug("Loading API configurations.")
+
+	var tempSpecRegister = make(map[string]*APISpec)
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
@@ -582,11 +585,14 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 				Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
 			}
 
-			ApiSpecRegister[referenceSpec.APIDefinition.APIID] = &referenceSpec
+			tempSpecRegister[referenceSpec.APIDefinition.APIID] = &referenceSpec
 
 		}
 
 	}
+
+	// Swap in the new register
+	ApiSpecRegister = tempSpecRegister
 
 }
 
