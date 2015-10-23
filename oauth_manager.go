@@ -249,10 +249,12 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 // HandleAccess wraps an access request with osin's primitives
 func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	resp := o.OsinServer.NewResponse()
+	var thisSessionState *SessionState
+	var username string
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
 		if ar.Type == osin.PASSWORD {
-			username := r.Form.Get("username")
+			username = r.Form.Get("username")
 			password := r.Form.Get("password")
 			keyName := o.API.OrgID + username
 			if config.HashKeys {
@@ -261,7 +263,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			}
 			searchKey := "apikey-" + keyName
 			log.Debug("Getting: ", searchKey)
-			thisSessionState, keyErr := o.OsinServer.Storage.GetUser(searchKey)
+
+			var keyErr error
+			thisSessionState, keyErr = o.OsinServer.Storage.GetUser(searchKey)
 			if keyErr != nil {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
@@ -287,6 +291,8 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 					thisSessionState.BasicAuthData.Hash = ""
 					asString, _ := json.Marshal(thisSessionState)
 					ar.UserData = string(asString)
+
+					//log.Warning("Old Keys: ", thisSessionState.OauthKeys)
 				}
 			}
 		} else {
@@ -294,8 +300,41 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			ar.Authorized = true
 		}
 
-		log.Debug("[OAuth] Finishing access request ")
+		// Does the user have an old OAuth token for this client?
+		if thisSessionState.OauthKeys != nil {
+			log.Warning("There's keys here bill")
+			oldToken, foundKey := thisSessionState.OauthKeys[ar.Client.GetId()]
+			if foundKey {
+				log.Warning("Found old token, removing: ", oldToken)
+
+				defer o.API.SessionManager.RemoveSession(oldToken)
+			}
+		}
+
+		log.Info("[OAuth] Finishing access request ")
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
+
+		new_token, foundNewToken := resp.Output["access_token"]
+		if username != "" {
+			if foundNewToken {
+				log.Warning("Updating token data in key")
+				if thisSessionState.OauthKeys == nil {
+					thisSessionState.OauthKeys = make(map[string]string)
+				}
+				thisSessionState.OauthKeys[ar.Client.GetId()] = new_token.(string)
+				log.Warning("New token: ", new_token.(string))
+				log.Warning("Keys: ", thisSessionState.OauthKeys)
+
+				keyName := o.API.OrgID + username
+
+				log.Warning("Updating user:", keyName)
+				sErr := o.API.SessionManager.UpdateSession(keyName, *thisSessionState, o.API.SessionLifetime)
+				if sErr != nil {
+					log.Error(sErr)
+				}
+			}
+		}
+
 	}
 	if resp.IsError && resp.InternalError != nil {
 		log.Error("ERROR: ", resp.InternalError)
@@ -370,6 +409,9 @@ type ExtendedOsinStorageInterface interface {
 
 	// GetUser retrieves a Basic Access user token type from the key store
 	GetUser(string) (*SessionState, error)
+
+	// SetUser updates a Basic Access user token type in the key store
+	SetUser(string, *SessionState, int64) error
 }
 
 // TykOsinServer subclasses osin.Server so we can add the SetClient method without wrecking the lbrary
@@ -755,4 +797,22 @@ func (r RedisOsinStorageInterface) GetUser(username string) (*SessionState, erro
 	}
 
 	return &thisSession, nil
+}
+
+func (r RedisOsinStorageInterface) SetUser(username string, sessionState *SessionState, timeout int64) error {
+	key := username
+	authDataJSON, marshalErr := json.Marshal(sessionState)
+	if marshalErr != nil {
+		return marshalErr
+	}
+
+	storeErr := r.store.SetRawKey(key, string(authDataJSON), timeout)
+
+	if storeErr != nil {
+		log.Error("Failure setting user token by key: ", storeErr)
+		return storeErr
+	}
+
+	return nil
+
 }

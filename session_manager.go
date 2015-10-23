@@ -39,6 +39,7 @@ type SessionState struct {
 	AccessRights     map[string]AccessDefinition `json:"access_rights"`
 	OrgID            string                      `json:"org_id"`
 	OauthClientID    string                      `json:"oauth_client_id"`
+	OauthKeys        map[string]string           `json:"oauth_keys"`
 	BasicAuthData    struct {
 		Password string   `json:"password"`
 		Hash     HashType `json:"hash_type"`

@@ -17,13 +17,14 @@ echo -n "Release version [ENTER]: "
 read rel 
 
 NEWVERSION="v$maj.$min.$patch.$rel"
+NEWVERSION_DHMAKE="$maj.$min.$patch.$rel"
 echo "Setting new version in source: " $NEWVERSION
 
 perl -pi -e 's/var VERSION string = \"(.*)\"/var VERSION string = \"'$NEWVERSION'\"/g' version.go
 
 # ----- END VERSION SETTING -----
 
-VERSION=$NEWVERSION
+VERSION=$NEWVERSION_DHMAKE
 SOURCEBIN=tyk
 SOURCEBINPATH=~/tyk
 i386BINDIR=$SOURCEBINPATH/build/i386/tyk.linux.i386-$VERSION
