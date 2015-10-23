@@ -285,12 +285,19 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				}
 
 				if passMatch {
+					log.Info("Here we are")
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
+					pw := thisSessionState.BasicAuthData.Password
+					hs := thisSessionState.BasicAuthData.Hash
+
 					thisSessionState.BasicAuthData.Password = ""
 					thisSessionState.BasicAuthData.Hash = ""
 					asString, _ := json.Marshal(thisSessionState)
 					ar.UserData = string(asString)
+
+					thisSessionState.BasicAuthData.Password = pw
+					thisSessionState.BasicAuthData.Hash = hs
 
 					//log.Warning("Old Keys: ", thisSessionState.OauthKeys)
 				}
@@ -301,33 +308,36 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		}
 
 		// Does the user have an old OAuth token for this client?
-		if thisSessionState.OauthKeys != nil {
-			log.Warning("There's keys here bill")
-			oldToken, foundKey := thisSessionState.OauthKeys[ar.Client.GetId()]
-			if foundKey {
-				log.Warning("Found old token, removing: ", oldToken)
+		if thisSessionState != nil {
+			if thisSessionState.OauthKeys != nil {
+				log.Debug("There's keys here bill...")
+				oldToken, foundKey := thisSessionState.OauthKeys[ar.Client.GetId()]
+				if foundKey {
+					log.Info("Found old token, revoking: ", oldToken)
 
-				defer o.API.SessionManager.RemoveSession(oldToken)
+					o.API.SessionManager.RemoveSession(oldToken)
+				}
 			}
 		}
+		
 
-		log.Info("[OAuth] Finishing access request ")
+		log.Debug("[OAuth] Finishing access request ")
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
 
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" {
 			if foundNewToken {
-				log.Warning("Updating token data in key")
+				log.Debug("Updating token data in key")
 				if thisSessionState.OauthKeys == nil {
 					thisSessionState.OauthKeys = make(map[string]string)
 				}
 				thisSessionState.OauthKeys[ar.Client.GetId()] = new_token.(string)
-				log.Warning("New token: ", new_token.(string))
-				log.Warning("Keys: ", thisSessionState.OauthKeys)
+				log.Debug("New token: ", new_token.(string))
+				log.Debug("Keys: ", thisSessionState.OauthKeys)
 
 				keyName := o.API.OrgID + username
 
-				log.Warning("Updating user:", keyName)
+				log.Debug("Updating user:", keyName)
 				sErr := o.API.SessionManager.UpdateSession(keyName, *thisSessionState, o.API.SessionLifetime)
 				if sErr != nil {
 					log.Error(sErr)

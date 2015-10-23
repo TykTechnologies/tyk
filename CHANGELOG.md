@@ -41,7 +41,7 @@
 	> openssl rsa -in key.rsa -pubout > key.rsa.pub
 
 - Tyk JWT's MUST use the "kid" header attribute, as this is the internal access token (when creating a key) that is used to set the rate limits, policies and quotas for the user. The benefit here is that if RSA is used, then al that is stored in a Tyk installatino that uses hashed keys is the hashed ID of the end user and their public key, and so very secure.
-
+- Fixed OAuth Password flow bug where a user could generate more than one token for the same API
 
 
 # 1.8.3.2
