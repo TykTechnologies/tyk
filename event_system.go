@@ -28,6 +28,8 @@ const (
 	EVENT_OrgQuotaExceeded  tykcommon.TykEvent = "OrgQuotaExceeded"
 	EVENT_TriggerExceeded   tykcommon.TykEvent = "TriggerExceeded"
 	EVENT_BreakerTriggered  tykcommon.TykEvent = "BreakerTriggered"
+	EVENT_HOSTDOWN          tykcommon.TykEvent = "HostDown"
+	EVENT_HOSTUP            tykcommon.TykEvent = "HostUp"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -35,6 +37,11 @@ const (
 type EventMetaDefault struct {
 	Message            string
 	OriginatingRequest string
+}
+
+type EVENT_HostStatusMeta struct {
+	EventMetaDefault
+	HostInfo HostHealthReport
 }
 
 // EVENT_QuotaExceededMeta is the metadata structure for a quota exceeded event (EVENT_QuotaExceeded)
@@ -173,7 +180,7 @@ func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData int
 
 func (s APISpec) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
 
-	log.Debug("EVENT FIRED")
+	log.Debug("EVENT FIRED: ", eventName)
 	handlers, handlerExists := s.EventPaths[eventName]
 
 	if handlerExists {

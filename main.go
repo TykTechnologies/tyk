@@ -218,7 +218,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
-	
+
 	// osinServer.AccessTokenGen = &AccessTokenGenTyk{}
 
 	oauthManager := OAuthManager{spec, osinServer}
@@ -594,6 +594,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	// Swap in the new register
 	ApiSpecRegister = tempSpecRegister
 
+	// Kick off our host checkers
+	SetCheckerHostList()
+
 }
 
 func RPCReloadLoop(RPCKey string) {
@@ -801,6 +804,9 @@ func main() {
 		go RPCReloadLoop(config.SlaveOptions.RPCKey)
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
+
+	// Initialise our Host Checker
+	InitHostCheckManager(GetGlobalStorageHandler("host-checker:", false))
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()
