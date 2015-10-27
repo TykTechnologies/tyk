@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"github.com/jeffail/tunny"
 	"github.com/pmylund/go-cache"
 	"math/rand"
@@ -17,6 +18,9 @@ const (
 type HostData struct {
 	CheckURL string
 	ID       string
+	Method   string
+	Headers  map[string]string
+	Body     string
 	MetaData map[string]string
 }
 
@@ -128,7 +132,28 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL, toCheck.ID)
 
 	t1 := time.Now()
-	response, err := http.Get(toCheck.CheckURL)
+
+	var response *http.Response
+	var respErr error
+
+	if toCheck.Method == "" {
+		response, respErr = http.Get(toCheck.CheckURL)
+	} else {
+		client := &http.Client{}
+
+		var body = []byte(toCheck.Body)
+		req, err := http.NewRequest(toCheck.Method, toCheck.CheckURL, bytes.NewBuffer(body))
+		if err != nil {
+			log.Error("Could not create request: ", err)
+			return
+		}
+		for header_name, header_value := range toCheck.Headers {
+			req.Header.Set(header_name, header_value)
+		}
+
+		response, respErr = client.Do(req)
+	}
+
 	t2 := time.Now()
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
@@ -138,7 +163,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		Latency:  millisec,
 	}
 
-	if err != nil {
+	if respErr != nil {
 		report.IsTCPError = true
 		h.errorChan <- report
 		return
@@ -258,10 +283,4 @@ func hostcheck_example() {
 	poller.Start()
 	defer poller.Stop()
 
-	// Lets add some hosts to scan
-	time.Sleep(1 * time.Second)
-	poller.AddHost(HostData{"http://sharrow.tyk.io:3000/", "10", map[string]string{}})
-
-	// Lets run for a bit before exiting
-	time.Sleep(240 * time.Second)
 }

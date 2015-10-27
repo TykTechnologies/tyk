@@ -1,6 +1,7 @@
 package main
 
 import (
+	b64 "encoding/base64"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/tykcommon"
 	"net/url"
@@ -143,7 +144,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 			HostInfo:         report,
 		})
 
-	log.Warning("[HOST CHECKER MANAGER] Host is down: ", report.CheckURL)
+	log.Warning("[HOST CHECKER MANAGER] Host is DOWN: ", report.CheckURL)
 }
 
 func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
@@ -161,7 +162,7 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 			HostInfo:         report,
 		})
 
-	log.Warning("[HOST CHECKER MANAGER] Host is back up: ", report.CheckURL)
+	log.Warning("[HOST CHECKER MANAGER] Host is UP:   ", report.CheckURL)
 }
 
 func (hc *HostCheckerManager) IsHostDown(thisUrl string) bool {
@@ -181,17 +182,34 @@ func (hc *HostCheckerManager) IsHostDown(thisUrl string) bool {
 	return false
 }
 
-func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostCheckObject, APIID string) HostData {
+func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostCheckObject, APIID string) (HostData, error) {
 	// Build the check URL:
+	var thisHostData HostData
 	u, err := url.Parse(checkObject.CheckURL)
 	if err != nil {
 		log.Error(err)
+		return thisHostData, err
 	}
 
-	thisHostData := HostData{
+	var bodyData string
+	var bodyByteArr []byte
+	var loadErr error
+	if len(checkObject.Body) > 0 {
+		bodyByteArr, loadErr = b64.StdEncoding.DecodeString(checkObject.Body)
+		if loadErr != nil {
+			log.Error("Failed to load blob data: ", loadErr)
+			return thisHostData, loadErr
+		}
+		bodyData = string(bodyByteArr)
+	}
+
+	thisHostData = HostData{
 		CheckURL: checkObject.CheckURL,
 		ID:       checkObject.CheckURL,
 		MetaData: make(map[string]string),
+		Method:   checkObject.Method,
+		Headers:  checkObject.Headers,
+		Body:     bodyData,
 	}
 
 	// Add our specific metadata
@@ -199,7 +217,7 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostChec
 	thisHostData.MetaData[UnHealthyHostMetaDataAPIKey] = APIID
 	thisHostData.MetaData[UnHealthyHostMetaDataHostKey] = u.Host
 
-	return thisHostData
+	return thisHostData, nil
 }
 
 func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
@@ -227,23 +245,40 @@ func SetCheckerHostList() {
 	hostList := []HostData{}
 	for _, spec := range ApiSpecRegister {
 		for _, checkItem := range spec.UptimeTests.CheckList {
-			hostList = append(hostList, GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID))
-			log.Info("---> Adding uptime test: ", checkItem.CheckURL)
+			newHostDoc, hdGenErr := GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
+			if hdGenErr == nil {
+				hostList = append(hostList, newHostDoc)
+				log.Info("---> Adding uptime test: ", checkItem.CheckURL)
+			} else {
+				log.Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
+				log.Warning("--------> Error was: ", hdGenErr)
+			}
+
 		}
 	}
 
 	GlobalHostChecker.UpdateTrackingList(hostList)
-
-	// Test fubctions
-	// go func() {
-	// 	time.Sleep(30 * time.Second)
-	// 	isDown := GlobalHostChecker.IsHostDown("http://sharrow.tyk.io:3000/banana/phone")
-	// 	log.Warning("IS IT DOWN? ", isDown)
-	// 	time.Sleep(30 * time.Second)
-
-	// 	isDown2 := GlobalHostChecker.IsHostDown("http://sharrow.tyk.io:3000/banana/phone")
-	// 	log.Warning("IS IT DOWN Now? ", isDown2)
-
-	// }()
-
 }
+
+/*
+
+## TEST CONFIGURATION
+
+uptime_tests: {
+    check_list: [
+      {
+        "url": "http://google.com:3000/"
+      },
+      {
+        "url": "http://posttestserver.com/post.php?dir=tyk-checker-target-test&beep=boop",
+        "method": "POST",
+        "headers": {
+          "this": "that",
+          "more": "beans"
+        },
+        "body": "VEhJUyBJUyBBIEJPRFkgT0JKRUNUIFRFWFQNCg0KTW9yZSBzdHVmZiBoZXJl"
+      }
+    ]
+  },
+
+*/
