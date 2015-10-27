@@ -34,6 +34,7 @@ type HostHealthReport struct {
 type HostUptimeChecker struct {
 	failureCallback    func(HostHealthReport)
 	upCallback         func(HostHealthReport)
+	pingCallback       func(HostHealthReport)
 	workerPoolSize     int
 	sampleTriggerLimit int
 	checkTimout        int
@@ -98,6 +99,7 @@ func (h *HostUptimeChecker) HostReporter() {
 				h.upCallback(okHost)
 				delete(h.unHealthyList, okHost.ID)
 			}
+			go h.pingCallback(okHost)
 
 		case failedHost := <-h.errorChan:
 
@@ -120,6 +122,7 @@ func (h *HostUptimeChecker) HostReporter() {
 					go h.failureCallback(failedHost)
 				}
 			}
+			go h.pingCallback(failedHost)
 
 		case <-h.stopPollingChan:
 			log.Debug("[HOST CHECKER] Received kill signal")
@@ -180,7 +183,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	h.okChan <- report
 }
 
-func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback func(HostHealthReport), upCallback func(HostHealthReport)) {
+func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList map[string]HostData, failureCallback func(HostHealthReport), upCallback func(HostHealthReport), pingCallback func(HostHealthReport)) {
 	h.sampleCache = cache.New(30*time.Second, 5*time.Second)
 	h.stopPollingChan = make(chan bool)
 	h.errorChan = make(chan HostHealthReport)
@@ -189,6 +192,7 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	h.unHealthyList = make(map[string]bool)
 	h.failureCallback = failureCallback
 	h.upCallback = upCallback
+	h.pingCallback = pingCallback
 
 	h.workerPoolSize = workers
 	if workers == 0 {
@@ -277,6 +281,9 @@ func hostcheck_example() {
 		// On success
 		func(fr HostHealthReport) {
 			log.Info("Host is back up! URL: ", fr.CheckURL)
+		},
+		func(fr HostHealthReport) {
+			log.Info("Host report, URL: ", fr.CheckURL)
 		})
 
 	// Start the check loop

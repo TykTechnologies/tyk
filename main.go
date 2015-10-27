@@ -62,6 +62,10 @@ func setupGlobals() {
 		log.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
+	// Initialise our Host Checker
+	HealthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
+	InitHostCheckManager(HealthCheckStore, nil)
+
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
 		AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
@@ -77,7 +81,8 @@ func setupGlobals() {
 
 		} else if config.AnalyticsConfig.Type == "mongo" {
 			log.Debug("Using MongoDB cache purge")
-			analytics.Clean = &MongoPurger{&AnalyticsStore, nil}
+			analytics.Clean = &MongoPurger{&AnalyticsStore, nil, "", ""}
+			GlobalHostChecker.Clean = &MongoUptimePurger{HealthCheckStore, nil, "tyk_uptime_analytics", UptimeAnalytics_KEYNAME}
 		} else if config.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
 			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
@@ -806,9 +811,6 @@ func main() {
 		go RPCReloadLoop(config.SlaveOptions.RPCKey)
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
-
-	// Initialise our Host Checker
-	InitHostCheckManager(GetGlobalStorageHandler("host-checker:", false))
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()

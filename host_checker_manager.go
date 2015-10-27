@@ -4,6 +4,7 @@ import (
 	b64 "encoding/base64"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/tykcommon"
+	"gopkg.in/vmihailenco/msgpack.v2"
 	"net/url"
 	"time"
 )
@@ -12,12 +13,44 @@ var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
 	Id                string
-	store             StorageHandler
+	store             *RedisClusterStorageManager
 	checker           *HostUptimeChecker
 	stopLoop          bool
 	pollerStarted     bool
 	unhealthyHostList map[string]bool
 	currentHostList   map[string]HostData
+	Clean             Purger
+}
+
+type UptimeReportData struct {
+	URL          string
+	RequestTime  int64
+	ResponseCode int
+	TCPError     bool
+	ServerError  bool
+	Day          int
+	Month        time.Month
+	Year         int
+	Hour         int
+	TimeStamp    time.Time
+	ExpireAt     time.Time `bson:"expireAt" json:"expireAt"`
+	APIID        string
+	OrgID        string
+}
+
+func (u *UptimeReportData) SetExpiry(expiresInSeconds int64) {
+	var expiry time.Duration
+
+	expiry = time.Duration(expiresInSeconds) * time.Second
+
+	if expiresInSeconds == 0 {
+		// Expiry is set to 100 years
+		expiry = (24 * time.Hour) * (365 * 100)
+	}
+
+	t := time.Now()
+	t2 := t.Add(expiry)
+	u.ExpireAt = t2
 }
 
 const (
@@ -26,9 +59,11 @@ const (
 	UnHealthyHostMetaDataHostKey   string = "host_name"
 	PollerCacheKey                 string = "PollerActiveInstanceID"
 	PoolerHostSentinelKeyPrefix    string = "PollerCheckerInstance:"
+
+	UptimeAnalytics_KEYNAME string = "tyk-uptime-analytics"
 )
 
-func (hc *HostCheckerManager) Init(store StorageHandler) {
+func (hc *HostCheckerManager) Init(store *RedisClusterStorageManager) {
 	hc.store = store
 	hc.unhealthyHostList = make(map[string]bool)
 	// Generate a new ID for ourselves
@@ -39,6 +74,9 @@ func (hc *HostCheckerManager) Start() {
 	// Start loop to check if we are active instance
 	if hc.Id != "" {
 		go hc.CheckActivePollerLoop()
+		if config.UptimeTests.Config.EnableUptimeAnalytics {
+			go hc.UptimePurgeLoop()
+		}
 	}
 }
 
@@ -69,6 +107,24 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 		}
 
 		time.Sleep(10 * time.Second)
+	}
+}
+
+func (hc *HostCheckerManager) UptimePurgeLoop() {
+	if config.AnalyticsConfig.PurgeDelay == -1 {
+		log.Warning("Analytics purge turned off, you are responsible for Redis storage maintenance.")
+		return
+	}
+	log.Debug("[HOST CHECK MANAGER] Started analytics purge loop")
+	for {
+		if hc.pollerStarted {
+			if hc.Clean != nil {
+				log.Debug("[HOST CHECK MANAGER] Purging uptime analytics")
+				hc.Clean.PurgeCache()
+			}
+
+		}
+		time.Sleep(time.Duration(config.AnalyticsConfig.PurgeDelay) * time.Second)
 	}
 }
 
@@ -110,7 +166,8 @@ func (hc *HostCheckerManager) StartPoller() {
 		config.UptimeTests.Config.TimeWait,
 		hc.currentHostList,
 		hc.OnHostDown,   // On failure
-		hc.OnHostBackUp) // On success
+		hc.OnHostBackUp, // On success
+		hc.OnHostReport) // All reports
 
 	// Start the check loop
 	log.Debug("---> Starting checker")
@@ -126,6 +183,12 @@ func (hc *HostCheckerManager) StopPoller() {
 
 func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 	return PoolerHostSentinelKeyPrefix + report.MetaData[UnHealthyHostMetaDataHostKey]
+}
+
+func (hc *HostCheckerManager) OnHostReport(report HostHealthReport) {
+	if config.UptimeTests.Config.EnableUptimeAnalytics {
+		go hc.RecordUptimeAnalytics(report)
+	}
 }
 
 func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
@@ -234,8 +297,53 @@ func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
 	}
 }
 
-func InitHostCheckManager(store StorageHandler) {
+// RecordHit will store an AnalyticsRecord in Redis
+func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) error {
+	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
+
+	thisSpec, found := ApiSpecRegister[thisReport.MetaData[UnHealthyHostMetaDataAPIKey]]
+	thisOrg := ""
+	if found {
+		thisOrg = thisSpec.OrgID
+	}
+
+	t := time.Now()
+
+	var serverError bool
+	if thisReport.ResponseCode > 200 {
+		serverError = true
+	}
+	newAnalyticsRecord := UptimeReportData{
+		URL:          thisReport.CheckURL,
+		RequestTime:  int64(thisReport.Latency),
+		ResponseCode: thisReport.ResponseCode,
+		TCPError:     thisReport.IsTCPError,
+		ServerError:  serverError,
+		Day:          t.Day(),
+		Month:        t.Month(),
+		Year:         t.Year(),
+		Hour:         t.Hour(),
+		TimeStamp:    t,
+		APIID:        thisReport.MetaData[UnHealthyHostMetaDataAPIKey],
+		OrgID:        thisOrg,
+	}
+
+	newAnalyticsRecord.SetExpiry(thisSpec.UptimeTests.Config.ExpireUptimeAnalyticsAfter)
+
+	encoded, err := msgpack.Marshal(newAnalyticsRecord)
+
+	if err != nil {
+		log.Error("Error encoding uptime data:", err)
+		return err
+	}
+
+	hc.store.AppendToSet(UptimeAnalytics_KEYNAME, string(encoded))
+	return nil
+}
+
+func InitHostCheckManager(store *RedisClusterStorageManager, purger Purger) {
 	GlobalHostChecker = HostCheckerManager{}
+	GlobalHostChecker.Clean = purger
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start()
 }

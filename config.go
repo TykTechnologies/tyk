@@ -109,9 +109,10 @@ type Config struct {
 	UptimeTests struct {
 		Disable bool `json:"disable"`
 		Config  struct {
-			FailureTriggerSampleSize int `json:"failure_trigger_sample_size"`
-			TimeWait                 int `json:"time_wait"`
-			CheckerPoolSize          int `json:"checker_pool_size"`
+			FailureTriggerSampleSize int  `json:"failure_trigger_sample_size"`
+			TimeWait                 int  `json:"time_wait"`
+			CheckerPoolSize          int  `json:"checker_pool_size"`
+			EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
 		} `json:"config"`
 	} `json:"uptime_tests"`
 }

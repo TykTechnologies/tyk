@@ -32,7 +32,7 @@ func NewRedisClusterPool(forceReconnect bool) *rediscluster.RedisCluster {
 		}
 	}
 
-	log.Info("Creating new Redis connection pool")
+	log.Debug("Creating new Redis connection pool")
 
 	maxIdle := 100
 	if config.Storage.MaxIdle > 0 {
