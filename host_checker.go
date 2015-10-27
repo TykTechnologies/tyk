@@ -139,7 +139,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	if toCheck.Method == "" {
 		response, respErr = http.Get(toCheck.CheckURL)
 	} else {
-		client := &http.Client{}
+		client := &http.Client{Timeout: 500 * time.Millisecond}
 
 		var body = []byte(toCheck.Body)
 		req, err := http.NewRequest(toCheck.Method, toCheck.CheckURL, bytes.NewBuffer(body))
