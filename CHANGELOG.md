@@ -43,6 +43,50 @@
 - Tyk JWT's MUST use the "kid" header attribute, as this is the internal access token (when creating a key) that is used to set the rate limits, policies and quotas for the user. The benefit here is that if RSA is used, then al that is stored in a Tyk installatino that uses hashed keys is the hashed ID of the end user and their public key, and so very secure.
 - Fixed OAuth Password flow bug where a user could generate more than one token for the same API
 
+- Added realtime uptime monitoring, uptime monitoring means you can create a series of check requests for your upstream hosts (they do not need to be the same as the APIs being managed), and have the gateway poll them for uptime, if a host goes down (non-200 code or TCP Error) then an Event is fired (`HostDown`), when it goes back up again another event is fired (`HostUp`), this can be combined with the webhook feature for realtime alerts
+- Realtime monitoring also records statistics to the database so they can be analyised or graphed later
+- Real time monitoring can also be hooked into the load balancer to have the load balancer skip bad hosts for dynamic configuration
+- When hosts go up and down, sentinels are activated in Redis so all nodes in a Tyk cluster can benefit
+- Only one Tyk node will ever do the polling, they use a rudimentary capture-the-flag redis key to identify who is the uptime tester
+- Monitoring can also be disabled if you want a non-active node to manage uptime tests and analytics purging
+- The uptime test list can be refreshed live by hot-reloading Tyk
+- Active monitoring can be used together with Circuit breaker to have the circuit breaker manage failing methods, while the uptime test can take a whole host offline if it becomes unresponsive
+- To configure uptime tests, in your tyk.conf:
+
+	```
+	"uptime_tests": {
+        "disable": false, // disable uptime tests on the node completely
+        "config": {
+            "enable_uptime_analytics": true,
+            "failure_trigger_sample_size": 1,
+            "time_wait": 5,
+            "checker_pool_size": 50
+        }
+    }
+    ```
+
+- Check lists usually sit with API configurations, so in your API Definition:
+
+	```
+	uptime_tests: {
+	    check_list: [
+	      {
+	        "url": "http://google.com:3000/"
+	      },
+	      {
+	        "url": "http://posttestserver.com/post.php?dir=tyk-checker-target-test&beep=boop",
+	        "method": "POST",
+	        "headers": {
+	          "this": "that",
+	          "more": "beans"
+	        },
+	        "body": "VEhJUyBJUyBBIEJPRFkgT0JKRUNUIFRFWFQNCg0KTW9yZSBzdHVmZiBoZXJl"
+	      }
+	    ]
+	  },
+	  ```
+
+- The body is base64 encoded in the second example, the first example will perform a simple GET, NOTE: using the simplified form will not enforce a timeout, while the more verbose form will fail with a 500ms timeout.
 
 # 1.8.3.2
 
