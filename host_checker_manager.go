@@ -16,6 +16,7 @@ type HostCheckerManager struct {
 	stopLoop          bool
 	pollerStarted     bool
 	unhealthyHostList map[string]bool
+	currentHostList   map[string]HostData
 }
 
 const (
@@ -47,20 +48,23 @@ func (hc *HostCheckerManager) GenerateCheckerId() {
 func (hc *HostCheckerManager) CheckActivePollerLoop() {
 	for {
 		if hc.stopLoop {
-			log.Info("[HOST CHECK MANAGER] Stopping uptime tests")
+			log.Debug("[HOST CHECK MANAGER] Stopping uptime tests")
 			break
 		}
 
 		// If I'm polling, lets start the loop
 		if hc.AmIPolling() {
 			if !hc.pollerStarted {
+				log.Debug("[HOST CHECK MANAGER] Starting Poller")
 				hc.pollerStarted = true
 				go hc.StartPoller()
 			}
 		} else {
-			log.Info("[HOST CHECK MANAGER] New master found, stopping uptime tests")
-			go hc.StopPoller()
-			hc.pollerStarted = false
+			log.Debug("[HOST CHECK MANAGER] New master found, stopping uptime tests")
+			if hc.pollerStarted {
+				go hc.StopPoller()
+				hc.pollerStarted = false
+			}
 		}
 
 		time.Sleep(10 * time.Second)
@@ -85,25 +89,25 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		return true
 	}
 
+	log.Debug("Active Instance is: ", ActiveInstance)
+	log.Debug("--- I am: ", hc.Id)
+
 	return false
 }
 
 func (hc *HostCheckerManager) StartPoller() {
 
 	log.Debug("---> Initialising checker")
-	hostList := map[string]HostData{}
 
 	// If we are restarting, we want to retain the host list
 	if hc.checker == nil {
 		hc.checker = &HostUptimeChecker{}
-	} else {
-		hostList = hc.checker.HostList
 	}
 
 	hc.checker.Init(config.UptimeTests.Config.CheckerPoolSize,
 		config.UptimeTests.Config.FailureTriggerSampleSize,
 		config.UptimeTests.Config.TimeWait,
-		hostList,
+		hc.currentHostList,
 		hc.OnHostDown,   // On failure
 		hc.OnHostBackUp) // On success
 
@@ -170,10 +174,11 @@ func (hc *HostCheckerManager) IsHostDown(thisUrl string) bool {
 	_, fErr := hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
 
 	if fErr != nil {
-		return false
+		// Found a key, the host is down
+		return true
 	}
 
-	return true
+	return false
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostCheckObject, APIID string) HostData {
@@ -204,6 +209,7 @@ func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
 		newHostList[host.CheckURL] = host
 	}
 
+	hc.currentHostList = newHostList
 	if hc.checker != nil {
 		log.Debug("Reset initiated")
 		hc.checker.ResetList(&newHostList)

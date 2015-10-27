@@ -107,10 +107,11 @@ type Config struct {
 		SessionProvider      tykcommon.SessionProviderMeta `json:"session_provider"`
 	} `json:"auth_override"`
 	UptimeTests struct {
-		Config struct {
+		Disable bool `json:"disable"`
+		Config  struct {
 			FailureTriggerSampleSize int `json:"failure_trigger_sample_size"`
-			TimeWait int `json:"time_wait"`
-			CheckerPoolSize int `json:"checker_pool_size"`
+			TimeWait                 int `json:"time_wait"`
+			CheckerPoolSize          int `json:"checker_pool_size"`
 		} `json:"config"`
 	} `json:"uptime_tests"`
 }

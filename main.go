@@ -595,7 +595,9 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 	ApiSpecRegister = tempSpecRegister
 
 	// Kick off our host checkers
-	SetCheckerHostList()
+	if config.UptimeTests.Disable == false {
+		SetCheckerHostList()
+	}
 
 }
 

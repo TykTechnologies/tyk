@@ -236,7 +236,10 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	go s.RecordHit(w, r, int64(millisec), resp.StatusCode)
+	if resp != nil {
+		go s.RecordHit(w, r, int64(millisec), resp.StatusCode)
+	}
+
 	return nil
 }
 
@@ -256,7 +259,9 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	go s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
+	if inRes != nil {
+		go s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
+	}
 
 	return inRes
 }
