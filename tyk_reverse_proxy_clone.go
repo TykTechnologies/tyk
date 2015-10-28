@@ -25,7 +25,7 @@ var ServiceCache *cache.Cache
 
 func GetURLFromService(spec *APISpec) (interface{}, error) {
 	sd := ServiceDiscovery{}
-	sd.New(spec)
+	sd.New(&spec.Proxy.ServiceDiscovery)
 	data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 
 	return data, err

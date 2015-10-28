@@ -70,12 +70,6 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 		if h.stopLoop {
 			break
 		}
-		for _, host := range h.HostList {
-			_, err := h.pool.SendWork(host)
-			if err != nil {
-				log.Error("[HOST CHECKER] could not send work, error: %v", err)
-			}
-		}
 		if h.doResetList {
 			if h.newList != nil {
 				h.HostList = *h.newList
@@ -84,6 +78,13 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 				log.Debug("[HOST CHECKER] Host list reset")
 			}
 		}
+		for _, host := range h.HostList {
+			_, err := h.pool.SendWork(host)
+			if err != nil {
+				log.Error("[HOST CHECKER] could not send work, error: %v", err)
+			}
+		}
+
 		time.Sleep(h.getStaggeredTime())
 	}
 	log.Info("[HOST CHECKER] Checker stopped")

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/lonelycode/gabs"
+	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 const ARRAY_NAME string = "tyk_array"
 
 type ServiceDiscovery struct {
-	spec                *APISpec
+	spec                *tykcommon.ServiceDiscoveryConfiguration
 	isNested            bool
 	isTargetList        bool
 	endpointReturnsList bool
@@ -22,26 +23,27 @@ type ServiceDiscovery struct {
 	portPath            string
 }
 
-func (s *ServiceDiscovery) New(spec *APISpec) {
+func (s *ServiceDiscovery) New(spec *tykcommon.ServiceDiscoveryConfiguration) {
 	s.spec = spec
-	s.isNested = spec.Proxy.ServiceDiscovery.UseNestedQuery
-	s.isTargetList = spec.Proxy.ServiceDiscovery.UseTargetList
-	s.endpointReturnsList = spec.Proxy.ServiceDiscovery.EndpointReturnsList
-	if spec.Proxy.ServiceDiscovery.PortDataPath != "" {
+	s.isNested = spec.UseNestedQuery
+	s.isTargetList = spec.UseTargetList
+	s.endpointReturnsList = spec.EndpointReturnsList
+
+	if spec.PortDataPath != "" {
 		s.portSeperate = true
-		s.portPath = spec.Proxy.ServiceDiscovery.PortDataPath
+		s.portPath = spec.PortDataPath
 	}
 
-	if spec.Proxy.ServiceDiscovery.ParentDataPath != "" {
-		s.parentPath = spec.Proxy.ServiceDiscovery.ParentDataPath
+	if spec.ParentDataPath != "" {
+		s.parentPath = spec.ParentDataPath
 	}
 
-	s.dataPath = spec.Proxy.ServiceDiscovery.DataPath
+	s.dataPath = spec.DataPath
 }
 
 func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	log.Debug("Getting ", name)
-	resp, err := http.Get(s.spec.Proxy.ServiceDiscovery.QueryEndpoint)
+	resp, err := http.Get(name)
 	if err != nil {
 		return "", err
 	}

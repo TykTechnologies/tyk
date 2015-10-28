@@ -2,6 +2,8 @@ package main
 
 import (
 	b64 "encoding/base64"
+	"encoding/json"
+	"errors"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/tykcommon"
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -19,6 +21,7 @@ type HostCheckerManager struct {
 	pollerStarted     bool
 	unhealthyHostList map[string]bool
 	currentHostList   map[string]HostData
+	resetsInitiated   map[string]bool
 	Clean             Purger
 }
 
@@ -66,6 +69,7 @@ const (
 func (hc *HostCheckerManager) Init(store *RedisClusterStorageManager) {
 	hc.store = store
 	hc.unhealthyHostList = make(map[string]bool)
+	hc.resetsInitiated = make(map[string]bool)
 	// Generate a new ID for ourselves
 	hc.GenerateCheckerId()
 }
@@ -208,6 +212,23 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 		})
 
 	log.Warning("[HOST CHECKER MANAGER] Host is DOWN: ", report.CheckURL)
+
+	if thisSpec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
+		thisApiId := thisSpec.APIID
+
+		// only do this once
+		_, initiated := hc.resetsInitiated[thisApiId]
+		if !initiated {
+			hc.resetsInitiated[thisApiId] = true
+			// Lets re-check the uptime tests after x seconds
+			go func() {
+				log.Printf("[HOST CHECKER MANAGER] Resetting test host list in %v seconds for API: %v", thisSpec.UptimeTests.Config.RecheckWait, thisApiId)
+				time.Sleep(time.Duration(thisSpec.UptimeTests.Config.RecheckWait) * time.Second)
+				hc.DoServiceDiscoveryListUpdateForID(thisApiId)
+				delete(hc.resetsInitiated, thisApiId)
+			}()
+		}
+	}
 }
 
 func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
@@ -297,6 +318,77 @@ func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
 	}
 }
 
+func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId string) {
+	log.Debug("--- Setting tracking list up for ID: ", apiId)
+	newHostList := make(map[string]HostData)
+
+	for _, existingHost := range hc.currentHostList {
+		if existingHost.MetaData[UnHealthyHostMetaDataAPIKey] != apiId {
+			// Add the old check list that excludes this API
+			newHostList[existingHost.CheckURL] = existingHost
+		}
+	}
+
+	// Add the new list for this APIID:
+	for _, host := range hd {
+		newHostList[host.CheckURL] = host
+	}
+
+	hc.currentHostList = newHostList
+	if hc.checker != nil {
+		log.Debug("Reset initiated")
+		hc.checker.ResetList(&newHostList)
+	}
+	log.Info("--- Queued tracking list update for API: ", apiId)
+}
+
+func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
+	spec, found := ApiSpecRegister[APIID]
+	if !found {
+		return []HostData{}, errors.New("PI ID not found in register!")
+	}
+	sd := ServiceDiscovery{}
+	sd.New(&spec.UptimeTests.Config.ServiceDiscovery)
+	data, err := sd.GetTarget(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
+
+	if err != nil {
+		log.Error("[HOST CHECKER MANAGER] Failed to retrieve host list: ", err)
+		return []HostData{}, err
+	}
+
+	// The returned data is a string, so lets unmarshal it:
+	checkTargets := make([]tykcommon.HostCheckObject, 0)
+	decodeErr := json.Unmarshal([]byte(data.(string)), &checkTargets)
+
+	if decodeErr != nil {
+		log.Error("[HOST CHECKER MANAGER] Decoder failed: ", decodeErr)
+		return []HostData{}, decodeErr
+	}
+
+	thisHostData := make([]HostData, len(checkTargets))
+	for i, target := range checkTargets {
+		newHostDoc, hdGenErr := GlobalHostChecker.PrepareTrackingHost(target, spec.APIID)
+		if hdGenErr != nil {
+			log.Error("[HOST CHECKER MANAGER] failed to convert to HostData", err)
+		} else {
+			thisHostData[i] = newHostDoc
+		}
+	}
+	return thisHostData, nil
+}
+
+func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(APIID string) {
+	log.Debug("[HOST CHECKER MANAGER] Getting data from service")
+	hostData, err := hc.GetListFromService(APIID)
+	if err != nil {
+		return
+	}
+
+	log.Debug("[HOST CHECKER MANAGER] Data was: \n", hostData)
+	log.Info("[HOST CHECKER MANAGER] Refreshing uptime tests from service for API: ", APIID)
+	hc.UpdateTrackingListByAPIID(hostData, APIID)
+}
+
 // RecordHit will store an AnalyticsRecord in Redis
 func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
@@ -352,16 +444,26 @@ func SetCheckerHostList() {
 	log.Info("Loading uptime tests:")
 	hostList := []HostData{}
 	for _, spec := range ApiSpecRegister {
-		for _, checkItem := range spec.UptimeTests.CheckList {
-			newHostDoc, hdGenErr := GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
-			if hdGenErr == nil {
-				hostList = append(hostList, newHostDoc)
-				log.Info("---> Adding uptime test: ", checkItem.CheckURL)
-			} else {
-				log.Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
-				log.Warning("--------> Error was: ", hdGenErr)
+		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
+			thisHostList, sdErr := GlobalHostChecker.GetListFromService(spec.APIID)
+			if sdErr == nil {
+				hostList = append(hostList, thisHostList...)
+				for _, t := range thisHostList {
+					log.Info("---> Adding uptime test: ", t.CheckURL)
+				}
 			}
+		} else {
+			for _, checkItem := range spec.UptimeTests.CheckList {
+				newHostDoc, hdGenErr := GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
+				if hdGenErr == nil {
+					hostList = append(hostList, newHostDoc)
+					log.Info("---> Adding uptime test: ", checkItem.CheckURL)
+				} else {
+					log.Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
+					log.Warning("--------> Error was: ", hdGenErr)
+				}
 
+			}
 		}
 	}
 
