@@ -87,6 +87,25 @@
 	  ```
 
 - The body is base64 encoded in the second example, the first example will perform a simple GET, NOTE: using the simplified form will not enforce a timeout, while the more verbose form will fail with a 500ms timeout.
+- Uptime tests can be configured from a service (e.g. etcd or consul), simply set this up in the API Definition (this is etcd):
+
+	```
+	"uptime_tests": {
+	    "check_list": [],
+	    "config": {
+	      "recheck_wait": 12,
+	      "service_discovery": {
+	        "use_discovery_service": true,
+	        "query_endpoint": "http://127.0.0.1:4001/v2/keys/uptimeTest",
+	        "data_path": "node.value"
+	      }
+	    }
+	},
+	```
+- Uptime tests by service discovery will load initially from the endpoint, then they will hit the endpoint again after recheck_wait to reload the tests for this API. If used in conjunction with upstream target service discovery it enables dynamic reconfiguring (and monitoring) of services.
+- The document that Tyk requires is a JSON string encoded version of the `check_list` parameter of the `uptime_tests` field, for etcd:
+
+	curl -L http://127.0.0.1:4001/v2/keys/uptimeTest -XPUT -d value='[{"url": "http://domain.com:3000/"}]'
 
 # 1.8.3.2
 
