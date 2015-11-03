@@ -71,7 +71,14 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 
 	vInfo, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
 
-	// Manage lobal headers first
+	// Manage global headers first - remove
+	if len(vInfo.GlobalHeadersRemove) > 0 {
+		for _, gdKey := range vInfo.GlobalHeaders {
+			r.Header.Del(gdKey)
+		}
+	}
+
+	// Add
 	if len(vInfo.GlobalHeaders) > 0 {
 		t.iterateAddHeaders(vInfo.GlobalHeaders, r)
 	}
