@@ -108,6 +108,7 @@
 
 	curl -L http://127.0.0.1:4001/v2/keys/uptimeTest -XPUT -d value='[{"url": "http://domain.com:3000/"}]'
 
+- Fixed a bug where incorrect version data would be recorded in analytics for APis that use the first URL parameter as the version (domain.com/v1/blah) 
 # 1.8.3.2
 
 - Enabled password grant type in OAuth:
