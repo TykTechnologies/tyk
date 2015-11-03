@@ -14,6 +14,7 @@
 - Proxy now records accurate status codes for upstream requests for better error reporting
 - Added refresh token invalidation API: `DELETE /tyk/oauth/refresh/{key}?api_id={api_id}`
 - Global header injection now works, can be enabled on a per-version basis by adding `global_headers:{"header_name": "header value"}` to the version object in the API Definition, global injections also supports key metadata variables.
+- Global header deletion now works: add `"global_headers_remove":["header_name", "header_name"] to your version object
 - Added request size limiter, request size limiter middleware will insist on content-length to be set, and check first against content-length value, and then actual request size value. To implement, add this to your version info:
 
 	"size_limits": [
