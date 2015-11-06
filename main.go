@@ -62,7 +62,6 @@ func displayConfig() {
 func getHostName() string {
 	hName := config.HostName
 	if config.HostName == "" {
-		log.Warning("No hostname set!")
 		hName = ""
 	}
 
@@ -420,12 +419,17 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 
 		onDomains, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
 		if listenPathExists {
-			for _, onDomain := range onDomains {
-				log.Debug("Checking Domain: ", onDomain)
-				if onDomain == referenceSpec.Domain {
-					log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
-					skip = true
-					break
+			if config.EnableCustomDomains == false {
+				log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
+				skip = true
+			} else {
+				for _, onDomain := range onDomains {
+					log.Debug("Checking Domain: ", onDomain)
+					if onDomain == referenceSpec.Domain {
+						log.Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
+						skip = true
+						break
+					}
 				}
 			}
 		}
