@@ -395,7 +395,7 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
 
-	listenPaths := make(map[string]bool)
+	listenPaths := make(map[string][]string)
 
 	// Create a new handler for each API spec
 	for apiIndex, _ := range APISpecs {
@@ -418,10 +418,16 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 			subrouter = Muxer
 		}
 
-		_, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
+		onDomains, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
 		if listenPathExists {
-			log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
-			skip = true
+			for _, onDomain := range onDomains {
+				log.Debug("Checking Domain: ", onDomain)
+				if onDomain == referenceSpec.Domain {
+					log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
+					skip = true
+					break
+				}
+			}
 		}
 
 		if referenceSpec.Proxy.ListenPath == "" {
@@ -441,7 +447,9 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 
 		if !skip {
 
-			listenPaths[referenceSpec.Proxy.ListenPath] = true
+			listenPaths[referenceSpec.Proxy.ListenPath] = append(listenPaths[referenceSpec.Proxy.ListenPath], referenceSpec.Domain)
+			log.Debug("Tracking: ", referenceSpec.Domain)
+
 			// Initialise the auth and session managers (use Redis for now)
 			var authStore StorageHandler
 			var sessionStore StorageHandler
