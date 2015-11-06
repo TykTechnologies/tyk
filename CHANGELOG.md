@@ -108,7 +108,15 @@
 
 	curl -L http://127.0.0.1:4001/v2/keys/uptimeTest -XPUT -d value='[{"url": "http://domain.com:3000/"}]'
 
-- Fixed a bug where incorrect version data would be recorded in analytics for APis that use the first URL parameter as the version (domain.com/v1/blah) 
+- Fixed a bug where incorrect version data would be recorded in analytics for APis that use the first URL parameter as the version (domain.com/v1/blah)
+- Added domain name support (removes requirement for host manager). The main Tyk instance can have a hostname (e.g. apis.domain.com), and API Definitions can support their own domains (e.g. mycoolservice.com), multiple API definitions can have the same domain name so long as their listen_paths do not clash (so you can API 1 on mycoolservice.com/api1 and API 2 on mycoolservice.com/api2 if you set the listen_path for API 1 and API2 respectively.)
+- Domains are loaded dynamically and strictly matched, so if calls for a listen path or API ID on the main tyk hostname will not work for APIs that have custom domain names set, this means services can be nicely segregated.
+- If the hostname is blank, then the router is open and anything will be matched (if you are using host manager, this is the option you want as it leaves domain routing up to NginX downstream)
+- Set up the main tyk instance hostname by adding `"hostname": "domain.com"` to the config
+- Enable custom api-specific domains by setting `enable_custome_domains` in the tyk.conf to true
+- Make an API use a custom domain by adding a `domain` element to the root object
+- Cusotm domains will work with your SSL certs
+
 # 1.8.3.2
 
 - Enabled password grant type in OAuth:

@@ -62,8 +62,8 @@ func displayConfig() {
 func getHostName() string {
 	hName := config.HostName
 	if config.HostName == "" {
-		log.Warning("No hostname set, using localhost")
-		hName = "localhost"
+		log.Warning("No hostname set!")
+		hName = ""
 	}
 
 	return hName
@@ -76,7 +76,12 @@ func pingTest(w http.ResponseWriter, r *http.Request) {
 // Create all globals and init connection handlers
 func setupGlobals() {
 	mainRouter = mux.NewRouter()
-	defaultRouter = mainRouter.Host(getHostName()).Subrouter()
+	if getHostName() != "" {
+		defaultRouter = mainRouter.Host(getHostName()).Subrouter()
+	} else {
+		defaultRouter = mainRouter
+	}
+
 	log.Info("Hostname set: ", getHostName())
 
 	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
@@ -402,9 +407,13 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 
 		// Handle custom domains
 		var subrouter *mux.Router
-		if referenceSpec.Domain != "" {
-			log.Info("----> Custom Domain: ", referenceSpec.Domain)
-			subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
+		if config.EnableCustomDomains {
+			if referenceSpec.Domain != "" {
+				log.Info("----> Custom Domain: ", referenceSpec.Domain)
+				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
+			} else {
+				subrouter = Muxer
+			}
 		} else {
 			subrouter = Muxer
 		}
@@ -661,7 +670,13 @@ func ReloadURLStructure() {
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
 
-	newMuxes := newRouter.Host(getHostName()).Subrouter()
+	var newMuxes *mux.Router
+	if getHostName() != "" {
+		newMuxes = newRouter.Host(getHostName()).Subrouter()
+	} else {
+		newMuxes = newRouter
+	}
+
 	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()
 	loadApps(specs, newMuxes)

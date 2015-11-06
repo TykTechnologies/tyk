@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"io/ioutil"
 	"net/http"
@@ -75,7 +76,7 @@ func createOauthAppDefinition() APISpec {
 	return createDefinitionFromString(oauthDefinition)
 }
 
-func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
+func getOAuthChain(spec APISpec, Muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(Muxer)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -107,11 +108,14 @@ func MakeOAuthAPI() *APISpec {
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	specs := []APISpec{thisSpec}
-	newMuxes := http.NewServeMux()
+	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
 
-	http.DefaultServeMux = newMuxes
+	newHttpMux := http.NewServeMux()
+	newHttpMux.Handle("/", newMuxes)
+	http.DefaultServeMux = newHttpMux
+
 	log.Debug("OAUTH Test Reload complete")
 
 	return &thisSpec
@@ -123,7 +127,7 @@ func TestAuthCodeRedirect(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/authorize/"
@@ -156,7 +160,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
@@ -191,7 +195,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
@@ -226,7 +230,7 @@ func GetAuthCode() map[string]string {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
@@ -267,7 +271,7 @@ func GetToken() tokenData {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
@@ -305,7 +309,7 @@ func TestClientAccessRequest(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
@@ -348,7 +352,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 	log.Warning("Created OAUTH API with APIID: ", thisSpec.APIID)
 	log.Warning("SPEC REGISTER: ", ApiSpecRegister)
@@ -426,7 +430,7 @@ func TestClientRefreshRequest(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
@@ -465,7 +469,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
