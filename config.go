@@ -115,6 +115,7 @@ type Config struct {
 			EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
 		} `json:"config"`
 	} `json:"uptime_tests"`
+	HostName string `json:"hostname"`
 }
 
 type CertData struct {
