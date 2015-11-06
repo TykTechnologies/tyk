@@ -15,6 +15,8 @@ const (
 	defaultSampletTriggerLimit int = 3
 )
 
+var HostCheckerClient *http.Client = &http.Client{Timeout: 500 * time.Millisecond}
+
 type HostData struct {
 	CheckURL string
 	ID       string
@@ -140,23 +142,23 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	var response *http.Response
 	var respErr error
 
+	useMethod := toCheck.Method
 	if toCheck.Method == "" {
-		response, respErr = http.Get(toCheck.CheckURL)
-	} else {
-		client := &http.Client{Timeout: 500 * time.Millisecond}
-
-		var body = []byte(toCheck.Body)
-		req, err := http.NewRequest(toCheck.Method, toCheck.CheckURL, bytes.NewBuffer(body))
-		if err != nil {
-			log.Error("Could not create request: ", err)
-			return
-		}
-		for header_name, header_value := range toCheck.Headers {
-			req.Header.Set(header_name, header_value)
-		}
-
-		response, respErr = client.Do(req)
+		useMethod = "GET"
 	}
+
+	var body = []byte(toCheck.Body)
+	req, err := http.NewRequest(useMethod, toCheck.CheckURL, bytes.NewBuffer(body))
+	if err != nil {
+		log.Error("Could not create request: ", err)
+		return
+	}
+	for header_name, header_value := range toCheck.Headers {
+		req.Header.Set(header_name, header_value)
+	}
+	req.Header.Set("Connection", "close")
+
+	response, respErr = HostCheckerClient.Do(req)
 
 	t2 := time.Now()
 

@@ -35,6 +35,7 @@ type UptimeReportData struct {
 	Month        time.Month
 	Year         int
 	Hour         int
+	Minute       int
 	TimeStamp    time.Time
 	ExpireAt     time.Time `bson:"expireAt" json:"expireAt"`
 	APIID        string
@@ -345,7 +346,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
 	spec, found := ApiSpecRegister[APIID]
 	if !found {
-		return []HostData{}, errors.New("PI ID not found in register!")
+		return []HostData{}, errors.New("API ID not found in register!")
 	}
 	sd := ServiceDiscovery{}
 	sd.New(&spec.UptimeTests.Config.ServiceDiscovery)
@@ -405,6 +406,7 @@ func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) 
 	if thisReport.ResponseCode > 200 {
 		serverError = true
 	}
+
 	newAnalyticsRecord := UptimeReportData{
 		URL:          thisReport.CheckURL,
 		RequestTime:  int64(thisReport.Latency),
@@ -415,9 +417,15 @@ func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) 
 		Month:        t.Month(),
 		Year:         t.Year(),
 		Hour:         t.Hour(),
+		Minute:       t.Minute(),
 		TimeStamp:    t,
 		APIID:        thisReport.MetaData[UnHealthyHostMetaDataAPIKey],
 		OrgID:        thisOrg,
+	}
+
+	// For anlytics purposes, we need a code
+	if thisReport.IsTCPError {
+		newAnalyticsRecord.ResponseCode = 521
 	}
 
 	newAnalyticsRecord.SetExpiry(thisSpec.UptimeTests.Config.ExpireUptimeAnalyticsAfter)
@@ -429,6 +437,7 @@ func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) 
 		return err
 	}
 
+	log.Debug("Recording uptime stat")
 	hc.store.AppendToSet(UptimeAnalytics_KEYNAME, string(encoded))
 	return nil
 }
