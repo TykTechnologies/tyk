@@ -586,7 +586,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				// for KeyLessAccess we can't support rate limiting, versioning or access rules
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
-				log.Warning("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
+				log.Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 
 			} else {
@@ -664,9 +664,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
 
 				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
-				log.Info("----> Rate limits available at: ", rateLimitPath)
+				log.Debug("----> Rate limits available at: ", rateLimitPath)
 				subrouter.Handle(rateLimitPath, simpleChain)
-				log.Warning("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
+				log.Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 			}
 

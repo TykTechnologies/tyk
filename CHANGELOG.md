@@ -116,6 +116,8 @@
 - Enable custom api-specific domains by setting `enable_custome_domains` in the tyk.conf to true
 - Make an API use a custom domain by adding a `domain` element to the root object
 - Cusotm domains will work with your SSL certs
+- Refactored API loader so that it used pointers all the way down, this lessens the amount of data that needs copying in RAM (will only really affect systems running 500+ APIs)
+- JSVM is now disabled by default, if you are not using JS middleware, you can reduce Tyk footprint significantly by not enabling it. To re-enable set `"enable_jsvm": true` in tyk.conf
 
 # 1.8.3.2
 
