@@ -200,7 +200,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	log.Debug("Update key: ", hc.getHostKey(report))
 	hc.store.SetKey(hc.getHostKey(report), "1", int64(config.UptimeTests.Config.TimeWait))
 
-	thisSpec, found := ApiSpecRegister[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	thisSpec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	if !found {
 		log.Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
 		return
@@ -236,7 +236,7 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 	log.Debug("Delete key: ", hc.getHostKey(report))
 	hc.store.DeleteKey(hc.getHostKey(report))
 
-	thisSpec, found := ApiSpecRegister[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	thisSpec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	if !found {
 		log.Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
 		return
@@ -344,7 +344,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 }
 
 func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
-	spec, found := ApiSpecRegister[APIID]
+	spec, found := (*ApiSpecRegister)[APIID]
 	if !found {
 		return []HostData{}, errors.New("API ID not found in register!")
 	}
@@ -394,7 +394,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(APIID string) {
 func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	thisSpec, found := ApiSpecRegister[thisReport.MetaData[UnHealthyHostMetaDataAPIKey]]
+	thisSpec, found := (*ApiSpecRegister)[thisReport.MetaData[UnHealthyHostMetaDataAPIKey]]
 	thisOrg := ""
 	if found {
 		thisOrg = thisSpec.OrgID
@@ -450,9 +450,9 @@ func InitHostCheckManager(store *RedisClusterStorageManager, purger Purger) {
 }
 
 func SetCheckerHostList() {
-	log.Info("Loading uptime tests:")
+	log.Info("Loading uptime tests...")
 	hostList := []HostData{}
-	for _, spec := range ApiSpecRegister {
+	for _, spec := range *ApiSpecRegister {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
 			thisHostList, sdErr := GlobalHostChecker.GetListFromService(spec.APIID)
 			if sdErr == nil {

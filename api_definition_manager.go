@@ -139,6 +139,13 @@ func (a *APIDefinitionLoader) Connect() {
 	}
 }
 
+// Connect connects to the storage engine - can be null
+func (a *APIDefinitionLoader) Disconnect() {
+	if a.dbSession != nil {
+		a.dbSession.Close()
+	}
+}
+
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) APISpec {
@@ -177,8 +184,10 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 	}
 
 	// Create and init the virtual Machine
-	newAppSpec.JSVM = &JSVM{}
-	newAppSpec.JSVM.Init(config.TykJSPath)
+	if config.EnableJSVM {
+		newAppSpec.JSVM = &JSVM{}
+		newAppSpec.JSVM.Init(config.TykJSPath)
+	}
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
@@ -221,8 +230,8 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 }
 
 // LoadDefinitionsFromMongo will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
-	var APISpecs = []APISpec{}
+func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() *[]*APISpec {
+	var APISpecs = []*APISpec{}
 
 	a.Connect()
 	apiCollection := a.dbSession.DB("").C("tyk_apis")
@@ -243,7 +252,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 
 	if mongoErr != nil {
 		log.Error("Could not find any application configs!: ", mongoErr)
-		return APISpecs
+		return &APISpecs
 	}
 
 	apiCollection.Find(search).All(&StringDefs)
@@ -253,14 +262,17 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
 
 		newAppSpec := a.MakeSpec(thisAppConfig)
-		APISpecs = append(APISpecs, newAppSpec)
+		APISpecs = append(APISpecs, &newAppSpec)
 	}
-	return APISpecs
+
+	a.Disconnect()
+
+	return &APISpecs
 }
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
-	var APISpecs = []APISpec{}
+func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
+	var APISpecs = []*APISpec{}
 
 	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	store.Connect()
@@ -285,13 +297,13 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
 
 	if jErr1 != nil {
 		log.Error("Failed decode: ", jErr1)
-		return APISpecs
+		return &APISpecs
 	}
 
 	jErr2 := json.Unmarshal([]byte(apiCollection), &StringDefs)
 	if jErr2 != nil {
 		log.Error("Failed decode: ", jErr2)
-		return APISpecs
+		return &APISpecs
 	}
 
 	for i, thisAppConfig := range APIDefinitions {
@@ -299,9 +311,9 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
 		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
 
 		newAppSpec := a.MakeSpec(thisAppConfig)
-		APISpecs = append(APISpecs, newAppSpec)
+		APISpecs = append(APISpecs, &newAppSpec)
 	}
-	return APISpecs
+	return &APISpecs
 }
 
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
@@ -321,8 +333,8 @@ func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefin
 
 // LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
-func (a *APIDefinitionLoader) LoadDefinitions(dir string) []APISpec {
-	var APISpecs = []APISpec{}
+func (a *APIDefinitionLoader) LoadDefinitions(dir string) *[]*APISpec {
+	var APISpecs = []*APISpec{}
 	// Grab json files from directory
 	files, _ := ioutil.ReadDir(dir)
 	for _, f := range files {
@@ -338,12 +350,12 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []APISpec {
 
 			thisAppConfig.RawData = thisRawConfig // Lets keep a copy for plugable modules
 			newAppSpec := a.MakeSpec(thisAppConfig)
-			APISpecs = append(APISpecs, newAppSpec)
+			APISpecs = append(APISpecs, &newAppSpec)
 
 		}
 	}
 
-	return APISpecs
+	return &APISpecs
 }
 
 func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
@@ -642,11 +654,16 @@ func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []tykcommon.Virt
 	// This way we can iterate the whole array once, on match we break with status
 	thisURLSpec := []URLSpec{}
 
+	if !config.EnableJSVM {
+		return thisURLSpec
+	}
+
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
+
 		PreLoadVirtualMetaCode(&newSpec.VirtualPathSpec, apiSpec.JSVM)
 
 		thisURLSpec = append(thisURLSpec, newSpec)

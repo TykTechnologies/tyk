@@ -57,7 +57,7 @@ func MakeSampleAPI() *APISpec {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := []APISpec{thisSpec}
+	specs := &[]*APISpec{&thisSpec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)

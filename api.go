@@ -50,7 +50,7 @@ func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 }
 
 func GetSpecForApi(APIID string) *APISpec {
-	spec, ok := ApiSpecRegister[APIID]
+	spec, ok := (*ApiSpecRegister)[APIID]
 	if !ok {
 		return nil
 	}
@@ -60,7 +60,7 @@ func GetSpecForApi(APIID string) *APISpec {
 
 func GetSpecForOrg(APIID string) *APISpec {
 	var aKey string
-	for k, v := range ApiSpecRegister {
+	for k, v := range *ApiSpecRegister {
 		if v.OrgID == APIID {
 			return v
 		}
@@ -68,7 +68,7 @@ func GetSpecForOrg(APIID string) *APISpec {
 	}
 
 	// If we can't find a spec, it doesn;t matter, because we default to Redis anyway, grab whatever you can find
-	return ApiSpecRegister[aKey]
+	return (*ApiSpecRegister)[aKey]
 }
 
 func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionState) {
@@ -124,7 +124,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 		// nothing defined, add key to ALL
 		if config.AllowMasterKeys {
 			log.Warning("No API Access Rights set, adding key to ALL.")
-			for _, spec := range ApiSpecRegister {
+			for _, spec := range *ApiSpecRegister {
 				if !dontReset {
 					spec.SessionManager.ResetQuota(keyName, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
@@ -363,7 +363,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 
 	if APIID == "-1" {
 		// Go through ALL managed API's and delete the key
-		for _, spec := range ApiSpecRegister {
+		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 		}
 
@@ -405,7 +405,7 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 
 	if APIID == "-1" {
 		// Go through ALL managed API's and delete the key
-		for _, spec := range ApiSpecRegister {
+		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 		}
 
@@ -461,7 +461,7 @@ func handleURLReload() ([]byte, int) {
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
-	log.WithFields(logrus.Fields{}).Info("Reloaded URL Structure - Success")
+	log.WithFields(logrus.Fields{}).Info("Reload URL Structure - Scheduled")
 
 	return responseMessage, code
 }
@@ -497,10 +497,10 @@ func HandleGetAPIList() ([]byte, int) {
 	var err error
 
 	var thisAPIIDList []tykcommon.APIDefinition
-	thisAPIIDList = make([]tykcommon.APIDefinition, len(ApiSpecRegister))
+	thisAPIIDList = make([]tykcommon.APIDefinition, len(*ApiSpecRegister))
 
 	c := 0
-	for _, apiSpec := range ApiSpecRegister {
+	for _, apiSpec := range *ApiSpecRegister {
 		thisAPIIDList[c] = apiSpec.APIDefinition
 		thisAPIIDList[c].RawData = nil
 		c++
@@ -520,7 +520,7 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	for _, apiSpec := range ApiSpecRegister {
+	for _, apiSpec := range *ApiSpecRegister {
 		if apiSpec.APIDefinition.APIID == APIID {
 
 			responseMessage, err = json.Marshal(apiSpec.APIDefinition)
@@ -1148,7 +1148,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				if config.AllowMasterKeys {
 					// nothing defined, add key to ALL
 					log.Warning("No API Access Rights set, adding key to ALL.")
-					for _, spec := range ApiSpecRegister {
+					for _, spec := range *ApiSpecRegister {
 						checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
 						if !spec.DontSetQuotasOnCreate {
 							// Reset quote by default

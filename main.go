@@ -41,7 +41,7 @@ var DefaultQuotaStore = DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
 
-var ApiSpecRegister = make(map[string]*APISpec)
+var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
 
 var mainRouter *mux.Router
@@ -130,7 +130,9 @@ func setupGlobals() {
 	templates = template.Must(template.ParseFiles(templateFile))
 
 	// Set up global JSVM
-	GlobalEventsJSVM.Init(config.TykJSPath)
+	if config.EnableJSVM {
+		GlobalEventsJSVM.Init(config.TykJSPath)
+	}
 
 	// Get the notifier ready
 	log.Debug("Notifier will not work in hybrid mode")
@@ -148,31 +150,33 @@ func setupGlobals() {
 }
 
 // Pull API Specs from configuration
-func getAPISpecs() []APISpec {
-	var APISpecs []APISpec
-	thisAPILoader := APIDefinitionLoader{}
+var APILoader APIDefinitionLoader = APIDefinitionLoader{}
+
+func getAPISpecs() *[]*APISpec {
+	var APISpecs *[]*APISpec
 
 	if config.UseDBAppConfigs {
 		log.Debug("Using App Configuration from Mongo DB")
-		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
+		APISpecs = APILoader.LoadDefinitionsFromMongo()
 	} else if config.SlaveOptions.UseRPC {
 		log.Debug("Using RPC Configuration")
-		APISpecs = thisAPILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
+		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
-		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
+		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
-	log.Printf("Detected %v APIs", len(APISpecs))
+	log.Printf("Detected %v APIs", len(*APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i, _ := range APISpecs {
-			APISpecs[i].AuthProvider = config.AuthOverride.AuthProvider
+		for i, _ := range *APISpecs {
+			(*APISpecs)[i].AuthProvider = config.AuthOverride.AuthProvider
+
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i, _ := range APISpecs {
-			APISpecs[i].SessionProvider = config.AuthOverride.SessionProvider
+		for i, _ := range *APISpecs {
+			(*APISpecs)[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
 
@@ -383,8 +387,12 @@ func IsRPCMode() bool {
 	return false
 }
 
+func doCopy(from *APISpec, to *APISpec) {
+	*to = *from
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
+func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// load the APi defs
 	log.Debug("Loading API configurations.")
 
@@ -393,14 +401,15 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 
 	listenPaths := make(map[string][]string)
 
 	// Create a new handler for each API spec
-	for apiIndex, _ := range APISpecs {
+	for _, referenceSpec := range *APISpecs {
 		var skip bool
 		// We need a reference to this as we change it on the go and re-use it in a global index
-		referenceSpec := APISpecs[apiIndex]
+		//referenceSpec := (*APISpecs)[apiIndex]
 
 		log.Info("--> Loading API: ", referenceSpec.APIDefinition.Name)
 
@@ -423,8 +432,9 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 				log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
 				skip = true
 			} else {
+				log.Info("Domain check...")
 				for _, onDomain := range onDomains {
-					log.Debug("Checking Domain: ", onDomain)
+					log.Info("Checking Domain: ", onDomain)
 					if onDomain == referenceSpec.Domain {
 						log.Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
 						skip = true
@@ -452,7 +462,11 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 		if !skip {
 
 			listenPaths[referenceSpec.Proxy.ListenPath] = append(listenPaths[referenceSpec.Proxy.ListenPath], referenceSpec.Domain)
-			log.Debug("Tracking: ", referenceSpec.Domain)
+			dN := referenceSpec.Domain
+			if dN == "" {
+				dN = "(no host)"
+			}
+			log.Info("----> Tracking: ", dN)
 
 			// Initialise the auth and session managers (use Redis for now)
 			var authStore StorageHandler
@@ -501,7 +515,6 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 			}
 
 			// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
-			healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 			referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
 			//Set up all the JSVM middleware
@@ -509,40 +522,43 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
 
-			log.Debug("Loading Middleware")
-			mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
+			if config.EnableJSVM {
+				log.Debug("----> Loading Middleware")
+				mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(referenceSpec)
 
-			referenceSpec.JSVM.LoadJSPaths(mwPaths)
+				referenceSpec.JSVM.LoadJSPaths(mwPaths)
+			}
 
 			if referenceSpec.EnableBatchRequestSupport {
-				addBatchEndpoint(&referenceSpec, subrouter)
+				addBatchEndpoint(referenceSpec, subrouter)
 			}
 
 			if referenceSpec.UseOauth2 {
-				thisOauthManager := addOAuthHandlers(&referenceSpec, subrouter, false)
+				thisOauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
 				referenceSpec.OAuthManager = thisOauthManager
 			}
 
-			proxy := TykNewSingleHostReverseProxy(remote, &referenceSpec)
+			proxy := TykNewSingleHostReverseProxy(remote, referenceSpec)
 			// initialise the proxy
-			proxy.New(nil, &referenceSpec)
+			proxy.New(nil, referenceSpec)
 			referenceSpec.target = remote
 
 			// Create the response processors
-			creeateResponseMiddlewareChain(&referenceSpec)
+			creeateResponseMiddlewareChain(referenceSpec)
 
 			//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
-			tykMiddleware := &TykMiddleware{&referenceSpec, proxy}
+			tykMiddleware := &TykMiddleware{referenceSpec, proxy}
 
 			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
 			CacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix}
 			CacheStore.Connect()
 
 			if referenceSpec.APIDefinition.UseKeylessAccess {
+				log.Info("----> Checking security policy: Open")
 
 				// Add pre-process MW
 				var chainArray = []alice.Constructor{}
-				handleCORS(&chainArray, &referenceSpec)
+				handleCORS(&chainArray, referenceSpec)
 
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
@@ -570,6 +586,7 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 
 				// for KeyLessAccess we can't support rate limiting, versioning or access rules
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
+				log.Warning("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 
 			} else {
@@ -579,24 +596,29 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 
 				if referenceSpec.APIDefinition.UseOauth2 {
 					// Oauth2
+					log.Info("----> Checking security policy: OAuth")
 					keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
+					log.Info("----> Checking security policy: Basic")
 					keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.EnableSignatureChecking {
 					// HMAC Auth
+					log.Info("----> Checking security policy: HMAC")
 					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.EnableJWT {
 					// JWT Auth
+					log.Info("----> Checking security policy: JWT")
 					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
 				} else {
 					// Auth key
+					log.Info("----> Checking security policy: Token")
 					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
 				}
 
 				var chainArray = []alice.Constructor{}
 
-				handleCORS(&chainArray, &referenceSpec)
+				handleCORS(&chainArray, referenceSpec)
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
@@ -627,6 +649,8 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 				}
 
+				log.Debug("----> Custom middleware processed")
+
 				// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 
@@ -640,19 +664,22 @@ func loadApps(APISpecs []APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
 
 				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
-				log.Debug("Rate limits available at: ", rateLimitPath)
+				log.Info("----> Rate limits available at: ", rateLimitPath)
 				subrouter.Handle(rateLimitPath, simpleChain)
+				log.Warning("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 			}
 
-			tempSpecRegister[referenceSpec.APIDefinition.APIID] = &referenceSpec
+			tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 
+		} else {
+			log.Warning("----> Skipped!")
 		}
 
 	}
 
 	// Swap in the new register
-	ApiSpecRegister = tempSpecRegister
+	ApiSpecRegister = &tempSpecRegister
 
 	// Kick off our host checkers
 	if config.UptimeTests.Disable == false {
@@ -667,10 +694,9 @@ func RPCReloadLoop(RPCKey string) {
 	}
 }
 
-// ReloadURLStructure will create a new muxer, reload all the app configs for an
-// instance and then replace the DefaultServeMux with the new one, this enables a
-// reconfiguration to take place without stopping any requests from being handled.
-func ReloadURLStructure() {
+func doReload() {
+	time.Sleep(10 * time.Second)
+
 	// Kill RPC if available
 	if config.SlaveOptions.UseRPC {
 		ClearRPCClients()
@@ -691,6 +717,7 @@ func ReloadURLStructure() {
 
 	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()
+
 	loadApps(specs, newMuxes)
 
 	// Load the API Policies
@@ -702,6 +729,20 @@ func ReloadURLStructure() {
 	http.DefaultServeMux = newServeMux
 
 	log.Info("API reload complete")
+
+	reloadScheduled = false
+}
+
+var reloadScheduled bool
+
+// ReloadURLStructure will create a new muxer, reload all the app configs for an
+// instance and then replace the DefaultServeMux with the new one, this enables a
+// reconfiguration to take place without stopping any requests from being handled.
+func ReloadURLStructure() {
+	if !reloadScheduled {
+		reloadScheduled = true
+		go doReload()
+	}
 }
 
 func init() {

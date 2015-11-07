@@ -117,6 +117,7 @@ type Config struct {
 	} `json:"uptime_tests"`
 	HostName            string `json:"hostname"`
 	EnableCustomDomains bool   `json:"enable_custom_domains"`
+	EnableJSVM          bool   `json:"enable_jsvm"`
 }
 
 type CertData struct {

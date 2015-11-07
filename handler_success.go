@@ -225,6 +225,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
+		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
