@@ -206,7 +206,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 
 		thisRecord.SetExpiry(expiresAfter)
 
-		analytics.RecordHit(thisRecord)
+		go analytics.RecordHit(thisRecord)
 	}
 
 	// Report in health check
@@ -238,7 +238,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp != nil {
-		go s.RecordHit(w, r, int64(millisec), resp.StatusCode)
+		s.RecordHit(w, r, int64(millisec), resp.StatusCode)
 	}
 
 	return nil
@@ -261,7 +261,7 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes != nil {
-		go s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
+		s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
 	}
 
 	return inRes

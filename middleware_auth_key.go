@@ -79,6 +79,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 		return errors.New("Authorization field missing"), 400
 	}
 
+
 	// Check if API key valid
 	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(authHeaderValue)
 	if !keyExists {
