@@ -20,6 +20,7 @@ tyk.conf.bak
 tyk.folder.conf
 tyk.db.conf
 tyk.compose.conf
+tyk.live.conf
 tyk.compose.rpc2.conf
 run.sh
 utils/cloud_release.sh
