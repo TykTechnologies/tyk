@@ -73,7 +73,8 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 
 	// Manage global headers first - remove
 	if len(vInfo.GlobalHeadersRemove) > 0 {
-		for _, gdKey := range vInfo.GlobalHeaders {
+		for _, gdKey := range vInfo.GlobalHeadersRemove {
+			log.Debug("Removing: ", gdKey)
 			r.Header.Del(gdKey)
 		}
 	}
