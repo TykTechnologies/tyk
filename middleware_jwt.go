@@ -77,6 +77,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
+		} else if k.TykMiddleware.Spec.JWTSigningMethod == "ecdsa" {
+			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
 		} else {
 			log.Warning("No signing method found in API Definition, defaulting to HMAC")
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -84,7 +88,19 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			}
 		}
 
-		tykId = token.Header["kid"].(string)
+		idFound := false
+		if token.Header["kid"] != nil {
+			tykId = token.Header["kid"].(string)
+			idFound = true
+		}
+
+		if !idFound {
+			if token.Claims["sub"] != nil {
+				tykId = token.Claims["sub"].(string)
+				idFound = true
+			}
+		}
+
 		var keyExists bool
 		thisSessionState, keyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 
@@ -102,10 +118,17 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		return nil, 200
 
 	} else {
+		var kID string
+		var found bool
+		if token != nil {
+			kID, found = token.Header["kid"].(string)
+		}
+
 		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
-			"key":    token.Header["kid"],
+			"path":        r.URL.Path,
+			"origin":      r.RemoteAddr,
+			"key":         kID,
+			"key_present": found,
 		}).Info("Attempted JWT access with non-existent key.")
 
 		if err != nil {
