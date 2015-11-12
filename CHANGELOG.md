@@ -103,7 +103,7 @@
 	    }
 	},
 	```
-- Uptime tests by service discovery will load initially from the endpoint, then they will hit the endpoint again after recheck_wait to reload the tests for this API. If used in conjunction with upstream target service discovery it enables dynamic reconfiguring (and monitoring) of services.
+- Uptime tests by service discovery will load initially from the endpoint, it will not re-poll the service until it detects an error, at which point it will schedule a reload of the endpoint data. If used in conjunction with upstream target service discovery it enables dynamic reconfiguring (and monitoring) of services.
 - The document that Tyk requires is a JSON string encoded version of the `check_list` parameter of the `uptime_tests` field, for etcd:
 
 	curl -L http://127.0.0.1:4001/v2/keys/uptimeTest -XPUT -d value='[{"url": "http://domain.com:3000/"}]'
@@ -118,6 +118,7 @@
 - Cusotm domains will work with your SSL certs
 - Refactored API loader so that it used pointers all the way down, this lessens the amount of data that needs copying in RAM (will only really affect systems running 500+ APIs)
 - JSVM is now disabled by default, if you are not using JS middleware, you can reduce Tyk footprint significantly by not enabling it. To re-enable set `"enable_jsvm": true` in tyk.conf
+- Fixed CORS so that if OPTIONS passthrough is enabled an upstream server can handle all pre-flight requests without any Tyk middleware intervening
 
 # 1.8.3.2
 
