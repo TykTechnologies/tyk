@@ -174,7 +174,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run the middleware
-	returnRaw, _ := d.Spec.JSVM.VM.Run(thisMeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + string(asJsonConfigData) + `);`)
+	thisVM := d.Spec.JSVM.VM.Copy()
+	returnRaw, _ := thisVM.Run(thisMeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + string(asJsonConfigData) + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
