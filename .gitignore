@@ -27,3 +27,7 @@ petstore.json
 *.key
 *.pem
 *.csr
+._graph.pdf
+tyk.compose.cluster.conf
+tyk.live.conf
+tyk.prof
