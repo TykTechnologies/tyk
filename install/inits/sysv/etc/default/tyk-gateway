@@ -1,0 +1,6 @@
+user="root"
+group="root"
+chroot="/"
+chdir="/"
+nice=""
+
