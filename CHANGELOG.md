@@ -119,6 +119,7 @@
 - Refactored API loader so that it used pointers all the way down, this lessens the amount of data that needs copying in RAM (will only really affect systems running 500+ APIs)
 - JSVM is now disabled by default, if you are not using JS middleware, you can reduce Tyk footprint significantly by not enabling it. To re-enable set `"enable_jsvm": true` in tyk.conf
 - Fixed CORS so that if OPTIONS passthrough is enabled an upstream server can handle all pre-flight requests without any Tyk middleware intervening
+- Dashboard config requires a home_dir field in order to work outside of it's home dir
 
 # 1.8.3.2
 
