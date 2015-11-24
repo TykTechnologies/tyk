@@ -248,7 +248,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() *[]*APISpec {
 
 	var APIDefinitions = []tykcommon.APIDefinition{}
 	var StringDefs = make([]bson.M, 0)
-	mongoErr := apiCollection.Find(search).All(&APIDefinitions)
+	mongoErr := apiCollection.Find(search).Sort("-sort_by").All(&APIDefinitions)
 
 	if mongoErr != nil {
 		log.Error("Could not find any application configs!: ", mongoErr)

@@ -22,6 +22,9 @@ type ErrorHandler struct {
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
+	if e.Spec.DoNotTrack {
+		return
+	}
 
 	if config.StoreAnalytics(r) {
 

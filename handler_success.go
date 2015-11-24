@@ -144,6 +144,10 @@ type SuccessHandler struct {
 
 func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int) {
 
+	if s.Spec.DoNotTrack {
+		return
+	}
+
 	if config.StoreAnalytics(r) {
 
 		t := time.Now()
