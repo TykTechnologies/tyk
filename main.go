@@ -203,27 +203,36 @@ func getPolicies() {
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(Muxer *mux.Router) {
+
+	var ApiMuxer *mux.Router
+	ApiMuxer = Muxer
+	if config.EnableAPISegregation {
+		if config.ControlAPIHostname != "" {
+			ApiMuxer = Muxer.Host(config.ControlAPIHostname).Subrouter()
+		}
+	}
+
 	// Add a root message to check all is OK
-	Muxer.HandleFunc("/", pingTest)
+	ApiMuxer.HandleFunc("/hello", pingTest)
 
 	// set up main API handlers
-	Muxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
-	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
+	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
+	ApiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
 
 	if !IsRPCMode() {
-		Muxer.HandleFunc("/tyk/org/keys/"+"{rest:.*}", CheckIsAPIOwner(orgHandler))
-		Muxer.HandleFunc("/tyk/keys/policy/"+"{rest:.*}", CheckIsAPIOwner(policyUpdateHandler))
-		Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
-		Muxer.HandleFunc("/tyk/apis/"+"{rest:.*}", CheckIsAPIOwner(apiHandler))
-		Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
-		Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
-		Muxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(invalidateOauthRefresh))
+		ApiMuxer.HandleFunc("/tyk/org/keys/"+"{rest:.*}", CheckIsAPIOwner(orgHandler))
+		ApiMuxer.HandleFunc("/tyk/keys/policy/"+"{rest:.*}", CheckIsAPIOwner(policyUpdateHandler))
+		ApiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
+		ApiMuxer.HandleFunc("/tyk/apis/"+"{rest:.*}", CheckIsAPIOwner(apiHandler))
+		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
+		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
+		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(invalidateOauthRefresh))
 	} else {
 		log.Info("Node is slaved, REST API minimised")
 	}
 
-	Muxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(keyHandler))
-	Muxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(oAuthClientHandler))
+	ApiMuxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(keyHandler))
+	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(oAuthClientHandler))
 }
 
 // Create API-specific OAuth handlers and respective auth servers

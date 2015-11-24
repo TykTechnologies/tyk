@@ -115,9 +115,11 @@ type Config struct {
 			EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
 		} `json:"config"`
 	} `json:"uptime_tests"`
-	HostName            string `json:"hostname"`
-	EnableCustomDomains bool   `json:"enable_custom_domains"`
-	EnableJSVM          bool   `json:"enable_jsvm"`
+	HostName             string `json:"hostname"`
+	EnableAPISegregation bool   `json:"enable_api_segregation"`
+	ControlAPIHostname   string `json:"control_api_hostname"`
+	EnableCustomDomains  bool   `json:"enable_custom_domains"`
+	EnableJSVM           bool   `json:"enable_jsvm"`
 }
 
 type CertData struct {

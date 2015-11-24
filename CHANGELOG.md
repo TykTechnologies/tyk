@@ -120,6 +120,7 @@
 - JSVM is now disabled by default, if you are not using JS middleware, you can reduce Tyk footprint significantly by not enabling it. To re-enable set `"enable_jsvm": true` in tyk.conf
 - Fixed CORS so that if OPTIONS passthrough is enabled an upstream server can handle all pre-flight requests without any Tyk middleware intervening
 - Dashboard config requires a home_dir field in order to work outside of it's home dir
+- Added option to segragate control API from front-end, set `enable_api_segregation` to true and then add the hostname to `control_api_hostname`
 
 # 1.8.3.2
 
