@@ -99,12 +99,12 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 		// If I'm polling, lets start the loop
 		if hc.AmIPolling() {
 			if !hc.pollerStarted {
-				log.Debug("[HOST CHECK MANAGER] Starting Poller")
+				log.Info("[HOST CHECK MANAGER] Starting Poller")
 				hc.pollerStarted = true
 				go hc.StartPoller()
 			}
 		} else {
-			log.Debug("[HOST CHECK MANAGER] New master found, stopping uptime tests")
+			log.Debug("[HOST CHECK MANAGER] New master found, no tests running")
 			if hc.pollerStarted {
 				go hc.StopPoller()
 				hc.pollerStarted = false
