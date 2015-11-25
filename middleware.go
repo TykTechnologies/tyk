@@ -38,17 +38,21 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
 
-			reqErr, errCode := mw.ProcessRequest(w, r, thisMwConfiguration)
-			if reqErr != nil {
-				handler := ErrorHandler{tykMwSuper}
-				handler.HandleError(w, r, reqErr.Error(), errCode)
-				return
-			}
-
-			// Special code, bypasses all other execution
-			if errCode != 666 {
-				// No error, carry on...
+			if (tykMwSuper.Spec.CORS.OptionsPassthrough) && (r.Method == "OPTIONS") {
 				h.ServeHTTP(w, r)
+			} else {
+				reqErr, errCode := mw.ProcessRequest(w, r, thisMwConfiguration)
+				if reqErr != nil {
+					handler := ErrorHandler{tykMwSuper}
+					handler.HandleError(w, r, reqErr.Error(), errCode)
+					return
+				}
+
+				// Special code, bypasses all other execution
+				if errCode != 666 {
+					// No error, carry on...
+					h.ServeHTTP(w, r)
+				}
 			}
 
 		}

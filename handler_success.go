@@ -144,6 +144,10 @@ type SuccessHandler struct {
 
 func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int) {
 
+	if s.Spec.DoNotTrack {
+		return
+	}
+
 	if config.StoreAnalytics(r) {
 
 		t := time.Now()
@@ -206,7 +210,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 
 		thisRecord.SetExpiry(expiresAfter)
 
-		analytics.RecordHit(thisRecord)
+		go analytics.RecordHit(thisRecord)
 	}
 
 	// Report in health check
@@ -225,6 +229,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
+		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
@@ -236,7 +241,10 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	go s.RecordHit(w, r, int64(millisec), resp.StatusCode)
+	if resp != nil {
+		s.RecordHit(w, r, int64(millisec), resp.StatusCode)
+	}
+
 	return nil
 }
 
@@ -256,7 +264,9 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
-	go s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
+	if inRes != nil {
+		s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
+	}
 
 	return inRes
 }

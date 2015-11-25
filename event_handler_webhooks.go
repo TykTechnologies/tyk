@@ -87,7 +87,7 @@ func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 	// Pre-load template on init
 	webHookTemplate, tErr := template.ParseFiles(thisHandler.conf.TemplatePath)
 	if tErr != nil {
-		log.Error("Failed to load webhook template! Using default. Error was: ", tErr)
+		log.Warning("[WEBHOOK] template failure, using default: ", tErr)
 		defaultPath := path.Join(config.TemplatePath, "default_webhook.json")
 		webHookTemplate, _ = template.ParseFiles(defaultPath)
 	}

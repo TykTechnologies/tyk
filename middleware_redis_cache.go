@@ -190,7 +190,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			m.Proxy.copyResponse(w, newRes.Body)
 
 			// Record analytics
-			go m.sh.RecordHit(w, r, 0, newRes.StatusCode)
+			if m.Spec.DoNotTrack == false {
+				go m.sh.RecordHit(w, r, 0, newRes.StatusCode)
+			}
 
 			// Stop any further execution
 			return nil, 666

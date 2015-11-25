@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"io/ioutil"
 	"net/http"
@@ -75,7 +76,7 @@ func createOauthAppDefinition() APISpec {
 	return createDefinitionFromString(oauthDefinition)
 }
 
-func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
+func getOAuthChain(spec APISpec, Muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(Muxer)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -94,7 +95,30 @@ func getOAuthChain(spec APISpec, Muxer *http.ServeMux) {
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
+	//ApiSpecRegister[spec.APIID] = &spec
 	Muxer.Handle(spec.Proxy.ListenPath, chain)
+}
+
+func MakeOAuthAPI() *APISpec {
+	log.Debug("CREATING TEMPORARY API FOR OAUTH")
+	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+
+	specs := &[]*APISpec{&thisSpec}
+	newMuxes := mux.NewRouter()
+	loadAPIEndpoints(newMuxes)
+	loadApps(specs, newMuxes)
+
+	newHttpMux := http.NewServeMux()
+	newHttpMux.Handle("/", newMuxes)
+	http.DefaultServeMux = newHttpMux
+
+	log.Debug("OAUTH Test Reload complete")
+
+	return &thisSpec
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
@@ -103,7 +127,7 @@ func TestAuthCodeRedirect(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/authorize/"
@@ -136,7 +160,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
@@ -171,7 +195,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
@@ -206,7 +230,7 @@ func GetAuthCode() map[string]string {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
@@ -247,7 +271,7 @@ func GetToken() tokenData {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
@@ -285,7 +309,7 @@ func TestClientAccessRequest(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
@@ -315,6 +339,88 @@ func TestClientAccessRequest(t *testing.T) {
 	}
 }
 
+func TestOAuthAPIRefreshInvalidate(t *testing.T) {
+
+	// Step 1 create token
+	tokenData := GetToken()
+
+	// thisSpec := createOauthAppDefinition()
+
+	sp := MakeOAuthAPI()
+	thisSpec := *sp
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	testMuxer := mux.NewRouter()
+	getOAuthChain(thisSpec, testMuxer)
+	log.Warning("Created OAUTH API with APIID: ", thisSpec.APIID)
+	log.Warning("SPEC REGISTER: ", ApiSpecRegister)
+
+	// Step 2 - invalidate the refresh token
+
+	uri1 := "/tyk/oauth/refresh/" + tokenData.RefreshToken + "?"
+	method1 := "DELETE"
+
+	recorder1 := httptest.NewRecorder()
+	param1 := make(url.Values)
+	//MakeSampleAPI()
+	param1.Set("api_id", "999999")
+	req1, err1 := http.NewRequest(method1, uri1+param1.Encode(), nil)
+
+	if err1 != nil {
+		t.Fatal(err1)
+	}
+
+	req1.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+
+	testMuxer.ServeHTTP(recorder1, req1)
+
+	newSuccess := Success{}
+	err := json.Unmarshal([]byte(recorder1.Body.String()), &newSuccess)
+
+	if err != nil {
+		t.Error("Could not unmarshal success message:\n", err)
+		t.Error(recorder1.Body.String())
+	} else {
+		if newSuccess.Status != "ok" {
+			t.Error("key not deleted, status error:\n", recorder1.Body.String())
+			t.Error(ApiSpecRegister)
+		}
+		if newSuccess.Action != "deleted" {
+			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder1.Body.String())
+		}
+	}
+
+	// Step 3 - try to refresh
+
+	uri := "/APIID/oauth/token/"
+	method := "POST"
+
+	param := make(url.Values)
+	param.Set("grant_type", "refresh_token")
+	param.Set("redirect_uri", T_REDIRECT_URI)
+	param.Set("client_id", T_CLIENT_ID)
+	param.Set("refresh_token", tokenData.RefreshToken)
+	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+
+	if recorder.Code == 200 {
+		t.Error("Response code should have been error but is: ", recorder.Code)
+		t.Error(recorder.Body)
+		t.Error(req.Body)
+		t.Error("CODE: ", tokenData.RefreshToken)
+	}
+}
+
 func TestClientRefreshRequest(t *testing.T) {
 
 	tokenData := GetToken()
@@ -324,7 +430,7 @@ func TestClientRefreshRequest(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
@@ -363,7 +469,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	testMuxer := http.NewServeMux()
+	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
 
 	uri := "/APIID/oauth/token/"

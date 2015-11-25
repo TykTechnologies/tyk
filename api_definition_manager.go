@@ -45,6 +45,7 @@ const (
 	CircuitBreaker         URLStatus = 10
 	URLRewrite             URLStatus = 11
 	VirtualPath            URLStatus = 12
+	RequestSizeLimit       URLStatus = 13
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -72,6 +73,7 @@ const (
 	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
 	StatusURLRewrite               RequestStatus = "URL Rewritten"
 	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
+	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -89,6 +91,7 @@ type URLSpec struct {
 	CircuitBreaker          ExtendedCircuitBreakerMeta
 	URLRewrite              tykcommon.URLRewriteMeta
 	VirtualPathSpec         tykcommon.VirtualMeta
+	RequestSize             tykcommon.RequestSizeMeta
 }
 
 type TransformSpec struct {
@@ -136,6 +139,13 @@ func (a *APIDefinitionLoader) Connect() {
 	}
 }
 
+// Connect connects to the storage engine - can be null
+func (a *APIDefinitionLoader) Disconnect() {
+	if a.dbSession != nil {
+		a.dbSession.Close()
+	}
+}
+
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) APISpec {
@@ -174,8 +184,10 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 	}
 
 	// Create and init the virtual Machine
-	newAppSpec.JSVM = &JSVM{}
-	newAppSpec.JSVM.Init(config.TykJSPath)
+	if config.EnableJSVM {
+		newAppSpec.JSVM = &JSVM{}
+		newAppSpec.JSVM.Init(config.TykJSPath)
+	}
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
@@ -218,8 +230,8 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 }
 
 // LoadDefinitionsFromMongo will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
-	var APISpecs = []APISpec{}
+func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() *[]*APISpec {
+	var APISpecs = []*APISpec{}
 
 	a.Connect()
 	apiCollection := a.dbSession.DB("").C("tyk_apis")
@@ -236,11 +248,11 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 
 	var APIDefinitions = []tykcommon.APIDefinition{}
 	var StringDefs = make([]bson.M, 0)
-	mongoErr := apiCollection.Find(search).All(&APIDefinitions)
+	mongoErr := apiCollection.Find(search).Sort("-sort_by").All(&APIDefinitions)
 
 	if mongoErr != nil {
 		log.Error("Could not find any application configs!: ", mongoErr)
-		return APISpecs
+		return &APISpecs
 	}
 
 	apiCollection.Find(search).All(&StringDefs)
@@ -250,14 +262,17 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() []APISpec {
 		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
 
 		newAppSpec := a.MakeSpec(thisAppConfig)
-		APISpecs = append(APISpecs, newAppSpec)
+		APISpecs = append(APISpecs, &newAppSpec)
 	}
-	return APISpecs
+
+	a.Disconnect()
+
+	return &APISpecs
 }
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
-	var APISpecs = []APISpec{}
+func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
+	var APISpecs = []*APISpec{}
 
 	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	store.Connect()
@@ -282,13 +297,13 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
 
 	if jErr1 != nil {
 		log.Error("Failed decode: ", jErr1)
-		return APISpecs
+		return &APISpecs
 	}
 
 	jErr2 := json.Unmarshal([]byte(apiCollection), &StringDefs)
 	if jErr2 != nil {
 		log.Error("Failed decode: ", jErr2)
-		return APISpecs
+		return &APISpecs
 	}
 
 	for i, thisAppConfig := range APIDefinitions {
@@ -296,9 +311,9 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []APISpec {
 		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
 
 		newAppSpec := a.MakeSpec(thisAppConfig)
-		APISpecs = append(APISpecs, newAppSpec)
+		APISpecs = append(APISpecs, &newAppSpec)
 	}
-	return APISpecs
+	return &APISpecs
 }
 
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
@@ -318,8 +333,8 @@ func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefin
 
 // LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
-func (a *APIDefinitionLoader) LoadDefinitions(dir string) []APISpec {
-	var APISpecs = []APISpec{}
+func (a *APIDefinitionLoader) LoadDefinitions(dir string) *[]*APISpec {
+	var APISpecs = []*APISpec{}
 	// Grab json files from directory
 	files, _ := ioutil.ReadDir(dir)
 	for _, f := range files {
@@ -335,12 +350,12 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []APISpec {
 
 			thisAppConfig.RawData = thisRawConfig // Lets keep a copy for plugable modules
 			newAppSpec := a.MakeSpec(thisAppConfig)
-			APISpecs = append(APISpecs, newAppSpec)
+			APISpecs = append(APISpecs, &newAppSpec)
 
 		}
 	}
 
-	return APISpecs
+	return &APISpecs
 }
 
 func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef tykcommon.VersionInfo) ([]URLSpec, bool) {
@@ -525,6 +540,24 @@ func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []tykcommon.HardTimeo
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileRequestSizePathSpec(paths []tykcommon.RequestSizeMeta, stat URLStatus) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.RequestSize = stringSpec
+
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
@@ -621,11 +654,16 @@ func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []tykcommon.Virt
 	// This way we can iterate the whole array once, on match we break with status
 	thisURLSpec := []URLSpec{}
 
+	if !config.EnableJSVM {
+		return thisURLSpec
+	}
+
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
+
 		PreLoadVirtualMetaCode(&newSpec.VirtualPathSpec, apiSpec.JSVM)
 
 		thisURLSpec = append(thisURLSpec, newSpec)
@@ -649,6 +687,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
+	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -662,6 +701,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, hardTimeouts...)
 	combinedPath = append(combinedPath, circuitBreakers...)
 	combinedPath = append(combinedPath, urlRewrites...)
+	combinedPath = append(combinedPath, requestSizes...)
 	combinedPath = append(combinedPath, virtualPaths...)
 
 	if len(whiteListPaths) > 0 {
@@ -704,6 +744,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusURLRewrite
 	case VirtualPath:
 		return StatusVirtualPath
+	case RequestSizeLimit:
+		return StatusRequestSizeControlled
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -820,6 +862,10 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 					if method != nil && method.(string) == v.VirtualPathSpec.Method {
 						return true, &v.VirtualPathSpec
 					}
+				case RequestSizeLimit:
+					if method != nil && method.(string) == v.RequestSize.Method {
+						return true, &v.RequestSize
+					}
 				}
 
 			}
@@ -847,8 +893,16 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return ""
 
 	} else if a.APIDefinition.VersionDefinition.Location == "url" {
-		thisURL := r.URL.String()
+		thisURL := r.URL.Path
 		thisURL = strings.Replace(thisURL, a.Proxy.ListenPath, "", 1)
+
+		if len(thisURL) == 0 {
+			return ""
+		}
+
+		if thisURL[:1] == "/" {
+			thisURL = thisURL[1:]
+		}
 
 		// Assume first param is the version ID
 		firstParamEndsAt := strings.Index(thisURL, "/")

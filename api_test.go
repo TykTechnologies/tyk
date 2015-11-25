@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/gorilla/mux"
+	"github.com/lonelycode/tykcommon"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
-
-	"github.com/lonelycode/tykcommon"
 )
 
 var apiTestDef string = `
@@ -57,12 +57,16 @@ func MakeSampleAPI() *APISpec {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := []APISpec{thisSpec}
-	newMuxes := http.NewServeMux()
+	specs := &[]*APISpec{&thisSpec}
+	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
 
-	http.DefaultServeMux = newMuxes
+	newHttmMuxer := http.NewServeMux()
+
+	newHttmMuxer.Handle("/", newMuxes)
+
+	http.DefaultServeMux = newHttmMuxer
 	log.Debug("TEST Reload complete")
 
 	return &thisSpec

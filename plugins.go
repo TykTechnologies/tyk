@@ -116,7 +116,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
-	returnRaw, _ := d.Spec.JSVM.VM.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+	thisVM := d.Spec.JSVM.VM.Copy()
+	returnRaw, _ := thisVM.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object

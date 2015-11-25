@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gorilla/mux"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -165,12 +166,14 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := []APISpec{thisSpec}
-	newMuxes := http.NewServeMux()
+	specs := &[]*APISpec{&thisSpec}
+	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
+	newHttpMuxer := http.NewServeMux()
+	newHttpMuxer.Handle("/", newMuxes)
 
-	http.DefaultServeMux = newMuxes
+	http.DefaultServeMux = newHttpMuxer
 	log.Debug("IP TEST Reload complete")
 
 	return &thisSpec

@@ -106,6 +106,20 @@ type Config struct {
 		ForceSessionProvider bool                          `json:"force_session_provider"`
 		SessionProvider      tykcommon.SessionProviderMeta `json:"session_provider"`
 	} `json:"auth_override"`
+	UptimeTests struct {
+		Disable bool `json:"disable"`
+		Config  struct {
+			FailureTriggerSampleSize int  `json:"failure_trigger_sample_size"`
+			TimeWait                 int  `json:"time_wait"`
+			CheckerPoolSize          int  `json:"checker_pool_size"`
+			EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
+		} `json:"config"`
+	} `json:"uptime_tests"`
+	HostName             string `json:"hostname"`
+	EnableAPISegregation bool   `json:"enable_api_segregation"`
+	ControlAPIHostname   string `json:"control_api_hostname"`
+	EnableCustomDomains  bool   `json:"enable_custom_domains"`
+	EnableJSVM           bool   `json:"enable_jsvm"`
 }
 
 type CertData struct {

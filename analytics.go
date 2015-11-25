@@ -178,8 +178,10 @@ func (c CSVPurger) PurgeCache() {
 // MongoPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type MongoPurger struct {
-	Store     *RedisClusterStorageManager
-	dbSession *mgo.Session
+	Store          *RedisClusterStorageManager
+	dbSession      *mgo.Session
+	CollectionName string
+	SetKeyName     string
 }
 
 // Connect Connects to Mongo
@@ -208,15 +210,95 @@ func (m *MongoPurger) PurgeCache() {
 		m.Connect()
 		m.PurgeCache()
 	} else {
-		analyticsCollection := m.dbSession.DB("").C(config.AnalyticsConfig.MongoCollection)
+		collectionName := config.AnalyticsConfig.MongoCollection
+		if m.CollectionName != "" {
+			collectionName = m.CollectionName
+		}
+		analyticsCollection := m.dbSession.DB("").C(collectionName)
 
-		AnalyticsValues := m.Store.GetAndDeleteSet(ANALYTICS_KEYNAME)
+		analyticsKeyName := ANALYTICS_KEYNAME
+		if m.SetKeyName != "" {
+			analyticsKeyName = m.SetKeyName
+		}
+		AnalyticsValues := m.Store.GetAndDeleteSet(analyticsKeyName)
 
 		if len(AnalyticsValues) > 0 {
 			keys := make([]interface{}, len(AnalyticsValues), len(AnalyticsValues))
 
 			for i, v := range AnalyticsValues {
 				decoded := AnalyticsRecord{}
+				err := msgpack.Unmarshal(v.([]byte), &decoded)
+				log.Debug("Decoded Record: ", decoded)
+				if err != nil {
+					log.Error("Couldn't unmarshal analytics data:")
+					log.Error(err)
+				} else {
+					keys[i] = interface{}(decoded)
+				}
+			}
+
+			err := analyticsCollection.Insert(keys...)
+			if err != nil {
+				log.Error("Problem inserting to mongo collection: ", err)
+			}
+		}
+	}
+
+}
+
+// MongoPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
+// in the Config object
+type MongoUptimePurger struct {
+	Store          *RedisClusterStorageManager
+	dbSession      *mgo.Session
+	CollectionName string
+	SetKeyName     string
+}
+
+// Connect Connects to Mongo
+func (m *MongoUptimePurger) Connect() {
+	var err error
+	m.dbSession, err = mgo.Dial(config.AnalyticsConfig.MongoURL)
+	if err != nil {
+		log.Error("Mongo connection failed:", err)
+		time.Sleep(5)
+		m.Connect()
+	}
+}
+
+// StartPurgeLoop starts the loop that will be started as a goroutine and pull data out of the in-memory
+// store and into MongoDB
+func (m MongoUptimePurger) StartPurgeLoop(nextCount int) {
+	time.Sleep(time.Duration(nextCount) * time.Second)
+	m.PurgeCache()
+	m.StartPurgeLoop(nextCount)
+}
+
+// PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
+func (m *MongoUptimePurger) PurgeCache() {
+	if m.dbSession == nil {
+		log.Debug("Connecting to analytics store")
+		m.Connect()
+		m.PurgeCache()
+	} else {
+		collectionName := config.AnalyticsConfig.MongoCollection
+		if m.CollectionName != "" {
+			collectionName = m.CollectionName
+		}
+		analyticsCollection := m.dbSession.DB("").C(collectionName)
+
+		analyticsKeyName := ANALYTICS_KEYNAME
+		if m.SetKeyName != "" {
+			analyticsKeyName = m.SetKeyName
+		}
+		log.Debug("Getting from: ", analyticsKeyName)
+		AnalyticsValues := m.Store.GetAndDeleteSet(analyticsKeyName)
+
+		if len(AnalyticsValues) > 0 {
+			keys := make([]interface{}, len(AnalyticsValues), len(AnalyticsValues))
+
+			for i, v := range AnalyticsValues {
+				decoded := UptimeReportData{}
 				err := msgpack.Unmarshal(v.([]byte), &decoded)
 				log.Debug("Decoded Record: ", decoded)
 				if err != nil {

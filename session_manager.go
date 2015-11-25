@@ -39,10 +39,14 @@ type SessionState struct {
 	AccessRights     map[string]AccessDefinition `json:"access_rights"`
 	OrgID            string                      `json:"org_id"`
 	OauthClientID    string                      `json:"oauth_client_id"`
+	OauthKeys        map[string]string           `json:"oauth_keys"`
 	BasicAuthData    struct {
 		Password string   `json:"password"`
 		Hash     HashType `json:"hash_type"`
 	} `json:"basic_auth_data"`
+	JWTData struct {
+		Secret string `json:"secret"`
+	} `json:"jwt_data"`
 	HMACEnabled   bool   `json:"hmac_enabled"`
 	HmacSecret    string `json:"hmac_string"`
 	IsInactive    bool   `json:"is_inactive"`
@@ -95,15 +99,16 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
+
+	// Set rolling window (off thread)
+	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
+
 	// Check sentinel
 	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
 	if sentinelActive == nil {
 		// Sentinel is set, fail
 		return false, 1
 	}
-
-	// if not - set rolling window (off thread)
-	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
 
 	currentSession.Allowance--
 	if !l.IsRedisQuotaExceeded(currentSession, key, store) {

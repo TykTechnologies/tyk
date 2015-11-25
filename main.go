@@ -4,8 +4,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/Sirupsen/logrus/hooks/sentry"
 	"github.com/docopt/docopt.go"
+	"github.com/evalphobia/logrus_sentry"
+	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
 	"github.com/lonelycode/tykcommon"
@@ -40,8 +41,11 @@ var DefaultQuotaStore = DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
 
-var ApiSpecRegister = make(map[string]*APISpec)
+var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
+
+var mainRouter *mux.Router
+var defaultRouter *mux.Router
 
 // Generic system error
 const (
@@ -55,12 +59,37 @@ func displayConfig() {
 	log.Info("--> Listening on port: ", config.ListenPort)
 }
 
+func getHostName() string {
+	hName := config.HostName
+	if config.HostName == "" {
+		hName = ""
+	}
+
+	return hName
+}
+
+func pingTest(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Hello Tiki")
+}
+
 // Create all globals and init connection handlers
 func setupGlobals() {
+	mainRouter = mux.NewRouter()
+	if getHostName() != "" {
+		defaultRouter = mainRouter.Host(getHostName()).Subrouter()
+	} else {
+		defaultRouter = mainRouter
+	}
+
+	log.Info("Hostname set: ", getHostName())
 
 	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
 		log.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
+
+	// Initialise our Host Checker
+	HealthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
+	InitHostCheckManager(HealthCheckStore, nil)
 
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
@@ -77,7 +106,8 @@ func setupGlobals() {
 
 		} else if config.AnalyticsConfig.Type == "mongo" {
 			log.Debug("Using MongoDB cache purge")
-			analytics.Clean = &MongoPurger{&AnalyticsStore, nil}
+			analytics.Clean = &MongoPurger{&AnalyticsStore, nil, "", ""}
+			GlobalHostChecker.Clean = &MongoUptimePurger{HealthCheckStore, nil, "tyk_uptime_analytics", UptimeAnalytics_KEYNAME}
 		} else if config.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
 			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
@@ -100,7 +130,9 @@ func setupGlobals() {
 	templates = template.Must(template.ParseFiles(templateFile))
 
 	// Set up global JSVM
-	GlobalEventsJSVM.Init(config.TykJSPath)
+	if config.EnableJSVM {
+		GlobalEventsJSVM.Init(config.TykJSPath)
+	}
 
 	// Get the notifier ready
 	log.Debug("Notifier will not work in hybrid mode")
@@ -118,31 +150,33 @@ func setupGlobals() {
 }
 
 // Pull API Specs from configuration
-func getAPISpecs() []APISpec {
-	var APISpecs []APISpec
-	thisAPILoader := APIDefinitionLoader{}
+var APILoader APIDefinitionLoader = APIDefinitionLoader{}
+
+func getAPISpecs() *[]*APISpec {
+	var APISpecs *[]*APISpec
 
 	if config.UseDBAppConfigs {
 		log.Debug("Using App Configuration from Mongo DB")
-		APISpecs = thisAPILoader.LoadDefinitionsFromMongo()
+		APISpecs = APILoader.LoadDefinitionsFromMongo()
 	} else if config.SlaveOptions.UseRPC {
 		log.Debug("Using RPC Configuration")
-		APISpecs = thisAPILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
+		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
-		APISpecs = thisAPILoader.LoadDefinitions(config.AppPath)
+		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
-	log.Printf("Detected %v APIs", len(APISpecs))
+	log.Printf("Detected %v APIs", len(*APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i, _ := range APISpecs {
-			APISpecs[i].AuthProvider = config.AuthOverride.AuthProvider
+		for i, _ := range *APISpecs {
+			(*APISpecs)[i].AuthProvider = config.AuthOverride.AuthProvider
+
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i, _ := range APISpecs {
-			APISpecs[i].SessionProvider = config.AuthOverride.SessionProvider
+		for i, _ := range *APISpecs {
+			(*APISpecs)[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
 
@@ -168,28 +202,41 @@ func getPolicies() {
 }
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
-func loadAPIEndpoints(Muxer *http.ServeMux) {
+func loadAPIEndpoints(Muxer *mux.Router) {
+
+	var ApiMuxer *mux.Router
+	ApiMuxer = Muxer
+	if config.EnableAPISegregation {
+		if config.ControlAPIHostname != "" {
+			ApiMuxer = Muxer.Host(config.ControlAPIHostname).Subrouter()
+		}
+	}
+
+	// Add a root message to check all is OK
+	ApiMuxer.HandleFunc("/hello", pingTest)
+
 	// set up main API handlers
-	Muxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
-	Muxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
+	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
+	ApiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
 
 	if !IsRPCMode() {
-		Muxer.HandleFunc("/tyk/org/keys/", CheckIsAPIOwner(orgHandler))
-		Muxer.HandleFunc("/tyk/keys/policy/", CheckIsAPIOwner(policyUpdateHandler))
-		Muxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
-		Muxer.HandleFunc("/tyk/apis/", CheckIsAPIOwner(apiHandler))
-		Muxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
-		Muxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
+		ApiMuxer.HandleFunc("/tyk/org/keys/"+"{rest:.*}", CheckIsAPIOwner(orgHandler))
+		ApiMuxer.HandleFunc("/tyk/keys/policy/"+"{rest:.*}", CheckIsAPIOwner(policyUpdateHandler))
+		ApiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
+		ApiMuxer.HandleFunc("/tyk/apis/"+"{rest:.*}", CheckIsAPIOwner(apiHandler))
+		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
+		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
+		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(invalidateOauthRefresh))
 	} else {
 		log.Info("Node is slaved, REST API minimised")
 	}
 
-	Muxer.HandleFunc("/tyk/keys/", CheckIsAPIOwner(keyHandler))
-	Muxer.HandleFunc("/tyk/oauth/clients/", CheckIsAPIOwner(oAuthClientHandler))
+	ApiMuxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(keyHandler))
+	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(oAuthClientHandler))
 }
 
 // Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthManager {
+func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager {
 	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
 	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
@@ -217,7 +264,8 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
-	osinServer.AccessTokenGen = &AccessTokenGenTyk{}
+
+	// osinServer.AccessTokenGen = &AccessTokenGenTyk{}
 
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
@@ -229,7 +277,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *http.ServeMux, test bool) *OAuthMana
 	return &oauthManager
 }
 
-func addBatchEndpoint(spec *APISpec, Muxer *http.ServeMux) {
+func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
 	log.Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	thisBatchHandler := BatchRequestHandler{API: spec}
@@ -348,28 +396,61 @@ func IsRPCMode() bool {
 	return false
 }
 
+func doCopy(from *APISpec, to *APISpec) {
+	*to = *from
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
+func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// load the APi defs
 	log.Debug("Loading API configurations.")
+
+	var tempSpecRegister = make(map[string]*APISpec)
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 
-	listenPaths := make(map[string]bool)
+	listenPaths := make(map[string][]string)
 
 	// Create a new handler for each API spec
-	for apiIndex, _ := range APISpecs {
+	for _, referenceSpec := range *APISpecs {
 		var skip bool
 		// We need a reference to this as we change it on the go and re-use it in a global index
-		referenceSpec := APISpecs[apiIndex]
+		//referenceSpec := (*APISpecs)[apiIndex]
+
 		log.Info("--> Loading API: ", referenceSpec.APIDefinition.Name)
 
-		_, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
+		// Handle custom domains
+		var subrouter *mux.Router
+		if config.EnableCustomDomains {
+			if referenceSpec.Domain != "" {
+				log.Info("----> Custom Domain: ", referenceSpec.Domain)
+				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
+			} else {
+				subrouter = Muxer
+			}
+		} else {
+			subrouter = Muxer
+		}
+
+		onDomains, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
 		if listenPathExists {
-			log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
-			skip = true
+			if config.EnableCustomDomains == false {
+				log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
+				skip = true
+			} else {
+				log.Info("Domain check...")
+				for _, onDomain := range onDomains {
+					log.Info("Checking Domain: ", onDomain)
+					if onDomain == referenceSpec.Domain {
+						log.Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
+						skip = true
+						break
+					}
+				}
+			}
 		}
 
 		if referenceSpec.Proxy.ListenPath == "" {
@@ -389,7 +470,13 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 		if !skip {
 
-			listenPaths[referenceSpec.Proxy.ListenPath] = true
+			listenPaths[referenceSpec.Proxy.ListenPath] = append(listenPaths[referenceSpec.Proxy.ListenPath], referenceSpec.Domain)
+			dN := referenceSpec.Domain
+			if dN == "" {
+				dN = "(no host)"
+			}
+			log.Info("----> Tracking: ", dN)
+
 			// Initialise the auth and session managers (use Redis for now)
 			var authStore StorageHandler
 			var sessionStore StorageHandler
@@ -437,7 +524,6 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			}
 
 			// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
-			healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 			referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
 			//Set up all the JSVM middleware
@@ -445,45 +531,49 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
 
-			log.Debug("Loading Middleware")
-			mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(&referenceSpec)
+			if config.EnableJSVM {
+				log.Debug("----> Loading Middleware")
+				mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(referenceSpec)
 
-			referenceSpec.JSVM.LoadJSPaths(mwPaths)
+				referenceSpec.JSVM.LoadJSPaths(mwPaths)
+			}
 
 			if referenceSpec.EnableBatchRequestSupport {
-				addBatchEndpoint(&referenceSpec, Muxer)
+				addBatchEndpoint(referenceSpec, subrouter)
 			}
 
 			if referenceSpec.UseOauth2 {
-				thisOauthManager := addOAuthHandlers(&referenceSpec, Muxer, false)
+				thisOauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
 				referenceSpec.OAuthManager = thisOauthManager
 			}
 
-			proxy := TykNewSingleHostReverseProxy(remote, &referenceSpec)
+			proxy := TykNewSingleHostReverseProxy(remote, referenceSpec)
 			// initialise the proxy
-			proxy.New(nil, &referenceSpec)
+			proxy.New(nil, referenceSpec)
 			referenceSpec.target = remote
 
 			// Create the response processors
-			creeateResponseMiddlewareChain(&referenceSpec)
+			creeateResponseMiddlewareChain(referenceSpec)
 
 			//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
-			tykMiddleware := &TykMiddleware{&referenceSpec, proxy}
+			tykMiddleware := &TykMiddleware{referenceSpec, proxy}
 
 			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
 			CacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix}
 			CacheStore.Connect()
 
 			if referenceSpec.APIDefinition.UseKeylessAccess {
+				log.Info("----> Checking security policy: Open")
 
 				// Add pre-process MW
 				var chainArray = []alice.Constructor{}
-				handleCORS(&chainArray, &referenceSpec)
+				handleCORS(&chainArray, referenceSpec)
 
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
@@ -505,7 +595,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 				// for KeyLessAccess we can't support rate limiting, versioning or access rules
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
-				Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
+				log.Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
+				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 
 			} else {
 
@@ -514,25 +605,34 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 
 				if referenceSpec.APIDefinition.UseOauth2 {
 					// Oauth2
+					log.Info("----> Checking security policy: OAuth")
 					keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
+					log.Info("----> Checking security policy: Basic")
 					keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.EnableSignatureChecking {
 					// HMAC Auth
+					log.Info("----> Checking security policy: HMAC")
 					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
+				} else if referenceSpec.EnableJWT {
+					// JWT Auth
+					log.Info("----> Checking security policy: JWT")
+					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
 				} else {
 					// Auth key
+					log.Info("----> Checking security policy: Token")
 					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
 				}
 
 				var chainArray = []alice.Constructor{}
 
-				handleCORS(&chainArray, &referenceSpec)
+				handleCORS(&chainArray, referenceSpec)
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
 					keyCheck,
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
@@ -558,6 +658,8 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 				}
 
+				log.Debug("----> Custom middleware processed")
+
 				// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 
@@ -571,15 +673,26 @@ func loadApps(APISpecs []APISpec, Muxer *http.ServeMux) {
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
 
 				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
-				log.Debug("Rate limits available at: ", rateLimitPath)
-				Muxer.Handle(rateLimitPath, simpleChain)
-				Muxer.Handle(referenceSpec.Proxy.ListenPath, chain)
+				log.Debug("----> Rate limits available at: ", rateLimitPath)
+				subrouter.Handle(rateLimitPath, simpleChain)
+				log.Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
+				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 			}
 
-			ApiSpecRegister[referenceSpec.APIDefinition.APIID] = &referenceSpec
+			tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 
+		} else {
+			log.Warning("----> Skipped!")
 		}
 
+	}
+
+	// Swap in the new register
+	ApiSpecRegister = &tempSpecRegister
+
+	// Kick off our host checkers
+	if config.UptimeTests.Disable == false {
+		SetCheckerHostList()
 	}
 
 }
@@ -590,10 +703,9 @@ func RPCReloadLoop(RPCKey string) {
 	}
 }
 
-// ReloadURLStructure will create a new muxer, reload all the app configs for an
-// instance and then replace the DefaultServeMux with the new one, this enables a
-// reconfiguration to take place without stopping any requests from being handled.
-func ReloadURLStructure() {
+func doReload() {
+	time.Sleep(10 * time.Second)
+
 	// Kill RPC if available
 	if config.SlaveOptions.UseRPC {
 		ClearRPCClients()
@@ -602,16 +714,44 @@ func ReloadURLStructure() {
 	// Reset the JSVM
 	GlobalEventsJSVM.Init(config.TykJSPath)
 
-	newMuxes := http.NewServeMux()
+	newRouter := mux.NewRouter()
+	mainRouter = newRouter
+
+	var newMuxes *mux.Router
+	if getHostName() != "" {
+		newMuxes = newRouter.Host(getHostName()).Subrouter()
+	} else {
+		newMuxes = newRouter
+	}
+
 	loadAPIEndpoints(newMuxes)
 	specs := getAPISpecs()
+
 	loadApps(specs, newMuxes)
 
 	// Load the API Policies
 	getPolicies()
 
-	http.DefaultServeMux = newMuxes
+	newServeMux := http.NewServeMux()
+	newServeMux.Handle("/", mainRouter)
+
+	http.DefaultServeMux = newServeMux
+
 	log.Info("API reload complete")
+
+	reloadScheduled = false
+}
+
+var reloadScheduled bool
+
+// ReloadURLStructure will create a new muxer, reload all the app configs for an
+// instance and then replace the DefaultServeMux with the new one, this enables a
+// reconfiguration to take place without stopping any requests from being handled.
+func ReloadURLStructure() {
+	if !reloadScheduled {
+		reloadScheduled = true
+		go doReload()
+	}
 }
 
 func init() {
@@ -770,7 +910,7 @@ func main() {
 		DefaultQuotaStore.Init(GetGlobalStorageHandler("orgkey.", false))
 	}
 
-	loadAPIEndpoints(http.DefaultServeMux)
+	loadAPIEndpoints(defaultRouter)
 
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
@@ -823,7 +963,7 @@ func main() {
 
 		// Accept connections in a new goroutine.
 		specs := getAPISpecs()
-		loadApps(specs, http.DefaultServeMux)
+		loadApps(specs, defaultRouter)
 		getPolicies()
 
 		// Use a custom server so we can control keepalives
@@ -834,13 +974,14 @@ func main() {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
 				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
-				Handler:      http.DefaultServeMux,
+				Handler:      defaultRouter,
 			}
 
 			go s.Serve(l)
 			displayConfig()
 		} else {
 			log.Printf("Gateway started (%v)", VERSION)
+			http.Handle("/", mainRouter)
 			go http.Serve(l, nil)
 			displayConfig()
 		}
@@ -850,7 +991,7 @@ func main() {
 		// Resume accepting connections in a new goroutine.
 		log.Info("Resuming listening on", l.Addr())
 		specs := getAPISpecs()
-		loadApps(specs, http.DefaultServeMux)
+		loadApps(specs, defaultRouter)
 		getPolicies()
 
 		if config.HttpServerOptions.OverrideDefaults {
@@ -859,15 +1000,16 @@ func main() {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
 				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
-				Handler:      http.DefaultServeMux,
+				Handler:      defaultRouter,
 			}
 
 			log.Info("Custom gateway started")
 			go s.Serve(l)
 			displayConfig()
 		} else {
-			log.Printf("Gateway started (%v)", VERSION)
+			log.Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
+			http.Handle("/", mainRouter)
 			http.Serve(l, nil)
 		}
 

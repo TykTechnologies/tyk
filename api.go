@@ -50,7 +50,7 @@ func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 }
 
 func GetSpecForApi(APIID string) *APISpec {
-	spec, ok := ApiSpecRegister[APIID]
+	spec, ok := (*ApiSpecRegister)[APIID]
 	if !ok {
 		return nil
 	}
@@ -60,7 +60,7 @@ func GetSpecForApi(APIID string) *APISpec {
 
 func GetSpecForOrg(APIID string) *APISpec {
 	var aKey string
-	for k, v := range ApiSpecRegister {
+	for k, v := range *ApiSpecRegister {
 		if v.OrgID == APIID {
 			return v
 		}
@@ -68,7 +68,26 @@ func GetSpecForOrg(APIID string) *APISpec {
 	}
 
 	// If we can't find a spec, it doesn;t matter, because we default to Redis anyway, grab whatever you can find
-	return ApiSpecRegister[aKey]
+	return (*ApiSpecRegister)[aKey]
+}
+
+func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionState) {
+	// Check the policy to see if we are forcing an expiry on the key
+	if newSession.ApplyPolicyID != "" {
+		thisPolicy, foundPolicy := Policies[newSession.ApplyPolicyID]
+		if foundPolicy {
+			// Are we foring an expiry?
+			if thisPolicy.KeyExpiresIn > 0 {
+				// We are, does the key exist?
+				_, found := GetKeyDetail(keyName, apiId)
+				if !found {
+					// this is a new key, lets expire it
+					newSession.Expires = time.Now().Unix() + thisPolicy.KeyExpiresIn
+				}
+
+			}
+		}
+	}
 }
 
 func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) error {
@@ -77,6 +96,9 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 		for apiId, _ := range newSession.AccessRights {
 			thisAPISpec := GetSpecForApi(apiId)
 			if thisAPISpec != nil {
+
+				checkAndApplyTrialPeriod(keyName, apiId, &newSession)
+
 				// Lets reset keys if they are edited by admin
 				if !thisAPISpec.DontSetQuotasOnCreate {
 					// Reset quote by default
@@ -84,6 +106,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 						thisAPISpec.SessionManager.ResetQuota(keyName, newSession)
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 					}
+
 					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
 					if err != nil {
 						return err
@@ -101,11 +124,12 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 		// nothing defined, add key to ALL
 		if config.AllowMasterKeys {
 			log.Warning("No API Access Rights set, adding key to ALL.")
-			for _, spec := range ApiSpecRegister {
+			for _, spec := range *ApiSpecRegister {
 				if !dontReset {
 					spec.SessionManager.ResetQuota(keyName, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
+				checkAndApplyTrialPeriod(keyName, spec.APIID, &newSession)
 				err := spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
 				if err != nil {
 					return err
@@ -119,7 +143,8 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 	}
 
 	log.WithFields(logrus.Fields{
-		"key": keyName,
+		"key":     keyName,
+		"expires": newSession.Expires,
 	}).Debug("New key added or updated.")
 	return nil
 }
@@ -338,7 +363,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 
 	if APIID == "-1" {
 		// Go through ALL managed API's and delete the key
-		for _, spec := range ApiSpecRegister {
+		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 		}
 
@@ -380,7 +405,7 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 
 	if APIID == "-1" {
 		// Go through ALL managed API's and delete the key
-		for _, spec := range ApiSpecRegister {
+		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 		}
 
@@ -436,7 +461,7 @@ func handleURLReload() ([]byte, int) {
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
-	log.WithFields(logrus.Fields{}).Info("Reloaded URL Structure - Success")
+	log.WithFields(logrus.Fields{}).Info("Reload URL Structure - Scheduled")
 
 	return responseMessage, code
 }
@@ -472,10 +497,10 @@ func HandleGetAPIList() ([]byte, int) {
 	var err error
 
 	var thisAPIIDList []tykcommon.APIDefinition
-	thisAPIIDList = make([]tykcommon.APIDefinition, len(ApiSpecRegister))
+	thisAPIIDList = make([]tykcommon.APIDefinition, len(*ApiSpecRegister))
 
 	c := 0
-	for _, apiSpec := range ApiSpecRegister {
+	for _, apiSpec := range *ApiSpecRegister {
 		thisAPIIDList[c] = apiSpec.APIDefinition
 		thisAPIIDList[c].RawData = nil
 		c++
@@ -495,7 +520,7 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	for _, apiSpec := range ApiSpecRegister {
+	for _, apiSpec := range *ApiSpecRegister {
 		if apiSpec.APIDefinition.APIID == APIID {
 
 			responseMessage, err = json.Marshal(apiSpec.APIDefinition)
@@ -1097,6 +1122,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				for apiId, _ := range newSession.AccessRights {
 					thisAPISpec := GetSpecForApi(apiId)
 					if thisAPISpec != nil {
+						checkAndApplyTrialPeriod(newKey, apiId, &newSession)
 						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 						if !thisAPISpec.DontSetQuotasOnCreate {
 							// Reset quota by default
@@ -1122,7 +1148,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				if config.AllowMasterKeys {
 					// nothing defined, add key to ALL
 					log.Warning("No API Access Rights set, adding key to ALL.")
-					for _, spec := range ApiSpecRegister {
+					for _, spec := range *ApiSpecRegister {
+						checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
 						if !spec.DontSetQuotasOnCreate {
 							// Reset quote by default
 							spec.SessionManager.ResetQuota(newKey, newSession)
@@ -1250,6 +1277,58 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	DoJSONWrite(w, code, responseMessage)
+}
+
+func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
+	keyCombined := r.URL.Path[len("/tyk/oauth/refresh/"):]
+
+	if r.Method == "DELETE" {
+		APIID := r.FormValue("api_id")
+		if APIID == "" {
+			DoJSONWrite(w, 400, createError("Missing parameter api_id"))
+			return
+		}
+		thisAPISpec := GetSpecForApi(APIID)
+		log.Warning("Looking for refresh token in API ID: ", APIID)
+		if thisAPISpec == nil {
+			DoJSONWrite(w, 400, createError("API for this refresh token not found"))
+			return
+		}
+
+		if thisAPISpec.OAuthManager == nil {
+			DoJSONWrite(w, 400, createError("OAuth is not enabled on this API"))
+			return
+		}
+
+		storeErr := thisAPISpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
+
+		if storeErr != nil {
+			log.Error("Failed to invalidate refresh token: ", storeErr)
+			DoJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
+			return
+		}
+
+		success := APIModifyKeySuccess{
+			Key:    keyCombined,
+			Status: "ok",
+			Action: "deleted",
+		}
+
+		responseMessage, err := json.Marshal(&success)
+
+		if err != nil {
+			log.Error(err)
+			DoJSONWrite(w, 400, createError("Failed to marshal data"))
+			return
+		}
+
+		DoJSONWrite(w, 200, responseMessage)
+		return
+	}
+
+	DoJSONWrite(w, 405, createError("Method not supported"))
+	return
+
 }
 
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {

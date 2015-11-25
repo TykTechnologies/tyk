@@ -20,13 +20,19 @@ type RedisClusterStorageManager struct {
 	HashKeys  bool
 }
 
-func NewRedisClusterPool() *rediscluster.RedisCluster {
-	if redisClusterSingleton != nil {
-		log.Debug("Redis pool already INITIALISED")
-		return redisClusterSingleton
+func NewRedisClusterPool(forceReconnect bool) *rediscluster.RedisCluster {
+	if !forceReconnect {
+		if redisClusterSingleton != nil {
+			log.Debug("Redis pool already INITIALISED")
+			return redisClusterSingleton
+		}
+	} else {
+		if redisClusterSingleton != nil {
+			redisClusterSingleton.CloseConnection()
+		}
 	}
 
-	log.Info("Creating new Redis connection pool")
+	log.Debug("Creating new Redis connection pool")
 
 	maxIdle := 100
 	if config.Storage.MaxIdle > 0 {
@@ -39,7 +45,7 @@ func NewRedisClusterPool() *rediscluster.RedisCluster {
 	}
 
 	if config.Storage.EnableCluster {
-		log.Info("Using clustered mode")
+		log.Info("--> Using clustered mode")
 	}
 
 	thisPoolConf := rediscluster.PoolConfig{
@@ -70,14 +76,17 @@ func NewRedisClusterPool() *rediscluster.RedisCluster {
 
 // Connect will establish a connection to the r.db
 func (r *RedisClusterStorageManager) Connect() bool {
-
 	if r.db == nil {
 		log.Debug("Connecting to redis cluster")
-		r.db = NewRedisClusterPool()
-	} else {
-		log.Debug("Storage Engine already initialised...")
+		r.db = NewRedisClusterPool(false)
+		return true
 	}
 
+	log.Debug("Storage Engine already initialised...")
+	log.Debug("Redis handles: ", len(r.db.Handles))
+
+	// Reset it just in case
+	r.db = redisClusterSingleton
 	return true
 }
 
@@ -432,6 +441,15 @@ func (r *RedisClusterStorageManager) DeleteRawKeys(keys []string, prefix string)
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
 func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback func(redis.Message)) error {
+	if r.db == nil {
+		return errors.New("Redis connection failed")
+	}
+
+	handle := r.db.RandomRedisHandle()
+	if handle == nil {
+		return errors.New("Redis connection failed")
+	}
+
 	psc := redis.PubSubConn{r.db.RandomRedisHandle().Pool.Get()}
 	psc.Subscribe(channel)
 	for {
@@ -444,7 +462,6 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 
 		case error:
 			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
-
 			return v
 		}
 	}
@@ -488,17 +505,18 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 		delCmd.Cmd = "DEL"
 		delCmd.Args = []interface{}{fixedKey}
 
-		r, err := redis.Values(r.db.DoTransaction([]rediscluster.ClusterTransaction{lrange, delCmd}))
+		redVal, err := redis.Values(r.db.DoTransaction([]rediscluster.ClusterTransaction{lrange, delCmd}))
 		if err != nil {
 			log.Error("Multi command failed: ", err)
+			r.Connect()
 		}
 
-		log.Debug("Analytics returned: ", r)
-		if len(r) == 0 {
+		log.Debug("Analytics returned: ", redVal)
+		if len(redVal) == 0 {
 			return []interface{}{}
 		}
 
-		vals := r[0].([]interface{})
+		vals := redVal[0].([]interface{})
 
 		log.Debug("Unpacked vals: ", vals)
 
@@ -597,7 +615,7 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 	if r.db == nil {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
-		r.SetRollingWindow(keyName, per, value_override)
+		return r.SetRollingWindow(keyName, per, value_override)
 	} else {
 		log.Debug("keyName is: ", keyName)
 		now := time.Now()
@@ -626,9 +644,14 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 		EXPIRE.Cmd = "EXPIRE"
 		EXPIRE.Args = []interface{}{keyName, per}
 
-		r, err := redis.Values(r.db.DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
+		redVal, err := redis.Values(r.db.DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
 
-		intVal := len(r[1].([]interface{}))
+		if len(redVal) < 2 {
+			log.Error("Multi command failed: return index is out of range")
+			return 0, []interface{}{}
+		}
+
+		intVal := len(redVal[1].([]interface{}))
 
 		log.Debug("Returned: ", intVal)
 
@@ -636,7 +659,7 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 			log.Error("Multi command failed: ", err)
 		}
 
-		return intVal, r[1].([]interface{})
+		return intVal, redVal[1].([]interface{})
 	}
 	return 0, []interface{}{}
 }
