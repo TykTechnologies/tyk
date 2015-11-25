@@ -100,22 +100,10 @@ fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_instal
 fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm ./=/opt/tyk-gateway
 
 package_cloud push tyk/tyk-gateway/ubuntu/precise *.deb
-
-# package_cloud push tyk/tyk-gateway/ubuntu/trusty *.deb
-# package_cloud push tyk/tyk-gateway/ubuntu/utopic *.deb
-# package_cloud push tyk/tyk-gateway/ubuntu/vivid *.deb
-# package_cloud push tyk/tyk-gateway/ubuntu/xenial *.deb
-
-# package_cloud push tyk/tyk-gateway/debian/jessie *.deb
-# package_cloud push tyk/tyk-gateway/debian/stretch *.deb
-# package_cloud push tyk/tyk-gateway/debian/buster *.deb
-
-
-# package_cloud push tyk/tyk-gateway/el/6 *.rpm
-# package_cloud push tyk/tyk-gateway/el/7 *.rpm
-# package_cloud push tyk/tyk-gateway/fedora/21 *.rpm
-# package_cloud push tyk/tyk-gateway/fedora/22 *.rpm
-# package_cloud push tyk/tyk-gateway/fedora/23 *.rpm
+package_cloud push tyk/tyk-gateway/ubuntu/trusty *.deb
+package_cloud push tyk/tyk-gateway/debian/jessie *.deb
+package_cloud push tyk/tyk-gateway/el/6 *.rpm
+package_cloud push tyk/tyk-gateway/el/7 *.rpm
 
 
 echo "Creating Deb Package for i386"
@@ -123,28 +111,22 @@ cd $i386TGZDIR/
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb ./=/opt/tyk-gateway
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t rpm ./=/opt/tyk-gateway
 
-
-# package_cloud push tyk/tyk-gateway/ubuntu/trusty *.deb
-# package_cloud push tyk/tyk-gateway/debian/buster *.deb
-# package_cloud push tyk/tyk-gateway/el/7 *.rpm
-# package_cloud push tyk/tyk-gateway/fedora/23 *.rpm
+package_cloud push tyk/tyk-gateway/ubuntu/precise *.deb
+package_cloud push tyk/tyk-gateway/ubuntu/trusty *.deb
+package_cloud push tyk/tyk-gateway/debian/jessie *.deb
+package_cloud push tyk/tyk-gateway/el/6 *.rpm
+package_cloud push tyk/tyk-gateway/el/7 *.rpm
 
 echo "Creating Deb Package for ARM"
 cd $armTGZDIR/
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm -s dir -t deb ./=/opt/tyk-gateway
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm -s dir -t rpm ./=/opt/tyk-gateway
 
-# package_cloud push tyk/tyk-gateway/ubuntu/precise *.deb
-# package_cloud push tyk/tyk-gateway/ubuntu/trusty *.deb
-
-# package_cloud push tyk/tyk-gateway/debian/jessie *.deb
-
-# package_cloud push tyk/tyk-gateway/raspbian/jessie *.deb
-# package_cloud push tyk/tyk-gateway/raspbian/stretch *.deb
-# package_cloud push tyk/tyk-gateway/raspbian/buster *.deb
-
-# package_cloud push tyk/tyk-gateway/el/7 *.rpm
-# package_cloud push tyk/tyk-gateway/fedora/23 *.rpm
+package_cloud push tyk/tyk-gateway/ubuntu/precise *.deb
+package_cloud push tyk/tyk-gateway/ubuntu/trusty *.deb
+package_cloud push tyk/tyk-gateway/debian/jessie *.deb
+package_cloud push tyk/tyk-gateway/el/6 *.rpm
+package_cloud push tyk/tyk-gateway/el/7 *.rpm
 
 #echo "Re-installing"
 #cd $amd64TGZDIR/
