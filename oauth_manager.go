@@ -122,7 +122,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		code = 405
 		responseMessage = createError("Method not supported")
 	}
-
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	fmt.Fprintf(w, string(responseMessage))
 }
@@ -319,7 +319,6 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				}
 			}
 		}
-		
 
 		log.Debug("[OAuth] Finishing access request ")
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
@@ -468,12 +467,12 @@ func (r RedisOsinStorageInterface) Close() {}
 func (r RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := CLIENT_PREFIX + id
 
-	log.Debug("Getting client ID:", key)
+	log.Info("Getting client ID:", id)
 
 	clientJSON, storeErr := r.store.GetKey(key)
 
 	if storeErr != nil {
-		log.Error("Failure retreiving client ID key")
+		log.Error("Failure retreiving client ID key: ", key)
 		log.Error(storeErr)
 		return nil, storeErr
 	}
