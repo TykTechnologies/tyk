@@ -40,14 +40,15 @@ type Config struct {
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
-		Type               string   `json:"type"`
-		CSVDir             string   `json:"csv_dir"`
-		MongoURL           string   `json:"mongo_url"`
-		MongoDbName        string   `json:"mongo_db_name"`
-		MongoCollection    string   `json:"mongo_collection"`
-		PurgeDelay         int      `json:"purge_delay"`
-		IgnoredIPs         []string `json:"ignored_ips"`
-		ignoredIPsCompiled map[string]bool
+		Type                    string   `json:"type"`
+		CSVDir                  string   `json:"csv_dir"`
+		MongoURL                string   `json:"mongo_url"`
+		MongoDbName             string   `json:"mongo_db_name"`
+		MongoCollection         string   `json:"mongo_collection"`
+		PurgeDelay              int      `json:"purge_delay"`
+		IgnoredIPs              []string `json:"ignored_ips"`
+		EnableDetailedRecording bool     `json:"enable_detailed_recording"`
+		ignoredIPsCompiled      map[string]bool
 	} `json:"analytics_config"`
 	HealthCheck struct {
 		EnableHealthChecks      bool  `json:"enable_health_checks"`

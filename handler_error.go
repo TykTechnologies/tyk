@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/gorilla/context"
 	"net/http"
@@ -58,6 +59,22 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			tags = thisSessionState.(SessionState).Tags
 		}
 
+		var requestCopy *http.Request
+		if config.AnalyticsConfig.EnableDetailedRecording {
+			requestCopy = CopyHttpRequest(r)
+		}
+
+		rawRequest := ""
+		rawResponse := ""
+		if config.AnalyticsConfig.EnableDetailedRecording {
+			if requestCopy != nil {
+				// Get the wire format representation
+				var wireFormatReq bytes.Buffer
+				requestCopy.Write(&wireFormatReq)
+				rawRequest = wireFormatReq.String()
+			}
+		}
+
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
@@ -76,6 +93,8 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			e.Spec.APIDefinition.OrgID,
 			OauthClientID,
 			0,
+			rawRequest,
+			rawResponse,
 			tags,
 			time.Now(),
 		}

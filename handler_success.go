@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 	"net/http"
@@ -142,7 +143,7 @@ type SuccessHandler struct {
 	*TykMiddleware
 }
 
-func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int) {
+func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack {
 		return
@@ -175,6 +176,23 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			tags = thisSessionState.(SessionState).Tags
 		}
 
+		rawRequest := ""
+		rawResponse := ""
+		if config.AnalyticsConfig.EnableDetailedRecording {
+			if requestCopy != nil {
+				// Get the wire format representation
+				var wireFormatReq bytes.Buffer
+				requestCopy.Write(&wireFormatReq)
+				rawRequest = wireFormatReq.String()
+			}
+			if responseCopy != nil {
+				// Get the wire format representation
+				var wireFormatRes bytes.Buffer
+				responseCopy.Write(&wireFormatRes)
+				rawResponse = wireFormatRes.String()
+			}
+		}
+
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
@@ -193,6 +211,8 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			s.Spec.APIDefinition.OrgID,
 			OauthClientID,
 			timing,
+			rawRequest,
+			rawResponse,
 			tags,
 			time.Now(),
 		}
@@ -234,15 +254,25 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
 
+	var copiedRequest *http.Request
+	if config.AnalyticsConfig.EnableDetailedRecording {
+		copiedRequest = CopyHttpRequest(r)
+	}
+
 	t1 := time.Now()
 	resp := s.Proxy.ServeHTTP(w, r)
 	t2 := time.Now()
+
+	var copiedResponse *http.Response
+	if config.AnalyticsConfig.EnableDetailedRecording {
+		copiedResponse := CopyHttpResponse(resp)
+	}
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp != nil {
-		s.RecordHit(w, r, int64(millisec), resp.StatusCode)
+		s.RecordHit(w, r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
 
 	return nil
@@ -257,15 +287,25 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 	}
 
+	var copiedRequest *http.Request
+	if config.AnalyticsConfig.EnableDetailedRecording {
+		copiedRequest = CopyHttpRequest(r)
+	}
+
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
 	t2 := time.Now()
+
+	var copiedResponse *http.Response
+	if config.AnalyticsConfig.EnableDetailedRecording {
+		copiedResponse := CopyHttpResponse(inRes)
+	}
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes != nil {
-		s.RecordHit(w, r, int64(millisec), inRes.StatusCode)
+		s.RecordHit(w, r, int64(millisec), inRes.StatusCode, copiedRequest, copiedResponse)
 	}
 
 	return inRes

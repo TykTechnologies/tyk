@@ -29,6 +29,8 @@ type AnalyticsRecord struct {
 	OrgID         string
 	OauthID       string
 	RequestTime   int64
+	RawRequest    string
+	RawResponse   string
 	Tags          []string
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
