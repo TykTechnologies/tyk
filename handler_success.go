@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	b64 "encoding/base64"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 	"net/http"
@@ -183,13 +184,13 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 				// Get the wire format representation
 				var wireFormatReq bytes.Buffer
 				requestCopy.Write(&wireFormatReq)
-				rawRequest = wireFormatReq.String()
+				rawRequest = b64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 			}
 			if responseCopy != nil {
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
-				rawResponse = wireFormatRes.String()
+				rawResponse = b64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
 
@@ -265,7 +266,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 
 	var copiedResponse *http.Response
 	if config.AnalyticsConfig.EnableDetailedRecording {
-		copiedResponse := CopyHttpResponse(resp)
+		copiedResponse = CopyHttpResponse(resp)
 	}
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
@@ -298,7 +299,7 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 
 	var copiedResponse *http.Response
 	if config.AnalyticsConfig.EnableDetailedRecording {
-		copiedResponse := CopyHttpResponse(inRes)
+		copiedResponse = CopyHttpResponse(inRes)
 	}
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001

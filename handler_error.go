@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	b64 "encoding/base64"
 	"fmt"
 	"github.com/gorilla/context"
 	"net/http"
@@ -71,7 +72,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 				// Get the wire format representation
 				var wireFormatReq bytes.Buffer
 				requestCopy.Write(&wireFormatReq)
-				rawRequest = wireFormatReq.String()
+				rawRequest = b64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 			}
 		}
 

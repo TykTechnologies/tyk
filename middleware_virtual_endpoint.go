@@ -116,6 +116,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
+	var copiedRequest *http.Request
+	if config.AnalyticsConfig.EnableDetailedRecording {
+		copiedRequest = CopyHttpRequest(r)
+	}
+
 	t1 := time.Now().UnixNano()
 	thisMeta := meta.(*tykcommon.VirtualMeta)
 
@@ -225,6 +230,12 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		log.Error("Response chain failed! ", chainErr)
 	}
 
+	// deep logging
+	var copiedResponse *http.Response
+	if config.AnalyticsConfig.EnableDetailedRecording {
+		copiedResponse = CopyHttpResponse(newResponse)
+	}
+
 	// Clone the response so we can save it
 	copiedRes := new(http.Response)
 	*copiedRes = *newResponse // includes shallow copies of maps, but okay
@@ -245,7 +256,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	d.HandleResponse(w, newResponse, &thisSessionState)
 
 	// Record analytics
-	go d.sh.RecordHit(w, r, 0, newResponse.StatusCode)
+	go d.sh.RecordHit(w, r, 0, newResponse.StatusCode, copiedRequest, copiedResponse)
 
 	return copiedRes
 

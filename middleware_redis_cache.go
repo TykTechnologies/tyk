@@ -106,6 +106,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				authHeaderValue = authVal.(string)
 			}
 
+			var copiedRequest *http.Request
+			if config.AnalyticsConfig.EnableDetailedRecording {
+				copiedRequest = CopyHttpRequest(r)
+			}
+
 			thisKey := m.CreateCheckSum(r, authHeaderValue)
 			retBlob, found := m.CacheStore.GetKey(thisKey)
 			if found != nil {
@@ -191,7 +196,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			// Record analytics
 			if m.Spec.DoNotTrack == false {
-				go m.sh.RecordHit(w, r, 0, newRes.StatusCode)
+				go m.sh.RecordHit(w, r, 0, newRes.StatusCode, copiedRequest, nil)
 			}
 
 			// Stop any further execution
