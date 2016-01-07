@@ -7,6 +7,7 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -242,6 +243,10 @@ func (m *MongoPurger) PurgeCache() {
 			err := analyticsCollection.Insert(keys...)
 			if err != nil {
 				log.Error("Problem inserting to mongo collection: ", err)
+				if strings.Contains(err.Error(), "Closed explicitly") {
+					log.Warning("--> Detected connection failure, reconnecting")
+					m.Connect()
+				}
 			}
 		}
 	}
@@ -314,6 +319,10 @@ func (m *MongoUptimePurger) PurgeCache() {
 			err := analyticsCollection.Insert(keys...)
 			if err != nil {
 				log.Error("Problem inserting to mongo collection: ", err)
+				if strings.Contains(err.Error(), "Closed explicitly") {
+					log.Warning("--> Detected connection failure, reconnecting")
+					m.Connect()
+				}
 			}
 		}
 	}

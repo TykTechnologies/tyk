@@ -1,6 +1,7 @@
 # 1.9.1
 
 - Added new feature: Detailed logging, enable by setting `analytics_config.enable_detailed_recording` to true, two new fields will be added to analytics data: rawRequest and rawResponse, these will be in wire format and are *NOT* anonymised. This adds additional processing complexity to request throughput so could degrade performance.
+- Added a check for connection failures
 
 
 # 1.9
