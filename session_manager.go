@@ -187,7 +187,20 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 
 	// if the returned val is >= quota: block
 	if (int64(qInt) - 1) >= currentSession.QuotaMax {
-		return true
+		RenewalDate := time.Unix(currentSession.QuotaRenews, 0)
+		log.Debug("Renewal Date is: ", RenewalDate)
+		log.Debug("Now:", time.Now())
+		if time.Now().After(RenewalDate) {
+			// The renewal date is in the past, we should update the quota!
+			// Also, this fixes legacy issues where there is no TTL on quota buckets
+			log.Warning("Incorrect key expiry setting detected, correcting.")
+			go store.DeleteRawKey(rawKey)
+			qInt = 1
+		} else {
+			// Renewal date is in the future and the quota is exceeded
+			return true
+		}
+
 	}
 
 	// If this is a new Quota period, ensure we let the end user know

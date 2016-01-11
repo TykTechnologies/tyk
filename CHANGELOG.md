@@ -3,9 +3,10 @@
 - Added new feature: Detailed logging, enable by setting `analytics_config.enable_detailed_recording` to true, two new fields will be added to analytics data: rawRequest and rawResponse, these will be in wire format and are *NOT* anonymised. This adds additional processing complexity to request throughput so could degrade performance.
 - Added a check for connection failures
 - Updating a key with a quota reset set to true will also remove any rate limit sentinels
-- CURL Rewrites and cache interactions now work properly, although you need to define the cached entry as the rewritten pattern in a seperate entry.
+- URL Rewrites and cache interactions now work properly, although you need to define the cached entry as the rewritten pattern in a seperate entry.
 - Org quotas monitors now only fire when the renewal is in the future, not the past.
-
+- Fixed bug where quotas would not reset (regression introduced by switch to Redis Cluster), Tyk will automaticall correct quota entries taht are incorrect.
+- Using golang builtins for time checking
 # 1.9
 
 - Gateway Mongo Driver updated to be compatible with MongoDB v3.0

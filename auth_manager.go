@@ -71,11 +71,11 @@ func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSta
 // IsKeyExpired checks if a key has expired, if the value of SessionState.Expires is 0, it will be ignored
 func (b DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
 	if newSession.Expires >= 1 {
-		diff := newSession.Expires - time.Now().Unix()
-		if diff > 0 {
-			return false
+		//diff := newSession.Expires - time.Now().Unix()
+		if time.Now().After(time.Unix(newSession.Expires, 0)) {
+			return true
 		}
-		return true
+		return false
 	}
 	return false
 }
@@ -91,12 +91,15 @@ func (b *DefaultSessionManager) GetStore() StorageHandler {
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState) {
 	log.Warning("Tracked quota reset for key: ", keyName)
-	rawKey := QuotaKeyPrefix + keyName
-	log.Debug("Setting: ", rawKey)
+	rawKey := QuotaKeyPrefix + publicHash(keyName)
+	log.Info("Setting key quota: ", rawKey)
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(keyName) + ".BLOCKED"
+	// Clear the rate limiter
 	go b.Store.DeleteRawKey(rateLimiterSentinelKey)
-	go b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+	// Fix the raw key
+	go b.Store.DeleteRawKey(rawKey)
+	//go b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 }
 
 // UpdateSession updates the session state in the storage engine
