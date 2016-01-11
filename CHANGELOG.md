@@ -4,6 +4,7 @@
 - Added a check for connection failures
 - Updating a key with a quota reset set to true will also remove any rate limit sentinels
 - CURL Rewrites and cache interactions now work properly, although you need to define the cached entry as the rewritten pattern in a seperate entry.
+- Org quotas monitors now only fire when the renewal is in the future, not the past.
 
 # 1.9
 
