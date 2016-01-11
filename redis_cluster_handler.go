@@ -246,7 +246,7 @@ func (r *RedisClusterStorageManager) IncrememntWithExpire(keyName string, expire
 		log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
 		if val == 1 {
 			log.Debug("--> Setting Expire")
-			r.db.Send("EXPIRE", fixedKey, expire)
+			r.db.Do("EXPIRE", fixedKey, expire)
 		}
 		if err != nil {
 			log.Error("Error trying to increment value:", err)

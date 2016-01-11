@@ -41,9 +41,20 @@ func (m Monitor) Check(sessionData *SessionState, key string) {
 	usagePerc = (float64(remainder) / float64(sessionData.QuotaMax)) * 100.0
 
 	log.Debug("Perc is: ", usagePerc)
+	RenewalDate := time.Unix(sessionData.QuotaRenews, 0)
+
+	log.Debug("Now is: ", time.Now())
+	log.Debug("Renewal is: ", RenewalDate)
+	if time.Now().After(RenewalDate) {
+		// Make sure that renewal is still in the future, If renewal is in the past,
+		// then the quota can expire and will auto-renew
+		log.Debug("Renewal date is in the past, skipping")
+		return
+	}
 
 	if config.Monitor.GlobalTriggerLimit > 0.0 {
 		if usagePerc >= config.Monitor.GlobalTriggerLimit {
+			log.Info("Firing...")
 			m.Fire(sessionData, key, config.Monitor.GlobalTriggerLimit)
 		}
 	}
@@ -52,6 +63,7 @@ func (m Monitor) Check(sessionData *SessionState, key string) {
 		if usagePerc >= triggerLimit {
 
 			if triggerLimit != config.Monitor.GlobalTriggerLimit {
+				log.Info("Firing...")
 				m.Fire(sessionData, key, triggerLimit)
 				break
 			}

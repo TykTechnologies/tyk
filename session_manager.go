@@ -181,6 +181,7 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 	log.Debug("[QUOTA] Inbound raw key is: ", key)
 	rawKey := QuotaKeyPrefix + publicHash(key)
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
+	log.Debug("Renewing with TTL: ", currentSession.QuotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
 
