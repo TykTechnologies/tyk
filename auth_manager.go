@@ -93,6 +93,9 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 	log.Warning("Tracked quota reset for key: ", keyName)
 	rawKey := QuotaKeyPrefix + keyName
 	log.Debug("Setting: ", rawKey)
+
+	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(keyName) + ".BLOCKED"
+	go b.Store.DeleteRawKey(rateLimiterSentinelKey)
 	go b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 }
 
