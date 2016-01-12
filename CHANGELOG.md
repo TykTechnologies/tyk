@@ -7,6 +7,7 @@
 - Org quotas monitors now only fire when the renewal is in the future, not the past.
 - Fixed bug where quotas would not reset (regression introduced by switch to Redis Cluster), Tyk will automaticall correct quota entries taht are incorrect.
 - Using golang builtins for time checking
+
 # 1.9
 
 - Gateway Mongo Driver updated to be compatible with MongoDB v3.0
