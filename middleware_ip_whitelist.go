@@ -32,7 +32,12 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 
 	// Enabled, check incoming IP address
 	for _, ip := range i.TykMiddleware.Spec.AllowedIPs {
-		allowedIP := net.ParseIP(ip)
+		// Might be CIDR, try this one first then fallback to IP parsing later
+		allowedIP, allowedNet, err := net.ParseCIDR(ip)
+		if err != nil {
+			allowedIP = net.ParseIP(ip)
+		}
+
 		splitIP := strings.Split(r.RemoteAddr, ":")
 		remoteIPString := splitIP[0]
 		if len(splitIP) > 2 {
@@ -41,8 +46,14 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 		remoteIP = net.ParseIP(remoteIPString)
 
+		// Check CIDR if possible
+		if allowedNet != nil && allowedNet.Contains(remoteIP) {
+			// matched, pass through
+			return nil, 200
+		}
+
 		// We parse the IP to manage IPv4 and IPv6 easily
-		if allowedIP.String() == remoteIP.String() {
+		if allowedIP.Equal(remoteIP) {
 			// matched, pass through
 			return nil, 200
 		}
