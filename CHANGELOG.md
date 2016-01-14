@@ -1,6 +1,7 @@
-# Develop
+# 1.9.1.1
 
 - Added CIDR Support (thanks @iwat)
+- Updated to build with Go 1.5.3 to address [CVE-2015-8618](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-8618)
 
 # 1.9.1
 
