@@ -453,7 +453,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		var bodyBuffer bytes.Buffer
 		bodyBuffer2 := new(bytes.Buffer)
 
-		p.copyResponse(&bodyBuffer, res.Body)
+		p.CopyResponse(&bodyBuffer, res.Body)
 		*bodyBuffer2 = bodyBuffer
 
 		// Create new ReadClosers so we can split output
@@ -502,11 +502,11 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	copyHeader(rw.Header(), res.Header)
 
 	rw.WriteHeader(res.StatusCode)
-	p.copyResponse(rw, res.Body)
+	p.CopyResponse(rw, res.Body)
 	return nil
 }
 
-func (p *ReverseProxy) copyResponse(dst io.Writer, src io.Reader) {
+func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader) {
 	if p.FlushInterval != 0 {
 		if wf, ok := dst.(writeFlusher); ok {
 			mlw := &maxLatencyWriter{

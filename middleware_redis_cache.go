@@ -192,7 +192,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 			w.Header().Add("x-tyk-cached-response", "1")
 			w.WriteHeader(newRes.StatusCode)
-			m.Proxy.copyResponse(w, newRes.Body)
+			m.Proxy.CopyResponse(w, newRes.Body)
 
 			// Record analytics
 			if m.Spec.DoNotTrack == false {

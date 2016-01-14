@@ -547,10 +547,25 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				referenceSpec.OAuthManager = thisOauthManager
 			}
 
-			proxy := TykNewSingleHostReverseProxy(remote, referenceSpec)
+			enableVersionOverrides := false
+			for _, versionData := range referenceSpec.VersionData.Versions {
+				if versionData.OverrideTarget != "" {
+					enableVersionOverrides = true
+					break
+				}
+			}
+
+			referenceSpec.target = remote
+			var proxy ReturningHttpHandler
+			if enableVersionOverrides {
+				log.Info("----> Multi target enabled")
+				proxy = &MultiTargetProxy{}
+			} else {
+				proxy = TykNewSingleHostReverseProxy(remote, referenceSpec)
+			}
+
 			// initialise the proxy
 			proxy.New(nil, referenceSpec)
-			referenceSpec.target = remote
 
 			// Create the response processors
 			creeateResponseMiddlewareChain(referenceSpec)

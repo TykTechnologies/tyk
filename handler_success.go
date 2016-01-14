@@ -5,6 +5,7 @@ import (
 	b64 "encoding/base64"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
+	"io"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -26,11 +27,18 @@ const (
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
 
+type ReturningHttpHandler interface {
+	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response
+	ServeHTTPForCache(http.ResponseWriter, *http.Request) *http.Response
+	CopyResponse(io.Writer, io.Reader)
+	New(interface{}, *APISpec) (TykResponseHandler, error)
+}
+
 // TykMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type TykMiddleware struct {
 	Spec  *APISpec
-	Proxy *ReverseProxy
+	Proxy ReturningHttpHandler
 }
 
 func SetUpSessionCache() *cache.Cache {
