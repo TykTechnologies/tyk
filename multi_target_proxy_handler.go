@@ -60,11 +60,11 @@ func (m *MultiTargetProxy) New(c interface{}, spec *APISpec) (TykResponseHandler
 
 	for versionName, versionData := range spec.VersionData.Versions {
 		if versionData.OverrideTarget == "" {
-			log.Info("----> Version ", versionName, " has no target")
+			log.Info("----> Version ", versionName, " has no override target")
 			m.VersionProxyMap[versionName] = m.defaultProxy
 		} else {
 			versionRemote, vRemoteErr := url.Parse(versionData.OverrideTarget)
-			log.Info("----> Version ", versionName, " has '", versionData.OverrideTarget, "' for target")
+			log.Info("----> Version ", versionName, " has '", versionData.OverrideTarget, "' for override target")
 			log.Debug("Multi-target URL: ", versionData.OverrideTarget)
 			log.Debug("Multi-target URL (obj): ", versionRemote)
 			if vRemoteErr != nil {

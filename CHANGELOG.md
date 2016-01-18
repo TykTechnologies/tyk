@@ -1,3 +1,7 @@
+# Develop
+
+- Limited multi-target support on a per-version basis: simply add "override_target": "http://domain.com" to the version section in your API Definition. Round Robin LB and Servie Discovery are *not* supported. 
+
 # 1.9.1.1
 
 - Added CIDR Support (thanks @iwat)
