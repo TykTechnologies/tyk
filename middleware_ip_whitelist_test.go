@@ -266,6 +266,65 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 	}
 }
 
+func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
+	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	thisSession := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
+	uri := "/about-lonelycoder/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.RemoteAddr = "10.0.0.1"
+	req.Header.Add("authorization", "gfgg1234")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(*spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 403 {
+		t.Error("Invalid response code, should be 403:  \n", recorder.Code, recorder.Body, req.RemoteAddr)
+	}
+}
+
+func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
+	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	thisSession := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
+	uri := "/about-lonelycoder/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.RemoteAddr = "10.0.0.1"
+	req.Header.Add("X-Forwarded-For", "127.0.0.1")
+	req.Header.Add("authorization", "gfgg1234")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getChain(*spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Invalid response code, should be 200:  \n", recorder.Code, recorder.Body, req.RemoteAddr)
+	}
+}
+
 func TestIpMiddlewareIPMissing(t *testing.T) {
 	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionMissing)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
