@@ -266,6 +266,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	// Set the token ID
 	token.Header["kid"] = thisTokenKID
+	log.Info("Kid is: ", thisTokenKID)
 	// Set some claims
 	token.Claims["foo"] = "bar"
 	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -466,7 +467,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	token.Header["kid"] = "12345"
 	// Set some claims
 	token.Claims["foo"] = "bar"
-	token.Claims["user_id"] = "my-test-user"
+	token.Claims["user_id"] = randSeq(10)
 	token.Claims["policy_id"] = "987654321"
 	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
@@ -526,7 +527,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	token.Header["kid"] = "12345"
 	// Set some claims
 	token.Claims["foo"] = "bar"
-	token.Claims["user_id"] = "my-test-user2"
+	token.Claims["user_id"] = randSeq(10)
 	token.Claims["policy_id"] = "1234567898978788"
 	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
@@ -586,7 +587,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	token.Header["kid"] = "12345"
 	// Set some claims
 	token.Claims["foo"] = "bar"
-	token.Claims["user_id"] = "my-test-user"
+	token.Claims["user_id"] = randSeq(10)
 	token.Claims["policy_id"] = "987654321"
 	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string

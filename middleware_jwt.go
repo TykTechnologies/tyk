@@ -120,6 +120,34 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 	return nil, errors.New("No matching KID could be found")
 }
 
+func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
+	// Try using a kid or sub header
+	idFound := false
+	var tykId string
+	if token.Header["kid"] != nil {
+		tykId = token.Header["kid"].(string)
+		idFound = true
+	}
+
+	if !idFound {
+		if token.Claims["sub"] != nil {
+			tykId = token.Claims["sub"].(string)
+			idFound = true
+		}
+	}
+
+	if idFound {
+		// Check Base64 encoded
+		decodedKID, decErr := b64.StdEncoding.DecodeString(tykId)
+		if decErr == nil {
+			//No error, probably encoded
+			tykId = string(decodedKID)
+		}
+	}
+
+	return tykId, idFound
+}
+
 func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	thisConfig := k.TykMiddleware.Spec.APIDefinition
 	// Check for central JWT source
@@ -144,54 +172,22 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	}
 
 	// Try using a kid or sub header
-	idFound := false
-	var tykId string
-	if token.Header["kid"] != nil {
-		tykId = token.Header["kid"].(string)
-		idFound = true
-	}
+	tykId, found := k.getIdentityFomToken(token)
 
-	if !idFound {
-		if token.Claims["sub"] != nil {
-			tykId = token.Claims["sub"].(string)
-			idFound = true
-		}
-	}
-
-	if !idFound {
+	if !found {
 		return nil, errors.New("Key ID not found")
 	}
 
-	// Check Base64 encoded
-	encoded := false
-	decodedKID, decErr := b64.StdEncoding.DecodeString(tykId)
-	if decErr == nil {
-		//No error, probably encoded
-		encoded = true
-	}
-
 	var thisSessionState SessionState
-	var keyExists, rawKeyExists bool
-	if encoded {
-		// Decoding did not fail, it might be encoded
-		thisSessionState, keyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(string(decodedKID))
-		if !keyExists {
-			//
-			thisSessionState, rawKeyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
-			if !rawKeyExists {
-				return nil, errors.New("Token invalid, key not found.")
-			}
-		}
-
-		return []byte(thisSessionState.JWTData.Secret), nil
-	}
-
+	var rawKeyExists bool
+	
 	// Couldn't b64 decode the kid, so lets try it raw
+	log.Debug("Getting key: ", tykId)
 	thisSessionState, rawKeyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !rawKeyExists {
+		log.Info("Not found!")
 		return nil, errors.New("Token invalid, key not found.")
 	}
-
 	return []byte(thisSessionState.JWTData.Secret), nil
 }
 
@@ -257,7 +253,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			}
 		}
 
-		val, secretErr := k.getSecret(token)
+		var val []byte
+		var secretErr error
+
+		val, secretErr = k.getSecret(token)
 		if secretErr != nil {
 			log.Error("Couldn't get token: ", secretErr)
 		}
@@ -348,7 +347,15 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		}
 
 		// It isn't, lets go ahead with the existing session
-		log.Debug("Using raw key ID")
+
+		found := false
+		tykId, found = k.getIdentityFomToken(token)
+
+		if !found {
+			return errors.New("Key id not found"), 403
+		}
+
+		log.Info("Using raw key ID: ", tykId)
 		thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 		if !keyExists {
 			return errors.New("Key not authorized"), 403
