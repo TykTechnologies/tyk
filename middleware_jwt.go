@@ -3,18 +3,49 @@ package main
 import "net/http"
 
 import (
+	"crypto/md5"
+	b64 "encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
+	"github.com/pmylund/go-cache"
 	"io"
+	"io/ioutil"
+	"strings"
+	"time"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type JWTMiddleware struct {
 	*TykMiddleware
+}
+
+var JWKCache *cache.Cache
+
+type JWK struct {
+	Alg string   `json:"alg"`
+	Kty string   `json:"kty"`
+	Use string   `json:"use"`
+	X5c []string `json:"x5c"`
+	N   string   `json:"n"`
+	E   string   `json:"e"`
+	KID string   `json:"kid"`
+	X5t string   `json:"x5t"`
+}
+
+type JWKs struct {
+	Keys []JWK `json:"keys"`
+}
+
+func stripBearer(token string) string {
+	thisToken := strings.Replace(token, "Bearer", "", 1)
+	thisToken = strings.Replace(thisToken, "bearer", "", 1)
+	thisToken = strings.TrimSpace(thisToken)
+	return thisToken
 }
 
 func (k JWTMiddleware) New() {}
@@ -28,9 +59,144 @@ func (k *JWTMiddleware) copyResponse(dst io.Writer, src io.Reader) {
 	io.Copy(dst, src)
 }
 
+func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string) ([]byte, error) {
+	// Implement a cache
+	if JWKCache == nil {
+		log.Debug("Creating JWK Cache")
+		JWKCache = cache.New(240*time.Second, 30*time.Second)
+	}
+
+	var thisJWKSet JWKs
+	cachedJWK, found := JWKCache.Get(k.TykMiddleware.Spec.APIID)
+	if !found {
+		// Get the JWK
+		log.Debug("Pulling JWK")
+		response, err := http.Get(url)
+		if err != nil {
+			log.Error("Failed to get resource URL: ", err)
+			return nil, err
+		}
+
+		// Decode it
+		defer response.Body.Close()
+		contents, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			log.Error("Failed to read body data: ", err)
+			return nil, err
+		}
+
+		decErr := json.Unmarshal(contents, &thisJWKSet)
+		if decErr != nil {
+			log.Error("Failed to decode body JWK: ", decErr)
+			return nil, err
+		}
+
+		// Cache it
+		log.Debug("Caching JWK")
+		JWKCache.Set(k.TykMiddleware.Spec.APIID, thisJWKSet, cache.DefaultExpiration)
+	} else {
+		thisJWKSet = cachedJWK.(JWKs)
+	}
+
+	log.Debug("Checking JWKs...")
+	for _, val := range thisJWKSet.Keys {
+		if val.KID == kid {
+			if strings.ToLower(val.Kty) == strings.ToLower(keyType) {
+				if len(val.X5c) > 0 {
+					// Use the first cert only
+					decodedCert, decErr := b64.StdEncoding.DecodeString(val.X5c[0])
+					if decErr != nil {
+						return nil, decErr
+					}
+					log.Debug("Found cert! Replying...")
+					log.Debug("Cert was: ", string(decodedCert))
+					return decodedCert, nil
+				}
+				return nil, errors.New("No certificates in JWK!")
+			}
+		}
+	}
+
+	return nil, errors.New("No matching KID could be found")
+}
+
+func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
+	thisConfig := k.TykMiddleware.Spec.APIDefinition
+	// Check for central JWT source
+	if thisConfig.JWTSource != "" {
+
+		// Is it a URL?
+		if strings.HasPrefix(strings.ToLower(thisConfig.JWTSource), "http://") || strings.HasPrefix(strings.ToLower(thisConfig.JWTSource), "https://") {
+			secret, urlErr := k.getSecretFromURL(thisConfig.JWTSource, token.Header["kid"].(string), k.TykMiddleware.Spec.JWTSigningMethod)
+			if urlErr != nil {
+				return nil, urlErr
+			}
+
+			return secret, nil
+		}
+
+		// If not, return the actual value
+		decodedCert, decErr := b64.StdEncoding.DecodeString(thisConfig.JWTSource)
+		if decErr != nil {
+			return nil, decErr
+		}
+		return decodedCert, nil
+	}
+
+	// Try using a kid or sub header
+	idFound := false
+	var tykId string
+	if token.Header["kid"] != nil {
+		tykId = token.Header["kid"].(string)
+		idFound = true
+	}
+
+	if !idFound {
+		if token.Claims["sub"] != nil {
+			tykId = token.Claims["sub"].(string)
+			idFound = true
+		}
+	}
+
+	if !idFound {
+		return nil, errors.New("Key ID not found")
+	}
+
+	// Check Base64 encoded
+	encoded := false
+	decodedKID, decErr := b64.StdEncoding.DecodeString(tykId)
+	if decErr == nil {
+		//No error, probably encoded
+		encoded = true
+	}
+
+	var thisSessionState SessionState
+	var keyExists, rawKeyExists bool
+	if encoded {
+		// Decoding did not fail, it might be encoded
+		thisSessionState, keyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(string(decodedKID))
+		if !keyExists {
+			//
+			thisSessionState, rawKeyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+			if !rawKeyExists {
+				return nil, errors.New("Token invalid, key not found.")
+			}
+		}
+
+		return []byte(thisSessionState.JWTData.Secret), nil
+	}
+
+	// Couldn't b64 decode the kid, so lets try it raw
+	thisSessionState, rawKeyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	if !rawKeyExists {
+		return nil, errors.New("Token invalid, key not found.")
+	}
+
+	return []byte(thisSessionState.JWTData.Secret), nil
+}
+
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
-	var thisSessionState SessionState
 	var tykId string
 
 	// Get the token
@@ -66,6 +232,9 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		return errors.New("Authorization field missing"), 400
 	}
 
+	// enable bearer token format
+	rawJWT = stripBearer(rawJWT)
+
 	// Verify the token
 	token, err := jwt.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
@@ -88,31 +257,104 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			}
 		}
 
-		idFound := false
-		if token.Header["kid"] != nil {
-			tykId = token.Header["kid"].(string)
-			idFound = true
+		val, secretErr := k.getSecret(token)
+		if secretErr != nil {
+			log.Error("Couldn't get token: ", secretErr)
 		}
 
-		if !idFound {
-			if token.Claims["sub"] != nil {
-				tykId = token.Claims["sub"].(string)
-				idFound = true
-			}
-		}
-
-		var keyExists bool
-		thisSessionState, keyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
-
-		if !keyExists {
-			return nil, errors.New("Token ivalid, key not found.")
-		}
-
-		return []byte(thisSessionState.JWTData.Secret), nil
+		return val, secretErr
 	})
 
 	if err == nil && token.Valid {
 		// all good to go
+
+		// Is this just a validation?
+		if k.TykMiddleware.Spec.APIDefinition.JWTSource != "" {
+			log.Debug("JWT authority is centralised")
+			// Generate a virtual token
+			var baseFound bool
+			var baseFieldData string
+			var tokenID string
+			baseFieldData, baseFound = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
+			if !baseFound {
+				var found bool
+				log.Warning("Base Field not found, using SUB")
+				baseFieldData, found = token.Claims["sub"].(string)
+				if !found {
+					log.Error("ID Could not be generated. Failing Request.")
+					return errors.New("Key not authorized"), 403
+				}
+
+			}
+			log.Debug("Base Field ID set to: ", baseFieldData)
+			data := []byte(baseFieldData)
+			tokenID = fmt.Sprintf("%x", md5.Sum(data))
+			SessionID := k.TykMiddleware.Spec.OrgID + tokenID
+
+			log.Debug("Temporary session ID is: ", SessionID)
+
+			thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+			if !keyExists {
+				// Create it
+				log.Debug("Key does not exist, creating")
+				thisSessionState = SessionState{}
+
+				var basePolicyID string
+				var foundPolicy bool
+				basePolicyID, foundPolicy = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
+				if !foundPolicy {
+					log.Error("Could not identify a policy to apply to this token!")
+					return errors.New("Key not authorized: no matching policy"), 403
+				}
+
+				policy, ok := Policies[basePolicyID]
+				if ok {
+					// Check ownership, policy org owner must be the same as API,
+					// otherwise youcould overwrite a session key with a policy from a different org!
+					if policy.OrgID != k.TykMiddleware.Spec.APIDefinition.OrgID {
+						log.Error("Attempting to apply policy from different organisation to key, skipping")
+						return errors.New("Key not authorized: no matching policy"), 403
+					}
+
+					log.Debug("Found policy, applying")
+					thisSessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+					thisSessionState.Rate = policy.Rate
+					thisSessionState.Per = policy.Per
+					thisSessionState.QuotaMax = policy.QuotaMax
+					thisSessionState.QuotaRenewalRate = policy.QuotaRenewalRate
+					thisSessionState.AccessRights = policy.AccessRights
+					thisSessionState.HMACEnabled = policy.HMACEnabled
+					thisSessionState.IsInactive = policy.IsInactive
+					thisSessionState.Tags = policy.Tags
+
+					// Update the session in the session manager in case it gets called again
+					k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
+					log.Debug("Policy applied to key")
+
+					context.Set(r, SessionData, thisSessionState)
+					context.Set(r, AuthHeaderValue, SessionID)
+					return nil, 200
+				}
+
+				log.Error("Could not identify a policy to apply to this token!")
+				return errors.New("Key not authorized: no matching policy"), 403
+			}
+
+			log.Debug("Key found - setting auth")
+			context.Set(r, SessionData, thisSessionState)
+			context.Set(r, AuthHeaderValue, SessionID)
+			return nil, 200
+
+		}
+
+		// It isn't, lets go ahead with the existing session
+		log.Debug("Using raw key ID")
+		thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+		if !keyExists {
+			return errors.New("Key not authorized"), 403
+		}
+
+		log.Debug("Raw key ID found.")
 		context.Set(r, SessionData, thisSessionState)
 		context.Set(r, AuthHeaderValue, tykId)
 		return nil, 200
@@ -132,7 +374,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		}).Info("Attempted JWT access with non-existent key.")
 
 		if err != nil {
-			log.Error("Token validtion errored: ", err)
+			log.Error("Token validation error: ", err)
 		}
 
 		// Fire Authfailed Event
@@ -141,6 +383,6 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
 
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorized"), 403
 	}
 }

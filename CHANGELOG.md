@@ -1,6 +1,12 @@
 # Develop
 
 - Limited multi-target support on a per-version basis: simply add "override_target": "http://domain.com" to the version section in your API Definition. Round Robin LB and Servie Discovery are *not* supported. 
+- Centralised JWT keys are now supported, adding `jwt_source` to an API definition will enable a central cert to validate all incoming tokens. 
+- `jwt_source` can either be a base64 encoded valid RSA/HMAC key OR a JWK URL, if it is a JWK URL then the `kid` must match the one in the JWK
+- Centralised JWT keys need a `jwt_identity_base_field` that basically identifies the user in the Claims of the JWT, this will fallback to `sub` if not found. This field forms the basis of a new "virtual" token that gets used after validation, it means policy attributes are carried forward through Tyk for attribution purposes.
+- Centralised JWT keys also need a `jwt_policy_field_name` which sets the policy to apply to the "virtual" key
+- JWT header can now support "Bearer xxxx" style auth headers
+
 
 # 1.9.1.1
 
