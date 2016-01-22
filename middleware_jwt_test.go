@@ -201,7 +201,7 @@ var JWK_URL string = "http://keyserver.tyk.io/test_jwk.json"
 
 func createJWTSession() SessionState {
 	var thisSession SessionState
-	thisSession.Rate = 1000000
+	thisSession.Rate = 1000000.0
 	thisSession.Allowance = thisSession.Rate
 	thisSession.LastCheck = time.Now().Unix() - 10
 	thisSession.Per = 1.0
@@ -217,7 +217,7 @@ func createJWTSession() SessionState {
 
 func createJWTSessionWithRSA() SessionState {
 	var thisSession SessionState
-	thisSession.Rate = 1000000
+	thisSession.Rate = 1000000.0
 	thisSession.Allowance = thisSession.Rate
 	thisSession.LastCheck = time.Now().Unix() - 10
 	thisSession.Per = 1.0
@@ -252,7 +252,7 @@ func getJWTChain(spec APISpec) http.Handler {
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
-	var thisTokenKID string = "78787885454"
+	var thisTokenKID string = randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "hmac"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -295,7 +295,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 }
 
 func TestJWTSessionRSA(t *testing.T) {
-	var thisTokenKID string = "2342342343434234"
+	var thisTokenKID string = randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -343,7 +343,7 @@ func TestJWTSessionRSA(t *testing.T) {
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
-	var thisTokenKID string = "1312312312314235245234234234234"
+	var thisTokenKID string = randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -392,7 +392,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 }
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
-	var thisTokenKID string = "23423423434342346"
+	var thisTokenKID string = randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
