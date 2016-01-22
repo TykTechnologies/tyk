@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/lonelycode/tyk.svg?branch=master)](https://travis-ci.org/lonelycode/tyk) 
+[![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/lonelycode/tyk) 
 
 # Tyk API Gateway ##
 
