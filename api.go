@@ -544,6 +544,11 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 }
 
 func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
+	if config.UseDBAppConfigs {
+		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
+		return createError("Due to enabled use_db_app_configs, please use Advanced Management API"), 500
+	}
+
 	success := true
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte

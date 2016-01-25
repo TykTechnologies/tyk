@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 )
@@ -86,7 +87,8 @@ type testAPIDefinition struct {
 func init() {
 	// Clean up our API list
 	log.Debug("Setting up Empty API path")
-	config.AppPath = "./test/"
+	config.AppPath = os.TempDir() + "/tyk_test/"
+	os.Mkdir(config.AppPath, 0755)
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
@@ -184,6 +186,65 @@ func TestApiHandlerGetSingle(t *testing.T) {
 	} else {
 		if ApiDefinition.APIID != "1" {
 			t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
+		}
+	}
+}
+
+func TestApiHandlerPost(t *testing.T) {
+	log.Debug("TEST POST SINGLE API DEFINITION")
+	uri := "/tyk/apis/1"
+	method := "POST"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+
+	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(apiTestDef))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	apiHandler(recorder, req)
+
+	var success Success
+	err = json.Unmarshal([]byte(recorder.Body.String()), &success)
+
+	if err != nil {
+		t.Error("Could not unmarshal POST result:\n", err, recorder.Body.String())
+	} else {
+		if success.Status != "ok" {
+			t.Error("Response is incorrect - not success :\n", recorder.Body.String())
+		}
+	}
+}
+
+func TestApiHandlerPostDbConfig(t *testing.T) {
+	log.Debug("TEST POST SINGLE API DEFINITION ON USE_DB_CONFIG")
+	uri := "/tyk/apis/1"
+	method := "POST"
+
+	config.UseDBAppConfigs = true
+	defer func() { config.UseDBAppConfigs = false }()
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+
+	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(apiTestDef))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	apiHandler(recorder, req)
+
+	var success Success
+	err = json.Unmarshal([]byte(recorder.Body.String()), &success)
+
+	if err != nil {
+		t.Error("Could not unmarshal POST result:\n", err, recorder.Body.String())
+	} else {
+		if success.Status == "ok" {
+			t.Error("Response is incorrect - expected error due to use_db_app_config :\n", recorder.Body.String())
 		}
 	}
 }
