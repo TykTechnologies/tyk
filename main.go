@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
+	"github.com/lonelycode/tyk/logger"
 	"github.com/lonelycode/tykcommon"
 	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
@@ -26,7 +27,7 @@ import (
 	"time"
 )
 
-var log = logrus.New()
+var log = logger.GetLogger()
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
@@ -56,7 +57,9 @@ const (
 
 // Display configuration options
 func displayConfig() {
-	log.Info("--> Listening on port: ", config.ListenPort)
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("--> Listening on port: ", config.ListenPort)
 }
 
 func getHostName() string {
@@ -77,14 +80,17 @@ func setupGlobals() {
 	mainRouter = mux.NewRouter()
 	if getHostName() != "" {
 		defaultRouter = mainRouter.Host(getHostName()).Subrouter()
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Hostname set: ", getHostName())
 	} else {
 		defaultRouter = mainRouter
 	}
 
-	log.Info("Hostname set: ", getHostName())
-
 	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
-		log.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
 	// Initialise our Host Checker
@@ -94,22 +100,30 @@ func setupGlobals() {
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
 		AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
-		log.Debug("Setting up analytics DB connection")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Setting up analytics DB connection")
 
 		analytics = RedisAnalyticsHandler{
 			Store: &AnalyticsStore,
 		}
 
 		if config.AnalyticsConfig.Type == "csv" {
-			log.Debug("Using CSV cache purge")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Using CSV cache purge")
 			analytics.Clean = &CSVPurger{&AnalyticsStore}
 
 		} else if config.AnalyticsConfig.Type == "mongo" {
-			log.Debug("Using MongoDB cache purge")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Using MongoDB cache purge")
 			analytics.Clean = &MongoPurger{&AnalyticsStore, nil, "", ""}
 			GlobalHostChecker.Clean = &MongoUptimePurger{HealthCheckStore, nil, "tyk_uptime_analytics", UptimeAnalytics_KEYNAME}
 		} else if config.AnalyticsConfig.Type == "rpc" {
-			log.Debug("Using RPC cache purge")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Using RPC cache purge")
 			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
 			thisPurger.Connect()
 			analytics.Clean = &thisPurger
@@ -120,7 +134,9 @@ func setupGlobals() {
 		if config.AnalyticsConfig.PurgeDelay >= 0 {
 			go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
 		} else {
-			log.Warn("Cache purge turned off, you are responsible for Redis storage maintenance.")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Warn("Cache purge turned off, you are responsible for Redis storage maintenance.")
 		}
 	}
 
@@ -135,7 +151,9 @@ func setupGlobals() {
 	}
 
 	// Get the notifier ready
-	log.Debug("Notifier will not work in hybrid mode")
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("Notifier will not work in hybrid mode")
 	MainNotifierStore := RedisClusterStorageManager{}
 	MainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
@@ -144,7 +162,9 @@ func setupGlobals() {
 		var monitorErr error
 		MonitoringHandler, monitorErr = WebHookHandler{}.New(config.Monitor.Config)
 		if monitorErr != nil {
-			log.Error("Failed to initialise monitor! ", monitorErr)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("Failed to initialise monitor! ", monitorErr)
 		}
 	}
 }
@@ -156,16 +176,22 @@ func getAPISpecs() *[]*APISpec {
 	var APISpecs *[]*APISpec
 
 	if config.UseDBAppConfigs {
-		log.Debug("Using App Configuration from Mongo DB")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Using App Configuration from Mongo DB")
 		APISpecs = APILoader.LoadDefinitionsFromMongo()
 	} else if config.SlaveOptions.UseRPC {
-		log.Debug("Using RPC Configuration")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Using RPC Configuration")
 		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
-	log.Printf("Detected %v APIs", len(*APISpecs))
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Printf("Detected %v APIs", len(*APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
 		for i, _ := range *APISpecs {
@@ -184,17 +210,25 @@ func getAPISpecs() *[]*APISpec {
 }
 
 func getPolicies() {
-	log.Debug("Loading policies")
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("Loading policies")
 	if config.Policies.PolicyRecordName == "" {
-		log.Debug("No policy record name defined, skipping...")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("No policy record name defined, skipping...")
 		return
 	}
 
 	if config.Policies.PolicySource == "mongo" {
-		log.Debug("Using Policies from Mongo DB")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Using Policies from Mongo DB")
 		Policies = LoadPoliciesFromMongo(config.Policies.PolicyRecordName)
 	} else if config.Policies.PolicySource == "rpc" {
-		log.Debug("Using Policies from RPC")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Using Policies from RPC")
 		Policies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		Policies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
@@ -228,7 +262,9 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
 		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(invalidateOauthRefresh))
 	} else {
-		log.Info("Node is slaved, REST API minimised")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Node is slaved, REST API minimised")
 	}
 
 	ApiMuxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(keyHandler))
@@ -253,14 +289,18 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	osinStorage := RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
 	if test {
-		log.Warning("Adding test client")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("Adding test client")
 		testClient := osin.DefaultClient{
 			Id:          "1234",
 			Secret:      "aabbccdd",
 			RedirectUri: "http://client.oauth.com",
 		}
 		osinStorage.SetClient(testClient.Id, &testClient, false)
-		log.Warning("Test client added")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("Test client added")
 	}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
@@ -278,7 +318,9 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 }
 
 func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
-	log.Debug("Batch requests enabled for API")
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	thisBatchHandler := BatchRequestHandler{API: spec}
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
@@ -293,12 +335,16 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
-		log.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
-		log.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
 
 	// Load from folder
@@ -309,12 +355,18 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 	for _, f := range files {
 		if strings.Contains(f.Name(), ".js") {
 			filePath := filepath.Join(middlwareFolderPath, f.Name())
-			log.Debug("Loading PRE-PROCESSOR file middleware from ", filePath)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Loading PRE-PROCESSOR file middleware from ", filePath)
 			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.Debug("-- Middleware name ", middlewareObjectName)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware name ", middlewareObjectName)
 
 			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
-			log.Debug("-- Middleware requires session: ", requiresSession)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware requires session: ", requiresSession)
 			thisMWDef := tykcommon.MiddlewareDefinition{}
 			thisMWDef.Name = middlewareObjectName
 			thisMWDef.Path = filePath
@@ -331,12 +383,18 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 	for _, f := range mwPostFiles {
 		if strings.Contains(f.Name(), ".js") {
 			filePath := filepath.Join(middlewarePostFolderPath, f.Name())
-			log.Debug("Loading POST-PROCESSOR file middleware from ", filePath)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Loading POST-PROCESSOR file middleware from ", filePath)
 			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.Debug("-- Middleware name ", middlewareObjectName)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware name ", middlewareObjectName)
 
 			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
-			log.Debug("-- Middleware requires session: ", requiresSession)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware requires session: ", requiresSession)
 			thisMWDef := tykcommon.MiddlewareDefinition{}
 			thisMWDef.Name = middlewareObjectName
 			thisMWDef.Path = filePath
@@ -358,11 +416,15 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 	for i, processorDetail := range referenceSpec.APIDefinition.ResponseProcessors {
 		processorType, err := GetResponseProcessorByName(processorDetail.Name)
 		if err != nil {
-			log.Error("Failed to load processor! ", err)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("Failed to load processor! ", err)
 			return
 		}
 		thisProcessor, _ := processorType.New(processorDetail.Options, referenceSpec)
-		log.Debug("Loading Response processor: ", processorDetail.Name)
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = thisProcessor
 	}
 	referenceSpec.ResponseChain = &responseChain
@@ -371,7 +433,9 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 
 	if spec.CORS.Enable {
-		log.Debug("CORS ENABLED")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("CORS ENABLED")
 		c := cors.New(cors.Options{
 			AllowedOrigins:     spec.CORS.AllowedOrigins,
 			AllowedMethods:     spec.CORS.AllowedMethods,
@@ -403,7 +467,9 @@ func doCopy(from *APISpec, to *APISpec) {
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// load the APi defs
-	log.Debug("Loading API configurations.")
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("Loading API configurations.")
 
 	var tempSpecRegister = make(map[string]*APISpec)
 
@@ -420,13 +486,17 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		// We need a reference to this as we change it on the go and re-use it in a global index
 		//referenceSpec := (*APISpecs)[apiIndex]
 
-		log.Info("--> Loading API: ", referenceSpec.APIDefinition.Name)
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Loading API: ", referenceSpec.APIDefinition.Name)
 
 		// Handle custom domains
 		var subrouter *mux.Router
 		if config.EnableCustomDomains {
 			if referenceSpec.Domain != "" {
-				log.Info("----> Custom Domain: ", referenceSpec.Domain)
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Info("----> Custom Domain: ", referenceSpec.Domain)
 				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
 			} else {
 				subrouter = Muxer
@@ -438,14 +508,22 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		onDomains, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
 		if listenPathExists {
 			if config.EnableCustomDomains == false {
-				log.Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
 				skip = true
 			} else {
-				log.Info("Domain check...")
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Info("Domain check...")
 				for _, onDomain := range onDomains {
-					log.Info("Checking Domain: ", onDomain)
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("Checking Domain: ", onDomain)
 					if onDomain == referenceSpec.Domain {
-						log.Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
+						log.WithFields(logrus.Fields{
+							"prefix": "main",
+						}).Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
 						skip = true
 						break
 					}
@@ -454,18 +532,24 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		}
 
 		if referenceSpec.Proxy.ListenPath == "" {
-			log.Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
 			skip = true
 		}
 
 		if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
-			log.Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
 			skip = true
 		}
 
 		remote, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
 		if err != nil {
-			log.Error("Culdn't parse target URL: ", err)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("Culdn't parse target URL: ", err)
 		}
 
 		if !skip {
@@ -475,7 +559,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			if dN == "" {
 				dN = "(no host)"
 			}
-			log.Info("----> Tracking: ", dN)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("----> Tracking: ", dN)
 
 			// Initialise the auth and session managers (use Redis for now)
 			var authStore StorageHandler
@@ -532,7 +618,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
 
 			if config.EnableJSVM {
-				log.Debug("----> Loading Middleware")
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("----> Loading Middleware")
 				mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(referenceSpec)
 
 				referenceSpec.JSVM.LoadJSPaths(mwPaths)
@@ -558,7 +646,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			referenceSpec.target = remote
 			var proxy ReturningHttpHandler
 			if enableVersionOverrides {
-				log.Info("----> Multi target enabled")
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Info("----> Multi target enabled")
 				proxy = &MultiTargetProxy{}
 			} else {
 				proxy = TykNewSingleHostReverseProxy(remote, referenceSpec)
@@ -578,7 +668,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			CacheStore.Connect()
 
 			if referenceSpec.APIDefinition.UseKeylessAccess {
-				log.Info("----> Checking security policy: Open")
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Info("----> Checking security policy: Open")
 
 				// Add pre-process MW
 				var chainArray = []alice.Constructor{}
@@ -610,7 +702,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				// for KeyLessAccess we can't support rate limiting, versioning or access rules
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
-				log.Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 
 			} else {
@@ -620,23 +714,33 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				if referenceSpec.APIDefinition.UseOauth2 {
 					// Oauth2
-					log.Info("----> Checking security policy: OAuth")
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("----> Checking security policy: OAuth")
 					keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
-					log.Info("----> Checking security policy: Basic")
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("----> Checking security policy: Basic")
 					keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.EnableSignatureChecking {
 					// HMAC Auth
-					log.Info("----> Checking security policy: HMAC")
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("----> Checking security policy: HMAC")
 					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.EnableJWT {
 					// JWT Auth
-					log.Info("----> Checking security policy: JWT")
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("----> Checking security policy: JWT")
 					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
 				} else {
 					// Auth key
-					log.Info("----> Checking security policy: Token")
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("----> Checking security policy: Token")
 					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
 				}
 
@@ -673,7 +777,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 				}
 
-				log.Debug("----> Custom middleware processed")
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("----> Custom middleware processed")
 
 				// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
@@ -688,16 +794,22 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
 
 				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
-				log.Debug("----> Rate limits available at: ", rateLimitPath)
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("----> Rate limits available at: ", rateLimitPath)
 				subrouter.Handle(rateLimitPath, simpleChain)
-				log.Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 			}
 
 			tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 
 		} else {
-			log.Warning("----> Skipped!")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Warning("----> Skipped!")
 		}
 
 	}
@@ -752,7 +864,9 @@ func doReload() {
 
 	http.DefaultServeMux = newServeMux
 
-	log.Info("API reload complete")
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("API reload complete")
 
 	reloadScheduled = false
 }
@@ -795,7 +909,9 @@ func init() {
 
 	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
 	if err != nil {
-		log.Warning("Error while parsing arguments: ", err)
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("Error while parsing arguments: ", err)
 	}
 
 	// Enable command mode
@@ -818,16 +934,22 @@ func init() {
 	filename := "/etc/tyk/tyk.conf"
 	value, _ := arguments["--conf"]
 	if value != nil {
-		log.Debug(fmt.Sprintf("Using %s for configuration", value.(string)))
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug(fmt.Sprintf("Using %s for configuration", value.(string)))
 		filename = arguments["--conf"].(string)
 	} else {
-		log.Debug("No configuration file defined, will try to use default (./tyk.conf)")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("No configuration file defined, will try to use default (./tyk.conf)")
 	}
 
 	loadConfig(filename, &config)
 
 	if config.Storage.Type != "redis" {
-		log.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
 	setupGlobals()
@@ -836,8 +958,12 @@ func init() {
 	if port != nil {
 		portNum, err := strconv.Atoi(port.(string))
 		if err != nil {
-			log.Error("Port specified in flags must be a number!")
-			log.Error(err)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("Port specified in flags must be a number!")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error(err)
 		} else {
 			config.ListenPort = portNum
 		}
@@ -850,11 +976,15 @@ func init() {
 	log.Level = logrus.InfoLevel
 	if doDebug == true {
 		log.Level = logrus.DebugLevel
-		log.Debug("Enabling debug-level output")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Enabling debug-level output")
 	}
 
 	if config.UseSentry {
-		log.Debug("Enabling Sentry support")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Enabling Sentry support")
 		hook, err := logrus_sentry.NewSentryHook(config.SentryCode, []logrus.Level{
 			logrus.PanicLevel,
 			logrus.FatalLevel,
@@ -866,7 +996,9 @@ func init() {
 		if err == nil {
 			log.Hooks.Add(hook)
 		}
-		log.Debug("Sentry hook active")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Sentry hook active")
 	}
 
 }
@@ -887,7 +1019,9 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	}
 
-	log.Error("No storage handler found!")
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Error("No storage handler found!")
 	return nil
 }
 
@@ -903,12 +1037,16 @@ func main() {
 	}
 
 	if doMemoryProfile {
-		log.Debug("Memory profiling active")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Memory profiling active")
 		profileFile, _ = os.Create("tyk.mprof")
 		defer profileFile.Close()
 	}
 	if doCpuProfile {
-		log.Info("Cpu profiling active")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Cpu profiling active")
 		profileFile, _ = os.Create("tyk.prof")
 		pprof.StartCPUProfile(profileFile)
 		defer pprof.StopCPUProfile()
@@ -918,7 +1056,9 @@ func main() {
 
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
-		log.Debug("Initialising default org store")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Initialising default org store")
 		//DefaultOrgStore.Init(&RedisClusterStorageManager{KeyPrefix: "orgkey."})
 		DefaultOrgStore.Init(GetGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(GetGlobalStorageHandler(CloudHandler, "orgkey.", false))
@@ -933,7 +1073,9 @@ func main() {
 	}
 
 	if config.SlaveOptions.UseRPC {
-		log.Debug("Starting RPC reload listener")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Starting RPC reload listener")
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			UserKey:          config.SlaveOptions.APIKey,
@@ -950,15 +1092,21 @@ func main() {
 	if nil != err {
 
 		// Listen on a TCP or a UNIX domain socket (TCP here).
-		log.Info("Setting up Server")
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Setting up Server")
 		if config.HttpServerOptions.UseSSL {
-			log.Info("--> Using SSL (https)")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("--> Using SSL (https)")
 			certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
 			certNameMap := make(map[string]*tls.Certificate)
 			for i, certData := range config.HttpServerOptions.Certificates {
 				cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
 				if err != nil {
-					log.Fatalf("Server error: loadkeys: %s", err)
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Fatalf("Server error: loadkeys: %s", err)
 				}
 				certs[i] = cert
 				certNameMap[certData.Name] = &certs[i]
@@ -972,7 +1120,9 @@ func main() {
 			}
 			l, err = tls.Listen("tcp", targetPort, &config)
 		} else {
-			log.Info("--> Standard listener (http)")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("--> Standard listener (http)")
 			l, err = net.Listen("tcp", targetPort)
 		}
 
@@ -983,8 +1133,12 @@ func main() {
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
-			log.Info("Custom gateway started")
-			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Custom gateway started")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
@@ -995,7 +1149,9 @@ func main() {
 			go s.Serve(l)
 			displayConfig()
 		} else {
-			log.Printf("Gateway started (%v)", VERSION)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Printf("Gateway started (%v)", VERSION)
 			http.Handle("/", mainRouter)
 			go http.Serve(l, nil)
 			displayConfig()
@@ -1004,13 +1160,17 @@ func main() {
 	} else {
 
 		// Resume accepting connections in a new goroutine.
-		log.Info("Resuming listening on", l.Addr())
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Resuming listening on", l.Addr())
 		specs := getAPISpecs()
 		loadApps(specs, defaultRouter)
 		getPolicies()
 
 		if config.HttpServerOptions.OverrideDefaults {
-			log.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
@@ -1018,11 +1178,15 @@ func main() {
 				Handler:      defaultRouter,
 			}
 
-			log.Info("Custom gateway started")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Custom gateway started")
 			go s.Serve(l)
 			displayConfig()
 		} else {
-			log.Printf("Gateway resumed (%v)", VERSION)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
 			http.Handle("/", mainRouter)
 			http.Serve(l, nil)
@@ -1030,14 +1194,18 @@ func main() {
 
 		// Kill the parent, now that the child has started successfully.
 		if err := goagain.Kill(); nil != err {
-			log.Fatalln(err)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalln(err)
 		}
 
 	}
 
 	// Block the main goroutine awaiting signals.
 	if _, err := goagain.Wait(l); nil != err {
-		log.Fatalln(err)
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatalln(err)
 	}
 
 	// Do whatever's necessary to ensure a graceful exit like waiting for
@@ -1045,7 +1213,9 @@ func main() {
 	//
 	// In this case, we'll simply stop listening and wait one second.
 	if err := l.Close(); nil != err {
-		log.Fatalln(err)
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatalln(err)
 	}
 	//time.Sleep(1e9)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/Sirupsen/logrus"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
@@ -29,13 +30,17 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 
 	policyConfig, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		log.Error("Couldn't load policy file: ", err)
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Error("Couldn't load policy file: ", err)
 		return policies
 	}
 
 	mErr := json.Unmarshal(policyConfig, &policies)
 	if mErr != nil {
-		log.Error("Couldn't unmarshal policies: ", mErr)
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Error("Couldn't unmarshal policies: ", mErr)
 	}
 
 	return policies
@@ -48,12 +53,16 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 
 	dbSession, dErr := mgo.Dial(config.AnalyticsConfig.MongoURL)
 	if dErr != nil {
-		log.Error("Mongo connection failed:", dErr)
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Error("Mongo connection failed:", dErr)
 		time.Sleep(5)
 		return LoadPoliciesFromMongo(collectionName)
 	}
 
-	log.Debug("Searching in collection: ", collectionName)
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Debug("Searching in collection: ", collectionName)
 	policyCollection := dbSession.DB("").C(collectionName)
 
 	search := bson.M{
@@ -63,15 +72,21 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 	mongoErr := policyCollection.Find(search).All(&dbPolicyList)
 
 	if mongoErr != nil {
-		log.Error("Could not find any policy configs! ", mongoErr)
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Error("Could not find any policy configs! ", mongoErr)
 		return policies
 	}
 
-	log.Printf("Loaded %v policies ", len(dbPolicyList))
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Printf("Loaded %v policies ", len(dbPolicyList))
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
-		log.Info("--> Processing policy ID: ", p.ID)
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Info("--> Processing policy ID: ", p.ID)
 	}
 
 	return policies
@@ -91,15 +106,21 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 	jErr1 := json.Unmarshal([]byte(rpcPolicies), &dbPolicyList)
 
 	if jErr1 != nil {
-		log.Error("Failed decode: ", jErr1)
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Error("Failed decode: ", jErr1)
 		return policies
 	}
 
-	log.Info("Policies found: ", len(dbPolicyList))
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Policies found: ", len(dbPolicyList))
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
-		log.Info("--> Processing policy ID: ", p.ID)
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Info("--> Processing policy ID: ", p.ID)
 	}
 
 	return policies

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
@@ -60,7 +61,9 @@ func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
 
 	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
 	if err != nil {
-		log.Error(err)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error(err)
 		return nil, err
 	}
 
@@ -76,7 +79,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	defer r.Body.Close()
 	originalBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Error("Failed to read request body! ", err)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Failed to read request body! ", err)
 		return nil, 200
 	}
 
@@ -92,7 +97,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	asJsonRequestObj, encErr := json.Marshal(thisRequestData)
 	if encErr != nil {
-		log.Error("Failed to encode request object for dynamic middleware: ", encErr)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Failed to encode request object for dynamic middleware: ", encErr)
 		return nil, 200
 	}
 
@@ -110,7 +117,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	sessionAsJsonObj, sessEncErr := json.Marshal(thisSessionState)
 
 	if sessEncErr != nil {
-		log.Error("Failed to encode session for VM: ", sessEncErr)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Failed to encode session for VM: ", sessEncErr)
 		return nil, 200
 	}
 
@@ -125,8 +134,12 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	decErr := json.Unmarshal([]byte(returnDataStr), &newRequestData)
 
 	if decErr != nil {
-		log.Error("Failed to decode middleware request data on return from VM: ", decErr)
-		log.Debug(returnDataStr)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Failed to decode middleware request data on return from VM: ", decErr)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Debug(returnDataStr)
 		return nil, 200
 	}
 
@@ -164,7 +177,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	log.Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
+	log.WithFields(logrus.Fields{
+		"prefix": "jsvm",
+	}).Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
 	return nil, 200
 }
@@ -194,10 +209,14 @@ func (j *JSVM) LoadJSPaths(paths []string) {
 	for _, mwPath := range paths {
 		js, loadErr := ioutil.ReadFile(mwPath)
 		if loadErr != nil {
-			log.Error("Failed to load Middleware JS: ", loadErr)
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("Failed to load Middleware JS: ", loadErr)
 		} else {
 			// No error, load the JS into the VM
-			log.Info("Loading JS File: ", mwPath)
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Info("Loading JS File: ", mwPath)
 			j.VM.Run(js)
 		}
 	}
@@ -221,7 +240,10 @@ type TykJSHttpResponse struct {
 func (j *JSVM) LoadTykJSApi() {
 	// Enable a log
 	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
-		log.Info("[JSVM] [LOG]: ", call.Argument(0).String())
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm-logmsg",
+			"type":   "log-msg",
+		}).Info(call.Argument(0).String())
 		return otto.Value{}
 	})
 
@@ -233,7 +255,9 @@ func (j *JSVM) LoadTykJSApi() {
 		if jsonHRO != "undefined" {
 			jsonErr := json.Unmarshal([]byte(jsonHRO), &HRO)
 			if jsonErr != nil {
-				log.Error("JSVM: Failed to deserialise HTTP Request object")
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("JSVM: Failed to deserialise HTTP Request object")
 				return otto.Value{}
 			}
 
@@ -276,7 +300,9 @@ func (j *JSVM) LoadTykJSApi() {
 			resp, respErr := client.Do(r)
 
 			if respErr != nil {
-				log.Error("[JSVM]: Request failed: ", respErr)
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("[JSVM]: Request failed: ", respErr)
 				return otto.Value{}
 			}
 
@@ -290,7 +316,9 @@ func (j *JSVM) LoadTykJSApi() {
 			retAsStr, _ := json.Marshal(tykResp)
 			returnVal, retErr := j.VM.ToValue(string(retAsStr))
 			if retErr != nil {
-				log.Error("[JSVM]: Failed to encode return value: ", retErr)
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("[JSVM]: Failed to encode return value: ", retErr)
 				return otto.Value{}
 			}
 
@@ -312,7 +340,9 @@ func (j *JSVM) LoadTykJSApi() {
 
 		returnVal, retErr := j.VM.ToValue(string(byteArray))
 		if retErr != nil {
-			log.Error("[JSVM]: Failed to encode return value: ", retErr)
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Failed to encode return value: ", retErr)
 			return otto.Value{}
 		}
 
@@ -328,7 +358,9 @@ func (j *JSVM) LoadTykJSApi() {
 		decErr := json.Unmarshal([]byte(encoddedSession), &newSession)
 
 		if decErr != nil {
-			log.Error("[JSVM]: Failed to decode the sesison data")
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Failed to decode the sesison data")
 			return otto.Value{}
 		}
 
@@ -345,13 +377,17 @@ func (j *JSVM) LoadTykJSApi() {
 	unsafeBatchHandler := BatchRequestHandler{}
 	j.VM.Set("TykBatchRequest", func(call otto.FunctionCall) otto.Value {
 		requestSet := call.Argument(0).String()
-		log.Debug("Batch input is: ", requestSet)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Debug("Batch input is: ", requestSet)
 
 		byteArray := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 
 		returnVal, retErr := j.VM.ToValue(string(byteArray))
 		if retErr != nil {
-			log.Error("[JSVM]: Failed to encode return value: ", retErr)
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Failed to encode return value: ", retErr)
 			return otto.Value{}
 		}
 
