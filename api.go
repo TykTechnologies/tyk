@@ -145,10 +145,9 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 
 	log.WithFields(logrus.Fields{
 		"prefix":  "api",
-		"prefix":  "api",
 		"key":     keyName,
 		"expires": newSession.Expires,
-	}).Debug("New key added or updated.")
+	}).Info("Key added or updated.")
 	return nil
 }
 
@@ -296,14 +295,16 @@ func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"prefix": "api",
 			"key":    sessionKey,
-		}).Warning("Attempted key retrieval - failure.")
+			"status": "fail",
+			"err":    "not found",
+		}).Warning("Failed to retrieve key detail.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    sessionKey,
-		}).Debug("Attempted key retrieval - success.")
+			"status": "ok",
+		}).Info("Retrieved key detail.")
 	}
 
 	return responseMessage, code
@@ -343,16 +344,25 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 
 	responseMessage, err = json.Marshal(&sessionsObj)
 	if err != nil {
-		log.Error("Marshalling failed: ", err)
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to retrieve key list.")
+
 		success = false
 		code = 500
 	}
 
 	if success {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "ok",
+		}).Info("Retrieved key list.")
+
 		return responseMessage, code
 	}
 
-	log.Debug("Attempted keys retrieval - success.")
 	return []byte(E_SYSTEM_ERROR), code
 
 }
@@ -376,7 +386,8 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    keyName,
-		}).Debug("Attempted key deletion across all managed API's - success.")
+			"status": "ok",
+		}).Info("Deleted key across all APIs.")
 
 		return responseMessage, 200
 	}
@@ -384,6 +395,11 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	thiSpec := GetSpecForApi(APIID)
 	if thiSpec == nil {
 		notFound := APIStatusMessage{"error", "API not found"}
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+		}).Error("Failed to delete key.")
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
 	}
@@ -395,14 +411,20 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed: ", err)
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to delete key.")
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"key":    keyName,
-	}).Debug("Attempted key deletion - success.")
+		"status": "ok",
+	}).Info("Deleted key.")
 
 	return responseMessage, code
 }
@@ -420,7 +442,8 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    keyName,
-		}).Debug("Attempted key deletion across all managed API's - success.")
+			"status": "ok",
+		}).Info("Deleted hashed key across all APIs.")
 
 		return responseMessage, 200
 	}
@@ -428,6 +451,13 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 	thiSpec := GetSpecForApi(APIID)
 	if thiSpec == nil {
 		notFound := APIStatusMessage{"error", "API not found"}
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err": "API not found",
+		}).Error("Failed to delete hashed key")
+
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
 	}
@@ -448,9 +478,10 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"key":    keyName,
-	}).Debug("Attempted key deletion - success.")
+			"prefix": "api",
+			"key":    keyName,
+			"status": "ok",
+		}).Info("Deleted hashed key.")
 
 	return responseMessage, code
 }
@@ -788,6 +819,13 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 
 	thiSpec := GetSpecForApi(APIID)
 	if thiSpec == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err": "API not found",
+		}).Error("Failed to update hashed key.")
+
 		notFound := APIStatusMessage{"error", "API not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
@@ -800,6 +838,13 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	rawSessionData, sessErr := sessStore.GetRawKey(setKeyName)
 
 	if sessErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err": sessErr,
+		}).Error("Failed to update hashed key.")
+
 		notFound := APIStatusMessage{"error", "Key not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
@@ -808,6 +853,13 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	sess := SessionState{}
 	jsErr := json.Unmarshal([]byte(rawSessionData), &sess)
 	if jsErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err": jsErr,
+		}).Error("Failed to update hashed key.")
+
 		notFound := APIStatusMessage{"error", "Unmarshalling failed"}
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
@@ -818,6 +870,13 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 
 	sessAsJS, encErr := json.Marshal(sess)
 	if encErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err": encErr,
+		}).Error("Failed to update hashed key.")
+
 		notFound := APIStatusMessage{"error", "Marshalling failed"}
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
@@ -825,6 +884,13 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 
 	setErr := sessStore.SetRawKey(setKeyName, string(sessAsJS), 0)
 	if setErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err": setErr,
+		}).Error("Failed to update hashed key.")
+
 		notFound := APIStatusMessage{"error", "Could not write key data"}
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
@@ -841,9 +907,10 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	}
 
 	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"key":    keyName,
-	}).Debug("Attempted key deletion - success.")
+			"prefix": "api",
+			"key":    keyName,
+			"status": "ok",
+		}).Info("Updated hashed key.")
 
 	return responseMessage, code
 }
@@ -929,8 +996,9 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    keyName,
-		}).Debug("New org key added or updated.")
+			"org":    keyName,
+			"status": "ok",
+		}).Info("New organization key added or updated.")
 		success = true
 	}
 
@@ -989,13 +1057,16 @@ func handleGetOrgDetail(ORGID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"Org":    ORGID,
-		}).Debug("Attempted key retrieval - failure.")
+			"org":    ORGID,
+			"status": "fail",
+			"err":    "not found",
+		}).Error("Failed retrieval of record for ORG ID.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"Org":    ORGID,
-		}).Debug("Attempted key retrieval - success.")
+			"org":    ORGID,
+			"status": "ok",
+		}).Info("Retrieved record for ORG ID.")
 	}
 
 	return responseMessage, code
@@ -1034,10 +1105,21 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 	}
 
 	if success {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"org":    ORGID,
+			"status": "ok",
+		}).Info("Successful orgs retrieval.")
+
 		return responseMessage, code
 	}
 
-	log.Debug("Attempted orgs retrieval - success.")
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"org":    ORGID,
+		"status": "fail",
+	}).Error("Failed orgs retrieval.")
+
 	return []byte(E_SYSTEM_ERROR), code
 
 }
@@ -1048,6 +1130,13 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 
 	thiSpec := GetSpecForOrg(ORGID)
 	if thiSpec == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    ORGID,
+			"status": "fail",
+			"err":    "not found",
+		}).Error("Failed to delete org key.")
+
 		notFound := APIStatusMessage{"error", "Org not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
@@ -1060,14 +1149,21 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed: ", err)
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    ORGID,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to delete org key.")
+
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"key":    ORGID,
-	}).Debug("Attempted org key deletion - success.")
+		"status": "ok",
+	}).Info("Org key deleted.")
 
 	return responseMessage, code
 }
@@ -1077,12 +1173,21 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	if r.Method == "GET" {
-		log.Info("Group reload: sending to channel")
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "ok",
+		}).Info("Group reload accepted.")
+
 		responseMessage, code = signalGroupReload()
 
 	} else {
 		// Return Not supported message (and code)
 		code = 405
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "fail",
+			"err":    "wrong method",
+		}).Error("Group reload failed.")
 		responseMessage = createError("Method not supported")
 	}
 
@@ -1132,7 +1237,12 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			responseMessage = []byte(E_SYSTEM_ERROR)
 			code = 500
-			log.Error("Couldn't decode body: ", err)
+
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"status": "fail",
+				"err":    err,
+			}).Error("Key creation failed.")
 
 		} else {
 
@@ -1162,7 +1272,9 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						log.WithFields(logrus.Fields{
 							"prefix": "api",
 							"apiID":  apiId,
+							"err":    "not found",
 						}).Error("Could not create key for this API ID, API doesn't exist.")
+
 						responseMessage = createError("Could not create key for this API ID, API doesn't exist.")
 						DoJSONWrite(w, 403, responseMessage)
 						return
@@ -1171,7 +1283,11 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				if config.AllowMasterKeys {
 					// nothing defined, add key to ALL
-					log.Warning("No API Access Rights set, adding key to ALL.")
+					log.WithFields(logrus.Fields{
+						"prefix": "api",
+						"status": "warning",
+					}).Warning("No API Access Rights set on key session, adding key to all APIs.")
+
 					for _, spec := range *ApiSpecRegister {
 						checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
 						if !spec.DontSetQuotasOnCreate {
@@ -1187,7 +1303,12 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				} else {
-					log.Error("Master keys disallowed in configuration, key not added.")
+					log.WithFields(logrus.Fields{
+						"prefix": "api",
+						"status": "error",
+						"err":    "master keys disabled",
+					}).Error("Master keys disallowed in configuration, key not added.")
+
 					responseMessage = createError("Failed to create key, keys must have at least one Access Rights record set.")
 					code = 403
 					DoJSONWrite(w, code, responseMessage)
@@ -1203,20 +1324,31 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, err = json.Marshal(&responseObj)
 
 			if err != nil {
-				log.Error("Marshalling failed: ", err)
+				log.WithFields(logrus.Fields{
+					"prefix": "api",
+					"status": "error",
+					"err":    err,
+				}).Error("System error, failed to generate key.")
+
 				responseMessage = []byte(E_SYSTEM_ERROR)
 				code = 500
 			} else {
 				log.WithFields(logrus.Fields{
 					"prefix": "api",
 					"key":    newKey,
-				}).Debug("Generated new key - success.")
+					"status": "ok",
+				}).Info("Generated new key.")
 			}
 		}
 
 	} else {
 		code = 405
 		responseMessage = createError("Method not supported")
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "fail",
+			"method": r.Method,
+		}).Warning("Attempted to create key with wrong HTTP method.")
 	}
 
 	DoJSONWrite(w, code, responseMessage)
@@ -1246,7 +1378,12 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			responseMessage = []byte(E_SYSTEM_ERROR)
 			code = 500
-			log.Error("Couldn't decode body: ", err)
+
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"status": "fail",
+				"err":    err,
+			}).Error("Failed to create OAuth client")
 
 		}
 
@@ -1262,20 +1399,29 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		}
 
 		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.GetId())
-		log.Debug("Storage ID: ", storageID)
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+		}).Debug("Created storage ID: ", storageID)
 
 		thisAPISpec := GetSpecForApi(newOauthClient.APIID)
 		if thisAPISpec == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
 				"apiID":  newOauthClient.APIID,
-			}).Error("Could not create key for this API ID, API doesn't exist.")
+				"status": "fail",
+				"err":    "API doesn't exist",
+			}).Error("Failed to create OAuth client")
 		}
 
 		storeErr := thisAPISpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
 
 		if storeErr != nil {
-			log.Error("Failed to save new client data: ", storeErr)
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  newOauthClient.APIID,
+				"status": "fail",
+				"err":    storeErr,
+			}).Error("Failed to create OAuth client")
 			responseMessage = createError("Failure in storing client data.")
 		}
 
@@ -1293,9 +1439,12 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			code = 500
 		} else {
 			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"key":    newClient.GetId(),
-			}).Debug("New OAuth Client registered successfully.")
+				"prefix":            "api",
+				"apiID":             newOauthClient.APIID,
+				"clientID":          reportableClientData.ClientID,
+				"clientRedirectURI": reportableClientData.ClientRedirectURI,
+				"status":            "ok",
+			}).Info("Created OAuth client")
 		}
 
 	} else {
@@ -1316,13 +1465,32 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		thisAPISpec := GetSpecForApi(APIID)
-		log.Warning("Looking for refresh token in API ID: ", APIID)
+
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  APIID,
+		}).Debug("Looking for refresh token in API Register")
+
 		if thisAPISpec == nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  APIID,
+				"status": "fail",
+				"err":    "API not found",
+			}).Error("Failed to invalidate refresh token")
+
 			DoJSONWrite(w, 400, createError("API for this refresh token not found"))
 			return
 		}
 
 		if thisAPISpec.OAuthManager == nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  APIID,
+				"status": "fail",
+				"err":    "API is not OAuth",
+			}).Error("Failed to invalidate refresh token")
+
 			DoJSONWrite(w, 400, createError("OAuth is not enabled on this API"))
 			return
 		}
@@ -1330,7 +1498,13 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 		storeErr := thisAPISpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
 
 		if storeErr != nil {
-			log.Error("Failed to invalidate refresh token: ", storeErr)
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  APIID,
+				"status": "fail",
+				"err":    storeErr,
+			}).Error("Failed to invalidate refresh token")
+
 			DoJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
 			return
 		}
@@ -1348,6 +1522,13 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 			DoJSONWrite(w, 400, createError("Failed to marshal data"))
 			return
 		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  APIID,
+			"token":  keyCombined,
+			"status": "ok",
+		}).Info("Invalidated refresh token")
 
 		DoJSONWrite(w, 200, responseMessage)
 		return
@@ -1415,7 +1596,10 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  APIID,
-		}).Error("Could ot get Client Details, API doesn't exist.")
+			"status": "fail",
+			"client": keyName,
+			"err":    "not found",
+		}).Error("Failed to retrieve OAuth client details")
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
@@ -1433,7 +1617,13 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		}
 		responseMessage, err = json.Marshal(&reportableClientData)
 		if err != nil {
-			log.Error("Marshalling failed: ", err)
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  APIID,
+				"status": "fail",
+				"client": keyName,
+				"err":    err,
+			}).Error("Failed to report OAuth client details")
 			success = false
 		}
 	}
@@ -1442,15 +1632,13 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-		}).Warning("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    keyName,
-		}).Debug("Attempted oauth client retrieval - success.")
+			"apiID":  APIID,
+			"status": "ok",
+			"client": keyName,
+		}).Info("Retrieved OAuth client ID")
 	}
 
 	return responseMessage, code
@@ -1468,7 +1656,11 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  APIID,
-		}).Error("Could ot get Client Details, API doesn't exist.")
+			"status": "fail",
+			"client": keyName,
+			"err":    "not found",
+		}).Error("Failed to delete OAuth client")
+
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 
@@ -1490,14 +1682,22 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
-		log.Error("Marshalling failed: ", err)
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  APIID,
+			"status": "fail",
+			"client": keyName,
+			"err":    err,
+		}).Error("Failed to report OAuth delete success")
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    keyName,
-	}).Debug("Attempted OAuth client deletion - success.")
+		"apiID":  APIID,
+		"status": "ok",
+		"client": keyName,
+	}).Info("Deleted OAuth client")
 
 	return responseMessage, code
 }
@@ -1511,13 +1711,16 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 	// filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
 	filterID := CLIENT_PREFIX
-	log.Debug("Filtering by: ", filterID)
+
 	thisAPISpec := GetSpecForApi(APIID)
 	if thisAPISpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  APIID,
-		}).Error("Could ot get Client Details, API doesn't exist.")
+			"status": "fail",
+			"err":    "API not found",
+		}).Error("Failed to retrieve OAuth client list.")
+
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 
@@ -1526,6 +1729,13 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 	thisClientData, getClientsErr := thisAPISpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
 	if getClientsErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  APIID,
+			"status": "fail",
+			"err":    getClientsErr,
+		}).Error("Failed to report OAuth client list")
+
 		success = false
 	} else {
 		clients := []OAuthClient{}
@@ -1540,7 +1750,12 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 		responseMessage, err = json.Marshal(&clients)
 		if err != nil {
-			log.Error("Marshalling failed: ", err)
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  APIID,
+				"status": "fail",
+				"err":    err,
+			}).Error("Failed to report OAuth client list")
 			success = false
 		}
 	}
@@ -1549,15 +1764,12 @@ func getOauthClients(APIID string) ([]byte, int) {
 		notFound := APIStatusMessage{"error", "OAuth slients not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"API":    APIID,
-		}).Warning("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"API":    APIID,
-		}).Debug("Attempted oauth clients retrieval - success.")
+			"apiID":  APIID,
+			"status": "ok",
+		}).Info("Retrieved OAuth client list")
 	}
 
 	return responseMessage, code

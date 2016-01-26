@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"time"
 )
@@ -17,9 +18,16 @@ func StartPubSubLoop() {
 	for {
 		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisReloadMsg)
 		if err != nil {
-			log.Error("Connection to Redis failed: ", err)
+			log.WithFields(logrus.Fields{
+				"prefix": "pub-sub",
+				"err":    err,
+			}).Error("Connection to Redis failed, reconnect in 10s")
+
 			time.Sleep(10 * time.Second)
-			log.Warning("Reconnecting")
+			log.WithFields(logrus.Fields{
+				"prefix": "pub-sub",
+			}).Warning("Reconnecting")
+
 			CacheStore.Connect()
 			CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisReloadMsg)
 		}
@@ -35,6 +43,8 @@ func HandleRedisReloadMsg(message redis.Message) {
 		return
 	}
 
-	log.Info("Reload signal received, reloading endpoints")
+	log.WithFields(logrus.Fields{
+		"prefix": "pub-sub",
+	}).Info("Reloading endpoints")
 	ReloadURLStructure()
 }

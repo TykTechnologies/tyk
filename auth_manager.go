@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"github.com/Sirupsen/logrus"
 	"github.com/nu7hatch/gouuid"
 	"strings"
 	"time"
@@ -55,7 +56,11 @@ func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSta
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var newSession SessionState
 	if err != nil {
-		log.Warning("Invalid key detected, not found in storage engine")
+		log.WithFields(logrus.Fields{
+			"prefix":      "auth-mgr",
+			"inbound-key": keyName,
+			"err":         err,
+		}).Warning("Key not found in storage engine")
 		return newSession, false
 	}
 
@@ -90,9 +95,13 @@ func (b *DefaultSessionManager) GetStore() StorageHandler {
 }
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState) {
-	log.Warning("Tracked quota reset for key: ", keyName)
+
 	rawKey := QuotaKeyPrefix + publicHash(keyName)
-	log.Info("Setting key quota: ", rawKey)
+	log.WithFields(logrus.Fields{
+		"prefix":      "auth-mgr",
+		"inbound-key": keyName,
+		"key":         rawKey,
+	}).Info("Reset quota for key.")
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(keyName) + ".BLOCKED"
 	// Clear the rate limiter
@@ -125,7 +134,11 @@ func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, b
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var thisSession SessionState
 	if err != nil {
-		log.Debug("Key does not exist")
+		log.WithFields(logrus.Fields{
+			"prefix":      "auth-mgr",
+			"inbound-key": keyName,
+			"err":         err,
+		}).Info("Could not get session detail, key not found")
 		return thisSession, false
 	}
 
