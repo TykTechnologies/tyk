@@ -8,6 +8,11 @@
 - JWT header can now support "Bearer xxxx" style auth headers
 - HMAC authentication now supports an alternate header (`x-aux-date`) for clients that do not provide a date header, this header is checked *first* before reverting to the `Date` field
 
+# Develop v2
+
+- Purger has been removed from core completely (replaced by Pump)
+- More tracing and more logging has been put in place, especially around API operations for easy tracing
+
 # 1.9.1.1
 
 - Added CIDR Support (thanks @iwat)
