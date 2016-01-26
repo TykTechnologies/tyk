@@ -114,8 +114,9 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 				}
 			} else {
 				log.WithFields(logrus.Fields{
-					"key":   keyName,
-					"apiID": apiId,
+					"prefix": "api",
+					"key":    keyName,
+					"apiID":  apiId,
 				}).Error("Could not add key for this API ID, API doesn't exist.")
 				return errors.New("API must be active to add keys")
 			}
@@ -143,6 +144,8 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 	}
 
 	log.WithFields(logrus.Fields{
+		"prefix":  "api",
+		"prefix":  "api",
 		"key":     keyName,
 		"expires": newSession.Expires,
 	}).Debug("New key added or updated.")
@@ -292,11 +295,14 @@ func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
 		log.WithFields(logrus.Fields{
-			"key": sessionKey,
+			"prefix": "api",
+			"prefix": "api",
+			"key":    sessionKey,
 		}).Warning("Attempted key retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
-			"key": sessionKey,
+			"prefix": "api",
+			"key":    sessionKey,
 		}).Debug("Attempted key retrieval - success.")
 	}
 
@@ -368,7 +374,8 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 		}
 
 		log.WithFields(logrus.Fields{
-			"key": keyName,
+			"prefix": "api",
+			"key":    keyName,
 		}).Debug("Attempted key deletion across all managed API's - success.")
 
 		return responseMessage, 200
@@ -393,7 +400,8 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"key": keyName,
+		"prefix": "api",
+		"key":    keyName,
 	}).Debug("Attempted key deletion - success.")
 
 	return responseMessage, code
@@ -410,7 +418,8 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 		}
 
 		log.WithFields(logrus.Fields{
-			"key": keyName,
+			"prefix": "api",
+			"key":    keyName,
 		}).Debug("Attempted key deletion across all managed API's - success.")
 
 		return responseMessage, 200
@@ -439,7 +448,8 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"key": keyName,
+		"prefix": "api",
+		"key":    keyName,
 	}).Debug("Attempted key deletion - success.")
 
 	return responseMessage, code
@@ -461,7 +471,8 @@ func handleURLReload() ([]byte, int) {
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
-	log.WithFields(logrus.Fields{}).Info("Reload URL Structure - Scheduled")
+	log.WithFields(logrus.Fields{
+		"prefix": "api"}).Info("Reload URL Structure - Scheduled")
 
 	return responseMessage, code
 }
@@ -487,7 +498,8 @@ func signalGroupReload() ([]byte, int) {
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
-	log.WithFields(logrus.Fields{}).Info("Reloaded URL Structure - Success")
+	log.WithFields(logrus.Fields{
+		"prefix": "api"}).Info("Reloaded URL Structure - Success")
 
 	return responseMessage, code
 }
@@ -535,7 +547,8 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"apiID": APIID,
+		"prefix": "api",
+		"apiID":  APIID,
 	}).Error("API doesn't exist.")
 	notFound := APIStatusMessage{"error", "API not found"}
 	responseMessage, _ = json.Marshal(&notFound)
@@ -828,7 +841,8 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	}
 
 	log.WithFields(logrus.Fields{
-		"key": keyName,
+		"prefix": "api",
+		"key":    keyName,
 	}).Debug("Attempted key deletion - success.")
 
 	return responseMessage, code
@@ -914,7 +928,8 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		}
 
 		log.WithFields(logrus.Fields{
-			"key": keyName,
+			"prefix": "api",
+			"key":    keyName,
 		}).Debug("New org key added or updated.")
 		success = true
 	}
@@ -973,11 +988,13 @@ func handleGetOrgDetail(ORGID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
 		log.WithFields(logrus.Fields{
-			"Org": ORGID,
+			"prefix": "api",
+			"Org":    ORGID,
 		}).Debug("Attempted key retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
-			"Org": ORGID,
+			"prefix": "api",
+			"Org":    ORGID,
 		}).Debug("Attempted key retrieval - success.")
 	}
 
@@ -1048,7 +1065,8 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"key": ORGID,
+		"prefix": "api",
+		"key":    ORGID,
 	}).Debug("Attempted org key deletion - success.")
 
 	return responseMessage, code
@@ -1142,7 +1160,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						}
 					} else {
 						log.WithFields(logrus.Fields{
-							"apiID": apiId,
+							"prefix": "api",
+							"apiID":  apiId,
 						}).Error("Could not create key for this API ID, API doesn't exist.")
 						responseMessage = createError("Could not create key for this API ID, API doesn't exist.")
 						DoJSONWrite(w, 403, responseMessage)
@@ -1189,7 +1208,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				code = 500
 			} else {
 				log.WithFields(logrus.Fields{
-					"key": newKey,
+					"prefix": "api",
+					"key":    newKey,
 				}).Debug("Generated new key - success.")
 			}
 		}
@@ -1247,7 +1267,8 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		thisAPISpec := GetSpecForApi(newOauthClient.APIID)
 		if thisAPISpec == nil {
 			log.WithFields(logrus.Fields{
-				"apiID": newOauthClient.APIID,
+				"prefix": "api",
+				"apiID":  newOauthClient.APIID,
 			}).Error("Could not create key for this API ID, API doesn't exist.")
 		}
 
@@ -1272,7 +1293,8 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			code = 500
 		} else {
 			log.WithFields(logrus.Fields{
-				"key": newClient.GetId(),
+				"prefix": "api",
+				"key":    newClient.GetId(),
 			}).Debug("New OAuth Client registered successfully.")
 		}
 
@@ -1391,7 +1413,8 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 	thisAPISpec := GetSpecForApi(APIID)
 	if thisAPISpec == nil {
 		log.WithFields(logrus.Fields{
-			"apiID": APIID,
+			"prefix": "api",
+			"apiID":  APIID,
 		}).Error("Could ot get Client Details, API doesn't exist.")
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
@@ -1420,11 +1443,13 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
 		log.WithFields(logrus.Fields{
-			"key": keyName,
+			"prefix": "api",
+			"key":    keyName,
 		}).Warning("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
-			"key": keyName,
+			"prefix": "api",
+			"key":    keyName,
 		}).Debug("Attempted oauth client retrieval - success.")
 	}
 
@@ -1441,7 +1466,8 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 	thisAPISpec := GetSpecForApi(APIID)
 	if thisAPISpec == nil {
 		log.WithFields(logrus.Fields{
-			"apiID": APIID,
+			"prefix": "api",
+			"apiID":  APIID,
 		}).Error("Could ot get Client Details, API doesn't exist.")
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
@@ -1469,7 +1495,8 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"key": keyName,
+		"prefix": "api",
+		"key":    keyName,
 	}).Debug("Attempted OAuth client deletion - success.")
 
 	return responseMessage, code
@@ -1488,7 +1515,8 @@ func getOauthClients(APIID string) ([]byte, int) {
 	thisAPISpec := GetSpecForApi(APIID)
 	if thisAPISpec == nil {
 		log.WithFields(logrus.Fields{
-			"apiID": APIID,
+			"prefix": "api",
+			"apiID":  APIID,
 		}).Error("Could ot get Client Details, API doesn't exist.")
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
 		responseMessage, _ = json.Marshal(&notFound)
@@ -1522,11 +1550,13 @@ func getOauthClients(APIID string) ([]byte, int) {
 		responseMessage, _ = json.Marshal(&notFound)
 		code = 404
 		log.WithFields(logrus.Fields{
-			"API": APIID,
+			"prefix": "api",
+			"API":    APIID,
 		}).Warning("Attempted oauth client retrieval - failure.")
 	} else {
 		log.WithFields(logrus.Fields{
-			"API": APIID,
+			"prefix": "api",
+			"API":    APIID,
 		}).Debug("Attempted oauth clients retrieval - success.")
 	}
 
