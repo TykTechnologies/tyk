@@ -6,7 +6,7 @@
 - Centralised JWT keys need a `jwt_identity_base_field` that basically identifies the user in the Claims of the JWT, this will fallback to `sub` if not found. This field forms the basis of a new "virtual" token that gets used after validation, it means policy attributes are carried forward through Tyk for attribution purposes.
 - Centralised JWT keys also need a `jwt_policy_field_name` which sets the policy to apply to the "virtual" key
 - JWT header can now support "Bearer xxxx" style auth headers
-
+- HMAC authentication now supports an alternate header (`x-aux-date`) for clients that do not provide a date header, this header is checked *first* before reverting to the `Date` field
 
 # 1.9.1.1
 

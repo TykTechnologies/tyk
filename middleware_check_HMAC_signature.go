@@ -18,6 +18,7 @@ import (
 
 // TODO: change these to real values
 const DateHeaderSpec string = "Date"
+const AltHeaderSpec string = "x-aux-date"
 const HMACClockSkewLimitInMs float64 = 1000
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
@@ -27,6 +28,8 @@ type HMACMiddleware struct {
 
 func (hm *HMACMiddleware) authorizationError(w http.ResponseWriter, r *http.Request) (error, int) {
 	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).WithFields(logrus.Fields{
 		"path":   r.URL.Path,
 		"origin": r.RemoteAddr,
 	}).Info("Authorization field missing or malformed")
@@ -42,35 +45,66 @@ func (hm *HMACMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (hm *HMACMiddleware) getDateHeader(r *http.Request) (string, bool) {
+
+	auxHeaderVal := r.Header.Get(AltHeaderSpec)
+	dateHeaderVal := r.Header.Get(DateHeaderSpec)
+
+	// Prefer aux if present
+	if auxHeaderVal != "" {
+		authHeaderValue := r.Header.Get("Authorization")
+		log.WithFields(logrus.Fields{
+			"prefix":      "hmac",
+			"auth_header": authHeaderValue,
+		}).Warning("Using auxiliary header for this request")
+		return auxHeaderVal, true
+	}
+
+	if dateHeaderVal != "" {
+		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
+		}).Debug("Got auth header")
+		return dateHeaderVal, false
+	}
+
+	return "", false
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	log.Debug("HMAC middleware activated")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("HMAC middleware activated")
 
 	authHeaderValue := r.Header.Get("Authorization")
 	if authHeaderValue == "" {
 		return hm.authorizationError(w, r)
 	}
 
-	log.Debug("Got auth header")
-
-	if r.Header.Get(DateHeaderSpec) == "" {
-		log.Debug("Date missing")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Got auth header")
+	DateHeaderVal, _ := hm.getDateHeader(r)
+	if DateHeaderVal == "" {
 		return hm.authorizationError(w, r)
 	}
 
-	isOutOftime := hm.checkClockSkew(r.Header.Get(DateHeaderSpec))
+	isOutOftime := hm.checkClockSkew(DateHeaderVal)
 	if isOutOftime == false {
 		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
-		}).Info("Date is out of allowed range.")
+		}).Warning("Date is out of allowed range.")
 
 		handler := ErrorHandler{hm.TykMiddleware}
 		handler.HandleError(w, r, "Date is out of allowed range.", 400)
 		return errors.New("Date is out of allowed range."), 400
 	}
 
-	log.Debug("Got date")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Got date")
 
 	// Extract the keyId:
 	splitTypes := strings.Split(authHeaderValue, " ")
@@ -78,21 +112,29 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return hm.authorizationError(w, r)
 	}
 
-	log.Debug("Found two fields")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Found two fields")
 
 	if strings.ToLower(splitTypes[0]) != "signature" {
 		return hm.authorizationError(w, r)
 	}
 
-	log.Debug("Found signature value field")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Found signature value field")
 
 	splitValues := strings.Split(splitTypes[1], ",")
 	if len(splitValues) != 3 {
-		log.Debug("Comma length is wrong - got: ", splitValues)
+		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
+		}).Debug("Comma length is wrong - got: ", splitValues)
 		return hm.authorizationError(w, r)
 	}
 
-	log.Debug("Found 2 commas - getting elements of signature")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Found 2 commas - getting elements of signature")
 
 	// extract the keyId, algorithm and signature
 	keyId := ""
@@ -102,7 +144,9 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		splitKeyValuePair := strings.Split(v, "=")
 
 		if len(splitKeyValuePair) != 2 {
-			log.Info("Equals length is wrong - got: ", splitKeyValuePair)
+			log.WithFields(logrus.Fields{
+				"prefix": "hmac",
+			}).Info("Equals length is wrong - got: ", splitKeyValuePair)
 			return hm.authorizationError(w, r)
 		}
 		if strings.ToLower(splitKeyValuePair[0]) == "keyid" {
@@ -117,16 +161,24 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	log.Debug("Extracted values... checking validity")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Extracted values... checking validity")
 
 	// None may be empty
 	if keyId == "" || algorithm == "" || signature == "" {
 		return hm.authorizationError(w, r)
 	}
 
-	log.Debug("Key is valid: ", keyId)
-	log.Debug("algo is valid: ", algorithm)
-	log.Debug("signature isn't empty: ", signature)
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Key is valid: ", keyId)
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("algo is valid: ", algorithm)
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("signature isn't empty: ", signature)
 
 	// Check if API key valid
 	thisSessionState, keyExists := hm.TykMiddleware.CheckSessionAndIdentityForValidKey(keyId)
@@ -134,7 +186,9 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return hm.authorizationError(w, r)
 	}
 
-	log.Debug("Found key in session store")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Found key in session store")
 
 	// Set session state on context, we will need it later
 	context.Set(r, SessionData, thisSessionState)
@@ -142,6 +196,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	if thisSessionState.HmacSecret == "" || thisSessionState.HMACEnabled == false {
 		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
 		}).Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
@@ -149,10 +204,14 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return errors.New("This key is invalid"), 400
 	}
 
-	log.Debug("Sessionstate is HMAC enabled")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Sessionstate is HMAC enabled")
 
 	ourSignature := hm.generateSignatureFromRequest(r, thisSessionState.HmacSecret)
-	log.Debug("Our Signature: ", ourSignature)
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Our Signature: ", ourSignature)
 
 	compareTo, err := url.QueryUnescape(signature)
 
@@ -160,10 +219,17 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return hm.authorizationError(w, r)
 	}
 
-	log.Info("Request Signature: ", compareTo)
-	log.Info("Should be: ", ourSignature)
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Request Signature: ", compareTo)
+
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Should be: ", ourSignature)
+
 	if ourSignature != compareTo {
 		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
 			"path":   r.URL.Path,
 			"origin": r.RemoteAddr,
 		}).Info("Request signature is invalid")
@@ -176,7 +242,9 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return errors.New("Request signature is invalid"), 400
 	}
 
-	log.Debug("Signature matches")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Signature matches")
 
 	// Everything seems in order let the request through
 	return nil, 200
@@ -186,11 +254,17 @@ func (hm HMACMiddleware) parseFormParams(values url.Values) string {
 	kvValues := map[string]string{}
 	keys := []string{}
 
-	log.Debug("Parsing header values")
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Parsing header values")
 
 	for k, v := range values {
-		log.Debug("Form parser - processing key: ", k)
-		log.Debug("Form parser - processing value: ", v)
+		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
+		}).Debug("Form parser - processing key: ", k)
+		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
+		}).Debug("Form parser - processing value: ", v)
 		encodedKey := url.QueryEscape(k)
 		encodedVals := []string{}
 		for _, raw_value := range v {
@@ -222,15 +296,23 @@ func (hm HMACMiddleware) generateSignatureFromRequest(r *http.Request, secret st
 	//method := strings.ToUpper(r.Method)
 	//base_url := url.QueryEscape(r.URL.RequestURI())
 
-	date_header := url.QueryEscape(r.Header.Get(DateHeaderSpec))
+	headerVal, useAlt := hm.getDateHeader(r)
+	date_header := url.QueryEscape(headerVal)
 
 	// Not using form params for now, just date string
 	//params := url.QueryEscape(hm.parseFormParams(r.Form))
 
-	// Prep the signature string
-	signatureString := strings.ToLower(DateHeaderSpec) + ":" + date_header
+	spec := DateHeaderSpec
+	if useAlt {
+		spec = AltHeaderSpec
+	}
 
-	log.Debug("Signature string before encoding: ", signatureString)
+	// Prep the signature string
+	signatureString := strings.ToLower(spec) + ":" + date_header
+
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
 	key := []byte(secret)
@@ -238,8 +320,13 @@ func (hm HMACMiddleware) generateSignatureFromRequest(r *http.Request, secret st
 	h.Write([]byte(signatureString))
 
 	encodedString := base64.StdEncoding.EncodeToString(h.Sum(nil))
-	log.Debug("Encoded signature string: ", encodedString)
-	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("Encoded signature string: ", encodedString)
+
+	log.WithFields(logrus.Fields{
+		"prefix": "hmac",
+	}).Debug("URL Encoded: ", url.QueryEscape(encodedString))
 
 	// Return as base64
 	return encodedString
@@ -253,7 +340,10 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	tim, err := time.Parse(refDate, dateHeaderValue)
 
 	if err != nil {
-		log.Error("Date parsing failed")
+		log.WithFields(logrus.Fields{
+			"prefix":      "hmac",
+			"date_string": tim,
+		}).Error("Date parsing failed")
 		return false
 	}
 
@@ -269,7 +359,9 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	}
 
 	if math.Abs(float64(in_ms)) > hm.TykMiddleware.Spec.HmacAllowedClockSkew {
-		log.Debug("Difference is: ", math.Abs(float64(in_ms)))
+		log.WithFields(logrus.Fields{
+			"prefix": "hmac",
+		}).Debug("Difference is: ", math.Abs(float64(in_ms)))
 		return false
 	}
 
