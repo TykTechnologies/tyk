@@ -781,10 +781,6 @@ func TestWithAnalytics(t *testing.T) {
 		Store: &AnalyticsStore,
 	}
 	analytics.Store.Connect()
-	analytics.Clean = &MockPurger{&AnalyticsStore}
-
-	// Clear it
-	analytics.Clean.PurgeCache()
 
 	spec := createNonVersionedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
@@ -825,7 +821,6 @@ func TestWithAnalytics(t *testing.T) {
 
 func TestWithAnalyticsErrorResponse(t *testing.T) {
 	config.EnableAnalytics = true
-	config.AnalyticsConfig.PurgeDelay = -1
 
 	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
@@ -834,10 +829,6 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 		Store: &AnalyticsStore,
 	}
 	analytics.Store.Connect()
-	analytics.Clean = &MockPurger{&AnalyticsStore}
-
-	// Clear it
-	analytics.Clean.PurgeCache()
 
 	spec := createNonVersionedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}

@@ -23,7 +23,6 @@ type HostCheckerManager struct {
 	unhealthyHostList map[string]bool
 	currentHostList   map[string]HostData
 	resetsInitiated   map[string]bool
-	Clean             Purger
 }
 
 type UptimeReportData struct {
@@ -95,7 +94,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 		if hc.stopLoop {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
-			}).Debug("[HOST CHECK MANAGER] Stopping uptime tests")
+			}).Debug("Stopping uptime tests")
 			break
 		}
 
@@ -104,14 +103,14 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 			if !hc.pollerStarted {
 				log.WithFields(logrus.Fields{
 					"prefix": "host-check-mgr",
-				}).Info("[HOST CHECK MANAGER] Starting Poller")
+				}).Info("Starting Poller")
 				hc.pollerStarted = true
 				go hc.StartPoller()
 			}
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
-			}).Debug("[HOST CHECK MANAGER] New master found, no tests running")
+			}).Debug("New master found, no tests running")
 			if hc.pollerStarted {
 				go hc.StopPoller()
 				hc.pollerStarted = false
@@ -123,41 +122,23 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 }
 
 func (hc *HostCheckerManager) UptimePurgeLoop() {
-	if config.AnalyticsConfig.PurgeDelay == -1 {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Warning("Host Check (PurgeDelay) purge turned off, you are responsible for Redis storage maintenance.")
-		return
-	}
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Debug("[HOST CHECK MANAGER] Started analytics purge loop")
-	for {
-		if hc.pollerStarted {
-			if hc.Clean != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "host-check-mgr",
-				}).Debug("[HOST CHECK MANAGER] Purging uptime analytics")
-				hc.Clean.PurgeCache()
-			}
-
-		}
-		time.Sleep(time.Duration(config.AnalyticsConfig.PurgeDelay) * time.Second)
-	}
+	}).Warning("Host checker data is no longer purged by Tyk Gateway, please use Tyk-Pump.")
 }
 
 func (hc *HostCheckerManager) AmIPolling() bool {
 	if hc.store == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Error("[HOST CHECK MANAGER] No storage instance set for uptime tests! Disabling poller...")
+		}).Error("No storage instance set for uptime tests! Disabling poller...")
 		return false
 	}
 	ActiveInstance, err := hc.store.GetKey(PollerCacheKey)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Debug("[HOST CHECK MANAGER] No Primary instance found, assuming control")
+		}).Debug("No Primary instance found, assuming control")
 		hc.store.SetKey(PollerCacheKey, hc.Id, 15)
 		return true
 	}
@@ -165,7 +146,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	if ActiveInstance == hc.Id {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Debug("[HOST CHECK MANAGER] Primary instance set, I am master")
+		}).Debug("Primary instance set, I am master")
 		hc.store.SetKey(PollerCacheKey, hc.Id, 15) // Reset TTL
 		return true
 	}
@@ -519,9 +500,8 @@ func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) 
 	return nil
 }
 
-func InitHostCheckManager(store *RedisClusterStorageManager, purger Purger) {
+func InitHostCheckManager(store *RedisClusterStorageManager) {
 	GlobalHostChecker = HostCheckerManager{}
-	GlobalHostChecker.Clean = purger
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start()
 }

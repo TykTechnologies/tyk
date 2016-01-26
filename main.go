@@ -95,7 +95,7 @@ func setupGlobals() {
 
 	// Initialise our Host Checker
 	HealthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(HealthCheckStore, nil)
+	InitHostCheckManager(HealthCheckStore)
 
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
@@ -108,36 +108,12 @@ func setupGlobals() {
 			Store: &AnalyticsStore,
 		}
 
-		if config.AnalyticsConfig.Type == "csv" {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Using CSV cache purge")
-			analytics.Clean = &CSVPurger{&AnalyticsStore}
-
-		} else if config.AnalyticsConfig.Type == "mongo" {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Using MongoDB cache purge")
-			analytics.Clean = &MongoPurger{&AnalyticsStore, nil, "", ""}
-			GlobalHostChecker.Clean = &MongoUptimePurger{HealthCheckStore, nil, "tyk_uptime_analytics", UptimeAnalytics_KEYNAME}
-		} else if config.AnalyticsConfig.Type == "rpc" {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Using RPC cache purge")
-			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
-			thisPurger.Connect()
-			analytics.Clean = &thisPurger
-		}
-
 		analytics.Store.Connect()
 
-		if config.AnalyticsConfig.PurgeDelay >= 0 {
-			go analytics.Clean.StartPurgeLoop(config.AnalyticsConfig.PurgeDelay)
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Warn("Cache purge turned off, you are responsible for Redis storage maintenance.")
-		}
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warn("Cache purging is no longer part of Tyk Gateway, please use Tyk-Pump.")
+
 	}
 
 	//genericOsinStorage = MakeNewOsinServer()

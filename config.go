@@ -40,12 +40,9 @@ type Config struct {
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
-		Type                    string   `json:"type"`
-		CSVDir                  string   `json:"csv_dir"`
+		//Type                    string   `json:"type"`
 		MongoURL                string   `json:"mongo_url"`
-		MongoDbName             string   `json:"mongo_db_name"`
 		MongoCollection         string   `json:"mongo_collection"`
-		PurgeDelay              int      `json:"purge_delay"`
 		IgnoredIPs              []string `json:"ignored_ips"`
 		EnableDetailedRecording bool     `json:"enable_detailed_recording"`
 		ignoredIPsCompiled      map[string]bool
@@ -147,8 +144,6 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.EnableAnalytics = false
 	configStruct.HealthCheck.EnableHealthChecks = true
 	configStruct.HealthCheck.HealthCheckValueTimeout = 60
-	configStruct.AnalyticsConfig.CSVDir = "/tmp"
-	configStruct.AnalyticsConfig.Type = "csv"
 	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
 	configStruct.UseAsyncSessionWrite = false
 	newConfig, err := json.MarshalIndent(configStruct, "", "    ")
