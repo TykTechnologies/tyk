@@ -136,15 +136,7 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 		}
 	}
 
-	if idFound {
-		// Check Base64 encoded
-		decodedKID, decErr := b64.StdEncoding.DecodeString(tykId)
-		if decErr == nil {
-			//No error, probably encoded
-			tykId = string(decodedKID)
-		}
-	}
-
+	log.Info("Found: ", tykId)
 	return tykId, idFound
 }
 
