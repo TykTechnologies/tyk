@@ -36,6 +36,7 @@
 
 - Tyk nodes require a valid nodeID that is supported by the dashboard in order to register. Node ID's cannot be cloned, the cloned ID will load, but will bounce other node connections.
 
+
 # 1.9.1.1
 
 - Added CIDR Support (thanks @iwat)
