@@ -12,6 +12,29 @@
 
 - Purger has been removed from core completely (replaced by Pump)
 - More tracing and more logging has been put in place, especially around API operations for easy tracing
+- Hot reloads (redis based), will not reset the muxer if no specs are returned (mproves stability if a data source goes down or fails)
+- REMOVED: MongoDB poller
+- REMOVED: MongoDB Policy poller
+- ADDED: Service-based API Definition loader (dashboard)
+- ADDED: Service-based Policy loader (dashboard)
+- To configure for API Defs: 
+
+	"use_db_app_configs": true,
+    "db_app_conf_options": {
+        "connection_string": "http://dashboard_host:port",
+        "node_id": "<your-node-id>",
+        "node_is_segmented": false,
+        "tags": []
+    },
+
+- To configure for Policies: 
+
+	"policies": {
+    	"policy_source": "service",
+        "policy_connection_string": "http://dashboard_host:port"
+    },
+
+- Tyk nodes require a valid nodeID that is supported by the dashboard in order to register. Node ID's cannot be cloned, the cloned ID will load, but will bounce other node connections.
 
 # 1.9.1.1
 

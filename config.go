@@ -17,13 +17,16 @@ type Config struct {
 	TykJSPath      string `json:"tyk_js_path"`
 	MiddlewarePath string `json:"middleware_path"`
 	Policies       struct {
-		PolicySource     string `json:"policy_source"`
-		PolicyRecordName string `json:"policy_record_name"`
+		PolicySource           string `json:"policy_source"`
+		PolicyConnectionString string `json:"policy_connection_string"`
+		PolicyRecordName       string `json:"policy_record_name"`
 	} `json:"policies"`
 	UseDBAppConfigs  bool `json:"use_db_app_configs"`
 	DBAppConfOptions struct {
-		NodeIsSegmented bool     `json:"node_is_segmented"`
-		Tags            []string `json:"tags"`
+		ConnectionString string   `json:"connection_string"`
+		NodeID           string   `json:"node_id"`
+		NodeIsSegmented  bool     `json:"node_is_segmented"`
+		Tags             []string `json:"tags"`
 	} `json:"db_app_conf_options"`
 	AppPath string `json:"app_path"`
 	Storage struct {

@@ -138,7 +138,7 @@ func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, b
 			"prefix":      "auth-mgr",
 			"inbound-key": keyName,
 			"err":         err,
-		}).Info("Could not get session detail, key not found")
+		}).Debug("Could not get session detail, key not found")
 		return thisSession, false
 	}
 

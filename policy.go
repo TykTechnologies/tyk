@@ -3,10 +3,9 @@ package main
 import (
 	"encoding/json"
 	"github.com/Sirupsen/logrus"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
-	"time"
+	"net/http"
 )
 
 type Policy struct {
@@ -46,42 +45,53 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 	return policies
 }
 
-// LoadPoliciesFromMongo will connect and download POlicies from a Mongo DB instance.
-func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
-	dbPolicyList := make([]Policy, 0)
+// LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
+func LoadPoliciesFromDashboard(endpoint string, nodeID string) map[string]Policy {
+
 	policies := make(map[string]Policy)
 
-	dbSession, dErr := mgo.Dial(config.AnalyticsConfig.MongoURL)
-	if dErr != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Mongo connection failed:", dErr)
-		time.Sleep(5)
-		return LoadPoliciesFromMongo(collectionName)
+	// Get the definitions
+	log.Debug("Calling: ", endpoint)
+	newRequest, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		log.Error("Failed to create request: ", err)
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Debug("Searching in collection: ", collectionName)
-	policyCollection := dbSession.DB("").C(collectionName)
+	newRequest.Header.Add("authorization", nodeID)
+	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
-	search := bson.M{
-		"active": true,
-	}
+	c := &http.Client{}
+	response, reqErr := c.Do(newRequest)
 
-	mongoErr := policyCollection.Find(search).All(&dbPolicyList)
-
-	if mongoErr != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Could not find any policy configs! ", mongoErr)
+	if reqErr != nil {
+		log.Error("Request failed: ", reqErr)
 		return policies
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Printf("Loaded %v policies ", len(dbPolicyList))
-	for _, p := range dbPolicyList {
+	defer response.Body.Close()
+	retBody, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		log.Error("Failed to read body: ", err)
+		return policies
+	}
+
+	// Extract Policies
+	type NodeResponseOK struct {
+		Status  string
+		Message []Policy
+		Nonce   string
+	}
+
+	thisList := NodeResponseOK{}
+
+	decErr := json.Unmarshal(retBody, &thisList)
+	if decErr != nil {
+		log.Error("Failed to decode body: ", decErr)
+		return policies
+	}
+
+	for _, p := range thisList.Message {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
 		log.WithFields(logrus.Fields{
@@ -89,6 +99,7 @@ func LoadPoliciesFromMongo(collectionName string) map[string]Policy {
 		}).Info("--> Processing policy ID: ", p.ID)
 	}
 
+	ServiceNonce = thisList.Nonce
 	return policies
 }
 

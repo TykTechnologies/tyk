@@ -8,7 +8,6 @@ import (
 	"github.com/lonelycode/tykcommon"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -128,6 +127,9 @@ type APIDefinitionLoader struct {
 	dbSession *mgo.Session
 }
 
+// Nonce to use when interacting with the dashboard service
+var ServiceNonce string
+
 // Connect connects to the storage engine - can be null
 func (a *APIDefinitionLoader) Connect() {
 	var err error
@@ -229,43 +231,158 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 	return newAppSpec
 }
 
-// LoadDefinitionsFromMongo will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromMongo() *[]*APISpec {
+func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) {
+	defer response.Body.Close()
+	contents, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		return []byte(""), err
+	}
+
+	return contents, nil
+
+}
+
+func RegisterNodeWithDashboard(endpoint string, nodeID string) error {
+	// Get the definitions
+	log.Debug("Calling: ", endpoint)
+	newRequest, err := http.NewRequest("PUT", endpoint, nil)
+	if err != nil {
+		log.Error("Failed to create request: ", err)
+	}
+
+	newRequest.Header.Add("authorization", nodeID)
+
+	c := &http.Client{}
+	response, reqErr := c.Do(newRequest)
+
+	if reqErr != nil {
+		log.Error("Request failed: ", reqErr)
+		return reqErr
+	}
+
+	defer response.Body.Close()
+	retBody, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		return err
+	}
+
+	// Extract tagged APIs#
+	type NodeResponseOK struct {
+		Status  string
+		Message interface{}
+		Nonce   string
+	}
+
+	thisVal := NodeResponseOK{}
+	decErr := json.Unmarshal(retBody, &thisVal)
+	if decErr != nil {
+		log.Error("Failed to decode body: ", decErr)
+		return decErr
+	}
+
+	// Set the nonce
+	ServiceNonce = thisVal.Nonce
+
+	return nil
+}
+
+// LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
+func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint string, nodeID string) *[]*APISpec {
 	var APISpecs = []*APISpec{}
 
-	a.Connect()
-	apiCollection := a.dbSession.DB("").C("tyk_apis")
-
-	search := bson.M{
-		"active": true,
+	// Get the definitions
+	log.Debug("Calling: ", endpoint)
+	newRequest, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		log.Error("Failed to create request: ", err)
 	}
 
-	// enable segments
-	if config.DBAppConfOptions.NodeIsSegmented {
-		log.Info("Segmented node, loading: ", config.DBAppConfOptions.Tags)
-		search["tags"] = bson.M{"$in": config.DBAppConfOptions.Tags}
-	}
+	newRequest.Header.Add("authorization", nodeID)
+	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
-	var APIDefinitions = []tykcommon.APIDefinition{}
-	var StringDefs = make([]bson.M, 0)
-	mongoErr := apiCollection.Find(search).Sort("-sort_by").All(&APIDefinitions)
+	c := &http.Client{}
+	response, reqErr := c.Do(newRequest)
 
-	if mongoErr != nil {
-		log.Error("Could not find any application configs!: ", mongoErr)
+	if reqErr != nil {
+		log.Error("Request failed: ", reqErr)
 		return &APISpecs
 	}
 
-	apiCollection.Find(search).All(&StringDefs)
+	retBody, bErr := a.readBody(response)
+	if bErr != nil {
+		log.Error("Failed to read body: ", bErr)
+		return &APISpecs
+	}
 
-	for i, thisAppConfig := range APIDefinitions {
-		thisAppConfig.DecodeFromDB()
-		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
+	// Extract tagged APIs#
 
+	type ResponseStruct struct {
+		ApiDefinition tykcommon.APIDefinition `bson:"api_definition" json:"api_definition"`
+	}
+	type NodeResponseOK struct {
+		Status  string
+		Message []ResponseStruct
+		Nonce   string
+	}
+
+	thisList := NodeResponseOK{}
+
+	decErr := json.Unmarshal(retBody, &thisList)
+	if decErr != nil {
+		log.Error("Failed to decode body: ", decErr)
+		return &APISpecs
+	}
+
+	thisRawList := make(map[string]interface{})
+	rawdecErr := json.Unmarshal(retBody, &thisRawList)
+	if rawdecErr != nil {
+		log.Error("Failed to decode body (raw): ", rawdecErr)
+		return &APISpecs
+	}
+
+	// Extract tagged entries only
+	APIDefinitions := make([]tykcommon.APIDefinition, 0)
+
+	if config.DBAppConfOptions.NodeIsSegmented {
+		APIDefinitions = make([]tykcommon.APIDefinition, 0)
+		tagList := make(map[string]bool)
+		toLoad := make(map[string]tykcommon.APIDefinition)
+
+		for _, mt := range config.DBAppConfOptions.Tags {
+			tagList[mt] = true
+		}
+
+		for index, apiEntry := range thisList.Message {
+			for _, t := range apiEntry.ApiDefinition.Tags {
+				_, ok := tagList[t]
+				if ok {
+					apiEntry.ApiDefinition.RawData = thisRawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
+					toLoad[apiEntry.ApiDefinition.APIID] = apiEntry.ApiDefinition
+				}
+
+			}
+		}
+
+		for _, apiDef := range toLoad {
+			APIDefinitions = append(APIDefinitions, apiDef)
+		}
+	} else {
+		for index, apiEntry := range thisList.Message {
+			apiEntry.ApiDefinition.RawData = thisRawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
+			APIDefinitions = append(APIDefinitions, apiEntry.ApiDefinition)
+		}
+	}
+
+	// Process
+	for _, thisAppConfig := range APIDefinitions {
 		newAppSpec := a.MakeSpec(thisAppConfig)
 		APISpecs = append(APISpecs, &newAppSpec)
 	}
 
-	a.Disconnect()
+	// Set the nonce
+	ServiceNonce = thisList.Nonce
 
 	return &APISpecs
 }

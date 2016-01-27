@@ -152,10 +152,23 @@ func getAPISpecs() *[]*APISpec {
 	var APISpecs *[]*APISpec
 
 	if config.UseDBAppConfigs {
+		if config.DBAppConfOptions.ConnectionString != "" {
+			connStr := config.DBAppConfOptions.ConnectionString
+			connStr = connStr + "/system/apis"
+			nodeID := config.DBAppConfOptions.NodeID
+			if nodeID != "" {
+				APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, "12345")
+			}
+
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatal("No connection string or node ID present. Failing.")
+		}
+
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debug("Using App Configuration from Mongo DB")
-		APISpecs = APILoader.LoadDefinitionsFromMongo()
+		}).Debug("Using App Configuration from Dashboard Service")
 	} else if config.SlaveOptions.UseRPC {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -186,9 +199,11 @@ func getAPISpecs() *[]*APISpec {
 }
 
 func getPolicies() {
+	thesePolicies := make(map[string]Policy)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Debug("Loading policies")
+
 	if config.Policies.PolicyRecordName == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -196,18 +211,37 @@ func getPolicies() {
 		return
 	}
 
-	if config.Policies.PolicySource == "mongo" {
+	if config.Policies.PolicySource == "service" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debug("Using Policies from Mongo DB")
-		Policies = LoadPoliciesFromMongo(config.Policies.PolicyRecordName)
+		}).Debug("Using Policies from Dashboard Service")
+
+		if config.DBAppConfOptions.ConnectionString != "" {
+			connStr := config.Policies.PolicyConnectionString
+			connStr = connStr + "/system/policies"
+			nodeID := config.DBAppConfOptions.NodeID
+			if nodeID != "" {
+				thesePolicies = LoadPoliciesFromDashboard(connStr, nodeID)
+			}
+
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatal("No connection string or node ID present. Failing.")
+		}
+
 	} else if config.Policies.PolicySource == "rpc" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using Policies from RPC")
-		Policies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
+		thesePolicies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
 	} else {
-		Policies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
+		thesePolicies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
+	}
+
+	if len(thesePolicies) > 0 {
+		Policies = thesePolicies
+		return
 	}
 }
 
@@ -809,6 +843,22 @@ func RPCReloadLoop(RPCKey string) {
 func doReload() {
 	time.Sleep(10 * time.Second)
 
+	// Load the API Policies
+	getPolicies()
+
+	// load the specs
+	specs := getAPISpecs()
+
+	if len(*specs) == 0 {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("No API Definitions found, not reloading")
+		reloadScheduled = false
+		return
+	}
+
+	// We have updated specs, lets load those...
+
 	// Kill RPC if available
 	if config.SlaveOptions.UseRPC {
 		ClearRPCClients()
@@ -828,12 +878,7 @@ func doReload() {
 	}
 
 	loadAPIEndpoints(newMuxes)
-	specs := getAPISpecs()
-
 	loadApps(specs, newMuxes)
-
-	// Load the API Policies
-	getPolicies()
 
 	newServeMux := http.NewServeMux()
 	newServeMux.Handle("/", mainRouter)
@@ -1103,6 +1148,18 @@ func main() {
 		}
 
 		// Accept connections in a new goroutine.
+		if config.UseDBAppConfigs {
+			connStr := config.Policies.PolicyConnectionString
+			if connStr == "" {
+				log.Fatal("Connection string is empty, failing.")
+			}
+
+			connStr = connStr + "/register/node"
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Registering node.")
+			RegisterNodeWithDashboard(connStr, config.DBAppConfOptions.NodeID)
+		}
 		specs := getAPISpecs()
 		loadApps(specs, defaultRouter)
 		getPolicies()
