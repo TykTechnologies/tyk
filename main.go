@@ -157,7 +157,7 @@ func getAPISpecs() *[]*APISpec {
 			connStr = connStr + "/system/apis"
 			nodeID := config.DBAppConfOptions.NodeID
 			if nodeID != "" {
-				APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, "12345")
+				APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, nodeID)
 			}
 
 		} else {
