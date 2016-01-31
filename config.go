@@ -13,6 +13,7 @@ import (
 type Config struct {
 	ListenPort     int    `json:"listen_port"`
 	Secret         string `json:"secret"`
+	NodeSecret     string `json:"node_secret"`
 	TemplatePath   string `json:"template_path"`
 	TykJSPath      string `json:"tyk_js_path"`
 	MiddlewarePath string `json:"middleware_path"`
@@ -24,7 +25,6 @@ type Config struct {
 	UseDBAppConfigs  bool `json:"use_db_app_configs"`
 	DBAppConfOptions struct {
 		ConnectionString string   `json:"connection_string"`
-		NodeID           string   `json:"node_id"`
 		NodeIsSegmented  bool     `json:"node_is_segmented"`
 		Tags             []string `json:"tags"`
 	} `json:"db_app_conf_options"`

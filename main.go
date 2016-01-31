@@ -48,6 +48,8 @@ var keyGen = DefaultKeyGenerator{}
 var mainRouter *mux.Router
 var defaultRouter *mux.Router
 
+var NodeID string
+
 // Generic system error
 const (
 	E_SYSTEM_ERROR          string = "{\"status\": \"system error, please contact administrator\"}"
@@ -155,10 +157,8 @@ func getAPISpecs() *[]*APISpec {
 		if config.DBAppConfOptions.ConnectionString != "" {
 			connStr := config.DBAppConfOptions.ConnectionString
 			connStr = connStr + "/system/apis"
-			nodeID := config.DBAppConfOptions.NodeID
-			if nodeID != "" {
-				APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, nodeID)
-			}
+
+			APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
 
 		} else {
 			log.WithFields(logrus.Fields{
@@ -216,13 +216,11 @@ func getPolicies() {
 			"prefix": "main",
 		}).Debug("Using Policies from Dashboard Service")
 
-		if config.DBAppConfOptions.ConnectionString != "" {
+		if config.Policies.PolicyConnectionString != "" {
 			connStr := config.Policies.PolicyConnectionString
 			connStr = connStr + "/system/policies"
-			nodeID := config.DBAppConfOptions.NodeID
-			if nodeID != "" {
-				thesePolicies = LoadPoliciesFromDashboard(connStr, nodeID)
-			}
+
+			thesePolicies = LoadPoliciesFromDashboard(connStr, config.NodeSecret)
 
 		} else {
 			log.WithFields(logrus.Fields{
@@ -1149,7 +1147,7 @@ func main() {
 
 		// Accept connections in a new goroutine.
 		if config.UseDBAppConfigs {
-			connStr := config.Policies.PolicyConnectionString
+			connStr := config.DBAppConfOptions.ConnectionString
 			if connStr == "" {
 				log.Fatal("Connection string is empty, failing.")
 			}
@@ -1158,7 +1156,19 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("Registering node.")
-			RegisterNodeWithDashboard(connStr, config.DBAppConfOptions.NodeID)
+			RegisterNodeWithDashboard(connStr, config.NodeSecret)
+
+			heartbeatConnStr := config.DBAppConfOptions.ConnectionString
+			if heartbeatConnStr == "" {
+				log.Fatal("Connection string is empty, failing.")
+			}
+
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Starting heartbeat.")
+			heartbeatConnStr = heartbeatConnStr + "/system/ping"
+			go StartBeating(heartbeatConnStr, config.NodeSecret)
+
 		}
 		specs := getAPISpecs()
 		loadApps(specs, defaultRouter)

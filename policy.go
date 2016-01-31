@@ -46,7 +46,7 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint string, nodeID string) map[string]Policy {
+func LoadPoliciesFromDashboard(endpoint string, secret string) map[string]Policy {
 
 	policies := make(map[string]Policy)
 
@@ -57,7 +57,8 @@ func LoadPoliciesFromDashboard(endpoint string, nodeID string) map[string]Policy
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", nodeID)
+	newRequest.Header.Add("authorization", secret)
+	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{}
@@ -91,6 +92,9 @@ func LoadPoliciesFromDashboard(endpoint string, nodeID string) map[string]Policy
 		return policies
 	}
 
+	ServiceNonce = thisList.Nonce
+	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+
 	for _, p := range thisList.Message {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
@@ -99,7 +103,6 @@ func LoadPoliciesFromDashboard(endpoint string, nodeID string) map[string]Policy
 		}).Info("--> Processing policy ID: ", p.ID)
 	}
 
-	ServiceNonce = thisList.Nonce
 	return policies
 }
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
+	"github.com/Sirupsen/logrus"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2"
 	"io/ioutil"
@@ -243,22 +244,29 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 
 }
 
-func RegisterNodeWithDashboard(endpoint string, nodeID string) error {
+func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("PUT", endpoint, nil)
+	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", nodeID)
+	newRequest.Header.Add("authorization", secret)
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
 		log.Error("Request failed: ", reqErr)
-		return reqErr
+		time.Sleep(time.Second * 5)
+		return RegisterNodeWithDashboard(endpoint, secret)
+	}
+
+	if response.StatusCode != 200 {
+		log.Error("Failed to register node, retrying in 5s")
+		time.Sleep(time.Second * 5)
+		return RegisterNodeWithDashboard(endpoint, secret)
 	}
 
 	defer response.Body.Close()
@@ -271,7 +279,82 @@ func RegisterNodeWithDashboard(endpoint string, nodeID string) error {
 	// Extract tagged APIs#
 	type NodeResponseOK struct {
 		Status  string
-		Message interface{}
+		Message map[string]string
+		Nonce   string
+	}
+
+	thisVal := NodeResponseOK{}
+	decErr := json.Unmarshal(retBody, &thisVal)
+	if decErr != nil {
+		log.Error("Failed to decode body: ", decErr)
+		return decErr
+	}
+
+	// Set the NodeID
+	var found bool
+	NodeID, found = thisVal.Message["NodeID"]
+	if !found {
+		log.Error("Failed to register node, retrying in 5s")
+		time.Sleep(time.Second * 5)
+		return RegisterNodeWithDashboard(endpoint, secret)
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "dashboard",
+		"id":    NodeID,
+	}).Info("Node registered")
+	// Set the nonce
+	ServiceNonce = thisVal.Nonce
+
+	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
+
+	return nil
+}
+
+func StartBeating(endpoint, secret string) {
+	for {
+		failure := SendHeartBeat(endpoint, secret)
+		if failure != nil {
+			log.Warning(failure)
+		}
+		time.Sleep(time.Second * 5)
+	}
+}
+
+func SendHeartBeat(endpoint string, secret string) error {
+	// Get the definitions
+	log.Debug("Calling: ", endpoint)
+	newRequest, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		log.Error("Failed to create request: ", err)
+	}
+
+	newRequest.Header.Add("authorization", secret)
+	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+
+	c := &http.Client{}
+	response, reqErr := c.Do(newRequest)
+
+	if reqErr != nil {
+		return errors.New("Dashboard is down? Heartbeat is failing.")
+	}
+
+	if response.StatusCode != 200 {
+		return errors.New("Dashboard is down? Heartbeat is failing.")
+	}
+
+	defer response.Body.Close()
+	retBody, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		return err
+	}
+
+	// Extract tagged APIs#
+	type NodeResponseOK struct {
+		Status  string
+		Message map[string]string
 		Nonce   string
 	}
 
@@ -285,11 +368,13 @@ func RegisterNodeWithDashboard(endpoint string, nodeID string) error {
 	// Set the nonce
 	ServiceNonce = thisVal.Nonce
 
+	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
+
 	return nil
 }
 
 // LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint string, nodeID string) *[]*APISpec {
+func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint string, secret string) *[]*APISpec {
 	var APISpecs = []*APISpec{}
 
 	// Get the definitions
@@ -299,7 +384,9 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", nodeID)
+	newRequest.Header.Add("authorization", secret)
+	log.Debug("Using: NodeID: ", NodeID)
+	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{}
@@ -383,6 +470,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 
 	// Set the nonce
 	ServiceNonce = thisList.Nonce
+	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
 	return &APISpecs
 }
