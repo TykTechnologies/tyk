@@ -336,6 +336,15 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 
 	var err error
 
+	if config.HashKeys {
+		errorMsg := APIErrorMessage{
+			Status: "error",
+			Error:  "Configuration is secured, key listings not available in hashed configurations",
+		}
+		errJSON, _ := json.Marshal(&errorMsg)
+		return errJSON, 400
+	}
+
 	thisSessionManager := FallbackKeySesionManager
 	if APIID != "" {
 		thiSpec := GetSpecForApi(APIID)
