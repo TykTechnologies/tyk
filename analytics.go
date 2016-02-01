@@ -88,13 +88,24 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 
 	if config.SlaveOptions.UseRPC {
 		// Extend tag list to include this data so wecan segment by node if necessary
-		thisRecord.Tags = append([]string{"tyk-hybrid-rpc"})
+		thisRecord.Tags = append(thisRecord.Tags, "tyk-hybrid-rpc")
 	}
 
 	if config.DBAppConfOptions.NodeIsSegmented {
 		// Extend tag list to include this data so wecan segment by node if necessary
 		thisRecord.Tags = append(thisRecord.Tags, config.DBAppConfOptions.Tags...)
 	}
+
+	// Lets add some metadata
+	if thisRecord.APIKey != "" {
+		thisRecord.Tags = append(thisRecord.Tags, "key-"+thisRecord.APIKey)
+	}
+
+	if thisRecord.OrgID != "" {
+		thisRecord.Tags = append(thisRecord.Tags, "org-"+thisRecord.OrgID)
+	}
+
+	thisRecord.Tags = append(thisRecord.Tags, "api-"+thisRecord.APIID)
 
 	encoded, err := msgpack.Marshal(thisRecord)
 
