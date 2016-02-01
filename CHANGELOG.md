@@ -8,6 +8,7 @@
 - JWT header can now support "Bearer xxxx" style auth headers
 - HMAC authentication now supports an alternate header (`x-aux-date`) for clients that do not provide a date header, this header is checked *first* before reverting to the `Date` field
 - Added capability to preserve host header, if `proxy.preserve_host_header` is set to true in an API definition then the host header in the outbound request is retained to be the inbound hostname of the proxy.
+- Added more default tags for better segmentation: key-{key-id}, org-{org-id} and api-{apiid} can now be used as tags to lock down the analytics filter in the dashboard.
 
 # Develop v2
 
