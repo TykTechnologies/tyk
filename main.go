@@ -39,6 +39,7 @@ var Policies = make(map[string]Policy)
 var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
 var DefaultQuotaStore = DefaultSessionManager{}
+var FallbackKeySesionManager SessionHandler = &DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
 
@@ -487,6 +488,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 
 	listenPaths := make(map[string][]string)
+
+	FallbackKeySesionManager.Init(&redisStore)
 
 	// Create a new handler for each API spec
 	for _, referenceSpec := range *APISpecs {

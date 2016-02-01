@@ -316,6 +316,67 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 	}
 }
 
+func TestKeyHandlerGetKey(t *testing.T) {
+	MakeSampleAPI()
+	createKey()
+
+	uri := "/tyk/keys/1234"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+
+	param.Set("api_id", "1")
+	req, err := http.NewRequest(method, uri+"?"+param.Encode(), nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyHandler(recorder, req)
+
+	newSuccess := make(map[string]interface{})
+	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+
+	if err != nil {
+		t.Error("Could not unmarshal success message:\n", err)
+	} else {
+		if recorder.Code != 200 {
+			t.Error("key not requested, status error:\n", recorder.Body.String())
+		}
+	}
+}
+
+func TestKeyHandlerGetKeyNoAPIID(t *testing.T) {
+	MakeSampleAPI()
+	createKey()
+
+	uri := "/tyk/keys/1234"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+
+	req, err := http.NewRequest(method, uri+"?"+param.Encode(), nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyHandler(recorder, req)
+
+	newSuccess := make(map[string]interface{})
+	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+
+	if err != nil {
+		t.Error("Could not unmarshal success message:\n", err)
+	} else {
+		if recorder.Code != 200 {
+			t.Error("key not requested, status error:\n", recorder.Body.String())
+		}
+	}
+}
+
 func createKey() {
 	uri := "/tyk/keys/1234"
 	method := "POST"
@@ -375,6 +436,41 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 	param := make(url.Values)
 	MakeSampleAPI()
 	param.Set("api_id", "1")
+	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	createKeyHandler(recorder, req)
+
+	newSuccess := Success{}
+	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+
+	if err != nil {
+		t.Error("Could not unmarshal success message:\n", err)
+	} else {
+		if newSuccess.Status != "ok" {
+			t.Error("key not created, status error:\n", recorder.Body.String())
+		}
+		if newSuccess.Action != "create" {
+			t.Error("Response is incorrect - action is not 'create' :\n", recorder.Body.String())
+		}
+	}
+}
+
+func TestCreateKeyHandlerCreateNewKeyNoAPIID(t *testing.T) {
+	createKey()
+
+	uri := "/tyk/keys/create"
+	method := "POST"
+
+	sampleKey := createSampleSession()
+	body, _ := json.Marshal(&sampleKey)
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	MakeSampleAPI()
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
 	if err != nil {

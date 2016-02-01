@@ -50,6 +50,11 @@ func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 }
 
 func GetSpecForApi(APIID string) *APISpec {
+	if ApiSpecRegister == nil {
+		log.Error("No API Register present!")
+		return nil
+	}
+
 	spec, ok := (*ApiSpecRegister)[APIID]
 	if !ok {
 		return nil
@@ -169,13 +174,18 @@ func SetSessionPassword(session *SessionState) {
 }
 
 func GetKeyDetail(key string, APIID string) (SessionState, bool) {
-	thiSpec := GetSpecForApi(APIID)
-	if thiSpec == nil {
-		log.Error("No API Spec found for this keyspace")
-		return SessionState{}, false
+
+	thisSessionManager := FallbackKeySesionManager
+	if APIID != "" {
+		thisSpec := GetSpecForApi(APIID)
+		if thisSpec == nil {
+			log.Error("No API Spec found for this keyspace")
+			return SessionState{}, false
+		}
+		thisSessionManager = thisSpec.SessionManager
 	}
 
-	return thiSpec.SessionManager.GetSessionDetail(key)
+	return thisSessionManager.GetSessionDetail(key)
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
@@ -271,14 +281,18 @@ func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 	var err error
 	code := 200
 
-	thiSpec := GetSpecForApi(APIID)
-	if thiSpec == nil {
-		notFound := APIStatusMessage{"error", "API not found"}
-		responseMessage, _ = json.Marshal(&notFound)
-		return responseMessage, 400
+	thisSessionManager := FallbackKeySesionManager
+	if APIID != "" {
+		thiSpec := GetSpecForApi(APIID)
+		if thiSpec == nil {
+			notFound := APIStatusMessage{"error", "API not found"}
+			responseMessage, _ = json.Marshal(&notFound)
+			return responseMessage, 400
+		}
+		thisSessionManager = thiSpec.SessionManager
 	}
 
-	thisSession, ok := thiSpec.SessionManager.GetSessionDetail(sessionKey)
+	thisSession, ok := thisSessionManager.GetSessionDetail(sessionKey)
 	if !ok {
 		success = false
 	} else {
@@ -322,14 +336,18 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 
 	var err error
 
-	thiSpec := GetSpecForApi(APIID)
-	if thiSpec == nil {
-		notFound := APIStatusMessage{"error", "API not found"}
-		responseMessage, _ = json.Marshal(&notFound)
-		return responseMessage, 400
+	thisSessionManager := FallbackKeySesionManager
+	if APIID != "" {
+		thiSpec := GetSpecForApi(APIID)
+		if thiSpec == nil {
+			notFound := APIStatusMessage{"error", "API not found"}
+			responseMessage, _ = json.Marshal(&notFound)
+			return responseMessage, 400
+		}
+		thisSessionManager = thiSpec.SessionManager
 	}
 
-	sessions := thiSpec.SessionManager.GetSessions(filter)
+	sessions := thisSessionManager.GetSessions(filter)
 
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
@@ -392,19 +410,18 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 		return responseMessage, 200
 	}
 
-	thiSpec := GetSpecForApi(APIID)
-	if thiSpec == nil {
-		notFound := APIStatusMessage{"error", "API not found"}
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "fail",
-		}).Error("Failed to delete key.")
-		responseMessage, _ = json.Marshal(&notFound)
-		return responseMessage, 400
+	thisSessionManager := FallbackKeySesionManager
+	if APIID != "" {
+		thiSpec := GetSpecForApi(APIID)
+		if thiSpec == nil {
+			notFound := APIStatusMessage{"error", "API not found"}
+			responseMessage, _ = json.Marshal(&notFound)
+			return responseMessage, 400
+		}
+		thisSessionManager = thiSpec.SessionManager
 	}
 
-	thiSpec.SessionManager.RemoveSession(keyName)
+	thisSessionManager.RemoveSession(keyName)
 	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
@@ -448,22 +465,20 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 		return responseMessage, 200
 	}
 
-	thiSpec := GetSpecForApi(APIID)
-	if thiSpec == nil {
-		notFound := APIStatusMessage{"error", "API not found"}
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to delete hashed key")
-
-		responseMessage, _ = json.Marshal(&notFound)
-		return responseMessage, 400
+	thisSessionManager := FallbackKeySesionManager
+	if APIID != "" {
+		thiSpec := GetSpecForApi(APIID)
+		if thiSpec == nil {
+			notFound := APIStatusMessage{"error", "API not found"}
+			responseMessage, _ = json.Marshal(&notFound)
+			return responseMessage, 400
+		}
+		thisSessionManager = thiSpec.SessionManager
 	}
 
 	// This is so we bypass the hash function
-	sessStore := thiSpec.SessionManager.GetStore()
+	sessStore := thisSessionManager.GetStore()
+
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
 	sessStore.DeleteRawKey(setKeyName)
@@ -748,17 +763,12 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage, code = handleAddOrUpdate(keyName, r)
 
 	} else if r.Method == "GET" {
-		if APIID == "" {
-			code = 405
-			responseMessage = createError("Missing required parameter 'api_id' in request")
+		if keyName != "" {
+			// Return single key detail
+			responseMessage, code = handleGetDetail(keyName, APIID)
 		} else {
-			if keyName != "" {
-				// Return single key detail
-				responseMessage, code = handleGetDetail(keyName, APIID)
-			} else {
-				// Return list of keys
-				responseMessage, code = handleGetAllKeys(filter, APIID)
-			}
+			// Return list of keys
+			responseMessage, code = handleGetAllKeys(filter, APIID)
 		}
 
 	} else if r.Method == "DELETE" {
@@ -817,22 +827,20 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	var responseMessage []byte
 	var err error
 
-	thiSpec := GetSpecForApi(APIID)
-	if thiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to update hashed key.")
-
-		notFound := APIStatusMessage{"error", "API not found"}
-		responseMessage, _ = json.Marshal(&notFound)
-		return responseMessage, 400
+	thisSessionManager := FallbackKeySesionManager
+	if APIID != "" {
+		thiSpec := GetSpecForApi(APIID)
+		if thiSpec == nil {
+			notFound := APIStatusMessage{"error", "API not found"}
+			responseMessage, _ = json.Marshal(&notFound)
+			return responseMessage, 400
+		}
+		thisSessionManager = thiSpec.SessionManager
 	}
 
 	// This is so we bypass the hash function
-	sessStore := thiSpec.SessionManager.GetStore()
+	sessStore := thisSessionManager.GetStore()
+
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
 	rawSessionData, sessErr := sessStore.GetRawKey(setKeyName)
@@ -1269,15 +1277,16 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 							return
 						}
 					} else {
-						log.WithFields(logrus.Fields{
-							"prefix": "api",
-							"apiID":  apiId,
-							"err":    "not found",
-						}).Error("Could not create key for this API ID, API doesn't exist.")
-
-						responseMessage = createError("Could not create key for this API ID, API doesn't exist.")
-						DoJSONWrite(w, 403, responseMessage)
-						return
+						// Use fallback
+						thisSessionManager := FallbackKeySesionManager
+						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+						thisSessionManager.ResetQuota(newKey, newSession)
+						err := thisSessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+						if err != nil {
+							responseMessage = createError("Failed to create key - " + err.Error())
+							DoJSONWrite(w, 403, responseMessage)
+							return
+						}
 					}
 				}
 			} else {
