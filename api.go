@@ -455,7 +455,7 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err": "API not found",
+			"err":    "API not found",
 		}).Error("Failed to delete hashed key")
 
 		responseMessage, _ = json.Marshal(&notFound)
@@ -478,10 +478,10 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 	}
 
 	log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "ok",
-		}).Info("Deleted hashed key.")
+		"prefix": "api",
+		"key":    keyName,
+		"status": "ok",
+	}).Info("Deleted hashed key.")
 
 	return responseMessage, code
 }
@@ -823,7 +823,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err": "API not found",
+			"err":    "API not found",
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "API not found"}
@@ -842,7 +842,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err": sessErr,
+			"err":    sessErr,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Key not found"}
@@ -857,7 +857,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err": jsErr,
+			"err":    jsErr,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Unmarshalling failed"}
@@ -874,7 +874,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err": encErr,
+			"err":    encErr,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Marshalling failed"}
@@ -888,7 +888,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err": setErr,
+			"err":    setErr,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Could not write key data"}
@@ -907,10 +907,10 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	}
 
 	log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "ok",
-		}).Info("Updated hashed key.")
+		"prefix": "api",
+		"key":    keyName,
+		"status": "ok",
+	}).Info("Updated hashed key.")
 
 	return responseMessage, code
 }
