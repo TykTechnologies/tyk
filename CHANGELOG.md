@@ -36,7 +36,7 @@
         "policy_connection_string": "http://dashboard_host:port"
     },
 
-- Tyk nodes require a valid nodeID that is supported by the dashboard in order to register. Node ID's cannot be cloned, the cloned ID will load, but will bounce other node connections.
+- Tyk nodes now register with a dashboard to be assigned an ID based on the licenses available.
 
 
 # 1.9.1.1
