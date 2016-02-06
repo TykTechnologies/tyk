@@ -4,9 +4,9 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
-	"github.com/Sirupsen/logrus"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2"
 	"io/ioutil"
@@ -263,14 +263,15 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 		return RegisterNodeWithDashboard(endpoint, secret)
 	}
 
+	defer response.Body.Close()
+	retBody, err := ioutil.ReadAll(response.Body)
+
 	if response.StatusCode != 200 {
 		log.Error("Failed to register node, retrying in 5s")
+		log.Debug("Response was: ", string(retBody))
 		time.Sleep(time.Second * 5)
 		return RegisterNodeWithDashboard(endpoint, secret)
 	}
-
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
 		return err
@@ -301,7 +302,7 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "dashboard",
-		"id":    NodeID,
+		"id":     NodeID,
 	}).Info("Node registered")
 	// Set the nonce
 	ServiceNonce = thisVal.Nonce
@@ -419,6 +420,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	decErr := json.Unmarshal(retBody, &thisList)
 	if decErr != nil {
 		log.Error("Failed to decode body: ", decErr)
+		log.Debug("Response was: ", string(retBody))
 		return &APISpecs
 	}
 
