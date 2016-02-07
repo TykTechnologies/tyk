@@ -1,7 +1,9 @@
 package main
 
 import (
+	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
+	"net"
 	"time"
 )
 
@@ -27,13 +29,58 @@ type AnalyticsRecord struct {
 	RawRequest    string
 	RawResponse   string
 	IPAddress     string
+	Geo           GeoData
 	Tags          []string
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
+}
+
+type GeoData struct {
+	Country struct {
+		ISOCode string `maxminddb:"iso_code"`
+	} `maxminddb:"country"`
+
+	City struct {
+		GeoNameID uint              `maxminddb:"geoname_id"`
+		Names     map[string]string `maxminddb:"names"`
+	} `maxminddb:"city"`
+
+	Location struct {
+		Latitude  float64 `maxminddb:"latitude"`
+		Longitude float64 `maxminddb:"longitude"`
+		TimeZone  string  `maxminddb:"time_zone"`
+	} `maxminddb:"location"`
 }
 
 const (
 	ANALYTICS_KEYNAME string = "tyk-system-analytics"
 )
+
+func (a *AnalyticsRecord) GetGeo(ipStr string) {
+	if !config.EnableGeoIP {
+		return
+	}
+
+	// Not great, tightly coupled
+	if analytics.GeoIPDB == nil {
+		return
+	}
+
+	ip := net.ParseIP(ipStr)
+
+	var record GeoData // Or any appropriate struct
+	err := analytics.GeoIPDB.Lookup(ip, &record)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Debug("ISO Code: ", record.Country.ISOCode)
+	log.Debug("City: ", record.City.Names["en"])
+	log.Debug("Lat: ", record.Location.Latitude)
+	log.Debug("Lon: ", record.Location.Longitude)
+	log.Debug("TZ: ", record.Location.TimeZone)
+
+	a.Geo = record
+}
 
 func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 	var expiry time.Duration
@@ -59,13 +106,27 @@ func (e AnalyticsError) Error() string {
 
 // AnalyticsHandler is an interface to record analytics data to a writer.
 type AnalyticsHandler interface {
+	Init() error
 	RecordHit(AnalyticsRecord) error
 }
 
 // RedisAnalyticsHandler implements AnalyticsHandler and will record analytics
 // data to a redis back end as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store *RedisClusterStorageManager
+	Store   *RedisClusterStorageManager
+	GeoIPDB *maxminddb.Reader
+}
+
+func (r *RedisAnalyticsHandler) Init() {
+	if config.EnableGeoIP {
+		var err error
+		r.GeoIPDB, err = maxminddb.Open(config.GeoIPDBLocation)
+		if err != nil {
+			log.Error("Failed to init GeoIP Database: ", err)
+		}
+	}
+
+	analytics.Store.Connect()
 }
 
 // RecordHit will store an AnalyticsRecord in Redis

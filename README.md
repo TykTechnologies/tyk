@@ -91,4 +91,6 @@ when you need redis and kill it later. Just make sure you are forwarding the def
 
 The master branch is NOT the stable releases, check the tags for stable releases that can be patched, please se the CHANGELOG for breaking changes or to see how things stand.
 
-Documentation is currently valid for the 1.1 release.
+### Geo IP features
+
+This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).

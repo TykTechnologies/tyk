@@ -223,9 +223,12 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			rawRequest,
 			rawResponse,
 			GetIPFromRequest(r),
+			GeoData{},
 			tags,
 			time.Now(),
 		}
+
+		thisRecord.GetGeo(GetIPFromRequest(r))
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if config.EnforceOrgDataAge {

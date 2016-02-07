@@ -97,9 +97,12 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			rawRequest,
 			rawResponse,
 			GetIPFromRequest(r),
+			GeoData{},
 			tags,
 			time.Now(),
 		}
+
+		thisRecord.GetGeo(GetIPFromRequest(r))
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if config.EnforceOrgDataAge {

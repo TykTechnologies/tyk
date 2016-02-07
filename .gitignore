@@ -33,3 +33,4 @@ petstore.json
 *.csr
 *.prof
 *.pdf
+GeoLite2-City.mmdb

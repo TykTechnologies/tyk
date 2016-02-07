@@ -121,6 +121,8 @@ type Config struct {
 	ControlAPIHostname   string `json:"control_api_hostname"`
 	EnableCustomDomains  bool   `json:"enable_custom_domains"`
 	EnableJSVM           bool   `json:"enable_jsvm"`
+	EnableGeoIP          bool   `json:"enable_geo_ip"`
+	GeoIPDBLocation      string `json:"geo_ip_db_path"`
 }
 
 type CertData struct {

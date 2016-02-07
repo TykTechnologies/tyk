@@ -111,7 +111,7 @@ func setupGlobals() {
 			Store: &AnalyticsStore,
 		}
 
-		analytics.Store.Connect()
+		analytics.Init()
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",

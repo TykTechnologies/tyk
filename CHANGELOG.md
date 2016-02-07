@@ -37,7 +37,9 @@
     },
 
 - Tyk nodes now register with a dashboard to be assigned an ID based on the licenses available.
-
+- X-Forwarded For now used to log IP addresses in event log
+- Analytics now records IP Address (OR X-F-F)
+- Analytics now records GeoIP data
 
 # 1.9.1.1
 
