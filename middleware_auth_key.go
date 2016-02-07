@@ -73,7 +73,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 		// No header value, fail
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, no auth header found.")
 
 		return errors.New("Authorization field missing"), 400
@@ -84,7 +84,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    authHeaderValue,
 		}).Info("Attempted access with non-existent key.")
 
@@ -109,7 +109,7 @@ func AuthFailed(m *TykMiddleware, r *http.Request, authHeaderValue string) {
 		EVENT_AuthFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           r.RemoteAddr,
+			Origin:           GetIPFromRequest(r),
 			Key:              authHeaderValue,
 		})
 }

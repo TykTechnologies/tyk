@@ -26,6 +26,7 @@ type AnalyticsRecord struct {
 	RequestTime   int64
 	RawRequest    string
 	RawResponse   string
+	IPAddress     string
 	Tags          []string
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }

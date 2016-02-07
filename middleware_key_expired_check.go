@@ -35,7 +35,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    authHeaderValue,
 		}).Info("Attempted access from inactive key.")
 
@@ -44,7 +44,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 			EVENT_KeyExpiredMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
-				Origin:           r.RemoteAddr,
+				Origin:           GetIPFromRequest(r),
 				Key:              authHeaderValue,
 			})
 
@@ -60,7 +60,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    authHeaderValue,
 		}).Info("Attempted access from expired key.")
 
@@ -69,7 +69,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 			EVENT_KeyExpiredMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
 				Path:             r.URL.Path,
-				Origin:           r.RemoteAddr,
+				Origin:           GetIPFromRequest(r),
 				Key:              authHeaderValue,
 			})
 

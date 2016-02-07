@@ -68,7 +68,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	// No paths matched, disallow
 	log.WithFields(logrus.Fields{
 		"path":      r.URL.Path,
-		"origin":    r.RemoteAddr,
+		"origin":    GetIPFromRequest(r),
 		"key":       authHeaderValue,
 		"api_found": false,
 	}).Info("Attempted access to unauthorised endpoint (Granular).")

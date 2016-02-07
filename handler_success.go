@@ -222,6 +222,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			timing,
 			rawRequest,
 			rawResponse,
+			GetIPFromRequest(r),
 			tags,
 			time.Now(),
 		}

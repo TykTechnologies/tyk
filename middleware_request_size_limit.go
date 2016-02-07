@@ -39,7 +39,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 	if int64(asInt) > sizeLimit {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"size":   statedCL,
 			"limit":  sizeLimit,
 		}).Info("Attempted access with large request size, blocked.")
@@ -52,7 +52,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 		// Request size is too big for globals
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"size":   r.ContentLength,
 			"limit":  sizeLimit,
 		}).Info("Attempted access with large request size, blocked.")

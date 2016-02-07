@@ -210,7 +210,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		// No header value, fail
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, no JWT auth header found.")
 
 		log.Debug("Looked in: ", thisConfig.AuthHeaderName)
@@ -367,7 +367,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		log.WithFields(logrus.Fields{
 			"path":        r.URL.Path,
-			"origin":      r.RemoteAddr,
+			"origin":      GetIPFromRequest(r),
 			"key":         kID,
 			"key_present": found,
 		}).Info("Attempted JWT access with non-existent key.")

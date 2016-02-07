@@ -46,7 +46,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 			EVENT_VersionFailureMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
-				Origin:           r.RemoteAddr,
+				Origin:           GetIPFromRequest(r),
 				Key:              "",
 				Reason:           string(stat),
 			})

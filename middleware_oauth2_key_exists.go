@@ -32,7 +32,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if len(parts) < 2 {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, no auth header found.")
 
 		return errors.New("Authorization field missing"), 400
@@ -41,7 +41,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if strings.ToLower(parts[0]) != "bearer" {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Bearer token malformed")
 
 		return errors.New("Bearer token malformed"), 400
@@ -53,7 +53,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    accessToken,
 		}).Info("Attempted access with non-existent key.")
 

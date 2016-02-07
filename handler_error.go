@@ -96,6 +96,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			0,
 			rawRequest,
 			rawResponse,
+			GetIPFromRequest(r),
 			tags,
 			time.Now(),
 		}

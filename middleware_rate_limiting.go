@@ -49,7 +49,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		if reason == 1 {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
-				"origin": r.RemoteAddr,
+				"origin": GetIPFromRequest(r),
 				"key":    authHeaderValue,
 			}).Info("Key rate limit exceeded.")
 
@@ -58,7 +58,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				EVENT_RateLimitExceededMeta{
 					EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 					Path:             r.URL.Path,
-					Origin:           r.RemoteAddr,
+					Origin:           GetIPFromRequest(r),
 					Key:              authHeaderValue,
 				})
 
@@ -70,7 +70,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		} else if reason == 2 {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
-				"origin": r.RemoteAddr,
+				"origin": GetIPFromRequest(r),
 				"key":    authHeaderValue,
 			}).Info("Key quota limit exceeded.")
 
@@ -79,7 +79,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				EVENT_QuotaExceededMeta{
 					EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 					Path:             r.URL.Path,
-					Origin:           r.RemoteAddr,
+					Origin:           GetIPFromRequest(r),
 					Key:              authHeaderValue,
 				})
 

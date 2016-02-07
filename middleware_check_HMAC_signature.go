@@ -31,7 +31,7 @@ func (hm *HMACMiddleware) authorizationError(w http.ResponseWriter, r *http.Requ
 		"prefix": "hmac",
 	}).WithFields(logrus.Fields{
 		"path":   r.URL.Path,
-		"origin": r.RemoteAddr,
+		"origin": GetIPFromRequest(r),
 	}).Info("Authorization field missing or malformed")
 
 	return errors.New("Authorization field missing, malformed or invalid"), 400
@@ -94,7 +94,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Warning("Date is out of allowed range.")
 
 		handler := ErrorHandler{hm.TykMiddleware}
@@ -198,7 +198,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
 
 		return errors.New("This key is invalid"), 400
@@ -231,7 +231,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Request signature is invalid")
 
 		// Fire Authfailed Event

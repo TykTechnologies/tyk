@@ -56,7 +56,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	if thisSessionState.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation access is disabled.")
 
@@ -72,7 +72,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		if reason == 2 {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
-				"origin": r.RemoteAddr,
+				"origin": GetIPFromRequest(r),
 				"key":    k.Spec.OrgID,
 			}).Warning("Organisation quota has been exceeded.")
 
@@ -81,7 +81,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 				EVENT_QuotaExceededMeta{
 					EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 					Path:             r.URL.Path,
-					Origin:           r.RemoteAddr,
+					Origin:           GetIPFromRequest(r),
 					Key:              k.Spec.OrgID,
 				})
 
@@ -154,7 +154,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	if thisSessionState.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation access is disabled.")
 
@@ -171,7 +171,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	if isQuotaExceeded {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation quota has been exceeded.")
 
@@ -180,7 +180,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 			EVENT_QuotaExceededMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
-				Origin:           r.RemoteAddr,
+				Origin:           GetIPFromRequest(r),
 				Key:              k.Spec.OrgID,
 			})
 

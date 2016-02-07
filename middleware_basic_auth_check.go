@@ -39,7 +39,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// No header value, fail
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, no auth header found.")
 
 		return k.requestForBasicAuth(w, "Authorization field missing")
@@ -50,7 +50,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Header malformed
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, header not in basic auth format.")
 
 		return errors.New("Attempted access with malformed header, header not in basic auth format"), 400
@@ -61,7 +61,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Base64 Decoding failed of basic auth data: ", err)
 
 		return errors.New("Attempted access with malformed header, auth data not encoded correctly"), 400
@@ -72,7 +72,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Header malformed
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, values not in basic auth format.")
 
 		return errors.New("Attempted access with malformed header, values not in basic auth format"), 400
@@ -84,7 +84,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    keyName,
 		}).Info("Attempted access with non-existent user.")
 
@@ -116,7 +116,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if !passMatch {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": r.RemoteAddr,
+			"origin": GetIPFromRequest(r),
 			"key":    keyName,
 		}).Info("Attempted access with existing user but failed password check.")
 

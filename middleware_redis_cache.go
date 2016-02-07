@@ -97,7 +97,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			// No authentication data? use the IP.
 			if authVal == nil {
-				authHeaderValue, ipErr = GetIP(r.RemoteAddr)
+				authHeaderValue, ipErr = GetIP(GetIPFromRequest(r))
 				if ipErr != nil {
 					log.Error(ipErr)
 					return nil, 200
