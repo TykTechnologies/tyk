@@ -70,7 +70,8 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	var record GeoData // Or any appropriate struct
 	err := analytics.GeoIPDB.Lookup(ip, &record)
 	if err != nil {
-		log.Fatal(err)
+		log.Error("GeoIP Failure (not recorded): ", err)
+		return
 	}
 
 	log.Debug("ISO Code: ", record.Country.ISOCode)
@@ -119,14 +120,25 @@ type RedisAnalyticsHandler struct {
 
 func (r *RedisAnalyticsHandler) Init() {
 	if config.EnableGeoIP {
-		var err error
-		r.GeoIPDB, err = maxminddb.Open(config.GeoIPDBLocation)
-		if err != nil {
-			log.Error("Failed to init GeoIP Database: ", err)
-		}
+		go r.reloadDB()
 	}
 
 	analytics.Store.Connect()
+}
+
+func (r *RedisAnalyticsHandler) reloadDB() {
+	thisDb, err := maxminddb.Open(config.GeoIPDBLocation)
+	if err != nil {
+		log.Error("Failed to init GeoIP Database: ", err)
+	} else {
+		oldDB := r.GeoIPDB
+		r.GeoIPDB = thisDb
+		if oldDB != nil {
+			oldDB.Close()
+		}
+
+	}
+	time.Sleep(time.Hour * 1)
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
