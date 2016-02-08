@@ -40,6 +40,7 @@
 - X-Forwarded For now used to log IP addresses in event log
 - Analytics now records IP Address (OR X-F-F)
 - Analytics now records GeoIP data
+- Analytics GeoIP DB can be replaced on disk, it will cleanly auto-reload every hour
 
 # 1.9.1.1
 
