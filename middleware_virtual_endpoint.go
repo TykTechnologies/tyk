@@ -117,7 +117,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	var copiedRequest *http.Request
-	if config.AnalyticsConfig.EnableDetailedRecording {
+	if RecordDetail(r) {
 		copiedRequest = CopyHttpRequest(r)
 	}
 
@@ -232,7 +232,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// deep logging
 	var copiedResponse *http.Response
-	if config.AnalyticsConfig.EnableDetailedRecording {
+	if RecordDetail(r) {
 		copiedResponse = CopyHttpResponse(newResponse)
 	}
 

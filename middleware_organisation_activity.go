@@ -1,6 +1,9 @@
 package main
 
-import "net/http"
+import (
+	"github.com/gorilla/context"
+	"net/http"
+)
 
 import (
 	"errors"
@@ -93,6 +96,10 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		// Run the trigger monitor
 		k.mon.Check(&thisSessionState, "")
 	}
+
+	// Lets keep a reference of the org
+	context.Set(r, OrgSessionContext, thisSessionState)
+
 	// Request is valid, carry on
 	return nil, 200
 }
@@ -199,6 +206,9 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 		// Run the trigger monitor
 		k.mon.Check(&thisSessionState, "")
 	}
+
+	// Lets keep a reference of the org
+	context.Set(r, OrgSessionContext, thisSessionState)
 
 	orgChan <- true
 }

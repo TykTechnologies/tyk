@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"github.com/gorilla/context"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -69,4 +70,23 @@ func CopyHttpResponse(r *http.Response) *http.Response {
 	}
 
 	return resCopy
+}
+
+func RecordDetail(r *http.Request) bool {
+	// Are we even checking?
+	if !config.EnforceOrgDataDeailLogging {
+		return config.AnalyticsConfig.EnableDetailedRecording
+	}
+
+	// We are, so get session data
+	ses, found := context.GetOk(r, OrgSessionContext)
+	var thisSessionState SessionState
+	if !found {
+		// no session found, use global config
+		return config.AnalyticsConfig.EnableDetailedRecording
+	}
+
+	// Session found
+	thisSessionState = ses.(SessionState)
+	return thisSessionState.EnableDetailedRecording
 }

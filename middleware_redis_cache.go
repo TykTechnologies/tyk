@@ -107,7 +107,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 
 			var copiedRequest *http.Request
-			if config.AnalyticsConfig.EnableDetailedRecording {
+			if RecordDetail(r) {
 				copiedRequest = CopyHttpRequest(r)
 			}
 

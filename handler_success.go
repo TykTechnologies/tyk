@@ -23,6 +23,7 @@ const (
 	AuthHeaderValue   = 1
 	VersionData       = 2
 	VersionKeyContext = 3
+	OrgSessionContext = 4
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
@@ -187,7 +188,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 
 		rawRequest := ""
 		rawResponse := ""
-		if config.AnalyticsConfig.EnableDetailedRecording {
+		if RecordDetail(r) {
 			if requestCopy != nil {
 				// Get the wire format representation
 				var wireFormatReq bytes.Buffer
@@ -268,7 +269,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	}
 
 	var copiedRequest *http.Request
-	if config.AnalyticsConfig.EnableDetailedRecording {
+	if RecordDetail(r) {
 		copiedRequest = CopyHttpRequest(r)
 	}
 
@@ -277,7 +278,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	t2 := time.Now()
 
 	var copiedResponse *http.Response
-	if config.AnalyticsConfig.EnableDetailedRecording {
+	if RecordDetail(r) {
 		copiedResponse = CopyHttpResponse(resp)
 	}
 
@@ -301,7 +302,7 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 	}
 
 	var copiedRequest *http.Request
-	if config.AnalyticsConfig.EnableDetailedRecording {
+	if RecordDetail(r) {
 		copiedRequest = CopyHttpRequest(r)
 	}
 
@@ -310,7 +311,7 @@ func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reques
 	t2 := time.Now()
 
 	var copiedResponse *http.Response
-	if config.AnalyticsConfig.EnableDetailedRecording {
+	if RecordDetail(r) {
 		copiedResponse = CopyHttpResponse(inRes)
 	}
 

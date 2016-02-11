@@ -61,13 +61,13 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		}
 
 		var requestCopy *http.Request
-		if config.AnalyticsConfig.EnableDetailedRecording {
+		if RecordDetail(r) {
 			requestCopy = CopyHttpRequest(r)
 		}
 
 		rawRequest := ""
 		rawResponse := ""
-		if config.AnalyticsConfig.EnableDetailedRecording {
+		if RecordDetail(r) {
 			if requestCopy != nil {
 				// Get the wire format representation
 				var wireFormatReq bytes.Buffer

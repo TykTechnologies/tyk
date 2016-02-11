@@ -29,6 +29,8 @@
         "tags": []
     },
 
+- Detail logging can now be activated on an organisation basis, setting `enforce_org_data_detail_logging` in the tyk.conf will enforce it (quotas must also be enforced for this to work), then setting `enable_detail_recording` in the org session object will enable or disable the logging method
+
 - To configure for Policies: 
 
 	"policies": {
