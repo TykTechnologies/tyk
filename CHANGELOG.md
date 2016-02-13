@@ -24,12 +24,9 @@
 	"use_db_app_configs": true,
     "db_app_conf_options": {
         "connection_string": "http://dashboard_host:port",
-        "node_id": "<your-node-id>",
         "node_is_segmented": false,
         "tags": []
     },
-
-- Detail logging can now be activated on an organisation basis, setting `enforce_org_data_detail_logging` in the tyk.conf will enforce it (quotas must also be enforced for this to work), then setting `enable_detail_recording` in the org session object will enable or disable the logging method
 
 - To configure for Policies: 
 
@@ -41,8 +38,16 @@
 - Tyk nodes now register with a dashboard to be assigned an ID based on the licenses available.
 - X-Forwarded For now used to log IP addresses in event log
 - Analytics now records IP Address (OR X-F-F)
-- Analytics now records GeoIP data
+- Analytics now records GeoIP data, to enable add (DB is MaxMind):
+	
+	```
+	"enable_geo_ip": true,
+    "geo_ip_db_path": "./GeoLite2-City.mmdb"
+    ```
+
 - Analytics GeoIP DB can be replaced on disk, it will cleanly auto-reload every hour
+- Detail logging can now be activated on an organisation basis, setting `enforce_org_data_detail_logging` in the tyk.conf will enforce it (quotas must also be enforced for this to work), then setting `enable_detail_recording` in the org session object will enable or disable the logging method
+
 
 # 1.9.1.1
 
