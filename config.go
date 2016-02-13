@@ -48,6 +48,8 @@ type Config struct {
 		MongoCollection         string   `json:"mongo_collection"`
 		IgnoredIPs              []string `json:"ignored_ips"`
 		EnableDetailedRecording bool     `json:"enable_detailed_recording"`
+		EnableGeoIP             bool     `json:"enable_geo_ip"`
+		GeoIPDBLocation         string   `json:"geo_ip_db_path"`
 		ignoredIPsCompiled      map[string]bool
 	} `json:"analytics_config"`
 	HealthCheck struct {
@@ -122,8 +124,6 @@ type Config struct {
 	ControlAPIHostname   string `json:"control_api_hostname"`
 	EnableCustomDomains  bool   `json:"enable_custom_domains"`
 	EnableJSVM           bool   `json:"enable_jsvm"`
-	EnableGeoIP          bool   `json:"enable_geo_ip"`
-	GeoIPDBLocation      string `json:"geo_ip_db_path"`
 }
 
 type CertData struct {

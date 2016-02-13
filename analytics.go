@@ -56,7 +56,7 @@ const (
 )
 
 func (a *AnalyticsRecord) GetGeo(ipStr string) {
-	if !config.EnableGeoIP {
+	if !config.AnalyticsConfig.EnableGeoIP {
 		return
 	}
 
@@ -119,7 +119,7 @@ type RedisAnalyticsHandler struct {
 }
 
 func (r *RedisAnalyticsHandler) Init() {
-	if config.EnableGeoIP {
+	if config.AnalyticsConfig.EnableGeoIP {
 		go r.reloadDB()
 	}
 
@@ -127,7 +127,7 @@ func (r *RedisAnalyticsHandler) Init() {
 }
 
 func (r *RedisAnalyticsHandler) reloadDB() {
-	thisDb, err := maxminddb.Open(config.GeoIPDBLocation)
+	thisDb, err := maxminddb.Open(config.AnalyticsConfig.GeoIPDBLocation)
 	if err != nil {
 		log.Error("Failed to init GeoIP Database: ", err)
 	} else {
