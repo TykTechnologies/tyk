@@ -121,10 +121,6 @@ type TykErrorResponse struct {
 }
 
 func getChain(spec APISpec) http.Handler {
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	//remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
@@ -269,7 +265,7 @@ var PathBasedDefinition string = `
 			"key": "version"
 		},
 		"auth": {
-			"use_param": true, 
+			"use_param": true,
 			"auth_header_name": "authorization"
 		},
 		"version_data": {
