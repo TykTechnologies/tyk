@@ -121,6 +121,7 @@ type Config struct {
 	ControlAPIHostname   string `json:"control_api_hostname"`
 	EnableCustomDomains  bool   `json:"enable_custom_domains"`
 	EnableJSVM           bool   `json:"enable_jsvm"`
+	HideGeneratorHeader  bool   `json:"hide_generator_header"`
 }
 
 type CertData struct {
@@ -151,6 +152,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.AnalyticsConfig.Type = "csv"
 	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
 	configStruct.UseAsyncSessionWrite = false
+	configStruct.HideGeneratorHeader = false
 	newConfig, err := json.MarshalIndent(configStruct, "", "    ")
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
