@@ -79,6 +79,9 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 		return errors.New("Authorization field missing"), 400
 	}
 
+	// Ignore Bearer prefix on token if it exists
+	authHeaderValue = stripBearer(authHeaderValue);
+
 	// Check if API key valid
 	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(authHeaderValue)
 	if !keyExists {
