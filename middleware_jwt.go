@@ -41,13 +41,6 @@ type JWKs struct {
 	Keys []JWK `json:"keys"`
 }
 
-func stripBearer(token string) string {
-	thisToken := strings.Replace(token, "Bearer", "", 1)
-	thisToken = strings.Replace(thisToken, "bearer", "", 1)
-	thisToken = strings.TrimSpace(thisToken)
-	return thisToken
-}
-
 func (k JWTMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config
@@ -172,7 +165,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 
 	var thisSessionState SessionState
 	var rawKeyExists bool
-	
+
 	// Couldn't b64 decode the kid, so lets try it raw
 	log.Debug("Getting key: ", tykId)
 	thisSessionState, rawKeyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
