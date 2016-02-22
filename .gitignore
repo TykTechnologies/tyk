@@ -31,3 +31,6 @@ petstore.json
 *.csr
 *.prof
 *.pdf
+*.mmdb
+ty.clonedash.conf
+tyk.dashboard.conf
