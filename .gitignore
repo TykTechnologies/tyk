@@ -20,8 +20,6 @@ tyk.conf.bak
 tyk.folder.conf
 tyk.db.conf
 tyk.compose.conf
-ty.clonedash.conf
-tyk.dashboard.conf
 tyk.live.conf
 tyk.compose.rpc2.conf
 run.sh
@@ -33,4 +31,6 @@ petstore.json
 *.csr
 *.prof
 *.pdf
-GeoLite2-City.mmdb
+*.mmdb
+ty.clonedash.conf
+tyk.dashboard.conf
