@@ -43,9 +43,7 @@ type Config struct {
 	} `json:"storage"`
 	EnableAnalytics bool `json:"enable_analytics"`
 	AnalyticsConfig struct {
-		//Type                    string   `json:"type"`
-		MongoURL                string   `json:"mongo_url"`
-		MongoCollection         string   `json:"mongo_collection"`
+		Type                    string   `json:"type"`
 		IgnoredIPs              []string `json:"ignored_ips"`
 		EnableDetailedRecording bool     `json:"enable_detailed_recording"`
 		EnableGeoIP             bool     `json:"enable_geo_ip"`

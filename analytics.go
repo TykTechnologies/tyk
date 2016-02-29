@@ -115,6 +115,7 @@ type AnalyticsHandler interface {
 // data to a redis back end as defined in the Config object
 type RedisAnalyticsHandler struct {
 	Store   *RedisClusterStorageManager
+	Clean   Purger
 	GeoIPDB *maxminddb.Reader
 }
 

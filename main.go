@@ -113,9 +113,17 @@ func setupGlobals() {
 
 		analytics.Init()
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warn("Cache purging is no longer part of Tyk Gateway, please use Tyk-Pump.")
+		if config.AnalyticsConfig.Type == "rpc" {
+			log.Debug("Using RPC cache purge")
+			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
+			thisPurger.Connect()
+			analytics.Clean = &thisPurger
+			go analytics.Clean.StartPurgeLoop(10)
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Warn("Cache purging is no longer part of Tyk Gateway, please use Tyk-Pump.")
+		}
 
 	}
 

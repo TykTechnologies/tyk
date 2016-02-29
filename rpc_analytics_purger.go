@@ -7,7 +7,14 @@ import (
 	"time"
 )
 
-// MongoPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
+// Purger is an interface that will define how the in-memory store will be purged
+// of analytics data to prevent it growing too large
+type Purger interface {
+	PurgeCache()
+	StartPurgeLoop(int)
+}
+
+// RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type RPCPurger struct {
 	Store     *RedisClusterStorageManager
@@ -16,7 +23,7 @@ type RPCPurger struct {
 	Address   string
 }
 
-// Connect Connects to Mongo
+// Connect Connects to RPC
 func (r *RPCPurger) Connect() {
 	log.Info("Connecting to RPC Analytics service")
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
@@ -28,7 +35,7 @@ func (r *RPCPurger) Connect() {
 }
 
 // StartPurgeLoop starts the loop that will be started as a goroutine and pull data out of the in-memory
-// store and into MongoDB
+// store and into RPC
 func (r RPCPurger) StartPurgeLoop(nextCount int) {
 	time.Sleep(time.Duration(nextCount) * time.Second)
 	r.PurgeCache()

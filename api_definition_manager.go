@@ -133,13 +133,7 @@ var ServiceNonce string
 
 // Connect connects to the storage engine - can be null
 func (a *APIDefinitionLoader) Connect() {
-	var err error
-	a.dbSession, err = mgo.Dial(config.AnalyticsConfig.MongoURL)
-	if err != nil {
-		log.Error("Mongo connection failed:", err)
-		time.Sleep(5)
-		a.Connect()
-	}
+	log.Warning("MongoDB Driver no longer implemented")
 }
 
 // Connect connects to the storage engine - can be null
