@@ -301,6 +301,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 					}
 
 					log.Debug("Found policy, applying")
+					thisSessionState.ApplyPolicyID = basePolicyID
 					thisSessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 					thisSessionState.Rate = policy.Rate
 					thisSessionState.Per = policy.Per
@@ -310,6 +311,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 					thisSessionState.HMACEnabled = policy.HMACEnabled
 					thisSessionState.IsInactive = policy.IsInactive
 					thisSessionState.Tags = policy.Tags
+					thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
 
 					// Update the session in the session manager in case it gets called again
 					k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
