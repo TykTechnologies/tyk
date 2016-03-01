@@ -51,6 +51,7 @@
 
 - Analytics GeoIP DB can be replaced on disk, it will cleanly auto-reload every hour
 - Detail logging can now be activated on an organisation basis, setting `enforce_org_data_detail_logging` in the tyk.conf will enforce it (quotas must also be enforced for this to work), then setting `enable_detail_recording` in the org session object will enable or disable the logging method
+- Centralised JWTs add a `TykJWTSessionID` to the session meta data on create to enable upstream hosts to work with the internalised token should things need changing
 
 
 # 1.9.1.1
