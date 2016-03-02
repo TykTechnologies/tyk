@@ -1177,7 +1177,7 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("Starting heartbeat.")
-			heartbeatConnStr = heartbeatConnStr + "/system/ping"
+			heartbeatConnStr = heartbeatConnStr + "/register/ping"
 			go StartBeating(heartbeatConnStr, config.NodeSecret)
 
 		}
