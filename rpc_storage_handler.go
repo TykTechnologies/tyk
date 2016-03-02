@@ -261,6 +261,11 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		return r.IncrememntWithExpire(keyName, expire)
 	}
 
+	if val == nil {
+		log.Warning("RPC increment returned nil value, returning 0")
+		return 0
+	}
+
 	return val.(int64)
 
 }
