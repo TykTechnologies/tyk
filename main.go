@@ -373,7 +373,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 			thisMWDef.RequireSession = requiresSession
 
 			mwPaths = append(mwPaths, filePath)
-			mwPreFuncs = append(mwPostFuncs, thisMWDef)
+			mwPreFuncs = append(mwPreFuncs, thisMWDef)
 		}
 	}
 
@@ -401,7 +401,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 			thisMWDef.RequireSession = requiresSession
 
 			mwPaths = append(mwPaths, filePath)
-			mwPreFuncs = append(mwPreFuncs, thisMWDef)
+			mwPostFuncs = append(mwPostFuncs, thisMWDef)
 		}
 	}
 
