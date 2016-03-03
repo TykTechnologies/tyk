@@ -59,7 +59,10 @@ func LoadPoliciesFromDashboard(endpoint string, secret string) map[string]Policy
 
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+
+	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+	ServiceNonceMutex.Unlock()
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
@@ -92,8 +95,10 @@ func LoadPoliciesFromDashboard(endpoint string, secret string) map[string]Policy
 		return policies
 	}
 
+	ServiceNonceMutex.Lock()
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+	ServiceNonceMutex.Unlock()
 
 	for _, p := range thisList.Message {
 		p.ID = p.MID.Hex()

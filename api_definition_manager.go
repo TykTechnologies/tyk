@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	textTemplate "text/template"
 	"time"
 )
@@ -129,6 +130,7 @@ type APIDefinitionLoader struct {
 }
 
 // Nonce to use when interacting with the dashboard service
+var ServiceNonceMutex = &sync.Mutex{}
 var ServiceNonce string
 
 // Connect connects to the storage engine - can be null
@@ -298,10 +300,12 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 		"prefix": "dashboard",
 		"id":     NodeID,
 	}).Info("Node registered")
-	// Set the nonce
-	ServiceNonce = thisVal.Nonce
 
+	// Set the nonce
+	ServiceNonceMutex.Lock()
+	ServiceNonce = thisVal.Nonce
 	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
+	ServiceNonceMutex.Unlock()
 
 	return nil
 }
@@ -326,7 +330,10 @@ func SendHeartBeat(endpoint string, secret string) error {
 
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+
+	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+	ServiceNonceMutex.Unlock()
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
@@ -361,9 +368,10 @@ func SendHeartBeat(endpoint string, secret string) error {
 	}
 
 	// Set the nonce
+	ServiceNonceMutex.Lock()
 	ServiceNonce = thisVal.Nonce
-
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
+	ServiceNonceMutex.Unlock()
 
 	return nil
 }
@@ -382,7 +390,10 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	newRequest.Header.Add("authorization", secret)
 	log.Debug("Using: NodeID: ", NodeID)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+
+	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+	ServiceNonceMutex.Unlock()
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
@@ -465,8 +476,10 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	}
 
 	// Set the nonce
+	ServiceNonceMutex.Lock()
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
+	ServiceNonceMutex.Unlock()
 
 	return &APISpecs
 }
