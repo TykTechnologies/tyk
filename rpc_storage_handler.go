@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/gorpc"
@@ -78,6 +79,11 @@ func (r *RPCStorageHandler) Connect() bool {
 	// Set up the cache
 	r.cache = cache.New(30*time.Second, 15*time.Second)
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
+
+	if log.Level != logrus.DebugLevel {
+		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
+	}
+
 	r.RPCClient.OnConnect = r.OnConnectFunc
 	r.RPCClient.Conns = 10
 	r.RPCClient.Start()
