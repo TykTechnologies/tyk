@@ -134,6 +134,12 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 	return setKeyName
 }
 
+func (r *RPCStorageHandler) ReAttemptLogin() {
+	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
+	time.Sleep(time.Second * 3)
+	r.Login()
+}
+
 func (r *RPCStorageHandler) Login() {
 	log.Debug("[RPC Store] Login initiated")
 
@@ -143,11 +149,15 @@ func (r *RPCStorageHandler) Login() {
 
 	ok, err := r.Client.Call("Login", r.UserKey)
 	if err != nil {
-		log.Fatal("RPC Login failed: ", err)
+		log.Error("RPC Login failed: ", err)
+		r.ReAttemptLogin()
+		return
 	}
 
 	if !ok.(bool) {
-		log.Fatal("RPC Login incorrect")
+		log.Error("RPC Login incorrect")
+		r.ReAttemptLogin()
+		return
 	}
 	log.Debug("[RPC Store] Login complete")
 }
