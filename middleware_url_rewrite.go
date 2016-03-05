@@ -17,6 +17,7 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (s
 		log.Debug("Compilation error: ", mpErr)
 		return "", mpErr
 	}
+	log.Debug("Inbound path: ", path)
 	result_slice := mp.FindAllStringSubmatch(path, -1)
 
 	// Make sure it matches the string
@@ -27,8 +28,8 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (s
 		dollarMatch, _ := regexp.Compile(`\$\d`) // Prepare our regex
 		replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
 
-		// log.Debug(result_slice)
-		// log.Debug(replace_slice)
+		log.Debug(result_slice)
+		log.Debug(replace_slice)
 
 		mapped_replace := make(map[string]string)
 		for mI, replacementVal := range result_slice[0] {
@@ -41,8 +42,9 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (s
 			newpath = strings.Replace(newpath, string(v[0]), string(mapped_replace[v[0]]), -1)
 		}
 
-		log.Debug("URL Re-written to: ", newpath)
 		log.Debug("URL Re-written from: ", path)
+		log.Debug("URL Re-written to: ", newpath)
+
 		// matched?? Set the modified path
 		return newpath, nil
 	}
@@ -85,7 +87,8 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if stat == StatusURLRewrite {
 		log.Debug("Rewriter active")
 		thisMeta := meta.(*tykcommon.URLRewriteMeta)
-		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.Path)
+		log.Info(r.URL)
+		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.String())
 		if pErr != nil {
 			return pErr, 500
 		}
