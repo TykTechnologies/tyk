@@ -537,7 +537,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 
 	if keys == nil {
-		log.Error("Keys returned nil object, skipping check")
+		log.Debug("Keys returned nil object, skipping check")
 		return
 	}
 
