@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/Sirupsen/logrus"
 	"github.com/lonelycode/gorpc"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"time"
@@ -27,6 +28,11 @@ type RPCPurger struct {
 func (r *RPCPurger) Connect() {
 	log.Info("Connecting to RPC Analytics service")
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
+
+	if log.Level != logrus.DebugLevel {
+		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
+	}
+
 	r.RPCClient.Start()
 	d := GetDispatcher()
 	r.Client = d.NewFuncClient(r.RPCClient)
