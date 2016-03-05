@@ -1,6 +1,7 @@
 .idea/
 .vagrant/
 testapps/
+utils/release_live.sh
 tyk.conf
 tyk.compose.rpc.conf
 tyk.compose.local_rpc.conf
