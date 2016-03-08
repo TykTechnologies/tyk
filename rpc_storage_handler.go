@@ -58,6 +58,11 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 }
 
+func handleReconnect() {
+	ClearRPCClients()
+
+}
+
 func (r *RPCStorageHandler) Register() {
 	r.ID = uuid.NewUUID().String()
 	myChan := make(chan int)
@@ -514,6 +519,8 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		if r.IsAccessError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
 			r.Login()
+		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
+			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
 	} else {
 		log.Debug("[RPC STORE] CheckReload: Received response")
