@@ -30,6 +30,9 @@ const (
 	EVENT_BreakerTriggered  tykcommon.TykEvent = "BreakerTriggered"
 	EVENT_HOSTDOWN          tykcommon.TykEvent = "HostDown"
 	EVENT_HOSTUP            tykcommon.TykEvent = "HostUp"
+	EVENT_TokenCreated      tykcommon.TykEvent = "TokenCreated"
+	EVENT_TokenUpdated      tykcommon.TykEvent = "TokenUpdated"
+	EVENT_TokenDeleted      tykcommon.TykEvent = "TokenDeleted"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -101,6 +104,13 @@ type EVENT_TriggerExceededMeta struct {
 	TriggerLimit int64
 }
 
+// EVENT_VersionFailureMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
+type EVENT_TokenMeta struct {
+	EventMetaDefault
+	Org string
+	Key string
+}
+
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
 	EventType     tykcommon.TykEvent
@@ -148,11 +158,14 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 		return WebHookHandler{}.New(thisConf)
 	case EH_JSVMHandler:
 		// Load the globals and file here
-		thisJSVMEventHandler, jsvmErr := JSVMEventHandler{Spec: Spec}.New(thisConf)
-		if jsvmErr == nil {
-			GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})
+		if Spec != nil {
+			thisJSVMEventHandler, jsvmErr := JSVMEventHandler{Spec: Spec}.New(thisConf)
+			if jsvmErr == nil {
+				GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})
+			}
+			return thisJSVMEventHandler, jsvmErr
 		}
-		return thisJSVMEventHandler, jsvmErr
+
 	}
 
 	return nil, errors.New("Handler not found")
@@ -227,4 +240,43 @@ func (l LogMessageEventHandler) HandleEvent(em EventMessage) {
 	}
 
 	log.Warning(formattedMsgString)
+}
+
+func InitGenericEventHandlers(theseEvents tykcommon.EventHandlerMetaConfig) map[tykcommon.TykEvent][]TykEventHandler {
+	actualEventHandlers := make(map[tykcommon.TykEvent][]TykEventHandler)
+	for eventName, eventHandlerConfs := range theseEvents.Events {
+		log.Debug("FOUND EVENTS TO INIT")
+		for _, handlerConf := range eventHandlerConfs {
+			log.Debug("CREATING EVENT HANDLERS")
+			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf, nil)
+
+			if getHandlerErr != nil {
+				log.Error("Failed to init event handler: ", getHandlerErr)
+			} else {
+				log.Debug("Init Event Handler: ", eventName)
+				actualEventHandlers[eventName] = append(actualEventHandlers[eventName], thisEventHandlerInstance)
+			}
+
+		}
+	}
+	return actualEventHandlers
+}
+
+func FireSystemEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
+
+	log.Debug("EVENT FIRED: ", eventName)
+	handlers, handlerExists := config.EventTriggers[eventName]
+
+	if handlerExists {
+		log.Debug("FOUND EVENT HANDLERS")
+		eventMessage := EventMessage{}
+		eventMessage.EventMetaData = eventMetaData
+		eventMessage.EventType = eventName
+		eventMessage.TimeStamp = time.Now().Local().String()
+
+		for _, handler := range handlers {
+			log.Debug("FIRING HANDLER")
+			go handler.HandleEvent(eventMessage)
+		}
+	}
 }

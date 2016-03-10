@@ -251,10 +251,13 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	}
 
 	var action string
+	var event tykcommon.TykEvent
 	if r.Method == "POST" {
 		action = "added"
+		event = EVENT_TokenCreated
 	} else {
 		action = "modified"
+		event = EVENT_TokenUpdated
 	}
 
 	if success {
@@ -271,6 +274,15 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			responseMessage = []byte(E_SYSTEM_ERROR)
 		}
 	}
+
+	FireSystemEvent(event, EVENT_TokenMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message:            "Key modified.",
+			OriginatingRequest: "",
+		},
+		Org: newSession.OrgID,
+		Key: keyName,
+	})
 
 	return responseMessage, code
 }
@@ -419,6 +431,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 		return responseMessage, 200
 	}
 
+	OrgID := ""
 	thisSessionManager := FallbackKeySesionManager
 	if APIID != "" {
 		thiSpec := GetSpecForApi(APIID)
@@ -427,6 +440,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 			responseMessage, _ = json.Marshal(&notFound)
 			return responseMessage, 400
 		}
+		OrgID = thiSpec.OrgID
 		thisSessionManager = thiSpec.SessionManager
 	}
 
@@ -445,6 +459,15 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 		}).Error("Failed to delete key.")
 		return []byte(E_SYSTEM_ERROR), 500
 	}
+
+	FireSystemEvent(EVENT_TokenDeleted, EVENT_TokenMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message:            "Key deleted.",
+			OriginatingRequest: "",
+		},
+		Org: OrgID,
+		Key: keyName,
+	})
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -1351,6 +1374,16 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				responseMessage = []byte(E_SYSTEM_ERROR)
 				code = 500
 			} else {
+
+				FireSystemEvent(EVENT_TokenCreated, EVENT_TokenMeta{
+					EventMetaDefault: EventMetaDefault{
+						Message:            "Key generated.",
+						OriginatingRequest: "",
+					},
+					Org: newSession.OrgID,
+					Key: newKey,
+				})
+
 				log.WithFields(logrus.Fields{
 					"prefix": "api",
 					"key":    newKey,

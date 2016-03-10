@@ -117,12 +117,14 @@ type Config struct {
 			EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
 		} `json:"config"`
 	} `json:"uptime_tests"`
-	HostName             string `json:"hostname"`
-	EnableAPISegregation bool   `json:"enable_api_segregation"`
-	ControlAPIHostname   string `json:"control_api_hostname"`
-	EnableCustomDomains  bool   `json:"enable_custom_domains"`
-	EnableJSVM           bool   `json:"enable_jsvm"`
-	HideGeneratorHeader  bool   `json:"hide_generator_header"`
+	HostName             string                                   `json:"hostname"`
+	EnableAPISegregation bool                                     `json:"enable_api_segregation"`
+	ControlAPIHostname   string                                   `json:"control_api_hostname"`
+	EnableCustomDomains  bool                                     `json:"enable_custom_domains"`
+	EnableJSVM           bool                                     `json:"enable_jsvm"`
+	HideGeneratorHeader  bool                                     `json:"hide_generator_header"`
+	EventHandlers        tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
+	EventTriggers        map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
 }
 
 type CertData struct {
@@ -182,6 +184,8 @@ func loadConfig(filePath string, configStruct *Config) {
 			log.Error(err)
 		}
 	}
+
+	configStruct.EventTriggers = InitGenericEventHandlers(configStruct.EventHandlers)
 }
 
 func (c *Config) loadIgnoredIPs() {
