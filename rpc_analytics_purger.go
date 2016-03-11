@@ -83,7 +83,7 @@ func (r *RPCPurger) PurgeCache() {
 		// Send keys to RPC
 		_, callErr := r.Client.Call("PurgeAnalyticsData", string(data))
 		if callErr != nil {
-			log.Error("Failed to call purge: ", callErr)
+			log.Error("Failed to call purge (reconnecting): ", callErr)
 			r.ReConnect()
 		}
 	}

@@ -507,7 +507,11 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 		}
 	}
 
-	return defString.(string)
+	if defString != nil {
+		return defString.(string)
+	}
+		
+	return ""
 
 }
 
