@@ -24,6 +24,11 @@ type RPCPurger struct {
 	Address   string
 }
 
+func (r *RPCPurger) ReConnect() {
+	r.RPCClient.Stop()
+	r.Connect()
+}
+
 // Connect Connects to RPC
 func (r *RPCPurger) Connect() {
 	log.Info("Connecting to RPC Analytics service")
@@ -76,7 +81,11 @@ func (r *RPCPurger) PurgeCache() {
 		}
 
 		// Send keys to RPC
-		r.Client.Call("PurgeAnalyticsData", string(data))
+		_, callErr := r.Client.Call("PurgeAnalyticsData", string(data))
+		if callErr != nil {
+			log.Error("Failed to call purge: ", callErr)
+			r.ReConnect()
+		}
 	}
 
 }
