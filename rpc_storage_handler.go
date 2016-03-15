@@ -510,7 +510,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 	if defString != nil {
 		return defString.(string)
 	}
-		
+
 	return ""
 
 }
@@ -652,6 +652,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 
 	Dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr string, orgId string) ([]string, error) {
 		return []string{}, nil
+	})
+
+	Dispatch.AddFunc("Ping", func() bool {
+		return false
 	})
 
 	return Dispatch

@@ -220,21 +220,43 @@ func GetTransport(timeOut int) http.RoundTripper {
 	return TykDefaultTransport
 }
 
+func cleanSlashes(a string) string {
+	endSlash := strings.HasSuffix(a, "//")
+	startSlash := strings.HasPrefix(a, "//")
+
+	if startSlash {
+		a = "/" + strings.TrimPrefix(a, "//")
+	}
+
+	if endSlash {
+		a = strings.TrimSuffix(a, "//") + "/"
+	}
+
+	return a
+}
+
 func singleJoiningSlash(a, b string) string {
+	a = cleanSlashes(a)
+	b = cleanSlashes(b)
+
 	aslash := strings.HasSuffix(a, "/")
 	bslash := strings.HasPrefix(b, "/")
 
 	switch {
 	case aslash && bslash:
+		log.Info(a + b)
 		return a + b[1:]
 	case !aslash && !bslash:
 		if len(b) > 0 {
+			log.Info(a + b)
 			return a + "/" + b
 		} else {
+			log.Info(a + b)
 			return a
 		}
 
 	}
+	log.Info(a + b)
 	return a + b
 }
 
