@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"time"
+	"bytes"
 )
 
 /*
@@ -146,10 +147,20 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 			fmt.Fprintf(w, string(responseMessage))
 			return
 		}
-
-		w.Header().Add("Location", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
+		if r.Method == "GET" {
+			var buffer bytes.Buffer
+			buffer.WriteString(o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
+			buffer.WriteString("?client_id=")
+			buffer.WriteString(r.FormValue("client_id"))
+			buffer.WriteString("&redirect_uri=")
+			buffer.WriteString(r.FormValue("redirect_uri"))
+			buffer.WriteString("&response_type=")
+			buffer.WriteString(r.FormValue("response_type"))
+			w.Header().Add("Location", buffer.String())
+		} else {
+			w.Header().Add("Location", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
+		}
 		w.WriteHeader(307)
-
 	} else {
 		// Return Not supported message (and code)
 		code = 405
