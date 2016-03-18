@@ -244,19 +244,19 @@ func singleJoiningSlash(a, b string) string {
 
 	switch {
 	case aslash && bslash:
-		log.Info(a + b)
+		log.Debug(a + b)
 		return a + b[1:]
 	case !aslash && !bslash:
 		if len(b) > 0 {
-			log.Info(a + b)
+			log.Debug(a + b)
 			return a + "/" + b
 		} else {
-			log.Info(a + b)
+			log.Debug(a + b)
 			return a
 		}
 
 	}
-	log.Info(a + b)
+	log.Debug(a + b)
 	return a + b
 }
 
