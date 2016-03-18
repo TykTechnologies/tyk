@@ -548,7 +548,7 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 
 // CheckForKeyspaceChanges will poll for keysace changes
 func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
-	log.Info("Checking for keyspace changes...")
+	log.Debug("Checking for keyspace changes...")
 	keys, err := r.Client.Call("GetKeySpaceUpdate", orgId)
 
 	if err != nil {
