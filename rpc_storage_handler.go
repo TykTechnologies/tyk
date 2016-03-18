@@ -542,23 +542,25 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 
 	for {
 		r.CheckForKeyspaceChanges(orgId)
-		time.Sleep(30 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
 // CheckForKeyspaceChanges will poll for keysace changes
 func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
+	log.Info("Checking for keyspace changes...")
 	keys, err := r.Client.Call("GetKeySpaceUpdate", orgId)
 
 	if err != nil {
 		if r.IsAccessError(err) {
 			r.Login()
-			r.CheckForKeyspaceChanges(orgId)
+			//r.CheckForKeyspaceChanges(orgId)
 		}
+		log.Warning("Keysapce warning: ", err)
 	}
 
 	if keys == nil {
-		log.Debug("Keys returned nil object, skipping check")
+		log.Info("Keys returned nil object, skipping check")
 		return
 	}
 
