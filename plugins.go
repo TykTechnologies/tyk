@@ -18,7 +18,7 @@ import (
 
 // Lets the user override and return a response from middleware
 type ReturnOverrides struct {
-	ResponseCode int
+	ResponseCode  int
 	ResponseError string
 }
 
