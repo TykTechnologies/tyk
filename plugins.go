@@ -13,7 +13,14 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"errors"
 )
+
+// Lets the user override and return a response from middleware
+type ReturnOverrides struct {
+	ResponseCode  int
+	ResponseError string
+}
 
 // MiniRequestObject is marshalled to JSON string and pased into JSON middleware
 type MiniRequestObject struct {
@@ -24,6 +31,7 @@ type MiniRequestObject struct {
 	URL           string
 	AddParams     map[string]string
 	DeleteParams  []string
+	ReturnOverrides ReturnOverrides
 }
 
 type VMReturnObject struct {
@@ -166,6 +174,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	log.Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
+	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 {
+		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
+	}
 	return nil, 200
 }
 
