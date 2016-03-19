@@ -78,6 +78,8 @@
 }
 ```
 
+- Nw Multi-DC / segregated environment / single dashboard support added for API and Keyspace propagation
+
 # 1.9.1.1
 
 - Added CIDR Support (thanks @iwat)

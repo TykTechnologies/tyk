@@ -31,6 +31,16 @@ type KeysValuesPair struct {
 	Values []string
 }
 
+type GroupLoginRequest struct {
+	UserKey string
+	GroupID string
+}
+
+type GroupKeySpaceRequest struct {
+	OrgID   string
+	GroupID string
+}
+
 var ErrorDenied error = errors.New("Access Denied")
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
@@ -145,11 +155,37 @@ func (r *RPCStorageHandler) ReAttemptLogin() {
 	r.Login()
 }
 
+func (r *RPCStorageHandler) GroupLogin() {
+	groupLoginData := GroupLoginRequest{
+		UserKey: r.UserKey,
+		GroupID: config.SlaveOptions.GroupID,
+	}
+	ok, err := r.Client.Call("LoginWithGroup", groupLoginData)
+	if err != nil {
+		log.Error("RPC Login failed: ", err)
+		r.ReAttemptLogin()
+		return
+	}
+
+	if !ok.(bool) {
+		log.Error("RPC Login incorrect")
+		r.ReAttemptLogin()
+		return
+	}
+	log.Debug("[RPC Store] Group Login complete")
+}
+
 func (r *RPCStorageHandler) Login() {
 	log.Debug("[RPC Store] Login initiated")
 
 	if len(r.UserKey) == 0 {
 		log.Fatal("No API Key set!")
+	}
+
+	// If we have a group ID, lets login as a group
+	if config.SlaveOptions.GroupID != "" {
+		r.GroupLogin()
+		return
 	}
 
 	ok, err := r.Client.Call("Login", r.UserKey)
@@ -538,6 +574,10 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
+	if config.SlaveOptions.DisableKeySpaceSync {
+		return
+	}
+
 	log.Info("Starting keyspace poller")
 
 	for {
@@ -549,12 +589,25 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 // CheckForKeyspaceChanges will poll for keysace changes
 func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	log.Debug("Checking for keyspace changes...")
-	keys, err := r.Client.Call("GetKeySpaceUpdate", orgId)
+
+	var keys interface{}
+	var err error
+
+	if config.SlaveOptions.GroupID == "" {
+		keys, err = r.Client.Call("GetKeySpaceUpdate", orgId)
+	} else {
+
+		grpReq := GroupKeySpaceRequest{
+			OrgID:   orgId,
+			GroupID: config.SlaveOptions.GroupID,
+		}
+		keys, err = r.Client.Call("GetGroupKeySpaceUpdate", grpReq)
+	}
 
 	if err != nil {
 		if r.IsAccessError(err) {
 			r.Login()
-			//r.CheckForKeyspaceChanges(orgId)
+			r.CheckForKeyspaceChanges(orgId)
 		}
 		log.Warning("Keysapce warning: ", err)
 	}
@@ -581,6 +634,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 	var Dispatch *gorpc.Dispatcher = gorpc.NewDispatcher()
 
 	Dispatch.AddFunc("Login", func(clientAddr string, userKey string) bool {
+		return false
+	})
+
+	Dispatch.AddFunc("LoginWithGroup", func(clientAddr string, groupData *GroupLoginRequest) bool {
 		return false
 	})
 
@@ -653,6 +710,10 @@ func GetDispatcher() *gorpc.Dispatcher {
 	})
 
 	Dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr string, orgId string) ([]string, error) {
+		return []string{}, nil
+	})
+
+	Dispatch.AddFunc("GetGroupKeySpaceUpdate", func(clientAddr string, groupData *GroupKeySpaceRequest) ([]string, error) {
 		return []string{}, nil
 	})
 

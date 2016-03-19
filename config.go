@@ -81,6 +81,8 @@ type Config struct {
 		APIKey                          string `json:"api_key"`
 		EnableRPCCache                  bool   `json:"enable_rpc_cache"`
 		BindToSlugsInsteadOfListenPaths bool   `json:"bind_to_slugs"`
+		DisableKeySpaceSync             bool   `json:"disable_keyspace_sync"`
+		GroupID                         string `json:"group_id"`
 	} `json:"slave_options"`
 	DisableVirtualPathBlobs bool `json:"disable_virtual_path_blobs"`
 	LocalSessionCache       struct {
