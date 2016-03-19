@@ -21,6 +21,7 @@ type ServiceDiscovery struct {
 	dataPath            string
 	parentPath          string
 	portPath            string
+	targetPath          string
 }
 
 func (s *ServiceDiscovery) New(spec *tykcommon.ServiceDiscoveryConfiguration) {
@@ -28,6 +29,7 @@ func (s *ServiceDiscovery) New(spec *tykcommon.ServiceDiscoveryConfiguration) {
 	s.isNested = spec.UseNestedQuery
 	s.isTargetList = spec.UseTargetList
 	s.endpointReturnsList = spec.EndpointReturnsList
+	s.targetPath = spec.TargetPath
 
 	if spec.PortDataPath != "" {
 		s.portSeperate = true
@@ -162,7 +164,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 				// Hijack this here because we need to use a non-nested get
 				for _, item := range *thisSet {
 					log.Debug("Child in list: ", item)
-					hostname = s.GetObject(item)
+					hostname = s.GetObject(item) + s.targetPath
 					// Add to list
 					hostList = append(hostList, hostname)
 				}
@@ -180,7 +182,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 
 	for _, item := range *thisSet {
 		log.Debug("Child in list: ", item)
-		hostname = s.GetHostname(item)
+		hostname = s.GetHostname(item) + s.targetPath
 		// Add to list
 		hostList = append(hostList, hostname)
 	}
@@ -189,7 +191,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 
 func (s *ServiceDiscovery) GetSubObject(obj *gabs.Container) string {
 	var hostname string
-	hostname = s.GetHostname(obj)
+	hostname = s.GetHostname(obj) + s.targetPath
 
 	return hostname
 }
