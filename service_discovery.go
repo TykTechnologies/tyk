@@ -83,7 +83,11 @@ func (s *ServiceDiscovery) GetPortFromObject(host *string, obj *gabs.Container) 
 	if s.portSeperate {
 		// Grab the port object
 		port := s.decodeToNameSpace(s.portPath, obj)
-		// TODO: Add it to host
+
+		switch port.(type) {
+		case []interface {}:
+			port = port.([]interface {})[0]
+		}
 
 		var portToUse string
 		switch port.(type) {
@@ -103,17 +107,38 @@ func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
 	parentData := s.decodeToNameSpace(s.parentPath, item)
 	// Get the data path from the decoded object
 	subContainer := gabs.Container{}
+	switch parentData.(type) {
+	default:
+		log.Info("Get Nested Object: parentData is not a string")
+		return ""
+	case string:
+	}
 	s.ParseObject(parentData.(string), &subContainer)
 	log.Debug("Parent SubContainer: ", subContainer)
 	// Get the hostname
-	hostname := s.decodeToNameSpace(s.dataPath, &subContainer).(string)
+	hostnameData := s.decodeToNameSpace(s.dataPath, &subContainer)
+	switch hostnameData.(type) {
+	default:
+		log.Info("Get Nested Object: hostname is not a string")
+		return ""
+	case string:
+	}
+	hostname := hostnameData.(string)
 	// Get the port
 	s.GetPortFromObject(&hostname, &subContainer)
 	return hostname
 }
 
 func (s *ServiceDiscovery) GetObject(item *gabs.Container) string {
-	hostname := s.decodeToNameSpace(s.dataPath, item).(string)
+	hostnameData := s.decodeToNameSpace(s.dataPath, item)
+	switch hostnameData.(type) {
+	default:
+		log.Info("Get Object: hostname is not a string")
+		return ""
+	case string:
+	}
+	hostname := hostnameData.(string)
+	log.Info("get object hostname: ", hostname)
 	// Get the port
 	s.GetPortFromObject(&hostname, item)
 	return hostname
@@ -153,6 +178,13 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 			parentData := s.decodeToNameSpace(s.parentPath, objList)
 			// Get the data path from the decoded object
 			subContainer := gabs.Container{}
+
+			switch parentData.(type) {
+			default:
+				log.Info("parentData is not a string")
+				return &hostList
+			case string:
+			}
 			// Now check if this string is a list
 			nestedString := parentData.(string)
 			if s.isList(nestedString) {
@@ -172,19 +204,30 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 
 			} else {
 				log.Debug("Not a list")
-				s.ParseObject(parentData.(string), &subContainer)
-				thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-				log.Debug("thisSet (object list): ", objList)
+				switch parentData.(type) {
+				default:
+					log.Info("parentData is not a string")
+				case string:
+					s.ParseObject(parentData.(string), &subContainer)
+					thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
+					log.Debug("thisSet (object list): ", objList)
+				}
 			}
+		} else if s.parentPath != "" {
+			thisSet = s.decodeToNameSpaceAsArray(s.parentPath, objList)
 		}
 
 	}
 
-	for _, item := range *thisSet {
-		log.Debug("Child in list: ", item)
-		hostname = s.GetHostname(item) + s.targetPath
-		// Add to list
-		hostList = append(hostList, hostname)
+	if (thisSet != nil) {
+		for _, item := range *thisSet {
+			log.Debug("Child in list: ", item)
+			hostname = s.GetHostname(item) + s.targetPath
+			// Add to list
+			hostList = append(hostList, hostname)
+		}
+	} else {
+		log.Info("Set is nil")
 	}
 	return &hostList
 }

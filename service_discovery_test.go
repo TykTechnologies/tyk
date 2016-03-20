@@ -76,6 +76,22 @@ var nested_list string = `
 }
 `
 
+var mesosphere string = `
+{
+ "tasks": [{
+  "id": "myservice.7fc21d4c-eabb-11e5-b381-066c48d09c8f",
+  "host": "httpbin.org",
+  "ipAddresses": [],
+  "ports": [80],
+  "startedAt": "2016-03-15T14:37:55.941Z",
+  "stagedAt": "2016-03-15T14:37:52.792Z",
+  "version": "2016-03-15T14:37:52.726Z",
+  "slaveId": "d70867df-fdb2-4889-abeb-0829c742fded-S2",
+  "appId": "/httpbin"
+ }]
+}
+`
+
 func configureService(name string, sd *ServiceDiscovery) string {
 	log.Info("Getting ", name)
 	switch name {
@@ -124,6 +140,15 @@ func configureService(name string, sd *ServiceDiscovery) string {
 		sd.parentPath = "Data"
 		sd.portPath = "port"
 		return nested_consul
+	case "mesosphere":
+		sd.isNested = false
+		sd.isTargetList = true
+		sd.endpointReturnsList = false
+		sd.portSeperate = true
+		sd.dataPath = "host"
+		sd.parentPath = "tasks"
+		sd.portPath = "ports"
+		return mesosphere
 	}
 	return ""
 }
@@ -245,6 +270,33 @@ func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
 	if tVal != host {
 		err := "Value is wrong, should be: " + tVal + " have: " + host
 		t.Error(err)
+	}
+
+}
+
+func TestServiceDiscovery_MESOSPHERE(t *testing.T) {
+	sd := ServiceDiscovery{}
+	rawData := configureService("mesosphere", &sd)
+	data, err := sd.ProcessRawData(rawData)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	var thisList *[]string
+	thisList = data.(*[]string)
+
+	arr := []string{"httpbin.org:80"}
+
+	if len(*thisList) != len(arr) {
+		t.Error("Result lists length do not match expected value")
+	}
+
+	for i, v := range *thisList {
+		if v != arr[i] {
+			err := "Value is wrong, should be: " + arr[i] + " have: " + v
+			t.Error(err)
+		}
 	}
 
 }
