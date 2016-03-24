@@ -240,6 +240,19 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 
 }
 
+func ReLogin() {
+	connStr := config.DBAppConfOptions.ConnectionString
+	if connStr == "" {
+		log.Fatal("Connection string is empty, failing.")
+	}
+
+	connStr = connStr + "/register/node"
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Registering node.")
+	RegisterNodeWithDashboard(connStr, config.NodeSecret)
+}
+
 func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
@@ -330,6 +343,7 @@ func SendHeartBeat(endpoint string, secret string) error {
 
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+	log.Debug("Sending Heartbeat as: ", NodeID)
 
 	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
@@ -426,6 +440,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	if decErr != nil {
 		log.Error("Failed to decode body: ", decErr)
 		log.Debug("Response was: ", string(retBody))
+		ReLogin()
 		return &APISpecs
 	}
 
@@ -526,9 +541,9 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 
 		if config.SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + thisAppConfig.Slug + "/"
-			log.Warning("Binding to ", 
-				newListenPath, 
-				" instead of ", 
+			log.Warning("Binding to ",
+				newListenPath,
+				" instead of ",
 				thisAppConfig.Proxy.ListenPath)
 
 			thisAppConfig.Proxy.ListenPath = newListenPath
