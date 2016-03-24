@@ -440,7 +440,10 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	if decErr != nil {
 		log.Error("Failed to decode body: ", decErr)
 		log.Debug("Response was: ", string(retBody))
+		log.Info("--> Retrying in 15s")
+		time.Sleep(time.Second * 15)
 		ReLogin()
+		a.LoadDefinitionsFromDashboardService(endpoint, secret)
 		return &APISpecs
 	}
 
