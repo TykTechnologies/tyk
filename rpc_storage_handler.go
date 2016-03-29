@@ -68,7 +68,7 @@ type RPCStorageHandler struct {
 	SuppressRegister bool
 }
 
-func handleReconnect() {
+func handleReconnect(r *RPCStorageHandler) {
 	ClearRPCClients()
 
 }
@@ -87,6 +87,11 @@ func (r *RPCStorageHandler) checkDisconnect() {
 		log.Debug("RPC Client disconnecting: ", res)
 		r.Disconnect()
 	}
+}
+
+func (r *RPCStorageHandler) ReConnect() {
+	r.RPCClient.Stop()
+	r.Connect()
 }
 
 // Connect will establish a connection to the DB
@@ -558,9 +563,10 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 	if err != nil {
 		if r.IsAccessError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
-			r.Login()
+			r.ReConnect()
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
+			r.ReConnect()
 		}
 	} else {
 		log.Debug("[RPC STORE] CheckReload: Received response")
