@@ -90,6 +90,7 @@ func (r *RPCStorageHandler) checkDisconnect() {
 }
 
 func (r *RPCStorageHandler) ReConnect() {
+	// Should only be used by reload checker
 	r.RPCClient.Stop()
 	r.Connect()
 }
