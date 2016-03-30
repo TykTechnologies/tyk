@@ -42,6 +42,7 @@ type StorageHandler interface {
 	Decrement(string)
 	IncrememntWithExpire(string, int64) int64
 	SetRollingWindow(string, int64, string) (int, []interface{})
+	SetRollingWindowPipeline(string, int64, string) (int, []interface{})
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	RemoveFromSet(string, string)
@@ -60,6 +61,11 @@ func (s *InMemoryStorageManager) Decrement(n string) {
 }
 
 func (s *InMemoryStorageManager) SetRollingWindow(keyName string, per int64, val string) (int, []interface{}) {
+	log.Warning("Not Implemented!")
+	return 0, []interface{}{}
+}
+
+func (s *InMemoryStorageManager) SetRollingWindowPipeline(keyName string, per int64, val string) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, []interface{}{}
 }
@@ -731,6 +737,47 @@ func (r *RedisStorageManager) AppendToSet(keyName string, value string) {
 
 // IncrementWithExpire will increment a key in redis
 func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire string) (int, []interface{}) {
+	db := r.pool.Get()
+	defer db.Close()
+
+	log.Debug("Incrementing raw key: ", keyName)
+	if db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		r.SetRollingWindow(keyName, per, expire)
+	} else {
+		log.Debug("keyName is: ", keyName)
+		now := time.Now()
+		log.Debug("Now is:", now)
+		onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
+		log.Debug("Then is: ", onePeriodAgo)
+
+		db.Send("MULTI")
+		// Drop the last period so we get current bucket
+		db.Send("ZREMRANGEBYSCORE", keyName, "-inf", onePeriodAgo.UnixNano())
+		// Get the set
+		db.Send("ZRANGE", keyName, 0, -1)
+		// Add this request to the pile
+		db.Send("ZADD", keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano())))
+		// REset the TTL so the key lives as long as the requests pile in
+		db.Send("EXPIRE", keyName, per)
+		r, err := redis.Values(db.Do("EXEC"))
+
+		intVal := len(r[1].([]interface{}))
+
+		log.Debug("Returned: ", intVal)
+
+		if err != nil {
+			log.Error("Multi command failed: ", err)
+		}
+
+		return intVal, r[1].([]interface{})
+	}
+	return 0, []interface{}{}
+}
+
+// IncrementWithExpire will increment a key in redis - NOT IMPLEMENTED
+func (r *RedisStorageManager) SetRollingWindowPipeline(keyName string, per int64, expire string) (int, []interface{}) {
 	db := r.pool.Get()
 	defer db.Close()
 

@@ -54,18 +54,19 @@ type Config struct {
 		EnableHealthChecks      bool  `json:"enable_health_checks"`
 		HealthCheckValueTimeout int64 `json:"health_check_value_timeouts"`
 	} `json:"health_check"`
-	UseAsyncSessionWrite            bool   `json:"optimisations_use_async_session_write"`
-	AllowMasterKeys                 bool   `json:"allow_master_keys"`
-	HashKeys                        bool   `json:"hash_keys"`
-	SuppressRedisSignalReload       bool   `json:"suppress_redis_signal_reload"`
-	SupressDefaultOrgStore          bool   `json:"suppress_default_org_store"`
-	SentryCode                      string `json:"sentry_code"`
-	UseSentry                       bool   `json:"use_sentry"`
-	EnforceOrgDataAge               bool   `json:"enforce_org_data_age"`
-	EnforceOrgDataDeailLogging      bool   `json:"enforce_org_data_detail_logging"`
-	EnforceOrgQuotas                bool   `json:"enforce_org_quotas"`
-	ExperimentalProcessOrgOffThread bool   `json:"experimental_process_org_off_thread"`
-	Monitor                         struct {
+	UseAsyncSessionWrite              bool   `json:"optimisations_use_async_session_write"`
+	AllowMasterKeys                   bool   `json:"allow_master_keys"`
+	HashKeys                          bool   `json:"hash_keys"`
+	SuppressRedisSignalReload         bool   `json:"suppress_redis_signal_reload"`
+	SupressDefaultOrgStore            bool   `json:"suppress_default_org_store"`
+	SentryCode                        string `json:"sentry_code"`
+	UseSentry                         bool   `json:"use_sentry"`
+	EnforceOrgDataAge                 bool   `json:"enforce_org_data_age"`
+	EnforceOrgDataDeailLogging        bool   `json:"enforce_org_data_detail_logging"`
+	EnforceOrgQuotas                  bool   `json:"enforce_org_quotas"`
+	ExperimentalProcessOrgOffThread   bool   `json:"experimental_process_org_off_thread"`
+	EnableNonTransactionalRateLimiter bool   `json:"enable_non_transactional_rate_limiter"`
+	Monitor                           struct {
 		EnableTriggerMonitors bool               `json:"enable_trigger_monitors"`
 		Config                WebHookHandlerConf `json:"configuration"`
 		GlobalTriggerLimit    float64            `json:"global_trigger_limit"`

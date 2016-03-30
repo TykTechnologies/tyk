@@ -496,6 +496,28 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 }
 
+// SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
+func (r *RPCStorageHandler) SetRollingWindowPipeline(keyName string, per int64, val string) (int, []interface{}) {
+	start := time.Now() // get current time
+	ibd := InboundData{
+		KeyName: keyName,
+		Per:     per,
+		Expire:  -1,
+	}
+
+	intVal, err := r.Client.Call("SetRollingWindow", ibd)
+	if r.IsAccessError(err) {
+		r.Login()
+		return r.SetRollingWindow(keyName, per, val)
+	}
+
+	elapsed := time.Since(start)
+	log.Debug("SetRollingWindow took ", elapsed)
+
+	return intVal.(int), []interface{}{}
+
+}
+
 func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
 	log.Error("Not implemented")
 	return map[string]string{}, nil

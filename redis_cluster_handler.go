@@ -663,3 +663,53 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 	}
 	return 0, []interface{}{}
 }
+
+func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, per int64, value_override string) (int, []interface{}) {
+
+	log.Debug("Incrementing raw key: ", keyName)
+	if r.db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.SetRollingWindow(keyName, per, value_override)
+	} else {
+		log.Debug("keyName is: ", keyName)
+		now := time.Now()
+		log.Debug("Now is:", now)
+		onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
+		log.Debug("Then is: ", onePeriodAgo)
+
+		ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
+		ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
+		ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
+
+		ZRANGE := rediscluster.ClusterTransaction{}
+		ZRANGE.Cmd = "ZRANGE"
+		ZRANGE.Args = []interface{}{keyName, 0, -1}
+
+		ZADD := rediscluster.ClusterTransaction{}
+		ZADD.Cmd = "ZADD"
+
+		if value_override != "-1" {
+			ZADD.Args = []interface{}{keyName, now.UnixNano(), value_override}
+		} else {
+			ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
+		}
+
+		EXPIRE := rediscluster.ClusterTransaction{}
+		EXPIRE.Cmd = "EXPIRE"
+		EXPIRE.Args = []interface{}{keyName, per}
+
+		redVal, err := redis.Values(r.db.DoPipeline([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
+
+		intVal := len(redVal[1].([]interface{}))
+
+		log.Debug("Returned: ", intVal)
+
+		if err != nil {
+			log.Error("Multi command failed: ", err)
+		}
+
+		return intVal, redVal[1].([]interface{})
+	}
+	return 0, []interface{}{}
+}
