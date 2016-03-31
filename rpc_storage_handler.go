@@ -91,8 +91,9 @@ func (r *RPCStorageHandler) checkDisconnect() {
 
 func (r *RPCStorageHandler) ReConnect() {
 	// Should only be used by reload checker
-	r.RPCClient.Stop()
+	r.Disconnect()
 	r.Connect()
+	log.Info("Reconnected.")
 }
 
 // Connect will establish a connection to the DB
@@ -155,9 +156,13 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 	return setKeyName
 }
 
-func (r *RPCStorageHandler) ReAttemptLogin() {
+func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
 	time.Sleep(time.Second * 3)
+	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
+		r.ReConnect()
+		return
+	}
 	r.Login()
 }
 
@@ -169,13 +174,13 @@ func (r *RPCStorageHandler) GroupLogin() {
 	ok, err := r.Client.Call("LoginWithGroup", groupLoginData)
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
-		r.ReAttemptLogin()
+		r.ReAttemptLogin(err)
 		return
 	}
 
 	if !ok.(bool) {
 		log.Error("RPC Login incorrect")
-		r.ReAttemptLogin()
+		r.ReAttemptLogin(errors.New("Login incorrect"))
 		return
 	}
 	log.Debug("[RPC Store] Group Login complete")
@@ -197,13 +202,13 @@ func (r *RPCStorageHandler) Login() {
 	ok, err := r.Client.Call("Login", r.UserKey)
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
-		r.ReAttemptLogin()
+		r.ReAttemptLogin(err)
 		return
 	}
 
 	if !ok.(bool) {
 		log.Error("RPC Login incorrect")
-		r.ReAttemptLogin()
+		r.ReAttemptLogin(errors.New("Login incorrect"))
 		return
 	}
 	log.Debug("[RPC Store] Login complete")
@@ -596,7 +601,8 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		if reload.(bool) {
 			// Do the reload!
 			log.Warning("[RPC STORE] Received Reload instruction!")
-			go ReloadURLStructure()
+			go signalGroupReload()
+			//go ReloadURLStructure()
 		}
 	}
 
