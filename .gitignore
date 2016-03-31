@@ -36,3 +36,4 @@ petstore.json
 *.mmdb
 ty.clonedash.conf
 tyk.dashboard.conf
+tyk.benchmark.conf

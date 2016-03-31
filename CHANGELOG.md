@@ -79,6 +79,8 @@
 ```
 
 - Nw Multi-DC / segregated environment / single dashboard support added for API and Keyspace propagation
+- Added new rate limit handler that is non-transactional, this can be enabled by setting `enable_non_transactional_rate_limiter` to true, this can provide exceptional performance improvements
+- Added option to enable or disable the sentinel-based rate-limiter, sentinel-based rate limiter provides a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cooldown for clients. Disabling the sentinel based limiter will make rate-limit calculations happen on-thread and therefore offers staggered cool-down and a smoother rate-limit experience for the client and similar performance as the sentinel-based limiter. TThis is disabled by default. To enable, set `enable_sentinel_rate_limiter` to `true`
 
 # 1.9.1.1
 

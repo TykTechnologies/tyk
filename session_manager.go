@@ -25,7 +25,7 @@ const (
 // check if a message should pass through or not
 type SessionLimiter struct{}
 
-func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) {
+func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	var ratePerPeriodNow int
@@ -35,13 +35,26 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), "-1")
 	}
 
-	log.Debug("Num Requests: ", ratePerPeriodNow)
+	//log.Info("Num Requests: ", ratePerPeriodNow)
 
-	// Subtract by 1 because of the delayed add in the window, and another subtraction because of the preemptive limit
-	if ratePerPeriodNow > (int(currentSession.Rate) - 2) {
-		// Set a sentinel value with expire
-		store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
+	// Subtract by 1 because of the delayed add in the window
+	subtractor := 1
+	if config.EnableSentinelRateLImiter {
+		// and another subtraction because of the preemptive limit
+		subtractor = 2
 	}
+
+	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
+
+	if ratePerPeriodNow > (int(currentSession.Rate) - subtractor) {
+		// Set a sentinel value with expire
+		if config.EnableSentinelRateLImiter {
+			store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
+		}
+		return true
+	}
+
+	return false
 }
 
 // ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
@@ -50,14 +63,19 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
 
-	// Set rolling window (off thread)
-	go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
+	if config.EnableSentinelRateLImiter {
+		go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
 
-	// Check sentinel
-	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
-	if sentinelActive == nil {
-		// Sentinel is set, fail
-		return false, 1
+		// Check sentinel
+		_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
+		if sentinelActive == nil {
+			// Sentinel is set, fail
+			return false, 1
+		}
+	} else {
+		if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
+			return false, 1
+		}
 	}
 
 	currentSession.Allowance--
