@@ -48,8 +48,38 @@ var ErrorDenied error = errors.New("Access Denied")
 var RPCClients = map[string]chan int{}
 
 func ClearRPCClients() {
+	log.Info("Found: ", len(RPCClients), " RPC connections, terminating")
 	for _, c := range RPCClients {
 		c <- 1
+	}
+}
+
+func RPCKeepAliveCheck(r *RPCStorageHandler) {
+	// Only run when connected
+	if r.Connected {
+		// Make sure the auth back end is still alive
+		c1 := make(chan string, 1)
+
+		go func() {
+			r.GetKey("0000")
+			c1 <- "1"
+		}()
+
+		ctd := false
+		select {
+		case res := <-c1:
+			log.Debug("Still alive: ", res)
+			ctd = true
+		case <-time.After(time.Second * 30):
+			log.Info("Handler seems to have disconnected, attempting reconnect")
+			r.ReConnect()
+		}
+		close(c1)
+
+		if ctd {
+			// Don't run too quickly, pulse every 10 secs
+			time.Sleep(time.Second * 10)
+		}
 	}
 }
 
@@ -98,6 +128,11 @@ func (r *RPCStorageHandler) ReConnect() {
 
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
+	// We don't want to constantly connect
+	if r.Connected {
+		return true
+	}
+
 	// Set up the cache
 	r.cache = cache.New(30*time.Second, 15*time.Second)
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
@@ -214,7 +249,7 @@ func (r *RPCStorageHandler) Login() {
 	log.Debug("[RPC Store] Login complete")
 }
 
-// GetKey will retreive a key from the database
+// GetKey will retrieve a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
 	log.Debug("[STORE] Getting WAS: ", keyName)

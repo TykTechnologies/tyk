@@ -494,6 +494,13 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+
+	if config.SlaveOptions.UseRPC {
+		StartRPCKeepaliveWatcher(&rpcAuthStore)
+		StartRPCKeepaliveWatcher(&rpcOrgStore)
+	}
 
 	listenPaths := make(map[string][]string)
 
@@ -602,9 +609,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				authStore = &thisStorageEngine
 				orgStore = &redisOrgStore
 			case RPCStorageEngine:
-				thisStorageEngine := &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+				thisStorageEngine := &rpcAuthStore // &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 				authStore = thisStorageEngine
-				orgStore = &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+				orgStore = &rpcOrgStore // &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 				config.EnforceOrgDataAge = true
 				config.EnforceOrgQuotas = true
 
@@ -1033,6 +1040,15 @@ func init() {
 
 }
 
+func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
+	go func() {
+		log.Info("Starting keepalive watcher...")
+		for {
+			RPCKeepAliveCheck(engine)
+		}
+	}()
+}
+
 func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 	var Name tykcommon.StorageEngineCode
 	// Select configuration options
@@ -1046,7 +1062,8 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 	case DefaultStorageEngine:
 		return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 	case RPCStorageEngine:
-		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		engine := &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		return engine
 	}
 
 	log.WithFields(logrus.Fields{
