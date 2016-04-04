@@ -1042,9 +1042,23 @@ func init() {
 
 func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 	go func() {
-		log.Info("Starting keepalive watcher...")
+		log.WithFields(logrus.Fields{
+			"prefix": "RPC Conn Mgr",
+		}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 		for {
 			RPCKeepAliveCheck(engine)
+			if engine == nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "RPC Conn Mgr",
+				}).Info("No engine, break")
+				break
+			}
+			if engine.Killed == true {
+				log.WithFields(logrus.Fields{
+					"prefix": "RPC Conn Mgr",
+				}).Debug("[RPC Conn Mgr] this connection killed")
+				break
+			}
 		}
 	}()
 }

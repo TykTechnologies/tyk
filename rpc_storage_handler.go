@@ -69,10 +69,12 @@ func RPCKeepAliveCheck(r *RPCStorageHandler) {
 		ctd := false
 		select {
 		case res := <-c1:
-			log.Debug("Still alive: ", res)
+			log.Debug("RPC Still alive: ", res)
 			ctd = true
 		case <-time.After(time.Second * 10):
-			log.Info("Handler seems to have disconnected, attempting reconnect")
+			log.WithFields(logrus.Fields{
+				"prefix": "RPC Conn Mgr",
+			}).Info("Handler seems to have disconnected, attempting reconnect")
 			r.ReConnect()
 		}
 
@@ -93,6 +95,7 @@ type RPCStorageHandler struct {
 	Address          string
 	cache            *cache.Cache
 	killChan         chan int
+	Killed           bool
 	Connected        bool
 	ID               string
 	SuppressRegister bool
@@ -114,7 +117,8 @@ func (r *RPCStorageHandler) Register() {
 func (r *RPCStorageHandler) checkDisconnect() {
 	select {
 	case res := <-r.killChan:
-		log.Debug("RPC Client disconnecting: ", res)
+		log.Info("RPC Client disconnecting: ", res)
+		r.Killed = true
 		r.Disconnect()
 	}
 }
