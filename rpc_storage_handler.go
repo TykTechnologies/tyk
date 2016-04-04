@@ -63,6 +63,7 @@ func RPCKeepAliveCheck(r *RPCStorageHandler) {
 		go func() {
 			r.GetKey("0000")
 			c1 <- "1"
+			close(c1)
 		}()
 
 		ctd := false
@@ -70,11 +71,10 @@ func RPCKeepAliveCheck(r *RPCStorageHandler) {
 		case res := <-c1:
 			log.Debug("Still alive: ", res)
 			ctd = true
-		case <-time.After(time.Second * 30):
+		case <-time.After(time.Second * 10):
 			log.Info("Handler seems to have disconnected, attempting reconnect")
 			r.ReConnect()
 		}
-		close(c1)
 
 		if ctd {
 			// Don't run too quickly, pulse every 10 secs
