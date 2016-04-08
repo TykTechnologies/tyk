@@ -49,27 +49,48 @@ func CopyRequest(r *http.Request) *http.Request {
 }
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+	var tempRes *http.Request
+
 	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
 
-	authHeaderValue := r.Header.Get(thisConfig.AuthHeaderName)
-	if thisConfig.UseParam {
-		tempRes := CopyRequest(r)
+	key := r.Header.Get(thisConfig.AuthHeaderName)
 
-		// Set hte header name
-		authHeaderValue = tempRes.FormValue(thisConfig.AuthHeaderName)
-	}
+	paramName := thisConfig.ParamName
+	if thisConfig.UseParam || paramName != "" {
+		if paramName == "" {
+			paramName = thisConfig.AuthHeaderName
+		}
 
-	if thisConfig.UseCookie {
-		tempRes := CopyRequest(r)
-		authCookie, notFoundErr := tempRes.Cookie(thisConfig.AuthHeaderName)
-		if notFoundErr != nil {
-			authHeaderValue = ""
-		} else {
-			authHeaderValue = authCookie.Value
+		tempRes = CopyRequest(r)
+		paramValue := tempRes.FormValue(paramName)
+
+		// Only use the paramValue if it has an actual value
+		if paramValue != "" {
+			key = paramValue
 		}
 	}
 
-	if authHeaderValue == "" {
+	cookieName := thisConfig.CookieName
+	if thisConfig.UseCookie || cookieName != "" {
+		if cookieName == "" {
+			cookieName = thisConfig.AuthHeaderName
+		}
+		if tempRes == nil {
+			tempRes = CopyRequest(r)
+		}
+
+		authCookie, notFoundErr := tempRes.Cookie(cookieName)
+		cookieValue := ""
+		if notFoundErr == nil {
+			cookieValue = authCookie.Value
+		}
+
+		if cookieValue != "" {
+			key = cookieValue
+		}
+	}
+
+	if key == "" {
 		// No header value, fail
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -80,19 +101,19 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	// Ignore Bearer prefix on token if it exists
-	authHeaderValue = stripBearer(authHeaderValue);
+	key = stripBearer(key)
 
 	// Check if API key valid
-	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(authHeaderValue)
+	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(key)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": GetIPFromRequest(r),
-			"key":    authHeaderValue,
+			"key":    key,
 		}).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, authHeaderValue)
+		AuthFailed(k.TykMiddleware, r, key)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
@@ -102,7 +123,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 
 	// Set session state on context, we will need it later
 	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, authHeaderValue)
+	context.Set(r, AuthHeaderValue, key)
 
 	return nil, 200
 }
