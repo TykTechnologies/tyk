@@ -132,6 +132,23 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 				cacheThisRequest := true
 				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
+
+				// make sure the status codes match if specified
+				if len(m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes) > 0 {
+					foundCode := false
+					for _, code := range(m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes) {
+						if code == reqVal.StatusCode {
+							cacheThisRequest = true
+							foundCode = true
+							break
+						}
+					}
+					if !foundCode {
+						cacheThisRequest = false
+					}
+				}
+				
+
 				// Are we using upstream cache control?
 				if m.Spec.APIDefinition.CacheOptions.EnableUpstreamCacheControl {
 					log.Debug("Upstream control enabled")
