@@ -46,12 +46,17 @@ func getAuthKeyChain(spec APISpec) http.Handler {
 	return chain
 }
 
-func TestBearerTokenAuthKeySession(t *testing.T) {
-	spec := createDefinitionFromString(authKeyDef)
+func setUp(def string) APISpec {
+	spec := createDefinitionFromString(def)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	return spec
+}
+
+func TestBearerTokenAuthKeySession(t *testing.T) {
+	spec := setUp(authKeyDef)
 	thisSession := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
@@ -111,11 +116,7 @@ var authKeyDef string = `
 	}`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
-	spec := createDefinitionFromString(multiAuthBackwardsCompatible)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := setUp(multiAuthBackwardsCompatible)
 	thisSession := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
@@ -174,11 +175,7 @@ var multiAuthBackwardsCompatible string = `
 	}`
 
 func TestMultiAuthSession(t *testing.T) {
-	spec := createDefinitionFromString(multiAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := setUp(multiAuthDef)
 	thisSession := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
@@ -188,6 +185,7 @@ func TestMultiAuthSession(t *testing.T) {
 	var err error
 	var recorder *httptest.ResponseRecorder
 
+	// Set the url param
 	recorder = httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), strings.NewReader("")); err != nil {
 		log.Error("Problem creating new request object.", err)
@@ -201,6 +199,7 @@ func TestMultiAuthSession(t *testing.T) {
 		t.Error(ioutil.ReadAll(recorder.Body))
 	}
 
+	// Set the header
 	recorder = httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", "/auth_key_test/?token=", strings.NewReader("")); err != nil {
 		log.Error("Problem creating new request object.", err)
@@ -214,6 +213,21 @@ func TestMultiAuthSession(t *testing.T) {
 		t.Error(ioutil.ReadAll(recorder.Body))
 	}
 
+	// Set the cookie
+	recorder = httptest.NewRecorder()
+	if req, err = http.NewRequest("GET", "/auth_key_test/?token=", strings.NewReader("")); err != nil {
+		log.Error("Problem creating new request object.", err)
+	}
+	req.AddCookie(&http.Cookie{Name: "oreo", Value: customToken})
+
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Third request failed with non-200 code, should have gone through!: \n", recorder.Code)
+		t.Error(ioutil.ReadAll(recorder.Body))
+	}
+
+	// No header, param or cookie
 	recorder = httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", "/auth_key_test/", strings.NewReader("")); err != nil {
 		log.Error("Problem creating new request object.", err)
@@ -239,7 +253,8 @@ var multiAuthDef string = `
 		},
 		"auth": {
 			"auth_header_name": "authorization",
-      "param_name": "token"
+      "param_name": "token",
+      "cookie_name": "oreo"
 		},
 		"version_data": {
 			"not_versioned": true,
