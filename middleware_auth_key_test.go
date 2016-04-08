@@ -1,14 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"github.com/justinas/alice"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 	"net/url"
-  "time"
-	"io/ioutil"
-
-	"github.com/justinas/alice"
+	"strings"
+	"testing"
+	"time"
 )
 
 func createAuthKeyAuthSession() SessionState {
@@ -45,34 +46,33 @@ func getAuthKeyChain(spec APISpec) http.Handler {
 	return chain
 }
 
-
 func TestBearerTokenAuthKeySession(t *testing.T) {
-  spec := createDefinitionFromString(authKeyDef)
+	spec := createDefinitionFromString(authKeyDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-  thisSession := createAuthKeyAuthSession()
+	thisSession := createAuthKeyAuthSession()
 	customToken := "54321111"
-  // AuthKey sessions are stored by {token}
-  spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	// AuthKey sessions are stored by {token}
+	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
 
-  recorder := httptest.NewRecorder()
-  req, err := http.NewRequest("GET", "/auth_key_test/", nil)
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/auth_key_test/", nil)
 
-  if err != nil {
-    log.Error("Problem creating new request object.", err)
-  }
+	if err != nil {
+		log.Error("Problem creating new request object.", err)
+	}
 
-  req.Header.Add("authorization", "Bearer " + customToken)
+	req.Header.Add("authorization", "Bearer "+customToken)
 
-  chain := getAuthKeyChain(spec)
-  chain.ServeHTTP(recorder, req)
+	chain := getAuthKeyChain(spec)
+	chain.ServeHTTP(recorder, req)
 
-  if recorder.Code != 200 {
-    t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
 		t.Error(ioutil.ReadAll(recorder.Body))
-  }
+	}
 }
 
 var authKeyDef string = `
@@ -87,6 +87,159 @@ var authKeyDef string = `
 		},
 		"auth": {
 			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"Default": {
+					"name": "Default",
+					"use_extended_paths": true,
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"white_list": [],
+						"black_list": []
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/auth_key_test/",
+			"target_url": "http://example.com/",
+			"strip_listen_path": true
+		}
+	}`
+
+func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
+	spec := createDefinitionFromString(multiAuthBackwardsCompatible)
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	thisSession := createAuthKeyAuthSession()
+	customToken := "54321111"
+	// AuthKey sessions are stored by {token}
+	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), strings.NewReader(""))
+
+	if err != nil {
+		log.Error("Problem creating new request object.", err)
+	}
+
+	chain := getAuthKeyChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+		t.Error(ioutil.ReadAll(recorder.Body))
+	}
+}
+
+var multiAuthBackwardsCompatible string = `
+  {
+		"name": "Tyk Auth Key Test",
+		"api_id": "31",
+		"org_id": "default",
+    "use_keyless": false,
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "token",
+      "use_param": true
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"Default": {
+					"name": "Default",
+					"use_extended_paths": true,
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"white_list": [],
+						"black_list": []
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/auth_key_test/",
+			"target_url": "http://example.com/",
+			"strip_listen_path": true
+		}
+	}`
+
+func TestMultiAuthSession(t *testing.T) {
+	spec := createDefinitionFromString(multiAuthDef)
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	thisSession := createAuthKeyAuthSession()
+	customToken := "54321111"
+	// AuthKey sessions are stored by {token}
+	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+
+	var req *http.Request
+	var err error
+	var recorder *httptest.ResponseRecorder
+
+	recorder = httptest.NewRecorder()
+	if req, err = http.NewRequest("GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), strings.NewReader("")); err != nil {
+		log.Error("Problem creating new request object.", err)
+	}
+
+	chain := getAuthKeyChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("First request failed with non-200 code, should have gone through!: \n", recorder.Code)
+		t.Error(ioutil.ReadAll(recorder.Body))
+	}
+
+	recorder = httptest.NewRecorder()
+	if req, err = http.NewRequest("GET", "/auth_key_test/?token=", strings.NewReader("")); err != nil {
+		log.Error("Problem creating new request object.", err)
+	}
+	req.Header.Add("authorization", customToken)
+
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Second request failed with non-200 code, should have gone through!: \n", recorder.Code)
+		t.Error(ioutil.ReadAll(recorder.Body))
+	}
+
+	recorder = httptest.NewRecorder()
+	if req, err = http.NewRequest("GET", "/auth_key_test/", strings.NewReader("")); err != nil {
+		log.Error("Problem creating new request object.", err)
+	}
+
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code == 200 {
+		t.Error("Request returned 200 code, should NOT have gone through!: \n", recorder.Code)
+		t.Error(ioutil.ReadAll(recorder.Body))
+	}
+}
+
+var multiAuthDef string = `
+  {
+		"name": "Tyk Auth Key Test",
+		"api_id": "31",
+		"org_id": "default",
+    "use_keyless": false,
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization",
+      "param_name": "token"
 		},
 		"version_data": {
 			"not_versioned": true,
