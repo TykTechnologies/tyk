@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Super hacky release script
 
@@ -7,7 +8,7 @@ CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3\.$4"
 
 echo "Current version is: " $CURRENTVERS 
 DATE=$(date +'%m-%d-%Y')
-BUILDVERS="$CURRENTVERS-nightly-DATE" 
+BUILDVERS="$CURRENTVERS-nightly-$DATE" 
 echo "Build will be: " $CURRENTVERS
 
 NEWVERSION=$BUILDVERS
@@ -31,6 +32,12 @@ armTGZDIR=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm-$VERSION
 
 cd $SOURCEBINPATH
 
+echo "Getting deps"
+go get -t -d -v ./...
+
+echo "Installing cross-compiler"
+go get github.com/mitchellh/gox
+
 echo "Creating build directory"
 rm -rf build
 mkdir -p $i386BINDIR
@@ -45,13 +52,6 @@ mkdir -p $armTGZDIR
 
 echo "Building binaries"
 gox -os="linux"
-
-rc=$?
-if [[ $rc != 0 ]] ; then
-    echo "Something went wrong with the build, please fix and retry"
-    rm -rf build
-    exit $rc
-fi
 
 echo "Preping TGZ Dirs"
 mkdir $i386TGZDIR/apps
@@ -89,3 +89,14 @@ cd $armTGZDIR/../
 tar -pczf $armTGZDIR/../tyk-linux-arm-$VERSION.tar.gz tyk.linux.arm-$VERSION/
 
 echo "TGZ Created"
+
+echo "Creating release directory and copying files"
+cd $SOURCEBINPATH
+RELEASEPATH=$SOURCEBINPATH/build/release
+mkdir $RELEASEPATH
+cp $i386TGZDIR/../*.tar.gz $RELEASEPATH
+cp $amd64TGZDIR/../*.tar.gz $RELEASEPATH
+cp $armTGZDIR/../*.tar.gz $RELEASEPATH
+
+echo "Done"
+
