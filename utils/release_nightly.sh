@@ -9,7 +9,7 @@ CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3\.$4"
 echo "Current version is: " $CURRENTVERS 
 DATE=$(date +'%m-%d-%Y')
 BUILDVERS="$CURRENTVERS-nightly-$DATE" 
-echo "Build will be: " $CURRENTVERS
+echo "Build will be: " $BUILDVERS
 
 NEWVERSION=$BUILDVERS
 NEWVERSION_DHMAKE=$BUILDVERS
