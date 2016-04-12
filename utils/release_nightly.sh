@@ -97,6 +97,6 @@ mkdir $RELEASEPATH
 cp $i386TGZDIR/../*.tar.gz $RELEASEPATH
 cp $amd64TGZDIR/../*.tar.gz $RELEASEPATH
 cp $armTGZDIR/../*.tar.gz $RELEASEPATH
-
+cp utils/nightlies/index.html $RELEASEPATH
 echo "Done"
 
