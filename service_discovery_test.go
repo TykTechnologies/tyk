@@ -27,6 +27,31 @@ var consul string = `
 ]
 `
 
+var eureka = `
+{
+	"application": {
+		"name": "ROUTE",
+		"instance": [{
+			"hostName": "ip-172-31-57-136",
+			"ipAddr": "172.31.57.136",
+			"port": {
+				"@enabled": "true",
+				"$": "47954"
+			}
+
+		}, {
+			"hostName": "ip-172-31-13-37",
+			"app": "ROUTE",
+			"ipAddr": "172.31.13.37",
+			"port": {
+				"@enabled": "true",
+				"$": "34406"
+			}
+		}]
+	}
+}
+`
+
 var nested_consul string = `
 [
   {
@@ -149,8 +174,45 @@ func configureService(name string, sd *ServiceDiscovery) string {
 		sd.parentPath = "tasks"
 		sd.portPath = "ports"
 		return mesosphere
+	case "eureka":
+		sd.isNested = false
+		sd.isTargetList = true
+		sd.endpointReturnsList = false
+		sd.portSeperate = true
+		sd.dataPath = "hostName"
+		sd.parentPath = "application.instance"
+		sd.portPath = "port.$"
+		return eureka
 	}
+
 	return ""
+}
+
+func TestServiceDiscovery_EUREKA(t *testing.T) {
+	sd := ServiceDiscovery{}
+	rawData := configureService("eureka", &sd)
+	data, err := sd.ProcessRawData(rawData)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	var thisList *[]string
+	thisList = data.(*[]string)
+
+	arr := []string{"ip-172-31-57-136:47954", "ip-172-31-13-37:34406"}
+
+	if len(*thisList) != len(arr) {
+		t.Error("Result lists length do not match expected value")
+	}
+
+	for i, v := range *thisList {
+		if v != arr[i] {
+			err := "Value is wrong, should be: " + arr[i] + " have: " + v
+			t.Error(err)
+		}
+	}
+
 }
 
 func TestServiceDiscovery_CONSUL(t *testing.T) {
