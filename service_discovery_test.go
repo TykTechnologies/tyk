@@ -27,26 +27,90 @@ var consul string = `
 ]
 `
 
-var eureka = `
+var eureka_real = `
 {
 	"application": {
 		"name": "ROUTE",
 		"instance": [{
 			"hostName": "ip-172-31-57-136",
+			"app": "ROUTE",
 			"ipAddr": "172.31.57.136",
+			"status": "UP",
+			"overriddenstatus": "UNKNOWN",
 			"port": {
 				"@enabled": "true",
-				"$": "47954"
-			}
-
+				"$": "60565"
+			},
+			"securePort": {
+				"@enabled": "false",
+				"$": "443"
+			},
+			"countryId": 1,
+			"dataCenterInfo": {
+				"@class": "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",
+				"name": "MyOwn"
+			},
+			"leaseInfo": {
+				"renewalIntervalInSecs": 10,
+				"durationInSecs": 10,
+				"registrationTimestamp": 1460471383902,
+				"lastRenewalTimestamp": 1460471403565,
+				"evictionTimestamp": 0,
+				"serviceUpTimestamp": 1460471383340
+			},
+			"metadata": {
+				"instanceId": "route:f673c15eebfc456a3c679a55d234a8ca",
+				"payment": "perCall",
+				"providerName": "MisterA"
+			},
+			"homePageUrl": "http:\/\/ip-172-31-57-136:60565\/",
+			"statusPageUrl": "http:\/\/ip-172-31-57-136:60565\/info",
+			"healthCheckUrl": "http:\/\/ip-172-31-57-136:60565\/health",
+			"vipAddress": "route",
+			"isCoordinatingDiscoveryServer": false,
+			"lastUpdatedTimestamp": 1460471383902,
+			"lastDirtyTimestamp": 1460471429751,
+			"actionType": "ADDED"
 		}, {
 			"hostName": "ip-172-31-13-37",
 			"app": "ROUTE",
 			"ipAddr": "172.31.13.37",
+			"status": "UP",
+			"overriddenstatus": "UNKNOWN",
 			"port": {
 				"@enabled": "true",
-				"$": "34406"
-			}
+				"$": "50045"
+			},
+			"securePort": {
+				"@enabled": "false",
+				"$": "443"
+			},
+			"countryId": 1,
+			"dataCenterInfo": {
+				"@class": "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",
+				"name": "MyOwn"
+			},
+			"leaseInfo": {
+				"renewalIntervalInSecs": 10,
+				"durationInSecs": 10,
+				"registrationTimestamp": 1460471387114,
+				"lastRenewalTimestamp": 1460471407062,
+				"evictionTimestamp": 0,
+				"serviceUpTimestamp": 1460471386750
+			},
+			"metadata": {
+				"instanceId": "route:838ba7845f1fd63d94c10ca9efdf77a5",
+				"payment": "flat",
+				"providerName": "MissB"
+			},
+			"homePageUrl": "http:\/\/ip-172-31-13-37:50045\/",
+			"statusPageUrl": "http:\/\/ip-172-31-13-37:50045\/info",
+			"healthCheckUrl": "http:\/\/ip-172-31-13-37:50045\/health",
+			"vipAddress": "route",
+			"isCoordinatingDiscoveryServer": false,
+			"lastUpdatedTimestamp": 1460471387114,
+			"lastDirtyTimestamp": 1460471360189,
+			"actionType": "ADDED"
 		}]
 	}
 }
@@ -182,7 +246,7 @@ func configureService(name string, sd *ServiceDiscovery) string {
 		sd.dataPath = "hostName"
 		sd.parentPath = "application.instance"
 		sd.portPath = "port.$"
-		return eureka
+		return eureka_real
 	}
 
 	return ""
@@ -200,7 +264,7 @@ func TestServiceDiscovery_EUREKA(t *testing.T) {
 	var thisList *[]string
 	thisList = data.(*[]string)
 
-	arr := []string{"ip-172-31-57-136:47954", "ip-172-31-13-37:34406"}
+	arr := []string{"ip-172-31-57-136:60565", "ip-172-31-13-37:50045"}
 
 	if len(*thisList) != len(arr) {
 		t.Error("Result lists length do not match expected value")
