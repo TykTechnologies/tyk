@@ -910,13 +910,25 @@ func doReload() {
 
 var reloadScheduled bool
 
+func checkReloadTimeout() {
+	if reloadScheduled {
+		time.Sleep(30 * time.Second)
+		if reloadScheduled {
+			log.Warning("Reloader timed out! Removing sentinel")
+			reloadScheduled = false
+		}
+	}
+}
+
 // ReloadURLStructure will create a new muxer, reload all the app configs for an
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
 func ReloadURLStructure() {
 	if !reloadScheduled {
 		reloadScheduled = true
+		log.Info("Initiating reload")
 		go doReload()
+		go checkReloadTimeout()
 	}
 }
 
