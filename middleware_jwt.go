@@ -275,7 +275,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			tokenID = fmt.Sprintf("%x", md5.Sum(data))
 			SessionID := k.TykMiddleware.Spec.OrgID + tokenID
 
-			log.Debug("Temporary session ID is: ", SessionID)
+			log.Debug("JWT Temporary session ID is: ", SessionID)
 
 			thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 			if !keyExists {
@@ -302,6 +302,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 					log.Debug("Found policy, applying")
 					thisSessionState.ApplyPolicyID = basePolicyID
+					thisSessionState.OrgID = k.TykMiddleware.Spec.APIDefinition.OrgID
 					thisSessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 					thisSessionState.Rate = policy.Rate
 					thisSessionState.Per = policy.Per

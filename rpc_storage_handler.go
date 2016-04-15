@@ -167,7 +167,7 @@ func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteClo
 
 func (r *RPCStorageHandler) Disconnect() bool {
 	if r.Connected {
-		r.RPCClient.Stop()
+		go r.RPCClient.Stop()
 		r.Connected = false
 		delete(RPCClients, r.ID)
 	}
