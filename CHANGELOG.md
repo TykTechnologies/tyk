@@ -1,5 +1,9 @@
 # Develop
 
+- Ficxed bug in contralised JWT secrets where OrgID was not set on internal token
+
+# v2.0
+
 - Limited multi-target support on a per-version basis: simply add "override_target": "http://domain.com" to the version section in your API Definition. Round Robin LB and Servie Discovery are *not* supported. 
 - Centralised JWT keys are now supported, adding `jwt_source` to an API definition will enable a central cert to validate all incoming tokens. 
 - `jwt_source` can either be a base64 encoded valid RSA/HMAC key OR a JWK URL, if it is a JWK URL then the `kid` must match the one in the JWK
@@ -12,10 +16,6 @@
 - HMAC support re-written and updated to the latest spec
 - HMAC: `request-target` now supported
 - HMAC: `headers` signature field is now supported (this means `Digest` can be included)
-
-
-# Develop v2
-
 - Purger has been removed from core completely (replaced by Pump)
 - More tracing and more logging has been put in place, especially around API operations for easy tracing
 - Hot reloads (redis based), will not reset the muxer if no specs are returned (mproves stability if a data source goes down or fails)
