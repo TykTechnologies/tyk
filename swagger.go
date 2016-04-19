@@ -38,6 +38,16 @@ type PathMethodObject struct {
 	Responses   map[string]ResponseCodeObjectAST `json:"responses"`
 }
 
+type PathItemObject struct {
+	Get     PathMethodObject `json:"get"`
+	Put     PathMethodObject `json:"put"`
+	Post    PathMethodObject `json:"post"`
+	Patch   PathMethodObject `json:"patch"`
+	Options PathMethodObject `json:"options"`
+	Delete  PathMethodObject `json:"delete"`
+	Head    PathMethodObject `json:"head"`
+}
+
 type SwaggerAST struct {
 	BasePath    string                         `json:"basePath"`
 	Consumes    []string                       `json:"consumes"`
@@ -58,10 +68,10 @@ type SwaggerAST struct {
 		Title          string `json:"title"`
 		Version        string `json:"version"`
 	} `json:"info"`
-	Paths    map[string]map[string]PathMethodObject `json:"paths"`
-	Produces []string                               `json:"produces"`
-	Schemes  []string                               `json:"schemes"`
-	Swagger  string                                 `json:"swagger"`
+	Paths    map[string]PathItemObject `json:"paths"`
+	Produces []string                  `json:"produces"`
+	Schemes  []string                  `json:"schemes"`
+	Swagger  string                    `json:"swagger"`
 }
 
 func (s *SwaggerAST) ReadString(asJson string) error {
@@ -88,16 +98,30 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, 
 	if len(s.Paths) == 0 {
 		return thisVersionInfo, errors.New("No paths defined in swagger file!")
 	}
-	for pathName, methods := range s.Paths {
+	for pathName, pathSpec := range s.Paths {
+		log.Debug("path: %s", pathName)
 		newEndpointMeta := tykcommon.EndPointMeta{}
 		newEndpointMeta.MethodActions = make(map[string]tykcommon.EndpointMethodMeta)
 		newEndpointMeta.Path = pathName
 
 		// We just want the paths here, no mocks
-		for methodName, _ := range methods {
+		methods := map[string]PathMethodObject{
+			"GET":     pathSpec.Get,
+			"PUT":     pathSpec.Put,
+			"POST":    pathSpec.Post,
+			"HEAD":    pathSpec.Head,
+			"PATCH":   pathSpec.Patch,
+			"OPTIONS": pathSpec.Options,
+			"DELETE":  pathSpec.Delete,
+		}
+		for methodName, m := range methods {
+			// skip methods that are not defined
+			if len(m.Responses) == 0 && m.Description == "" && m.OperationID == "" {
+				continue
+			}
 			thisMethodAction := tykcommon.EndpointMethodMeta{}
 			thisMethodAction.Action = tykcommon.NoAction
-			newEndpointMeta.MethodActions[strings.ToUpper(methodName)] = thisMethodAction
+			newEndpointMeta.MethodActions[methodName] = thisMethodAction
 		}
 
 		thisVersionInfo.ExtendedPaths.WhiteList = append(thisVersionInfo.ExtendedPaths.WhiteList, newEndpointMeta)
