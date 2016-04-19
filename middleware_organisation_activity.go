@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gorilla/context"
 	"net/http"
+	"sync"
 )
 
 import (
@@ -11,7 +12,15 @@ import (
 )
 
 var orgChanMap = make(map[string]chan bool)
-var orgActiveMap = make(map[string]bool)
+
+type orgActiveMapMu struct {
+	sync.RWMutex
+	OrgMap map[string]bool
+}
+
+var orgActiveMap = orgActiveMapMu{
+	OrgMap: make(map[string]bool),
+}
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
@@ -110,9 +119,13 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 		isActive = <-orgChan
 		log.Debug("Chan got:", isActive)
 		if isActive {
-			orgActiveMap[orgId] = true
+			orgActiveMap.Lock()
+			orgActiveMap.OrgMap[orgId] = true
+			orgActiveMap.Unlock()
 		} else {
-			orgActiveMap[orgId] = false
+			orgActiveMap.Lock()
+			orgActiveMap.OrgMap[orgId] = false
+			orgActiveMap.Unlock()
 		}
 	}
 }
@@ -133,7 +146,9 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *
 
 	go k.AllowAccessNext(orgChan, r)
 
-	active, found := orgActiveMap[k.Spec.OrgID]
+	orgActiveMap.RLock()
+	active, found := orgActiveMap.OrgMap[k.Spec.OrgID]
+	orgActiveMap.RUnlock()
 	if found {
 		log.Debug("Is not active")
 		if !active {
