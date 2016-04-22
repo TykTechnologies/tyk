@@ -136,6 +136,9 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
 	thisVM := d.Spec.JSVM.VM.Copy()
+	log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Debug("Running: ", middlewareClassname)
 	returnRaw, _ := thisVM.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
@@ -182,8 +185,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the sesison data (if modified)
 	if !d.Pre {
 		if d.UseSession {
-			thisSessionState.MetaData = newRequestData.SessionMeta
-			d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+			if len(newRequestData.SessionMeta) > 0 {
+				thisSessionState.MetaData = newRequestData.SessionMeta	
+				d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+			}
+			
 		}
 	}
 
