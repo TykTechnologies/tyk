@@ -285,10 +285,32 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 				var basePolicyID string
 				var foundPolicy bool
-				basePolicyID, foundPolicy = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
-				if !foundPolicy {
-					log.Error("Could not identify a policy to apply to this token from field!")
-					return errors.New("Key not authorized: no matching policy"), 403
+				if k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName != "" {
+					basePolicyID, foundPolicy = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
+					if !foundPolicy {
+						log.Error("Could not identify a policy to apply to this token from field!")
+						return errors.New("Key not authorized: no matching policy"), 403
+					}
+				} else if k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField != "" {
+					clientID, clientIDFound := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
+					if !clientIDFound {
+						log.Error("Could not identify a policy to apply to this token from field!")
+						return errors.New("Key not authorized: no matching policy"), 403
+					}
+
+					// Check for a regular token that matches this client ID
+					clientsessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
+					if !keyExists {
+						return errors.New("Key not authorized: Oauth client does not exist"), 403
+					}
+
+					if clientsessionState.ApplyPolicyID == "" {
+						return errors.New("Key not authorized: Oauth clientID does not have a policy"), 403
+					}
+
+					// Use the policy from the client ID
+					basePolicyID = clientsessionState.ApplyPolicyID
+
 				}
 
 				newSessionState, err := generateSessionFromPolicy(basePolicyID,
@@ -403,6 +425,6 @@ func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (
 
 		return thisSessionState, nil
 	}
-	
+
 	return thisSessionState, errors.New("Policy not found")
 }

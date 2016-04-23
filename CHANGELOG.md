@@ -1,6 +1,28 @@
 # Develop
 
-- Ficxed bug in contralised JWT secrets where OrgID was not set on internal token
+- Fixed bug in contralised JWT secrets where OrgID was not set on internal token
+- OAuth Clients are now fully editable (you can set the clientID and secret at creation time)
+- OAuth client now support adding a matched Policy ID, if key_rules are not included when the tokens are authorized, the policy ID will be used as the baseline of the stored token - this is useful in cases where a third-party IDP provide clients and they must be matched to specific policies. THis also means you no longer nee to add key_rules to your oauth authorize callbacks, making the process more streamlined and standards-based.
+- JWT Now suports a matched client: It is now possible to have a JWT contain a client ID (azp claim) and a base identity field (e.g. sub), Tyk will use the policy applied to the client on the base identity of the token, enabling matched clients in JWTs.
+
+For example:
+
+- Developer registers a client app with your IDP
+- You create a custom API token in Tyk that matches the client ID (This custom token *Must* use a policy)
+- This custom token now represents this client application within Tyk - it is not the same as a registered OAuth client, this token only acts as a proxy key
+- Set up your API with the `jwt_client_base_field` (the claim in the JWT that representsthe client ID - typically `azp`) and `jwt_identity_base_field` (the claim that represents the users identity - e.g. `sub`), do *not* use the `jwt_policy_field_name`, as this will alter the flow of the validation
+- Generate a JWT that has these claims filled in, make sure the client ID in the `azp` field is the same as the one you have added to Tyk in step 1
+- Create a request to Tyk
+
+What happens:
+
+- Tyk will validate the JWT
+- Tyk will extract the client ID fro the token, and fetch the token that you created, it will then check the policy
+- Tyl will then fetch the underlying users identity and generate a hash to represent them locally
+- Tyk will generate an internal token based on the identity and the policy from the Client ID going forward
+
+
+
 
 # v2.0
 

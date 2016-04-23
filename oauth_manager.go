@@ -825,7 +825,7 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 		checkPolicy = false
 		marshalErr := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
 		if marshalErr != nil {
-			log.Info("Couldn't decode SessionState from UserData, checking policy: ", marshalErr)
+			log.Info("[GenerateAccessToken] Couldn't decode SessionState from UserData, checking policy: ", marshalErr)
 			checkPolicy = true
 		}
 	}

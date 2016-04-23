@@ -288,6 +288,10 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(oAuthClientHandler))
 }
 
+func generateOAuthPrefix(apiID string) string {
+	return OAUTH_PREFIX + apiID + "."
+}
+
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager {
 	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
@@ -299,7 +303,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 
-	OAuthPrefix := OAUTH_PREFIX + spec.APIID + "."
+	OAuthPrefix := generateOAuthPrefix(spec.APIID)
 	//storageManager := RedisClusterStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager := GetGlobalStorageHandler(OAuthPrefix, false)
 	storageManager.Connect()

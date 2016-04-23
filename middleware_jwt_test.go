@@ -136,6 +136,48 @@ var jwtWithCentralDef string = `
 
 `
 
+var jwtWithCentralDefNoPolicyBaseField string = `
+
+	{
+		"name": "Tyk JWT With JWK API",
+		"api_id": "76",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"enable_jwt": true,
+		"jwt_source": "Ci0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tCk1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBeXFaNHJ3S0Y4cUNFeFM3a3BZNGMKbkphLzM3Rk1rSk5rYWxaM091c2xMQjBvUkw4VDRjOTRrZEY0YWVOelNGa1NlMm45OUlCSTZTc2w3OXZiZk1aYgordDA2TDBROTRrKy9QMzd4NysvUkpaaWZmNHkxVkdqcm5ybk1JMml1OWw0aUJCUll6Tm1HNmVibHJvRU1NV2xnCms1dHlzSGd4QjU5Q1NOSWNEOWdxazFoeDRuL0ZnT212S3NmUWdXSE5sUFNEVFJjV0dXR2hCMi9YZ05WWUcycE8KbFF4QVBxTGhCSGVxR1RYQmJQZkdGOWNIeml4cHNQcjZHdGJ6UHdoc1EvOGJQeG9KN2hkZm4rcnp6dGtzM2Q2KwpIV1VSY3lOVExSZTBtalhqamVlOVo2K2daK0grZlM0cG5QOXRxVDdJZ1U2ZVBVV1Rwam9pUHRMZXhnc0FhL2N0CmpRSURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=",
+		"jwt_signing_method": "RSA",
+		"jwt_identity_base_field": "user_id",
+		"jwt_client_base_field": "azp",
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"Default": {
+					"name": "Default",
+					"use_extended_paths": true,
+					"expires": "3000-01-02 15:04",
+					"paths": {
+						"ignored": [],
+						"white_list": [],
+						"black_list": []
+					}
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/jwt_test",
+			"target_url": "http://example.com/",
+			"strip_listen_path": true
+		}
+	}
+
+`
+
 const JWTSECRET string = "9879879878787878"
 
 // openssl genrsa -out app.rsa
@@ -227,6 +269,22 @@ func createJWTSessionWithRSA() SessionState {
 	thisSession.QuotaRemaining = 1
 	thisSession.QuotaMax = -1
 	thisSession.JWTData.Secret = JWTRSA_PUBKEY
+
+	return thisSession
+}
+
+func createJWTSessionWithRSAWithPolicy() SessionState {
+	var thisSession SessionState
+	thisSession.Rate = 1000000.0
+	thisSession.Allowance = thisSession.Rate
+	thisSession.LastCheck = time.Now().Unix() - 10
+	thisSession.Per = 1.0
+	thisSession.Expires = 0
+	thisSession.QuotaRenewalRate = 300 // 5 minutes
+	thisSession.QuotaRenews = time.Now().Unix() + 20
+	thisSession.QuotaRemaining = 1
+	thisSession.QuotaMax = -1
+	thisSession.ApplyPolicyID = "987654321"
 
 	return thisSession
 }
@@ -438,6 +496,73 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 
 	if recorder.Code != 403 {
 		t.Error("Initial request failed with !=403 code, should have failed!: \n", recorder.Code)
+	}
+}
+
+func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
+	spec := createDefinitionFromString(jwtWithCentralDefNoPolicyBaseField)
+	spec.JWTSigningMethod = "rsa"
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+
+	thisTokenID := "1234567891010101"
+	thisSession := createJWTSessionWithRSAWithPolicy()
+	spec.SessionManager.ResetQuota(thisTokenID, thisSession)
+	spec.SessionManager.UpdateSession(thisTokenID, thisSession, 60)
+
+	Policies["987654321"] = Policy{
+		ID:               "987654321",
+		OrgID:            "default",
+		Rate:             1000.0,
+		Per:              1.0,
+		QuotaMax:         -1,
+		QuotaRenewalRate: -1,
+		AccessRights: map[string]AccessDefinition{"76": AccessDefinition{
+			APIName:  "Test",
+			APIID:    "76",
+			Versions: []string{"default"},
+		}},
+		Active:       true,
+		KeyExpiresIn: 60,
+	}
+
+	// Create the token
+	token := jwt.New(jwt.GetSigningMethod("RS512"))
+	// Set some claims
+	token.Claims["foo"] = "bar"
+	token.Claims["user_id"] = randSeq(10)
+	token.Claims["azp"] = thisTokenID
+	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	// Sign and get the complete encoded token as a string
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	if getSignErr != nil {
+		log.Error("Couldn't extract private key: ")
+		t.Fatal(getSignErr)
+	}
+	tokenString, err := token.SignedString(signKey)
+	if err != nil {
+		log.Error("Couldn't create JWT token: ")
+		t.Fatal(err)
+	}
+	log.Info(tokenString)
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	// add a colon here
+	req.Header.Add("authorization", "Bearer "+tokenString)
+
+	if err != nil {
+		log.Error("Problem generating the test token: ", err)
+	}
+
+	chain := getJWTChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have passed!: ", recorder.Code)
 	}
 }
 
