@@ -308,11 +308,21 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	if test {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Warning("Adding test client")
+		}).Warning("Adding test clients")
+
+		testPolicy := Policy{}
+		testPolicy.Rate = 100
+		testPolicy.Per = 1
+		testPolicy.QuotaMax = -1
+		testPolicy.QuotaRenewalRate = 1000000000
+
+		Policies["TEST-4321"] = testPolicy
+
 		testClient := OAuthClient{
 			ClientID:          "1234",
 			ClientSecret:      "aabbccdd",
 			ClientRedirectURI: "http://client.oauth.com",
+			PolicyID:          "TEST-4321",
 		}
 		osinStorage.SetClient(testClient.ClientID, &testClient, false)
 		log.WithFields(logrus.Fields{

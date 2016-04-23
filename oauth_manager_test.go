@@ -14,12 +14,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 )
 
 const (
 	T_REDIRECT_URI string = "http://client.oauth.com"
 	T_CLIENT_ID    string = "1234"
+	P_CLIENT_ID    string = "4321"
 )
 
 var keyRules = `
@@ -222,6 +224,63 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 		t.Error(recorder.Body)
 		t.Error(req.Body)
 	}
+}
+
+func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
+	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	testMuxer := mux.NewRouter()
+	getOAuthChain(thisSpec, testMuxer)
+
+	uri := "/APIID/tyk/oauth/authorize-client/"
+	method := "POST"
+
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", T_REDIRECT_URI)
+	param.Set("client_id", T_CLIENT_ID)
+
+	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Response code should have been 200 but is: ", recorder.Code)
+		t.Error(recorder.Body)
+		t.Error(req.Body)
+	}
+
+	asData := make(map[string]interface{})
+	decoder := json.NewDecoder(recorder.Body)
+	marshalErr := decoder.Decode(&asData)
+	if marshalErr != nil {
+		t.Error("Decode failed: ", marshalErr)
+	}
+
+	token := asData["access_token"].(string)
+
+	// Verify the token is correct
+	key, fnd := redisStore.GetKey(token)
+	if fnd != nil {
+		t.Error("Key was not created (Can't find it)!")
+		fmt.Println(fnd)
+	}
+
+	if !strings.Contains(key, `"apply_policy_id":"TEST-4321"`) {
+		t.Error("Policy not added to token!")
+		fmt.Println(key)
+	}
+
 }
 
 func GetAuthCode() map[string]string {

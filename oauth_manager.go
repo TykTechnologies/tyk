@@ -126,10 +126,12 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		// On AUTH grab session state data and add to UserData (not validated, not good!)
 		sessionStateJSONData := r.FormValue("key_rules")
 		if sessionStateJSONData == "" {
-			responseMessage := createError("Authorise request is missing key_rules in params")
-			w.WriteHeader(400)
-			fmt.Fprintf(w, string(responseMessage))
-			return
+			log.Warning("Authorise request is missing key_rules in params, policy will be required!")
+			log.Info(sessionStateJSONData)
+			//responseMessage := createError("Authorise request is missing key_rules in params")
+			//w.WriteHeader(400)
+			//fmt.Fprintf(w, string(responseMessage))
+			//return
 		}
 
 		// Handle the authorisation and write the JSON output to the resource provider
@@ -687,13 +689,29 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 
 	// Create a SessionState object and register it with the authmanager
 	var newSession SessionState
-	unmarshalErr := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
 
-	if unmarshalErr != nil {
-		log.Error("Couldn't decode SessionState from UserData")
-		log.Error(unmarshalErr)
-		return unmarshalErr
+	// ------
+	checkPolicy := true
+	if accessData.UserData != nil {
+		checkPolicy = false
+		marshalErr := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
+		if marshalErr != nil {
+			log.Info("Couldn't decode SessionState from UserData, checking policy: ", marshalErr)
+			checkPolicy = true
+		}
 	}
+
+	if checkPolicy {
+		// defined in JWT middleware
+		sessionFromPolicy, notFoundErr := generateSessionFromPolicy(accessData.Client.GetPolicyID(), "", false)
+		if notFoundErr != nil {
+			return errors.New("Couldn't use policy or key rules to create token, failing")
+		}
+
+		newSession = sessionFromPolicy
+	}
+
+	// ------
 
 	// Set the client ID for analytics
 	newSession.OauthClientID = accessData.Client.GetId()
