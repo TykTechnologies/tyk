@@ -1406,6 +1406,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
 type NewClientRequest struct {
+	ClientID          string `json:"client_id"`
 	ClientRedirectURI string `json:"redirect_uri"`
 	APIID             string `json:"api_id"`
 	PolicyID          string `json:"policy_id"`
@@ -1438,9 +1439,13 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		u5, err := uuid.NewV4()
-		cleanSting := strings.Replace(u5.String(), "-", "", -1)
-		u5Secret, err := uuid.NewV4()
+		// Allow the client ID to be set
+		cleanSting := newOauthClient.ClientID
+		if newOauthClient.ClientID == "" {
+			u5, _ := uuid.NewV4()
+			cleanSting = strings.Replace(u5.String(), "-", "", -1)
+		}
+		u5Secret, _ := uuid.NewV4()
 		secret := base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
 
 		newClient := OAuthClient{
