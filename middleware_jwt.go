@@ -287,26 +287,28 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 				var foundPolicy bool
 				basePolicyID, foundPolicy = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
 				if !foundPolicy {
-					log.Error("Could not identify a policy to apply to this token!")
+					log.Error("Could not identify a policy to apply to this token from field!")
 					return errors.New("Key not authorized: no matching policy"), 403
 				}
 
-				newSessionState, err := generateSessionFromPolicy(basePolicyID, k.TykMiddleware.Spec.APIDefinition.OrgID, true)
+				newSessionState, err := generateSessionFromPolicy(basePolicyID,
+					k.TykMiddleware.Spec.APIDefinition.OrgID,
+					true)
 
-				if err != nil {
+				if err == nil {
 					thisSessionState = newSessionState
 					thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
 
 					// Update the session in the session manager in case it gets called again
 					k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
-					log.Debug("Policy applied to key")
+					log.Info("Policy applied to key")
 
 					context.Set(r, SessionData, thisSessionState)
 					context.Set(r, AuthHeaderValue, SessionID)
 					return nil, 200
 				}
 
-				log.Error("Could not identify a policy to apply to this token!")
+				log.Error("Could not find a valid policy to apply to this token!")
 				return errors.New("Key not authorized: no matching policy"), 403
 			}
 
@@ -366,9 +368,13 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 }
 
 func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (SessionState, error) {
+	log.Debug("Generating from policID: ", policyID)
+	log.Debug(Policies)
 	policy, ok := Policies[policyID]
 	thisSessionState := SessionState{}
+	log.Debug(ok)
 	if ok {
+		log.Debug("Policy found")
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise youcould overwrite a session key with a policy from a different org!
 
@@ -397,5 +403,6 @@ func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (
 
 		return thisSessionState, nil
 	}
+	
 	return thisSessionState, errors.New("Policy not found")
 }
