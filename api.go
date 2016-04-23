@@ -1410,6 +1410,7 @@ type NewClientRequest struct {
 	ClientRedirectURI string `json:"redirect_uri"`
 	APIID             string `json:"api_id"`
 	PolicyID          string `json:"policy_id"`
+	ClientSecret      string `json:"client_secret"`
 }
 
 func createOauthClientStorageID(APIID string, clientID string) string {
@@ -1445,8 +1446,13 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			u5, _ := uuid.NewV4()
 			cleanSting = strings.Replace(u5.String(), "-", "", -1)
 		}
-		u5Secret, _ := uuid.NewV4()
-		secret := base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
+
+		// Allow the secret to be set
+		secret := newOauthClient.ClientSecret
+		if newOauthClient.ClientSecret == "" {
+			u5Secret, _ := uuid.NewV4()
+			secret = base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
+		}
 
 		newClient := OAuthClient{
 			ClientID:          cleanSting,
