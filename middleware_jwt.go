@@ -291,27 +291,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 					return errors.New("Key not authorized: no matching policy"), 403
 				}
 
-				policy, ok := Policies[basePolicyID]
-				if ok {
-					// Check ownership, policy org owner must be the same as API,
-					// otherwise youcould overwrite a session key with a policy from a different org!
-					if policy.OrgID != k.TykMiddleware.Spec.APIDefinition.OrgID {
-						log.Error("Attempting to apply policy from different organisation to key, skipping")
-						return errors.New("Key not authorized: no matching policy"), 403
-					}
+				newSessionState, err := generateSessionFromPolicy(basePolicyID, k.TykMiddleware.Spec.APIDefinition.OrgID, true)
 
-					log.Debug("Found policy, applying")
-					thisSessionState.ApplyPolicyID = basePolicyID
-					thisSessionState.OrgID = k.TykMiddleware.Spec.APIDefinition.OrgID
-					thisSessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-					thisSessionState.Rate = policy.Rate
-					thisSessionState.Per = policy.Per
-					thisSessionState.QuotaMax = policy.QuotaMax
-					thisSessionState.QuotaRenewalRate = policy.QuotaRenewalRate
-					thisSessionState.AccessRights = policy.AccessRights
-					thisSessionState.HMACEnabled = policy.HMACEnabled
-					thisSessionState.IsInactive = policy.IsInactive
-					thisSessionState.Tags = policy.Tags
+				if err != nil {
+					thisSessionState = newSessionState
 					thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
 
 					// Update the session in the session manager in case it gets called again
@@ -380,4 +363,39 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		return errors.New("Key not authorized"), 403
 	}
+}
+
+func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (SessionState, error) {
+	policy, ok := Policies[policyID]
+	thisSessionState := SessionState{}
+	if ok {
+		// Check ownership, policy org owner must be the same as API,
+		// otherwise youcould overwrite a session key with a policy from a different org!
+
+		if enforceOrg {
+			if policy.OrgID != OrgID {
+				log.Error("Attempting to apply policy from different organisation to key, skipping")
+				return thisSessionState, errors.New("Key not authorized: no matching policy")
+			}
+		} else {
+			// Org isn;t enforced, so lets use the policy baseline
+			OrgID = policy.OrgID
+		}
+
+		log.Debug("Found policy, applying")
+		thisSessionState.ApplyPolicyID = policyID
+		thisSessionState.OrgID = OrgID
+		thisSessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+		thisSessionState.Rate = policy.Rate
+		thisSessionState.Per = policy.Per
+		thisSessionState.QuotaMax = policy.QuotaMax
+		thisSessionState.QuotaRenewalRate = policy.QuotaRenewalRate
+		thisSessionState.AccessRights = policy.AccessRights
+		thisSessionState.HMACEnabled = policy.HMACEnabled
+		thisSessionState.IsInactive = policy.IsInactive
+		thisSessionState.Tags = policy.Tags
+
+		return thisSessionState, nil
+	}
+	return thisSessionState, errors.New("Policy not found")
 }

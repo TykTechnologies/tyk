@@ -1,15 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	osin "github.com/lonelycode/osin"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"time"
-	"bytes"
 )
 
 /*
@@ -36,9 +37,31 @@ Effort required by Resource Owner:
 
 // OAuthClient is a representation within an APISpec of a client
 type OAuthClient struct {
-	ClientID          string `json:"client_id"`
-	ClientSecret      string `json:"secret"`
-	ClientRedirectURI string `json:"redirect_uri"`
+	ClientID          string      `json:"id"`
+	ClientSecret      string      `json:"secret"`
+	ClientRedirectURI string      `json:"redirecturi"`
+	UserData          interface{} `json:",omitempty"`
+	PolicyID          string      `json:"policyid"`
+}
+
+func (oc *OAuthClient) GetId() string {
+	return oc.ClientID
+}
+
+func (oc *OAuthClient) GetSecret() string {
+	return oc.ClientSecret
+}
+
+func (oc *OAuthClient) GetRedirectUri() string {
+	return oc.ClientRedirectURI
+}
+
+func (oc *OAuthClient) GetUserData() interface{} {
+	return oc.UserData
+}
+
+func (oc *OAuthClient) GetPolicyID() string {
+	return oc.PolicyID
 }
 
 // OAuthNotificationType const to reduce risk of colisions
@@ -488,7 +511,7 @@ func (r RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 		return nil, storeErr
 	}
 
-	thisClient := new(osin.DefaultClient)
+	thisClient := new(OAuthClient)
 	if marshalErr := json.Unmarshal([]byte(clientJSON), &thisClient); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth client object")
 		log.Error(marshalErr)
@@ -511,7 +534,7 @@ func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, er
 		return nil, storeErr
 	}
 
-	thisClient := new(osin.DefaultClient)
+	thisClient := new(OAuthClient)
 	if marshalErr := json.Unmarshal([]byte(clientJSON), &thisClient); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth client object")
 		log.Error(marshalErr)
@@ -542,7 +565,7 @@ func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) 
 	theseClients := []osin.Client{}
 
 	for _, clientJSON := range clientJSON {
-		thisClient := new(osin.DefaultClient)
+		thisClient := new(OAuthClient)
 		if marshalErr := json.Unmarshal([]byte(clientJSON), &thisClient); marshalErr != nil {
 			log.Error("Couldn't unmarshal OAuth client object")
 			log.Error(marshalErr)
@@ -628,7 +651,7 @@ func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeDa
 	}
 
 	thisAuthData := osin.AuthorizeData{}
-	thisAuthData.Client = new(osin.DefaultClient)
+	thisAuthData.Client = new(OAuthClient)
 	if marshalErr := json.Unmarshal([]byte(authJSON), &thisAuthData); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadAuthorize)")
 		log.Error(marshalErr)
@@ -716,7 +739,7 @@ func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, e
 	}
 
 	thisAccessData := osin.AccessData{}
-	thisAccessData.Client = new(osin.DefaultClient)
+	thisAccessData.Client = new(OAuthClient)
 	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisAccessData); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadAccess)")
 		log.Error(marshalErr)
@@ -751,7 +774,7 @@ func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, 
 
 	// new interface means having to make this nested... ick.
 	thisAccessData := osin.AccessData{}
-	thisAccessData.Client = new(osin.DefaultClient)
+	thisAccessData.Client = new(OAuthClient)
 
 	if marshalErr := json.Unmarshal([]byte(accessJSON), &thisAccessData); marshalErr != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", marshalErr)
@@ -779,12 +802,24 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 	log.Info("[OAuth] Generating new token")
 
 	var newSession SessionState
-	marshalErr := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
+	checkPolicy := true
+	if data.UserData != nil {
+		checkPolicy = false
+		marshalErr := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
+		if marshalErr != nil {
+			log.Info("Couldn't decode SessionState from UserData, checking policy: ", marshalErr)
+			checkPolicy = true
+		}
+	}
 
-	if marshalErr != nil {
-		log.Error("Couldn't decode SessionState from UserData")
-		log.Error(marshalErr)
-		return "", "", marshalErr
+	if checkPolicy {
+		// defined in JWT middleware
+		sessionFromPolicy, notFoundErr := generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
+		if notFoundErr != nil {
+			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
+		}
+
+		newSession = sessionFromPolicy
 	}
 
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)

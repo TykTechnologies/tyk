@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	osin "github.com/lonelycode/osin"
 	"github.com/lonelycode/tykcommon"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
@@ -1409,6 +1408,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 type NewClientRequest struct {
 	ClientRedirectURI string `json:"redirect_uri"`
 	APIID             string `json:"api_id"`
+	PolicyID          string `json:"policy_id"`
 }
 
 func createOauthClientStorageID(APIID string, clientID string) string {
@@ -1443,10 +1443,11 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		u5Secret, err := uuid.NewV4()
 		secret := base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
 
-		newClient := osin.DefaultClient{
-			Id:          cleanSting,
-			RedirectUri: newOauthClient.ClientRedirectURI,
-			Secret:      secret,
+		newClient := OAuthClient{
+			ClientID:          cleanSting,
+			ClientRedirectURI: newOauthClient.ClientRedirectURI,
+			ClientSecret:      secret,
+			PolicyID:          newOauthClient.PolicyID,
 		}
 
 		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.GetId())
@@ -1480,6 +1481,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			ClientID:          newClient.GetId(),
 			ClientSecret:      newClient.GetSecret(),
 			ClientRedirectURI: newClient.GetRedirectUri(),
+			PolicyID:          newClient.GetPolicyID(),
 		}
 
 		responseMessage, err = json.Marshal(&reportableClientData)
@@ -1665,6 +1667,7 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 			ClientID:          thisClientData.GetId(),
 			ClientSecret:      thisClientData.GetSecret(),
 			ClientRedirectURI: thisClientData.GetRedirectUri(),
+			PolicyID:          thisClientData.GetPolicyID(),
 		}
 		responseMessage, err = json.Marshal(&reportableClientData)
 		if err != nil {
@@ -1795,6 +1798,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 				ClientID:          osinClient.GetId(),
 				ClientSecret:      osinClient.GetSecret(),
 				ClientRedirectURI: osinClient.GetRedirectUri(),
+				PolicyID:          osinClient.GetPolicyID(),
 			}
 			clients = append(clients, reportableClientData)
 		}

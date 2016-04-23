@@ -309,12 +309,12 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("Adding test client")
-		testClient := osin.DefaultClient{
-			Id:          "1234",
-			Secret:      "aabbccdd",
-			RedirectUri: "http://client.oauth.com",
+		testClient := OAuthClient{
+			ClientID:          "1234",
+			ClientSecret:      "aabbccdd",
+			ClientRedirectURI: "http://client.oauth.com",
 		}
-		osinStorage.SetClient(testClient.Id, &testClient, false)
+		osinStorage.SetClient(testClient.ClientID, &testClient, false)
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("Test client added")
