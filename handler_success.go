@@ -179,11 +179,13 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 		// If OAuth, we need to grab it from the session, which may or may not exist
 		OauthClientID := ""
 		tags := make([]string, 0)
+		var alias string
 		thisSessionState := context.Get(r, SessionData)
 
 		if thisSessionState != nil {
 			OauthClientID = thisSessionState.(SessionState).OauthClientID
 			tags = thisSessionState.(SessionState).Tags
+			alias = thisSessionState.(SessionState).Alias
 		}
 
 		rawRequest := ""
@@ -226,6 +228,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			GetIPFromRequest(r),
 			GeoData{},
 			tags,
+			alias,
 			time.Now(),
 		}
 

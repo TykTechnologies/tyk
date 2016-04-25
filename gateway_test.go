@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +51,7 @@ func createNonThrottledSession() SessionState {
 	thisSession.QuotaRenews = time.Now().Unix()
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = 10
+	thisSession.Alias = "TEST-ALIAS"
 
 	return thisSession
 }

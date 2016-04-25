@@ -54,4 +54,5 @@ type SessionState struct {
 	EnableDetailedRecording bool        `json:"enable_detail_recording"`
 	MetaData                interface{} `json:"meta_data"`
 	Tags                    []string    `json:"tags"`
+	Alias string `json:"alias"`
 }

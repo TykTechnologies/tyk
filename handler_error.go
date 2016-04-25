@@ -52,11 +52,13 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		r.URL.Path = "/" + r.URL.Path
 
 		OauthClientID := ""
+		var alias string
 		tags := make([]string, 0)
 		thisSessionState := context.Get(r, SessionData)
 
 		if thisSessionState != nil {
 			OauthClientID = thisSessionState.(SessionState).OauthClientID
+			alias = thisSessionState.(SessionState).Alias 
 			tags = thisSessionState.(SessionState).Tags
 		}
 
@@ -99,6 +101,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			GetIPFromRequest(r),
 			GeoData{},
 			tags,
+			alias,
 			time.Now(),
 		}
 
