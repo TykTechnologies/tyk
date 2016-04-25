@@ -176,6 +176,133 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	return []byte(thisSessionState.JWTData.Secret), nil
 }
 
+func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
+	if k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName != "" {
+		basePolicyID, foundPolicy := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
+		if !foundPolicy {
+			log.Error("Could not identify a policy to apply to this token from field!")
+			return "", false
+		}
+
+		return basePolicyID, true
+
+	} else if k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField != "" {
+		clientID, clientIDFound := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
+		if !clientIDFound {
+			log.Error("Could not identify a policy to apply to this token from field!")
+			return "", false
+		}
+
+		// Check for a regular token that matches this client ID
+		clientsessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
+		if !keyExists {
+			return "", false
+		}
+
+		if clientsessionState.ApplyPolicyID == "" {
+			return "", false
+		}
+
+		// Use the policy from the client ID
+		return clientsessionState.ApplyPolicyID, true
+	}
+
+	return "", false
+}
+
+func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token)  (error, int) {
+	log.Debug("JWT authority is centralised")
+	// Generate a virtual token
+	var baseFound bool
+	var baseFieldData string
+	var tokenID string
+	baseFieldData, baseFound = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
+	if !baseFound {
+		var found bool
+		log.Warning("Base Field not found, using SUB")
+		baseFieldData, found = token.Claims["sub"].(string)
+		if !found {
+			log.Error("ID Could not be generated. Failing Request.")
+			k.reportLoginFailure("[NOT FOUND]", r)
+			return errors.New("Key not authorized"), 403
+		}
+
+	}
+	log.Debug("Base Field ID set to: ", baseFieldData)
+	data := []byte(baseFieldData)
+	tokenID = fmt.Sprintf("%x", md5.Sum(data))
+	SessionID := k.TykMiddleware.Spec.OrgID + tokenID
+
+	log.Debug("JWT Temporary session ID is: ", SessionID)
+
+	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	if !keyExists {
+		// Create it
+		log.Debug("Key does not exist, creating")
+		thisSessionState = SessionState{}
+
+		basePolicyID, foundPolicy := k.getBasePolicyID(token)
+		if !foundPolicy {
+			return errors.New("Key not authorized: no matching policy found"), 403
+		}
+
+		newSessionState, err := generateSessionFromPolicy(basePolicyID,
+			k.TykMiddleware.Spec.APIDefinition.OrgID,
+			true)
+
+		if err == nil {
+			thisSessionState = newSessionState
+			thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
+
+			// Update the session in the session manager in case it gets called again
+			k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
+			log.Debug("Policy applied to key")
+
+			context.Set(r, SessionData, thisSessionState)
+			context.Set(r, AuthHeaderValue, SessionID)
+			return nil, 200
+		}
+
+		k.reportLoginFailure(baseFieldData, r)
+		log.Error("Could not find a valid policy to apply to this token!")
+		return errors.New("Key not authorized: no matching policy"), 403
+	}
+
+	log.Debug("Key found")
+	context.Set(r, SessionData, thisSessionState)
+	context.Set(r, AuthHeaderValue, SessionID)
+	return nil, 200
+}
+
+func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
+	// Fire Authfailed Event
+	AuthFailed(k.TykMiddleware, r, tykId)
+
+	// Report in health check
+	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+}
+
+func (k *JWTMiddleware) processOneToOneTokenMap(w http.ResponseWriter, r *http.Request, token *jwt.Token) (error, int) {
+	tykId, found := k.getIdentityFomToken(token)
+
+	if !found {
+		k.reportLoginFailure(tykId, r)
+		return errors.New("Key id not found"), 403
+	}
+
+	log.Info("Using raw key ID: ", tykId)
+	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	if !keyExists {
+		k.reportLoginFailure(tykId, r)
+		return errors.New("Key not authorized"), 403
+	}
+
+	log.Debug("Raw key ID found.")
+	context.Set(r, SessionData, thisSessionState)
+	context.Set(r, AuthHeaderValue, tykId)
+	return nil, 200
+}
+
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
 	var tykId string
@@ -210,6 +337,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		log.Debug("Raw data was: ", rawJWT)
 		log.Debug("Headers are: ", r.Header)
 
+		k.reportLoginFailure(tykId, r)
 		return errors.New("Authorization field missing"), 400
 	}
 
@@ -254,137 +382,26 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		// Is this just a validation?
 		if k.TykMiddleware.Spec.APIDefinition.JWTSource != "" {
-			log.Debug("JWT authority is centralised")
-			// Generate a virtual token
-			var baseFound bool
-			var baseFieldData string
-			var tokenID string
-			baseFieldData, baseFound = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
-			if !baseFound {
-				var found bool
-				log.Warning("Base Field not found, using SUB")
-				baseFieldData, found = token.Claims["sub"].(string)
-				if !found {
-					log.Error("ID Could not be generated. Failing Request.")
-					return errors.New("Key not authorized"), 403
-				}
-
-			}
-			log.Debug("Base Field ID set to: ", baseFieldData)
-			data := []byte(baseFieldData)
-			tokenID = fmt.Sprintf("%x", md5.Sum(data))
-			SessionID := k.TykMiddleware.Spec.OrgID + tokenID
-
-			log.Debug("JWT Temporary session ID is: ", SessionID)
-
-			thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
-			if !keyExists {
-				// Create it
-				log.Debug("Key does not exist, creating")
-				thisSessionState = SessionState{}
-
-				var basePolicyID string
-				var foundPolicy bool
-				if k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName != "" {
-					basePolicyID, foundPolicy = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
-					if !foundPolicy {
-						log.Error("Could not identify a policy to apply to this token from field!")
-						return errors.New("Key not authorized: no matching policy"), 403
-					}
-				} else if k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField != "" {
-					clientID, clientIDFound := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
-					if !clientIDFound {
-						log.Error("Could not identify a policy to apply to this token from field!")
-						return errors.New("Key not authorized: no matching policy"), 403
-					}
-
-					// Check for a regular token that matches this client ID
-					clientsessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
-					if !keyExists {
-						return errors.New("Key not authorized: Oauth client does not exist"), 403
-					}
-
-					if clientsessionState.ApplyPolicyID == "" {
-						return errors.New("Key not authorized: Oauth clientID does not have a policy"), 403
-					}
-
-					// Use the policy from the client ID
-					basePolicyID = clientsessionState.ApplyPolicyID
-
-				}
-
-				newSessionState, err := generateSessionFromPolicy(basePolicyID,
-					k.TykMiddleware.Spec.APIDefinition.OrgID,
-					true)
-
-				if err == nil {
-					thisSessionState = newSessionState
-					thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
-
-					// Update the session in the session manager in case it gets called again
-					k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
-					log.Info("Policy applied to key")
-
-					context.Set(r, SessionData, thisSessionState)
-					context.Set(r, AuthHeaderValue, SessionID)
-					return nil, 200
-				}
-
-				log.Error("Could not find a valid policy to apply to this token!")
-				return errors.New("Key not authorized: no matching policy"), 403
-			}
-
-			log.Debug("Key found - setting auth")
-			context.Set(r, SessionData, thisSessionState)
-			context.Set(r, AuthHeaderValue, SessionID)
-			return nil, 200
-
+			return k.processCentralisedJWT(w, r, token)
 		}
 
 		// It isn't, lets go ahead with the existing session
-
-		found := false
-		tykId, found = k.getIdentityFomToken(token)
-
-		if !found {
-			return errors.New("Key id not found"), 403
-		}
-
-		log.Info("Using raw key ID: ", tykId)
-		thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
-		if !keyExists {
-			return errors.New("Key not authorized"), 403
-		}
-
-		log.Debug("Raw key ID found.")
-		context.Set(r, SessionData, thisSessionState)
-		context.Set(r, AuthHeaderValue, tykId)
-		return nil, 200
-
+		return k.processOneToOneTokenMap(w, r, token)
+		
 	} else {
-		var kID string
-		var found bool
-		if token != nil {
-			kID, found = token.Header["kid"].(string)
-		}
-
 		log.WithFields(logrus.Fields{
 			"path":        r.URL.Path,
 			"origin":      GetIPFromRequest(r),
-			"key":         kID,
-			"key_present": found,
 		}).Info("Attempted JWT access with non-existent key.")
 
 		if err != nil {
-			log.Error("Token validation error: ", err)
+			log.WithFields(logrus.Fields{
+				"path":        r.URL.Path,
+				"origin":      GetIPFromRequest(r),
+			}).Error("JWT validation error: ", err)
 		}
 
-		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, tykId)
-
-		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
-
+		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), 403
 	}
 }
