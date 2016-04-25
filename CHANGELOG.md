@@ -18,7 +18,7 @@ What happens:
 
 - Tyk will validate the JWT
 - Tyk will extract the client ID fro the token, and fetch the token that you created, it will then check the policy
-- Tyl will then fetch the underlying users identity and generate a hash to represent them locally
+- Tyk will then fetch the underlying users identity and generate a hash to represent them locally
 - Tyk will generate an internal token based on the identity and the policy from the Client ID going forward
 
 

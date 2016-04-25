@@ -210,6 +210,7 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 	return "", false
 }
 
+// processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition. 
 func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token)  (error, int) {
 	log.Debug("JWT authority is centralised")
 	// Generate a virtual token
@@ -241,6 +242,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 		log.Debug("Key does not exist, creating")
 		thisSessionState = SessionState{}
 
+		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy := k.getBasePolicyID(token)
 		if !foundPolicy {
 			return errors.New("Key not authorized: no matching policy found"), 403
@@ -378,14 +380,14 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 	})
 
 	if err == nil && token.Valid {
-		// all good to go
+		// Token is valid - let's move on
 
-		// Is this just a validation?
+		// Are we mapping to a central JWT Secret?
 		if k.TykMiddleware.Spec.APIDefinition.JWTSource != "" {
 			return k.processCentralisedJWT(w, r, token)
 		}
 
-		// It isn't, lets go ahead with the existing session
+		// No, let's try one-to-one mapping
 		return k.processOneToOneTokenMap(w, r, token)
 		
 	} else {
