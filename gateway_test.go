@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
