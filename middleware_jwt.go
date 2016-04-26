@@ -409,7 +409,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 }
 
 func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (SessionState, error) {
-	log.Debug("Generating from policID: ", policyID)
+	log.Debug("Generating from policyID: ", policyID)
 	log.Debug(Policies)
 	policy, ok := Policies[policyID]
 	thisSessionState := SessionState{}

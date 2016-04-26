@@ -4,6 +4,7 @@ import "net/http"
 
 import (
 	"crypto/md5"
+	b64 "encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
@@ -11,13 +12,15 @@ import (
 	"github.com/gorilla/context"
 )
 
+var OIDPREFIX string = "openid"
+
 type OpenIDMW struct {
 	*TykMiddleware
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 }
 
-func (k OpenIDMW) New() {
+func (k *OpenIDMW) New() {
 	k.provider_client_policymap = make(map[string]map[string]string)
 	// Create an OpenID Configuration and store
 	var configErr error
@@ -25,20 +28,32 @@ func (k OpenIDMW) New() {
 		openid.ErrorHandler(k.dummyErrorHandler))
 
 	if configErr != nil {
-		log.Error("OpenID configuration error: ", configErr)
+		log.WithFields(logrus.Fields{
+			"prefix": OIDPREFIX,
+		}).Error("OpenID configuration error: ", configErr)
 	}
 }
 
 func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 	providers := []openid.Provider{}
+	log.Debug("Setting up providers: ", k.TykMiddleware.Spec.OpenIDOptions.Providers)
 	for _, provider := range k.TykMiddleware.Spec.OpenIDOptions.Providers {
 		iss := provider.Issuer
+		log.Debug("Setting up Issuer: ", iss)
 		providerClientArray := make([]string, len(provider.ClientIDs))
 
 		i := 0
 		for clientID, policyID := range provider.ClientIDs {
-			k.provider_client_policymap[iss][clientID] = policyID
-			providerClientArray[i] = clientID
+			clID, _ := b64.StdEncoding.DecodeString(clientID)
+			thisClientID := string(clID)
+			if k.provider_client_policymap[iss] == nil {
+				k.provider_client_policymap[iss] = map[string]string{thisClientID: policyID}
+			} else {
+				k.provider_client_policymap[iss][thisClientID] = policyID
+			}
+
+			log.Debug("--> Setting up client: ", thisClientID, " with policy: ", policyID)
+			providerClientArray[i] = thisClientID
 			i++
 		}
 
@@ -46,6 +61,7 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 
 		if err != nil {
 			log.WithFields(logrus.Fields{
+				"prefix":   OIDPREFIX,
 				"provider": iss,
 			}).Error("Failed to create provider: ", err)
 		} else {
@@ -86,14 +102,18 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	clients, cfound := token.Claims["aud"]
 
 	if !found && !cfound {
-		log.Error("No issuer or audiences found!")
+		log.WithFields(logrus.Fields{
+			"prefix": OIDPREFIX,
+		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure(SessionID, r)
 		return errors.New("Key not authorised"), 403
 	}
 
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
 	if !foundIssuer {
-		log.Error("No issuer or audiences found!")
+		log.WithFields(logrus.Fields{
+			"prefix": OIDPREFIX,
+		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure(SessionID, r)
 		return errors.New("Key not authorised"), 403
 	}
@@ -101,7 +121,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	policyID := ""
 	switch v := clients.(type) {
 	case string:
-		policyID = v
+		policyID = clientSet[v]
 	case []interface{}:
 		for _, audVal := range v {
 			policy, foundPolicy := clientSet[audVal.(string)]
@@ -113,7 +133,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	}
 
 	if policyID == "" {
-		log.Error("No matching policy found!")
+		log.WithFields(logrus.Fields{
+			"prefix": OIDPREFIX,
+		}).Error("No matching policy found!")
 		k.reportLoginFailure(SessionID, r)
 		return errors.New("Key not authorised"), 403
 	}
@@ -131,7 +153,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 
 		if err != nil {
 			k.reportLoginFailure(SessionID, r)
-			log.Error("Could not find a valid policy to apply to this token!")
+			log.WithFields(logrus.Fields{
+				"prefix": OIDPREFIX,
+			}).Error("Could not find a valid policy to apply to this token!")
 			return errors.New("Key not authorized: no matching policy"), 403
 		}
 
@@ -152,6 +176,11 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 }
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
+	log.WithFields(logrus.Fields{
+		"prefix": OIDPREFIX,
+		"key":    tykId,
+	}).Warning("Attempted access with invalid key.")
+
 	// Fire Authfailed Event
 	AuthFailed(k.TykMiddleware, r, tykId)
 

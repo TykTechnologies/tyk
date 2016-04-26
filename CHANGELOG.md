@@ -23,7 +23,58 @@
 
 - Added support for key aliases, when adding a token, you can now add an alias to the token, this will appear in analytics when viewing on a per-key basis, can be helpful for degugging problem users when using a hashed key set.
 
+- Added OpenID Connect Token validation (OIDC ID Tokens) - this is similar to the JWT support but specific to OpenID Connect standard.
 
+### Enabling OpenID Connect
+
+**Set up your API Definition**
+
+```
+use_openid: true,
+  openid_options: {
+    providers: [
+      {
+        issuer: "accounts.google.com",
+        client_ids: {
+          NDA3NDA4NzE4MTkyLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t: "571f84c430c55e4d45000002"
+        }
+      }
+    ]
+  },
+```
+
+**Options**
+
+`openid_options.providers`
+
+An array of supported providers
+
+`openid_options.providers.issuer`
+
+The name of the issuing entity, e.g. google acocunts
+
+`openid_options.providers.client_ids`
+
+A map of `base64(clientID):PolicyID`
+
+This map will assign a policy already stored in Tyk to a client ID, this will cause Tyk to apply this policy to the underlying ientity of the uer (i.e. generate an internal token that represents the User that holds the token).
+
+Why Base64? We require base64 encoded client IDs to ensure cross-compatability with document stores
+
+What happens:
+
+- Tyk will validate the JWT according to the OpenID Spec:
+
+	1. Is the token a valid jwt?
+	2. Is the token issued by a known OP?
+	3. Is the token issued for a known client?
+	4. Is the token valid at the time ('not use before' and 'expire at' claims)?
+	5. Is the token signed accordingly?
+
+- Tyk will then check the API definition for a supported Client/Policy under the issuing IDP
+- This policy will then be used as a template for a new internal token that represents this user (so we can apply the policy across logins)
+- The internal token is generated off of the OpenID connect User ID claim
+- The request is then passed through to the rest of the Tyk validation chain
 
 # v2.0
 
