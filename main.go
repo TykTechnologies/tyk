@@ -776,6 +776,14 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						"prefix": "main",
 					}).Info("----> Checking security policy: JWT")
 					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
+				} else if referenceSpec.UseOpenID {
+					// JWT Auth
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("----> Checking security policy: OpenID")
+
+					// initialise the OID configuration on this reference Spec
+					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware:tykMiddleware}, tykMiddleware)
 				} else {
 					// Auth key
 					log.WithFields(logrus.Fields{
