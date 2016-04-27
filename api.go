@@ -1410,7 +1410,7 @@ type NewClientRequest struct {
 	ClientRedirectURI string `json:"redirect_uri"`
 	APIID             string `json:"api_id"`
 	PolicyID          string `json:"policy_id"`
-	ClientSecret      string `json:"client_secret"`
+	ClientSecret      string `json:"secret"`
 }
 
 func createOauthClientStorageID(APIID string, clientID string) string {
@@ -1442,6 +1442,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 
 		// Allow the client ID to be set
 		cleanSting := newOauthClient.ClientID
+
 		if newOauthClient.ClientID == "" {
 			u5, _ := uuid.NewV4()
 			cleanSting = strings.Replace(u5.String(), "-", "", -1)
@@ -1488,7 +1489,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			responseMessage = createError("Failure in storing client data.")
 		}
 
-		reportableClientData := OAuthClient{
+		reportableClientData := NewClientRequest{
 			ClientID:          newClient.GetId(),
 			ClientSecret:      newClient.GetSecret(),
 			ClientRedirectURI: newClient.GetRedirectUri(),
@@ -1674,7 +1675,7 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 	if getClientErr != nil {
 		success = false
 	} else {
-		reportableClientData := OAuthClient{
+		reportableClientData := NewClientRequest{
 			ClientID:          thisClientData.GetId(),
 			ClientSecret:      thisClientData.GetSecret(),
 			ClientRedirectURI: thisClientData.GetRedirectUri(),
@@ -1803,14 +1804,15 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 		success = false
 	} else {
-		clients := []OAuthClient{}
+		clients := []NewClientRequest{}
 		for _, osinClient := range thisClientData {
-			reportableClientData := OAuthClient{
+			reportableClientData := NewClientRequest{
 				ClientID:          osinClient.GetId(),
 				ClientSecret:      osinClient.GetSecret(),
 				ClientRedirectURI: osinClient.GetRedirectUri(),
 				PolicyID:          osinClient.GetPolicyID(),
 			}
+
 			clients = append(clients, reportableClientData)
 		}
 
