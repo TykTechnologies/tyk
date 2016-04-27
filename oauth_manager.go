@@ -127,7 +127,6 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		sessionStateJSONData := r.FormValue("key_rules")
 		if sessionStateJSONData == "" {
 			log.Warning("Authorise request is missing key_rules in params, policy will be required!")
-			log.Info(sessionStateJSONData)
 			//responseMessage := createError("Authorise request is missing key_rules in params")
 			//w.WriteHeader(400)
 			//fmt.Fprintf(w, string(responseMessage))
