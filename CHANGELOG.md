@@ -25,6 +25,8 @@
 
 - Added OpenID Connect Token validation (OIDC ID Tokens) - this is similar to the JWT support but specific to OpenID Connect standard.
 
+- OpenID Connect tokens can be rate-limited per client (so the same user comming via different clients can have different rate limits): in the open ID options, set `"segregate_by_client": true`
+
 ### Enabling OpenID Connect
 
 **Set up your API Definition**

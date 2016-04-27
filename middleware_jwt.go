@@ -255,6 +255,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 		if err == nil {
 			thisSessionState = newSessionState
 			thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
+			thisSessionState.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again
 			k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)

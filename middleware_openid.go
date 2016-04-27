@@ -94,10 +94,6 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	}
 
 	// 3. Create or set the session to match
-	data := []byte(user.ID)
-	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	SessionID := k.TykMiddleware.Spec.OrgID + tokenID
-
 	iss, found := token.Claims["iss"]
 	clients, cfound := token.Claims["aud"]
 
@@ -105,7 +101,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
-		k.reportLoginFailure(SessionID, r)
+		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), 403
 	}
 
@@ -114,18 +110,21 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
-		k.reportLoginFailure(SessionID, r)
+		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), 403
 	}
 
 	policyID := ""
+	thisClientID := ""
 	switch v := clients.(type) {
 	case string:
 		policyID = clientSet[v]
+		thisClientID = v
 	case []interface{}:
 		for _, audVal := range v {
 			policy, foundPolicy := clientSet[audVal.(string)]
 			if foundPolicy {
+				thisClientID = audVal.(string)
 				policyID = policy
 				break
 			}
@@ -136,9 +135,20 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,
 		}).Error("No matching policy found!")
-		k.reportLoginFailure(SessionID, r)
+		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), 403
 	}
+
+	data := []byte(user.ID)
+	tokenID := fmt.Sprintf("%x", md5.Sum(data))
+	SessionID := k.TykMiddleware.Spec.OrgID + tokenID
+	if k.Spec.OpenIDOptions.SegregateByClient {
+		// We are segregating by client, so use it as part of the internal token
+		log.Debug("Client ID:", thisClientID)
+		SessionID = k.TykMiddleware.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(thisClientID))) + tokenID
+	}
+
+	log.Debug("Generated Session ID: ", SessionID)
 
 	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 	if !keyExists {
@@ -160,7 +170,8 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		}
 
 		thisSessionState = newSessionState
-		thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
+		thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID, "ClientID": thisClientID}
+		thisSessionState.Alias = thisClientID + ":" + user.ID
 
 		// Update the session in the session manager in case it gets called again
 		k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
