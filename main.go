@@ -1173,6 +1173,13 @@ func main() {
 			l, err = net.Listen("tcp", targetPort)
 		}
 
+		// Check if listener was started successfully.
+		if nil != err {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalf("Error starting listener: %s", err)
+		}
+
 		// Accept connections in a new goroutine.
 		if config.UseDBAppConfigs {
 			connStr := config.DBAppConfOptions.ConnectionString
