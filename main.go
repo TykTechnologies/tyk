@@ -229,7 +229,7 @@ func getPolicies() {
 			connStr := config.Policies.PolicyConnectionString
 			connStr = connStr + "/system/policies"
 
-			thesePolicies = LoadPoliciesFromDashboard(connStr, config.NodeSecret)
+			thesePolicies = LoadPoliciesFromDashboard(connStr, config.NodeSecret, config.Policies.AllowExplicitPolicyID)
 
 		} else {
 			log.WithFields(logrus.Fields{
@@ -783,7 +783,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					}).Info("----> Checking security policy: OpenID")
 
 					// initialise the OID configuration on this reference Spec
-					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware:tykMiddleware}, tykMiddleware)
+					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware)
 				} else {
 					// Auth key
 					log.WithFields(logrus.Fields{

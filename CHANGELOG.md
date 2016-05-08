@@ -78,6 +78,9 @@ What happens:
 - The internal token is generated off of the OpenID connect User ID claim
 - The request is then passed through to the rest of the Tyk validation chain
 
+- Tyk Dashboard will now respect internal policy IDs (id instead of _id) for a policy object allowing for fixed-policy IDs across installations.
+    - To enable, add `allow_explicit_policy_id: true` to your configuration file under the `policies` section
+
 # v2.0
 
 - Limited multi-target support on a per-version basis: simply add "override_target": "http://domain.com" to the version section in your API Definition. Round Robin LB and Servie Discovery are *not* supported. 

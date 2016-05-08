@@ -21,6 +21,7 @@ type Config struct {
 		PolicySource           string `json:"policy_source"`
 		PolicyConnectionString string `json:"policy_connection_string"`
 		PolicyRecordName       string `json:"policy_record_name"`
+		AllowExplicitPolicyID  bool   `json:"allow_explicit_policy_id"`
 	} `json:"policies"`
 	UseDBAppConfigs  bool `json:"use_db_app_configs"`
 	DBAppConfOptions struct {

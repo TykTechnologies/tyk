@@ -46,7 +46,7 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint string, secret string) map[string]Policy {
+func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit bool) map[string]Policy {
 
 	policies := make(map[string]Policy)
 
@@ -101,11 +101,26 @@ func LoadPoliciesFromDashboard(endpoint string, secret string) map[string]Policy
 	ServiceNonceMutex.Unlock()
 
 	for _, p := range thisList.Message {
-		p.ID = p.MID.Hex()
-		policies[p.MID.Hex()] = p
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Info("--> Processing policy ID: ", p.ID)
+		thisID := p.MID.Hex()
+		if allowExplicit {
+			if p.ID != "" {
+				thisID = p.ID
+			}
+		}
+		p.ID = thisID
+		_, foundP := policies[thisID] 
+		if !foundP {
+			policies[thisID] = p
+			log.WithFields(logrus.Fields{
+				"prefix": "policy",
+			}).Info("--> Processing policy ID: ", p.ID)
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "policy",
+				"policyID": p.ID,
+				"OrgID": p.OrgID,
+			}).Warning("--> Skipping policy, new item has a duplicate ID!")
+		}
 	}
 
 	return policies
