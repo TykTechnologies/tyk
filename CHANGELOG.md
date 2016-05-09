@@ -80,6 +80,7 @@ What happens:
 
 - Tyk Dashboard will now respect internal policy IDs (id instead of _id) for a policy object allowing for fixed-policy IDs across installations.
     - To enable, add `allow_explicit_policy_id: true` to your configuration file under the `policies` section
+    - To enable compatibility in the dashboard, add `allow_explicit_policy_id: true` to the root of your dashboard conf
 
 # v2.0
 
@@ -159,7 +160,7 @@ What happens:
 
 - Nw Multi-DC / segregated environment / single dashboard support added for API and Keyspace propagation
 - Added new rate limit handler that is non-transactional, this can be enabled by setting `enable_non_transactional_rate_limiter` to true, this can provide exceptional performance improvements
-- Added option to enable or disable the sentinel-based rate-limiter, sentinel-based rate limiter provides a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cooldown for clients. Disabling the sentinel based limiter will make rate-limit calculations happen on-thread and therefore offers staggered cool-down and a smoother rate-limit experience for the client and similar performance as the sentinel-based limiter. TThis is disabled by default. To enable, set `enable_sentinel_rate_limiter` to `true`
+- Added option to enable or disable the sentinel-based rate-limiter, sentinel-based rate limiter provides a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cooldown for clients. Disabling the sentinel based limiter will make rate-limit calculations happen on-thread and therefore offers staggered cool-down and a smoother rate-limit experience for the client and similar performance as the sentinel-based limiter. This is disabled by default. To enable, set `enable_sentinel_rate_limiter` to `true` 
 
 # 1.9.1.1
 
