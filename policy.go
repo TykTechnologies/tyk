@@ -24,6 +24,38 @@ type Policy struct {
 	KeyExpiresIn     int64                       `bson:"key_expires_in" json:"key_expires_in"`
 }
 
+type DBAccessDefinition struct {
+	APIName     string       `json:"apiname"`
+	APIID       string       `json:"apiid"`
+	Versions    []string     `json:"versions"`
+	AllowedURLs []AccessSpec `bson:"allowed_urls"  json:"allowed_urls"` // mapped string MUST be a valid regex
+}
+
+func (d *DBAccessDefinition) ToRegularAD() AccessDefinition {
+	thisAD := AccessDefinition{
+		APIName:     d.APIName,
+		APIID:       d.APIID,
+		Versions:    d.Versions,
+		AllowedURLs: d.AllowedURLs,
+	}
+
+	return thisAD
+}
+
+type DBPolicy struct {
+	Policy
+	AccessRights map[string]DBAccessDefinition `bson:"access_rights" json:"access_rights"`
+}
+
+func (d *DBPolicy) ToRegularPolicy() Policy {
+	thisPolicy := Policy(d.Policy)
+	for k, v := range d.AccessRights {
+		thisPolicy.AccessRights = make(map[string]AccessDefinition)
+		thisPolicy.AccessRights[k] = v.ToRegularAD()
+	}
+	return thisPolicy
+}
+
 func LoadPoliciesFromFile(filePath string) map[string]Policy {
 	policies := make(map[string]Policy)
 
@@ -83,7 +115,7 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	// Extract Policies
 	type NodeResponseOK struct {
 		Status  string
-		Message []Policy
+		Message []DBPolicy
 		Nonce   string
 	}
 
@@ -108,17 +140,18 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 			}
 		}
 		p.ID = thisID
-		_, foundP := policies[thisID] 
+		_, foundP := policies[thisID]
 		if !foundP {
-			policies[thisID] = p
+			policies[thisID] = p.ToRegularPolicy()
 			log.WithFields(logrus.Fields{
 				"prefix": "policy",
 			}).Info("--> Processing policy ID: ", p.ID)
+			log.Debug("POLICY ACCESS RIGHTS: ", p.AccessRights)
 		} else {
 			log.WithFields(logrus.Fields{
-				"prefix": "policy",
+				"prefix":   "policy",
 				"policyID": p.ID,
-				"OrgID": p.OrgID,
+				"OrgID":    p.OrgID,
 			}).Warning("--> Skipping policy, new item has a duplicate ID!")
 		}
 	}

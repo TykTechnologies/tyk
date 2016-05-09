@@ -93,6 +93,9 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 			thisSession.IsInactive = policy.IsInactive
 			thisSession.Tags = policy.Tags
 
+			log.Debug("Policy Applied, Access rights are: ", thisSession.AccessRights)
+			log.Debug("Policy Applied, Access rights were: ", policy.AccessRights)
+
 			// Update the session in the session manager in case it gets called again
 			t.Spec.SessionManager.UpdateSession(key, *thisSession, t.Spec.APIDefinition.SessionLifetime)
 			log.Debug("Policy applied to key")
