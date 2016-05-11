@@ -51,7 +51,9 @@ mkdir -p $armTGZDIR
 
 
 echo "Building binaries"
-gox -os="linux"
+gox -osarch="linux/amd64" 
+gox -osarch="linux/i386"
+gox -osarch="linux/arm"
 
 echo "Preping TGZ Dirs"
 mkdir $i386TGZDIR/apps
