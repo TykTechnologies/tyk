@@ -52,7 +52,7 @@ mkdir -p $armTGZDIR
 
 echo "Building binaries"
 gox -osarch="linux/amd64" 
-gox -osarch="linux/i386"
+gox -osarch="linux/386"
 gox -osarch="linux/arm"
 
 echo "Preping TGZ Dirs"
