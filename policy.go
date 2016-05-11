@@ -49,10 +49,12 @@ type DBPolicy struct {
 
 func (d *DBPolicy) ToRegularPolicy() Policy {
 	thisPolicy := Policy(d.Policy)
+	thisPolicy.AccessRights = make(map[string]AccessDefinition)
+
 	for k, v := range d.AccessRights {
-		thisPolicy.AccessRights = make(map[string]AccessDefinition)
 		thisPolicy.AccessRights[k] = v.ToRegularAD()
 	}
+
 	return thisPolicy
 }
 
