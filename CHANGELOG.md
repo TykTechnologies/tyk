@@ -82,7 +82,7 @@ What happens:
     - To enable, add `allow_explicit_policy_id: true` to your configuration file under the `policies` section
     - To enable compatibility in the dashboard, add `allow_explicit_policy_id: true` to the root of your dashboard conf
 - Fixed policy bug where a policy would not corectly overwrite a token's access rights with the correct metadata, causing it to not be editable later.
-
+- Black / White / Ignore / Transform and Injec lists are now matched on a lowercase version of the inbound path, so match patterns must be lowercase otherwise they will be ignored.
 
 # v2.0
 
