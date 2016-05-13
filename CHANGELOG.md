@@ -83,6 +83,20 @@ What happens:
     - To enable compatibility in the dashboard, add `allow_explicit_policy_id: true` to the root of your dashboard conf
 - Fixed policy bug where a policy would not corectly overwrite a token's access rights with the correct metadata, causing it to not be editable later.
 - Black / White / Ignore / Transform and Injec lists are now matched on a lowercase version of the inbound path, so match patterns must be lowercase otherwise they will be ignored.
+- New Response middleware to force target_url replacements in return headers such as "Link", and "Location" which tend to be set upstream by the service with incorrect values (real values)
+
+    "response_processors": [
+        {
+            "name": "header_transform",
+            "options": {
+                "rev_proxy_header_cleanup": {
+                    "headers": ["Link", "Location"],
+                    "target_host": "http://TykHost:TykPort"
+                }
+            }
+        }
+    ]
+
 
 # v2.0
 
