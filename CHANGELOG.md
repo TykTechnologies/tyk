@@ -1,4 +1,4 @@
-# Develop
+# v2.1
 
 - Fixed bug in contralised JWT secrets where OrgID was not set on internal token
 - OAuth Clients are now fully editable (you can set the clientID and secret at creation time)
