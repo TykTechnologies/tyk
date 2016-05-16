@@ -74,6 +74,9 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 
 // We don't want any of the error handling, we use our own
 func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Request) bool {
+	log.WithFields(logrus.Fields{
+		"prefix": OIDPREFIX,
+	}).Warning("JWT Invalid: ", e)
 	return true
 }
 
