@@ -52,6 +52,10 @@ func CopyHttpRequest(r *http.Request) *http.Request {
 func CopyHttpResponse(r *http.Response) *http.Response {
 
 	resCopy := new(http.Response)
+	if r == nil {
+		return resCopy
+	}
+	
 	*resCopy = *r
 
 	if r.Body != nil {

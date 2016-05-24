@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 	"io"
@@ -406,6 +407,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	}
 
+	var thisIP string
 	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
 		// If we aren't the first proxy retain prior
 		// X-Forwarded-For information as a comma+space
@@ -414,6 +416,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
 		}
 		outreq.Header.Set("X-Forwarded-For", clientIP)
+		thisIP = clientIP
 	}
 
 	// Circuit breaker
@@ -445,7 +448,28 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	if err != nil {
-		log.Error("http: proxy error: ", err)
+
+		authHeaderValue := context.Get(req, AuthHeaderValue).(string)
+		var obfuscated string
+		if len(authHeaderValue) > 4 {
+			obfuscated = "****" + authHeaderValue[len(authHeaderValue)-4:]
+		}
+
+		var alias string
+		if sessVal != nil {
+			alias = sessVal.(SessionState).Alias
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix":      "proxy",
+			"user_ip":     thisIP,
+			"server_name": outreq.Host,
+			"user_id":     obfuscated,
+			"user_name":   alias,
+			"org_id":      p.TykAPISpec.APIDefinition.OrgID,
+			"api_id":      p.TykAPISpec.APIDefinition.APIID,
+		}).Error("http: proxy error: ", err)
+
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", 408)
 

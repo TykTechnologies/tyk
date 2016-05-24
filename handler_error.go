@@ -4,7 +4,9 @@ import (
 	"bytes"
 	b64 "encoding/base64"
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"net"
 	"net/http"
 	"runtime/pprof"
 	"strings"
@@ -28,13 +30,15 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		return
 	}
 
+	keyName := ""
+	// Track the key ID if it exists
+	authHeaderValue := context.Get(r, AuthHeaderValue)
+	var alias string
+
 	if config.StoreAnalytics(r) {
 
 		t := time.Now()
 
-		// Track the key ID if it exists
-		authHeaderValue := context.Get(r, AuthHeaderValue)
-		keyName := ""
 		if authHeaderValue != nil {
 			keyName = authHeaderValue.(string)
 		}
@@ -50,15 +54,17 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 
 		// This is an odd bugfix, will need further testing
 		r.URL.Path = "/" + r.URL.Path
+		if strings.HasPrefix(r.URL.Path, "//") {
+			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/")
+		}
 
 		OauthClientID := ""
-		var alias string
 		tags := make([]string, 0)
 		thisSessionState := context.Get(r, SessionData)
 
 		if thisSessionState != nil {
 			OauthClientID = thisSessionState.(SessionState).OauthClientID
-			alias = thisSessionState.(SessionState).Alias 
+			alias = thisSessionState.(SessionState).Alias
 			tags = thisSessionState.(SessionState).Tags
 		}
 
@@ -136,6 +142,32 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 	if config.CloseConnections {
 		w.Header().Add("Connection", "close")
 	}
+
+	var obfuscated string
+	log.Info(keyName)
+	if len(keyName) > 4 {
+		obfuscated = "****" + keyName[len(keyName)-4:]
+	}
+
+	var thisIP string
+	if clientIP, _, derr := net.SplitHostPort(r.RemoteAddr); derr == nil {
+		// If we aren't the first proxy retain prior
+		// X-Forwarded-For information as a comma+space
+		// separated list and fold multiple headers into one.
+		if prior, ok := r.Header["X-Forwarded-For"]; ok {
+			clientIP = strings.Join(prior, ", ") + ", " + clientIP
+		}
+		thisIP = clientIP
+	}
+	log.WithFields(logrus.Fields{
+		"prefix":      "gateway",
+		"user_ip":     thisIP,
+		"server_name": e.Spec.APIDefinition.Proxy.TargetURL,
+		"user_id":     obfuscated,
+		"org_id":      e.Spec.APIDefinition.OrgID,
+		"api_id":      e.Spec.APIDefinition.APIID,
+		"path":        r.URL.Path,
+	}).Error("request error: ", err)
 
 	log.Debug("Returning error header")
 	w.WriteHeader(errCode)
