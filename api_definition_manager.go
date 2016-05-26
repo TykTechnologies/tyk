@@ -543,7 +543,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 		thisAppConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
 
 		if config.SlaveOptions.BindToSlugsInsteadOfListenPaths {
-			newListenPath := "/" + thisAppConfig.Slug + "/"
+			newListenPath := "/" + thisAppConfig.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
 				" instead of ",
