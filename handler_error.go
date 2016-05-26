@@ -144,7 +144,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 	}
 
 	var obfuscated string
-	log.Info(keyName)
+	
 	if len(keyName) > 4 {
 		obfuscated = "****" + keyName[len(keyName)-4:]
 	}
