@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/lonelycode/tykcommon"
+	"github.com/Sirupsen/logrus"
 	"github.com/mitchellh/mapstructure"
-	//"io"
 	"io/ioutil"
+	"github.com/clbanning/mxj"
 	"net/http"
-	//"time"
 	"strconv"
 )
 
@@ -79,7 +79,17 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		var bodyData interface{}
 		switch thisMeta.TemplateMeta.TemplateData.Input {
 		case tykcommon.RequestXML:
-			log.Warning("XML Input is not supprted")
+			mxj.XmlCharsetReader = WrappedCharsetReader
+			var xErr error
+			bodyData, xErr = mxj.NewMapXml(body) // unmarshal
+			if xErr != nil {
+				log.WithFields(logrus.Fields{
+					"prefix":      "outbound-transform",
+					"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
+					"api_id":      rt.Spec.APIDefinition.APIID,
+					"path":        req.URL.Path,
+				}).Error("Error unmarshalling XML: ", err)
+			}
 		case tykcommon.RequestJSON:
 			json.Unmarshal(body, &bodyData)
 		default:
@@ -88,11 +98,15 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 		// Apply to template
 		var bodyBuffer bytes.Buffer
-		log.Warning("RUNNING TRANSFORM")
 		err = thisMeta.Template.Execute(&bodyBuffer, bodyData)
 
 		if err != nil {
-			log.Error("Failed to apply template to request: ", err)
+			log.WithFields(logrus.Fields{
+					"prefix":      "outbound-transform",
+					"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
+					"api_id":      rt.Spec.APIDefinition.APIID,
+					"path":        req.URL.Path,
+				}).Error("Failed to apply template to request: ", err)
 		}
 
 		res.ContentLength = int64(bodyBuffer.Len())

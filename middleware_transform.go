@@ -3,11 +3,19 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/Sirupsen/logrus"
+	"github.com/clbanning/mxj"
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
+	"golang.org/x/net/html/charset"
+	"io"
 	"io/ioutil"
 	"net/http"
 )
+
+func WrappedCharsetReader(s string, i io.Reader) (io.Reader, error) {
+	return charset.NewReader(i, s)
+}
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformMiddleware struct {
@@ -49,7 +57,17 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		var bodyData interface{}
 		switch thisMeta.TemplateMeta.TemplateData.Input {
 		case tykcommon.RequestXML:
-			log.Warning("XML Input is not supprted")
+			mxj.XmlCharsetReader = WrappedCharsetReader
+			var xErr error
+			bodyData, xErr = mxj.NewMapXml(body) // unmarshal
+			if xErr != nil {
+				log.WithFields(logrus.Fields{
+					"prefix":      "inbound-transform",
+					"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
+					"api_id":      t.Spec.APIDefinition.APIID,
+					"path":        r.URL.Path,
+				}).Error("Error unmarshalling XML: ", err)
+			}
 		case tykcommon.RequestJSON:
 			json.Unmarshal(body, &bodyData)
 		default:
@@ -68,10 +86,16 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		var bodyBuffer bytes.Buffer
 		err = thisMeta.Template.Execute(&bodyBuffer, bodyData)
 		if err != nil {
-			log.Error("Failed to apply template to request: ", err)
+			log.WithFields(logrus.Fields{
+				"prefix":      "inbound-transform",
+				"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
+				"api_id":      t.Spec.APIDefinition.APIID,
+				"path":        r.URL.Path,
+			}).Error("Failed to apply template to request: ", err)
 		}
 		r.Body = ioutil.NopCloser(&bodyBuffer)
 		r.ContentLength = int64(bodyBuffer.Len())
+
 	}
 
 	return nil, 200

@@ -1,3 +1,45 @@
+# Develop
+
+- Added XML transform support for requests and responses, simply set the data type to `xml` int he transforms section and create your template the same way you would for JSON. 
+
+### XML transform demo
+
+For this XML:
+
+```
+<?xml version="1.0" encoding="utf-8"?>
+<servers version="1">
+    <server>
+        <serverName>Shanghai_VPN</serverName>
+        <serverIP>127.0.0.1</serverIP>
+    </server>
+    <server>
+        <serverName>Beijing_VPN</serverName>
+        <serverIP>127.0.0.2</serverIP>
+    </server>
+</servers>
+```
+
+And this Template:
+
+```
+{
+{{range $x, $s := .servers.server}}    "{{$s.serverName}}": "{{$s.serverIP}}"{{if not $x}},{{end}}
+{{end}}
+}
+```
+
+You get this output:
+
+
+```
+{
+    "Shanghai_VPN": "127.0.0.1",
+    "Beijing_VPN": "127.0.0.2"
+
+}
+```
+
 # v2.1
 
 - Fixed bug in contralised JWT secrets where OrgID was not set on internal token
