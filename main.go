@@ -726,6 +726,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
 
 				for _, obj := range mwPreFuncs {
@@ -809,6 +810,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
+					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
 

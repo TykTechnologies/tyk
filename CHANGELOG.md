@@ -40,6 +40,18 @@ You get this output:
 }
 ```
 
+- Added request method transform: This is very simple at the moment, and only chagnes the type of method, it does not data massaging, to enaqble, add to your extended paths:
+
+    method_transforms: [
+            {
+              path: "post",
+              method: "GET",
+              to_method: "POST"
+            }
+    ],
+
+
+
 # v2.1
 
 - Fixed bug in contralised JWT secrets where OrgID was not set on internal token

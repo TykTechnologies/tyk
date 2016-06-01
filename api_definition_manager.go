@@ -47,6 +47,7 @@ const (
 	URLRewrite             URLStatus = 11
 	VirtualPath            URLStatus = 12
 	RequestSizeLimit       URLStatus = 13
+	MethodTransformed      URLStatus = 14
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -67,6 +68,7 @@ const (
 	StatusTransform                RequestStatus = "Transformed path"
 	StatusTransformResponse        RequestStatus = "Transformed response"
 	StatusHeaderInjected           RequestStatus = "Header injected"
+	StatusMethodTransformed        RequestStatus = "Method Transformed"
 	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
 	StatusActionRedirect           RequestStatus = "Found an Action, changing route"
 	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
@@ -93,6 +95,7 @@ type URLSpec struct {
 	URLRewrite              tykcommon.URLRewriteMeta
 	VirtualPathSpec         tykcommon.VirtualMeta
 	RequestSize             tykcommon.RequestSizeMeta
+	MethodTransform         tykcommon.MethodTransformMeta
 }
 
 type TransformSpec struct {
@@ -764,6 +767,23 @@ func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []tykcommon.Header
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileMethodTransformSpec(paths []tykcommon.MethodTransformMeta, stat URLStatus) []URLSpec {
+
+	// transform an extended configuration URL into an array of URLSpecs
+	// This way we can iterate the whole array once, on match we break with status
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		newSpec.MethodTransform = stringSpec
+
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []tykcommon.HardTimeoutMeta, stat URLStatus) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
@@ -930,6 +950,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite)
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
+	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -945,6 +966,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, urlRewrites...)
 	combinedPath = append(combinedPath, requestSizes...)
 	combinedPath = append(combinedPath, virtualPaths...)
+	combinedPath = append(combinedPath, methodTransforms...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -988,6 +1010,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusVirtualPath
 	case RequestSizeLimit:
 		return StatusRequestSizeControlled
+	case MethodTransformed:
+		return StatusMethodTransformed
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1108,6 +1132,10 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 					if method != nil && method.(string) == v.RequestSize.Method {
 						return true, &v.RequestSize
 					}
+				case MethodTransformed:
+					if method != nil && method.(string) == v.MethodTransform.Method {
+						return true, &v.MethodTransform
+					}
 				}
 
 			}
@@ -1225,6 +1253,8 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 		return true, StatusTransform, meta
 	case StatusHeaderInjected:
 		return true, StatusHeaderInjected, meta
+	case StatusMethodTransformed:
+		return true, StatusMethodTransformed, meta
 	default:
 		return true, StatusOk, meta
 	}
