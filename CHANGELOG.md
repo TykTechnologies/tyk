@@ -50,6 +50,7 @@ You get this output:
             }
     ],
 
+- Out of the box, tyk will ship with HA settings enabled where possible (this means using the new non-transactional rate limiter)
 
 
 # v2.1

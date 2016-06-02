@@ -213,13 +213,6 @@ func getPolicies() {
 		"prefix": "main",
 	}).Debug("Loading policies")
 
-	if config.Policies.PolicyRecordName == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("No policy record name defined, skipping...")
-		return
-	}
-
 	if config.Policies.PolicySource == "service" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -243,6 +236,13 @@ func getPolicies() {
 		}).Debug("Using Policies from RPC")
 		thesePolicies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
 	} else {
+		// this is the only case now where we need a policy record name
+		if config.Policies.PolicyRecordName == "" {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("No policy record name defined, skipping...")
+			return
+		}
 		thesePolicies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
 	}
 
