@@ -719,6 +719,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
@@ -806,6 +807,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),

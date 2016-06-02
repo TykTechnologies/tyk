@@ -131,6 +131,7 @@ type Config struct {
 	HideGeneratorHeader  bool                                     `json:"hide_generator_header"`
 	EventHandlers        tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
 	EventTriggers        map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
+	EnableContextVars    bool                                     `json:"enable_context_vars"`
 }
 
 type CertData struct {

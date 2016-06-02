@@ -24,6 +24,7 @@ const (
 	VersionData       = 2
 	VersionKeyContext = 3
 	OrgSessionContext = 4
+	ContextData       = 5
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)

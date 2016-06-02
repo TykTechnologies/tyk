@@ -29,6 +29,11 @@ func GetIPFromRequest(r *http.Request) string {
 
 func CopyHttpRequest(r *http.Request) *http.Request {
 	reqCopy := new(http.Request)
+
+	if r == nil {
+		return reqCopy
+	}
+
 	*reqCopy = *r
 
 	if r.Body != nil {
@@ -55,7 +60,7 @@ func CopyHttpResponse(r *http.Response) *http.Response {
 	if r == nil {
 		return resCopy
 	}
-	
+
 	*resCopy = *r
 
 	if r.Body != nil {

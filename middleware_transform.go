@@ -71,7 +71,8 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		case tykcommon.RequestJSON:
 			json.Unmarshal(body, &bodyData)
 		default:
-			json.Unmarshal(body, &bodyData)
+			// unset, assume an open field
+			bodyData = make(map[string]interface{})
 		}
 
 		if thisMeta.TemplateMeta.TemplateData.EnableSession {
@@ -79,6 +80,14 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			switch bodyData.(type) {
 			case map[string]interface{}:
 				bodyData.(map[string]interface{})["_tyk_meta"] = ses.MetaData
+			}
+		}
+
+		if config.EnableContextVars {
+			contextData := context.Get(r, ContextData)
+			switch bodyData.(type) {
+			case map[string]interface{}:
+				bodyData.(map[string]interface{})["_tyk_context"] = contextData
 			}
 		}
 
