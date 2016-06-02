@@ -51,7 +51,19 @@ You get this output:
     ],
 
 - Out of the box, tyk will ship with HA settings enabled where possible (this means using the new non-transactional rate limiter)
+- Added a new concept called "Partitioned Policies", with policies that are partitioned, only sections of the policy will be applied to the underlying token so that tokens can be generated with a dynamic ACL, but still subscribe to a fixed quota and rate limit level. THIS MEANS THAT THE TOKEN MUST HAVE A FULL SET OF ACL RULES AND QUOTAS BEFORE USING AND PARTITIONED POLICIES ARE NOT SUITABLE FOR PORTAL USE.
 
+### To set up a partitioned policy
+
+Add the following section to the policy object:
+
+    "partitions": {
+        "quota": false,
+        "rate_limit": false,
+        "acl": false
+    }
+
+Then set the partitions that you want to overwrite to "true", the aprtitions that are marked as true will then be applied to the token instead of the full policy. 
 
 # v2.1
 

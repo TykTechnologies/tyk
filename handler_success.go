@@ -83,13 +83,51 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 			}
 
 			log.Debug("Found policy, applying")
-			thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-			thisSession.Rate = policy.Rate
-			thisSession.Per = policy.Per
-			thisSession.QuotaMax = policy.QuotaMax
-			thisSession.QuotaRenewalRate = policy.QuotaRenewalRate
-			thisSession.AccessRights = policy.AccessRights
-			thisSession.HMACEnabled = policy.HMACEnabled
+
+			if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
+				// This is a partitioned policy, only apply what is active
+				log.Debug("Applying partitioned policy")
+
+				if policy.Partitions.Quota {
+					// Quotas
+					log.Debug("Applying partition: Quota")
+					thisSession.QuotaMax = policy.QuotaMax
+					thisSession.QuotaRenewalRate = policy.QuotaRenewalRate
+				}
+
+				if policy.Partitions.RateLimit {
+					// Rate limting
+					log.Debug("Applying partition: Rate Limit")
+					thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+					thisSession.Rate = policy.Rate
+					thisSession.Per = policy.Per
+				}
+
+				if policy.Partitions.Acl {
+					// ACL
+					log.Debug("Applying partition: ACL")
+					thisSession.AccessRights = policy.AccessRights
+					thisSession.HMACEnabled = policy.HMACEnabled
+				}
+
+			} else {
+				// This is not a partitioned policy, apply everything
+				log.Debug("Applying regular policy")
+				// Quotas
+				thisSession.QuotaMax = policy.QuotaMax
+				thisSession.QuotaRenewalRate = policy.QuotaRenewalRate
+
+				// Rate limting
+				thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+				thisSession.Rate = policy.Rate
+				thisSession.Per = policy.Per
+
+				// ACL
+				thisSession.AccessRights = policy.AccessRights
+				thisSession.HMACEnabled = policy.HMACEnabled
+			}
+
+			// Required for all
 			thisSession.IsInactive = policy.IsInactive
 			thisSession.Tags = policy.Tags
 
