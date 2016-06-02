@@ -65,6 +65,20 @@ Add the following section to the policy object:
 
 Then set the partitions that you want to overwrite to "true", the aprtitions that are marked as true will then be applied to the token instead of the full policy. 
 
+- Added context variable support, this middleware will extract the path, the path parts (break on `/`), and try to pull all form-relatexd data (url-form-encoded or query string params) and put them into a context variable that is available to other middleware. Currently this is only integrated with the body transform middleware as `_tyk_context`. To enable set `"enable_context_vars": true` in the `tyk.conf` file. Transform sample:
+
+Path: {{._tyk_context.path}}
+
+    Path Elements:
+    {{ range $i, $v := ._tyk_context.path_parts }}
+    --> {{$v}}
+    {{ end }}
+
+    Form/QueryString Data: {{._tyk_context.request_data}} 
+    Token: {{._tyk_context.token}}
+
+
+
 # v2.1
 
 - Fixed bug in contralised JWT secrets where OrgID was not set on internal token
