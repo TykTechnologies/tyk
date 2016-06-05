@@ -88,7 +88,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if stat == StatusURLRewrite {
 		log.Debug("Rewriter active")
 		thisMeta := meta.(*tykcommon.URLRewriteMeta)
-		log.Info(r.URL)
+		log.Debug(r.URL)
 		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.String())
 		if pErr != nil {
 			return pErr, 500
