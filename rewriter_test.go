@@ -148,3 +148,51 @@ func TestRewriterWithMissingAgain(t *testing.T) {
 		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
+
+func TestRewriterWithQS(t *testing.T) {
+	rw := URLRewriter{}
+
+	testConf := tykcommon.URLRewriteMeta{
+		Path:         "",
+		Method:       "",
+		MatchPattern: "(.*)",
+		RewriteTo:    "$1&newParam=that",
+	}
+
+	inbound := "foo/bar?param1=this"
+	expected := "foo/bar?param1=this&newParam=that"
+
+	val, err := rw.Rewrite(&testConf, inbound)
+
+	if err != nil {
+		t.Error("Compile failed: ", err)
+	}
+
+	if val != expected {
+		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+	}
+}
+
+func TestRewriterWithQS2(t *testing.T) {
+	rw := URLRewriter{}
+
+	testConf := tykcommon.URLRewriteMeta{
+		Path:         "",
+		Method:       "",
+		MatchPattern: "test/val/(.*)/space/(.*)/and/then(.*)",
+		RewriteTo:    "change/to/$2/$1$3",
+	}
+
+	inbound := "test/val/ONE/space/TWO/and/then?param1=this"
+	expected := "change/to/TWO/ONE?param1=this"
+
+	val, err := rw.Rewrite(&testConf, inbound)
+
+	if err != nil {
+		t.Error("Compile failed: ", err)
+	}
+
+	if val != expected {
+		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+	}
+}

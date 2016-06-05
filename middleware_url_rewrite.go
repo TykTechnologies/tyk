@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"net/url"
 )
 
 type URLRewriter struct{}
@@ -87,16 +88,22 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if stat == StatusURLRewrite {
 		log.Debug("Rewriter active")
 		thisMeta := meta.(*tykcommon.URLRewriteMeta)
-		log.Info(r.URL)
+		log.Debug(r.URL)
 		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.String())
 		if pErr != nil {
 			return pErr, 500
 		}
-		r.URL.Path = p
-		if strings.Index(p, "?") != -1 {
-			// query string, this gets odd, so lets set the opaque value
-			r.URL.Opaque = "/" + p
+		newURL, uErr := url.Parse(p)
+		if uErr != nil {
+			log.Error("URL Rewrite failed, could not parse: ", p)
+		} else {
+			r.URL = newURL
 		}
+		// r.URL.Path = p
+		// if strings.Index(p, "?") != -1 {
+		// 	// query string, this gets odd, so lets set the opaque value
+		// 	r.URL.Opaque = "/" + p
+		// }
 
 	}
 	return nil, 200
