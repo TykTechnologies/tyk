@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	T_REDIRECT_URI string = "http://client.oauth.com"
-	T_CLIENT_ID    string = "1234"
-	P_CLIENT_ID    string = "4321"
+	T_REDIRECT_URI     string = "http://client.oauth.com"
+	T_CLIENT_ID        string = "1234"
+	T_CLIENT_SECRET    string = "aabbccdd"
+	P_CLIENT_ID        string = "4321"
 )
 
 var keyRules = `
@@ -44,7 +45,8 @@ var oauthDefinition string = `
 		"oauth_meta": {
 			"allowed_access_types": [
 				"authorization_code",
-				"refresh_token"
+				"refresh_token",
+				"client_credentials"
 			],
 			"allowed_authorize_types": [
 				"code",
@@ -357,6 +359,54 @@ func GetToken() tokenData {
 	}
 	log.Debug("TOKEN DATA: ", string(body))
 	return thisResponse
+}
+
+func TestOAuthClientCredsGrant (t *testing.T) {
+	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	testMuxer := mux.NewRouter()
+	getOAuthChain(thisSpec, testMuxer)
+
+	uri := "/APIID/oauth/token/"
+	method := "POST"
+
+	param := make(url.Values)
+	param.Set("grant_type", "client_credentials")
+	param.Set("client_id", T_CLIENT_ID)
+	param.Set("client_secret", T_CLIENT_SECRET)
+	
+	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	recorder := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+
+	var thisResponse = tokenData{}
+	body, _ := ioutil.ReadAll(recorder.Body)
+	//	fmt.Println(string(body))
+	err := json.Unmarshal(body, &thisResponse)
+	if err != nil {
+		fmt.Println(err)
+	}
+	log.Debug("TOKEN DATA: ", string(body))
+	log.Info("Access token: ", thisResponse.AccessToken)
+	
+	if recorder.Code != 200 {
+		t.Error("Response code should have 200 error but is: ", recorder.Code)
+		t.Error(recorder.Body)
+		t.Error(req.Body)
+	}
+
+	if thisResponse.AccessToken == "" {
+		t.Error("Access token is empty!")
+		t.Error(recorder.Body)
+		t.Error(req.Body)
+	}
+
 }
 
 func TestClientAccessRequest(t *testing.T) {
