@@ -684,8 +684,6 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 		accessData.ExpiresIn = config.OauthTokenExpire
 	}
 
-	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
-
 	// Create a SessionState object and register it with the authmanager
 	var newSession SessionState
 
@@ -719,7 +717,7 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, newSession.Expires)
+	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn))
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
