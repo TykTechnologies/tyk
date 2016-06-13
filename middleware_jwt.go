@@ -210,8 +210,8 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 	return "", false
 }
 
-// processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition. 
-func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token)  (error, int) {
+// processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
+func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token) (error, int) {
 	log.Debug("JWT authority is centralised")
 	// Generate a virtual token
 	var baseFound bool
@@ -390,17 +390,17 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		// No, let's try one-to-one mapping
 		return k.processOneToOneTokenMap(w, r, token)
-		
+
 	} else {
 		log.WithFields(logrus.Fields{
-			"path":        r.URL.Path,
-			"origin":      GetIPFromRequest(r),
+			"path":   r.URL.Path,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted JWT access with non-existent key.")
 
 		if err != nil {
 			log.WithFields(logrus.Fields{
-				"path":        r.URL.Path,
-				"origin":      GetIPFromRequest(r),
+				"path":   r.URL.Path,
+				"origin": GetIPFromRequest(r),
 			}).Error("JWT validation error: ", err)
 		}
 
@@ -442,6 +442,10 @@ func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (
 		thisSessionState.HMACEnabled = policy.HMACEnabled
 		thisSessionState.IsInactive = policy.IsInactive
 		thisSessionState.Tags = policy.Tags
+
+		if policy.KeyExpiresIn > 0 {
+			thisSessionState.Expires = time.Now().Unix() + policy.KeyExpiresIn
+		}
 
 		return thisSessionState, nil
 	}
