@@ -1,9 +1,11 @@
 package main
 
 import (
+	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,7 +13,7 @@ import (
 
 type URLRewriter struct{}
 
-func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (string, error) {
+func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
 	// Find all the matching groups:
 	mp, mpErr := regexp.Compile(thisMeta.MatchPattern)
 	if mpErr != nil {
@@ -19,12 +21,13 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (s
 		return "", mpErr
 	}
 	log.Debug("Inbound path: ", path)
-	result_slice := mp.FindAllStringSubmatch(path, -1)
+	newpath := path
 
+	result_slice := mp.FindAllStringSubmatch(path, -1)
 	// Make sure it matches the string
 	log.Debug("Rewriter checking matches, len is: ", len(result_slice))
 	if len(result_slice) > 0 {
-		newpath := thisMeta.RewriteTo
+		newpath = thisMeta.RewriteTo
 		// get the indices for the replacements:
 		dollarMatch, _ := regexp.Compile(`\$\d+`) // Prepare our regex
 		replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
@@ -47,10 +50,58 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (s
 		log.Debug("URL Re-written to: ", newpath)
 
 		// matched?? Set the modified path
-		return newpath, nil
+		// return newpath, nil
 	}
 
-	return path, nil
+	if useContext {
+		log.Info("Using context")
+		var contextData map[string]interface{}
+		cnt, contextFound := context.GetOk(r, ContextData)
+
+		if contextFound {
+			contextData = cnt.(map[string]interface{})
+		}
+
+		dollarMatch, _ := regexp.Compile(`\$tyk_context.(\w+)`)
+		replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
+		for _, v := range replace_slice {
+			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
+			log.Debug("Replacing: ", v[0])
+
+			if contextFound {
+				tempVal, ok := contextData[contextKey]
+				var nVal string
+				if ok {
+					switch tempVal.(type) {
+					case string:
+						nVal = tempVal.(string)
+					case []string:
+						nVal = strings.Join(tempVal.([]string), ",")
+						// Remove empty start
+						nVal = strings.TrimPrefix(nVal, ",")
+					case url.Values:
+						end := len(tempVal.(url.Values))
+						i := 0
+						nVal = ""
+						for key, val := range tempVal.(url.Values) {
+							nVal += key + ":" + strings.Join(val, ",")
+							if i < end-1 {
+								nVal += ";"
+							}
+							i++
+						}
+					default:
+						log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
+					}
+					newpath = strings.Replace(newpath, string(v[0]), url.QueryEscape(nVal), -1)
+				}
+
+			}
+
+		}
+	}
+
+	return newpath, nil
 }
 
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
@@ -90,7 +141,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		log.Debug("Rewriter active")
 		thisMeta := meta.(*tykcommon.URLRewriteMeta)
 		log.Debug(r.URL)
-		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.String())
+		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.String(), true, r)
 		if pErr != nil {
 			return pErr, 500
 		}
@@ -100,11 +151,6 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		} else {
 			r.URL = newURL
 		}
-		// r.URL.Path = p
-		// if strings.Index(p, "?") != -1 {
-		// 	// query string, this gets odd, so lets set the opaque value
-		// 	r.URL.Opaque = "/" + p
-		// }
 
 	}
 	return nil, 200
