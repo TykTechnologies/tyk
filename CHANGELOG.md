@@ -66,7 +66,7 @@ Add the following section to the policy object:
 
 Then set the partitions that you want to overwrite to "true", the partitions that are marked as true will then be applied to the token instead of the full policy. 
 
-- Added context variable support, this middleware will extract the path, the path parts (break on `/`), and try to pull all form-related data (url-form-encoded or query string params) and put them into a context variable that is available to other middleware. Currently this is only integrated with the body transform middleware as `_tyk_context`. To enable set `"enable_context_vars": true` in the `tyk.conf` file. Transform sample:
+- Added context variable support, this middleware will extract the path, the path parts (break on `/`), and try to pull all form-related data (url-form-encoded or query string params) and put them into a context variable that is available to other middleware. Currently this is only integrated with the body transform middleware as `_tyk_context`. To enable set `"enable_context_vars": true` in the API Definition. Transform sample:
 
 Path: {{._tyk_context.path}}
 
@@ -78,7 +78,8 @@ Path: {{._tyk_context.path}}
     Form/QueryString Data: {{._tyk_context.request_data}} 
     Token: {{._tyk_context.token}}
 
-
+- Context variables also available in headers using `$tyk_context.` namespace
+- WARNING: POTENTIALLY BREAKING CHANGE: Flush interval is now in milliseconds, not seconds, before upgrading, if you are using flush interval, make sure that the value has been updated.
 
 # v2.1
 

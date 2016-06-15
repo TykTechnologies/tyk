@@ -83,7 +83,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			}
 		}
 
-		if config.EnableContextVars {
+		if t.Spec.EnableContextVars {
 			contextData := context.Get(r, ContextData)
 			switch bodyData.(type) {
 			case map[string]interface{}:

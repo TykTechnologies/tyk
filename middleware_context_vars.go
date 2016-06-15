@@ -24,7 +24,7 @@ func (m *MiddlewareContextVars) GetConfig() (interface{}, error) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
-	if !config.EnableContextVars {
+	if !m.Spec.EnableContextVars {
 		return nil, 200
 	}
 
@@ -47,6 +47,9 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 
 		// path data
 		contextDataObject["path"] = copiedRequest.URL.Path
+
+		// IP:Port
+		contextDataObject["remote_addr"] = copiedRequest.RemoteAddr
 	}
 
 	log.Debug("Context Data Object: ", contextDataObject)

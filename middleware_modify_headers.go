@@ -4,6 +4,8 @@ import (
 	"github.com/gorilla/context"
 	"github.com/lonelycode/tykcommon"
 	"net/http"
+	"net/url"
+	"reflect"
 	"strings"
 )
 
@@ -13,6 +15,7 @@ type TransformHeaders struct {
 }
 
 const TYK_META_LABEL string = "$tyk_meta."
+const TYK_CONTEXT_LABEL string = "$tyk_context."
 
 type TransformHeadersConfig struct{}
 
@@ -29,16 +32,22 @@ func (t *TransformHeaders) GetConfig() (interface{}, error) {
 func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Request) {
 	// Get session data
 	ses, found := context.GetOk(r, SessionData)
+	cnt, contextFound := context.GetOk(r, ContextData)
 	var thisSessionState SessionState
+	var contextData map[string]interface{}
+
 	if found {
 		thisSessionState = ses.(SessionState)
+	}
+
+	if contextFound {
+		contextData = cnt.(map[string]interface{})
 	}
 
 	// Iterate and manage key array injection
 	for nKey, nVal := range kv {
 		if strings.Contains(nVal, TYK_META_LABEL) {
 			// Using meta_data key
-			log.Debug("Meta data key in use")
 			if found {
 				metaKey := strings.Replace(nVal, TYK_META_LABEL, "", 1)
 				if thisSessionState.MetaData != nil {
@@ -52,6 +61,45 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 
 				} else {
 					log.Debug("Meta data object is nil! Skipping.")
+				}
+			}
+
+		} else if strings.Contains(nVal, TYK_CONTEXT_LABEL) {
+			// Using context key
+			if contextFound {
+				metaKey := strings.Replace(nVal, TYK_CONTEXT_LABEL, "", 1)
+				if contextData != nil {
+					tempVal, ok := contextData[metaKey]
+					if ok {
+						switch tempVal.(type) {
+						case string:
+							nVal = tempVal.(string)
+						case []string:
+							nVal = strings.Join(tempVal.([]string), ",")
+							// Remove empty start
+							nVal = strings.TrimPrefix(nVal, ",")
+						case url.Values:
+							end := len(tempVal.(url.Values))
+							i := 0
+							nVal = ""
+							for key, val := range tempVal.(url.Values) {
+								nVal += key + ":" + strings.Join(val, ",")
+								if i < end-1 {
+									nVal += ";"
+								}
+								i++
+							}
+						default:
+							log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
+						}
+
+						r.Header.Add(nKey, nVal)
+					} else {
+						log.Warning("Context Data not found for key in map: ", metaKey)
+					}
+
+				} else {
+					log.Debug("Context data object is nil! Skipping.")
 				}
 			}
 

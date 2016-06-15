@@ -4,6 +4,7 @@ middleware/e1d21f942ec746ed416ab97fe1bf07e8/
 testapps/
 utils/release_live.sh
 tyk.conf
+tyk_elasticache.conf
 tyk.compose.rpc.conf
 tyk.compose.local_rpc.conf
 tyk.compose.cluster.conf
