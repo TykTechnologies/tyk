@@ -80,6 +80,7 @@ Path: {{._tyk_context.path}}
 
 - Context variables also available in headers using `$tyk_context.` namespace
 - WARNING: POTENTIALLY BREAKING CHANGE: Flush interval is now in milliseconds, not seconds, before upgrading, if you are using flush interval, make sure that the value has been updated.
+- Context variables also available in URL rewriter
 
 # v2.1
 
