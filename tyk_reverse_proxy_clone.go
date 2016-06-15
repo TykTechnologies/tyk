@@ -160,7 +160,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 	}
 
-	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(config.HttpServerOptions.FlushInterval) * time.Second}
+	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(config.HttpServerOptions.FlushInterval) * time.Millisecond}
 }
 
 // onExitFlushLoop is a callback set by tests to detect the state of the
@@ -277,7 +277,7 @@ func NewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
 	}
-	return &ReverseProxy{Director: director, FlushInterval: 1 * time.Second}
+	return &ReverseProxy{Director: director, FlushInterval: 1000 * time.Millisecond}
 }
 
 func copyHeader(dst, src http.Header) {
