@@ -11,7 +11,7 @@ import (
 
 type URLRewriter struct{}
 
-func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, useContext bool, path string) (string, error) {
+func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string) (string, error) {
 	// Find all the matching groups:
 	mp, mpErr := regexp.Compile(thisMeta.MatchPattern)
 	if mpErr != nil {
@@ -48,10 +48,6 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, useContext bool
 
 		// matched?? Set the modified path
 		return newpath, nil
-	}
-
-	if useContext {
-		dollarMatch, _ := regexp.Compile(`\$tyk_context.(\w+)`)
 	}
 
 	return path, nil
