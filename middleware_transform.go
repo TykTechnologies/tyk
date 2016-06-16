@@ -66,7 +66,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 					"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
 					"api_id":      t.Spec.APIDefinition.APIID,
 					"path":        r.URL.Path,
-				}).Error("Error unmarshalling XML: ", err)
+				}).Error("Error unmarshalling XML: ", xErr)
 			}
 		case tykcommon.RequestJSON:
 			json.Unmarshal(body, &bodyData)
