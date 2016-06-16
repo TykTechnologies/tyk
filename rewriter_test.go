@@ -18,7 +18,7 @@ func TestRewriter(t *testing.T) {
 	inbound := "test/straight/rewrite"
 	expected := "change/to/me"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
@@ -42,7 +42,7 @@ func TestRewriterWithOneVal(t *testing.T) {
 	inbound := "test/val/VALUE"
 	expected := "change/to/VALUE"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
@@ -66,7 +66,7 @@ func TestRewriterWithThreeVals(t *testing.T) {
 	inbound := "test/val/ONE/space/TWO/and/then/THREE"
 	expected := "change/to/ONE/TWO/THREE"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
@@ -90,7 +90,7 @@ func TestRewriterWithReverse(t *testing.T) {
 	inbound := "test/val/ONE/space/TWO/and/then/THREE"
 	expected := "change/to/THREE/TWO/ONE"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
@@ -114,7 +114,7 @@ func TestRewriterWithMissing(t *testing.T) {
 	inbound := "test/val/ONE/space/TWO/and/then/THREE"
 	expected := "change/to/ONE/TWO"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
@@ -138,7 +138,7 @@ func TestRewriterWithMissingAgain(t *testing.T) {
 	inbound := "test/val/ONE/space/TWO/and/then/THREE"
 	expected := "change/to/THREE/ONE"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
@@ -162,7 +162,7 @@ func TestRewriterWithQS(t *testing.T) {
 	inbound := "foo/bar?param1=this"
 	expected := "foo/bar?param1=this&newParam=that"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
@@ -186,7 +186,7 @@ func TestRewriterWithQS2(t *testing.T) {
 	inbound := "test/val/ONE/space/TWO/and/then?param1=this"
 	expected := "change/to/TWO/ONE?param1=this"
 
-	val, err := rw.Rewrite(&testConf, inbound)
+	val, err := rw.Rewrite(&testConf, inbound, false, nil)
 
 	if err != nil {
 		t.Error("Compile failed: ", err)
