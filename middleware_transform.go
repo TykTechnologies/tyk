@@ -104,7 +104,6 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 		r.Body = ioutil.NopCloser(&bodyBuffer)
 		r.ContentLength = int64(bodyBuffer.Len())
-
 	}
 
 	return nil, 200

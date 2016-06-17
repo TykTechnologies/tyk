@@ -116,12 +116,12 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if config.EnforceOrgDataAge {
 			thisOrg := e.Spec.OrgID
-			orgSessionState, found := e.GetOrgSession(thisOrg)
-			if found {
-				if orgSessionState.DataExpires > 0 {
-					expiresAfter = orgSessionState.DataExpires
-				}
+			orgExpireDataTime := e.GetOrgSessionExpiry(thisOrg)
+
+			if orgExpireDataTime > 0 {
+				expiresAfter = orgExpireDataTime
 			}
+
 		}
 
 		thisRecord.SetExpiry(expiresAfter)
@@ -144,7 +144,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 	}
 
 	var obfuscated string
-	
+
 	if len(keyName) > 4 {
 		obfuscated = "****" + keyName[len(keyName)-4:]
 	}

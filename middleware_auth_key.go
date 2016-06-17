@@ -124,7 +124,6 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	// Set session state on context, we will need it later
 	context.Set(r, SessionData, thisSessionState)
 	context.Set(r, AuthHeaderValue, key)
-
 	return nil, 200
 }
 

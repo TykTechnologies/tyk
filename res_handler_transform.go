@@ -3,11 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/lonelycode/tykcommon"
 	"github.com/Sirupsen/logrus"
+	"github.com/clbanning/mxj"
+	"github.com/lonelycode/tykcommon"
 	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
-	"github.com/clbanning/mxj"
 	"net/http"
 	"strconv"
 )
@@ -34,27 +34,10 @@ func (rt ResponseTransformMiddleware) New(c interface{}, spec *APISpec) (TykResp
 	thisHandler.config = thisModuleConfig
 	thisHandler.Spec = spec
 
-	log.Warning("Response body transform processor initialised")
+	log.Debug("Response body transform processor initialised")
 
 	return thisHandler, nil
 }
-
-// func (rt ResponseTransformMiddleware) copyResponse(dst io.Writer, src io.Reader) {
-// 	if rt.FlushInterval != 0 {
-// 		if wf, ok := dst.(writeFlusher); ok {
-// 			mlw := &maxLatencyWriter{
-// 				dst:     wf,
-// 				latency: p.FlushInterval,
-// 				done:    make(chan bool),
-// 			}
-// 			go mlw.flushLoop()
-// 			defer mlw.stop()
-// 			dst = mlw
-// 		}
-// 	}
-
-// 	io.Copy(dst, src)
-// }
 
 func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	// New request checker, more targetted, less likely to fail
@@ -102,11 +85,11 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 		if err != nil {
 			log.WithFields(logrus.Fields{
-					"prefix":      "outbound-transform",
-					"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
-					"api_id":      rt.Spec.APIDefinition.APIID,
-					"path":        req.URL.Path,
-				}).Error("Failed to apply template to request: ", err)
+				"prefix":      "outbound-transform",
+				"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
+				"api_id":      rt.Spec.APIDefinition.APIID,
+				"path":        req.URL.Path,
+			}).Error("Failed to apply template to request: ", err)
 		}
 
 		res.ContentLength = int64(bodyBuffer.Len())

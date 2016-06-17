@@ -28,6 +28,7 @@ const (
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
+var ExpiryCache *cache.Cache = cache.New(600*time.Second, 5*time.Second)
 
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response
@@ -64,10 +65,30 @@ func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	thisSession, found = t.Spec.OrgSessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
+		if config.EnforceOrgDataAge {
+			// We cache org expiry data
+			log.Debug("Setting data expiry: ", thisSession.OrgID)
+			go t.SetOrgExpiry(thisSession.OrgID, thisSession.DataExpires)
+		}
 		return thisSession, true
 	}
 
 	return thisSession, found
+}
+
+func (t TykMiddleware) SetOrgExpiry(orgid string, expiry int64) {
+	ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
+}
+
+func (t TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
+	log.Debug("Checking: ", orgid)
+	cachedVal, found := ExpiryCache.Get(orgid)
+	if !found {
+		log.Debug("no cached entry found, returning 7 days")
+		return 604800
+	}
+
+	return cachedVal.(int64)
 }
 
 // ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
@@ -161,6 +182,7 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	}
 
 	// Check session store
+	log.Debug("Querying keystore")
 	thisSession, found = t.Spec.SessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
@@ -169,11 +191,11 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
+		log.Debug("Got key")
 		return thisSession, true
 	}
 
 	// 2. If not there, get it from the AuthorizationHandler
-
 	thisSession, found = t.Spec.AuthManager.IsKeyAuthorised(key)
 	if found {
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
@@ -279,11 +301,10 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if config.EnforceOrgDataAge {
 			thisOrg := s.Spec.OrgID
-			orgSessionState, found := s.GetOrgSession(thisOrg)
-			if found {
-				if orgSessionState.DataExpires > 0 {
-					expiresAfter = orgSessionState.DataExpires
-				}
+			orgExpireDataTime := s.GetOrgSessionExpiry(thisOrg)
+
+			if orgExpireDataTime > 0 {
+				expiresAfter = orgExpireDataTime
 			}
 		}
 
@@ -306,6 +327,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
 func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
+	log.Debug("Started proxy")
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
 		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
@@ -333,7 +355,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	if resp != nil {
 		s.RecordHit(w, r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
-
+	log.Debug("Done proxy")
 	return nil
 }
 
