@@ -882,6 +882,52 @@ func RPCReloadLoop(RPCKey string) {
 	}
 }
 
+func doLoadWithBackup(specs []APISpec) {
+	
+	log.Warning("Load Policies too!")
+
+	if len(specs) == 0 {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("No API Definitions found, not loading backup")
+		return
+	}
+
+	// We have updated specs, lets load those...
+	// Clean them first
+
+	APISpecPtrs := make([]*APISpec, len(specs))
+	for i, _ := range(specs){
+		APISpecPtrs[i] = &specs[i]
+	}
+
+	// Reset the JSVM
+	GlobalEventsJSVM.Init(config.TykJSPath)
+
+	newRouter := mux.NewRouter()
+	mainRouter = newRouter
+
+	var newMuxes *mux.Router
+	if getHostName() != "" {
+		newMuxes = newRouter.Host(getHostName()).Subrouter()
+	} else {
+		newMuxes = newRouter
+	}
+
+	loadAPIEndpoints(newMuxes)
+	loadApps(&APISpecPtrs, newMuxes)
+
+	newServeMux := http.NewServeMux()
+	newServeMux.Handle("/", mainRouter)
+
+	http.DefaultServeMux = newServeMux
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("API backup load complete")
+
+}
+
 func doReload() {
 	time.Sleep(10 * time.Second)
 

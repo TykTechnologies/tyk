@@ -41,6 +41,9 @@ type GroupKeySpaceRequest struct {
 	GroupID string
 }
 
+// RPC_LoadCount is a counter to check if this is a cold boot
+var RPC_LoadCount int
+
 var ErrorDenied error = errors.New("Access Denied")
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
@@ -197,6 +200,19 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 
 func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
+
+	if RPC_LoadCount == 0 {
+		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
+		APIlist := LoadDefinitionsFromRPCBackup()
+		log.Warning("[RPC Store] --> Done")
+		if APIlist != nil {
+			log.Warning("[RPC Store] ----> Found APIs")
+			doLoadWithBackup(APIlist)	
+		}
+		
+		//LoadPoliciesFromRPCBackup()
+	}
+
 	time.Sleep(time.Second * 3)
 	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
 		r.ReConnect()
@@ -223,6 +239,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		return
 	}
 	log.Debug("[RPC Store] Group Login complete")
+	RPC_LoadCount += 1
 }
 
 func (r *RPCStorageHandler) Login() {
@@ -251,6 +268,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 	log.Debug("[RPC Store] Login complete")
+	RPC_LoadCount += 1
 }
 
 // GetKey will retrieve a key from the database

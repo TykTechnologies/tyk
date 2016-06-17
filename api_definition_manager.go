@@ -558,7 +558,86 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 		newAppSpec := a.MakeSpec(thisAppConfig)
 		APISpecs = append(APISpecs, &newAppSpec)
 	}
+
+	if RPC_LoadCount > 0 {
+		SaveRPCDefinitionsBackup(&APISpecs)
+	}
 	return &APISpecs
+}
+
+func getTagListAsString() string {
+	tagList := ""
+	if len(config.DBAppConfOptions.Tags) > 0 {
+		tagList = strings.Join(config.DBAppConfOptions.Tags, "-")
+	}
+
+	return tagList
+}
+
+const RPCKeyPrefix string = "rpc:"
+const BackupKeyBase string = "node-definition-backup:"
+func SaveRPCDefinitionsBackup(apis *[]*APISpec) {
+	log.Info("Storing RPC backup")
+	tagList := getTagListAsString()
+	
+	log.Info("--> Connecting to DB")
+
+	thisStore := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
+	connected := thisStore.Connect()
+
+	log.Info("--> Connected to DB")
+
+	if !connected {
+		log.Error("--> RPC Backup save failed: redis connection failed")	
+		return
+	}
+
+	thisList, err := json.Marshal(apis)
+	if err != nil {
+		log.Error("Failed to save RPC backup: ", err)
+		return
+	}
+	
+	rErr := thisStore.SetKey(BackupKeyBase+tagList, string(thisList), -1)
+	if rErr != nil {
+		log.Error("Failed to store node backup: ", rErr)
+	}
+}
+
+func LoadDefinitionsFromRPCBackup() []APISpec {
+	var ApiList []APISpec
+	tagList := getTagListAsString()
+	checkKey := BackupKeyBase+tagList
+
+	log.Info("--> Connecting to DB")
+	thisStore := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
+	log.Info("--> Got Handle")
+
+	connected := thisStore.Connect()
+	log.Info("--> Connected to DB")
+
+	if !connected {
+		log.Error("--> RPC Backup recovery failed: redis connection failed")	
+		return ApiList
+	}
+
+	apiListAsString, rErr := thisStore.GetKey(checkKey)
+	if rErr != nil {
+		log.Error("--> Failed to get node backup (",checkKey,"): ", rErr)
+		return ApiList
+	}
+
+	log.Info("--> Retrieved API List")
+
+	unMErr := json.Unmarshal([]byte(apiListAsString), &ApiList)
+	if unMErr != nil {
+		log.Error("--> Failed to get node backup: ", unMErr)
+		return ApiList
+	}
+
+	log.Info("Found: ", len(ApiList))
+
+	return ApiList
 }
 
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
@@ -976,7 +1055,11 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 }
 
 func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler, healthStorageHandler StorageHandler, orgStorageHandler StorageHandler) {
-	a.AuthManager.Init(AuthStore)
+	if a.AuthManager != nil {
+		log.Warning("Starting without an Auth manager!")
+		a.AuthManager.Init(AuthStore)	
+	}
+
 	a.SessionManager.Init(SessionStore)
 	a.Health.Init(healthStorageHandler)
 	a.OrgSessionManager.Init(orgStorageHandler)
