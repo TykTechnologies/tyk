@@ -286,6 +286,10 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 
 	ApiMuxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(keyHandler))
 	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(oAuthClientHandler))
+
+	log.WithFields(logrus.Fields{
+			"prefix": "main",
+	}).Warning("Loaded API Endpoints")
 }
 
 func generateOAuthPrefix(apiID string) string {
@@ -500,7 +504,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Debug("Loading API configurations.")
+	}).Info("Loading API configurations.")
 
 	var tempSpecRegister = make(map[string]*APISpec)
 
@@ -671,8 +675,16 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			}
 
 			if referenceSpec.UseOauth2 {
-				thisOauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
-				referenceSpec.OAuthManager = thisOauthManager
+				log.Debug("Loading OAuth Manager")
+				if !RPC_EmergencyMode {
+					thisOauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
+					log.Debug("-- Added OAuth Handlers")
+
+					referenceSpec.OAuthManager = thisOauthManager
+					log.Debug("Done loading OAuth Manager")	
+				} else {
+					log.Debug("RPC Emergency mode detected! OAuth APIs will not function!")
+				}
 			}
 
 			enableVersionOverrides := false
@@ -794,6 +806,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
 				}
 
+				log.Debug("Chain array start")
+
 				var chainArray = []alice.Constructor{}
 
 				handleCORS(&chainArray, referenceSpec)
@@ -816,6 +830,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
 
+				log.Debug("Chain array end")
 				// Add pre-process MW
 				for _, obj := range mwPreFuncs {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
@@ -836,6 +851,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
 				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 
+				log.Debug("Chain completed")
+
 				userCheckHandler := http.HandlerFunc(UserRatesCheck())
 				simpleChain := alice.New(
 					CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
@@ -852,11 +869,15 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				subrouter.Handle(rateLimitPath, simpleChain)
 				log.WithFields(logrus.Fields{
 					"prefix": "main",
-				}).Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
+				}).Info("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
+				log.Debug("Subrouter done")
+
 			}
 
 			tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
+			log.Debug("tempSpecRegister done")
+			
 
 		} else {
 			log.WithFields(logrus.Fields{
@@ -869,10 +890,19 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// Swap in the new register
 	ApiSpecRegister = &tempSpecRegister
 
+	log.Debug("Checker host list")
+
 	// Kick off our host checkers
 	if config.UptimeTests.Disable == false {
 		SetCheckerHostList()
 	}
+
+	log.Debug("Checker host Done")
+
+
+	log.WithFields(logrus.Fields{
+			"prefix": "main",
+	}).Info("Initialised API Definitions")
 
 }
 
@@ -882,11 +912,11 @@ func RPCReloadLoop(RPCKey string) {
 	}
 }
 
-func doLoadWithBackup(specs []APISpec) {
-	
-	log.Warning("Load Policies too!")
+func doLoadWithBackup(specs *[]*APISpec) {
 
-	if len(specs) == 0 {
+	log.Warning("[RPC Backup] --> Load Policies too!")
+
+	if len(*specs) == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not loading backup")
@@ -896,13 +926,15 @@ func doLoadWithBackup(specs []APISpec) {
 	// We have updated specs, lets load those...
 	// Clean them first
 
-	APISpecPtrs := make([]*APISpec, len(specs))
-	for i, _ := range(specs){
-		APISpecPtrs[i] = &specs[i]
-	}
+	// APISpecPtrs := make([]*APISpec, len(specs))
+	// for i, _ := range(specs){
+	// 	APISpecPtrs[i] = &specs[i]
+	// }
 
 	// Reset the JSVM
 	GlobalEventsJSVM.Init(config.TykJSPath)
+	log.Warning("[RPC Backup] --> Initialised JSVM")
+
 
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
@@ -914,18 +946,28 @@ func doLoadWithBackup(specs []APISpec) {
 		newMuxes = newRouter
 	}
 
+	log.Warning("[RPC Backup] --> Set up routers")
+	log.Warning("[RPC Backup] --> Loading endpoints")
+
 	loadAPIEndpoints(newMuxes)
-	loadApps(&APISpecPtrs, newMuxes)
+
+	log.Warning("[RPC Backup] --> Loading APIs")
+	loadApps(specs, newMuxes)
+	log.Warning("[RPC Backup] --> API Load Done")
 
 	newServeMux := http.NewServeMux()
 	newServeMux.Handle("/", mainRouter)
 
 	http.DefaultServeMux = newServeMux
+	log.Warning("[RPC Backup] --> Replaced muxer")
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("API backup load complete")
 
+	log.Warning("[RPC Backup] --> Ready to listen")
+	RPC_EmergencyModeLoaded = true
+	listen()
 }
 
 func doReload() {
@@ -976,6 +1018,10 @@ func doReload() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("API reload complete")
+
+	// Unset these
+	RPC_EmergencyModeLoaded = false
+	RPC_EmergencyMode = false
 
 	reloadScheduled = false
 }
@@ -1171,16 +1217,6 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 }
 
 func main() {
-	ReadTimeout := 120
-	WriteTimeout := 120
-	if config.HttpServerOptions.ReadTimeout > 0 {
-		ReadTimeout = config.HttpServerOptions.ReadTimeout
-	}
-
-	if config.HttpServerOptions.WriteTimeout > 0 {
-		WriteTimeout = config.HttpServerOptions.WriteTimeout
-	}
-
 	if doMemoryProfile {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1197,8 +1233,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	targetPort := fmt.Sprintf(":%d", config.ListenPort)
-
+	
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
 		log.WithFields(logrus.Fields{
@@ -1232,10 +1267,24 @@ func main() {
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
 
+	listen()
+}
+
+func listen() {
+	ReadTimeout := 120
+	WriteTimeout := 120
+	if config.HttpServerOptions.ReadTimeout > 0 {
+		ReadTimeout = config.HttpServerOptions.ReadTimeout
+	}
+
+	if config.HttpServerOptions.WriteTimeout > 0 {
+		WriteTimeout = config.HttpServerOptions.WriteTimeout
+	}
+	targetPort := fmt.Sprintf(":%d", config.ListenPort)
+
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()
 	if nil != err {
-
 		// Listen on a TCP or a UNIX domain socket (TCP here).
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1303,9 +1352,13 @@ func main() {
 			go StartBeating(heartbeatConnStr, config.NodeSecret)
 
 		}
-		specs := getAPISpecs()
-		loadApps(specs, defaultRouter)
-		getPolicies()
+
+		if !RPC_EmergencyMode {
+			specs := getAPISpecs()
+			loadApps(specs, defaultRouter)
+			getPolicies()	
+		}
+		
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
@@ -1328,7 +1381,9 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Printf("Gateway started (%v)", VERSION)
-			http.Handle("/", mainRouter)
+			if !RPC_EmergencyMode {
+				http.Handle("/", mainRouter)
+			}
 			go http.Serve(l, nil)
 			displayConfig()
 		}

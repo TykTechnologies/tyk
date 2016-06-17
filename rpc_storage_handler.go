@@ -43,6 +43,8 @@ type GroupKeySpaceRequest struct {
 
 // RPC_LoadCount is a counter to check if this is a cold boot
 var RPC_LoadCount int
+var RPC_EmergencyMode bool
+var RPC_EmergencyModeLoaded bool
 
 var ErrorDenied error = errors.New("Access Denied")
 
@@ -202,15 +204,18 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
 
 	if RPC_LoadCount == 0 {
-		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
-		APIlist := LoadDefinitionsFromRPCBackup()
-		log.Warning("[RPC Store] --> Done")
-		if APIlist != nil {
-			log.Warning("[RPC Store] ----> Found APIs")
-			doLoadWithBackup(APIlist)	
+		if !RPC_EmergencyModeLoaded {
+			log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
+			APIlist := LoadDefinitionsFromRPCBackup()
+			log.Warning("[RPC Store] --> Done")
+			if APIlist != nil {
+				RPC_EmergencyMode = true
+				log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
+				doLoadWithBackup(APIlist)	
+			}
+			
+			//LoadPoliciesFromRPCBackup()
 		}
-		
-		//LoadPoliciesFromRPCBackup()
 	}
 
 	time.Sleep(time.Second * 3)

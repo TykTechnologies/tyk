@@ -507,8 +507,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
 func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
-	var APISpecs = []*APISpec{}
-
 	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	store.Connect()
 
@@ -525,6 +523,16 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 
 	store.Disconnect()
 
+	if RPC_LoadCount > 0 {
+		SaveRPCDefinitionsBackup(apiCollection)
+	}
+
+	return a.processRPCDefinitions(apiCollection)
+}
+
+func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*APISpec {
+	var APISpecs = []*APISpec{}
+
 	var APIDefinitions = []tykcommon.APIDefinition{}
 	var StringDefs = make([]map[string]interface{}, 0)
 
@@ -532,13 +540,13 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 
 	if jErr1 != nil {
 		log.Error("Failed decode: ", jErr1)
-		return &APISpecs
+		return nil
 	}
 
 	jErr2 := json.Unmarshal([]byte(apiCollection), &StringDefs)
 	if jErr2 != nil {
 		log.Error("Failed decode: ", jErr2)
-		return &APISpecs
+		return nil
 	}
 
 	for i, thisAppConfig := range APIDefinitions {
@@ -559,9 +567,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 		APISpecs = append(APISpecs, &newAppSpec)
 	}
 
-	if RPC_LoadCount > 0 {
-		SaveRPCDefinitionsBackup(&APISpecs)
-	}
 	return &APISpecs
 }
 
@@ -576,10 +581,11 @@ func getTagListAsString() string {
 
 const RPCKeyPrefix string = "rpc:"
 const BackupKeyBase string = "node-definition-backup:"
-func SaveRPCDefinitionsBackup(apis *[]*APISpec) {
+
+func SaveRPCDefinitionsBackup(thisList string) {
 	log.Info("Storing RPC backup")
 	tagList := getTagListAsString()
-	
+
 	log.Info("--> Connecting to DB")
 
 	thisStore := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
@@ -588,63 +594,51 @@ func SaveRPCDefinitionsBackup(apis *[]*APISpec) {
 	log.Info("--> Connected to DB")
 
 	if !connected {
-		log.Error("--> RPC Backup save failed: redis connection failed")	
+		log.Error("--> RPC Backup save failed: redis connection failed")
 		return
 	}
 
-	thisList, err := json.Marshal(apis)
-	if err != nil {
-		log.Error("Failed to save RPC backup: ", err)
-		return
-	}
-	
-	rErr := thisStore.SetKey(BackupKeyBase+tagList, string(thisList), -1)
+	// thisList, err := json.Marshal(apis)
+	// if err != nil {
+	// 	log.Error("Failed to save RPC backup: ", err)
+	// 	return
+	// }
+
+	rErr := thisStore.SetKey(BackupKeyBase+tagList, thisList, -1)
 	if rErr != nil {
 		log.Error("Failed to store node backup: ", rErr)
 	}
 }
 
-func LoadDefinitionsFromRPCBackup() []APISpec {
-	var ApiList []APISpec
+func LoadDefinitionsFromRPCBackup() *[]*APISpec {
 	tagList := getTagListAsString()
-	checkKey := BackupKeyBase+tagList
+	checkKey := BackupKeyBase + tagList
 
-	log.Info("--> Connecting to DB")
 	thisStore := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
-	log.Info("--> Got Handle")
 
 	connected := thisStore.Connect()
-	log.Info("--> Connected to DB")
+	log.Info("[RPC] --> Connected to DB")
 
 	if !connected {
-		log.Error("--> RPC Backup recovery failed: redis connection failed")	
-		return ApiList
+		log.Error("[RPC] --> RPC Backup recovery failed: redis connection failed")
+		return nil
 	}
 
 	apiListAsString, rErr := thisStore.GetKey(checkKey)
 	if rErr != nil {
-		log.Error("--> Failed to get node backup (",checkKey,"): ", rErr)
-		return ApiList
+		log.Error("[RPC] --> Failed to get node backup (", checkKey, "): ", rErr)
+		return nil
 	}
 
-	log.Info("--> Retrieved API List")
-
-	unMErr := json.Unmarshal([]byte(apiListAsString), &ApiList)
-	if unMErr != nil {
-		log.Error("--> Failed to get node backup: ", unMErr)
-		return ApiList
-	}
-
-	log.Info("Found: ", len(ApiList))
-
-	return ApiList
+	a := APIDefinitionLoader{}
+	return a.processRPCDefinitions(apiListAsString)
 }
 
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
 	thisAppConfig := tykcommon.APIDefinition{}
 	err := json.Unmarshal(apiDef, &thisAppConfig)
 	if err != nil {
-		log.Error("Couldn't unmarshal api configuration")
+		log.Error("[RPC] --> Couldn't unmarshal api configuration")
 		log.Error(err)
 	}
 
@@ -1055,11 +1049,7 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 }
 
 func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler, healthStorageHandler StorageHandler, orgStorageHandler StorageHandler) {
-	if a.AuthManager != nil {
-		log.Warning("Starting without an Auth manager!")
-		a.AuthManager.Init(AuthStore)	
-	}
-
+	a.AuthManager.Init(AuthStore)
 	a.SessionManager.Init(SessionStore)
 	a.Health.Init(healthStorageHandler)
 	a.OrgSessionManager.Init(orgStorageHandler)
