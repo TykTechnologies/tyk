@@ -288,8 +288,8 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(oAuthClientHandler))
 
 	log.WithFields(logrus.Fields{
-			"prefix": "main",
-	}).Warning("Loaded API Endpoints")
+		"prefix": "main",
+	}).Debug("Loaded API Endpoints")
 }
 
 func generateOAuthPrefix(apiID string) string {
@@ -681,9 +681,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					log.Debug("-- Added OAuth Handlers")
 
 					referenceSpec.OAuthManager = thisOauthManager
-					log.Debug("Done loading OAuth Manager")	
+					log.Debug("Done loading OAuth Manager")
 				} else {
-					log.Debug("RPC Emergency mode detected! OAuth APIs will not function!")
+					log.Warning("RPC Emergency mode detected! OAuth APIs will not function!")
 				}
 			}
 
@@ -877,7 +877,6 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 			tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 			log.Debug("tempSpecRegister done")
-			
 
 		} else {
 			log.WithFields(logrus.Fields{
@@ -899,9 +898,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 	log.Debug("Checker host Done")
 
-
 	log.WithFields(logrus.Fields{
-			"prefix": "main",
+		"prefix": "main",
 	}).Info("Initialised API Definitions")
 
 }
@@ -910,64 +908,6 @@ func RPCReloadLoop(RPCKey string) {
 	for {
 		RPCListener.CheckForReload(config.SlaveOptions.RPCKey)
 	}
-}
-
-func doLoadWithBackup(specs *[]*APISpec) {
-
-	log.Warning("[RPC Backup] --> Load Policies too!")
-
-	if len(*specs) == 0 {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("No API Definitions found, not loading backup")
-		return
-	}
-
-	// We have updated specs, lets load those...
-	// Clean them first
-
-	// APISpecPtrs := make([]*APISpec, len(specs))
-	// for i, _ := range(specs){
-	// 	APISpecPtrs[i] = &specs[i]
-	// }
-
-	// Reset the JSVM
-	GlobalEventsJSVM.Init(config.TykJSPath)
-	log.Warning("[RPC Backup] --> Initialised JSVM")
-
-
-	newRouter := mux.NewRouter()
-	mainRouter = newRouter
-
-	var newMuxes *mux.Router
-	if getHostName() != "" {
-		newMuxes = newRouter.Host(getHostName()).Subrouter()
-	} else {
-		newMuxes = newRouter
-	}
-
-	log.Warning("[RPC Backup] --> Set up routers")
-	log.Warning("[RPC Backup] --> Loading endpoints")
-
-	loadAPIEndpoints(newMuxes)
-
-	log.Warning("[RPC Backup] --> Loading APIs")
-	loadApps(specs, newMuxes)
-	log.Warning("[RPC Backup] --> API Load Done")
-
-	newServeMux := http.NewServeMux()
-	newServeMux.Handle("/", mainRouter)
-
-	http.DefaultServeMux = newServeMux
-	log.Warning("[RPC Backup] --> Replaced muxer")
-
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("API backup load complete")
-
-	log.Warning("[RPC Backup] --> Ready to listen")
-	RPC_EmergencyModeLoaded = true
-	listen()
 }
 
 func doReload() {
@@ -1233,7 +1173,6 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
 		log.WithFields(logrus.Fields{
@@ -1356,9 +1295,8 @@ func listen() {
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
 			loadApps(specs, defaultRouter)
-			getPolicies()	
+			getPolicies()
 		}
-		
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
