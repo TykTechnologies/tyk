@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime/pprof"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -499,6 +500,30 @@ func doCopy(from *APISpec, to *APISpec) {
 	*to = *from
 }
 
+type SortableAPISpecListByListen []*APISpec
+
+func (s SortableAPISpecListByListen) Len() int {
+	return len(s)
+}
+func (s SortableAPISpecListByListen) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s SortableAPISpecListByListen) Less(i, j int) bool {
+	return len(s[i].Proxy.ListenPath) > len(s[j].Proxy.ListenPath)
+}
+
+type SortableAPISpecListByHost []*APISpec
+
+func (s SortableAPISpecListByHost) Len() int {
+	return len(s)
+}
+func (s SortableAPISpecListByHost) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s SortableAPISpecListByHost) Less(i, j int) bool {
+	return len(s[i].Domain) > len(s[j].Domain)
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// load the APi defs
@@ -523,6 +548,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	listenPaths := make(map[string][]string)
 
 	FallbackKeySesionManager.Init(&redisStore)
+
+	sort.Sort(SortableAPISpecListByHost(*APISpecs))
+	sort.Sort(SortableAPISpecListByListen(*APISpecs))
 
 	// Create a new handler for each API spec
 	for _, referenceSpec := range *APISpecs {
