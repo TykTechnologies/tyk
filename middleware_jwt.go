@@ -123,8 +123,8 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 	}
 
 	if !idFound {
-		if token.Claims["sub"] != nil {
-			tykId = token.Claims["sub"].(string)
+		if token.Claims.(jwt.MapClaims)["sub"] != nil {
+			tykId = token.Claims.(jwt.MapClaims)["sub"].(string)
 			idFound = true
 		}
 	}
@@ -178,7 +178,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 	if k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName != "" {
-		basePolicyID, foundPolicy := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
+		basePolicyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
 		if !foundPolicy {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
@@ -187,7 +187,7 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 		return basePolicyID, true
 
 	} else if k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField != "" {
-		clientID, clientIDFound := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
+		clientID, clientIDFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
 		if !clientIDFound {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
@@ -217,11 +217,11 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	var baseFound bool
 	var baseFieldData string
 	var tokenID string
-	baseFieldData, baseFound = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
+	baseFieldData, baseFound = token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
 	if !baseFound {
 		var found bool
 		log.Warning("Base Field not found, using SUB")
-		baseFieldData, found = token.Claims["sub"].(string)
+		baseFieldData, found = token.Claims.(jwt.MapClaims)["sub"].(string)
 		if !found {
 			log.Error("ID Could not be generated. Failing Request.")
 			k.reportLoginFailure("[NOT FOUND]", r)
@@ -375,6 +375,15 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		val, secretErr = k.getSecret(token)
 		if secretErr != nil {
 			log.Error("Couldn't get token: ", secretErr)
+		}
+
+		if k.TykMiddleware.Spec.JWTSigningMethod == "rsa" {
+			asRSA, err := jwt.ParseRSAPublicKeyFromPEM(val)
+			if err != nil {
+				log.Error("Failed to deccode JWT to RSA type")
+				return nil, err
+			}
+			return asRSA, secretErr
 		}
 
 		return val, secretErr

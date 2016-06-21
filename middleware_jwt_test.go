@@ -326,8 +326,8 @@ func TestJWTSessionHMAC(t *testing.T) {
 	token.Header["kid"] = thisTokenKID
 	log.Info("Kid is: ", thisTokenKID)
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	tokenString, err := token.SignedString([]byte(JWTSECRET))
 	if err != nil {
@@ -369,8 +369,8 @@ func TestJWTSessionRSA(t *testing.T) {
 	// Set the token ID
 	token.Header["kid"] = thisTokenKID
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
 	if getSignErr != nil {
@@ -418,8 +418,8 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	// Set the token ID
 	token.Header["kid"] = thisTokenKID
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
 	if getSignErr != nil {
@@ -466,8 +466,8 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	// Set the token ID
 	token.Header["kid"] = thisTokenKID
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
 	if getSignErr != nil {
@@ -531,10 +531,10 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["user_id"] = randSeq(10)
-	token.Claims["azp"] = thisTokenID
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["azp"] = thisTokenID
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
 	if getSignErr != nil {
@@ -591,10 +591,10 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	// Set the token ID
 	token.Header["kid"] = "12345"
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["user_id"] = randSeq(10)
-	token.Claims["policy_id"] = "987654321"
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
 	if getSignErr != nil {
@@ -651,10 +651,10 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	// Set the token ID
 	token.Header["kid"] = "12345"
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["user_id"] = randSeq(10)
-	token.Claims["policy_id"] = "1234567898978788"
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["policy_id"] = "1234567898978788"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
 	if getSignErr != nil {
@@ -711,10 +711,10 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	// Set the token ID
 	token.Header["kid"] = "12345"
 	// Set some claims
-	token.Claims["foo"] = "bar"
-	token.Claims["user_id"] = randSeq(10)
-	token.Claims["policy_id"] = "987654321"
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
 	if getSignErr != nil {

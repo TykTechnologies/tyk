@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/openid2go/openid"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 )
 
@@ -97,8 +98,8 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	}
 
 	// 3. Create or set the session to match
-	iss, found := token.Claims["iss"]
-	clients, cfound := token.Claims["aud"]
+	iss, found := token.Claims.(jwt.MapClaims)["iss"]
+	clients, cfound := token.Claims.(jwt.MapClaims)["aud"]
 
 	if !found && !cfound {
 		log.WithFields(logrus.Fields{
