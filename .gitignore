@@ -2,8 +2,8 @@
 .vagrant/
 middleware/e1d21f942ec746ed416ab97fe1bf07e8/
 testapps/
-vendor/github.com/TykTechnologies/
-vendor/github.com/dgrijalva/
+vendor/github.com/TykTechnologies_hotfix/
+vendor/github.com/dgrijalva_hotfix/
 utils/release_live.sh
 tyk.conf
 tyk_elasticache.conf
