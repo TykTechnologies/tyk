@@ -51,7 +51,15 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 		// Use a list
 		spec.RoundRobin.SetMax(targetData)
 		td := *targetData.(*[]string)
-		thisHost := EnsureTransport(td[spec.RoundRobin.GetPos()])
+
+		pos := spec.RoundRobin.GetPos()
+		if pos > (len(td) - 1) {
+			// problem
+			spec.RoundRobin.SetMax(td)
+			pos = 0
+		}
+
+		thisHost := EnsureTransport(td[pos])
 
 		// Check hosts against uptime tests
 		if spec.Proxy.CheckHostAgainstUptimeTests {
