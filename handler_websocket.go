@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/mitchellh/mapstructure"
+	"github.com/lonelycode/tykcommon"
 	"io"
 	"net"
 	"net/http"
@@ -79,26 +79,14 @@ type WebsockethandlerMiddleware struct {
 	*TykMiddleware
 }
 
-type WebsockethandlerMiddlewareConfig struct {
-	WebsocketOptions struct {
-		WebsocketTarget string `mapstructure:"websocket_target" bson:"websocket_target" json:"websocket_target"`
-	} `mapstructure:"websocket_options" bson:"websocket_options" json:"websocket_options"`
-}
+type WebsockethandlerMiddlewareConfig struct{}
 
 // New lets you do any initialisations for the object can be done here
 func (m *WebsockethandlerMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *WebsockethandlerMiddleware) GetConfig() (interface{}, error) {
-	var thisModuleConfig WebsockethandlerMiddlewareConfig
-
-	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	return thisModuleConfig, nil
+	return m.Spec.APIDefinition.WebsocketOptions, nil
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -115,10 +103,10 @@ func (m *WebsockethandlerMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 			"origin": GetIPFromRequest(r),
 		}).Warning("Upstream websocket server must be configurable!")
 
-		var thisConfig WebsockethandlerMiddlewareConfig
-		thisConfig = configuration.(WebsockethandlerMiddlewareConfig)
+		var thisConfig tykcommon.WebsocketConfig
+		thisConfig = configuration.(tykcommon.WebsocketConfig)
 
-		p := websocketProxy(thisConfig.WebsocketOptions.WebsocketTarget)
+		p := websocketProxy(thisConfig.WebsocketTarget)
 		p.ServeHTTP(w, r)
 		// Pass through
 		return nil, 1666
