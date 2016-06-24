@@ -8,14 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/context"
-	"github.com/pmylund/go-cache"
 	"io"
 	"io/ioutil"
 	"strings"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/context"
+	"github.com/pmylund/go-cache"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -123,8 +124,9 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 	}
 
 	if !idFound {
-		if token.Claims["sub"] != nil {
-			tykId = token.Claims["sub"].(string)
+		claims := token.Claims.(jwt.MapClaims)
+		if claims["sub"] != nil {
+			tykId = claims["sub"].(string)
 			idFound = true
 		}
 	}
@@ -178,7 +180,8 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 	if k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName != "" {
-		basePolicyID, foundPolicy := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
+		claims := token.Claims.(jwt.MapClaims)
+		basePolicyID, foundPolicy := claims[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
 		if !foundPolicy {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
@@ -187,7 +190,8 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 		return basePolicyID, true
 
 	} else if k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField != "" {
-		clientID, clientIDFound := token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
+		claims := token.Claims.(jwt.MapClaims)
+		clientID, clientIDFound := claims[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
 		if !clientIDFound {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
@@ -210,18 +214,19 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 	return "", false
 }
 
-// processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition. 
-func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token)  (error, int) {
+// processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
+func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token) (error, int) {
 	log.Debug("JWT authority is centralised")
 	// Generate a virtual token
 	var baseFound bool
 	var baseFieldData string
 	var tokenID string
-	baseFieldData, baseFound = token.Claims[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
+	claims := token.Claims.(jwt.MapClaims)
+	baseFieldData, baseFound = claims[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
 	if !baseFound {
 		var found bool
 		log.Warning("Base Field not found, using SUB")
-		baseFieldData, found = token.Claims["sub"].(string)
+		baseFieldData, found = claims["sub"].(string)
 		if !found {
 			log.Error("ID Could not be generated. Failing Request.")
 			k.reportLoginFailure("[NOT FOUND]", r)
@@ -390,17 +395,17 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		// No, let's try one-to-one mapping
 		return k.processOneToOneTokenMap(w, r, token)
-		
+
 	} else {
 		log.WithFields(logrus.Fields{
-			"path":        r.URL.Path,
-			"origin":      GetIPFromRequest(r),
+			"path":   r.URL.Path,
+			"origin": GetIPFromRequest(r),
 		}).Info("Attempted JWT access with non-existent key.")
 
 		if err != nil {
 			log.WithFields(logrus.Fields{
-				"path":        r.URL.Path,
-				"origin":      GetIPFromRequest(r),
+				"path":   r.URL.Path,
+				"origin": GetIPFromRequest(r),
 			}).Error("JWT validation error: ", err)
 		}
 
