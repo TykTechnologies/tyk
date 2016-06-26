@@ -26,7 +26,6 @@ type WSDialer struct {
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	target := canonicalAddr(req.URL)
 
-	// TODO: TLS
 	d, err := ws.Dial("tcp", target)
 	defer d.Close()
 	if err != nil {
