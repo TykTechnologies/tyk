@@ -344,15 +344,14 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 	resp := s.Proxy.ServeHTTP(w, r)
 	t2 := time.Now()
 
-	var copiedResponse *http.Response
-	if RecordDetail(r) {
-		copiedResponse = CopyHttpResponse(resp)
-	}
-
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if resp != nil {
+		var copiedResponse *http.Response
+		if RecordDetail(r) {
+			copiedResponse = CopyHttpResponse(resp)
+		}
 		s.RecordHit(w, r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
 	log.Debug("Done proxy")
