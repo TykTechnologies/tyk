@@ -5,6 +5,7 @@ testapps/
 vendor/github.com/TykTechnologies_hotfix/
 vendor/github.com/dgrijalva_hotfix/
 utils/release_live.sh
+utils/release_rc.sh
 tyk.conf
 tyk_elasticache.conf
 tyk.compose.rpc.conf
