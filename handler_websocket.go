@@ -1,9 +1,8 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
-	// "github.com/lonelycode/tykcommon"
 	"errors"
+	"github.com/Sirupsen/logrus"
 	"io"
 	"net"
 	"net/http"
@@ -27,7 +26,6 @@ type WSDialer struct {
 
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	target := canonicalAddr(req.URL)
-	log.Info("WS: Dialing: ", target)
 
 	// TODO: TLS
 	d, err := ws.Dial("tcp", target)
@@ -41,15 +39,6 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	err = req.Write(d)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"path":   req.URL.Path,
-			"origin": GetIPFromRequest(req),
-		}).Error("Error copying request to target: %v", err)
-		return nil, err
-	}
-	
 	hj, ok := ws.RW.(http.Hijacker)
 	if !ok {
 		http.Error(ws.RW, "Not a hijacker?", 500)
@@ -66,6 +55,15 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
+	err = req.Write(d)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"path":   req.URL.Path,
+			"origin": GetIPFromRequest(req),
+		}).Error("Error copying request to target: %v", err)
+		return nil, err
+	}
+
 	errc := make(chan error, 2)
 	cp := func(dst io.Writer, src io.Reader) {
 		_, err := io.Copy(dst, src)
@@ -77,55 +75,6 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	<-errc
 
 	return nil, nil
-}
-
-func WebsocketProxyHandler(target string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		d, err := net.Dial("tcp", target)
-		if err != nil {
-			http.Error(w, "Error contacting backend server.", 500)
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-			}).Printf("Error dialing websocket backend %s: %v", target, err)
-			return
-		}
-		hj, ok := w.(http.Hijacker)
-		if !ok {
-			http.Error(w, "Not a hijacker?", 500)
-			return
-		}
-		nc, _, err := hj.Hijack()
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-			}).Printf("Hijack error: %v", err)
-			return
-		}
-		
-		defer nc.Close()
-		defer d.Close()
-
-		err = r.Write(d)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-			}).Printf("Error copying request to target: %v", err)
-			return
-		}
-
-		errc := make(chan error, 2)
-		cp := func(dst io.Writer, src io.Reader) {
-			_, err := io.Copy(dst, src)
-			errc <- err
-		}
-		go cp(d, nc)
-		go cp(nc, d)
-
-		<-errc
-	})
 }
 
 func IsWebsocket(req *http.Request) bool {
@@ -140,43 +89,3 @@ func IsWebsocket(req *http.Request) bool {
 	}
 	return true
 }
-
-// type WebsockethandlerMiddleware struct {
-// 	*TykMiddleware
-// }
-
-// type WebsockethandlerMiddlewareConfig struct{}
-
-// // New lets you do any initialisations for the object can be done here
-// func (m *WebsockethandlerMiddleware) New() {}
-
-// // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-// func (m *WebsockethandlerMiddleware) GetConfig() (interface{}, error) {
-// 	return m.Spec.APIDefinition.WebsocketOptions, nil
-// }
-
-// // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-// func (m *WebsockethandlerMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-// 	if isWebsocket(r) {
-// 		if m.Spec.APIDefinition.Proxy.StripListenPath {
-// 			log.Debug("Stripping: ", m.Spec.Proxy.ListenPath)
-// 			r.URL.Path = "/" + strings.Replace(r.URL.Path, m.Spec.Proxy.ListenPath, "", 1)
-// 			log.Debug("Upstream Path is: ", r.URL.Path)
-// 		}
-
-// 		log.WithFields(logrus.Fields{
-// 			"path":   r.URL.Path,
-// 			"origin": GetIPFromRequest(r),
-// 		}).Warning("Upstream websocket server must be configurable!")
-
-// 		var thisConfig tykcommon.WebsocketConfig
-// 		thisConfig = configuration.(tykcommon.WebsocketConfig)
-
-// 		p := websocketProxy(thisConfig.WebsocketTarget)
-// 		p.ServeHTTP(w, r)
-// 		// Pass through
-// 		return nil, 1666
-// 	}
-
-// 	return nil, 200
-// }

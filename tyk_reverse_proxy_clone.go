@@ -360,7 +360,6 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request) http.R
 	}
 
 	if IsWebsocket(req) {
-		log.Info("WS: Detected websocket upgrade")
 		wsTransport := &WSDialer{*thisTransport, rw}
 		return wsTransport
 	}
@@ -383,30 +382,35 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
 
-	log.Debug("Outbound Request: ", outreq.URL.String())
 	p.Director(outreq)
+
 	outreq.Proto = "HTTP/1.1"
 	outreq.ProtoMajor = 1
 	outreq.ProtoMinor = 1
 	outreq.Close = false
 
-	// Remove hop-by-hop headers to the backend.  Especially
-	// important is "Connection" because we want a persistent
-	// connection, regardless of what the client sent to us.  This
-	// is modifying the same underlying map from req (shallow
-	// copied above) so we only copy it if necessary.
-	copiedHeaders := false
-	for _, h := range hopHeaders {
-		if outreq.Header.Get(h) != "" {
-			if !copiedHeaders {
-				outreq.Header = make(http.Header)
-				logreq.Header = make(http.Header)
-				copyHeader(outreq.Header, req.Header)
-				copyHeader(logreq.Header, req.Header)
-				copiedHeaders = true
+	// Do not modify outbound request headers if they are WS
+	if !IsWebsocket(outreq) {
+		log.Debug("Outbound Request: ", outreq.URL.String())
+		
+		// Remove hop-by-hop headers to the backend.  Especially
+		// important is "Connection" because we want a persistent
+		// connection, regardless of what the client sent to us.  This
+		// is modifying the same underlying map from req (shallow
+		// copied above) so we only copy it if necessary.
+		copiedHeaders := false
+		for _, h := range hopHeaders {
+			if outreq.Header.Get(h) != "" {
+				if !copiedHeaders {
+					outreq.Header = make(http.Header)
+					logreq.Header = make(http.Header)
+					copyHeader(outreq.Header, req.Header)
+					copyHeader(logreq.Header, req.Header)
+					copiedHeaders = true
+				}
+				outreq.Header.Del(h)
+				logreq.Header.Del(h)
 			}
-			outreq.Header.Del(h)
-			logreq.Header.Del(h)
 		}
 	}
 
@@ -457,7 +461,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if authOk {
 			authHeaderValue = contextAuthVal.(string)
 		}
-		
+
 		var obfuscated string
 		if len(authHeaderValue) > 4 {
 			obfuscated = "****" + authHeaderValue[len(authHeaderValue)-4:]
