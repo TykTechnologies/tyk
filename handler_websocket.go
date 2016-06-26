@@ -2,14 +2,87 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/lonelycode/tykcommon"
+	// "github.com/lonelycode/tykcommon"
+	"errors"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
-func websocketProxy(target string) http.Handler {
+func canonicalAddr(url *url.URL) string {
+	addr := url.Host
+	// If the addr has a port number attached
+	if !(strings.LastIndex(addr, ":") > strings.LastIndex(addr, "]")) {
+		return addr + ":80"
+	}
+	return addr
+}
+
+type WSDialer struct {
+	TykTransporter
+	RW http.ResponseWriter
+}
+
+func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
+	target := canonicalAddr(req.URL)
+	log.Info("WS: Dialing: ", target)
+
+	// TODO: TLS
+	d, err := ws.Dial("tcp", target)
+	if err != nil {
+		http.Error(ws.RW, "Error contacting backend server.", 500)
+		log.WithFields(logrus.Fields{
+			"path":   target,
+			"origin": GetIPFromRequest(req),
+		}).Printf("Error dialing websocket backend %s: %v", target, err)
+		return nil, errors.New("Dial error")
+	}
+	
+	hj, ok := ws.RW.(http.Hijacker)
+	if !ok {
+		http.Error(ws.RW, "Not a hijacker?", 500)
+		return nil, errors.New("Not a hjijacker?")
+	}
+
+	nc, _, err := hj.Hijack()
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"path":   req.URL.Path,
+			"origin": GetIPFromRequest(req),
+		}).Printf("Hijack error: %v", err)
+		return nil, errors.New("Hijack error")
+	}
+	
+	log.Info("WS: Hijack OK")
+
+	defer nc.Close()
+	defer d.Close()
+
+	err = req.Write(d)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"path":   req.URL.Path,
+			"origin": GetIPFromRequest(req),
+		}).Error("Error copying request to target: %v", err)
+		return nil, errors.New("Error copying request to target")
+	}
+
+	errc := make(chan error, 2)
+	cp := func(dst io.Writer, src io.Reader) {
+		_, err := io.Copy(dst, src)
+		errc <- err
+	}
+	go cp(d, nc)
+	go cp(nc, d)
+
+	<-errc
+
+	return nil, nil
+}
+
+func WebsocketProxyHandler(target string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		d, err := net.Dial("tcp", target)
 		if err != nil {
@@ -33,6 +106,7 @@ func websocketProxy(target string) http.Handler {
 			}).Printf("Hijack error: %v", err)
 			return
 		}
+		
 		defer nc.Close()
 		defer d.Close()
 
@@ -57,7 +131,7 @@ func websocketProxy(target string) http.Handler {
 	})
 }
 
-func isWebsocket(req *http.Request) bool {
+func IsWebsocket(req *http.Request) bool {
 	conn_hdr := ""
 	conn_hdrs := req.Header["Connection"]
 	if len(conn_hdrs) > 0 {
@@ -75,42 +149,42 @@ func isWebsocket(req *http.Request) bool {
 	return upgrade_websocket
 }
 
-type WebsockethandlerMiddleware struct {
-	*TykMiddleware
-}
+// type WebsockethandlerMiddleware struct {
+// 	*TykMiddleware
+// }
 
-type WebsockethandlerMiddlewareConfig struct{}
+// type WebsockethandlerMiddlewareConfig struct{}
 
-// New lets you do any initialisations for the object can be done here
-func (m *WebsockethandlerMiddleware) New() {}
+// // New lets you do any initialisations for the object can be done here
+// func (m *WebsockethandlerMiddleware) New() {}
 
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *WebsockethandlerMiddleware) GetConfig() (interface{}, error) {
-	return m.Spec.APIDefinition.WebsocketOptions, nil
-}
+// // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
+// func (m *WebsockethandlerMiddleware) GetConfig() (interface{}, error) {
+// 	return m.Spec.APIDefinition.WebsocketOptions, nil
+// }
 
-// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (m *WebsockethandlerMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	if isWebsocket(r) {
-		if m.Spec.APIDefinition.Proxy.StripListenPath {
-			log.Debug("Stripping: ", m.Spec.Proxy.ListenPath)
-			r.URL.Path = "/" + strings.Replace(r.URL.Path, m.Spec.Proxy.ListenPath, "", 1)
-			log.Debug("Upstream Path is: ", r.URL.Path)
-		}
+// // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+// func (m *WebsockethandlerMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+// 	if isWebsocket(r) {
+// 		if m.Spec.APIDefinition.Proxy.StripListenPath {
+// 			log.Debug("Stripping: ", m.Spec.Proxy.ListenPath)
+// 			r.URL.Path = "/" + strings.Replace(r.URL.Path, m.Spec.Proxy.ListenPath, "", 1)
+// 			log.Debug("Upstream Path is: ", r.URL.Path)
+// 		}
 
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
-		}).Warning("Upstream websocket server must be configurable!")
+// 		log.WithFields(logrus.Fields{
+// 			"path":   r.URL.Path,
+// 			"origin": GetIPFromRequest(r),
+// 		}).Warning("Upstream websocket server must be configurable!")
 
-		var thisConfig tykcommon.WebsocketConfig
-		thisConfig = configuration.(tykcommon.WebsocketConfig)
+// 		var thisConfig tykcommon.WebsocketConfig
+// 		thisConfig = configuration.(tykcommon.WebsocketConfig)
 
-		p := websocketProxy(thisConfig.WebsocketTarget)
-		p.ServeHTTP(w, r)
-		// Pass through
-		return nil, 1666
-	}
+// 		p := websocketProxy(thisConfig.WebsocketTarget)
+// 		p.ServeHTTP(w, r)
+// 		// Pass through
+// 		return nil, 1666
+// 	}
 
-	return nil, 200
-}
+// 	return nil, 200
+// }

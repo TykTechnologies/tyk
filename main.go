@@ -759,7 +759,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
@@ -848,7 +848,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					keyCheck,
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),

@@ -200,34 +200,27 @@ type ReverseProxy struct {
 	ResponseHandler ResponseChain
 }
 
-var TykDefaultTransport http.RoundTripper = &http.Transport{
+type TykTransporter struct {
+	http.Transport
+}
+
+func (t *TykTransporter) SetDialFunc(Dial func(string, string) (net.Conn, error)) {
+	t.Dial = Dial
+}
+
+func (t *TykTransporter) SetTimeout(timeOut int) {
+	//t.Dial.Timeout = time.Duration(timeOut) * time.Second
+	t.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
+}
+
+var TykDefaultTransport *TykTransporter = &TykTransporter{http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	Dial: (&net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}).Dial,
 	TLSHandshakeTimeout: 10 * time.Second,
-}
-
-func GetTransport(timeOut int) http.RoundTripper {
-	if timeOut > 0 {
-		log.Debug("Setting timeout for outbound request to: ", timeOut)
-		var ModifiedTransport http.RoundTripper = &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   time.Duration(timeOut) * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
-			ResponseHeaderTimeout: time.Duration(timeOut) * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-		}
-
-		return ModifiedTransport
-
-	}
-
-	return TykDefaultTransport
-}
+}}
 
 func cleanSlashes(a string) string {
 	endSlash := strings.HasSuffix(a, "//")
@@ -267,25 +260,6 @@ func singleJoiningSlash(a, b string) string {
 	}
 	log.Debug(a + b)
 	return a + b
-}
-
-// NewSingleHostReverseProxy returns a new ReverseProxy that rewrites
-// URLs to the scheme, host, and base path provided in target. If the
-// target's path is "/base" and the incoming request was for "/dir",
-// the target request will be for /base/dir.
-func NewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
-	targetQuery := target.RawQuery
-	director := func(req *http.Request) {
-		req.URL.Scheme = target.Scheme
-		req.URL.Host = target.Host
-		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
-		if targetQuery == "" || req.URL.RawQuery == "" {
-			req.URL.RawQuery = targetQuery + req.URL.RawQuery
-		} else {
-			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
-		}
-	}
-	return &ReverseProxy{Director: director, FlushInterval: 1000 * time.Millisecond}
 }
 
 func copyHeader(dst, src http.Header) {
@@ -371,13 +345,40 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	return false, nil
 }
 
+func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request) http.RoundTripper {
+	var thisTransport *TykTransporter = TykDefaultTransport
+
+	// Use the default unless we've modified the timout
+	if timeOut > 0 {
+		log.Debug("Setting timeout for outbound request to: ", timeOut)
+		thisTransport.SetDialFunc((&net.Dialer{
+			Timeout:   time.Duration(timeOut) * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial)
+		thisTransport.SetTimeout(timeOut)
+
+	}
+
+	// TODO: Websocket stuff here!
+	if IsWebsocket(req) {
+		log.Info("WS Detected")
+		if !strings.HasPrefix(req.URL.Path, "/") {
+			log.Info("Prefixing path")
+			req.URL.Path = "/" + req.URL.Path
+			log.Info(req.URL.Path)
+		}
+		wsTransport := &WSDialer{*thisTransport, rw}
+		return wsTransport
+	}
+
+	return thisTransport
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	transport := p.Transport
-	if transport == nil {
-		// 1. Check if timeouts are set for this endpoint
-		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		transport = GetTransport(timeout)
-	}
+	// 1. Check if timeouts are set for this endpoint
+	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+	transport = GetTransport(timeout, rw, req)
 
 	// Do this before we make a shallow copy
 	sessVal := context.Get(req, SessionData)
@@ -497,6 +498,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", 500)
 		return nil
 
+	}
+
+	if IsWebsocket(req) {
+		return nil
 	}
 
 	inres := new(http.Response)
