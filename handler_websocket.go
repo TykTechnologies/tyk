@@ -26,6 +26,22 @@ type WSDialer struct {
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	target := canonicalAddr(req.URL)
 
+	// TLS
+	/*
+		// We do not get this WSS scheme, need another way to identify it
+		if outreq.URL.Scheme == "wss" {
+			var tlsConfig *tls.Config
+			if p.TLSClientConfig == nil {
+				tlsConfig = &tls.Config{}
+			} else {
+				tlsConfig = p.TLSClientConfig
+			}
+			dial = func(network, address string) (net.Conn, error) {
+				return tls.Dial("tcp", host, tlsConfig)
+			}
+		}
+	*/
+
 	d, err := ws.Dial("tcp", target)
 	defer d.Close()
 	if err != nil {
