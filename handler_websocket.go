@@ -98,11 +98,6 @@ func (m *WebsockethandlerMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 			log.Debug("Upstream Path is: ", r.URL.Path)
 		}
 
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
-		}).Warning("Upstream websocket server must be configurable!")
-
 		var thisConfig tykcommon.WebsocketConfig
 		thisConfig = configuration.(tykcommon.WebsocketConfig)
 
