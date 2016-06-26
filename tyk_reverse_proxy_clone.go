@@ -359,14 +359,8 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request) http.R
 
 	}
 
-	// TODO: Websocket stuff here!
 	if IsWebsocket(req) {
-		log.Info("WS Detected")
-		if !strings.HasPrefix(req.URL.Path, "/") {
-			log.Info("Prefixing path")
-			req.URL.Path = "/" + req.URL.Path
-			log.Info(req.URL.Path)
-		}
+		log.Info("WS: Detected websocket upgrade")
 		wsTransport := &WSDialer{*thisTransport, rw}
 		return wsTransport
 	}
@@ -458,7 +452,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if err != nil {
 
-		authHeaderValue := context.Get(req, AuthHeaderValue).(string)
+		var authHeaderValue string
+		contextAuthVal, authOk := context.GetOk(req, AuthHeaderValue)
+		if authOk {
+			authHeaderValue = contextAuthVal.(string)
+		}
+		
 		var obfuscated string
 		if len(authHeaderValue) > 4 {
 			obfuscated = "****" + authHeaderValue[len(authHeaderValue)-4:]

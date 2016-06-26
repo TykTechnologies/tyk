@@ -31,13 +31,23 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// TODO: TLS
 	d, err := ws.Dial("tcp", target)
+	defer d.Close()
 	if err != nil {
 		http.Error(ws.RW, "Error contacting backend server.", 500)
 		log.WithFields(logrus.Fields{
 			"path":   target,
 			"origin": GetIPFromRequest(req),
-		}).Printf("Error dialing websocket backend %s: %v", target, err)
-		return nil, errors.New("Dial error")
+		}).Error("Error dialing websocket backend %s: %v", target, err)
+		return nil, err
+	}
+
+	err = req.Write(d)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"path":   req.URL.Path,
+			"origin": GetIPFromRequest(req),
+		}).Error("Error copying request to target: %v", err)
+		return nil, err
 	}
 	
 	hj, ok := ws.RW.(http.Hijacker)
@@ -47,26 +57,13 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	nc, _, err := hj.Hijack()
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"path":   req.URL.Path,
-			"origin": GetIPFromRequest(req),
-		}).Printf("Hijack error: %v", err)
-		return nil, errors.New("Hijack error")
-	}
-	
-	log.Info("WS: Hijack OK")
-
 	defer nc.Close()
-	defer d.Close()
-
-	err = req.Write(d)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
 			"origin": GetIPFromRequest(req),
-		}).Error("Error copying request to target: %v", err)
-		return nil, errors.New("Error copying request to target")
+		}).Error("Hijack error: %v", err)
+		return nil, err
 	}
 
 	errc := make(chan error, 2)
@@ -132,21 +129,16 @@ func WebsocketProxyHandler(target string) http.Handler {
 }
 
 func IsWebsocket(req *http.Request) bool {
-	conn_hdr := ""
-	conn_hdrs := req.Header["Connection"]
-	if len(conn_hdrs) > 0 {
-		conn_hdr = conn_hdrs[0]
+	connection := strings.ToLower(strings.TrimSpace(req.Header.Get("Connection")))
+	if connection != "upgrade" {
+		return false
 	}
 
-	upgrade_websocket := false
-	if strings.ToLower(conn_hdr) == "upgrade" {
-		upgrade_hdrs := req.Header["Upgrade"]
-		if len(upgrade_hdrs) > 0 {
-			upgrade_websocket = (strings.ToLower(upgrade_hdrs[0]) == "websocket")
-		}
+	upgrade := strings.ToLower(strings.TrimSpace(req.Header.Get("Upgrade")))
+	if upgrade != "websocket" {
+		return false
 	}
-
-	return upgrade_websocket
+	return true
 }
 
 // type WebsockethandlerMiddleware struct {
