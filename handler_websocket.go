@@ -27,6 +27,11 @@ type WSDialer struct {
 }
 
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
+
+	if !config.HttpServerOptions.EnableWebSockets {
+		return nil, errors.New("WebSockets has been disabled on this host")
+	}
+
 	target := canonicalAddr(req.URL)
 
 	// TLS
@@ -54,7 +59,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		log.WithFields(logrus.Fields{
 			"path":   target,
 			"origin": GetIPFromRequest(req),
-		}).Error("Error dialing websocket backend," target, ": ", err)
+		}).Error("Error dialing websocket backend", target, ": ", err)
 		return nil, err
 	}
 	defer d.Close()
