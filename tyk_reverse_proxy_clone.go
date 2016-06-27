@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
@@ -195,6 +196,10 @@ type ReverseProxy struct {
 	// If zero, no periodic flushing is done.
 	FlushInterval time.Duration
 
+	// TLSClientConfig specifies the TLS configuration to use for 'wss'.
+	// If nil, the default configuration is used.
+	TLSClientConfig *tls.Config
+
 	TykAPISpec      *APISpec
 	ErrorHandler    ErrorHandler
 	ResponseHandler ResponseChain
@@ -345,7 +350,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	return false, nil
 }
 
-func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request) http.RoundTripper {
+func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	var thisTransport *TykTransporter = TykDefaultTransport
 
 	// Use the default unless we've modified the timout
@@ -360,7 +365,7 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request) http.R
 	}
 
 	if IsWebsocket(req) {
-		wsTransport := &WSDialer{*thisTransport, rw}
+		wsTransport := &WSDialer{*thisTransport, rw, p.TLSClientConfig}
 		return wsTransport
 	}
 
@@ -371,7 +376,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	transport := p.Transport
 	// 1. Check if timeouts are set for this endpoint
 	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-	transport = GetTransport(timeout, rw, req)
+	transport = GetTransport(timeout, rw, req, p)
 
 	// Do this before we make a shallow copy
 	sessVal := context.Get(req, SessionData)
@@ -389,10 +394,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq.ProtoMinor = 1
 	outreq.Close = false
 
+	log.Debug("Outbound Request: ", outreq.URL.String())
+	
 	// Do not modify outbound request headers if they are WS
 	if !IsWebsocket(outreq) {
-		log.Debug("Outbound Request: ", outreq.URL.String())
-		
+
 		// Remove hop-by-hop headers to the backend.  Especially
 		// important is "Connection" because we want a persistent
 		// connection, regardless of what the client sent to us.  This

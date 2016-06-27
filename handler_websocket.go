@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"github.com/Sirupsen/logrus"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,38 +22,42 @@ func canonicalAddr(url *url.URL) string {
 
 type WSDialer struct {
 	TykTransporter
-	RW http.ResponseWriter
+	RW        http.ResponseWriter
+	TLSConfig *tls.Config
 }
 
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	target := canonicalAddr(req.URL)
 
 	// TLS
-	/*
-		// We do not get this WSS scheme, need another way to identify it
-		if outreq.URL.Scheme == "wss" {
-			var tlsConfig *tls.Config
-			if p.TLSClientConfig == nil {
-				tlsConfig = &tls.Config{}
-			} else {
-				tlsConfig = p.TLSClientConfig
-			}
-			dial = func(network, address string) (net.Conn, error) {
-				return tls.Dial("tcp", host, tlsConfig)
-			}
-		}
-	*/
+	dial := ws.Dial
+	if dial == nil {
+		dial = net.Dial
+	}
 
-	d, err := ws.Dial("tcp", target)
-	defer d.Close()
+	// We do not get this WSS scheme, need another way to identify it
+	if req.URL.Scheme == "wss" || req.URL.Scheme == "https" {
+		var tlsConfig *tls.Config
+		if ws.TLSClientConfig == nil {
+			tlsConfig = &tls.Config{}
+		} else {
+			tlsConfig = ws.TLSClientConfig
+		}
+		dial = func(network, address string) (net.Conn, error) {
+			return tls.Dial("tcp", target, tlsConfig)
+		}
+	}
+
+	d, err := dial("tcp", target)
 	if err != nil {
 		http.Error(ws.RW, "Error contacting backend server.", 500)
 		log.WithFields(logrus.Fields{
 			"path":   target,
 			"origin": GetIPFromRequest(req),
-		}).Error("Error dialing websocket backend %s: %v", target, err)
+		}).Error("Error dialing websocket backend," target, ": ", err)
 		return nil, err
 	}
+	defer d.Close()
 
 	hj, ok := ws.RW.(http.Hijacker)
 	if !ok {
@@ -60,7 +66,6 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	nc, _, err := hj.Hijack()
-	defer nc.Close()
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
@@ -68,6 +73,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		}).Error("Hijack error: %v", err)
 		return nil, err
 	}
+	defer nc.Close()
 
 	err = req.Write(d)
 	if err != nil {
