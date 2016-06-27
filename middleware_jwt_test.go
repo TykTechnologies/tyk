@@ -548,6 +548,57 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	}
 }
 
+func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
+	var thisTokenKID string = randSeq(10)
+	spec := createDefinitionFromString(jwtDef)
+	spec.DoNotTrack = true
+	spec.JWTSigningMethod = "rsa"
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	thisSession := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+
+	// Create the token
+	token := jwt.New(jwt.GetSigningMethod("RS512"))
+	// Set the token ID
+	token.Header["kid"] = thisTokenKID
+	// Set some claims
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	// Sign and get the complete encoded token as a string
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	if getSignErr != nil {
+		log.Error("Couldn't extract private key: ")
+		t.Fatal(getSignErr)
+	}
+	tokenString, err := token.SignedString(signKey)
+	if err != nil {
+		log.Error("Couldn't create JWT token: ")
+		t.Fatal(err)
+	}
+	log.Info(tokenString)
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+
+	// Make it empty
+	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
+
+	if err != nil {
+		log.Error("Problem generating the test token: ", err)
+	}
+
+	chain := getJWTChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 403 {
+		t.Error("Initial request failed with non-403 code, was: \n", recorder.Code)
+	}
+}
+
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	var thisTokenKID string = randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
