@@ -81,6 +81,9 @@ Path: {{._tyk_context.path}}
 - Context variables also available in headers using `$tyk_context.` namespace
 - WARNING: POTENTIALLY BREAKING CHANGE: Flush interval is now in milliseconds, not seconds, before upgrading, if you are using flush interval, make sure that the value has been updated.
 - Context variables also available in URL rewriter
+- Added Websockets support (beta), websockets can now be proxied like a regular HTP request, tyk will detect the upgrade and initiate a proxy to the upstream websocket host. This can be TLS enabled and Tyk can proxy over HTTPS -> WSS upstream. 
+- Websockets execute at the end of the middleware chain, so all the benefits of CB and auth middleware can be enabled (within the limits of the WebSockets protocol)
+- No analytics are gatthered for these requests, but rate limiting, quotas and auth will work fully for initial connection requsts (e.g . to prevent connection flooding)
 
 # v2.1
 
