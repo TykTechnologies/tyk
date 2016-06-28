@@ -48,6 +48,13 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 					return
 				}
 
+				// Special code, stops execution
+				if errCode == 1666 {
+					// Stop
+					log.Info("[Middleware] Received stop code")
+					return
+				}
+
 				// Special code, bypasses all other execution
 				if errCode != 666 {
 					// No error, carry on...

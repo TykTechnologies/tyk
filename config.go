@@ -99,6 +99,7 @@ type Config struct {
 		ReadTimeout      int        `json:"read_timeout"`
 		WriteTimeout     int        `json:"write_timeout"`
 		UseSSL           bool       `json:"use_ssl"`
+		EnableWebSockets bool       `json:"enable_websockets"`
 		Certificates     []CertData `json:"certificates"`
 		ServerName       string     `json:"server_name"`
 		MinVersion       uint16     `json:"min_version"`

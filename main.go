@@ -767,7 +767,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),					
 				}
 
 				for _, obj := range mwPreFuncs {
@@ -847,6 +847,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					keyCheck,
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
+					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
