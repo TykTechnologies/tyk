@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
@@ -14,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-	"errors"
 )
 
 // Lets the user override and return a response from middleware
@@ -25,14 +25,15 @@ type ReturnOverrides struct {
 
 // MiniRequestObject is marshalled to JSON string and pased into JSON middleware
 type MiniRequestObject struct {
-	Headers       map[string][]string
-	SetHeaders    map[string]string
-	DeleteHeaders []string
-	Body          string
-	URL           string
-	Params        map[string][]string
-	AddParams     map[string]string
-	DeleteParams  []string
+	Headers         map[string][]string
+	SetHeaders      map[string]string
+	DeleteHeaders   []string
+	Body            string
+	URL             string
+	Params          map[string][]string
+	AddParams       map[string]string
+	ExtendedParams  map[string][]string
+	DeleteParams    []string
 	ReturnOverrides ReturnOverrides
 }
 
@@ -95,14 +96,15 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	thisRequestData := MiniRequestObject{
-		Headers:       r.Header,
-		SetHeaders:    make(map[string]string),
-		DeleteHeaders: make([]string, 0),
-		Body:          string(originalBody),
-		URL:           r.URL.Path,
-		Params:        r.URL.Query(),
-		AddParams:     make(map[string]string),
-		DeleteParams:  make([]string, 0),
+		Headers:        r.Header,
+		SetHeaders:     make(map[string]string),
+		DeleteHeaders:  make([]string, 0),
+		Body:           string(originalBody),
+		URL:            r.URL.Path,
+		Params:         r.URL.Query(),
+		AddParams:      make(map[string]string),
+		ExtendedParams: make(map[string][]string),
+		DeleteParams:   make([]string, 0),
 	}
 
 	asJsonRequestObj, encErr := json.Marshal(thisRequestData)
@@ -137,8 +139,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	middlewareClassname := d.MiddlewareClassName
 	thisVM := d.Spec.JSVM.VM.Copy()
 	log.WithFields(logrus.Fields{
-			"prefix": "jsvm",
-		}).Debug("Running: ", middlewareClassname)
+		"prefix": "jsvm",
+	}).Debug("Running: ", middlewareClassname)
 	returnRaw, _ := thisVM.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
@@ -180,16 +182,22 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		values.Set(p, v)
 	}
 
+	for p, v := range newRequestData.Request.ExtendedParams {
+		for _, val := range v {
+			values.Add(p, val)
+		}
+	}
+
 	r.URL.RawQuery = values.Encode()
 
 	// Save the sesison data (if modified)
 	if !d.Pre {
 		if d.UseSession {
 			if len(newRequestData.SessionMeta) > 0 {
-				thisSessionState.MetaData = newRequestData.SessionMeta	
+				thisSessionState.MetaData = newRequestData.SessionMeta
 				d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
 			}
-			
+
 		}
 	}
 
