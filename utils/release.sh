@@ -96,158 +96,158 @@ tar -pczf $armTGZDIR/../tyk-linux-arm-$VERSION.tar.gz tyk.linux.arm-$VERSION/
 
 cd $SOURCEBINPATH
 
-echo "Moving binaries"
-mv tyk_linux_386 $i386BINDIR/$SOURCEBIN
-mv tyk_linux_amd64 $amd64BINDIR/$SOURCEBIN
-mv tyk_linux_arm $armBINDIR/$SOURCEBIN
+# echo "Moving binaries"
+# mv tyk_linux_386 $i386BINDIR/$SOURCEBIN
+# mv tyk_linux_amd64 $amd64BINDIR/$SOURCEBIN
+# mv tyk_linux_arm $armBINDIR/$SOURCEBIN
 
-echo "Copying configuration files into distros"
-cp $SOURCEBINPATH/apps/app_sample.json $i386BINDIR
-cp $SOURCEBINPATH/templates/*.json $i386BINDIR
-cp $SOURCEBINPATH/tyk.conf.example $i386BINDIR/tyk.conf
-cp -r $SOURCEBINPATH/middleware/*.js $i386BINDIR
-cp -r $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
-cp -r $SOURCEBINPATH/js/tyk.js $i386BINDIR
-cp -r $SOURCEBINPATH/policies/policies.json $i386BINDIR
-
-
-cp $SOURCEBINPATH/apps/app_sample.json $amd64BINDIR
-cp $SOURCEBINPATH/templates/*.json $amd64BINDIR
-cp $SOURCEBINPATH/tyk.conf.example $amd64BINDIR/tyk.conf
-cp -r $SOURCEBINPATH/middleware/*.js $amd64BINDIR
-cp -r $SOURCEBINPATH/event_handlers/sample/*.js $amd64BINDIR
-cp -r $SOURCEBINPATH/js/tyk.js $amd64BINDIR
-cp -r $SOURCEBINPATH/policies/policies.json $amd64BINDIR
+# echo "Copying configuration files into distros"
+# cp $SOURCEBINPATH/apps/app_sample.json $i386BINDIR
+# cp $SOURCEBINPATH/templates/*.json $i386BINDIR
+# cp $SOURCEBINPATH/tyk.conf.example $i386BINDIR/tyk.conf
+# cp -r $SOURCEBINPATH/middleware/*.js $i386BINDIR
+# cp -r $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
+# cp -r $SOURCEBINPATH/js/tyk.js $i386BINDIR
+# cp -r $SOURCEBINPATH/policies/policies.json $i386BINDIR
 
 
-cp $SOURCEBINPATH/apps/app_sample.json $armBINDIR
-cp $SOURCEBINPATH/templates/*.json $armBINDIR
-cp $SOURCEBINPATH/tyk.conf.example $armBINDIR/tyk.conf
-cp -r $SOURCEBINPATH/middleware/*.js $armBINDIR
-cp -r $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
-cp -r $SOURCEBINPATH/js/tyk.js $armBINDIR
-cp -r $SOURCEBINPATH/policies/policies.json $armBINDIR
-
-# -------------------------------------------------------
-echo "Preparing i386"
-cd $i386BINDIR
-
-# Create the packaging skeleton (debian/*)
-#dh_make -s --indep --createorig --yes
-dh_make -s --indep --createorig --yes
-
-# Remove make calls
-grep -v makefile debian/rules > debian/rules.new
-mv debian/rules.new debian/rules
-
-# debian/install must contain the list of scripts to install
-# as well as the target directory
-echo $SOURCEBIN usr/bin > debian/install
-echo "app_sample.json" etc/tyk/apps >> debian/install
-echo "error.json" etc/tyk/templates >> debian/install
-echo "default_webhook.json" etc/tyk/templates >> debian/install
-echo "tyk.conf" etc/tyk >> debian/install
-echo "tyk.js" etc/tyk/js >> debian/install
-echo "policies.json" etc/tyk/policies >> debian/install
-echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
-echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
-echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
-echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
-
-sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
-sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
-sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
-sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
-
-# We don't want a quilt based package
-echo "1.0" > debian/source/format
-# Remove the example files
-rm debian/*.ex
-
-# Build the package.
-# You  will get a lot of warnings.
-debuild -us -uc
-
-# -------------------------------------------------------
-echo "Preparing amd64"
-cd $amd64BINDIR
-
-# Create the packaging skeleton (debian/*)
-dh_make -s --indep --createorig --yes
-
-# Remove make calls
-grep -v makefile debian/rules > debian/rules.new
-mv debian/rules.new debian/rules
-
-# debian/install must contain the list of scripts to install
-# as well as the target directory
-echo $SOURCEBIN usr/bin > debian/install
-echo "app_sample.json" etc/tyk/apps >> debian/install
-echo "error.json" etc/tyk/templates >> debian/install
-echo "default_webhook.json" etc/tyk/templates >> debian/install
-echo "tyk.conf" etc/tyk >> debian/install
-echo "tyk.js" etc/tyk/js >> debian/install
-echo "policies.json" etc/tyk/policies >> debian/install
-echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
-echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
-echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
-echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
-
-sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
-sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
-sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
-sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
+# cp $SOURCEBINPATH/apps/app_sample.json $amd64BINDIR
+# cp $SOURCEBINPATH/templates/*.json $amd64BINDIR
+# cp $SOURCEBINPATH/tyk.conf.example $amd64BINDIR/tyk.conf
+# cp -r $SOURCEBINPATH/middleware/*.js $amd64BINDIR
+# cp -r $SOURCEBINPATH/event_handlers/sample/*.js $amd64BINDIR
+# cp -r $SOURCEBINPATH/js/tyk.js $amd64BINDIR
+# cp -r $SOURCEBINPATH/policies/policies.json $amd64BINDIR
 
 
-# We don't want a quilt based package
-echo "1.0" > debian/source/format
+# cp $SOURCEBINPATH/apps/app_sample.json $armBINDIR
+# cp $SOURCEBINPATH/templates/*.json $armBINDIR
+# cp $SOURCEBINPATH/tyk.conf.example $armBINDIR/tyk.conf
+# cp -r $SOURCEBINPATH/middleware/*.js $armBINDIR
+# cp -r $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
+# cp -r $SOURCEBINPATH/js/tyk.js $armBINDIR
+# cp -r $SOURCEBINPATH/policies/policies.json $armBINDIR
 
-# Remove the example files
-rm debian/*.ex
+# # -------------------------------------------------------
+# echo "Preparing i386"
+# cd $i386BINDIR
 
-# Build the package.
-# You  will get a lot of warnings.
-debuild -us -uc
+# # Create the packaging skeleton (debian/*)
+# #dh_make -s --indep --createorig --yes
+# dh_make -s --indep --createorig --yes
 
-# -------------------------------------------------------
-echo "Preparing arm"
-cd $armBINDIR
+# # Remove make calls
+# grep -v makefile debian/rules > debian/rules.new
+# mv debian/rules.new debian/rules
 
-# Create the packaging skeleton (debian/*)
-dh_make -s --indep --createorig --yes
+# # debian/install must contain the list of scripts to install
+# # as well as the target directory
+# echo $SOURCEBIN usr/bin > debian/install
+# echo "app_sample.json" etc/tyk/apps >> debian/install
+# echo "error.json" etc/tyk/templates >> debian/install
+# echo "default_webhook.json" etc/tyk/templates >> debian/install
+# echo "tyk.conf" etc/tyk >> debian/install
+# echo "tyk.js" etc/tyk/js >> debian/install
+# echo "policies.json" etc/tyk/policies >> debian/install
+# echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
+# echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
+# echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
+# echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
 
-# Remove make calls
-grep -v makefile debian/rules > debian/rules.new
-mv debian/rules.new debian/rules
+# sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
+# sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
+# sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
+# sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
 
-# debian/install must contain the list of scripts to install
-# as well as the target directory
-echo $SOURCEBIN usr/bin > debian/install
-echo "app_sample.json" etc/tyk/apps >> debian/install
-echo "error.json" etc/tyk/templates >> debian/install
-echo "default_webhook.json" etc/tyk/templates >> debian/install
-echo "tyk.conf" etc/tyk >> debian/install
-echo "tyk.js" etc/tyk/js >> debian/install
-echo "policies.json" etc/tyk/policies >> debian/install
-echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
-echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
-echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
-echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
+# # We don't want a quilt based package
+# echo "1.0" > debian/source/format
+# # Remove the example files
+# rm debian/*.ex
 
-sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
-sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
-sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
-sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
+# # Build the package.
+# # You  will get a lot of warnings.
+# debuild -us -uc
+
+# # -------------------------------------------------------
+# echo "Preparing amd64"
+# cd $amd64BINDIR
+
+# # Create the packaging skeleton (debian/*)
+# dh_make -s --indep --createorig --yes
+
+# # Remove make calls
+# grep -v makefile debian/rules > debian/rules.new
+# mv debian/rules.new debian/rules
+
+# # debian/install must contain the list of scripts to install
+# # as well as the target directory
+# echo $SOURCEBIN usr/bin > debian/install
+# echo "app_sample.json" etc/tyk/apps >> debian/install
+# echo "error.json" etc/tyk/templates >> debian/install
+# echo "default_webhook.json" etc/tyk/templates >> debian/install
+# echo "tyk.conf" etc/tyk >> debian/install
+# echo "tyk.js" etc/tyk/js >> debian/install
+# echo "policies.json" etc/tyk/policies >> debian/install
+# echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
+# echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
+# echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
+# echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
+
+# sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
+# sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
+# sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
+# sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
 
 
-# We don't want a quilt based package
-echo "1.0" > debian/source/format
+# # We don't want a quilt based package
+# echo "1.0" > debian/source/format
 
-# Remove the example files
-rm debian/*.ex
+# # Remove the example files
+# rm debian/*.ex
 
-# Build the package.
-# You  will get a lot of warnings.
-debuild -us -uc
+# # Build the package.
+# # You  will get a lot of warnings.
+# debuild -us -uc
+
+# # -------------------------------------------------------
+# echo "Preparing arm"
+# cd $armBINDIR
+
+# # Create the packaging skeleton (debian/*)
+# dh_make -s --indep --createorig --yes
+
+# # Remove make calls
+# grep -v makefile debian/rules > debian/rules.new
+# mv debian/rules.new debian/rules
+
+# # debian/install must contain the list of scripts to install
+# # as well as the target directory
+# echo $SOURCEBIN usr/bin > debian/install
+# echo "app_sample.json" etc/tyk/apps >> debian/install
+# echo "error.json" etc/tyk/templates >> debian/install
+# echo "default_webhook.json" etc/tyk/templates >> debian/install
+# echo "tyk.conf" etc/tyk >> debian/install
+# echo "tyk.js" etc/tyk/js >> debian/install
+# echo "policies.json" etc/tyk/policies >> debian/install
+# echo "sampleMiddleware.js" etc/tyk/middleware/sample >> debian/install
+# echo "firebase_test.js" etc/tyk/event_handlers/sample >> debian/install
+# echo "sample_event_handler.js" etc/tyk/event_handlers/sample >> debian/install
+# echo "session_editor.js" etc/tyk/event_handlers/sample >> debian/install
+
+# sed -i 's/.*Maintainer: Martin Buhr <martin@jive.ly>.*/Maintainer: Martin Buhr <martin@jive.ly>/' debian/control
+# sed -i 's/.*Homepage: http://tyk.io/.*/Homepage: http://tyk.io/' debian/control
+# sed -i 's/.*Description:A lightweight API gateway server.*/Description: A lightweight API gateway server/' debian/control
+# sed -i 's/.*A lightweight API gateway server written in Go.*/ A lightweight API gateway server written in Go/' debian/control
+
+
+# # We don't want a quilt based package
+# echo "1.0" > debian/source/format
+
+# # Remove the example files
+# rm debian/*.ex
+
+# # Build the package.
+# # You  will get a lot of warnings.
+# debuild -us -uc
 
 
