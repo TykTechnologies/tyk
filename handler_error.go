@@ -135,6 +135,10 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		}
 
 		thisRecord.SetExpiry(expiresAfter)
+		if config.AnalyticsConfig.NormaliseUrls.Enabled {
+			thisRecord.NormalisePath()
+		}
+
 		go analytics.RecordHit(thisRecord)
 	}
 

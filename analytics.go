@@ -4,6 +4,7 @@ import (
 	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"net"
+	"regexp"
 	"time"
 )
 
@@ -31,7 +32,7 @@ type AnalyticsRecord struct {
 	IPAddress     string
 	Geo           GeoData
 	Tags          []string
-	Alias         string 
+	Alias         string
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
 
@@ -82,6 +83,59 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	log.Debug("TZ: ", record.Location.TimeZone)
 
 	a.Geo = record
+}
+
+type NormaliseURLPatterns struct {
+	UUIDs  *regexp.Regexp
+	IDs    *regexp.Regexp
+	Custom []*regexp.Regexp
+}
+
+func InitNormalisationPatterns() NormaliseURLPatterns {
+	thesePatterns := NormaliseURLPatterns{}
+
+	uuidPat, pat1Err := regexp.Compile("[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}")
+	if pat1Err != nil {
+		log.Error("failed to compile custom pattern: ", pat1Err)
+	}
+
+	numPat, pat2Err := regexp.Compile(`\/(\d+)`)
+	if pat2Err != nil {
+		log.Error("failed to compile custom pattern: ", pat2Err)
+	}
+
+	custPats := []*regexp.Regexp{}
+	for _, pattern := range config.AnalyticsConfig.NormaliseUrls.Custom {
+		thisPat, patErr := regexp.Compile(pattern)
+		if patErr != nil {
+			log.Error("failed to compile custom pattern: ", patErr)
+		} else {
+			custPats = append(custPats, thisPat)
+		}
+	}
+
+	thesePatterns.UUIDs = uuidPat
+	thesePatterns.IDs = numPat
+	thesePatterns.Custom = custPats
+
+	return thesePatterns
+}
+
+func (a *AnalyticsRecord) NormalisePath() {
+	if config.AnalyticsConfig.NormaliseUrls.Enabled {
+		if config.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+			a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+		}
+		if config.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+			a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
+		}
+		if len(config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom) > 0 {
+			for _, r := range config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom {
+				a.Path = r.ReplaceAllString(a.Path, "{var}")
+			}
+		}
+	}
+
 }
 
 func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {

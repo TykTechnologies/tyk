@@ -155,6 +155,14 @@ func setupGlobals() {
 			}).Error("Failed to initialise monitor! ", monitorErr)
 		}
 	}
+
+	if config.AnalyticsConfig.NormaliseUrls.Enabled {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Setting up analytics normaliser")
+		config.AnalyticsConfig.NormaliseUrls.compiledPatternSet = InitNormalisationPatterns()
+	}
+
 }
 
 // Pull API Specs from configuration
@@ -767,7 +775,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),					
+					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
 
 				for _, obj := range mwPreFuncs {

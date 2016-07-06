@@ -49,7 +49,14 @@ type Config struct {
 		EnableDetailedRecording bool     `json:"enable_detailed_recording"`
 		EnableGeoIP             bool     `json:"enable_geo_ip"`
 		GeoIPDBLocation         string   `json:"geo_ip_db_path"`
-		ignoredIPsCompiled      map[string]bool
+		NormaliseUrls           struct {
+			Enabled            bool                 `json:"enabled"`
+			NormaliseUUIDs     bool                 `json:"normalise_uuids"`
+			NormaliseNumbers   bool                 `json:"normalise_numbers"`
+			Custom             []string             `json:"custom_patterns"`
+			compiledPatternSet NormaliseURLPatterns // see analytics.go
+		} `json:"normalise_urls"`
+		ignoredIPsCompiled map[string]bool
 	} `json:"analytics_config"`
 	HealthCheck struct {
 		EnableHealthChecks      bool  `json:"enable_health_checks"`

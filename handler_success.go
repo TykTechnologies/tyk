@@ -310,6 +310,10 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 
 		thisRecord.SetExpiry(expiresAfter)
 
+		if config.AnalyticsConfig.NormaliseUrls.Enabled {
+			thisRecord.NormalisePath()
+		}
+
 		go analytics.RecordHit(thisRecord)
 	}
 
