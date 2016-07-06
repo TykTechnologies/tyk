@@ -97,6 +97,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
+			r.URL.Path,
 			r.ContentLength,
 			r.Header.Get("User-Agent"),
 			t.Day(),

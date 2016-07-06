@@ -272,6 +272,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 		thisRecord := AnalyticsRecord{
 			r.Method,
 			r.URL.Path,
+			r.URL.Path,
 			r.ContentLength,
 			r.Header.Get("User-Agent"),
 			t.Day(),
