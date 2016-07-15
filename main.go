@@ -4,13 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	logger "github.com/TykTechnologies/tykcommon-logger"
 	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
-	"github.com/lonelycode/tykcommon"
 	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
 	"html/template"
@@ -201,14 +201,14 @@ func getAPISpecs() *[]*APISpec {
 	}).Printf("Detected %v APIs", len(*APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].AuthProvider = config.AuthOverride.AuthProvider
 
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
@@ -1059,7 +1059,7 @@ func init() {
 	}
 
 	// Enable command mode
-	for k, _ := range CommandModeOptions {
+	for k := range CommandModeOptions {
 
 		v := arguments[k]
 
@@ -1256,7 +1256,7 @@ func listen() {
 	if config.HttpServerOptions.WriteTimeout > 0 {
 		WriteTimeout = config.HttpServerOptions.WriteTimeout
 	}
-	targetPort := fmt.Sprintf(":%d", config.ListenPort)
+	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()

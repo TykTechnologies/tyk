@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"github.com/Sirupsen/logrus"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 	"strconv"
 )
