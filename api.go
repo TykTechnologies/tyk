@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"

@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/gorilla/context"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 	"net/url"
 	"reflect"

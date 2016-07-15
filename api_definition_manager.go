@@ -6,7 +6,7 @@ import (
 	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2"
 	"io/ioutil"

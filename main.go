@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
 	"html/template"
