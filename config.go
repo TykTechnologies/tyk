@@ -11,6 +11,7 @@ import (
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
+	ListenAddress  string `json:"listen_address"`
 	ListenPort     int    `json:"listen_port"`
 	Secret         string `json:"secret"`
 	NodeSecret     string `json:"node_secret"`
@@ -149,6 +150,7 @@ type CertData struct {
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
 func WriteDefaultConf(configStruct *Config) {
+	configStruct.ListenAddress = ""
 	configStruct.ListenPort = 8080
 	configStruct.Secret = "352d20ee67be67f6340b4c0605b044b7"
 	configStruct.TemplatePath = "./templates"
