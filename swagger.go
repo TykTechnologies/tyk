@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/lonelycode/go-uuid/uuid"
-	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"strings"
 )

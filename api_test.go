@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/mux"
-	"github.com/lonelycode/tykcommon"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

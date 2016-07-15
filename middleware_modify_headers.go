@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
-	"github.com/lonelycode/tykcommon"
 	"net/http"
 	"net/url"
 	"reflect"

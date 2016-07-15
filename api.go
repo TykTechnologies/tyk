@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
-	"github.com/lonelycode/tykcommon"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
@@ -97,7 +97,7 @@ func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionS
 func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) error {
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
-		for apiId, _ := range newSession.AccessRights {
+		for apiId := range newSession.AccessRights {
 			thisAPISpec := GetSpecForApi(apiId)
 			if thisAPISpec != nil {
 
@@ -216,7 +216,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 				// Ge the session
 				var originalKey SessionState
 				var found bool
-				for api_id, _ := range newSession.AccessRights {
+				for api_id := range newSession.AccessRights {
 					originalKey, found = GetKeyDetail(keyName, api_id)
 					if found {
 						break
@@ -1291,7 +1291,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if len(newSession.AccessRights) > 0 {
-				for apiId, _ := range newSession.AccessRights {
+				for apiId := range newSession.AccessRights {
 					thisAPISpec := GetSpecForApi(apiId)
 					if thisAPISpec != nil {
 						checkAndApplyTrialPeriod(newKey, apiId, &newSession)

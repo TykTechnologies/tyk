@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/lonelycode/go-uuid/uuid"
-	"github.com/lonelycode/tykcommon"
 	"io/ioutil"
 	"strings"
 )
