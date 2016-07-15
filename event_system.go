@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2/bson"
 	"net/http"

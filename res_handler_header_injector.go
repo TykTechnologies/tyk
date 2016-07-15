@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/mitchellh/mapstructure"
 	"net/http"
 )
