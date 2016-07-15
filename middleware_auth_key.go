@@ -97,7 +97,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, no auth header found.")
 
-		return errors.New("Authorization field missing"), 400
+		return errors.New("Authorization field missing"), 401
 	}
 
 	// Ignore Bearer prefix on token if it exists
