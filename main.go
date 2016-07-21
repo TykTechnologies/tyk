@@ -138,6 +138,8 @@ func setupGlobals() {
 		GlobalEventsJSVM.Init(config.TykJSPath)
 	}
 
+	CoProcessInit()
+
 	// Get the notifier ready
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
