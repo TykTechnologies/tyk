@@ -782,6 +782,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, obj := range mwPreFuncs {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+
+					if EnableCoProcess {
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				for _, baseMw := range baseChainArray {
@@ -790,6 +794,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, obj := range mwPostFuncs {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+
+					if EnableCoProcess {
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				// for KeyLessAccess we can't support rate limiting, versioning or access rules
@@ -873,6 +881,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				// Add pre-process MW
 				for _, obj := range mwPreFuncs {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+
+					if EnableCoProcess {
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				for _, baseMw := range baseChainArray {
@@ -881,6 +893,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, obj := range mwPostFuncs {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+
+					if EnableCoProcess {
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				log.WithFields(logrus.Fields{
