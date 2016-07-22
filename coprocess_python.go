@@ -139,7 +139,6 @@ func (d *PythonDispatcher) DispatchHook(payload, payloadType string) CoProcessMi
 
 	C.free(unsafe.Pointer(CPayload))
 	C.free(unsafe.Pointer(CPayloadType))
-	C.free(unsafe.Pointer(CResult))
 
 	return modifiedRequest
 
