@@ -103,6 +103,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"unsafe"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -136,6 +137,10 @@ func (d *PythonDispatcher) DispatchHook(payload, payloadType string) CoProcessMi
 
 	log.Println("GoString (unmarshal) => ", modifiedRequest)
 
+	C.free(unsafe.Pointer(CPayload))
+	C.free(unsafe.Pointer(CPayloadType))
+	C.free(unsafe.Pointer(CResult))
+
 	return modifiedRequest
 
 }
@@ -166,14 +171,18 @@ func PythonNewDispatcher(middlewarePath string) (err error, dispatcher CoProcess
 	} else {
 		dispatcher = &PythonDispatcher{}
 	}
+
+	C.free(unsafe.Pointer(CMiddlewarePath))
+
 	return err, dispatcher
 }
 
 func PythonSetEnv(pythonPaths ...string) {
 	var CPythonPath *C.char
 	CPythonPath = C.CString(strings.Join(pythonPaths, ":"))
-
 	C.Python_SetEnv(CPythonPath)
+
+	C.free(unsafe.Pointer(CPythonPath))
 }
 
 func CoProcessInit() (err error) {
