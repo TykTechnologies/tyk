@@ -7,10 +7,10 @@ package main
 
 #include "coprocess/sds/sds.h"
 
+#include "coprocess/api.h"
+
 #include "coprocess/python/dispatcher.h"
 #include "coprocess/python/binding.h"
-
-extern void CoProcess_Log(char *msg, char *level);
 
 */
 import "C"
@@ -99,6 +99,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	    "prefix": "CoProcessMiddleware",
 	  }).Info( "ProcessRequest: ", m.MiddlewareClassName )
 	*/
+
+	log.Println("*** PROCESSREQUEST!", m.TykMiddleware.Spec)
+	log.Println("getOrgId() = ", m.TykMiddleware.Spec.OrgID)
+	log.Println("getAPIID() = ", m.TykMiddleware.Spec.APIID)
 
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
