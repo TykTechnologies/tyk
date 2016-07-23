@@ -13,12 +13,21 @@ package main
 
 #include "coprocess/sds/sds.h"
 
+#include "coprocess/api.h"
+
 #include "coprocess/python/binding.h"
 #include "coprocess/python/dispatcher.h"
 
 static int Python_Init() {
   CoProcess_Log( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
   Py_Initialize();
+
+	char *k = "key";
+	char *v = "value";
+	int ttl = 100;
+
+	TykStoreData(k,v,ttl);
+	
   return Py_IsInitialized();
 }
 
