@@ -17,13 +17,18 @@ import "C"
 import("fmt")
 
 //export TykStoreData
-func TykStoreData( key *C.char, value *C.char, TTL C.int ) {
+func TykStoreData( CKey *C.char, CValue *C.char, CTTL C.int ) {
   // Store or cache some data in Redis, INCR, DECR?
-  fmt.Println("storeData\n")
+  key := C.GoString(CKey)
+  value := C.GoString(CValue)
+  ttl := int(CTTL)
+  fmt.Println("storeData: ", key, ", ", value, ", ", ttl)
 }
 
 //export TykTriggerEvent
-func TykTriggerEvent( eventName *C.char, payload *C.char ) {
+func TykTriggerEvent( CEventName *C.char, CPayload *C.char ) {
   // triggers Tyk event
-  fmt.Println("triggerEvent\n")
+  eventName := C.GoString(CEventName)
+  payload := C.GoString(CPayload)
+  fmt.Println("triggerEvent: ", eventName, ", ", payload)
 }
