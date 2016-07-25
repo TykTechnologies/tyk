@@ -13,7 +13,7 @@ class Post(HandlerDecorator):
     def __call__(self, req, sess):
         self.f(req, sess)
 
-class AccessRightsCheck(HandlerDecorator):
+class PostKeyAuth(HandlerDecorator):
     def __cal__(self, req, sess):
         self.f(req, sess)
 
