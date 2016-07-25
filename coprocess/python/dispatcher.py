@@ -58,14 +58,3 @@ class TykDispatcher:
 
         payload = json.dumps(payload)
         return payload
-
-class TykGateway:
-    def store_data(key, value, ttl):
-        print("store_data", key, value, ttl)
-    def trigger_event(key, value, ttl):
-        print("trigger_event", key, value, ttl)
-    def log(msg, level):
-        print("log", msg, level)
-
-# dispatcher = TykDispatcher("/Users/matias/dev/tyk/middleware/python")
-# dispatcher.dispatch_hook("{\"Body\":\"tyk=1\"}", "pre")
