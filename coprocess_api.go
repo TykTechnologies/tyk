@@ -14,7 +14,11 @@ package main
 */
 import "C"
 
-import("fmt")
+import(
+  "github.com/lonelycode/tykcommon"
+
+  "fmt"
+)
 
 //export TykStoreData
 func TykStoreData( CKey *C.char, CValue *C.char, CTTL C.int ) {
@@ -27,8 +31,10 @@ func TykStoreData( CKey *C.char, CValue *C.char, CTTL C.int ) {
 
 //export TykTriggerEvent
 func TykTriggerEvent( CEventName *C.char, CPayload *C.char ) {
-  // triggers Tyk event
   eventName := C.GoString(CEventName)
   payload := C.GoString(CPayload)
-  fmt.Println("triggerEvent: ", eventName, ", ", payload)
+
+  FireSystemEvent(tykcommon.TykEvent(eventName), EventMetaDefault{
+    Message: payload,
+  })
 }
