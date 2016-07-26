@@ -15,6 +15,6 @@ func CoProcessInit() {
 	}).Info("Disabled feature")
 }
 
-func CreateCoProcessMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	return nil
 }
