@@ -781,7 +781,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(tykMiddleware))
+					chainArray = append(chainArray, CreateCoProcessMiddleware(true, tykMiddleware))
 				}
 
 				for _, obj := range mwPreFuncs {
@@ -790,6 +790,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, baseMw := range baseChainArray {
 					chainArray = append(chainArray, baseMw)
+				}
+
+				if EnableCoProcess {
+					chainArray = append(chainArray, CreateCoProcessMiddleware(false, tykMiddleware))
 				}
 
 				for _, obj := range mwPostFuncs {
@@ -876,7 +880,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				log.Debug("Chain array end")
 
 				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(tykMiddleware))
+					chainArray = append(chainArray, CreateCoProcessMiddleware(true, tykMiddleware))
 				}
 
 				// Add pre-process MW
@@ -886,6 +890,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, baseMw := range baseChainArray {
 					chainArray = append(chainArray, baseMw)
+				}
+
+				if EnableCoProcess {
+					chainArray = append(chainArray, CreateCoProcessMiddleware(false, tykMiddleware))
 				}
 
 				for _, obj := range mwPostFuncs {

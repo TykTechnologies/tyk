@@ -35,12 +35,12 @@ func CoProcessDispatchHook(r CoProcessMiniRequestObject, payloadType string) CoP
 	return GlobalDispatcher.DispatchHook(string(payload), payloadType)
 }
 
-func CreateCoProcessMiddleware(tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(IsPre bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware:       tykMwSuper,
+		Pre: IsPre,
 		/*
 		MiddlewareClassName: MiddlewareName,
-		Pre:                 IsPre,
 		UseSession:          UseSession,
 		*/
 	}
@@ -96,15 +96,15 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	/*
 	  log.WithFields(logrus.Fields{
 	    "prefix": "CoProcessMiddleware",
-	  }).Info( "ProcessRequest: ", m.MiddlewareClassName )
-	*/
+	  }).Info( "ProcessRequest: ", m.MiddlewareClassName, " Pre: ", m.Pre )
 
+	/*
 	log.Println("*** PROCESSREQUEST!", m.TykMiddleware.Spec)
 	log.Println("getOrgId() = ", m.TykMiddleware.Spec.OrgID)
 	log.Println("getAPIID() = ", m.TykMiddleware.Spec.APIID)
+	*/
 
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
