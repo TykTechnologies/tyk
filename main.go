@@ -973,7 +973,7 @@ func getCmdArguments() map[string]interface{} {
 		--log-instrumentation        Output instrumentation data to stdout
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
+	arguments, err := docopt.Parse(usage, nil, true, VERSION, false)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
