@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 )
 

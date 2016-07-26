@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/lonelycode/go-uuid/uuid"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"io/ioutil"
 	"strings"
 )

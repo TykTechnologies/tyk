@@ -6,7 +6,7 @@ import (
 	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/lonelycode/go-uuid/uuid"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"net/url"
 	"time"

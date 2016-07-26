@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/lonelycode/gabs"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"io/ioutil"
 	"net/http"
 	"strconv"
