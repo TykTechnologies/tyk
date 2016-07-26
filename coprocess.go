@@ -35,12 +35,14 @@ func CoProcessDispatchHook(r CoProcessMiniRequestObject, payloadType string) CoP
 	return GlobalDispatcher.DispatchHook(string(payload), payloadType)
 }
 
-func CreateCoProcessMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware:       tykMwSuper,
+		/*
 		MiddlewareClassName: MiddlewareName,
 		Pre:                 IsPre,
 		UseSession:          UseSession,
+		*/
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
