@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
 	"net/http"

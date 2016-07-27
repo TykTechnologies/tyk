@@ -6,7 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/context"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"golang.org/x/net/html/charset"
 	"io"
 	"io/ioutil"

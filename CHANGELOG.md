@@ -1,5 +1,6 @@
 # Develop
 
+- Added the option to set the listen path (defaults to binding to all addresses)
 - Fixed URL Rewriter to better handle query strings
 - Added XML transform support for requests and responses, simply set the data type to `xml` int he transforms section and create your template the same way you would for JSON. 
 

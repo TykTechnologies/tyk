@@ -1,4 +1,5 @@
 {
+  "listen_address": "",
   "listen_port": 8080,
   "secret": "352d20ee67be67f6340b4c0605b044b7",
   "template_path": "/etc/tyk/templates",

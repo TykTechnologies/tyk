@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
-	"github.com/lonelycode/tykcommon"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
 	"html/template"
@@ -61,6 +61,9 @@ const (
 
 // Display configuration options
 func displayConfig() {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("--> Listening on address: ", config.ListenAddress)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("--> Listening on port: ", config.ListenPort)
@@ -1275,7 +1278,7 @@ func listen() {
 	if config.HttpServerOptions.WriteTimeout > 0 {
 		WriteTimeout = config.HttpServerOptions.WriteTimeout
 	}
-	targetPort := fmt.Sprintf(":%d", config.ListenPort)
+	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 
 	// Handle reload when SIGUSR2 is received
 	l, err := goagain.Listener()
