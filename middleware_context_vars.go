@@ -41,18 +41,12 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		segmentedPathArray := strings.Split(copiedRequest.URL.Path, "/")
 		contextDataObject["path_parts"] = segmentedPathArray
 
-		// Key data
-		authHeaderValue := context.Get(r, AuthHeaderValue)
-		contextDataObject["token"] = authHeaderValue
-
 		// path data
 		contextDataObject["path"] = copiedRequest.URL.Path
 
 		// IP:Port
 		contextDataObject["remote_addr"] = copiedRequest.RemoteAddr
 	}
-
-	log.Debug("Context Data Object: ", contextDataObject)
 
 	context.Set(r, ContextData, contextDataObject)
 

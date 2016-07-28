@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gorilla/context"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -54,7 +54,7 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 	}
 
 	if useContext {
-		log.Info("Using context")
+		log.Debug("Using context")
 		var contextData map[string]interface{}
 		cnt, contextFound := context.GetOk(r, ContextData)
 
@@ -70,6 +70,50 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 
 			if contextFound {
 				tempVal, ok := contextData[contextKey]
+				var nVal string
+				if ok {
+					switch tempVal.(type) {
+					case string:
+						nVal = tempVal.(string)
+					case []string:
+						nVal = strings.Join(tempVal.([]string), ",")
+						// Remove empty start
+						nVal = strings.TrimPrefix(nVal, ",")
+					case url.Values:
+						end := len(tempVal.(url.Values))
+						i := 0
+						nVal = ""
+						for key, val := range tempVal.(url.Values) {
+							nVal += key + ":" + strings.Join(val, ",")
+							if i < end-1 {
+								nVal += ";"
+							}
+							i++
+						}
+					default:
+						log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
+					}
+					newpath = strings.Replace(newpath, string(v[0]), url.QueryEscape(nVal), -1)
+				}
+
+			}
+
+		}
+	}
+
+	// Meta data from the token
+	sess, sessFound := context.GetOk(r, SessionData)
+	if sessFound {
+		thisSessionState := sess.(SessionState)
+
+		metaDollarMatch, _ := regexp.Compile(`\$tyk_meta.(\w+)`)
+		metaReplace_slice := metaDollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
+		for _, v := range metaReplace_slice {
+			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
+			log.Debug("Replacing: ", v[0])
+
+			tempVal, ok := thisSessionState.MetaData.(map[string]interface{})[contextKey]
+			if ok {
 				var nVal string
 				if ok {
 					switch tempVal.(type) {

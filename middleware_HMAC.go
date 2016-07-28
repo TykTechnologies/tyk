@@ -100,10 +100,24 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Set session state on context, we will need it later
 	context.Set(r, SessionData, thisSessionState)
 	context.Set(r, AuthHeaderValue, fieldValues.KeyID)
-
+	hm.setContextVars(r, fieldValues.KeyID)
 	// Everything seems in order let the request through
 	return nil, 200
 
+}
+
+func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
+	// Flatten claims and add to context
+	if hm.Spec.EnableContextVars {
+		cnt, contextFound := context.GetOk(r, ContextData)
+		var contextDataObject map[string]interface{}
+		if contextFound {
+			// Key data
+			contextDataObject = cnt.(map[string]interface{})
+			contextDataObject["token"] = token
+			context.Set(r, ContextData, contextDataObject)
+		}
+	}
 }
 
 func (hm *HMACMiddleware) authorizationError(w http.ResponseWriter, r *http.Request) (error, int) {
