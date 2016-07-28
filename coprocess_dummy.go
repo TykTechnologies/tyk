@@ -16,6 +16,20 @@ const(
 	CoProcessPostKeyAuth
 )
 
+type DummyCoProcessMiddleware struct {
+	*TykMiddleware
+}
+
+func (m *DummyCoProcessMiddleware) New() {}
+
+func (m *DummyCoProcessMiddleware) GetConfig() (interface{}, error) {
+	return nil, nil
+}
+
+func (m *DummyCoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+	return nil, 200
+}
+
 func CoProcessInit() {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
@@ -23,5 +37,5 @@ func CoProcessInit() {
 }
 
 func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
-	return nil
+	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
 }
