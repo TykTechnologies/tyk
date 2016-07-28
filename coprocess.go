@@ -20,19 +20,13 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/gorilla/context"
 
+	"github.com/TykTechnologies/tyk/coprocess"
+
 	"encoding/json"
 
 	"bytes"
 	"io/ioutil"
 	"net/http"
-)
-
-const(
-	_ = iota
-	CoProcessPre
-	CoProcessPost
-	CoProcessPostKeyAuth
-	CoProcessCustomKeyCheck
 )
 
 var EnableCoProcess bool = true
@@ -132,18 +126,18 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	switch m.HookType {
-	case CoProcessPre:
+	case coprocess.PreHook:
 		object.HookType = "pre"
-	case CoProcessPost:
+	case coprocess.PostHook:
 		object.HookType = "post"
-	case CoProcessPostKeyAuth:
+	case coprocess.PostKeyAuthHook:
 		object.HookType = "postkeyauth"
 	default:
 		object.HookType = ""
 	}
 
 	// Encode the session object (if not a pre-process)
-	if m.HookType != CoProcessPre  && m.HookType != CoProcessCustomKeyCheck {
+	if m.HookType != coprocess.PreHook  && m.HookType != coprocess.CustomKeyCheckHook {
 		object.Session = context.Get(r, SessionData).(SessionState)
 	}
 

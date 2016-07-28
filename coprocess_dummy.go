@@ -4,18 +4,11 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
+
 	"net/http"
 )
 
 var EnableCoProcess bool = false
-
-const(
-	_ = iota
-	CoProcessPre
-	CoProcessPost
-	CoProcessPostKeyAuth
-	CoProcessCustomKeyCheck
-)
 
 type DummyCoProcessMiddleware struct {
 	*TykMiddleware
