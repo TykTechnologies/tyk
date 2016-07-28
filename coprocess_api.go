@@ -15,7 +15,7 @@ package main
 import "C"
 
 import(
-  "github.com/lonelycode/tykcommon"
+  "github.com/TykTechnologies/tykcommon"
 
   "fmt"
 )
