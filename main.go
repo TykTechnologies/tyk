@@ -784,7 +784,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(true, tykMiddleware))
+					chainArray = append(chainArray, CreateCoProcessMiddleware(CoProcessPre, tykMiddleware))
 				}
 
 				for _, obj := range mwPreFuncs {
@@ -796,7 +796,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(false, tykMiddleware))
+					chainArray = append(chainArray, CreateCoProcessMiddleware(CoProcessPost, tykMiddleware))
 				}
 
 				for _, obj := range mwPostFuncs {
@@ -866,6 +866,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
 					keyCheck,
+					CreateCoProcessMiddleware(CoProcessPostKeyAuth, tykMiddleware),
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
@@ -883,7 +884,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				log.Debug("Chain array end")
 
 				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(true, tykMiddleware))
+					chainArray = append(chainArray, CreateCoProcessMiddleware(CoProcessPre, tykMiddleware))
 				}
 
 				// Add pre-process MW
@@ -896,7 +897,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(false, tykMiddleware))
+					chainArray = append(chainArray, CreateCoProcessMiddleware(CoProcessPost, tykMiddleware))
 				}
 
 				for _, obj := range mwPostFuncs {

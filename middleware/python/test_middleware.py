@@ -21,5 +21,11 @@ def AddSomeHeader(request, session, spec):
 
     return request, session
 
+@PostKeyAuth
+def Something(request, session, spec):
+    print("post key auth?")
+    
+    return request, session
+
 def NotARealHandler():
     pass

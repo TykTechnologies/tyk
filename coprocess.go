@@ -27,6 +27,13 @@ import (
 	"net/http"
 )
 
+const(
+	_ = iota
+	CoProcessPre
+	CoProcessPost
+	CoProcessPostKeyAuth
+)
+
 var EnableCoProcess bool = true
 
 var GlobalDispatcher CoProcessDispatcher
@@ -36,10 +43,10 @@ func CoProcessDispatchHook(o CoProcessObject) CoProcessObject {
 	return GlobalDispatcher.DispatchHook(objectAsJson)
 }
 
-func CreateCoProcessMiddleware(IsPre bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware:       tykMwSuper,
-		Pre: IsPre,
+		HookType: hookType,
 		/*
 		MiddlewareClassName: MiddlewareName,
 		UseSession:          UseSession,
@@ -75,9 +82,7 @@ type CoProcessMiniRequestObject struct {
 
 type CoProcessMiddleware struct {
 	*TykMiddleware
-	MiddlewareClassName string
-	Pre                 bool
-	UseSession          bool
+	HookType int
 }
 
 type CoProcessMiddlewareConfig struct {
@@ -106,7 +111,7 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	  log.WithFields(logrus.Fields{
 	    "prefix": "coprocess",
-	  }).Info( "ProcessRequest: ", m.MiddlewareClassName, " Pre: ", m.Pre )
+	  }).Info( "ProcessRequest, HookType:", m.HookType )
 
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
@@ -125,12 +130,20 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		DeleteParams:   make([]string, 0),
 	}
 
-	object.HookType = "pre"
+	switch m.HookType {
+	case CoProcessPre:
+		object.HookType = "pre"
+	case CoProcessPost:
+		object.HookType = "post"
+	case CoProcessPostKeyAuth:
+		object.HookType = "postkeyauth"
+	default:
+		object.HookType = ""
+	}
 
 	// Encode the session object (if not a pre-process)
-	if !m.Pre {
+	if m.HookType != CoProcessPre  {
 		object.Session = context.Get(r, SessionData).(SessionState)
-		object.HookType = "post"
 	}
 
 	// Append spec data
