@@ -19,7 +19,6 @@ class TykMiddleware:
                         self.handlers[handler_type] = []
                     self.handlers[handler_type].append(attr_value)
 
-    def process(self, handler, payload, payload_type):
-        print("TykMiddleware.process()", payload)
-        request, session = handler(payload, {})
-        return request
+    def process(self, handler, object):
+        object.request, object.session = handler(object.request, object.session, object.spec)
+        return object
