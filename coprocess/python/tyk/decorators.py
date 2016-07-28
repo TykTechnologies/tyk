@@ -14,7 +14,7 @@ class Post(HandlerDecorator):
         return self.f(req, sess, spec)
 
 class PostKeyAuth(HandlerDecorator):
-    def __cal__(self, req, sess, spec):
+    def __call__(self, req, sess, spec):
         return self.f(req, sess, spec)
 
 def ThisIsNotADecorator():
