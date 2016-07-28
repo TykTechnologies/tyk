@@ -1,5 +1,10 @@
 # Develop
 
+- Context Data now includes JWT Claims, claims are added as individual keys as $tyk_context.jwt_claims_CLAIMNAME.
+- Meta data is now available to the URL Rewriter (for e.g. to inject a custom querystring for key holders.)
+
+# v2.2
+
 - Added the option to set the listen path (defaults to binding to all addresses)
 - Fixed URL Rewriter to better handle query strings
 - Added XML transform support for requests and responses, simply set the data type to `xml` int he transforms section and create your template the same way you would for JSON. 
