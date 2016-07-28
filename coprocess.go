@@ -144,6 +144,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	r.ContentLength = int64(len(newObject.Request.Body))
 	r.Body = ioutil.NopCloser(bytes.NewBufferString(newObject.Request.Body))
 
+	for _, dh := range newObject.Request.DeleteHeaders {
+		r.Header.Del(dh)
+	}
+
+	for h, v := range newObject.Request.SetHeaders {
+		r.Header.Set(h, v)
+	}
+
 	return nil, 200
 }
 
