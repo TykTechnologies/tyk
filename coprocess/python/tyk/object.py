@@ -13,11 +13,8 @@ class TykCoProcessObject:
         self.spec = self.object['spec']
         self.hook_type = self.object['hook_type']
 
-    def add_header(self, key, value):
-        self.request.SetHeaders[key] = value
-
     def dump(self):
         self.object['request'] = self.request.__dict__
         self.object['session'] = self.session.__dict__
-        
+
         return json.dumps(self.object)
