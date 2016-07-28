@@ -48,6 +48,21 @@ func CopyRequest(r *http.Request) *http.Request {
 	return tempRes
 }
 
+func (k *AuthKey) setContextVars(r *http.Request, token string) {
+	// Flatten claims and add to context
+	if k.Spec.EnableContextVars {
+		cnt, contextFound := context.GetOk(r, ContextData)
+		var contextDataObject map[string]interface{}
+		if contextFound {
+			// Key data
+			contextDataObject = cnt.(map[string]interface{})
+			contextDataObject["token"] = token
+			context.Set(r, ContextData, contextDataObject)
+		}
+		
+	}
+}
+
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	var tempRes *http.Request
 
@@ -124,6 +139,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	// Set session state on context, we will need it later
 	context.Set(r, SessionData, thisSessionState)
 	context.Set(r, AuthHeaderValue, key)
+	k.setContextVars(r, key)
 	return nil, 200
 }
 

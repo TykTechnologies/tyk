@@ -263,6 +263,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 
 			context.Set(r, SessionData, thisSessionState)
 			context.Set(r, AuthHeaderValue, SessionID)
+			k.setContextVars(r, token)
 			return nil, 200
 		}
 
@@ -274,6 +275,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	log.Debug("Key found")
 	context.Set(r, SessionData, thisSessionState)
 	context.Set(r, AuthHeaderValue, SessionID)
+	k.setContextVars(r, token)
 	return nil, 200
 }
 
@@ -303,6 +305,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(w http.ResponseWriter, r *http.R
 	log.Debug("Raw key ID found.")
 	context.Set(r, SessionData, thisSessionState)
 	context.Set(r, AuthHeaderValue, tykId)
+	k.setContextVars(r, token)
 	return nil, 200
 }
 
@@ -415,6 +418,30 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), 403
+	}
+}
+
+func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
+	// Flatten claims and add to context
+	if k.Spec.EnableContextVars {
+		cnt, contextFound := context.GetOk(r, ContextData)
+		var contextDataObject map[string]interface{}
+		if contextFound {
+			contextDataObject = cnt.(map[string]interface{})
+			claimPrefix := "jwt_claims_"
+
+			for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
+				thisClaim := claimPrefix + claimName
+				contextDataObject[thisClaim] = claimValue
+			}
+
+			// Key data
+			authHeaderValue := context.Get(r, AuthHeaderValue)
+			contextDataObject["token"] = authHeaderValue
+			
+			context.Set(r, ContextData, contextDataObject)
+		}
+		
 	}
 }
 
