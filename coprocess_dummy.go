@@ -14,6 +14,7 @@ const(
 	CoProcessPre
 	CoProcessPost
 	CoProcessPostKeyAuth
+	CoProcessCustomKeyCheck
 )
 
 type DummyCoProcessMiddleware struct {

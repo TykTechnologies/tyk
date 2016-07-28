@@ -32,6 +32,7 @@ const(
 	CoProcessPre
 	CoProcessPost
 	CoProcessPostKeyAuth
+	CoProcessCustomKeyCheck
 )
 
 var EnableCoProcess bool = true
@@ -142,7 +143,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Encode the session object (if not a pre-process)
-	if m.HookType != CoProcessPre  {
+	if m.HookType != CoProcessPre  && m.HookType != CoProcessCustomKeyCheck {
 		object.Session = context.Get(r, SessionData).(SessionState)
 	}
 
