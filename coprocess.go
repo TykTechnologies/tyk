@@ -18,6 +18,7 @@ import "C"
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/mitchellh/mapstructure"
+	"github.com/gorilla/context"
 
 	"encoding/json"
 
@@ -30,9 +31,9 @@ var EnableCoProcess bool = true
 
 var GlobalDispatcher CoProcessDispatcher
 
-func CoProcessDispatchHook(r CoProcessMiniRequestObject, payloadType string) CoProcessMiniRequestObject {
-	payload, _ := json.Marshal(r)
-	return GlobalDispatcher.DispatchHook(string(payload), payloadType)
+func CoProcessDispatchHook(o CoProcessObject) CoProcessObject {
+	objectAsJson, _ := json.Marshal(o)
+	return GlobalDispatcher.DispatchHook(objectAsJson)
 }
 
 func CreateCoProcessMiddleware(IsPre bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
@@ -49,7 +50,14 @@ func CreateCoProcessMiddleware(IsPre bool, tykMwSuper *TykMiddleware) func(http.
 }
 
 type CoProcessDispatcher interface {
-	DispatchHook(string, string) CoProcessMiniRequestObject
+	DispatchHook([]byte) CoProcessObject
+}
+
+type CoProcessObject struct {
+	HookType string	`json:"hook_type"`
+	Request CoProcessMiniRequestObject	`json:"request,omitempty"`
+	Session SessionState	`json:"session,omitempty"`
+	Spec map[string]string `json:"spec,omitempty"`
 }
 
 type CoProcessMiniRequestObject struct {
@@ -97,21 +105,15 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	  log.WithFields(logrus.Fields{
-	    "prefix": "CoProcessMiddleware",
+	    "prefix": "coprocess",
 	  }).Info( "ProcessRequest: ", m.MiddlewareClassName, " Pre: ", m.Pre )
-
-	/*
-	log.Println("*** PROCESSREQUEST!", m.TykMiddleware.Spec)
-	log.Println("getOrgId() = ", m.TykMiddleware.Spec.OrgID)
-	log.Println("getAPIID() = ", m.TykMiddleware.Spec.APIID)
-	*/
 
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
 
-	var thisRequestData, newRequestData CoProcessMiniRequestObject
+	var object, newObject CoProcessObject
 
-	thisRequestData = CoProcessMiniRequestObject{
+	object.Request = CoProcessMiniRequestObject{
 		Headers:        r.Header,
 		SetHeaders:     make(map[string]string),
 		DeleteHeaders:  make([]string, 0),
@@ -123,22 +125,24 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		DeleteParams:   make([]string, 0),
 	}
 
-	if m.Pre {
-		newRequestData = CoProcessDispatchHook(thisRequestData, "pre")
-		r.ContentLength = int64(len(newRequestData.Body))
-		r.Body = ioutil.NopCloser(bytes.NewBufferString(newRequestData.Body))
+	object.HookType = "pre"
 
-		for h, v := range newRequestData.SetHeaders {
-			r.Header.Set(h, v)
-		}
-
-	} else {
-		// CoProcessDispatchHook(thisRequestData, "post")
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
+	// Encode the session object (if not a pre-process)
+	if !m.Pre {
+		object.Session = context.Get(r, SessionData).(SessionState)
+		object.HookType = "post"
 	}
 
-	log.Println("thisRequestData:", thisRequestData)
-	log.Println("newRequestData::", newRequestData)
+	// Append spec data
+	object.Spec = map[string]string{
+		"OrgID": m.TykMiddleware.Spec.OrgID,
+		"APIID": m.TykMiddleware.Spec.APIID,
+	}
+
+	newObject = CoProcessDispatchHook(object)
+
+	r.ContentLength = int64(len(newObject.Request.Body))
+	r.Body = ioutil.NopCloser(bytes.NewBufferString(newObject.Request.Body))
 
 	return nil, 200
 }
