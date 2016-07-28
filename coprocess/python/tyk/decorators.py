@@ -17,5 +17,9 @@ class PostKeyAuth(HandlerDecorator):
     def __call__(self, req, sess, spec):
         return self.f(req, sess, spec)
 
+class CustomKeyCheck(HandlerDecorator):
+    def __call__(self, req, sess, spec):
+        return self.f(req, sess, spec)
+
 def ThisIsNotADecorator():
     pass
