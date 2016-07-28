@@ -152,6 +152,17 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		r.Header.Set(h, v)
 	}
 
+	values := r.URL.Query()
+	for _, k := range newObject.Request.DeleteParams {
+		values.Del(k)
+	}
+
+	for p, v := range newObject.Request.AddParams {
+		values.Set(p, v)
+	}
+
+	r.URL.RawQuery = values.Encode()
+
 	return nil, 200
 }
 
