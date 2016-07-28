@@ -4,6 +4,7 @@ import json
 
 import tyk
 from tyk.middleware import TykMiddleware
+from tyk.object import TykCoProcessObject
 
 class TykDispatcher:
     '''A simple dispatcher'''
@@ -24,16 +25,13 @@ class TykDispatcher:
             middleware = TykMiddleware(basename)
             self.middlewares.append(middleware)
 
-    def dispatch_hook(self, payload, payload_type):
-        print("TykDispatcher.dispatch_hook: ", payload, payload_type)
-
-        payload = json.loads(payload)
+    def dispatch_hook(self, object_json):
+        print("TykDispatcher.dispatch_hook: ", object_json)
+        object = TykCoProcessObject(object_json)
 
         for middleware in self.middlewares:
-            if payload_type in middleware.handlers:
-                for handler in middleware.handlers[payload_type]:
-                    payload = middleware.process(handler, payload, payload_type)
-                    print("payload is = ", payload)
+            if object.hook_type in middleware.handlers:
+                for handler in middleware.handlers[object.hook_type]:
+                    object = middleware.process(handler, object)
 
-        payload = json.dumps(payload)
-        return payload
+        return object.dump()
