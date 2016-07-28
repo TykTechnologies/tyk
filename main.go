@@ -848,7 +848,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 					// initialise the OID configuration on this reference Spec
 					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.APIDefinition.RawData["enable_coprocess_auth"] == true && EnableCoProcess {
+				} else if referenceSpec.EnableCoProcessAuth && EnableCoProcess {
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: CoProcess")
