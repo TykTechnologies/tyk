@@ -27,7 +27,7 @@ static int Python_Init() {
 	int ttl = 100;
 
 	TykStoreData(k,v,ttl);
-	
+
   return Py_IsInitialized();
 }
 
@@ -87,17 +87,16 @@ static void Python_SetEnv(char* python_path) {
   setenv("PYTHONPATH", python_path, 1 );
 }
 
-static char* Python_DispatchHook(char *payload, char *payload_type) {
-  if( payload == NULL || payload_type == NULL ) {
+static char* Python_DispatchHook(char *object_json) {
+  if( object_json == NULL ) {
     return NULL;
   } else {
-    PyObject *args = PyTuple_Pack( 2, PyUnicode_FromString(payload), PyUnicode_FromString(payload_type));
+    PyObject *args = PyTuple_Pack( 1, PyUnicode_FromString(object_json) );
     PyObject *result = PyObject_CallObject( dispatcher_hook, args );
     if( result == NULL ) {
       PyErr_Print();
       return NULL;
     } else {
-      printf("\n\nOK!!!\n\n");
       char *payload = PyUnicode_AsUTF8(result);
       return payload;
     }
@@ -123,33 +122,24 @@ type PythonDispatcher struct {
 	CoProcessDispatcher
 }
 
-func (d *PythonDispatcher) DispatchHook(payload, payloadType string) CoProcessMiniRequestObject {
+func (d *PythonDispatcher) DispatchHook(objectJson []byte) CoProcessObject {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Info("PythonDispatcher.DispatchHook")
 
-	var CPayload *C.char
-	CPayload = C.CString(payload)
-	var CPayloadType *C.char
-	CPayloadType = C.CString(payloadType)
+	var CObjectStr *C.char
+	CObjectStr = C.CString(string(objectJson))
 
-	var CResult *C.char
-	CResult = C.Python_DispatchHook(CPayload, CPayloadType)
+	var CNewObjectStr *C.char
+	CNewObjectStr = C.Python_DispatchHook(CObjectStr)
 
-	var result string
-	result = C.GoString(CResult)
+	var newObjectStr string
+	newObjectStr = C.GoString(CNewObjectStr)
 
-	log.Println("GoString => ", result)
+	var newObject CoProcessObject
+	json.Unmarshal([]byte(newObjectStr), &newObject)
 
-	var modifiedRequest CoProcessMiniRequestObject
-	json.Unmarshal([]byte(result), &modifiedRequest)
-
-	log.Println("GoString (unmarshal) => ", modifiedRequest)
-
-	C.free(unsafe.Pointer(CPayload))
-	C.free(unsafe.Pointer(CPayloadType))
-
-	return modifiedRequest
+	return newObject
 
 }
 
