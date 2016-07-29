@@ -18,13 +18,13 @@ import "C"
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/mitchellh/mapstructure"
-	"github.com/gorilla/context"
+	// "github.com/gorilla/context"
 
 	"github.com/TykTechnologies/tykcommon/coprocess"
 
 	"encoding/json"
 
-	"bytes"
+	// "bytes"
 	"io/ioutil"
 	"net/http"
 )
@@ -51,8 +51,59 @@ func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(htt
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
+type CoProcessor struct {
+	HookType string
+}
+
+func( c *CoProcessor ) SetHookType(hookType string) {
+	c.HookType = hookType
+}
+
+func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
+
+	defer r.Body.Close()
+	originalBody, _ := ioutil.ReadAll(r.Body)
+
+	var object CoProcessObject
+
+	object.Request = CoProcessMiniRequestObject{
+		Headers:        r.Header,
+		SetHeaders:     make(map[string]string),
+		DeleteHeaders:  make([]string, 0),
+		Body:           string(originalBody),
+		URL:            r.URL.Path,
+		Params:         r.URL.Query(),
+		AddParams:      make(map[string]string),
+		ExtendedParams: make(map[string][]string),
+		DeleteParams:   make([]string, 0),
+	}
+
+	return object
+}
+
+func( c *CoProcessor ) Dispatch(object *CoProcessObject) CoProcessObject {
+
+	 objectJson, _ := json.Marshal(object)
+
+	 var CObjectStr *C.char
+	 CObjectStr = C.CString(string(objectJson))
+
+	 log.Println("Cobjectstr", CObjectStr)
+
+	 var CNewObjectStr *C.char
+	 CNewObjectStr = GlobalDispatcher.Dispatch(CObjectStr)
+
+	 var newObjectStr string
+	 newObjectStr = C.GoString(CNewObjectStr)
+
+	 log.Println("Got CNewObjectStr: ", newObjectStr)
+
+	 return CoProcessObject{}
+}
+
 type CoProcessDispatcher interface {
 	DispatchHook([]byte) CoProcessObject
+	Dispatch(*C.char) *C.char
 }
 
 type CoProcessObject struct {
@@ -107,6 +158,29 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	  log.WithFields(logrus.Fields{
 	    "prefix": "coprocess",
 	  }).Info( "ProcessRequest, HookType:", m.HookType )
+
+	thisCoProcessor := CoProcessor{}
+
+	switch m.HookType {
+	case coprocess.PreHook:
+		thisCoProcessor.SetHookType("pre")
+	case coprocess.PostHook:
+		thisCoProcessor.SetHookType("post")
+	case coprocess.PostKeyAuthHook:
+		thisCoProcessor.SetHookType("postkeyauth")
+	default:
+		thisCoProcessor.SetHookType("")
+	}
+
+	object := thisCoProcessor.GetObjectFromRequest(r)
+
+	log.Println("GetObjectFromRequest =", object)
+
+	returnObject := thisCoProcessor.Dispatch(&object)
+
+	log.Println("returnObject =", returnObject)
+
+	/*
 
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
@@ -170,6 +244,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	r.URL.RawQuery = values.Encode()
+	*/
 
 	return nil, 200
 }
