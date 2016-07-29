@@ -10,11 +10,17 @@ class TykCoProcessObject:
         self.request = TykCoProcessRequest(self.object['request'])
         self.session = TykSession(self.object['session'])
 
-        # Should we require this keys?
+        # Should we require these keys?
+
         if 'spec' in self.object:
             self.spec = self.object['spec']
+        else:
+            self.spec = {}
+
         if 'hook_type' in self.object:
             self.hook_type = self.object['hook_type']
+        else:
+            self.spec = {}
 
     def dump(self):
         self.object['request'] = self.request.__dict__
