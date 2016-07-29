@@ -18,8 +18,6 @@
   #define DL_IMPORT(_T) _T
 #endif
 
-__PYX_EXTERN_C DL_IMPORT(void) exposed_say_hello(int __pyx_skip_dispatch);
-
 #endif /* !__PYX_HAVE_API__gateway */
 
 #if PY_MAJOR_VERSION < 3
