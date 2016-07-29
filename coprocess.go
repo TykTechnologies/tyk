@@ -18,13 +18,13 @@ import "C"
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/mitchellh/mapstructure"
-	// "github.com/gorilla/context"
+	"github.com/gorilla/context"
 
 	"github.com/TykTechnologies/tykcommon/coprocess"
 
 	"encoding/json"
 
-	// "bytes"
+	"bytes"
 	"io/ioutil"
 	"net/http"
 )
@@ -42,21 +42,14 @@ func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(htt
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware:       tykMwSuper,
 		HookType: hookType,
-		/*
-		MiddlewareClassName: MiddlewareName,
-		UseSession:          UseSession,
-		*/
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
 type CoProcessor struct {
-	HookType string
-}
-
-func( c *CoProcessor ) SetHookType(hookType string) {
-	c.HookType = hookType
+	HookType int
+	Middleware *CoProcessMiddleware
 }
 
 func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
@@ -78,27 +71,81 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 		DeleteParams:   make([]string, 0),
 	}
 
+	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
+	if c.Middleware != nil && c.HookType == 0 {
+		c.HookType = c.Middleware.HookType
+	}
+
+	switch c.HookType {
+	case coprocess.PreHook:
+		object.HookType = "pre"
+	case coprocess.PostHook:
+		object.HookType = "post"
+	case coprocess.PostKeyAuthHook:
+		object.HookType = "postkeyauth"
+	}
+
+	// Append spec data:
+	if c.Middleware != nil {
+		object.Spec = map[string]string{
+			"OrgID": c.Middleware.TykMiddleware.Spec.OrgID,
+			"APIID": c.Middleware.TykMiddleware.Spec.APIID,
+		}
+	}
+
+	// Encode the session object (if not a pre-process & not a custom key check):
+	if c.HookType != coprocess.PreHook  && c.HookType != coprocess.CustomKeyCheckHook {
+		var session interface{}
+		session = context.Get(r, SessionData)
+		if session != nil {
+			object.Session = session.(SessionState)
+		}
+	}
+
 	return object
+}
+
+func( c *CoProcessor) ObjectPostProcess(object *CoProcessObject, r *http.Request) {
+	r.ContentLength = int64(len(object.Request.Body))
+	r.Body = ioutil.NopCloser(bytes.NewBufferString(object.Request.Body))
+
+	for _, dh := range object.Request.DeleteHeaders {
+		r.Header.Del(dh)
+	}
+
+	for h, v := range object.Request.SetHeaders {
+		r.Header.Set(h, v)
+	}
+
+	values := r.URL.Query()
+	for _, k := range object.Request.DeleteParams {
+		values.Del(k)
+	}
+
+	for p, v := range object.Request.AddParams {
+		values.Set(p, v)
+	}
+
+	r.URL.RawQuery = values.Encode()
 }
 
 func( c *CoProcessor ) Dispatch(object *CoProcessObject) CoProcessObject {
 
-	 objectJson, _ := json.Marshal(object)
+	objectJson, _ := json.Marshal(object)
 
-	 var CObjectStr *C.char
-	 CObjectStr = C.CString(string(objectJson))
+	var CObjectStr *C.char
+	CObjectStr = C.CString(string(objectJson))
 
-	 log.Println("Cobjectstr", CObjectStr)
+	var CNewObjectStr *C.char
+	CNewObjectStr = GlobalDispatcher.Dispatch(CObjectStr)
 
-	 var CNewObjectStr *C.char
-	 CNewObjectStr = GlobalDispatcher.Dispatch(CObjectStr)
+	var newObjectStr string
+	newObjectStr = C.GoString(CNewObjectStr)
 
-	 var newObjectStr string
-	 newObjectStr = C.GoString(CNewObjectStr)
+	var newObject CoProcessObject
+	json.Unmarshal([]byte(newObjectStr), &newObject)
 
-	 log.Println("Got CNewObjectStr: ", newObjectStr)
-
-	 return CoProcessObject{}
+	return newObject
 }
 
 type CoProcessDispatcher interface {
@@ -155,118 +202,40 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	  log.WithFields(logrus.Fields{
-	    "prefix": "coprocess",
-	  }).Info( "ProcessRequest, HookType:", m.HookType )
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+		}).Info( "ProcessRequest, HookType:", m.HookType )
 
-	thisCoProcessor := CoProcessor{}
 
-	switch m.HookType {
-	case coprocess.PreHook:
-		thisCoProcessor.SetHookType("pre")
-	case coprocess.PostHook:
-		thisCoProcessor.SetHookType("post")
-	case coprocess.PostKeyAuthHook:
-		thisCoProcessor.SetHookType("postkeyauth")
-	default:
-		thisCoProcessor.SetHookType("")
-	}
-
-	object := thisCoProcessor.GetObjectFromRequest(r)
-
-	log.Println("GetObjectFromRequest =", object)
-
-	returnObject := thisCoProcessor.Dispatch(&object)
-
-	log.Println("returnObject =", returnObject)
-
-	/*
-
-	defer r.Body.Close()
-	originalBody, _ := ioutil.ReadAll(r.Body)
-
-	var object, newObject CoProcessObject
-
-	object.Request = CoProcessMiniRequestObject{
-		Headers:        r.Header,
-		SetHeaders:     make(map[string]string),
-		DeleteHeaders:  make([]string, 0),
-		Body:           string(originalBody),
-		URL:            r.URL.Path,
-		Params:         r.URL.Query(),
-		AddParams:      make(map[string]string),
-		ExtendedParams: make(map[string][]string),
-		DeleteParams:   make([]string, 0),
-	}
-
-	switch m.HookType {
-	case coprocess.PreHook:
-		object.HookType = "pre"
-	case coprocess.PostHook:
-		object.HookType = "post"
-	case coprocess.PostKeyAuthHook:
-		object.HookType = "postkeyauth"
-	default:
-		object.HookType = ""
-	}
-
-	// Encode the session object (if not a pre-process)
-	if m.HookType != coprocess.PreHook  && m.HookType != coprocess.CustomKeyCheckHook {
-		var session interface{}
-		session = context.Get(r, SessionData)
-		if session != nil {
-			object.Session = session.(SessionState)
+		// It's also possible to override the HookType:
+		thisCoProcessor := CoProcessor{
+			Middleware: m,
+			// HookType: coprocess.PreHook,
 		}
+
+		object := thisCoProcessor.GetObjectFromRequest(r)
+
+		returnObject := thisCoProcessor.Dispatch(&object)
+
+		thisCoProcessor.ObjectPostProcess(&returnObject, r)
+
+		return nil, 200
 	}
 
-	// Append spec data
-	object.Spec = map[string]string{
-		"OrgID": m.TykMiddleware.Spec.OrgID,
-		"APIID": m.TykMiddleware.Spec.APIID,
-	}
+	//export CoProcess_Log
+	func CoProcess_Log(CMessage *C.char, CLogLevel *C.char) {
+		var message, logLevel string
+		message = C.GoString(CMessage)
+		logLevel = C.GoString(CLogLevel)
 
-	newObject = CoProcessDispatchHook(object)
-
-	r.ContentLength = int64(len(newObject.Request.Body))
-	r.Body = ioutil.NopCloser(bytes.NewBufferString(newObject.Request.Body))
-
-	for _, dh := range newObject.Request.DeleteHeaders {
-		r.Header.Del(dh)
-	}
-
-	for h, v := range newObject.Request.SetHeaders {
-		r.Header.Set(h, v)
-	}
-
-	values := r.URL.Query()
-	for _, k := range newObject.Request.DeleteParams {
-		values.Del(k)
-	}
-
-	for p, v := range newObject.Request.AddParams {
-		values.Set(p, v)
-	}
-
-	r.URL.RawQuery = values.Encode()
-	*/
-
-	return nil, 200
-}
-
-//export CoProcess_Log
-func CoProcess_Log(CMessage *C.char, CLogLevel *C.char) {
-	var message, logLevel string
-	message = C.GoString(CMessage)
-	logLevel = C.GoString(CLogLevel)
-
-	switch logLevel {
-	case "error":
-		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
-		}).Error(message)
-	default:
-		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
-		}).Info(message)
-	}
-}
+		switch logLevel {
+		case "error":
+			log.WithFields(logrus.Fields{
+				"prefix": CoProcessName,
+				}).Error(message)
+			default:
+				log.WithFields(logrus.Fields{
+					"prefix": CoProcessName,
+					}).Info(message)
+				}
+			}
