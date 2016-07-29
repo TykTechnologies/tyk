@@ -212,7 +212,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Encode the session object (if not a pre-process)
 	if m.HookType != coprocess.PreHook  && m.HookType != coprocess.CustomKeyCheckHook {
-		object.Session = context.Get(r, SessionData).(SessionState)
+		var session interface{}
+		session = context.Get(r, SessionData)
+		if session != nil {
+			object.Session = session.(SessionState)
+		}
 	}
 
 	// Append spec data
