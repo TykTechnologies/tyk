@@ -384,6 +384,45 @@ func (r *RedisClusterStorageManager) DeleteRawKey(keyName string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk
+func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
+
+	if r.db == nil {
+		log.Info("Connection dropped, connecting..")
+		r.Connect()
+		return r.DeleteScanMatch(pattern)
+	}
+
+	log.Debug("Deleting: ", pattern)
+
+	// here we'll store our iterator value
+	iter := 0
+
+	// this will store the keys of each iteration
+	var keys []string
+	for {
+
+		// we scan with our iter offset, starting at 0
+		if arr, err := redis.MultiBulk(r.db.Do("SCAN", iter, "MATCH", pattern)); err != nil {
+			log.Error(err)
+			return false
+		} else {
+
+			// now we get the iter and the keys from the multi-bulk reply
+			iter, _ = redis.Int(arr[0], nil)
+			theseKeys, _ := redis.Strings(arr[1], nil)
+			keys = append(keys, theseKeys...)
+		}
+
+		// check if we need to stop...
+		if iter == 0 {
+			break
+		}
+	}
+
+	return r.DeleteRawKeys(keys, "")
+}
+
+// DeleteKeys will remove a group of keys in bulk
 func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
 
 	if r.db == nil {

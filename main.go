@@ -4,13 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	logger "github.com/TykTechnologies/tykcommon-logger"
 	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
 	"html/template"
@@ -290,6 +290,7 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
 		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
 		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(invalidateOauthRefresh))
+		ApiMuxer.HandleFunc("/tyk/cache/"+"{rest:.*}", CheckIsAPIOwner(invalidateCacheHandler))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1171,6 +1172,10 @@ func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 			}
 		}
 	}()
+}
+
+func GetGlobalLocalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
+	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 }
 
 func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {

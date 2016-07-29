@@ -46,6 +46,7 @@ type StorageHandler interface {
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	RemoveFromSet(string, string)
+	DeleteScanMatch(string) bool
 }
 
 // InMemoryStorageManager implements the StorageHandler interface,
@@ -171,6 +172,11 @@ func (s InMemoryStorageManager) AddToSet(keyName string, value string) {
 
 func (s InMemoryStorageManager) RemoveFromSet(keyName string, value string) {
 	log.Error("Not implemented")
+}
+
+func (s InMemoryStorageManager) DeleteScanMatch(pattern string) bool {
+	log.Error("Not implemented")
+	return false
 }
 
 // ------------------- REDIS STORAGE MANAGER -------------------------------
@@ -891,4 +897,9 @@ func (r *RedisStorageManager) RemoveFromSet(keyName string, value string) {
 
 		return
 	}
+}
+
+func (s *RedisStorageManager) DeleteScanMatch(pattern string) bool {
+	log.Error("Not implemented")
+	return false
 }
