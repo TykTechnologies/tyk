@@ -18,15 +18,14 @@ package main
 #include "coprocess/python/binding.h"
 #include "coprocess/python/dispatcher.h"
 
+#include "coprocess/python/tyk/gateway.h"
+
 static int Python_Init() {
   CoProcess_Log( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
   Py_Initialize();
 
-	char *k = "key";
-	char *v = "value";
-	int ttl = 100;
-
-	TykStoreData(k,v,ttl);
+	// This exposes the Cython interface as "gateway"
+	PyInit_gateway();
 
   return Py_IsInitialized();
 }
