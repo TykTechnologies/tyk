@@ -121,6 +121,15 @@ type PythonDispatcher struct {
 	CoProcessDispatcher
 }
 
+func (d *PythonDispatcher) Dispatch(CObjectStr *C.char) *C.char {
+	log.Println("PythonDispatcher receives the object!")
+
+	var CNewObjectStr *C.char
+	CNewObjectStr = C.Python_DispatchHook(CObjectStr)
+
+	return CNewObjectStr
+}
+
 func (d *PythonDispatcher) DispatchHook(objectJson []byte) CoProcessObject {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
