@@ -20,7 +20,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/gorilla/context"
 
-	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon/coprocess"
 
 	"encoding/json"
 
