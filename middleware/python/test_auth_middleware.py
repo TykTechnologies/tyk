@@ -1,5 +1,5 @@
 from tyk.decorators import *
-from tyk.gateway import TykGateway as tyk
+from gateway import TykGateway as tyk
 
 @CustomKeyCheck
 def MyKeyCheck(request, session, spec):

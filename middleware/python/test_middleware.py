@@ -1,5 +1,5 @@
 from tyk.decorators import *
-from tyk.gateway import TykGateway as tyk
+from gateway import TykGateway as tyk
 
 @Pre
 def ModifyRequest(request, session, spec):
@@ -24,7 +24,7 @@ def AddSomeHeader(request, session, spec):
 @PostKeyAuth
 def Something(request, session, spec):
     print("post key auth?")
-    
+
     return request, session
 
 def NotARealHandler():
