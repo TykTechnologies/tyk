@@ -293,6 +293,7 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
 		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
 		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(invalidateOauthRefresh))
+		ApiMuxer.HandleFunc("/tyk/cache/"+"{rest:.*}", CheckIsAPIOwner(invalidateCacheHandler))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1198,6 +1199,10 @@ func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 			}
 		}
 	}()
+}
+
+func GetGlobalLocalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
+	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 }
 
 func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {

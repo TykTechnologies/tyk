@@ -211,9 +211,9 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 			if APIlist != nil {
 				RPC_EmergencyMode = true
 				log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-				doLoadWithBackup(APIlist)	
+				doLoadWithBackup(APIlist)
 			}
-			
+
 			//LoadPoliciesFromRPCBackup()
 		}
 	}
@@ -725,6 +725,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		log.Info("--> removing cached key: ", key)
 		handleDeleteKey(key, "-1")
 	}
+}
+
+func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
+	log.Error("Not implemented")
+	return false
 }
 
 func GetDispatcher() *gorpc.Dispatcher {

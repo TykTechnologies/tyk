@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
@@ -1914,4 +1914,44 @@ func UserRatesCheck() func(http.ResponseWriter, *http.Request) {
 
 		return
 	}
+}
+
+func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
+	var responseMessage []byte
+	var code int = 200
+
+	if r.Method == "DELETE" {
+		APIID := r.URL.Path[len("/tyk/cache/"):]
+		err := HandleInvalidateAPICache(APIID)
+		if err != nil {
+			log.Error("Failed to delete cache: ", err)
+			code = 500
+			responseMessage = createError("Cache invalidation failed")
+			DoJSONWrite(w, code, responseMessage)
+			return
+		}
+
+		okMsg := APIStatusMessage{"ok", "cache invalidated"}
+		responseMessage, _ = json.Marshal(&okMsg)
+		code = 200
+	} else {
+		// Return Not supported message (and code)
+		code = 405
+		responseMessage = createError("Method not supported")
+	}
+
+	DoJSONWrite(w, code, responseMessage)
+}
+
+func HandleInvalidateAPICache(APIID string) error {
+	keyPrefix := "cache-" + APIID 
+	matchPattern := keyPrefix + "*"
+	thisStore := GetGlobalLocalStorageHandler(keyPrefix, false)
+
+	ok := thisStore.DeleteScanMatch(matchPattern)
+	if !ok {
+		return errors.New("Scan/delete failed")
+	}
+
+	return nil
 }

@@ -176,3 +176,8 @@ func (s LDAPStorageHandler) AddToSet(keyName string, value string) {
 func (s LDAPStorageHandler) RemoveFromSet(keyName string, value string) {
 	log.Error("Not implemented")
 }
+
+func (s LDAPStorageHandler) DeleteScanMatch(pattern string) bool {
+	log.Error("Not implemented")
+	return false
+}
