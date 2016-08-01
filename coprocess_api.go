@@ -16,17 +16,19 @@ import "C"
 
 import(
   "github.com/TykTechnologies/tykcommon"
-
-  "fmt"
 )
+
+const CoprocessDefaultKeyPrefix string = "coprocess-data:"
 
 //export TykStoreData
 func TykStoreData( CKey *C.char, CValue *C.char, CTTL C.int ) {
   // Store or cache some data in Redis, INCR, DECR?
   key := C.GoString(CKey)
   value := C.GoString(CValue)
-  ttl := int(CTTL)
-  fmt.Println("storeData: ", key, ", ", value, ", ", ttl)
+  ttl := int64(CTTL)
+
+  thisStorageHandler := GetGlobalLocalStorageHandler(CoprocessDefaultKeyPrefix, false)
+  thisStorageHandler.SetKey(key, value, ttl)
 }
 
 //export TykTriggerEvent
