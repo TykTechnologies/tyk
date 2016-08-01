@@ -1,11 +1,12 @@
 #!/bin/bash
 # This script compiles gateway.pyx using Cython
 # and patches the binding file to include custom build tags (coprocess, python)
-
+INPUT=$1
+echo "cython: $INPUT"
 cd tyk/
-rm gateway.c
+rm $INPUT.c
 echo "Cython compilation..."
-cythonize gateway.pyx
+cythonize $INPUT.pyx
 echo "Appending build tags!"
-echo -e "// +build coprocess\n// +build python\n\n$(cat gateway.c)" > gateway.c
+echo -e "// +build coprocess\n// +build python\n\n$(cat $INPUT.c)" > $INPUT.c
 echo "Done"
