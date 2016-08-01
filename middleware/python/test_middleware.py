@@ -3,7 +3,12 @@ from gateway import TykGateway as tyk
 
 @Pre
 def ModifyRequest(request, session, spec):
-    tyk.store_data( "cool_key", "cool_value", 300 )
+    print("about to store cool_key!")
+    tyk.store_data( "cool_key", "not_so_cool", 300 )
+    print("about to fetch cool_key")
+    val = tyk.get_data("cool_key")
+    print("val = ", val)
+    tyk.store_data( "expire_soon", "not_so_cool", 5 )
     tyk.trigger_event( "a_middleware_event", "additional_data" )
 
     request.add_header("custom_header", "custom_value")
