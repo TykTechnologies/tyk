@@ -43,5 +43,3 @@ ty.clonedash.conf
 tyk.dashboard.conf
 tyk.benchmark.conf
 tyk_elasticache.conf
-coprocess/
-middleware/python/
