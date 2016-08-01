@@ -19,16 +19,16 @@ go build -tags 'coprocess python'
 
 To compile the gateway API binding (assuming you're on the repository root):
 
-```
+```sh
 cd coprocess/python
-
-# this will "cythonize" gateway.pyx, generating gateway.c & gateway.h
 ./cythonize gateway
 ```
 
+This will "cythonize" `gateway.pyx`, generating `gateway.c` and `gateway.h`.
+
 To compile some other binding (where `mybinding.pyx` is your Cython input file):
 
-```
+```sh
 cd coprocess/python
 ./cythonize mybinding
 ```
@@ -101,9 +101,9 @@ def SetKeyOnRequest(request, session, spec):
 
 Cython takes a `.pyx` file and generates a C source file and its corresponding header, after this process, we use these two files as part of the `cgo` build process. This approach has been used as an alternative to `cffi`, which introduced an additional step into the setup, requiring the user to install the module first.
 
-So in practice, we don't use the `.pyx` files directly (and they aren't required at runtime!). When the build process is over, the bindings are part of the Tyk binary & can be loaded and accessed from Go code.
+So in practice, we don't use the `.pyx` files directly (and they aren't required at runtime!). When the build process is over, the bindings are part of the Tyk binary and can be loaded and accessed from Go code.
 
-The bindings [declare an initialization function](tyk/gateway.h) that should be called after the Python interpreter is invoked, this will load the actual module and make it possible to load it using `import mymodule`. This is how [`gateway.pyx`](tyk/gateway.pyx) and its functions become available.
+The bindings [declare an initialization function](tyk/gateway.h) that should be called after the Python interpreter is invoked, this will load the actual module and make it possible to import it using `import mymodule`. This is how [`gateway.pyx`](tyk/gateway.pyx) and its functions become available.
 
 ### Middleware and wrappers
 
