@@ -31,6 +31,16 @@ func TykStoreData( CKey *C.char, CValue *C.char, CTTL C.int ) {
   thisStorageHandler.SetKey(key, value, ttl)
 }
 
+//export TykGetData
+func TykGetData( CKey *C.char ) *C.char {
+  key := C.GoString(CKey)
+
+  thisStorageHandler := GetGlobalLocalStorageHandler(CoprocessDefaultKeyPrefix, false)
+  // TODO: return error
+  val, _ := thisStorageHandler.GetKey(key)
+  return C.CString(val)
+}
+
 //export TykTriggerEvent
 func TykTriggerEvent( CEventName *C.char, CPayload *C.char ) {
   eventName := C.GoString(CEventName)
