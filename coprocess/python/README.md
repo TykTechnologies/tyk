@@ -99,7 +99,7 @@ def SetKeyOnRequest(request, session, spec):
 
 ### Cython bindings
 
-Cython takes a `.pyx` file and generates a C source file and its corresponding header, after this process, we use these two files as part of the `cgo` build process. This approach has been used as an alternative to `cffi`, which introduced an additional step into the setup, requiring the user to install the module first.
+Cython takes a `.pyx` file and generates a C source file (`.c`) with its corresponding header (`.h`), after this process, we use these two files as part of the `cgo` build process. This approach has been used as an alternative to `cffi`, which introduced an additional step into the setup, requiring the user to install the module first.
 
 So in practice, we don't use the `.pyx` files directly (and they aren't required at runtime!). When the build process is over, the bindings are part of the Tyk binary and can be loaded and accessed from Go code.
 
