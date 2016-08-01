@@ -1,6 +1,6 @@
 # Coprocess - PoC
 
-## Build
+## Build notes
 
 It's possible to use a [build tag](https://golang.org/pkg/go/build/#hdr-Build_Constraints):
 
@@ -23,6 +23,10 @@ go build
 ```
 
 ```coprocess_dummy.go``` provides a dummy ```CoProcessInit``` function that will be called if you perform a standard Tyk build. This file will be ignored when using the ```coprocess``` build tag, as we expect it to be implemented by a language.
+
+## Python support
+
+[Python](https://www.python.org/) support is an ongoing task, more notes [here](python/README.md).
 
 ## Coprocess Gateway API
 
