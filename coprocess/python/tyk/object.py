@@ -12,6 +12,11 @@ class TykCoProcessObject:
 
         # Should we require these keys?
 
+        if 'metadata' in self.object:
+            self.metadata = self.object['metadata']
+        else:
+            self.metadata = {}
+
         if 'spec' in self.object:
             self.spec = self.object['spec']
         else:
@@ -25,5 +30,6 @@ class TykCoProcessObject:
     def dump(self):
         self.object['request'] = self.request.__dict__
         self.object['session'] = self.session.__dict__
+        self.object['metadata'] = self.metadata
 
         return json.dumps(self.object)

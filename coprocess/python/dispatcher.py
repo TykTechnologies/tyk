@@ -26,7 +26,6 @@ class TykDispatcher:
             self.middlewares.append(middleware)
 
     def dispatch_hook(self, object_json):
-        print("TykDispatcher.dispatch_hook: ", object_json)
         object = TykCoProcessObject(object_json)
 
         for middleware in self.middlewares:

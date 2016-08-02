@@ -22,7 +22,7 @@ class CustomKeyCheck():
         self.f = f
         return
     def __call__(self, req, sess, metadata, spec):
-        return self.f(req, sess, metadata)
+        return self.f(req, sess, metadata, spec)
 
 def ThisIsNotADecorator():
     pass
