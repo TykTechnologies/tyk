@@ -22,8 +22,8 @@ import (
 
 	"github.com/TykTechnologies/tykcommon/coprocess"
 
+	"errors"
 	"encoding/json"
-
 	"bytes"
 	"io/ioutil"
 	"net/http"
@@ -86,6 +86,8 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 	case coprocess.CustomKeyCheckHook:
 		object.HookType = "customkeycheck"
 	}
+
+	object.Metadata = make(map[string]string)
 
 	// Append spec data:
 	if c.Middleware != nil {
@@ -163,6 +165,11 @@ type CoProcessObject struct {
 	Spec map[string]string `json:"spec,omitempty"`
 }
 
+type CoProcessReturnOverrides struct {
+	ResponseCode  int	`json:"response_code"`
+	ResponseError string	`json:"response_error"`
+}
+
 type CoProcessMiniRequestObject struct {
 	Headers         map[string][]string
 	SetHeaders      map[string]string
@@ -173,7 +180,7 @@ type CoProcessMiniRequestObject struct {
 	AddParams       map[string]string
 	ExtendedParams  map[string][]string
 	DeleteParams    []string
-	ReturnOverrides ReturnOverrides
+	ReturnOverrides CoProcessReturnOverrides	`json:"return_overrides"`
 }
 
 type CoProcessMiddleware struct {
@@ -222,10 +229,15 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		thisCoProcessor.ObjectPostProcess(&returnObject, r)
 
+		if returnObject.Request.ReturnOverrides.ResponseCode != 0 {
+			return errors.New(returnObject.Request.ReturnOverrides.ResponseError), returnObject.Request.ReturnOverrides.ResponseCode
+		}
+
+		authHeaderValue := returnObject.Metadata["token"]
+
 		if m.HookType == coprocess.CustomKeyCheckHook {
-			log.Println("Hook Type is ", m.HookType, "Should I set session?")
 			context.Set(r, SessionData, returnObject.Session)
-			context.Set(r, AuthHeaderValue, "token123")
+			context.Set(r, AuthHeaderValue, authHeaderValue)
 		}
 
 		// context.GetOk(r, SessionData)
