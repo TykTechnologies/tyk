@@ -159,6 +159,7 @@ type CoProcessObject struct {
 	HookType string	`json:"hook_type"`
 	Request CoProcessMiniRequestObject	`json:"request,omitempty"`
 	Session SessionState	`json:"session,omitempty"`
+	Metadata map[string]string	`json:"metadata",omitempty`
 	Spec map[string]string `json:"spec,omitempty"`
 }
 
@@ -220,6 +221,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		returnObject := thisCoProcessor.Dispatch(&object)
 
 		thisCoProcessor.ObjectPostProcess(&returnObject, r)
+
+		if m.HookType == coprocess.CustomKeyCheckHook {
+			log.Println("Hook Type is ", m.HookType, "Should I set session?")
+			context.Set(r, SessionData, returnObject.Session)
+			context.Set(r, AuthHeaderValue, "token123")
+		}
+
+		// context.GetOk(r, SessionData)
 
 		return nil, 200
 	}
