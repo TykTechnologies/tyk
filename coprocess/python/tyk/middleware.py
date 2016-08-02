@@ -20,5 +20,11 @@ class TykMiddleware:
                     self.handlers[handler_type].append(attr_value)
 
     def process(self, handler, object):
-        object.request, object.session = handler(object.request, object.session, object.spec)
+        print("*** process", self, type(handler))
+        handlerType = type(handler)
+        print("*** handlerType", handlerType, handlerType == decorators.CustomKeyCheck)
+        if handlerType == decorators.CustomKeyCheck:
+            object.request, object.session, object.metadata = handler(object.request, object.session, object.metadata, object.spec)
+        else :
+            object.request, object.session = handler(object.request, object.session, object.spec)
         return object
