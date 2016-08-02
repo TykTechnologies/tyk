@@ -83,6 +83,8 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 		object.HookType = "post"
 	case coprocess.PostKeyAuthHook:
 		object.HookType = "postkeyauth"
+	case coprocess.CustomKeyCheckHook:
+		object.HookType = "customkeycheck"
 	}
 
 	// Append spec data:
