@@ -9,3 +9,8 @@ class TykCoProcessRequest:
         self.AddParams[key] = value
     def delete_param(self, key):
         self.DeleteParams.append(key)
+    def get_header(self, key):
+        if key in self.Headers:
+            return self.Headers[key][0]
+        else:
+            return None
