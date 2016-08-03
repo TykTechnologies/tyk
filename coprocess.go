@@ -229,11 +229,24 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		thisCoProcessor.ObjectPostProcess(&returnObject, r)
 
-		if returnObject.Request.ReturnOverrides.ResponseCode != 0 {
-			return errors.New(returnObject.Request.ReturnOverrides.ResponseError), returnObject.Request.ReturnOverrides.ResponseCode
-		}
-
 		authHeaderValue := returnObject.Metadata["token"]
+
+		if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
+
+			log.WithFields(logrus.Fields{
+					"path":   r.URL.Path,
+					"origin": GetIPFromRequest(r),
+					"key":    authHeaderValue,
+			}).Info("Attempted access with invalid key.")
+
+			// Fire Authfailed Event
+			AuthFailed(m.TykMiddleware, r, authHeaderValue)
+
+			// Report in health check
+			ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
+
+			return errors.New("Key not authorised"), returnObject.Request.ReturnOverrides.ResponseCode
+		}
 
 		if m.HookType == coprocess.CustomKeyCheckHook {
 			context.Set(r, SessionData, returnObject.Session)
