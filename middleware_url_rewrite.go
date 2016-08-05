@@ -166,6 +166,13 @@ func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (m *URLRewriteMiddleware) CheckHostRewrite(newTarget string,  r *http.Request) {
+	if strings.HasPrefix(strings.ToLower(newTarget), "https://") || strings.HasPrefix(strings.ToLower(newTarget), "http://") {
+		log.Debug("Detected a host rewrite in pattern!")
+		context.Set(r, RetainHost, true)
+	}
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Uee the request status validator to see if it's in our cache list
@@ -189,6 +196,9 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		if pErr != nil {
 			return pErr, 500
 		}
+
+		m.CheckHostRewrite(p, r)
+		
 		newURL, uErr := url.Parse(p)
 		if uErr != nil {
 			log.Error("URL Rewrite failed, could not parse: ", p)
