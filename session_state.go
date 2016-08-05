@@ -1,3 +1,5 @@
+//go:generate msgp
+
 package main
 
 type HashType string

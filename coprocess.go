@@ -1,5 +1,8 @@
 // +build coprocess
 
+//go:generate msgp
+//msgp:ignore CoProcessor CoProcessMiddleware CoProcessMiddlewareConfig TykMiddleware
+
 package main
 
 /*
@@ -157,32 +160,6 @@ type CoProcessDispatcher interface {
 	Dispatch(*C.char) *C.char
 }
 
-type CoProcessObject struct {
-	HookType string	`json:"hook_type"`
-	Request CoProcessMiniRequestObject	`json:"request,omitempty"`
-	Session SessionState	`json:"session,omitempty"`
-	Metadata map[string]string	`json:"metadata",omitempty`
-	Spec map[string]string `json:"spec,omitempty"`
-}
-
-type CoProcessReturnOverrides struct {
-	ResponseCode  int	`json:"response_code"`
-	ResponseError string	`json:"response_error"`
-}
-
-type CoProcessMiniRequestObject struct {
-	Headers         map[string][]string
-	SetHeaders      map[string]string
-	DeleteHeaders   []string
-	Body            string
-	URL             string
-	Params          map[string][]string
-	AddParams       map[string]string
-	ExtendedParams  map[string][]string
-	DeleteParams    []string
-	ReturnOverrides CoProcessReturnOverrides	`json:"return_overrides"`
-}
-
 type CoProcessMiddleware struct {
 	*TykMiddleware
 	HookType int
@@ -190,6 +167,31 @@ type CoProcessMiddleware struct {
 
 type CoProcessMiddlewareConfig struct {
 	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+}
+
+type CoProcessObject struct {
+	HookType string	`json:"hook_type" msg:"hook_type"`
+	Request CoProcessMiniRequestObject	`json:"request,omitempty" msg:"request"`
+	Session SessionState	`json:"session,omitempty" msg:"session"`
+	Metadata map[string]string	`json:"metadata",omitempty msg:"metadata"`
+	Spec map[string]string `json:"spec,omitempty" msg:"spec"`
+}
+
+type CoProcessReturnOverrides struct {
+	ResponseCode  int	`json:"response_code" msg:"response_code"`
+	ResponseError string	`json:"response_error" msg:"response_error"`
+}
+type CoProcessMiniRequestObject struct {
+	Headers         map[string][]string	`msg:"headers"`
+	SetHeaders      map[string]string	`msg:"set_headers"`
+	DeleteHeaders   []string	`msg:"delete_headers"`
+	Body            string	`msg:"body"`
+	URL             string	`msg:"url"`
+	Params          map[string][]string	`msg:"params"`
+	AddParams       map[string]string	`msg:"add_params"`
+	ExtendedParams  map[string][]string	`msg:"extended_params"`
+	DeleteParams    []string	`msg:"delete_params"`
+	ReturnOverrides CoProcessReturnOverrides	`json:"return_overrides" msg:"return_overrides"`
 }
 
 // New lets you do any initialisations for the object can be done here
