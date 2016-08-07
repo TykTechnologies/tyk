@@ -146,10 +146,9 @@ func( c *CoProcessor ) Dispatch(object *CoProcessObject) CoProcessObject {
 
 	var objectPtr *C.struct_CoProcessObject
 
-	objectPtr = &C.struct_CoProcessObject{
-		p_data: unsafe.Pointer(CObjectStr),
-		length: C.int( len(objectMsg) ),
-	}
+	objectPtr = (*C.struct_CoProcessObject)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessObject{}))))
+	objectPtr.p_data = unsafe.Pointer(CObjectStr)
+	objectPtr.length = C.int( len(objectMsg) )
 
 	var newObjectPtr *C.struct_CoProcessObject
 	newObjectPtr = GlobalDispatcher.Dispatch(objectPtr)
@@ -159,6 +158,10 @@ func( c *CoProcessor ) Dispatch(object *CoProcessObject) CoProcessObject {
 
 	var newObject CoProcessObject
 	newObject.UnmarshalMsg( newObjectBytes )
+
+	C.free(unsafe.Pointer(CObjectStr))
+	C.free(unsafe.Pointer(objectPtr))
+	C.free(unsafe.Pointer(newObjectPtr))
 
 	return newObject
 }
