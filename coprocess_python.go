@@ -108,8 +108,6 @@ static struct CoProcessObject* Python_DispatchHook(struct CoProcessObject* objec
 			outputObject->p_data = (void*)output;
 			outputObject->length = msg_length;
 
-			free(object->p_data);
-
 			return outputObject;
 		}
 	}
