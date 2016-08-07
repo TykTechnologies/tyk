@@ -74,8 +74,6 @@ After re-compiling a binding, the C source code will change and you may want to 
 
 [Python](https://www.python.org/) has a very popular and well-documented [C API](https://docs.python.org/3/c-api/index.html), this coprocess feature makes a heavy use of it.
 
-## Interop
-
 ## Built-in modules
 
 All the standard Python modules are available and it's also possible to load additional ones, if you add them to your local Python installation (for example, using pip).

@@ -1,34 +1,52 @@
 # Coprocess - PoC
 
-## Build notes
+This feature makes it possible to write Tyk middleware using your favorite languages.
 
-It's possible to use a [build tag](https://golang.org/pkg/go/build/#hdr-Build_Constraints):
+## Python support
 
-```
-go build -tags 'coprocess python'
-```
-
-```
-go build -tags 'coprocess somelanguage'
-```
-
-Each language should implement a ```CoProcessInit``` function, this will be called from the main function when the ```coprocess``` build tag is used.
-
-Using the ```coprocess``` build tag with no language tag will fail.
-
-A standard build is still possible:
-
-```
-go build
-```
-
-```coprocess_dummy.go``` provides a dummy ```CoProcessInit``` function that will be called if you perform a standard Tyk build. This file will be ignored when using the ```coprocess``` build tag, as we expect it to be implemented by a language.
+[Python](https://www.python.org/) support is an ongoing task, more notes [here](python/README.md).
 
 ## Interoperability
 
-This module implements an in-process message passing mechanism, based on [msgpack](http://msgpack.org), any supported language should provide a function to receive, unmarshal and process this kind of messages.
+This feature implements an in-process message passing mechanism, based on [msgpack](http://msgpack.org), any supported languages should provide a function to receive, unmarshal and process this kind of messages.
 
-The main interoperability task is achieved by using [cgo](https://golang.org/cmd/cgo/) as a bridge between any supported languages -like Python- and the Go codebase.
+The main interoperability task is achieved by using [cgo](https://golang.org/cmd/cgo/) as a bridge between a supported language -like Python- and the Go codebase.
+
+Your C bridge function must accept and return a `CoProcessMessage` data structure like the one described in [`api.h`](api.h), where `p_data` is a pointer to the raw msgpack data and `length` indicates the length of it.
+
+```c
+struct CoProcessMessage {
+  void* p_data;
+  int length;
+};
+```
+
+The unpacked data will hold the actual `CoProcessObject` data structure, where `HookType` represents the hook type (see below), `Request` represents the HTTP request and `Session` is the Tyk session data.
+
+The `Spec` field holds the API specification data, like organization ID, API ID, etc.
+
+
+```go
+type CoProcessObject struct {
+	HookType string
+	Request  CoProcessMiniRequestObject
+	Session  SessionState
+	Metadata map[string]string
+	Spec     map[string]string
+}
+```
+
+## Coprocess Dispatcher - Hooks
+
+This component is in charge of dispatching your HTTP requests to the custom middlewares, in the right order. The dispatcher follows the standard middleware chain logic and provides a simple mechanism for "hooking" your custom middleware behavior, the supported hooks are:
+
+**Pre:** gets executed before any authentication information is extracted from the header or parameter list of the request.
+
+**Post:** gets executed after the authentication, validation, throttling, and quota-limiting middleware has been executed, just before the request is proxied upstream. Use this to post-process a request before sending it to your upstream API.
+
+**PostKeyAuth:** gets executed right after the autentication process.
+
+**CustomKeyCheck:** gets executed as a custom authentication middleware, instead of the standard ones provided by Tyk. Use this to provide your own authentication mechanism.
 
 ## Coprocess Gateway API
 
@@ -67,9 +85,29 @@ def call():
   TykTriggerEvent( event_name, payload )
 ```
 
-## Python support
+## Build notes
 
-[Python](https://www.python.org/) support is an ongoing task, more notes [here](python/README.md).
+It's possible to use a [build tag](https://golang.org/pkg/go/build/#hdr-Build_Constraints):
+
+```
+go build -tags 'coprocess python'
+```
+
+```
+go build -tags 'coprocess somelanguage'
+```
+
+Each language should implement a ```CoProcessInit``` function, this will be called from the main function when the ```coprocess``` build tag is used.
+
+Using the ```coprocess``` build tag with no language tag will fail.
+
+A standard build is still possible:
+
+```
+go build
+```
+
+```coprocess_dummy.go``` provides a dummy ```CoProcessInit``` function that will be called if you perform a standard Tyk build. This file will be ignored when using the ```coprocess``` build tag, as we expect it to be implemented by a language.
 
 ## References
 
