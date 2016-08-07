@@ -26,20 +26,15 @@ import (
 	"github.com/TykTechnologies/tykcommon/coprocess"
 
 	"errors"
-	"encoding/json"
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"unsafe"
 )
 
 var EnableCoProcess bool = true
 
 var GlobalDispatcher CoProcessDispatcher
-
-func CoProcessDispatchHook(o CoProcessObject) CoProcessObject {
-	objectAsJson, _ := json.Marshal(o)
-	return GlobalDispatcher.DispatchHook(objectAsJson)
-}
 
 func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
@@ -64,7 +59,7 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 
 	object.Request = CoProcessMiniRequestObject{
 		Headers:        r.Header,
-		SetHeaders:     make(map[string]string),
+		SetHeaders:     make(map[string]string, 0),
 		DeleteHeaders:  make([]string, 0),
 		Body:           string(originalBody),
 		URL:            r.URL.Path,
@@ -72,6 +67,7 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 		AddParams:      make(map[string]string),
 		ExtendedParams: make(map[string][]string),
 		DeleteParams:   make([]string, 0),
+		ReturnOverrides: CoProcessReturnOverrides{ ResponseCode: -1, ResponseError: "" },
 	}
 
 	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
@@ -90,7 +86,10 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 		object.HookType = "customkeycheck"
 	}
 
-	object.Metadata = make(map[string]string)
+	object.Metadata = make(map[string]string, 0)
+	object.Spec = make(map[string]string, 0)
+
+	// object.Session = SessionState{}
 
 	// Append spec data:
 	if c.Middleware != nil {
@@ -138,26 +137,34 @@ func( c *CoProcessor) ObjectPostProcess(object *CoProcessObject, r *http.Request
 
 func( c *CoProcessor ) Dispatch(object *CoProcessObject) CoProcessObject {
 
-	objectJson, _ := json.Marshal(object)
+	objectMsg, _ := object.MarshalMsg(nil)
+
+	objectMsgStr := string(objectMsg)
 
 	var CObjectStr *C.char
-	CObjectStr = C.CString(string(objectJson))
+	CObjectStr = C.CString( objectMsgStr )
 
-	var CNewObjectStr *C.char
-	CNewObjectStr = GlobalDispatcher.Dispatch(CObjectStr)
+	var objectPtr *C.struct_CoProcessObject
 
-	var newObjectStr string
-	newObjectStr = C.GoString(CNewObjectStr)
+	objectPtr = &C.struct_CoProcessObject{
+		p_data: unsafe.Pointer(CObjectStr),
+		length: C.int( len(objectMsg) ),
+	}
+
+	var newObjectPtr *C.struct_CoProcessObject
+	newObjectPtr = GlobalDispatcher.Dispatch(objectPtr)
+
+	var newObjectBytes []byte
+	newObjectBytes = C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 
 	var newObject CoProcessObject
-	json.Unmarshal([]byte(newObjectStr), &newObject)
+	newObject.UnmarshalMsg( newObjectBytes )
 
 	return newObject
 }
 
 type CoProcessDispatcher interface {
-	DispatchHook([]byte) CoProcessObject
-	Dispatch(*C.char) *C.char
+	Dispatch(*C.struct_CoProcessObject) *C.struct_CoProcessObject
 }
 
 type CoProcessMiddleware struct {

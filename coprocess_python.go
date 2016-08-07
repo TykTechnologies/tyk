@@ -86,26 +86,39 @@ static void Python_SetEnv(char* python_path) {
   setenv("PYTHONPATH", python_path, 1 );
 }
 
-static char* Python_DispatchHook(char *object_json) {
-  if( object_json == NULL ) {
-    return NULL;
-  } else {
-    PyObject *args = PyTuple_Pack( 1, PyUnicode_FromString(object_json) );
-    PyObject *result = PyObject_CallObject( dispatcher_hook, args );
-    if( result == NULL ) {
-      PyErr_Print();
-      return NULL;
-    } else {
-      char *payload = PyUnicode_AsUTF8(result);
-      return payload;
-    }
-  }
+static struct CoProcessObject* Python_DispatchHook(struct CoProcessObject* object) {
+	struct CoProcessObject* outputObject = malloc(sizeof *outputObject);
+
+	if( object->p_data == NULL ) {
+		return outputObject;
+	} else {
+		PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
+		PyObject *result = PyObject_CallObject( dispatcher_hook, args );
+
+		if( result == NULL ) {
+			PyErr_Print();
+			return outputObject;
+		} else {
+			PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
+			char* output = PyBytes_AsString(new_object_msg_item);
+
+			PyObject* new_object_msg_length = PyTuple_GetItem( result, 1 );
+			int msg_length = PyLong_AsLong(new_object_msg_length);
+
+			outputObject->p_data = (void*)output;
+			outputObject->length = msg_length;
+
+			free(object->p_data);
+
+			return outputObject;
+		}
+	}
 }
+
 */
 import "C"
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path"
@@ -121,34 +134,11 @@ type PythonDispatcher struct {
 	CoProcessDispatcher
 }
 
-func (d *PythonDispatcher) Dispatch(CObjectStr *C.char) *C.char {
-	log.Println("PythonDispatcher receives the object!")
+func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessObject) *C.struct_CoProcessObject {
+	var newObjectPtr *C.struct_CoProcessObject
+	newObjectPtr = C.Python_DispatchHook(objectPtr)
 
-	var CNewObjectStr *C.char
-	CNewObjectStr = C.Python_DispatchHook(CObjectStr)
-
-	return CNewObjectStr
-}
-
-func (d *PythonDispatcher) DispatchHook(objectJson []byte) CoProcessObject {
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Info("PythonDispatcher.DispatchHook")
-
-	var CObjectStr *C.char
-	CObjectStr = C.CString(string(objectJson))
-
-	var CNewObjectStr *C.char
-	CNewObjectStr = C.Python_DispatchHook(CObjectStr)
-
-	var newObjectStr string
-	newObjectStr = C.GoString(CNewObjectStr)
-
-	var newObject CoProcessObject
-	json.Unmarshal([]byte(newObjectStr), &newObject)
-
-	return newObject
-
+	return newObjectPtr
 }
 
 func PythonInit() (err error) {
