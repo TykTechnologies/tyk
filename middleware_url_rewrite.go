@@ -166,8 +166,10 @@ func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (m *URLRewriteMiddleware) CheckHostRewrite(newTarget string,  r *http.Request) {
-	if strings.HasPrefix(strings.ToLower(newTarget), "https://") || strings.HasPrefix(strings.ToLower(newTarget), "http://") {
+func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
+	oldAsURL, _ := url.Parse(oldPath)
+	newAsURL, _ := url.Parse(newTarget)
+	if oldAsURL.Host != newAsURL.Host {
 		log.Debug("Detected a host rewrite in pattern!")
 		context.Set(r, RetainHost, true)
 	}
@@ -192,13 +194,14 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		log.Debug("Rewriter active")
 		thisMeta := meta.(*tykcommon.URLRewriteMeta)
 		log.Debug(r.URL)
+		oldPath := r.URL.String()
 		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.String(), true, r)
 		if pErr != nil {
 			return pErr, 500
 		}
 
-		m.CheckHostRewrite(p, r)
-		
+		m.CheckHostRewrite(oldPath, p, r)
+
 		newURL, uErr := url.Parse(p)
 		if uErr != nil {
 			log.Error("URL Rewrite failed, could not parse: ", p)
