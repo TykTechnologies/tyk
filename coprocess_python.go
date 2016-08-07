@@ -35,6 +35,8 @@ static int Python_LoadDispatcher() {
   PyObject *module_name = PyUnicode_FromString( dispatcher_module_name );
   dispatcher_module = PyImport_Import( module_name );
 
+	Py_DECREF(module_name);
+
   if( dispatcher_module == NULL ) {
     PyErr_Print();
     return -1;
@@ -61,6 +63,9 @@ static int Python_NewDispatcher(char* middleware_path) {
   if( PyCallable_Check(dispatcher_class) ) {
     dispatcher_args = PyTuple_Pack( 1, PyUnicode_FromString(middleware_path) );
     dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
+
+		Py_DECREF(dispatcher_args);
+
     if( dispatcher == NULL) {
       PyErr_Print();
       return -1;
@@ -72,6 +77,8 @@ static int Python_NewDispatcher(char* middleware_path) {
 
   dispatcher_hook_name = PyUnicode_FromString( hook_name );
   dispatcher_hook = PyObject_GetAttr(dispatcher, dispatcher_hook_name);
+
+	Py_DECREF(dispatcher_hook_name);
 
   if( dispatcher_hook == NULL ) {
     PyErr_Print();
@@ -95,7 +102,10 @@ static struct CoProcessObject* Python_DispatchHook(struct CoProcessObject* objec
 		PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
 		PyObject *result = PyObject_CallObject( dispatcher_hook, args );
 
+		Py_DECREF(args);
+
 		if( result == NULL ) {
+			Py_DECREF(result);
 			PyErr_Print();
 			return outputObject;
 		} else {
@@ -107,6 +117,8 @@ static struct CoProcessObject* Python_DispatchHook(struct CoProcessObject* objec
 
 			outputObject->p_data = (void*)output;
 			outputObject->length = msg_length;
+
+			Py_DECREF(result);
 
 			return outputObject;
 		}
