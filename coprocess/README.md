@@ -24,9 +24,11 @@ go build
 
 ```coprocess_dummy.go``` provides a dummy ```CoProcessInit``` function that will be called if you perform a standard Tyk build. This file will be ignored when using the ```coprocess``` build tag, as we expect it to be implemented by a language.
 
-## Python support
+## Interoperability
 
-[Python](https://www.python.org/) support is an ongoing task, more notes [here](python/README.md).
+This module implements an in-process message passing mechanism, based on [msgpack](http://msgpack.org), any supported language should provide a function to receive, unmarshal and process this kind of messages.
+
+The main interoperability task is achieved by using [cgo](https://golang.org/cmd/cgo/) as a bridge between any supported languages -like Python- and the Go codebase.
 
 ## Coprocess Gateway API
 
@@ -64,6 +66,10 @@ def call():
   payload = 'my payload'.encode('utf-8')
   TykTriggerEvent( event_name, payload )
 ```
+
+## Python support
+
+[Python](https://www.python.org/) support is an ongoing task, more notes [here](python/README.md).
 
 ## References
 
