@@ -155,6 +155,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			}
 		}
 
+		var newTarget *url.URL
+		switchTargets := false
 		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
 		if found {
 			if URLRewriteContainsTarget.(bool) {
@@ -163,17 +165,23 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 				if pErr != nil {
 					log.Error("Failed to parse URL! Err: ", pErr)
 				} else {
-					target = tmpTarget
+					newTarget = tmpTarget
+					switchTargets = true
 				}
+				context.Clear(req)
 			}
 		}
 
 		// No override, and no load balancing? Use the existing target
-		req.URL.Scheme = target.Scheme
-		req.URL.Host = target.Host
-		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+		var targetToUse *url.URL = target
+		if switchTargets {
+			targetToUse = newTarget
+		}
+		req.URL.Scheme = targetToUse.Scheme
+		req.URL.Host = targetToUse.Host
+		req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
 		if !spec.Proxy.PreserveHostHeader {
-			req.Host = target.Host
+			req.Host = targetToUse.Host
 		}
 		if targetQuery == "" || req.URL.RawQuery == "" {
 			req.URL.RawQuery = targetQuery + req.URL.RawQuery
@@ -418,7 +426,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq.Close = false
 
 	log.Debug("Outbound Request: ", outreq.URL.String())
-	
+
 	// Do not modify outbound request headers if they are WS
 	if !IsWebsocket(outreq) {
 
