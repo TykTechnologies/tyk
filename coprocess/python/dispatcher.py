@@ -1,6 +1,5 @@
 from glob import glob
 from os import getcwd, chdir, path
-import json
 
 import tyk
 from tyk.middleware import TykMiddleware
@@ -25,8 +24,8 @@ class TykDispatcher:
             middleware = TykMiddleware(basename)
             self.middlewares.append(middleware)
 
-    def dispatch_hook(self, object_json):
-        object = TykCoProcessObject(object_json)
+    def dispatch_hook(self, object_msg):
+        object = TykCoProcessObject(object_msg)
 
         for middleware in self.middlewares:
             if object.hook_type in middleware.handlers:
