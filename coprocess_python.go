@@ -93,8 +93,8 @@ static void Python_SetEnv(char* python_path) {
   setenv("PYTHONPATH", python_path, 1 );
 }
 
-static struct CoProcessObject* Python_DispatchHook(struct CoProcessObject* object) {
-	struct CoProcessObject* outputObject = malloc(sizeof *outputObject);
+static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* object) {
+	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
 
 	if( object->p_data == NULL ) {
 		return outputObject;
@@ -144,8 +144,8 @@ type PythonDispatcher struct {
 	CoProcessDispatcher
 }
 
-func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessObject) *C.struct_CoProcessObject {
-	var newObjectPtr *C.struct_CoProcessObject
+func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.struct_CoProcessMessage {
+	var newObjectPtr *C.struct_CoProcessMessage
 	newObjectPtr = C.Python_DispatchHook(objectPtr)
 
 	return newObjectPtr

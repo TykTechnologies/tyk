@@ -1,7 +1,7 @@
 #ifndef TYK_COPROCESS_API
 #define TYK_COPROCESS_API
 
-struct CoProcessObject {
+struct CoProcessMessage {
   void* p_data;
   int length;
 };

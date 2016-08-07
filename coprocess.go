@@ -144,13 +144,13 @@ func (c *CoProcessor) Dispatch(object *CoProcessObject) CoProcessObject {
 	var CObjectStr *C.char
 	CObjectStr = C.CString(objectMsgStr)
 
-	var objectPtr *C.struct_CoProcessObject
+	var objectPtr *C.struct_CoProcessMessage
 
-	objectPtr = (*C.struct_CoProcessObject)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessObject{}))))
+	objectPtr = (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
 	objectPtr.p_data = unsafe.Pointer(CObjectStr)
 	objectPtr.length = C.int(len(objectMsg))
 
-	var newObjectPtr *C.struct_CoProcessObject
+	var newObjectPtr *C.struct_CoProcessMessage
 	newObjectPtr = GlobalDispatcher.Dispatch(objectPtr)
 
 	var newObjectBytes []byte
@@ -167,7 +167,7 @@ func (c *CoProcessor) Dispatch(object *CoProcessObject) CoProcessObject {
 }
 
 type CoProcessDispatcher interface {
-	Dispatch(*C.struct_CoProcessObject) *C.struct_CoProcessObject
+	Dispatch(*C.struct_CoProcessMessage) *C.struct_CoProcessMessage
 }
 
 type CoProcessMiddleware struct {
