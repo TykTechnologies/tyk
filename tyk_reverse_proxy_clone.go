@@ -155,6 +155,19 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			}
 		}
 
+		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+		if found {
+			if URLRewriteContainsTarget.(bool) {
+				log.Debug("Detected host rewrite, overriding target")
+				tmpTarget, pErr := url.Parse(req.URL.String())
+				if pErr != nil {
+					log.Error("Failed to parse URL! Err: ", pErr)
+				} else {
+					target = tmpTarget
+				}
+			}
+		}
+
 		// No override, and no load balancing? Use the existing target
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
@@ -384,6 +397,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq := new(http.Request)
 	logreq := new(http.Request)
 	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
+
+	// We need to double set the context for the outbound request to reprocess the target
+	URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+	if found {
+		if URLRewriteContainsTarget.(bool) {
+			log.Debug("Detected host rewrite, notifying director")
+			context.Set(outreq, RetainHost, true)
+		}
+	}
+
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
 

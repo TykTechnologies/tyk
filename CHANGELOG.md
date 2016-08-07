@@ -3,6 +3,7 @@
 - Context Data now includes JWT Claims, claims are added as individual keys as $tyk_context.jwt_claims_CLAIMNAME.
 - Meta data is now available to the URL Rewriter (for e.g. to inject a custom querystring for key holders.)
 - Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}` 
+- It is now possible to rewrite a URL with a new host and have the host act as an override to any target settings that are in the API Definition
 
 # v2.2
 
