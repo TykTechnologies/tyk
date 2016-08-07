@@ -20,13 +20,13 @@ import "C"
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/mitchellh/mapstructure"
 	"github.com/gorilla/context"
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tykcommon/coprocess"
 
-	"errors"
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"unsafe"
@@ -38,19 +38,19 @@ var GlobalDispatcher CoProcessDispatcher
 
 func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
-		TykMiddleware:       tykMwSuper,
-		HookType: hookType,
+		TykMiddleware: tykMwSuper,
+		HookType:      hookType,
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
 type CoProcessor struct {
-	HookType int
+	HookType   int
 	Middleware *CoProcessMiddleware
 }
 
-func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
+func (c *CoProcessor) GetObjectFromRequest(r *http.Request) CoProcessObject {
 
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
@@ -58,16 +58,16 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 	var object CoProcessObject
 
 	object.Request = CoProcessMiniRequestObject{
-		Headers:        r.Header,
-		SetHeaders:     make(map[string]string, 0),
-		DeleteHeaders:  make([]string, 0),
-		Body:           string(originalBody),
-		URL:            r.URL.Path,
-		Params:         r.URL.Query(),
-		AddParams:      make(map[string]string),
-		ExtendedParams: make(map[string][]string),
-		DeleteParams:   make([]string, 0),
-		ReturnOverrides: CoProcessReturnOverrides{ ResponseCode: -1, ResponseError: "" },
+		Headers:         r.Header,
+		SetHeaders:      make(map[string]string, 0),
+		DeleteHeaders:   make([]string, 0),
+		Body:            string(originalBody),
+		URL:             r.URL.Path,
+		Params:          r.URL.Query(),
+		AddParams:       make(map[string]string),
+		ExtendedParams:  make(map[string][]string),
+		DeleteParams:    make([]string, 0),
+		ReturnOverrides: CoProcessReturnOverrides{ResponseCode: -1, ResponseError: ""},
 	}
 
 	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
@@ -100,7 +100,7 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 	}
 
 	// Encode the session object (if not a pre-process & not a custom key check):
-	if c.HookType != coprocess.PreHook  && c.HookType != coprocess.CustomKeyCheckHook {
+	if c.HookType != coprocess.PreHook && c.HookType != coprocess.CustomKeyCheckHook {
 		var session interface{}
 		session = context.Get(r, SessionData)
 		if session != nil {
@@ -111,7 +111,7 @@ func( c *CoProcessor ) GetObjectFromRequest(r *http.Request ) CoProcessObject {
 	return object
 }
 
-func( c *CoProcessor) ObjectPostProcess(object *CoProcessObject, r *http.Request) {
+func (c *CoProcessor) ObjectPostProcess(object *CoProcessObject, r *http.Request) {
 	r.ContentLength = int64(len(object.Request.Body))
 	r.Body = ioutil.NopCloser(bytes.NewBufferString(object.Request.Body))
 
@@ -135,20 +135,20 @@ func( c *CoProcessor) ObjectPostProcess(object *CoProcessObject, r *http.Request
 	r.URL.RawQuery = values.Encode()
 }
 
-func( c *CoProcessor ) Dispatch(object *CoProcessObject) CoProcessObject {
+func (c *CoProcessor) Dispatch(object *CoProcessObject) CoProcessObject {
 
 	objectMsg, _ := object.MarshalMsg(nil)
 
 	objectMsgStr := string(objectMsg)
 
 	var CObjectStr *C.char
-	CObjectStr = C.CString( objectMsgStr )
+	CObjectStr = C.CString(objectMsgStr)
 
 	var objectPtr *C.struct_CoProcessObject
 
 	objectPtr = (*C.struct_CoProcessObject)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessObject{}))))
 	objectPtr.p_data = unsafe.Pointer(CObjectStr)
-	objectPtr.length = C.int( len(objectMsg) )
+	objectPtr.length = C.int(len(objectMsg))
 
 	var newObjectPtr *C.struct_CoProcessObject
 	newObjectPtr = GlobalDispatcher.Dispatch(objectPtr)
@@ -157,7 +157,7 @@ func( c *CoProcessor ) Dispatch(object *CoProcessObject) CoProcessObject {
 	newObjectBytes = C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 
 	var newObject CoProcessObject
-	newObject.UnmarshalMsg( newObjectBytes )
+	newObject.UnmarshalMsg(newObjectBytes)
 
 	C.free(unsafe.Pointer(CObjectStr))
 	C.free(unsafe.Pointer(objectPtr))
@@ -180,28 +180,28 @@ type CoProcessMiddlewareConfig struct {
 }
 
 type CoProcessObject struct {
-	HookType string	`json:"hook_type" msg:"hook_type"`
-	Request CoProcessMiniRequestObject	`json:"request,omitempty" msg:"request"`
-	Session SessionState	`json:"session,omitempty" msg:"session"`
-	Metadata map[string]string	`json:"metadata",omitempty msg:"metadata"`
-	Spec map[string]string `json:"spec,omitempty" msg:"spec"`
+	HookType string                     `json:"hook_type" msg:"hook_type"`
+	Request  CoProcessMiniRequestObject `json:"request,omitempty" msg:"request"`
+	Session  SessionState               `json:"session,omitempty" msg:"session"`
+	Metadata map[string]string          `json:"metadata",omitempty msg:"metadata"`
+	Spec     map[string]string          `json:"spec,omitempty" msg:"spec"`
 }
 
 type CoProcessReturnOverrides struct {
-	ResponseCode  int	`json:"response_code" msg:"response_code"`
-	ResponseError string	`json:"response_error" msg:"response_error"`
+	ResponseCode  int    `json:"response_code" msg:"response_code"`
+	ResponseError string `json:"response_error" msg:"response_error"`
 }
 type CoProcessMiniRequestObject struct {
-	Headers         map[string][]string	`msg:"headers"`
-	SetHeaders      map[string]string	`msg:"set_headers"`
-	DeleteHeaders   []string	`msg:"delete_headers"`
-	Body            string	`msg:"body"`
-	URL             string	`msg:"url"`
-	Params          map[string][]string	`msg:"params"`
-	AddParams       map[string]string	`msg:"add_params"`
-	ExtendedParams  map[string][]string	`msg:"extended_params"`
-	DeleteParams    []string	`msg:"delete_params"`
-	ReturnOverrides CoProcessReturnOverrides	`json:"return_overrides" msg:"return_overrides"`
+	Headers         map[string][]string      `msg:"headers"`
+	SetHeaders      map[string]string        `msg:"set_headers"`
+	DeleteHeaders   []string                 `msg:"delete_headers"`
+	Body            string                   `msg:"body"`
+	URL             string                   `msg:"url"`
+	Params          map[string][]string      `msg:"params"`
+	AddParams       map[string]string        `msg:"add_params"`
+	ExtendedParams  map[string][]string      `msg:"extended_params"`
+	DeleteParams    []string                 `msg:"delete_params"`
+	ReturnOverrides CoProcessReturnOverrides `json:"return_overrides" msg:"return_overrides"`
 }
 
 // New lets you do any initialisations for the object can be done here
@@ -226,64 +226,63 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
-		}).Info( "ProcessRequest, HookType:", m.HookType )
+	}).Info("ProcessRequest, HookType:", m.HookType)
 
-
-		// It's also possible to override the HookType:
-		thisCoProcessor := CoProcessor{
-			Middleware: m,
-			// HookType: coprocess.PreHook,
-		}
-
-		object := thisCoProcessor.GetObjectFromRequest(r)
-
-		returnObject := thisCoProcessor.Dispatch(&object)
-
-		thisCoProcessor.ObjectPostProcess(&returnObject, r)
-
-		authHeaderValue := returnObject.Metadata["token"]
-
-		if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
-
-			log.WithFields(logrus.Fields{
-					"path":   r.URL.Path,
-					"origin": GetIPFromRequest(r),
-					"key":    authHeaderValue,
-			}).Info("Attempted access with invalid key.")
-
-			// Fire Authfailed Event
-			AuthFailed(m.TykMiddleware, r, authHeaderValue)
-
-			// Report in health check
-			ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
-
-			return errors.New("Key not authorised"), returnObject.Request.ReturnOverrides.ResponseCode
-		}
-
-		if m.HookType == coprocess.CustomKeyCheckHook {
-			context.Set(r, SessionData, returnObject.Session)
-			context.Set(r, AuthHeaderValue, authHeaderValue)
-		}
-
-		// context.GetOk(r, SessionData)
-
-		return nil, 200
+	// It's also possible to override the HookType:
+	thisCoProcessor := CoProcessor{
+		Middleware: m,
+		// HookType: coprocess.PreHook,
 	}
 
-	//export CoProcess_Log
-	func CoProcess_Log(CMessage *C.char, CLogLevel *C.char) {
-		var message, logLevel string
-		message = C.GoString(CMessage)
-		logLevel = C.GoString(CLogLevel)
+	object := thisCoProcessor.GetObjectFromRequest(r)
 
-		switch logLevel {
-		case "error":
-			log.WithFields(logrus.Fields{
-				"prefix": CoProcessName,
-				}).Error(message)
-			default:
-				log.WithFields(logrus.Fields{
-					"prefix": CoProcessName,
-					}).Info(message)
-				}
-			}
+	returnObject := thisCoProcessor.Dispatch(&object)
+
+	thisCoProcessor.ObjectPostProcess(&returnObject, r)
+
+	authHeaderValue := returnObject.Metadata["token"]
+
+	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
+
+		log.WithFields(logrus.Fields{
+			"path":   r.URL.Path,
+			"origin": GetIPFromRequest(r),
+			"key":    authHeaderValue,
+		}).Info("Attempted access with invalid key.")
+
+		// Fire Authfailed Event
+		AuthFailed(m.TykMiddleware, r, authHeaderValue)
+
+		// Report in health check
+		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
+
+		return errors.New("Key not authorised"), returnObject.Request.ReturnOverrides.ResponseCode
+	}
+
+	if m.HookType == coprocess.CustomKeyCheckHook {
+		context.Set(r, SessionData, returnObject.Session)
+		context.Set(r, AuthHeaderValue, authHeaderValue)
+	}
+
+	// context.GetOk(r, SessionData)
+
+	return nil, 200
+}
+
+//export CoProcess_Log
+func CoProcess_Log(CMessage *C.char, CLogLevel *C.char) {
+	var message, logLevel string
+	message = C.GoString(CMessage)
+	logLevel = C.GoString(CLogLevel)
+
+	switch logLevel {
+	case "error":
+		log.WithFields(logrus.Fields{
+			"prefix": CoProcessName,
+		}).Error(message)
+	default:
+		log.WithFields(logrus.Fields{
+			"prefix": CoProcessName,
+		}).Info(message)
+	}
+}
