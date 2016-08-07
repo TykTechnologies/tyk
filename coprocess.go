@@ -183,7 +183,7 @@ type CoProcessObject struct {
 	HookType string                     `json:"hook_type" msg:"hook_type"`
 	Request  CoProcessMiniRequestObject `json:"request,omitempty" msg:"request"`
 	Session  SessionState               `json:"session,omitempty" msg:"session"`
-	Metadata map[string]string          `json:"metadata",omitempty msg:"metadata"`
+	Metadata map[string]string          `json:"metadata,omitempty" msg:"metadata"`
 	Spec     map[string]string          `json:"spec,omitempty" msg:"spec"`
 }
 
