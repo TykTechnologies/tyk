@@ -908,7 +908,7 @@ func (z *CoProcessObject) DecodeMsg(dc *msgp.Reader) (err error) {
 			if err != nil {
 				return
 			}
-		case "Metadata":
+		case "metadata":
 			var ztmt uint32
 			ztmt, err = dc.ReadMapHeader()
 			if err != nil {
@@ -1002,8 +1002,8 @@ func (z *CoProcessObject) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	// write "Metadata"
-	err = en.Append(0xa8, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61)
+	// write "metadata"
+	err = en.Append(0xa8, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61)
 	if err != nil {
 		return err
 	}
@@ -1062,8 +1062,8 @@ func (z *CoProcessObject) MarshalMsg(b []byte) (o []byte, err error) {
 	if err != nil {
 		return
 	}
-	// string "Metadata"
-	o = append(o, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61)
+	// string "metadata"
+	o = append(o, 0xa8, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61)
 	o = msgp.AppendMapHeader(o, uint32(len(z.Metadata)))
 	for zzdc, zelx := range z.Metadata {
 		o = msgp.AppendString(o, zzdc)
@@ -1110,7 +1110,7 @@ func (z *CoProcessObject) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
-		case "Metadata":
+		case "metadata":
 			var ztyy uint32
 			ztyy, bts, err = msgp.ReadMapHeaderBytes(bts)
 			if err != nil {

@@ -1,4 +1,4 @@
-// build +coprocess
+// +build coprocess
 
 package main
 
