@@ -2,6 +2,18 @@ syntax = "proto3";
 
 package main;
 
+message CoProcessAccessSpec {
+  string url = 1;
+  repeated string methods = 2;
+}
+
+message CoProcessAccessDefinition {
+  string api_name = 1;
+  string api_id = 2;
+  repeated string versions = 3;
+  repeated CoProcessAccessSpec allowed_urls = 4;
+}
+
 message CoProcessSessionState {
   int64 last_check = 1;
 
@@ -15,28 +27,39 @@ message CoProcessSessionState {
   int64 quota_remaining = 8;
   int64 quota_renewal_rate = 9;
 
-  // map<string, string> access_rights = 10;
+  map<string, CoProcessAccessDefinition> access_rights = 10;
 
   string org_id = 11;
   string oauth_client_id = 12;
   map<string, string> oauth_keys = 13;
 
-  // basic_auth_data struct
 
-  // jwtdata struct
+  message BasicAuthData {
+    string password = 1;
+    string hash = 2;
+  }
+  BasicAuthData basic_auth_data = 15;
 
-  bool hmac_enabled = 16;
-  string hmac_secret = 17;
-  bool is_inactive = 18;
-  string apply_policy_id = 19;
-  int64 data_expires = 20;
+  message JWTData {
+    string secret = 1;
+  }
+  JWTData jwt_data = 16;
 
-  // monitor struct
+  bool hmac_enabled = 17;
+  string hmac_secret = 18;
+  bool is_inactive = 19;
+  string apply_policy_id = 20;
+  int64 data_expires = 21;
 
-  bool enable_detailed_recording = 22;
+  message Monitor {
+    repeated double trigger_limits = 1;
+  }
+  Monitor monitor = 22;
+
+  bool enable_detailed_recording = 23;
 
   // metadata interface{}
 
-  repeated string tags = 23;
-  string alias = 24;
+  repeated string tags = 24;
+  string alias = 25;
 }
