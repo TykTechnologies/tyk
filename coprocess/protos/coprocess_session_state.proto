@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package main;
+
+message CoProcessSessionState {
+  int64 last_check = 1;
+
+  double allowance = 2;
+  double rate = 3;
+  double per = 4;
+
+  int64 expires = 5;
+  int64 quota_max = 6;
+  int64 quota_renews = 7;
+  int64 quota_remaining = 8;
+  int64 quota_renewal_rate = 9;
+
+  // map<string, string> access_rights = 10;
+
+  string org_id = 11;
+  string oauth_client_id = 12;
+  map<string, string> oauth_keys = 13;
+
+  // basic_auth_data struct
+
+  // jwtdata struct
+
+  bool hmac_enabled = 16;
+  string hmac_secret = 17;
+  bool is_inactive = 18;
+  string apply_policy_id = 19;
+  int64 data_expires = 20;
+
+  // monitor struct
+
+  bool enable_detailed_recording = 22;
+
+  // metadata interface{}
+
+  repeated string tags = 23;
+  string alias = 24;
+}
