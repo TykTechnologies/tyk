@@ -23,7 +23,9 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/TykTechnologies/tykcommon/coprocess"
+	// "github.com/TykTechnologies/tykcommon/coprocess"
+
+	"github.com/TykTechnologies/tyk/coprocess/protos/go_out"
 
 	"bytes"
 	"errors"
@@ -36,17 +38,17 @@ var EnableCoProcess bool = true
 
 var GlobalDispatcher CoProcessDispatcher
 
-func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookType int32, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware: tykMwSuper,
-		HookType:      hookType,
+		HookType:      coprocess.HookType(hookType),
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
 type CoProcessor struct {
-	HookType   int
+	HookType   coprocess.HookType
 	Middleware *CoProcessMiddleware
 }
 
@@ -76,13 +78,13 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) CoProcessObject {
 	}
 
 	switch c.HookType {
-	case coprocess.PreHook:
+	case coprocess.HookType_Pre:
 		object.HookType = "pre"
-	case coprocess.PostHook:
+	case coprocess.HookType_Post:
 		object.HookType = "post"
-	case coprocess.PostKeyAuthHook:
+	case coprocess.HookType_PostKeyAuth:
 		object.HookType = "postkeyauth"
-	case coprocess.CustomKeyCheckHook:
+	case coprocess.HookType_CustomKeyCheck:
 		object.HookType = "customkeycheck"
 	}
 
@@ -100,7 +102,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) CoProcessObject {
 	}
 
 	// Encode the session object (if not a pre-process & not a custom key check):
-	if c.HookType != coprocess.PreHook && c.HookType != coprocess.CustomKeyCheckHook {
+	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
 		var session interface{}
 		session = context.Get(r, SessionData)
 		if session != nil {
@@ -172,7 +174,7 @@ type CoProcessDispatcher interface {
 
 type CoProcessMiddleware struct {
 	*TykMiddleware
-	HookType int
+	HookType coprocess.HookType
 }
 
 type CoProcessMiddlewareConfig struct {
@@ -259,7 +261,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Key not authorised"), returnObject.Request.ReturnOverrides.ResponseCode
 	}
 
-	if m.HookType == coprocess.CustomKeyCheckHook {
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		context.Set(r, SessionData, returnObject.Session)
 		context.Set(r, AuthHeaderValue, authHeaderValue)
 	}
