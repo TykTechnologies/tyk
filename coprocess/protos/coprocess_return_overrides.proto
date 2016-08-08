@@ -3,5 +3,6 @@ syntax = "proto3";
 package main;
 
 message CoProcessReturnOverrides {
-
+  int32 response_code = 1;
+  string response_error = 2;
 }
