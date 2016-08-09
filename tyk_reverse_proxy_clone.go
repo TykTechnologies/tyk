@@ -155,6 +155,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			}
 		}
 
+		// Specifically override with a URL rewrite
 		var newTarget *url.URL
 		switchTargets := false
 		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
