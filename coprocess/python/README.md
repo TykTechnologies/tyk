@@ -8,6 +8,7 @@ The purpose of this README is to provide an overview of the architecture and a f
 * [Python 3.x](https://www.python.org/)
 * [Go](https://golang.org)
 * [Cython](http://cython.org/) (required if you need to modify and re-compile the gateway API binding)
+* [protobuf](https://pypi.python.org/pypi/protobuf/3.0.0) (Python module): `pip install protobuf`
 
 ## Build steps
 
