@@ -197,8 +197,9 @@ func CoProcessInit() (err error) {
 
 	dispatcherPath := path.Join(workDir, "coprocess/python")
 	middlewarePath := path.Join(workDir, "middleware/python")
+	protoPath := path.Join(workDir, "coprocess/python/proto")
 
-	PythonSetEnv(dispatcherPath, middlewarePath)
+	PythonSetEnv(dispatcherPath, middlewarePath, protoPath)
 
 	PythonInit()
 	PythonLoadDispatcher()
