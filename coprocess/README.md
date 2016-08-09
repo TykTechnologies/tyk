@@ -8,11 +8,11 @@ This feature makes it possible to write Tyk middleware using your favorite langu
 
 ## Interoperability
 
-This feature implements an in-process message passing mechanism, based on [msgpack](http://msgpack.org), any supported languages should provide a function to receive, unmarshal and process this kind of messages.
+This feature implements an in-process message passing mechanism, based on [Protocol Buffers](https://developers.google.com/protocol-buffers/), any supported languages should provide a function to receive, unmarshal and process this kind of messages.
 
 The main interoperability task is achieved by using [cgo](https://golang.org/cmd/cgo/) as a bridge between a supported language -like Python- and the Go codebase.
 
-Your C bridge function must accept and return a `CoProcessMessage` data structure like the one described in [`api.h`](api.h), where `p_data` is a pointer to the raw msgpack data and `length` indicates the length of it.
+Your C bridge function must accept and return a `CoProcessMessage` data structure like the one described in [`api.h`](api.h), where `p_data` is a pointer to the serialized data and `length` indicates the length of it.
 
 ```c
 struct CoProcessMessage {
