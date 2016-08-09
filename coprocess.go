@@ -23,9 +23,7 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
-	// "github.com/TykTechnologies/tykcommon/coprocess"
-
-	"github.com/TykTechnologies/tyk/coprocess/protos/go_out"
+	"github.com/TykTechnologies/tyk/coprocess"
 
 	"github.com/golang/protobuf/proto"
 
