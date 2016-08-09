@@ -29,8 +29,8 @@ message SessionState {
 
   map<string, AccessDefinition> access_rights = 10;
 
-  string org_id = 11;
-  string oauth_client_id = 12;
+  string orgID = 11;
+  string oauth_clientID = 12;
   map<string, string> oauth_keys = 13;
 
 
@@ -38,27 +38,27 @@ message SessionState {
     string password = 1;
     string hash = 2;
   }
-  BasicAuthData basic_auth_data = 15;
+  BasicAuthData basic_auth_data = 14;
 
   message JWTData {
     string secret = 1;
   }
-  JWTData jwt_data = 16;
+  JWTData jwt_data = 15;
 
-  bool hmac_enabled = 17;
-  string hmac_secret = 18;
-  bool is_inactive = 19;
-  string apply_policy_id = 20;
-  int64 data_expires = 21;
+  bool HMAC_enabled = 16;
+  string hmac_secret = 17;
+  bool is_inactive = 18;
+  string apply_policyID = 19;
+  int64 data_expires = 20;
 
   message Monitor {
     repeated double trigger_limits = 1;
   }
-  Monitor monitor = 22;
+  Monitor monitor = 21;
 
-  bool enable_detailed_recording = 23;
+  bool enable_detailed_recording = 22;
 
-  // metadata interface{}
+  string metadata = 23;
 
   repeated string tags = 24;
   string alias = 25;
