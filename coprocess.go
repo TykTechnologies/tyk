@@ -27,6 +27,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/coprocess/protos/go_out"
 
+	"github.com/golang/protobuf/proto"
+
 	"bytes"
 	"errors"
 	"io/ioutil"
@@ -52,11 +54,35 @@ type CoProcessor struct {
 	Middleware *CoProcessMiddleware
 }
 
-func (c *CoProcessor) GetObjectFromRequest(r *http.Request) CoProcessObject {
+func ToProtoMap(inputMap map[string][]string) map[string]*coprocess.StringSlice {
+	newMap := make(map[string]*coprocess.StringSlice, 0)
+
+	if inputMap != nil {
+		for k, v := range inputMap {
+			newMap[k] = &coprocess.StringSlice{v}
+		}
+	}
+
+	return newMap
+}
+
+func ToProtoSession( session interface{}) *coprocess.SessionState {
+	var sessionState SessionState
+	sessionState = session.(SessionState)
+
+	log.Println("ToProtoSession, input =", sessionState)
+
+	newSessionState := &coprocess.SessionState{}
+
+	return newSessionState
+}
+
+func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
 
+	/*
 	var object CoProcessObject
 
 	object.Request = CoProcessMiniRequestObject{
@@ -71,22 +97,35 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) CoProcessObject {
 		DeleteParams:    make([]string, 0),
 		ReturnOverrides: CoProcessReturnOverrides{ResponseCode: -1, ResponseError: ""},
 	}
+	*/
+
+	var object *coprocess.Object
+	var miniRequestObject *coprocess.MiniRequestObject
+
+	miniRequestObject = &coprocess.MiniRequestObject{
+		Headers: ToProtoMap(r.Header),
+		SetHeaders: make(map[string]string, 0),
+		DeleteHeaders: make([]string, 0),
+		Body: string(originalBody),
+		Url: r.URL.Path,
+		Params: ToProtoMap(r.URL.Query()),
+		AddParams: make(map[string]string),
+		ExtendedParams: ToProtoMap(nil),
+		DeleteParams: make([]string, 0),
+		ReturnOverrides: &coprocess.ReturnOverrides{-1, ""},
+	}
+
+	object = &coprocess.Object{
+		Request: miniRequestObject,
+	}
+
 
 	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
 	if c.Middleware != nil && c.HookType == 0 {
 		c.HookType = c.Middleware.HookType
 	}
 
-	switch c.HookType {
-	case coprocess.HookType_Pre:
-		object.HookType = "pre"
-	case coprocess.HookType_Post:
-		object.HookType = "post"
-	case coprocess.HookType_PostKeyAuth:
-		object.HookType = "postkeyauth"
-	case coprocess.HookType_CustomKeyCheck:
-		object.HookType = "customkeycheck"
-	}
+	object.HookType = coprocess.HookType(c.HookType)
 
 	object.Metadata = make(map[string]string, 0)
 	object.Spec = make(map[string]string, 0)
@@ -106,16 +145,22 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) CoProcessObject {
 		var session interface{}
 		session = context.Get(r, SessionData)
 		if session != nil {
-			object.Session = session.(SessionState)
+			// object.Session = session.(SessionState)
+			object.Session = ToProtoSession(session)
 		}
 	}
 
 	return object
 }
 
-func (c *CoProcessor) ObjectPostProcess(object *CoProcessObject, r *http.Request) {
+func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) {
 	r.ContentLength = int64(len(object.Request.Body))
 	r.Body = ioutil.NopCloser(bytes.NewBufferString(object.Request.Body))
+
+	for h, v := range object.Request.SetHeaders {
+		r.Header.Set(h, v)
+	}
+	/*
 
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
@@ -135,11 +180,17 @@ func (c *CoProcessor) ObjectPostProcess(object *CoProcessObject, r *http.Request
 	}
 
 	r.URL.RawQuery = values.Encode()
+	*/
 }
 
-func (c *CoProcessor) Dispatch(object *CoProcessObject) CoProcessObject {
+func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 
-	objectMsg, _ := object.MarshalMsg(nil)
+
+	// objectMsg, _ := object.MarshalMsg(nil)
+
+	objectMsg, _ := proto.Marshal(object)
+
+	log.Println("coprocess.go#189, objectMsg (length) =", len(objectMsg), "objectMsg =", objectMsg)
 
 	objectMsgStr := string(objectMsg)
 
@@ -158,8 +209,9 @@ func (c *CoProcessor) Dispatch(object *CoProcessObject) CoProcessObject {
 	var newObjectBytes []byte
 	newObjectBytes = C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 
-	var newObject CoProcessObject
-	newObject.UnmarshalMsg(newObjectBytes)
+	newObject := &coprocess.Object{}
+	proto.Unmarshal(newObjectBytes, newObject)
+	// newObject.UnmarshalMsg(newObjectBytes)
 
 	C.free(unsafe.Pointer(CObjectStr))
 	C.free(unsafe.Pointer(objectPtr))
@@ -238,9 +290,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	object := thisCoProcessor.GetObjectFromRequest(r)
 
-	returnObject := thisCoProcessor.Dispatch(&object)
+	returnObject := thisCoProcessor.Dispatch(object)
 
-	thisCoProcessor.ObjectPostProcess(&returnObject, r)
+	thisCoProcessor.ObjectPostProcess(returnObject, r)
 
 	authHeaderValue := returnObject.Metadata["token"]
 
@@ -258,7 +310,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Report in health check
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
 
-		return errors.New("Key not authorised"), returnObject.Request.ReturnOverrides.ResponseCode
+		return errors.New("Key not authorised"), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
