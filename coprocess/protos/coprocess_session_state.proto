@@ -1,20 +1,20 @@
 syntax = "proto3";
 
-package main;
+package coprocess;
 
-message CoProcessAccessSpec {
+message AccessSpec {
   string url = 1;
   repeated string methods = 2;
 }
 
-message CoProcessAccessDefinition {
+message AccessDefinition {
   string api_name = 1;
   string api_id = 2;
   repeated string versions = 3;
-  repeated CoProcessAccessSpec allowed_urls = 4;
+  repeated AccessSpec allowed_urls = 4;
 }
 
-message CoProcessSessionState {
+message SessionState {
   int64 last_check = 1;
 
   double allowance = 2;
@@ -27,7 +27,7 @@ message CoProcessSessionState {
   int64 quota_remaining = 8;
   int64 quota_renewal_rate = 9;
 
-  map<string, CoProcessAccessDefinition> access_rights = 10;
+  map<string, AccessDefinition> access_rights = 10;
 
   string org_id = 11;
   string oauth_client_id = 12;

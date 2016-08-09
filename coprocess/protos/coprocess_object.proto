@@ -2,13 +2,14 @@ syntax = "proto3";
 
 import "coprocess_mini_request_object.proto";
 import "coprocess_session_state.proto";
+import "coprocess_common.proto";
 
-package main;
+package coprocess;
 
-message CoProcessObject {
-  string hook_type = 1;
-  CoProcessMiniRequestObject request = 2;
-  CoProcessSessionState session_state = 3;
+message Object {
+  HookType hook_type = 1;
+  MiniRequestObject request = 2;
+  SessionState session = 3;
   map<string, string> metadata = 4;
   map<string, string> spec = 5;
 }
