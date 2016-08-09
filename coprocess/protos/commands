@@ -1,1 +1,0 @@
-protoc -I. --go_out=go_out/ *.proto
