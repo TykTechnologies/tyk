@@ -1,35 +1,40 @@
-import msgpack
+import sys
 
 from tyk.session import TykSession
 from tyk.request import TykCoProcessRequest
 
+import coprocess_common_pb2 as HookType
+
+from coprocess_object_pb2 import Object
+from coprocess_mini_request_object_pb2 import MiniRequestObject
+from coprocess_return_overrides_pb2 import ReturnOverrides
+from coprocess_session_state_pb2 import SessionState
+
 class TykCoProcessObject:
     def __init__(self, object_msg):
-        self.object = msgpack.unpackb(object_msg, use_list=False, encoding='utf-8')
+        self.object = Object()
+        try:
+            self.object.ParseFromString(object_msg)
+        except:
+            # TODO: add error handling
+            pass
 
-        self.request = TykCoProcessRequest(self.object['request'])
-        self.session = TykSession(self.object['session'])
+        self.request = TykCoProcessRequest(self.object.request)
+        self.session = TykSession(self.object.session)
+        self.spec = self.object.spec
+        self.metadata = self.object.metadata
 
-        # Should we require these keys?
-        if 'metadata' in self.object:
-            self.metadata = self.object['metadata']
-        else:
-            self.metadata = {}
-
-        if 'spec' in self.object:
-            self.spec = self.object['spec']
-        else:
-            self.spec = {}
-
-        if 'hook_type' in self.object:
-            self.hook_type = self.object['hook_type']
-        else:
-            self.spec = {}
+        if self.object.hook_type == HookType.Unknown:
+            self.hook_type = ''
+        elif self.object.hook_type == HookType.Pre:
+            self.hook_type = 'pre'
+        elif self.object.hook_type == HookType.Post:
+            self.hook_type = 'post'
+        elif self.object.hook_type == HookType.PostKeyAuth:
+            self.hook_type = 'postkeyauth'
+        elif self.object.hook_type == HookType.CustomKeyCheck:
+            self.hook_type = 'customkeycheck'
 
     def dump(self):
-        self.object['request'] = self.request.__dict__
-        self.object['session'] = self.session.__dict__
-        self.object['metadata'] = self.metadata
-
-        new_object = msgpack.packb(self.object, use_bin_type=True)
+        new_object = self.object.SerializeToString()
         return new_object, len(new_object)
