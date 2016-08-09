@@ -4,16 +4,13 @@ class TykCoProcessRequest():
     def add_header(self, key, value):
         self.__object__.set_headers[key] = value
     def delete_header(self, key):
-        # self.delete_headers = self.delete_headers + (key,)
-        pass
+        self.__object__.delete_headers.append(key)
     def add_param(self, key, value):
         self.__object__.add_params[key] = value
     def delete_param(self, key):
-        # self.delete_params = self.delete_params + (key,)
-        pass
+        self.__object__.delete_params.append(key)
     def get_header(self, key):
-        pass
-        # if key in self.headers:
-            # return self.headers[key][0]
-        # else:
-            #return None
+        if key in self.__object__.headers:
+            return self.__object__.headers[key].items[0]
+        else:
+            return None

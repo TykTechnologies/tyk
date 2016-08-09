@@ -67,10 +67,10 @@ func ToProtoMap(inputMap map[string][]string) map[string]*coprocess.StringSlice 
 }
 
 func ToProtoSession( session interface{}) *coprocess.SessionState {
+	/*
 	var sessionState SessionState
 	sessionState = session.(SessionState)
-
-	log.Println("ToProtoSession, input =", sessionState)
+	*/
 
 	newSessionState := &coprocess.SessionState{}
 
@@ -157,11 +157,6 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	r.ContentLength = int64(len(object.Request.Body))
 	r.Body = ioutil.NopCloser(bytes.NewBufferString(object.Request.Body))
 
-	for h, v := range object.Request.SetHeaders {
-		r.Header.Set(h, v)
-	}
-	/*
-
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
 	}
@@ -180,17 +175,12 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	}
 
 	r.URL.RawQuery = values.Encode()
-	*/
 }
 
 func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 
 
-	// objectMsg, _ := object.MarshalMsg(nil)
-
 	objectMsg, _ := proto.Marshal(object)
-
-	log.Println("coprocess.go#189, objectMsg (length) =", len(objectMsg), "objectMsg =", objectMsg)
 
 	objectMsgStr := string(objectMsg)
 
