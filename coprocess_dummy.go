@@ -4,6 +4,7 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/coprocess"
 
 	"net/http"
 )
@@ -30,6 +31,6 @@ func CoProcessInit() {
 	}).Info("Disabled feature")
 }
 
-func CreateCoProcessMiddleware(hookType int, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookType coprocess.HookType, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
 }

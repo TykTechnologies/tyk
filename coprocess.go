@@ -38,10 +38,10 @@ var EnableCoProcess bool = true
 
 var GlobalDispatcher CoProcessDispatcher
 
-func CreateCoProcessMiddleware(hookType int32, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookType coprocess.HookType, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware: tykMwSuper,
-		HookType:      coprocess.HookType(hookType),
+		HookType:      hookType,
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
@@ -177,7 +177,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 		c.HookType = c.Middleware.HookType
 	}
 
-	object.HookType = coprocess.HookType(c.HookType)
+	object.HookType = c.HookType
 
 	object.Metadata = make(map[string]string, 0)
 	object.Spec = make(map[string]string, 0)
