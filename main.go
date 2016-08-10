@@ -377,11 +377,19 @@ func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, tykcommon.MiddlewareDriver) {
+func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, tykcommon.MiddlewareDriver) {
 	mwPaths := []string{}
+	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+	mwPostAuthCheckFuncs := []tykcommon.MiddlewareDefinition{}
 	mwDriver := tykcommon.OttoDriver
+
+	// Set AuthCheck hook
+	if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" {
+		mwAuthCheckFunc = referenceSpec.APIDefinition.CustomMiddleware.AuthCheck
+	}
+	// mwAuthCheckFunc
 
 	// Load form the configuration
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
@@ -462,8 +470,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 		mwDriver = referenceSpec.APIDefinition.CustomMiddleware.Driver
 	}
 
-	return mwPaths, mwPreFuncs, mwPostFuncs, mwDriver
-
+	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver
 }
 
 func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
@@ -707,8 +714,11 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 			//Set up all the JSVM middleware
 			mwPaths := []string{}
+			var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+			// mwPostAuthCheckFuncs := []tykcommon.MiddlewareDefinition{}
+
 			var mwDriver tykcommon.MiddlewareDriver
 
 			// TODO: use config.EnableCoProcess
@@ -716,7 +726,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				log.WithFields(logrus.Fields{
 					"prefix": "main",
 				}).Debug("----> Loading Middleware")
-				mwPaths, mwPreFuncs, mwPostFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
+
+				mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, _, mwDriver = loadCustomMiddleware(referenceSpec)
 
 				if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
 					referenceSpec.JSVM.LoadJSPaths(mwPaths)
@@ -797,7 +808,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, obj := range mwPreFuncs {
 					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
-						log.Println("Registering pre: obj.Name =", obj.Name, "HookType_Pre", "mwDriver =", mwDriver)
+						log.WithFields(logrus.Fields{
+							"prefix": "coprocess",
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
 						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
@@ -810,7 +823,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, obj := range mwPostFuncs {
 					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
-						log.Println("Registering post: obj.Name =", obj.Name, "HookType_Post", "mwDriver =", mwDriver)
+						log.WithFields(logrus.Fields{
+							"prefix": "coprocess",
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )
 						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
@@ -862,10 +877,16 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					// initialise the OID configuration on this reference Spec
 					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware)
 				} else if referenceSpec.EnableCoProcessAuth && EnableCoProcess {
+					// TODO: check if mwAuthCheckFunc is available/valid
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: CoProcess")
-					// keyCheck = CreateCoProcessMiddleware(coprocess.HookType_CustomKeyCheck, tykMiddleware)
+
+					log.WithFields(logrus.Fields{
+						"prefix": "coprocess",
+					}).Debug("----> Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver )
+
+					keyCheck = CreateCoProcessMiddleware(mwAuthCheckFunc.Name, coprocess.HookType_CustomKeyCheck, mwDriver, tykMiddleware)
 				} else {
 					// Auth key
 					log.WithFields(logrus.Fields{
@@ -902,29 +923,31 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				log.Debug("Chain array end")
 
-				/*
-				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(coprocess.HookType_Pre, tykMiddleware))
-				}
-				*/
-
 				// Add pre-process MW
 				for _, obj := range mwPreFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+						log.WithFields(logrus.Fields{
+							"prefix": "coprocess",
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
+					} else {
+						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				for _, baseMw := range baseChainArray {
 					chainArray = append(chainArray, baseMw)
 				}
 
-				/*
-				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(coprocess.HookType_Post, tykMiddleware))
-				}
-				*/
-
 				for _, obj := range mwPostFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+						log.WithFields(logrus.Fields{
+							"prefix": "coprocess",
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
+					} else {
+						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				log.WithFields(logrus.Fields{
