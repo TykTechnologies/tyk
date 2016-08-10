@@ -29,8 +29,8 @@ message SessionState {
 
   map<string, AccessDefinition> access_rights = 10;
 
-  string orgID = 11;
-  string oauth_clientID = 12;
+  string org_id = 11;
+  string oauth_client_id = 12;
   map<string, string> oauth_keys = 13;
 
 
@@ -45,10 +45,10 @@ message SessionState {
   }
   JWTData jwt_data = 15;
 
-  bool HMAC_enabled = 16;
+  bool hmac_enabled = 16;
   string hmac_secret = 17;
   bool is_inactive = 18;
-  string apply_policyID = 19;
+  string apply_policy_id = 19;
   int64 data_expires = 20;
 
   message Monitor {
