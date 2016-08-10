@@ -1,5 +1,6 @@
 class HandlerDecorator(object):
     def __init__(self, f):
+        self.name = f.__name__
         self.f = f
         return
     def __call__(self, req, sess, spec):
