@@ -1054,6 +1054,7 @@ func ReloadURLStructure() {
 		reloadScheduled = true
 		log.Info("Initiating reload")
 		go doReload()
+		go doCoprocessReload()
 		go checkReloadTimeout()
 	}
 }

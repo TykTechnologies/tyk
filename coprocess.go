@@ -47,6 +47,14 @@ func CreateCoProcessMiddleware(hookType coprocess.HookType, tykMwSuper *TykMiddl
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
+func doCoprocessReload() {
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	}).Info("Reloading middlewares")
+	GlobalDispatcher.Reload()
+
+}
+
 type CoProcessor struct {
 	HookType   coprocess.HookType
 	Middleware *CoProcessMiddleware
@@ -262,6 +270,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 
 type CoProcessDispatcher interface {
 	Dispatch(*C.struct_CoProcessMessage) *C.struct_CoProcessMessage
+	Reload()
 }
 
 type CoProcessMiddleware struct {

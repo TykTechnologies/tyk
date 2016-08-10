@@ -164,6 +164,10 @@ func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.str
 	return newObjectPtr
 }
 
+func (d *PythonDispatcher) Reload() {
+	Python_ReloadDispatcher()
+}
+
 func PythonInit() (err error) {
 	result := C.Python_Init()
 	if result == 0 {

@@ -31,6 +31,8 @@ func CoProcessInit() {
 	}).Info("Disabled feature")
 }
 
+func doCoprocessReload() { }
+
 func CreateCoProcessMiddleware(hookType coprocess.HookType, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
 }
