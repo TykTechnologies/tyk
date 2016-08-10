@@ -4,6 +4,27 @@
 - Meta data is now available to the URL Rewriter (for e.g. to inject a custom querystring for key holders.)
 - Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}` 
 - It is now possible to rewrite a URL with a new host and have the host act as an override to any target settings that are in the API Definition
+- Added more remote logger support: Graylog, Syslog and Logstash
+
+### Graylog:
+
+    "use_graylog": true,
+    "graylog_network_addr": "<graylog_ip>:<graylog_port>"
+
+### Syslog
+
+If the transport or address are empty, syslog will log to file
+
+    "use_syslog": true,
+    "syslog_transport": "udp" | "",
+    "syslog_network_addr:  "172.17.0.2:9999" | "",
+
+### Logstash
+
+    "use_logstash": "true"
+    "logstash_transport": "tcp",
+    "logstash_network_addr": "172.17.0.2:9999"
+    
 
 # v2.2
 

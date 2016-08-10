@@ -6,8 +6,11 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	logger "github.com/TykTechnologies/tykcommon-logger"
+	"gopkg.in/gemnasium/logrus-graylog-hook.v2"
 	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
@@ -19,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"log/syslog"
 	"path"
 	"path/filepath"
 	"runtime/pprof"
@@ -1031,6 +1035,74 @@ func ReloadURLStructure() {
 	}
 }
 
+func setupLogger() {
+	if config.UseSentry {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Enabling Sentry support")
+		hook, err := logrus_sentry.NewSentryHook(config.SentryCode, []logrus.Level{
+			logrus.PanicLevel,
+			logrus.FatalLevel,
+			logrus.ErrorLevel,
+		})
+
+		hook.Timeout = 0
+
+		if err == nil {
+			log.Hooks.Add(hook)
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Sentry hook active")
+	}
+
+	if config.UseSyslog {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Enabling Syslog support")
+		hook, err := logrus_syslog.NewSyslogHook(config.SyslogTransport, 
+			config.SyslogNetworkAddr, 
+			syslog.LOG_INFO, "")
+
+		if err == nil {
+			log.Hooks.Add(hook)
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Syslog hook active")
+	}
+
+	if config.UseGraylog {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Enabling Graylog support")
+		hook := graylog.NewGraylogHook(config.GraylogNetworkAddr, 
+			map[string]interface{}{"tyk-module": "gateway"})
+		
+		log.Hooks.Add(hook)
+		
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Graylog hook active")
+	}
+
+	if config.UseLogstash {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Enabling Logstash support")
+		hook, err := logrus_logstash.NewHook(config.LogstashTransport, 
+			config.LogstashNetworkAddr, 
+			"tyk-gateway")
+
+		if err == nil {
+			log.Hooks.Add(hook)
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Logstash hook active")
+	}
+}
+
 func init() {
 
 	usage := `Tyk API Gateway.
@@ -1129,25 +1201,8 @@ func init() {
 		}).Debug("Enabling debug-level output")
 	}
 
-	if config.UseSentry {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Enabling Sentry support")
-		hook, err := logrus_sentry.NewSentryHook(config.SentryCode, []logrus.Level{
-			logrus.PanicLevel,
-			logrus.FatalLevel,
-			logrus.ErrorLevel,
-		})
-
-		hook.Timeout = 0
-
-		if err == nil {
-			log.Hooks.Add(hook)
-		}
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Sentry hook active")
-	}
+	// Enable all the loggers
+	setupLogger()
 
 }
 
