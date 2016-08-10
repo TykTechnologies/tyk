@@ -19,4 +19,7 @@ static PyObject* dispatcher;
 static PyObject* dispatcher_hook_name;
 static PyObject* dispatcher_hook;
 
+static char* dispatcher_reload = "reload";
+static PyObject* dispatcher_reload_hook;
+
 #endif

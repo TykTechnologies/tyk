@@ -59,6 +59,19 @@ static int Python_LoadDispatcher() {
   return 0;
 }
 
+static void Python_ReloadDispatcher() {
+	PyObject *hook_name = PyUnicode_FromString(dispatcher_reload);
+	if( dispatcher_reload_hook == NULL ) {
+		dispatcher_reload_hook = PyObject_GetAttr(dispatcher, hook_name);
+	};
+
+	PyObject* result = PyObject_CallObject( dispatcher_reload_hook, NULL );
+
+	Py_DECREF(hook_name);
+	Py_DECREF(result);
+
+}
+
 static int Python_NewDispatcher(char* middleware_path) {
   if( PyCallable_Check(dispatcher_class) ) {
     dispatcher_args = PyTuple_Pack( 1, PyUnicode_FromString(middleware_path) );
@@ -165,6 +178,10 @@ func PythonLoadDispatcher() (err error) {
 		err = errors.New("Can't load dispatcher")
 	}
 	return err
+}
+
+func Python_ReloadDispatcher() {
+	C.Python_ReloadDispatcher()
 }
 
 func PythonNewDispatcher(middlewarePath string) (err error, dispatcher CoProcessDispatcher) {
