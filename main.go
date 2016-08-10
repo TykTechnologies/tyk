@@ -377,10 +377,11 @@ func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition) {
+func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, tykcommon.MiddlewareDriver) {
 	mwPaths := []string{}
 	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+	mwDriver := tykcommon.OttoDriver
 
 	// Load form the configuration
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
@@ -456,7 +457,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 		}
 	}
 
-	return mwPaths, mwPreFuncs, mwPostFuncs
+	return mwPaths, mwPreFuncs, mwPostFuncs, mwDriver
 
 }
 
@@ -703,12 +704,14 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			mwPaths := []string{}
 			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+			var mwDriver tykcommon.MiddlewareDriver
 
-			if config.EnableJSVM {
+			// TODO: use config.EnableCoProcess
+			if config.EnableJSVM || EnableCoProcess {
 				log.WithFields(logrus.Fields{
 					"prefix": "main",
 				}).Debug("----> Loading Middleware")
-				mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(referenceSpec)
+				mwPaths, mwPreFuncs, mwPostFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
 				referenceSpec.JSVM.LoadJSPaths(mwPaths)
 			}
