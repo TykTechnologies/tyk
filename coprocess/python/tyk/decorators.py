@@ -21,6 +21,7 @@ class PostKeyAuth(HandlerDecorator):
 class CustomKeyCheck():
     def __init__(self, f):
         self.f = f
+        self.name = f.__name__
         return
     def __call__(self, req, sess, metadata, spec):
         return self.f(req, sess, metadata, spec)
