@@ -49,21 +49,21 @@ class TykDispatcher:
         self.purge_middlewares()
         self.load_middlewares()
 
-    def find_middleware_for_handler(self, hook_type, name):
-        found_middleware, matching_handler = None, None
+    def find_hook(self, hook_type, hook_name):
+        found_middleware, matching_hook_handler = None, None
         for middleware in self.middlewares:
             if hook_type in middleware.handlers:
                 for handler in middleware.handlers[hook_type]:
-                    if handler.name == name:
+                    if handler.name == hook_name:
                         found_middleware = middleware
-                        matching_handler = handler
-        return found_middleware, matching_handler
+                        matching_hook_handler = handler
+        return found_middleware, matching_hook_handler
 
     def dispatch_hook(self, object_msg):
         object = TykCoProcessObject(object_msg)
-        middleware, handler = self.find_middleware_for_handler(object.hook_type, object.middleware_name)
-        if handler:
-            object = middleware.process(handler, object)
+        middleware, hook_handler = self.find_hook(object.hook_type, object.hook_name)
+        if hook_handler:
+            object = middleware.process(hook_handler, object)
         else:
-            print("Can't dispatch", object.middleware_name, "isn't defined.")
+            print("Can't dispatch", object.hook_name, "isn't defined.")
         return object.dump()

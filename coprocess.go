@@ -42,15 +42,15 @@ var GlobalDispatcher CoProcessDispatcher
 type CoProcessMiddleware struct {
 	*TykMiddleware
 	HookType coprocess.HookType
-	MiddlewareName string
+	HookName string
 	MiddlewareDriver tykcommon.MiddlewareDriver
 }
 
-func CreateCoProcessMiddleware(mwName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware: tykMwSuper,
 		HookType:      hookType,
-		MiddlewareName:	mwName,
+		HookName:	hookName,
 		MiddlewareDriver: mwDriver,
 	}
 
@@ -187,7 +187,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	object = &coprocess.Object{
 		Request: miniRequestObject,
-		MiddlewareName: c.Middleware.MiddlewareName,
+		HookName: c.Middleware.HookName,
 	}
 
 

@@ -8,7 +8,7 @@ package coprocess;
 
 message Object {
   HookType hook_type = 1;
-  string middleware_name = 2;
+  string hook_name = 2;
   MiniRequestObject request = 3;
   SessionState session = 4;
   map<string, string> metadata = 5;
