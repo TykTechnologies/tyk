@@ -187,6 +187,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	object = &coprocess.Object{
 		Request: miniRequestObject,
+		MiddlewareName: c.Middleware.MiddlewareName,
 	}
 
 

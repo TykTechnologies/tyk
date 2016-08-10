@@ -23,6 +23,7 @@ class TykCoProcessObject:
         self.session = TykSession(self.object.session)
         self.spec = self.object.spec
         self.metadata = self.object.metadata
+        self.middleware_name = self.object.middleware_name
 
         if self.object.hook_type == HookType.Unknown:
             self.hook_type = ''
