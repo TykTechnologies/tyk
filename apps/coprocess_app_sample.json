@@ -34,18 +34,20 @@
     "custom_middleware": {
     "pre": [
         {
-            "name": "samplePreProcessMiddleware",
-            "path": "middleware/sample_pre.js",
+            "name": "MyPreMiddleware",
             "require_session": false
         }
     ],
     "post": [
         {
-            "name": "samplePostProcessMiddleware",
-            "path": "middleware/sample_post.js",
+            "name": "MyPostMiddleware",
             "require_session": true
         }
-    ]
+    ],
+    "auth_check": {
+      "name": "MyAuthCheck"
+    },
+    "driver": "python"
   },
     "enable_batch_request_support": false
 }
