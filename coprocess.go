@@ -39,10 +39,19 @@ var EnableCoProcess bool = true
 
 var GlobalDispatcher CoProcessDispatcher
 
-func CreateCoProcessMiddleware(MiddlewareName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+type CoProcessMiddleware struct {
+	*TykMiddleware
+	HookType coprocess.HookType
+	MiddlewareName string
+	MiddlewareDriver tykcommon.MiddlewareDriver
+}
+
+func CreateCoProcessMiddleware(mwName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware: tykMwSuper,
 		HookType:      hookType,
+		MiddlewareName:	mwName,
+		MiddlewareDriver: mwDriver,
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
@@ -272,11 +281,6 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 type CoProcessDispatcher interface {
 	Dispatch(*C.struct_CoProcessMessage) *C.struct_CoProcessMessage
 	Reload()
-}
-
-type CoProcessMiddleware struct {
-	*TykMiddleware
-	HookType coprocess.HookType
 }
 
 type CoProcessMiddlewareConfig struct {
