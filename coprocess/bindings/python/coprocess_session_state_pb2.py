@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_session_state.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_pb=_b('\n\x1d\x63oprocess_session_state.proto\x12\tcoprocess\"*\n\nAccessSpec\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0f\n\x07methods\x18\x02 \x03(\t\"s\n\x10\x41\x63\x63\x65ssDefinition\x12\x10\n\x08\x61pi_name\x18\x01 \x01(\t\x12\x0e\n\x06\x61pi_id\x18\x02 \x01(\t\x12\x10\n\x08versions\x18\x03 \x03(\t\x12+\n\x0c\x61llowed_urls\x18\x04 \x03(\x0b\x32\x15.coprocess.AccessSpec\"\xbc\x07\n\x0cSessionState\x12\x12\n\nlast_check\x18\x01 \x01(\x03\x12\x11\n\tallowance\x18\x02 \x01(\x01\x12\x0c\n\x04rate\x18\x03 \x01(\x01\x12\x0b\n\x03per\x18\x04 \x01(\x01\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\tquota_max\x18\x06 \x01(\x03\x12\x14\n\x0cquota_renews\x18\x07 \x01(\x03\x12\x17\n\x0fquota_remaining\x18\x08 \x01(\x03\x12\x1a\n\x12quota_renewal_rate\x18\t \x01(\x03\x12@\n\raccess_rights\x18\n \x03(\x0b\x32).coprocess.SessionState.AccessRightsEntry\x12\r\n\x05orgID\x18\x0b \x01(\t\x12\x16\n\x0eoauth_clientID\x18\x0c \x01(\t\x12:\n\noauth_keys\x18\r \x03(\x0b\x32&.coprocess.SessionState.OauthKeysEntry\x12>\n\x0f\x62\x61sic_auth_data\x18\x0e \x01(\x0b\x32%.coprocess.SessionState.BasicAuthData\x12\x31\n\x08jwt_data\x18\x0f \x01(\x0b\x32\x1f.coprocess.SessionState.JWTData\x12\x14\n\x0cHMAC_enabled\x18\x10 \x01(\x08\x12\x13\n\x0bhmac_secret\x18\x11 \x01(\t\x12\x13\n\x0bis_inactive\x18\x12 \x01(\x08\x12\x16\n\x0e\x61pply_policyID\x18\x13 \x01(\t\x12\x14\n\x0c\x64\x61ta_expires\x18\x14 \x01(\x03\x12\x30\n\x07monitor\x18\x15 \x01(\x0b\x32\x1f.coprocess.SessionState.Monitor\x12!\n\x19\x65nable_detailed_recording\x18\x16 \x01(\x08\x12\x10\n\x08metadata\x18\x17 \x01(\t\x12\x0c\n\x04tags\x18\x18 \x03(\t\x12\r\n\x05\x61lias\x18\x19 \x01(\t\x1aP\n\x11\x41\x63\x63\x65ssRightsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.coprocess.AccessDefinition:\x02\x38\x01\x1a\x30\n\x0eOauthKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a/\n\rBasicAuthData\x12\x10\n\x08password\x18\x01 \x01(\t\x12\x0c\n\x04hash\x18\x02 \x01(\t\x1a\x19\n\x07JWTData\x12\x0e\n\x06secret\x18\x01 \x01(\t\x1a!\n\x07Monitor\x12\x16\n\x0etrigger_limits\x18\x01 \x03(\x01\x62\x06proto3')
+  serialized_pb=_b('\n\x1d\x63oprocess_session_state.proto\x12\tcoprocess\"*\n\nAccessSpec\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0f\n\x07methods\x18\x02 \x03(\t\"s\n\x10\x41\x63\x63\x65ssDefinition\x12\x10\n\x08\x61pi_name\x18\x01 \x01(\t\x12\x0e\n\x06\x61pi_id\x18\x02 \x01(\t\x12\x10\n\x08versions\x18\x03 \x03(\t\x12+\n\x0c\x61llowed_urls\x18\x04 \x03(\x0b\x32\x15.coprocess.AccessSpec\"\xbf\x07\n\x0cSessionState\x12\x12\n\nlast_check\x18\x01 \x01(\x03\x12\x11\n\tallowance\x18\x02 \x01(\x01\x12\x0c\n\x04rate\x18\x03 \x01(\x01\x12\x0b\n\x03per\x18\x04 \x01(\x01\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\tquota_max\x18\x06 \x01(\x03\x12\x14\n\x0cquota_renews\x18\x07 \x01(\x03\x12\x17\n\x0fquota_remaining\x18\x08 \x01(\x03\x12\x1a\n\x12quota_renewal_rate\x18\t \x01(\x03\x12@\n\raccess_rights\x18\n \x03(\x0b\x32).coprocess.SessionState.AccessRightsEntry\x12\x0e\n\x06org_id\x18\x0b \x01(\t\x12\x17\n\x0foauth_client_id\x18\x0c \x01(\t\x12:\n\noauth_keys\x18\r \x03(\x0b\x32&.coprocess.SessionState.OauthKeysEntry\x12>\n\x0f\x62\x61sic_auth_data\x18\x0e \x01(\x0b\x32%.coprocess.SessionState.BasicAuthData\x12\x31\n\x08jwt_data\x18\x0f \x01(\x0b\x32\x1f.coprocess.SessionState.JWTData\x12\x14\n\x0chmac_enabled\x18\x10 \x01(\x08\x12\x13\n\x0bhmac_secret\x18\x11 \x01(\t\x12\x13\n\x0bis_inactive\x18\x12 \x01(\x08\x12\x17\n\x0f\x61pply_policy_id\x18\x13 \x01(\t\x12\x14\n\x0c\x64\x61ta_expires\x18\x14 \x01(\x03\x12\x30\n\x07monitor\x18\x15 \x01(\x0b\x32\x1f.coprocess.SessionState.Monitor\x12!\n\x19\x65nable_detailed_recording\x18\x16 \x01(\x08\x12\x10\n\x08metadata\x18\x17 \x01(\t\x12\x0c\n\x04tags\x18\x18 \x03(\t\x12\r\n\x05\x61lias\x18\x19 \x01(\t\x1aP\n\x11\x41\x63\x63\x65ssRightsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.coprocess.AccessDefinition:\x02\x38\x01\x1a\x30\n\x0eOauthKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a/\n\rBasicAuthData\x12\x10\n\x08password\x18\x01 \x01(\t\x12\x0c\n\x04hash\x18\x02 \x01(\t\x1a\x19\n\x07JWTData\x12\x0e\n\x06secret\x18\x01 \x01(\t\x1a!\n\x07Monitor\x12\x16\n\x0etrigger_limits\x18\x01 \x03(\x01\x62\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -149,8 +149,8 @@ _SESSIONSTATE_ACCESSRIGHTSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=921,
-  serialized_end=1001,
+  serialized_start=924,
+  serialized_end=1004,
 )
 
 _SESSIONSTATE_OAUTHKEYSENTRY = _descriptor.Descriptor(
@@ -186,8 +186,8 @@ _SESSIONSTATE_OAUTHKEYSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1003,
-  serialized_end=1051,
+  serialized_start=1006,
+  serialized_end=1054,
 )
 
 _SESSIONSTATE_BASICAUTHDATA = _descriptor.Descriptor(
@@ -223,8 +223,8 @@ _SESSIONSTATE_BASICAUTHDATA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1053,
-  serialized_end=1100,
+  serialized_start=1056,
+  serialized_end=1103,
 )
 
 _SESSIONSTATE_JWTDATA = _descriptor.Descriptor(
@@ -253,8 +253,8 @@ _SESSIONSTATE_JWTDATA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1102,
-  serialized_end=1127,
+  serialized_start=1105,
+  serialized_end=1130,
 )
 
 _SESSIONSTATE_MONITOR = _descriptor.Descriptor(
@@ -283,8 +283,8 @@ _SESSIONSTATE_MONITOR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1129,
-  serialized_end=1162,
+  serialized_start=1132,
+  serialized_end=1165,
 )
 
 _SESSIONSTATE = _descriptor.Descriptor(
@@ -365,14 +365,14 @@ _SESSIONSTATE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='orgID', full_name='coprocess.SessionState.orgID', index=10,
+      name='org_id', full_name='coprocess.SessionState.org_id', index=10,
       number=11, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='oauth_clientID', full_name='coprocess.SessionState.oauth_clientID', index=11,
+      name='oauth_client_id', full_name='coprocess.SessionState.oauth_client_id', index=11,
       number=12, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -400,7 +400,7 @@ _SESSIONSTATE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='HMAC_enabled', full_name='coprocess.SessionState.HMAC_enabled', index=15,
+      name='hmac_enabled', full_name='coprocess.SessionState.hmac_enabled', index=15,
       number=16, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
@@ -421,7 +421,7 @@ _SESSIONSTATE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='apply_policyID', full_name='coprocess.SessionState.apply_policyID', index=18,
+      name='apply_policy_id', full_name='coprocess.SessionState.apply_policy_id', index=18,
       number=19, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -482,7 +482,7 @@ _SESSIONSTATE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=206,
-  serialized_end=1162,
+  serialized_end=1165,
 )
 
 _ACCESSDEFINITION.fields_by_name['allowed_urls'].message_type = _ACCESSSPEC
