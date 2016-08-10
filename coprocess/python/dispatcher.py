@@ -5,11 +5,13 @@ import tyk
 from tyk.middleware import TykMiddleware
 from tyk.object import TykCoProcessObject
 
+from gateway import TykGateway as tyk
+
 class TykDispatcher:
     '''A simple dispatcher'''
 
     def __init__(self, middleware_path):
-        print("TykDispatcher.__init__")
+        tyk.log( "Initializing dispatcher", "info" )
         self.middleware_path = path.join(middleware_path, '*.py')
         self.middlewares = []
         self.load_middlewares()
@@ -29,7 +31,7 @@ class TykDispatcher:
         return found_middleware
 
     def load_middlewares(self):
-        print("TykDispatcher.load_middlewares()")
+        tyk.log( "Loading middlewares.", "info" )
         # chdir(self.middleware_path)
         for module_name in self.get_modules():
             middleware = self.find_middleware(module_name)
@@ -40,12 +42,14 @@ class TykDispatcher:
                 self.middlewares.append(middleware)
 
     def purge_middlewares(self):
+        tyk.log( "Purging middlewares.", "info" )
         available_modules = self.get_modules()
         for middleware in self.middlewares:
             if not middleware.filepath in available_modules:
                 self.middlewares.remove(middleware)
 
     def reload(self):
+        tyk.log( "Reloading middlewares.", "info" )
         self.purge_middlewares()
         self.load_middlewares()
 
@@ -65,5 +69,5 @@ class TykDispatcher:
         if hook_handler:
             object = middleware.process(hook_handler, object)
         else:
-            print("Can't dispatch", object.hook_name, "isn't defined.")
+            tyk.log( "Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
         return object.dump()
