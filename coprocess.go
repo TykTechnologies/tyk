@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/TykTechnologies/tyk/coprocess"
 
 	"github.com/golang/protobuf/proto"
@@ -38,7 +39,7 @@ var EnableCoProcess bool = true
 
 var GlobalDispatcher CoProcessDispatcher
 
-func CreateCoProcessMiddleware(hookType coprocess.HookType, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(MiddlewareName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware: tykMwSuper,
 		HookType:      hookType,

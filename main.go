@@ -457,6 +457,11 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 		}
 	}
 
+	// Set middleware driver, defaults to OttoDriver
+	if referenceSpec.APIDefinition.CustomMiddleware.Driver != "" {
+		mwDriver = referenceSpec.APIDefinition.CustomMiddleware.Driver
+	}
+
 	return mwPaths, mwPreFuncs, mwPostFuncs, mwDriver
 
 }
@@ -713,7 +718,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}).Debug("----> Loading Middleware")
 				mwPaths, mwPreFuncs, mwPostFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
-				referenceSpec.JSVM.LoadJSPaths(mwPaths)
+				if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
+					referenceSpec.JSVM.LoadJSPaths(mwPaths)
+				}
 			}
 
 			if referenceSpec.EnableBatchRequestSupport {
@@ -788,24 +795,26 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
 
-				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(coprocess.HookType_Pre, tykMiddleware))
-				}
-
 				for _, obj := range mwPreFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+						log.Println("Registering pre: obj.Name =", obj.Name, "HookType_Pre", "mwDriver =", mwDriver)
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
+					} else {
+						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				for _, baseMw := range baseChainArray {
 					chainArray = append(chainArray, baseMw)
 				}
 
-				if EnableCoProcess {
-					chainArray = append(chainArray, CreateCoProcessMiddleware(coprocess.HookType_Post, tykMiddleware))
-				}
-
 				for _, obj := range mwPostFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+						log.Println("Registering post: obj.Name =", obj.Name, "HookType_Post", "mwDriver =", mwDriver)
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
+					} else {
+						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
+					}
 				}
 
 				// for KeyLessAccess we can't support rate limiting, versioning or access rules
@@ -856,8 +865,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: CoProcess")
-					// keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
-					keyCheck = CreateCoProcessMiddleware(coprocess.HookType_CustomKeyCheck, tykMiddleware)
+					// keyCheck = CreateCoProcessMiddleware(coprocess.HookType_CustomKeyCheck, tykMiddleware)
 				} else {
 					// Auth key
 					log.WithFields(logrus.Fields{
@@ -878,7 +886,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
 					keyCheck,
-					CreateCoProcessMiddleware(coprocess.HookType_PostKeyAuth, tykMiddleware),
+					// CreateCoProcessMiddleware(coprocess.HookType_PostKeyAuth, tykMiddleware),
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
@@ -894,9 +902,11 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				log.Debug("Chain array end")
 
+				/*
 				if EnableCoProcess {
 					chainArray = append(chainArray, CreateCoProcessMiddleware(coprocess.HookType_Pre, tykMiddleware))
 				}
+				*/
 
 				// Add pre-process MW
 				for _, obj := range mwPreFuncs {
@@ -907,9 +917,11 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					chainArray = append(chainArray, baseMw)
 				}
 
+				/*
 				if EnableCoProcess {
 					chainArray = append(chainArray, CreateCoProcessMiddleware(coprocess.HookType_Post, tykMiddleware))
 				}
+				*/
 
 				for _, obj := range mwPostFuncs {
 					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
