@@ -24,6 +24,10 @@ class TykDispatcher:
             middleware = TykMiddleware(basename)
             self.middlewares.append(middleware)
 
+    def reload(self):
+        self.middlewares = []
+        self.load_middlewares()
+
     def dispatch_hook(self, object_msg):
         object = TykCoProcessObject(object_msg)
 
