@@ -142,7 +142,11 @@ func setupGlobals() {
 		GlobalEventsJSVM.Init(config.TykJSPath)
 	}
 
-	CoProcessInit()
+	if config.EnableCoProcess {
+		CoProcessInit()
+	} else {
+		EnableCoProcess = false
+	}
 
 	// Get the notifier ready
 	log.WithFields(logrus.Fields{
@@ -807,7 +811,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				for _, obj := range mwPreFuncs {
-					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
@@ -822,7 +826,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				for _, obj := range mwPostFuncs {
-					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )
@@ -876,7 +880,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 					// initialise the OID configuration on this reference Spec
 					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.EnableCoProcessAuth && EnableCoProcess {
+				} else if EnableCoProcess && mwDriver != tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth {
 					// TODO: check if mwAuthCheckFunc is available/valid
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
@@ -925,7 +929,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				// Add pre-process MW
 				for _, obj := range mwPreFuncs {
-					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
@@ -940,7 +944,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				for _, obj := range mwPostFuncs {
-					if EnableCoProcess && mwDriver != tykcommon.OttoDriver {
+					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )

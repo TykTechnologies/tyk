@@ -335,7 +335,11 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
-	}).Info("ProcessRequest, HookType:", m.HookType)
+	}).Debug("CoProcess Request, HookType: ", m.HookType)
+
+	if !EnableCoProcess {
+		return nil, 200
+	}
 
 	// It's also possible to override the HookType:
 	thisCoProcessor := CoProcessor{
