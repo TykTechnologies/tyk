@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_object.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_pb=_b('\n\x16\x63oprocess_object.proto\x12\tcoprocess\x1a#coprocess_mini_request_object.proto\x1a\x1d\x63oprocess_session_state.proto\x1a\x16\x63oprocess_common.proto\"\xc5\x02\n\x06Object\x12&\n\thook_type\x18\x01 \x01(\x0e\x32\x13.coprocess.HookType\x12-\n\x07request\x18\x02 \x01(\x0b\x32\x1c.coprocess.MiniRequestObject\x12(\n\x07session\x18\x03 \x01(\x0b\x32\x17.coprocess.SessionState\x12\x31\n\x08metadata\x18\x04 \x03(\x0b\x32\x1f.coprocess.Object.MetadataEntry\x12)\n\x04spec\x18\x05 \x03(\x0b\x32\x1b.coprocess.Object.SpecEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a+\n\tSpecEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
+  serialized_pb=_b('\n\x16\x63oprocess_object.proto\x12\tcoprocess\x1a#coprocess_mini_request_object.proto\x1a\x1d\x63oprocess_session_state.proto\x1a\x16\x63oprocess_common.proto\"\xde\x02\n\x06Object\x12&\n\thook_type\x18\x01 \x01(\x0e\x32\x13.coprocess.HookType\x12\x17\n\x0fmiddleware_name\x18\x02 \x01(\t\x12-\n\x07request\x18\x03 \x01(\x0b\x32\x1c.coprocess.MiniRequestObject\x12(\n\x07session\x18\x04 \x01(\x0b\x32\x17.coprocess.SessionState\x12\x31\n\x08metadata\x18\x05 \x03(\x0b\x32\x1f.coprocess.Object.MetadataEntry\x12)\n\x04spec\x18\x06 \x03(\x0b\x32\x1b.coprocess.Object.SpecEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a+\n\tSpecEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
   ,
   dependencies=[coprocess__mini__request__object__pb2.DESCRIPTOR,coprocess__session__state__pb2.DESCRIPTOR,coprocess__common__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -63,8 +63,8 @@ _OBJECT_METADATAENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=363,
-  serialized_end=410,
+  serialized_start=388,
+  serialized_end=435,
 )
 
 _OBJECT_SPECENTRY = _descriptor.Descriptor(
@@ -100,8 +100,8 @@ _OBJECT_SPECENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=412,
-  serialized_end=455,
+  serialized_start=437,
+  serialized_end=480,
 )
 
 _OBJECT = _descriptor.Descriptor(
@@ -119,29 +119,36 @@ _OBJECT = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='request', full_name='coprocess.Object.request', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
+      name='middleware_name', full_name='coprocess.Object.middleware_name', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='session', full_name='coprocess.Object.session', index=2,
+      name='request', full_name='coprocess.Object.request', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='metadata', full_name='coprocess.Object.metadata', index=3,
-      number=4, type=11, cpp_type=10, label=3,
+      name='session', full_name='coprocess.Object.session', index=3,
+      number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='metadata', full_name='coprocess.Object.metadata', index=4,
+      number=5, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='spec', full_name='coprocess.Object.spec', index=4,
-      number=5, type=11, cpp_type=10, label=3,
+      name='spec', full_name='coprocess.Object.spec', index=5,
+      number=6, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -159,7 +166,7 @@ _OBJECT = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=130,
-  serialized_end=455,
+  serialized_end=480,
 )
 
 _OBJECT_METADATAENTRY.containing_type = _OBJECT
