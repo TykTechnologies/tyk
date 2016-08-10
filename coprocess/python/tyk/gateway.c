@@ -774,20 +774,22 @@ static PyObject *__pyx_n_s_value;
 static PyObject *__pyx_pf_7gateway_10TykGateway_store_data(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_key, PyObject *__pyx_v_value, PyObject *__pyx_v_ttl); /* proto */
 static PyObject *__pyx_pf_7gateway_10TykGateway_2get_data(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_key); /* proto */
 static PyObject *__pyx_pf_7gateway_10TykGateway_4trigger_event(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_event_name, PyObject *__pyx_v_payload); /* proto */
-static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__pyx_self, CYTHON_UNUSED PyObject *__pyx_v_msg, CYTHON_UNUSED PyObject *__pyx_v_level); /* proto */
+static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_msg, PyObject *__pyx_v_level); /* proto */
 static PyObject *__pyx_tuple_;
 static PyObject *__pyx_tuple__2;
 static PyObject *__pyx_tuple__3;
 static PyObject *__pyx_tuple__4;
 static PyObject *__pyx_tuple__5;
 static PyObject *__pyx_tuple__6;
+static PyObject *__pyx_tuple__7;
 static PyObject *__pyx_tuple__8;
 static PyObject *__pyx_tuple__10;
 static PyObject *__pyx_tuple__12;
-static PyObject *__pyx_codeobj__7;
+static PyObject *__pyx_tuple__14;
 static PyObject *__pyx_codeobj__9;
 static PyObject *__pyx_codeobj__11;
 static PyObject *__pyx_codeobj__13;
+static PyObject *__pyx_codeobj__15;
 
 /* "gateway.pyx":11
  * 
@@ -1086,7 +1088,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_4trigger_event(CYTHON_UNUSED PyO
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))             # <<<<<<<<<<<<<<
  *   def log(msg, level):
- *     pass
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
  */
   __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_event_name, __pyx_n_s_encode); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -1131,15 +1133,15 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_4trigger_event(CYTHON_UNUSED PyO
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):             # <<<<<<<<<<<<<<
- *     pass
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
  */
 
 /* Python wrapper */
 static PyObject *__pyx_pw_7gateway_10TykGateway_7log(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
 static PyMethodDef __pyx_mdef_7gateway_10TykGateway_7log = {"log", (PyCFunction)__pyx_pw_7gateway_10TykGateway_7log, METH_VARARGS|METH_KEYWORDS, 0};
 static PyObject *__pyx_pw_7gateway_10TykGateway_7log(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
-  CYTHON_UNUSED PyObject *__pyx_v_msg = 0;
-  CYTHON_UNUSED PyObject *__pyx_v_level = 0;
+  PyObject *__pyx_v_msg = 0;
+  PyObject *__pyx_v_level = 0;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("log (wrapper)", 0);
@@ -1193,13 +1195,54 @@ static PyObject *__pyx_pw_7gateway_10TykGateway_7log(PyObject *__pyx_self, PyObj
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__pyx_self, CYTHON_UNUSED PyObject *__pyx_v_msg, CYTHON_UNUSED PyObject *__pyx_v_level) {
+static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_msg, PyObject *__pyx_v_level) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  char *__pyx_t_3;
+  PyObject *__pyx_t_4 = NULL;
+  char *__pyx_t_5;
   __Pyx_RefNannySetupContext("log", 0);
+
+  /* "gateway.pyx":19
+ *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
+ *   def log(msg, level):
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )             # <<<<<<<<<<<<<<
+ */
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_msg, __pyx_n_s_encode); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_tuple__6, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_3 = __Pyx_PyObject_AsString(__pyx_t_2); if (unlikely((!__pyx_t_3) && PyErr_Occurred())) __PYX_ERR(0, 19, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_level, __pyx_n_s_encode); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_tuple__7, NULL); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_5 = __Pyx_PyObject_AsString(__pyx_t_4); if (unlikely((!__pyx_t_5) && PyErr_Occurred())) __PYX_ERR(0, 19, __pyx_L1_error)
+  CoProcess_Log(__pyx_t_3, __pyx_t_5);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+
+  /* "gateway.pyx":18
+ *   def trigger_event(event_name, payload):
+ *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
+ *   def log(msg, level):             # <<<<<<<<<<<<<<
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ */
 
   /* function exit code */
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_AddTraceback("gateway.TykGateway.log", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -1296,7 +1339,7 @@ static int __Pyx_InitCachedConstants(void) {
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))             # <<<<<<<<<<<<<<
  *   def log(msg, level):
- *     pass
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
  */
   __pyx_tuple__4 = PyTuple_Pack(1, __pyx_kp_s_utf_8); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(0, 17, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__4);
@@ -1305,6 +1348,18 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__5);
   __Pyx_GIVEREF(__pyx_tuple__5);
 
+  /* "gateway.pyx":19
+ *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
+ *   def log(msg, level):
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )             # <<<<<<<<<<<<<<
+ */
+  __pyx_tuple__6 = PyTuple_Pack(1, __pyx_kp_s_utf_8); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__6);
+  __Pyx_GIVEREF(__pyx_tuple__6);
+  __pyx_tuple__7 = PyTuple_Pack(1, __pyx_kp_s_utf_8); if (unlikely(!__pyx_tuple__7)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__7);
+  __Pyx_GIVEREF(__pyx_tuple__7);
+
   /* "gateway.pyx":11
  * 
  * class TykGateway:
@@ -1312,10 +1367,10 @@ static int __Pyx_InitCachedConstants(void) {
  *     TykStoreData( key.encode('utf-8'), value.encode('utf-8'), ttl)
  *   def get_data(key):
  */
-  __pyx_tuple__6 = PyTuple_Pack(3, __pyx_n_s_key, __pyx_n_s_value, __pyx_n_s_ttl); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 11, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__6);
-  __Pyx_GIVEREF(__pyx_tuple__6);
-  __pyx_codeobj__7 = (PyObject*)__Pyx_PyCode_New(3, 0, 3, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__6, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_store_data, 11, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__7)) __PYX_ERR(0, 11, __pyx_L1_error)
+  __pyx_tuple__8 = PyTuple_Pack(3, __pyx_n_s_key, __pyx_n_s_value, __pyx_n_s_ttl); if (unlikely(!__pyx_tuple__8)) __PYX_ERR(0, 11, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__8);
+  __Pyx_GIVEREF(__pyx_tuple__8);
+  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(3, 0, 3, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_store_data, 11, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) __PYX_ERR(0, 11, __pyx_L1_error)
 
   /* "gateway.pyx":13
  *   def store_data(key, value, ttl):
@@ -1324,10 +1379,10 @@ static int __Pyx_InitCachedConstants(void) {
  *     output = TykGetData(key.encode('utf-8'))
  *     return output.decode('utf-8')
  */
-  __pyx_tuple__8 = PyTuple_Pack(2, __pyx_n_s_key, __pyx_n_s_output); if (unlikely(!__pyx_tuple__8)) __PYX_ERR(0, 13, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__8);
-  __Pyx_GIVEREF(__pyx_tuple__8);
-  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_get_data, 13, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) __PYX_ERR(0, 13, __pyx_L1_error)
+  __pyx_tuple__10 = PyTuple_Pack(2, __pyx_n_s_key, __pyx_n_s_output); if (unlikely(!__pyx_tuple__10)) __PYX_ERR(0, 13, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__10);
+  __Pyx_GIVEREF(__pyx_tuple__10);
+  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__10, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_get_data, 13, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(0, 13, __pyx_L1_error)
 
   /* "gateway.pyx":16
  *     output = TykGetData(key.encode('utf-8'))
@@ -1336,21 +1391,21 @@ static int __Pyx_InitCachedConstants(void) {
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):
  */
-  __pyx_tuple__10 = PyTuple_Pack(2, __pyx_n_s_event_name, __pyx_n_s_payload); if (unlikely(!__pyx_tuple__10)) __PYX_ERR(0, 16, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__10);
-  __Pyx_GIVEREF(__pyx_tuple__10);
-  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(2, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__10, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_trigger_event, 16, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(0, 16, __pyx_L1_error)
+  __pyx_tuple__12 = PyTuple_Pack(2, __pyx_n_s_event_name, __pyx_n_s_payload); if (unlikely(!__pyx_tuple__12)) __PYX_ERR(0, 16, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__12);
+  __Pyx_GIVEREF(__pyx_tuple__12);
+  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(2, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__12, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_trigger_event, 16, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) __PYX_ERR(0, 16, __pyx_L1_error)
 
   /* "gateway.pyx":18
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):             # <<<<<<<<<<<<<<
- *     pass
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
  */
-  __pyx_tuple__12 = PyTuple_Pack(2, __pyx_n_s_msg, __pyx_n_s_level); if (unlikely(!__pyx_tuple__12)) __PYX_ERR(0, 18, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__12);
-  __Pyx_GIVEREF(__pyx_tuple__12);
-  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(2, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__12, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_log, 18, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) __PYX_ERR(0, 18, __pyx_L1_error)
+  __pyx_tuple__14 = PyTuple_Pack(2, __pyx_n_s_msg, __pyx_n_s_level); if (unlikely(!__pyx_tuple__14)) __PYX_ERR(0, 18, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__14);
+  __Pyx_GIVEREF(__pyx_tuple__14);
+  __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(2, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__14, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_matias_dev_tyk_coprocess, __pyx_n_s_log, 18, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) __PYX_ERR(0, 18, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -1475,7 +1530,7 @@ PyMODINIT_FUNC PyInit_gateway(void)
  *     TykStoreData( key.encode('utf-8'), value.encode('utf-8'), ttl)
  *   def get_data(key):
  */
-  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_1store_data, 0, __pyx_n_s_TykGateway_store_data, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__7)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 11, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_1store_data, 0, __pyx_n_s_TykGateway_store_data, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__9)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 11, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   if (PyObject_SetItem(__pyx_t_1, __pyx_n_s_store_data, __pyx_t_2) < 0) __PYX_ERR(0, 11, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -1487,7 +1542,7 @@ PyMODINIT_FUNC PyInit_gateway(void)
  *     output = TykGetData(key.encode('utf-8'))
  *     return output.decode('utf-8')
  */
-  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_3get_data, 0, __pyx_n_s_TykGateway_get_data, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__9)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 13, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_3get_data, 0, __pyx_n_s_TykGateway_get_data, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__11)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   if (PyObject_SetItem(__pyx_t_1, __pyx_n_s_get_data, __pyx_t_2) < 0) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -1499,7 +1554,7 @@ PyMODINIT_FUNC PyInit_gateway(void)
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):
  */
-  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_5trigger_event, 0, __pyx_n_s_TykGateway_trigger_event, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__11)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 16, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_5trigger_event, 0, __pyx_n_s_TykGateway_trigger_event, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__13)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 16, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   if (PyObject_SetItem(__pyx_t_1, __pyx_n_s_trigger_event, __pyx_t_2) < 0) __PYX_ERR(0, 16, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -1508,9 +1563,9 @@ PyMODINIT_FUNC PyInit_gateway(void)
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):             # <<<<<<<<<<<<<<
- *     pass
+ *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
  */
-  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_7log, 0, __pyx_n_s_TykGateway_log, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__13)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 18, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_7log, 0, __pyx_n_s_TykGateway_log, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__15)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 18, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   if (PyObject_SetItem(__pyx_t_1, __pyx_n_s_log, __pyx_t_2) < 0) __PYX_ERR(0, 18, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;

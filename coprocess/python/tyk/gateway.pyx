@@ -16,4 +16,4 @@ class TykGateway:
   def trigger_event(event_name, payload):
     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
   def log(msg, level):
-    pass
+    CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
