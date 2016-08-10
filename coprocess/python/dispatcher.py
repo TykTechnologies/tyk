@@ -31,7 +31,7 @@ class TykDispatcher:
         return found_middleware
 
     def load_middlewares(self):
-        tyk.log( "Loading middlewares.", "info" )
+        tyk.log( "Loading middlewares.", "debug" )
         # chdir(self.middleware_path)
         for module_name in self.get_modules():
             middleware = self.find_middleware(module_name)
@@ -42,10 +42,11 @@ class TykDispatcher:
                 self.middlewares.append(middleware)
 
     def purge_middlewares(self):
-        tyk.log( "Purging middlewares.", "info" )
+        tyk.log( "Purging middlewares.", "debug" )
         available_modules = self.get_modules()
         for middleware in self.middlewares:
             if not middleware.filepath in available_modules:
+                tyk.log( "Purging middleware: '{0}'".format(middleware.filepath), "warning" )
                 self.middlewares.remove(middleware)
 
     def reload(self):
@@ -64,10 +65,14 @@ class TykDispatcher:
         return found_middleware, matching_hook_handler
 
     def dispatch_hook(self, object_msg):
-        object = TykCoProcessObject(object_msg)
-        middleware, hook_handler = self.find_hook(object.hook_type, object.hook_name)
-        if hook_handler:
-            object = middleware.process(hook_handler, object)
-        else:
-            tyk.log( "Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
-        return object.dump()
+        try:
+            object = TykCoProcessObject(object_msg)
+            middleware, hook_handler = self.find_hook(object.hook_type, object.hook_name)
+            if hook_handler:
+                object = middleware.process(hook_handler, object)
+            else:
+                tyk.log( "Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
+            return object.dump()
+        except:
+            tyk.log_error( "Can't dispatch, protocol error:" )
+            return object_msg

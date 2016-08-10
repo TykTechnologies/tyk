@@ -5,16 +5,21 @@ from importlib import invalidate_caches as invalidate_caches
 import inspect, sys
 import tyk.decorators as decorators
 
+from gateway import TykGateway as tyk
+
 HandlerDecorators = list( map( lambda m: m[1], inspect.getmembers(decorators, inspect.isclass) ) )
 
 class TykMiddleware:
     def __init__(self, filepath):
-        # print("Loading:", filepath )
+        tyk.log( "Loading module: '{0}'".format(filepath), "info")
         self.filepath = filepath
-        self.module = import_module(filepath)
         self.handlers = {}
 
-        self.register_handlers()
+        try:
+            self.module = import_module(filepath)
+            self.register_handlers()
+        except:
+            tyk.log_error( "Middleware initialization error:" )
 
     def register_handlers(self):
         for attr in dir(self.module):
@@ -34,7 +39,7 @@ class TykMiddleware:
             self.handlers = {}
             self.register_handlers()
         except:
-            print("Reload error:", sys.exc_info(), "remove middleware?")
+            tyk.log_error( "Reload error:" )
 
     def process(self, handler, object):
         handlerType = type(handler)
