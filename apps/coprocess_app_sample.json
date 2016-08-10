@@ -9,7 +9,8 @@
     "auth": {
         "auth_header_name": "authorization"
     },
-    "enable_coprocess_auth": true,
+    "use_keyless": true,
+    "enable_coprocess_auth": false,
     "version_data": {
         "not_versioned": true,
         "versions": {
