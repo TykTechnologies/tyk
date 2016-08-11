@@ -919,7 +919,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
 					keyCheck,
-					// CreateCoProcessMiddleware("MyPostKeyAuthMiddleware", coprocess.HookType_PostKeyAuth, mwDriver, tykMiddleware),
+				}
+
+				var postAuthChainArray = []alice.Constructor{
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
@@ -932,6 +934,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
+
 
 				log.Debug("Chain array end")
 
@@ -949,6 +952,19 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				for _, baseMw := range baseChainArray {
 					chainArray = append(chainArray, baseMw)
+				}
+
+				for _, obj := range mwPostAuthCheckFuncs {
+					if mwDriver != tykcommon.OttoDriver {
+						log.WithFields(logrus.Fields{
+							"prefix": "coprocess",
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
+						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_PostKeyAuth, mwDriver, tykMiddleware))
+					}
+				}
+
+				for _, postAuthMw := range postAuthChainArray {
+					chainArray = append(chainArray, postAuthMw)
 				}
 
 				for _, obj := range mwPostFuncs {
