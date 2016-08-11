@@ -58,7 +58,7 @@ func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSta
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
-			"inbound-key": keyName,
+			"inbound-key": ObfuscateKeyString(keyName),
 			"err":         err,
 		}).Warning("Key not found in storage engine")
 		return newSession, false
@@ -99,7 +99,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 	rawKey := QuotaKeyPrefix + publicHash(keyName)
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
-		"inbound-key": keyName,
+		"inbound-key": ObfuscateKeyString(keyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
 
@@ -136,7 +136,7 @@ func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, b
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
-			"inbound-key": keyName,
+			"inbound-key": ObfuscateKeyString(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
 		return thisSession, false
