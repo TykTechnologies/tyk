@@ -35,7 +35,8 @@ import (
 	"unsafe"
 )
 
-var EnableCoProcess bool = true
+// config.EnableProcess will override this
+var EnableCoProcess bool = false
 
 var GlobalDispatcher CoProcessDispatcher
 
@@ -282,6 +283,14 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 type CoProcessDispatcher interface {
 	Dispatch(*C.struct_CoProcessMessage) *C.struct_CoProcessMessage
 	Reload()
+}
+
+func CoProcessInit() (err error) {
+	if config.EnableCoProcess {
+		GlobalDispatcher, err = NewCoProcessDispatcher()
+		EnableCoProcess = true
+	}
+	return err
 }
 
 type CoProcessMiddlewareConfig struct {

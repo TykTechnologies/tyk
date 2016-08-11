@@ -148,8 +148,6 @@ func setupGlobals() {
 
 	if config.EnableCoProcess {
 		CoProcessInit()
-	} else {
-		EnableCoProcess = false
 	}
 
 	// Get the notifier ready

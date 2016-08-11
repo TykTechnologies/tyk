@@ -212,7 +212,7 @@ func PythonSetEnv(pythonPaths ...string) {
 	C.free(unsafe.Pointer(CPythonPath))
 }
 
-func CoProcessInit() (err error) {
+func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
 
 	workDir, _ := os.Getwd()
 
@@ -224,7 +224,8 @@ func CoProcessInit() (err error) {
 
 	PythonInit()
 	PythonLoadDispatcher()
-	err, GlobalDispatcher = PythonNewDispatcher(middlewarePath)
+	
+	err, dispatcher = PythonNewDispatcher(middlewarePath)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -232,5 +233,5 @@ func CoProcessInit() (err error) {
 		}).Error(err)
 	}
 
-	return err
+	return dispatcher, err
 }
