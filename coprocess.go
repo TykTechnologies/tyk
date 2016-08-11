@@ -83,88 +83,6 @@ func ToProtoMap(inputMap map[string][]string) map[string]*coprocess.StringSlice 
 	return newMap
 }
 
-func ToTykSession( sessionState *coprocess.SessionState) SessionState {
-	var newSessionState SessionState
-
-	basicAuthData := struct{
-		Password string   `json:"password" msg:"password"`
-		Hash     HashType `json:"hash_type" msg:"hash_type"`
-	}{"", HASH_PlainText}
-
-	jwtData := struct{
-		Secret string `json:"secret" msg:"secret"`
-	}{""}
-
-	monitor := struct{
-		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
-	}{[]float64{}}
-
-	newSessionState = SessionState{
-		sessionState.LastCheck,
-		sessionState.Allowance,
-		sessionState.Rate,
-		sessionState.Per,
-		sessionState.Expires,
-		sessionState.QuotaMax,
-		sessionState.QuotaRenews,
-		sessionState.QuotaRemaining,
-		sessionState.QuotaRenewalRate,
-		map[string]AccessDefinition{},
-		sessionState.OrgId,
-		sessionState.OauthClientId,
-		sessionState.OauthKeys,
-		basicAuthData,
-		jwtData,
-		sessionState.HmacEnabled,
-		sessionState.HmacSecret,
-		sessionState.IsInactive,
-		sessionState.ApplyPolicyId,
-		sessionState.DataExpires,
-		monitor,
-		sessionState.EnableDetailedRecording,
-		nil,
-		sessionState.Tags,
-		sessionState.Alias,
-	}
-	return newSessionState
-}
-
-func ToProtoSession( session interface{}) *coprocess.SessionState {
-
-	var sessionState SessionState
-	sessionState = session.(SessionState)
-
-	newSessionState := &coprocess.SessionState{
-		sessionState.LastCheck,
-		sessionState.Allowance,
-		sessionState.Rate,
-		sessionState.Per,
-		sessionState.Expires,
-		sessionState.QuotaMax,
-		sessionState.QuotaRenews,
-		sessionState.QuotaRemaining,
-		sessionState.QuotaRenewalRate,
-		nil, // AccessRights map[string]*AccessDefinition
-		sessionState.OrgID,
-		sessionState.OauthClientID,
-		sessionState.OauthKeys,
-		nil, // BasicAuthData *SessionState_BasicAuthData
-		nil, // JwtData *SessionState_JWTData
-		sessionState.HMACEnabled,
-		sessionState.HmacSecret,
-		sessionState.IsInactive,
-		sessionState.ApplyPolicyID,
-		sessionState.DataExpires,
-		nil, // Monitor *SessionState_Monitor
-		sessionState.EnableDetailedRecording,
-		"",
-		sessionState.Tags,
-		sessionState.Alias,
-	}
-
-	return newSessionState
-}
-
 func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	defer r.Body.Close()
@@ -217,7 +135,8 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 		var session interface{}
 		session = context.Get(r, SessionData)
 		if session != nil {
-			object.Session = ToProtoSession(session)
+			sessionState := session.(SessionState)
+			object.Session = ProtoSessionState(sessionState)
 		}
 	}
 
@@ -383,7 +302,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		if returnObject.Session != nil {
-			context.Set(r, SessionData, ToTykSession(returnObject.Session))
+			// context.Set(r, SessionData, ToTykSession(returnObject.Session))
+			context.Set(r, SessionData, TykSessionState(returnObject.Session) )
 			context.Set(r, AuthHeaderValue, authHeaderValue)
 		}
 	}
