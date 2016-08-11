@@ -19,7 +19,7 @@ def MyPostMiddleware(request, session, spec):
 @CustomKeyCheck
 def MyAuthCheck(request, session, metadata, spec):
     print("my_middleware.py: MyAuthCheck")
-    
+
     print("test_auth_middleware - Request:", request)
     print("test_auth_middleware - Session:", session)
     print("test_auth_middleware - Spec:", spec)
@@ -31,8 +31,8 @@ def MyAuthCheck(request, session, metadata, spec):
 
     if request_token == valid_token:
         print("test_auth_middleware: Valid token")
-        session.__object__.rate = 1000.0
-        session.__object__.per = 1.0
+        session.object.rate = 1000.0
+        session.object.per = 1.0
         metadata['token'] = 'mytoken'
     else:
         print("test_auth_middleware: Invalid token")

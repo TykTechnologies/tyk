@@ -9,8 +9,8 @@
     "auth": {
         "auth_header_name": "authorization"
     },
-    "use_keyless": true,
-    "enable_coprocess_auth": false,
+    "use_keyless": false,
+    "enable_coprocess_auth": true,
     "version_data": {
         "not_versioned": true,
         "versions": {
@@ -44,6 +44,12 @@
             "name": "MyPostMiddleware",
             "require_session": true
         }
+    ],
+    "post_key_auth": [
+      {
+        "name": "MyPostKeyAuthMiddleware",
+        "require_session": true
+      }
     ],
     "auth_check": {
       "name": "MyAuthCheck"

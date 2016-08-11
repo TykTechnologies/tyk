@@ -32,14 +32,16 @@ def ModifyRequest(request, session, spec):
 @Post
 def PrintSession(request, session, spec):
     print("test_middleware: PrintSession")
-    print("session = ", session, session.__object__)
+    # print("session = ", session, session.object)
     # print(session.allowance)
 
     return request, session
 
 @PostKeyAuth
-def Something(request, session, spec):
+def MyPostKeyAuthMiddleware(request, session, spec):
     print("test_middleware: PostKeyAuth")
+    print("session object:")
+    print(session.object)
 
     return request, session
 
