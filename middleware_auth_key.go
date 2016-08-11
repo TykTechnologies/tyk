@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"io"
 	"io/ioutil"
@@ -59,7 +60,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 			contextDataObject["token"] = token
 			context.Set(r, ContextData, contextDataObject)
 		}
-		
+
 	}
 }
 
@@ -137,9 +138,12 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	// Set session state on context, we will need it later
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, key)
-	k.setContextVars(r, key)
+	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.AuthToken) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, key)
+		k.setContextVars(r, key)
+	}
+
 	return nil, 200
 }
 

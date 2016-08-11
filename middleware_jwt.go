@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
@@ -261,9 +262,11 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 			k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
 			log.Debug("Policy applied to key")
 
-			context.Set(r, SessionData, thisSessionState)
-			context.Set(r, AuthHeaderValue, SessionID)
-			k.setContextVars(r, token)
+			if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+				context.Set(r, SessionData, thisSessionState)
+				context.Set(r, AuthHeaderValue, SessionID)
+				k.setContextVars(r, token)
+			}
 			return nil, 200
 		}
 
@@ -273,9 +276,10 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	}
 
 	log.Debug("Key found")
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, SessionID)
-	k.setContextVars(r, token)
+	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, SessionID)
+	}
 	return nil, 200
 }
 
@@ -438,10 +442,10 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 			// Key data
 			authHeaderValue := context.Get(r, AuthHeaderValue)
 			contextDataObject["token"] = authHeaderValue
-			
+
 			context.Set(r, ContextData, contextDataObject)
 		}
-		
+
 	}
 }
 

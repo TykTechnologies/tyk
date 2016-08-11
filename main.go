@@ -807,64 +807,86 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 			} else {
 
-				// Select the keying method to use for setting session states
-				var keyCheck func(http.Handler) http.Handler
+				var chainArray = []alice.Constructor{}
 
+				handleCORS(&chainArray, referenceSpec)
+				var baseChainArray_PreAuth = []alice.Constructor{
+					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
+				}
+
+				// Add pre-process MW
+				for _, obj := range mwPreFuncs {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+				}
+
+				for _, baseMw := range baseChainArray_PreAuth {
+					chainArray = append(chainArray, baseMw)
+				}
+
+				// Select the keying method to use for setting session states
+				var authArray = []alice.Constructor{}
 				if referenceSpec.APIDefinition.UseOauth2 {
 					// Oauth2
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: OAuth")
-					keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.APIDefinition.UseBasicAuth {
+					authArray = append(authArray, CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware))
+
+				}
+
+				if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: Basic")
-					keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.EnableSignatureChecking {
+					authArray = append(authArray, CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware))
+				}
+
+				if referenceSpec.EnableSignatureChecking {
 					// HMAC Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: HMAC")
-					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.EnableJWT {
+					authArray = append(authArray, CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware))
+				}
+
+				if referenceSpec.EnableJWT {
 					// JWT Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: JWT")
-					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.UseOpenID {
+					authArray = append(authArray, CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware))
+				}
+
+				if referenceSpec.UseOpenID {
 					// JWT Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: OpenID")
 
 					// initialise the OID configuration on this reference Spec
-					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware)
-				} else {
+					authArray = append(authArray, CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware))
+				}
+
+				if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.APIDefinition.UseBasicAuth && !referenceSpec.APIDefinition.UseOauth2) {
 					// Auth key
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: Token")
-					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
+					authArray = append(authArray, CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware))
 				}
 
-				log.Debug("Chain array start")
+				for _, authMw := range authArray {
+					chainArray = append(chainArray, authMw)
+				}
 
-				var chainArray = []alice.Constructor{}
-
-				handleCORS(&chainArray, referenceSpec)
-				var baseChainArray = []alice.Constructor{
-					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-					keyCheck,
+				var baseChainArray_PostAuth = []alice.Constructor{
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
@@ -875,13 +897,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
 
-				log.Debug("Chain array end")
-				// Add pre-process MW
-				for _, obj := range mwPreFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
-				}
-
-				for _, baseMw := range baseChainArray {
+				for _, baseMw := range baseChainArray_PostAuth {
 					chainArray = append(chainArray, baseMw)
 				}
 
@@ -899,13 +915,29 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				log.Debug("Chain completed")
 
 				userCheckHandler := http.HandlerFunc(UserRatesCheck())
-				simpleChain := alice.New(
+				simpleChain_PreAuth := []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					keyCheck,
+					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware)}
+
+				simpleChain_PostAuth := []alice.Constructor{
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
+					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)}
+
+				var fullSimpleChain = []alice.Constructor{}
+				for _, mw := range simpleChain_PreAuth {
+					fullSimpleChain = append(fullSimpleChain, mw)
+				}
+
+				for _, authMw := range authArray {
+					fullSimpleChain = append(fullSimpleChain, authMw)
+				}
+
+				for _, mw := range simpleChain_PostAuth {
+					fullSimpleChain = append(fullSimpleChain, mw)
+				}
+
+				simpleChain := alice.New(fullSimpleChain...).Then(userCheckHandler)
 
 				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
 				log.WithFields(logrus.Fields{

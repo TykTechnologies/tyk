@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"math"
 	"net/http"
@@ -98,9 +99,12 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Set session state on context, we will need it later
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, fieldValues.KeyID)
-	hm.setContextVars(r, fieldValues.KeyID)
+	if (hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.HMACKey) || (hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, fieldValues.KeyID)
+		hm.setContextVars(r, fieldValues.KeyID)
+	}
+
 	// Everything seems in order let the request through
 	return nil, 200
 
