@@ -84,3 +84,15 @@ func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
 
   return session
 }
+
+func ProtoMap(inputMap map[string][]string) map[string]string {
+	newMap := make(map[string]string, 0)
+
+	if inputMap != nil {
+		for k, v := range inputMap {
+			newMap[k] = v[0]
+		}
+	}
+
+	return newMap
+}

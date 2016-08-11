@@ -71,18 +71,6 @@ type CoProcessor struct {
 	Middleware *CoProcessMiddleware
 }
 
-func ToProtoMap(inputMap map[string][]string) map[string]*coprocess.StringSlice {
-	newMap := make(map[string]*coprocess.StringSlice, 0)
-
-	if inputMap != nil {
-		for k, v := range inputMap {
-			newMap[k] = &coprocess.StringSlice{v}
-		}
-	}
-
-	return newMap
-}
-
 func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	defer r.Body.Close()
@@ -92,14 +80,14 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 	var miniRequestObject *coprocess.MiniRequestObject
 
 	miniRequestObject = &coprocess.MiniRequestObject{
-		Headers: ToProtoMap(r.Header),
+		Headers: ProtoMap(r.Header),
 		SetHeaders: make(map[string]string, 0),
 		DeleteHeaders: make([]string, 0),
 		Body: string(originalBody),
 		Url: r.URL.Path,
-		Params: ToProtoMap(r.URL.Query()),
+		Params: ProtoMap(r.URL.Query()),
 		AddParams: make(map[string]string),
-		ExtendedParams: ToProtoMap(nil),
+		ExtendedParams: ProtoMap(nil),
 		DeleteParams: make([]string, 0),
 		ReturnOverrides: &coprocess.ReturnOverrides{-1, ""},
 	}

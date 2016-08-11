@@ -14,16 +14,15 @@ _sym_db = _symbol_database.Default()
 
 
 import coprocess_return_overrides_pb2 as coprocess__return__overrides__pb2
-import coprocess_common_pb2 as coprocess__common__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_mini_request_object.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_pb=_b('\n#coprocess_mini_request_object.proto\x12\tcoprocess\x1a coprocess_return_overrides.proto\x1a\x16\x63oprocess_common.proto\"\x9b\x06\n\x11MiniRequestObject\x12:\n\x07headers\x18\x01 \x03(\x0b\x32).coprocess.MiniRequestObject.HeadersEntry\x12\x41\n\x0bset_headers\x18\x02 \x03(\x0b\x32,.coprocess.MiniRequestObject.SetHeadersEntry\x12\x16\n\x0e\x64\x65lete_headers\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\x0b\n\x03url\x18\x05 \x01(\t\x12\x38\n\x06params\x18\x06 \x03(\x0b\x32(.coprocess.MiniRequestObject.ParamsEntry\x12?\n\nadd_params\x18\x07 \x03(\x0b\x32+.coprocess.MiniRequestObject.AddParamsEntry\x12I\n\x0f\x65xtended_params\x18\x08 \x03(\x0b\x32\x30.coprocess.MiniRequestObject.ExtendedParamsEntry\x12\x15\n\rdelete_params\x18\t \x03(\t\x12\x34\n\x10return_overrides\x18\n \x01(\x0b\x32\x1a.coprocess.ReturnOverrides\x1a\x46\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.coprocess.StringSlice:\x02\x38\x01\x1a\x31\n\x0fSetHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x45\n\x0bParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.coprocess.StringSlice:\x02\x38\x01\x1a\x30\n\x0e\x41\x64\x64ParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1aM\n\x13\x45xtendedParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.coprocess.StringSlice:\x02\x38\x01\x62\x06proto3')
+  serialized_pb=_b('\n#coprocess_mini_request_object.proto\x12\tcoprocess\x1a coprocess_return_overrides.proto\"\xd3\x05\n\x11MiniRequestObject\x12:\n\x07headers\x18\x01 \x03(\x0b\x32).coprocess.MiniRequestObject.HeadersEntry\x12\x41\n\x0bset_headers\x18\x02 \x03(\x0b\x32,.coprocess.MiniRequestObject.SetHeadersEntry\x12\x16\n\x0e\x64\x65lete_headers\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\x0b\n\x03url\x18\x05 \x01(\t\x12\x38\n\x06params\x18\x06 \x03(\x0b\x32(.coprocess.MiniRequestObject.ParamsEntry\x12?\n\nadd_params\x18\x07 \x03(\x0b\x32+.coprocess.MiniRequestObject.AddParamsEntry\x12I\n\x0f\x65xtended_params\x18\x08 \x03(\x0b\x32\x30.coprocess.MiniRequestObject.ExtendedParamsEntry\x12\x15\n\rdelete_params\x18\t \x03(\t\x12\x34\n\x10return_overrides\x18\n \x01(\x0b\x32\x1a.coprocess.ReturnOverrides\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fSetHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a-\n\x0bParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x30\n\x0e\x41\x64\x64ParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x35\n\x13\x45xtendedParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
   ,
-  dependencies=[coprocess__return__overrides__pb2.DESCRIPTOR,coprocess__common__pb2.DESCRIPTOR,])
+  dependencies=[coprocess__return__overrides__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
@@ -45,8 +44,8 @@ _MINIREQUESTOBJECT_HEADERSENTRY = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='value', full_name='coprocess.MiniRequestObject.HeadersEntry.value', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -62,8 +61,8 @@ _MINIREQUESTOBJECT_HEADERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=583,
-  serialized_end=653,
+  serialized_start=559,
+  serialized_end=605,
 )
 
 _MINIREQUESTOBJECT_SETHEADERSENTRY = _descriptor.Descriptor(
@@ -99,8 +98,8 @@ _MINIREQUESTOBJECT_SETHEADERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=655,
-  serialized_end=704,
+  serialized_start=607,
+  serialized_end=656,
 )
 
 _MINIREQUESTOBJECT_PARAMSENTRY = _descriptor.Descriptor(
@@ -119,8 +118,8 @@ _MINIREQUESTOBJECT_PARAMSENTRY = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='value', full_name='coprocess.MiniRequestObject.ParamsEntry.value', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -136,8 +135,8 @@ _MINIREQUESTOBJECT_PARAMSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=706,
-  serialized_end=775,
+  serialized_start=658,
+  serialized_end=703,
 )
 
 _MINIREQUESTOBJECT_ADDPARAMSENTRY = _descriptor.Descriptor(
@@ -173,8 +172,8 @@ _MINIREQUESTOBJECT_ADDPARAMSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=777,
-  serialized_end=825,
+  serialized_start=705,
+  serialized_end=753,
 )
 
 _MINIREQUESTOBJECT_EXTENDEDPARAMSENTRY = _descriptor.Descriptor(
@@ -193,8 +192,8 @@ _MINIREQUESTOBJECT_EXTENDEDPARAMSENTRY = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='value', full_name='coprocess.MiniRequestObject.ExtendedParamsEntry.value', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -210,8 +209,8 @@ _MINIREQUESTOBJECT_EXTENDEDPARAMSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=827,
-  serialized_end=904,
+  serialized_start=755,
+  serialized_end=808,
 )
 
 _MINIREQUESTOBJECT = _descriptor.Descriptor(
@@ -303,17 +302,14 @@ _MINIREQUESTOBJECT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=109,
-  serialized_end=904,
+  serialized_start=85,
+  serialized_end=808,
 )
 
-_MINIREQUESTOBJECT_HEADERSENTRY.fields_by_name['value'].message_type = coprocess__common__pb2._STRINGSLICE
 _MINIREQUESTOBJECT_HEADERSENTRY.containing_type = _MINIREQUESTOBJECT
 _MINIREQUESTOBJECT_SETHEADERSENTRY.containing_type = _MINIREQUESTOBJECT
-_MINIREQUESTOBJECT_PARAMSENTRY.fields_by_name['value'].message_type = coprocess__common__pb2._STRINGSLICE
 _MINIREQUESTOBJECT_PARAMSENTRY.containing_type = _MINIREQUESTOBJECT
 _MINIREQUESTOBJECT_ADDPARAMSENTRY.containing_type = _MINIREQUESTOBJECT
-_MINIREQUESTOBJECT_EXTENDEDPARAMSENTRY.fields_by_name['value'].message_type = coprocess__common__pb2._STRINGSLICE
 _MINIREQUESTOBJECT_EXTENDEDPARAMSENTRY.containing_type = _MINIREQUESTOBJECT
 _MINIREQUESTOBJECT.fields_by_name['headers'].message_type = _MINIREQUESTOBJECT_HEADERSENTRY
 _MINIREQUESTOBJECT.fields_by_name['set_headers'].message_type = _MINIREQUESTOBJECT_SETHEADERSENTRY
