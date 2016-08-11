@@ -59,31 +59,35 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 
 // ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
-func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
+func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) (bool, int) {
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
 
-	if config.EnableSentinelRateLImiter {
-		go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
+	if enableRL {
+		if config.EnableSentinelRateLImiter {
+			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
 
-		// Check sentinel
-		_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
-		if sentinelActive == nil {
-			// Sentinel is set, fail
-			return false, 1
-		}
-	} else {
-		if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
-			return false, 1
+			// Check sentinel
+			_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
+			if sentinelActive == nil {
+				// Sentinel is set, fail
+				return false, 1
+			}
+		} else {
+			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
+				return false, 1
+			}
 		}
 	}
 
-	currentSession.Allowance--
-	if !l.IsRedisQuotaExceeded(currentSession, key, store) {
-		return true, 0
+	if enableQ {
+		currentSession.Allowance--
+		if l.IsRedisQuotaExceeded(currentSession, key, store) {
+			return false, 2
+		}
 	}
 
-	return false, 2
+	return true, 0
 
 }
 
