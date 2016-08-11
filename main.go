@@ -388,14 +388,13 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-	mwPostAuthCheckFuncs := []tykcommon.MiddlewareDefinition{}
+	mwPostKeyAuthFuncs := []tykcommon.MiddlewareDefinition{}
 	mwDriver := tykcommon.OttoDriver
 
 	// Set AuthCheck hook
 	if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = referenceSpec.APIDefinition.CustomMiddleware.AuthCheck
 	}
-	// mwAuthCheckFunc
 
 	// Load form the configuration
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
@@ -476,7 +475,12 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 		mwDriver = referenceSpec.APIDefinition.CustomMiddleware.Driver
 	}
 
-	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver
+	// Load PostAuthCheck hooks
+	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.PostKeyAuth {
+		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
+	}
+
+	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwDriver
 }
 
 func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
@@ -723,7 +727,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-			// mwPostAuthCheckFuncs := []tykcommon.MiddlewareDefinition{}
+			mwPostAuthCheckFuncs := []tykcommon.MiddlewareDefinition{}
 
 			var mwDriver tykcommon.MiddlewareDriver
 
@@ -733,7 +737,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					"prefix": "main",
 				}).Debug("----> Loading Middleware")
 
-				mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, _, mwDriver = loadCustomMiddleware(referenceSpec)
+				mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
 				if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
 					referenceSpec.JSVM.LoadJSPaths(mwPaths)
@@ -905,7 +909,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				var chainArray = []alice.Constructor{}
 
+
 				handleCORS(&chainArray, referenceSpec)
+
 				var baseChainArray = []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
@@ -913,7 +919,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
 					keyCheck,
-					// CreateCoProcessMiddleware(coprocess.HookType_PostKeyAuth, tykMiddleware),
+					// CreateCoProcessMiddleware("MyPostKeyAuthMiddleware", coprocess.HookType_PostKeyAuth, mwDriver, tykMiddleware),
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
