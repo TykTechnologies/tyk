@@ -68,16 +68,17 @@ type Config struct {
 	HashKeys                          bool   `json:"hash_keys"`
 	SuppressRedisSignalReload         bool   `json:"suppress_redis_signal_reload"`
 	SupressDefaultOrgStore            bool   `json:"suppress_default_org_store"`
+	UseRedisLog                       bool   `json:"use_redis_log"`
 	SentryCode                        string `json:"sentry_code"`
 	UseSentry                         bool   `json:"use_sentry"`
 	UseSyslog                         bool   `json:"use_syslog"`
 	UseGraylog                        bool   `json:"use_graylog"`
 	UseLogstash                       bool   `json:"use_logstash"`
-	GraylogNetworkAddr				  string `json:"graylog_network_addr"`
-	LogstashNetworkAddr				  string `json:"logstash_network_addr"`
+	GraylogNetworkAddr                string `json:"graylog_network_addr"`
+	LogstashNetworkAddr               string `json:"logstash_network_addr"`
 	SyslogTransport                   string `json:"syslog_transport"`
 	LogstashTransport                 string `json:"logstash_transport"`
-	SyslogNetworkAddr				  string `json:"syslog_network_addr"`
+	SyslogNetworkAddr                 string `json:"syslog_network_addr"`
 	EnforceOrgDataAge                 bool   `json:"enforce_org_data_age"`
 	EnforceOrgDataDeailLogging        bool   `json:"enforce_org_data_detail_logging"`
 	EnforceOrgQuotas                  bool   `json:"enforce_org_quotas"`

@@ -4,26 +4,26 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	"github.com/TykTechnologies/tykcommon"
 	logger "github.com/TykTechnologies/tykcommon-logger"
-	"gopkg.in/gemnasium/logrus-graylog-hook.v2"
+	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	osin "github.com/lonelycode/osin"
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
+	"gopkg.in/gemnasium/logrus-graylog-hook.v2"
 	"html/template"
 	"io/ioutil"
+	"log/syslog"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"log/syslog"
 	"path"
 	"path/filepath"
 	"runtime/pprof"
@@ -1130,8 +1130,8 @@ func setupLogger() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Syslog support")
-		hook, err := logrus_syslog.NewSyslogHook(config.SyslogTransport, 
-			config.SyslogNetworkAddr, 
+		hook, err := logrus_syslog.NewSyslogHook(config.SyslogTransport,
+			config.SyslogNetworkAddr,
 			syslog.LOG_INFO, "")
 
 		if err == nil {
@@ -1146,11 +1146,11 @@ func setupLogger() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Graylog support")
-		hook := graylog.NewGraylogHook(config.GraylogNetworkAddr, 
+		hook := graylog.NewGraylogHook(config.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
-		
+
 		log.Hooks.Add(hook)
-		
+
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Graylog hook active")
@@ -1160,8 +1160,8 @@ func setupLogger() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Logstash support")
-		hook, err := logrus_logstash.NewHook(config.LogstashTransport, 
-			config.LogstashNetworkAddr, 
+		hook, err := logrus_logstash.NewHook(config.LogstashTransport,
+			config.LogstashNetworkAddr,
 			"tyk-gateway")
 
 		if err == nil {
@@ -1171,6 +1171,16 @@ func setupLogger() {
 			"prefix": "main",
 		}).Debug("Logstash hook active")
 	}
+
+	if config.UseRedisLog {
+		redisHook := NewRedisHook()
+		log.Hooks.Add(redisHook)
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Redis log hook active")
+	}
+
 }
 
 func init() {

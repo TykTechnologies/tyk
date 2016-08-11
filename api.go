@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
+	"net"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -120,7 +121,12 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 				log.WithFields(logrus.Fields{
 					"prefix": "api",
 					"key":    keyName,
-					"apiID":  apiId,
+					"org_id": newSession.OrgID,
+					"api_id":  apiId,
+					"user_id": "system",
+					"user_ip": "--",
+					"path": "--",
+					"server_name": "system",
 				}).Error("Could not add key for this API ID, API doesn't exist.")
 				return errors.New("API must be active to add keys")
 			}
@@ -149,10 +155,26 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 
 	log.WithFields(logrus.Fields{
 		"prefix":  "api",
-		"key":     keyName,
+		"key":     ObfuscateKeyString(keyName),
 		"expires": newSession.Expires,
+		"org_id": newSession.OrgID,
+		"api_id":  "--",
+		"user_id": "system",
+		"user_ip": "--",
+		"path": "--",
+		"server_name": "system",
 	}).Info("Key added or updated.")
 	return nil
+}
+
+func ObfuscateKeyString(keyName string) string {
+	var obfuscated string = "--"
+
+	if len(keyName) > 4 {
+		obfuscated = "****" + keyName[len(keyName)-4:]
+	}
+
+	return obfuscated
 }
 
 // ---- TODO: This changes the URL structure of the API completely ----
@@ -320,14 +342,14 @@ func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    sessionKey,
+			"key":    ObfuscateKeyString(sessionKey),
 			"status": "fail",
 			"err":    "not found",
 		}).Warning("Failed to retrieve key detail.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    sessionKey,
+			"key":    ObfuscateKeyString(sessionKey),
 			"status": "ok",
 		}).Info("Retrieved key detail.")
 	}
@@ -1326,6 +1348,12 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
 						"status": "warning",
+						"org_id": newSession.OrgID,
+						"api_id":  "--",
+						"user_id": "system",
+						"user_ip": getIPHelper(r),
+						"path": "--",
+						"server_name": "system",
 					}).Warning("No API Access Rights set on key session, adding key to all APIs.")
 
 					for _, spec := range *ApiSpecRegister {
@@ -1347,6 +1375,12 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						"prefix": "api",
 						"status": "error",
 						"err":    "master keys disabled",
+						"org_id": newSession.OrgID,
+						"api_id":  "--",
+						"user_id": "system",
+						"user_ip": getIPHelper(r),
+						"path": "--",
+						"server_name": "system",
 					}).Error("Master keys disallowed in configuration, key not added.")
 
 					responseMessage = createError("Failed to create key, keys must have at least one Access Rights record set.")
@@ -1368,6 +1402,12 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					"prefix": "api",
 					"status": "error",
 					"err":    err,
+					"org_id": newSession.OrgID,
+					"api_id":  "--",
+					"user_id": "system",
+					"user_ip": getIPHelper(r),
+					"path": "--",
+					"server_name": "system",
 				}).Error("System error, failed to generate key.")
 
 				responseMessage = []byte(E_SYSTEM_ERROR)
@@ -1385,9 +1425,15 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 				log.WithFields(logrus.Fields{
 					"prefix": "api",
-					"key":    newKey,
+					"key":    ObfuscateKeyString(newKey),
 					"status": "ok",
-				}).Info("Generated new key.")
+					"api_id":  "--",
+					"org_id": newSession.OrgID,
+					"user_id": "system",
+					"user_ip": getIPHelper(r),
+					"path": "--",
+					"server_name": "system",
+				}).Info("Generated new key: (", ObfuscateKeyString(newKey), ")")
 			}
 		}
 
@@ -1916,15 +1962,49 @@ func UserRatesCheck() func(http.ResponseWriter, *http.Request) {
 	}
 }
 
+func getIPHelper(r *http.Request) string {
+
+	var thisIP string
+	if clientIP, _, derr := net.SplitHostPort(r.RemoteAddr); derr == nil {
+		// If we aren't the first proxy retain prior
+		// X-Forwarded-For information as a comma+space
+		// separated list and fold multiple headers into one.
+		if prior, ok := r.Header["X-Forwarded-For"]; ok {
+			clientIP = strings.Join(prior, ", ") + ", " + clientIP
+		}
+		thisIP = clientIP
+	}
+
+	return thisIP
+}
+
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int = 200
 
 	if r.Method == "DELETE" {
 		APIID := r.URL.Path[len("/tyk/cache/"):]
+
+		spec := GetSpecForApi(APIID)
+		var orgid string
+		if spec!= nil {
+			orgid = spec.OrgID
+		}
+
 		err := HandleInvalidateAPICache(APIID)
 		if err != nil {
-			log.Error("Failed to delete cache: ", err)
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"api_id":  APIID,
+				"status": "fail",
+				"err":    err,
+				"org_id": orgid,
+				"user_id": "system",
+				"user_ip": getIPHelper(r),
+				"path": "--",
+				"server_name": "system",
+			}).Error("Failed to delete cache: ", err)
+			
 			code = 500
 			responseMessage = createError("Cache invalidation failed")
 			DoJSONWrite(w, code, responseMessage)
@@ -1933,6 +2013,16 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 		okMsg := APIStatusMessage{"ok", "cache invalidated"}
 		responseMessage, _ = json.Marshal(&okMsg)
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "ok",
+			"org_id": orgid,
+			"api_id":  APIID,
+			"user_id": "system",
+			"user_ip": getIPHelper(r),
+			"path": "--",
+			"server_name": "system",
+		}).Info("Cache invalidated successfully")
 		code = 200
 	} else {
 		// Return Not supported message (and code)
@@ -1944,7 +2034,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleInvalidateAPICache(APIID string) error {
-	keyPrefix := "cache-" + APIID 
+	keyPrefix := "cache-" + APIID
 	matchPattern := keyPrefix + "*"
 	thisStore := GetGlobalLocalStorageHandler(keyPrefix, false)
 
