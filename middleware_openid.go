@@ -21,7 +21,6 @@ type OpenIDMW struct {
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 	lock                      sync.RWMutex
-	plock                     sync.RWMutex
 }
 
 func (k *OpenIDMW) New() {
@@ -32,7 +31,6 @@ func (k *OpenIDMW) New() {
 		openid.ErrorHandler(k.dummyErrorHandler))
 
 	k.lock = sync.RWMutex{}
-	k.plock = sync.RWMutex{}
 
 	if configErr != nil {
 		log.WithFields(logrus.Fields{
