@@ -6,21 +6,45 @@ import(
   "github.com/TykTechnologies/tyk/coprocess"
 )
 
+// This function takes a coprocess.SessionState (as returned by the Protocol Buffer binding), and outputs a standard Tyk SessionState.
 func TykSessionState(sessionState *coprocess.SessionState) SessionState {
   var session SessionState
 
-  basicAuthData := struct{
+  accessDefinitions := make( map[string]AccessDefinition, len(sessionState.AccessRights) )
+
+  for key, protoAccessDefinition := range sessionState.AccessRights {
+    allowedUrls := make([]AccessSpec, len(protoAccessDefinition.AllowedUrls))
+    for _, protoAllowedUrl := range protoAccessDefinition.AllowedUrls {
+      allowedUrl := AccessSpec{protoAllowedUrl.Url, protoAllowedUrl.Methods}
+      allowedUrls = append(allowedUrls, allowedUrl)
+    }
+    accessDefinition := AccessDefinition{protoAccessDefinition.ApiName, protoAccessDefinition.ApiId, protoAccessDefinition.Versions, allowedUrls}
+    accessDefinitions[key] = accessDefinition
+  }
+
+  var basicAuthData struct{
     Password string   `json:"password" msg:"password"`
     Hash     HashType `json:"hash_type" msg:"hash_type"`
-  }{"", HASH_PlainText}
+  }
+  if sessionState.BasicAuthData != nil {
+    basicAuthData.Password = sessionState.BasicAuthData.Password
+    basicAuthData.Hash = HashType(sessionState.BasicAuthData.Hash)
+  }
 
-  jwtData := struct{
+  var jwtData struct{
     Secret string `json:"secret" msg:"secret"`
-  }{""}
+  }
+  if sessionState.JwtData != nil {
+    jwtData.Secret = sessionState.JwtData.Secret
+  }
 
-  monitor := struct{
+  var monitor struct{
     TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
-  }{[]float64{}}
+  }
+
+  if sessionState.Monitor != nil {
+    monitor.TriggerLimits = sessionState.Monitor.TriggerLimits
+  }
 
   session = SessionState{
     sessionState.LastCheck,
@@ -32,7 +56,7 @@ func TykSessionState(sessionState *coprocess.SessionState) SessionState {
     sessionState.QuotaRenews,
     sessionState.QuotaRemaining,
     sessionState.QuotaRenewalRate,
-    map[string]AccessDefinition{},
+    accessDefinitions,
     sessionState.OrgId,
     sessionState.OauthClientId,
     sessionState.OauthKeys,
@@ -49,10 +73,38 @@ func TykSessionState(sessionState *coprocess.SessionState) SessionState {
     sessionState.Tags,
     sessionState.Alias,
   }
+
   return session
 }
 
+// This function takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
 func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
+
+  accessDefinitions := make( map[string]*coprocess.AccessDefinition, len(sessionState.AccessRights) )
+
+  for key, accessDefinition := range sessionState.AccessRights {
+    var allowedUrls []*coprocess.AccessSpec
+    for _, allowedUrl := range accessDefinition.AllowedURLs {
+      accessSpec := &coprocess.AccessSpec{ allowedUrl.URL, allowedUrl.Methods }
+      allowedUrls = append(allowedUrls, accessSpec)
+    }
+
+    protoAccessDefinition := &coprocess.AccessDefinition{
+      accessDefinition.APIName, accessDefinition.APIID, accessDefinition.Versions, allowedUrls,
+    }
+
+    accessDefinitions[key] = protoAccessDefinition
+
+  }
+
+  var basicAuthData *coprocess.BasicAuthData
+  basicAuthData = &coprocess.BasicAuthData{sessionState.BasicAuthData.Password, string(sessionState.BasicAuthData.Hash)}
+
+  var jwtData *coprocess.JWTData
+  jwtData = &coprocess.JWTData{sessionState.JWTData.Secret}
+
+  var monitor *coprocess.Monitor
+  monitor = &coprocess.Monitor{sessionState.Monitor.TriggerLimits}
 
   session := &coprocess.SessionState{
     sessionState.LastCheck,
@@ -64,18 +116,18 @@ func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
     sessionState.QuotaRenews,
     sessionState.QuotaRemaining,
     sessionState.QuotaRenewalRate,
-    nil, // AccessRights map[string]*AccessDefinition
+    accessDefinitions,
     sessionState.OrgID,
     sessionState.OauthClientID,
     sessionState.OauthKeys,
-    nil, // BasicAuthData *SessionState_BasicAuthData
-    nil, // JwtData *SessionState_JWTData
+    basicAuthData,
+    jwtData,
     sessionState.HMACEnabled,
     sessionState.HmacSecret,
     sessionState.IsInactive,
     sessionState.ApplyPolicyID,
     sessionState.DataExpires,
-    nil, // Monitor *SessionState_Monitor
+    monitor,
     sessionState.EnableDetailedRecording,
     "",
     sessionState.Tags,
