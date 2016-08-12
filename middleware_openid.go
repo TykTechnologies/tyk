@@ -11,6 +11,7 @@ import (
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
+	"sync"
 )
 
 var OIDPREFIX string = "openid"
@@ -19,6 +20,8 @@ type OpenIDMW struct {
 	*TykMiddleware
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
+	lock                      sync.RWMutex
+	plock                     sync.RWMutex
 }
 
 func (k *OpenIDMW) New() {
@@ -27,6 +30,9 @@ func (k *OpenIDMW) New() {
 	var configErr error
 	k.providerConfiguration, configErr = openid.NewConfiguration(openid.ProvidersGetter(k.getProviders),
 		openid.ErrorHandler(k.dummyErrorHandler))
+
+	k.lock = sync.RWMutex{}
+	k.plock = sync.RWMutex{}
 
 	if configErr != nil {
 		log.WithFields(logrus.Fields{
@@ -47,11 +53,14 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 		for clientID, policyID := range provider.ClientIDs {
 			clID, _ := b64.StdEncoding.DecodeString(clientID)
 			thisClientID := string(clID)
+
+			k.lock.Lock()
 			if k.provider_client_policymap[iss] == nil {
 				k.provider_client_policymap[iss] = map[string]string{thisClientID: policyID}
 			} else {
 				k.provider_client_policymap[iss][thisClientID] = policyID
 			}
+			k.lock.Unlock()
 
 			log.Debug("--> Setting up client: ", thisClientID, " with policy: ", policyID)
 			providerClientArray[i] = thisClientID
@@ -109,7 +118,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		return errors.New("Key not authorised"), 403
 	}
 
+	k.lock.Lock()
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
+	k.lock.Unlock()
 	if !foundIssuer {
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,
@@ -122,11 +133,15 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	thisClientID := ""
 	switch v := clients.(type) {
 	case string:
+		k.lock.RLock()
 		policyID = clientSet[v]
+		k.lock.RUnlock()
 		thisClientID = v
 	case []interface{}:
 		for _, audVal := range v {
+			k.lock.RLock()
 			policy, foundPolicy := clientSet[audVal.(string)]
+			k.lock.RUnlock()
 			if foundPolicy {
 				thisClientID = audVal.(string)
 				policyID = policy
