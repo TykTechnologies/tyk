@@ -21,9 +21,16 @@ def MyAuthCheck(request, session, metadata, spec):
         session.rate = 1000.0
         session.per = 1.0
 
+        basic_auth_data = BasicAuthData(password="the password", hash="bcrypt")
         spec = AccessSpec( url="http://test_url", methods=["GET", "POST"])
-        definition = AccessDefinition( api_name="My API", api_id="api_01", allowed_urls=[spec])
-        session.access_rights["key"].CopyFrom(definition)
+        definition = AccessDefinition( api_name="api_name_string", api_id="api_id", versions=["version_string", "another_version_string"], allowed_urls=[spec])
+        jwt_data = JWTData(secret="secret_string")
+        monitor = Monitor(trigger_limits=[0.1, 0.2, 0.3, 0.4])
+
+        # session.basic_auth_data.CopyFrom(basic_auth_data)
+        # session.access_rights["key"].CopyFrom(definition)
+        # session.jwt_data.CopyFrom(jwt_data)
+        # session.monitor.CopyFrom(monitor)
 
         print("Returning session:", session)
 
