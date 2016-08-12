@@ -19,6 +19,9 @@ It has these top-level messages:
 	ReturnOverrides
 	AccessSpec
 	AccessDefinition
+	BasicAuthData
+	JWTData
+	Monitor
 	SessionState
 */
 package coprocess

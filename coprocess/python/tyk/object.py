@@ -20,7 +20,8 @@ class TykCoProcessObject:
             pass
 
         self.request = TykCoProcessRequest(self.object.request)
-        self.session = TykSession(self.object.session)
+        # self.session = TykSession(self.object.session)
+        self.session = self.object.session
         self.spec = self.object.spec
         self.metadata = self.object.metadata
         self.hook_name = self.object.hook_name

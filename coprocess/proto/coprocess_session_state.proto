@@ -14,6 +14,19 @@ message AccessDefinition {
   repeated AccessSpec allowed_urls = 4;
 }
 
+message BasicAuthData {
+  string password = 1;
+  string hash = 2;
+}
+
+message JWTData {
+  string secret = 1;
+}
+
+message Monitor {
+  repeated double trigger_limits = 1;
+}
+
 message SessionState {
   int64 last_check = 1;
 
@@ -33,16 +46,8 @@ message SessionState {
   string oauth_client_id = 12;
   map<string, string> oauth_keys = 13;
 
-
-  message BasicAuthData {
-    string password = 1;
-    string hash = 2;
-  }
   BasicAuthData basic_auth_data = 14;
 
-  message JWTData {
-    string secret = 1;
-  }
   JWTData jwt_data = 15;
 
   bool hmac_enabled = 16;
@@ -51,9 +56,6 @@ message SessionState {
   string apply_policy_id = 19;
   int64 data_expires = 20;
 
-  message Monitor {
-    repeated double trigger_limits = 1;
-  }
   Monitor monitor = 21;
 
   bool enable_detailed_recording = 22;
