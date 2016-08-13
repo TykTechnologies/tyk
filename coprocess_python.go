@@ -32,8 +32,6 @@ static int Python_Init() {
 	PyEval_InitThreads();
 	mainThreadState = PyEval_SaveThread();
 
-	PyEval_AcquireThread(mainThreadState);
-
   return Py_IsInitialized();
 }
 
@@ -116,16 +114,25 @@ static void Python_SetEnv(char* python_path) {
 static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* object) {
 	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
 
-	PyEval_AcquireLock();
-
 	if( object->p_data == NULL ) {
 		return outputObject;
 	} else {
+
+		MutexLock();
+		PyEval_AcquireLock();
+		PyThreadState* ts = PyThreadState_New(mainThreadState->interp);
+		PyThreadState_Swap(ts);
+
 		PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
+
 		PyObject *result = PyObject_CallObject( dispatcher_hook, args );
 
-		// Py_DECREF(args);
-
+		PyThreadState_Swap(mainThreadState);
+		PyThreadState_Clear(ts);
+		PyThreadState_Delete(ts);
+		PyEval_ReleaseLock();
+		MutexUnlock();
+		
 		if( result == NULL ) {
 			// Py_DECREF(result);
 			PyErr_Print();
@@ -140,10 +147,6 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 			outputObject->p_data = (void*)output;
 			outputObject->length = msg_length;
 
-			PyEval_ReleaseLock();
-
-			// Py_DECREF(result);
-
 			return outputObject;
 		}
 	}
@@ -157,7 +160,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"unsafe"
 
 	"github.com/Sirupsen/logrus"
@@ -165,20 +167,18 @@ import (
 
 const CoProcessName string = "python"
 
-var GILMutex sync.Mutex
-
 type PythonDispatcher struct {
 	CoProcessDispatcher
 }
 
 func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.struct_CoProcessMessage {
 
-	GILMutex.Lock()
+	// GILMutex.Lock()
 
 	var newObjectPtr *C.struct_CoProcessMessage
 	newObjectPtr = C.Python_DispatchHook(objectPtr)
 
-	GILMutex.Unlock()
+	// GILMutex.Unlock()
 
 	return newObjectPtr
 }
@@ -242,9 +242,12 @@ func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
 	PythonSetEnv(dispatcherPath, middlewarePath, protoPath)
 
 	PythonInit()
+	C.PyEval_AcquireThread(C.mainThreadState);
 	PythonLoadDispatcher()
 
 	err, dispatcher = PythonNewDispatcher(middlewarePath)
+
+	C.PyThreadState_Swap(C.mainThreadState);
 
 	C.PyEval_ReleaseLock()
 
