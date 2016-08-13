@@ -20,12 +20,19 @@ package main
 
 #include "coprocess/python/tyk/gateway.h"
 
+PyThreadState* mainThreadState = NULL;
+
 static int Python_Init() {
   CoProcess_Log( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
   Py_Initialize();
 
 	// This exposes the Cython interface as "gateway"
 	PyInit_gateway();
+
+	PyEval_InitThreads();
+	mainThreadState = PyEval_SaveThread();
+
+	PyEval_AcquireThread(mainThreadState);
 
   return Py_IsInitialized();
 }
@@ -109,16 +116,18 @@ static void Python_SetEnv(char* python_path) {
 static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* object) {
 	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
 
+	PyEval_AcquireLock();
+
 	if( object->p_data == NULL ) {
 		return outputObject;
 	} else {
 		PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
 		PyObject *result = PyObject_CallObject( dispatcher_hook, args );
 
-		Py_DECREF(args);
+		// Py_DECREF(args);
 
 		if( result == NULL ) {
-			Py_DECREF(result);
+			// Py_DECREF(result);
 			PyErr_Print();
 			return outputObject;
 		} else {
@@ -131,7 +140,9 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 			outputObject->p_data = (void*)output;
 			outputObject->length = msg_length;
 
-			Py_DECREF(result);
+			PyEval_ReleaseLock();
+
+			// Py_DECREF(result);
 
 			return outputObject;
 		}
@@ -146,6 +157,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/Sirupsen/logrus"
@@ -153,13 +165,20 @@ import (
 
 const CoProcessName string = "python"
 
+var GILMutex sync.Mutex
+
 type PythonDispatcher struct {
 	CoProcessDispatcher
 }
 
 func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.struct_CoProcessMessage {
+
+	GILMutex.Lock()
+
 	var newObjectPtr *C.struct_CoProcessMessage
 	newObjectPtr = C.Python_DispatchHook(objectPtr)
+
+	GILMutex.Unlock()
 
 	return newObjectPtr
 }
@@ -224,8 +243,10 @@ func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
 
 	PythonInit()
 	PythonLoadDispatcher()
-	
+
 	err, dispatcher = PythonNewDispatcher(middlewarePath)
+
+	C.PyEval_ReleaseLock()
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
