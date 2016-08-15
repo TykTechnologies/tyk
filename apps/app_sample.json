@@ -9,7 +9,7 @@
     "auth": {
         "auth_header_name": "authorization"
     },
-    "use_keyless": true,
+    "use_keyless": false,
     "version_data": {
         "not_versioned": true,
         "versions": {
@@ -30,7 +30,18 @@
         "target_url": "http://127.0.0.1/",
         "strip_listen_path": true
     },
-    "event_handlers": {},
+    "event_handlers": {
+      "events": {
+        "AuthFailure": [
+                {
+                    "handler_name":"cp_dynamic_handler",
+                    "handler_meta": {
+                        "name": "my_handler"
+                    }
+                }
+            ]
+      }
+    },
     "custom_middleware": {
     "pre": [
         {
