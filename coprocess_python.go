@@ -74,9 +74,9 @@ static void Python_ReloadDispatcher() {
 
 }
 
-static int Python_NewDispatcher(char* middleware_path) {
+static int Python_NewDispatcher(char* middleware_path, char* event_handler_path) {
   if( PyCallable_Check(dispatcher_class) ) {
-    dispatcher_args = PyTuple_Pack( 1, PyUnicode_FromString(middleware_path) );
+    dispatcher_args = PyTuple_Pack( 2, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path) );
     dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
 
 		Py_DECREF(dispatcher_args);
@@ -190,11 +190,15 @@ func Python_ReloadDispatcher() {
 	C.Python_ReloadDispatcher()
 }
 
-func PythonNewDispatcher(middlewarePath string) (err error, dispatcher CoProcessDispatcher) {
+func PythonNewDispatcher(middlewarePath string, eventHandlerPath string) (err error, dispatcher CoProcessDispatcher) {
 	var CMiddlewarePath *C.char
 	CMiddlewarePath = C.CString(middlewarePath)
 
-	result := C.Python_NewDispatcher(CMiddlewarePath)
+	var CEventHandlerPath *C.char
+	CEventHandlerPath = C.CString(eventHandlerPath)
+
+	result := C.Python_NewDispatcher(CMiddlewarePath, CEventHandlerPath)
+
 	if result == -1 {
 		err = errors.New("Can't initialize a dispatcher")
 	} else {
@@ -202,6 +206,7 @@ func PythonNewDispatcher(middlewarePath string) (err error, dispatcher CoProcess
 	}
 
 	C.free(unsafe.Pointer(CMiddlewarePath))
+	C.free(unsafe.Pointer(CEventHandlerPath))
 
 	return err, dispatcher
 }
@@ -220,14 +225,15 @@ func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
 
 	dispatcherPath := path.Join(workDir, "coprocess/python")
 	middlewarePath := path.Join(workDir, "middleware/python")
+	eventHandlerPath := path.Join(workDir, "event_handlers")
 	protoPath := path.Join(workDir, "coprocess/python/proto")
 
-	PythonSetEnv(dispatcherPath, middlewarePath, protoPath)
+	PythonSetEnv(dispatcherPath, middlewarePath, protoPath, eventHandlerPath)
 
 	PythonInit()
 	PythonLoadDispatcher()
 
-	err, dispatcher = PythonNewDispatcher(middlewarePath)
+	err, dispatcher = PythonNewDispatcher(middlewarePath, eventHandlerPath)
 
 	C.PyEval_ReleaseLock()
 
