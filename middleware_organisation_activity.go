@@ -76,7 +76,9 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	}
 
 	// We found a session, apply the quota limiter
-	forwardMessage, reason := k.sessionlimiter.ForwardMessage(&thisSessionState, k.Spec.OrgID, k.Spec.OrgSessionManager.GetStore())
+	forwardMessage, reason := k.sessionlimiter.ForwardMessage(&thisSessionState,
+		k.Spec.OrgID,
+		k.Spec.OrgSessionManager.GetStore(), false, false)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, thisSessionState, 0)
 
