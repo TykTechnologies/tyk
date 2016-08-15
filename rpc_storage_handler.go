@@ -462,6 +462,9 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 		return r.DeleteKey(keyName)
 	}
 
+	if ok == nil {
+		return false
+	}
 	return ok.(bool)
 }
 
@@ -474,6 +477,9 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 		return r.DeleteRawKey(keyName)
 	}
 
+	if ok == nil {
+		return false
+	}
 	return ok.(bool)
 }
 
@@ -491,6 +497,10 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 		if r.IsAccessError(err) {
 			r.Login()
 			return r.DeleteKeys(keys)
+		}
+
+		if ok == nil {
+			return false
 		}
 
 		return ok.(bool)
@@ -559,6 +569,11 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 	elapsed := time.Since(start)
 	log.Debug("SetRollingWindow took ", elapsed)
 
+	if intVal == nil {
+		log.Warning("RPC Handler: SetRollingWindow() returned nil, returning 0")
+		return 0, []interface{}{}
+	}
+
 	return intVal.(int), []interface{}{}
 
 }
@@ -580,6 +595,11 @@ func (r *RPCStorageHandler) SetRollingWindowPipeline(keyName string, per int64, 
 
 	elapsed := time.Since(start)
 	log.Debug("SetRollingWindow took ", elapsed)
+
+	if intVal == nil {
+		log.Warning("RPC Handler: SetRollingWindowPipeline() returned nil, returning 0")
+		return 0, []interface{}{}
+	}
 
 	return intVal.(int), []interface{}{}
 
@@ -624,6 +644,12 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		}
 	}
 	log.Debug("API Definitions retrieved")
+
+	if defString == nil {
+		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
+		return ""
+	}
+
 	return defString.(string)
 
 }
