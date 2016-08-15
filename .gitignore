@@ -15,6 +15,7 @@ tyk.compose.cluster.conf
 tyk.rpc.conf
 tyk.rpc.local.conf
 tyk.rpc.local2.conf
+live_hybrid.conf
 /tyk
 logs/
 test.*.conf

@@ -94,6 +94,7 @@ type Config struct {
 	}
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
 	OauthTokenExpire   int32 `json:"oauth_token_expire"`
+	OauthRedirectUriSeparator   string `json:"oauth_redirect_uri_separator"`
 	SlaveOptions       struct {
 		UseRPC                          bool   `json:"use_rpc"`
 		ConnectionString                string `json:"connection_string"`
@@ -180,6 +181,7 @@ func WriteDefaultConf(configStruct *Config) {
 	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
 	configStruct.UseAsyncSessionWrite = false
 	configStruct.HideGeneratorHeader = false
+	configStruct.OauthRedirectUriSeparator = ""
 	newConfig, err := json.MarshalIndent(configStruct, "", "    ")
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
