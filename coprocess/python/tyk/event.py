@@ -11,7 +11,7 @@ class TykEventHandler:
 
     def process(self, event):
         print("process", event)
-        self.callback(event, {})
+        self.callback(event.message, event.spec)
 
     def from_module(module_name):
         module = import_module(module_name)
