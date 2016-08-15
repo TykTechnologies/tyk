@@ -26,5 +26,13 @@ class CustomKeyCheck():
     def __call__(self, req, sess, metadata, spec):
         return self.f(req, sess, metadata, spec)
 
+class Event(object):
+    def __init__(self, f):
+        self.name = f.__name__
+        self.f = f
+        return
+    def __call__(self, event, spec):
+        self.f(event, spec)
+
 def ThisIsNotADecorator():
     pass
