@@ -9,6 +9,7 @@
     "auth": {
         "auth_header_name": "authorization"
     },
+    "use_keyless": true,
     "version_data": {
         "not_versioned": true,
         "versions": {
@@ -25,8 +26,8 @@
         }
     },
     "proxy": {
-        "listen_path": "/tyk-api-test/",
-        "target_url": "http://httpbin.org",
+        "listen_path": "/otto/",
+        "target_url": "http://127.0.0.1/",
         "strip_listen_path": true
     },
     "event_handlers": {},
@@ -42,7 +43,7 @@
         {
             "name": "samplePostProcessMiddleware",
             "path": "middleware/sample_post.js",
-            "require_session": true
+            "require_session": false
         }
     ]
   },

@@ -46,7 +46,7 @@
     },
     "proxy": {
         "listen_path": "/quickstart/",
-        "target_url": "http://httpbin.org/",
+        "target_url": "http://127.0.0.1/",
         "strip_listen_path": true
     }
 }
