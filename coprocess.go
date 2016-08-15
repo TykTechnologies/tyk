@@ -189,6 +189,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 
 type CoProcessDispatcher interface {
 	Dispatch(*C.struct_CoProcessMessage) *C.struct_CoProcessMessage
+	DispatchEvent([]byte)
 	Reload()
 }
 
