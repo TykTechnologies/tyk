@@ -10,6 +10,6 @@ extern void TykStoreData(char* key, char* value, int ttl);
 extern char* TykGetData(char* key);
 extern void TykTriggerEvent(char* event_name, char* payload);
 
-extern void CoProcess_Log(char *msg, char *level);
+extern void CoProcessLog(char *msg, char *level);
 
 #endif
