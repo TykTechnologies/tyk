@@ -93,7 +93,11 @@ static int Python_NewDispatcher(char* middleware_path, char* event_handler_path)
   dispatcher_hook_name = PyUnicode_FromString( hook_name );
   dispatcher_hook = PyObject_GetAttr(dispatcher, dispatcher_hook_name);
 
+	dispatch_event_name = PyUnicode_FromString( dispatch_event_name_s );
+	dispatch_event = PyObject_GetAttr(dispatcher, dispatch_event_name );
+
 	Py_DECREF(dispatcher_hook_name);
+	Py_DECREF(dispatch_event_name);
 
   if( dispatcher_hook == NULL ) {
     PyErr_Print();
@@ -139,6 +143,14 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 	}
 }
 
+static void Python_DispatchEvent(char* event_json) {
+	gilState = PyGILState_Ensure();
+	printf("Python_DispatchEvent (C): %s\n", event_json);
+	PyObject *args = PyTuple_Pack( 1, PyUnicode_FromString(event_json) );
+	PyObject *result = PyObject_CallObject( dispatch_event, args );
+	PyGILState_Release(gilState);
+}
+
 */
 import "C"
 
@@ -164,6 +176,14 @@ func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.str
 	newObjectPtr = C.Python_DispatchHook(objectPtr)
 
 	return newObjectPtr
+}
+
+func(d *PythonDispatcher) DispatchEvent(eventJson []byte) {
+	var CEventJson *C.char
+	CEventJson = C.CString(string(eventJson))
+	C.Python_DispatchEvent(CEventJson)
+	C.free(unsafe.Pointer(CEventJson))
+	return
 }
 
 func (d *PythonDispatcher) Reload() {

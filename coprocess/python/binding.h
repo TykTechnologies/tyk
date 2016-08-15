@@ -10,5 +10,6 @@ static int Python_NewDispatcher(char*, char*);
 static void Python_ReloadDispatcher();
 
 static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage*);
+static void Python_DispatchEvent(char*);
 
 #endif
