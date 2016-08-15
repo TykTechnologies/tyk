@@ -14,6 +14,7 @@ class TykDispatcher:
         tyk.log( "Initializing dispatcher", "info" )
         self.middleware_path = path.join(middleware_path, '*.py')
         self.middlewares = []
+        self.hook_table = {}
         self.load_middlewares()
 
     def get_modules(self):
@@ -40,6 +41,15 @@ class TykDispatcher:
             else:
                 middleware = TykMiddleware(module_name)
                 self.middlewares.append(middleware)
+        self.update_hook_table()
+
+    def update_hook_table(self):
+        self.hook_table = {}
+        for middleware in self.middlewares:
+            for hook_type in middleware.handlers:
+                for handler in middleware.handlers[hook_type]:
+                    handler.middleware = middleware
+                    self.hook_table[handler.name] = handler
 
     def purge_middlewares(self):
         tyk.log( "Purging middlewares.", "debug" )
@@ -54,7 +64,7 @@ class TykDispatcher:
         self.purge_middlewares()
         self.load_middlewares()
 
-    def find_hook(self, hook_type, hook_name):
+    def find_hook_by_type_and_name(self, hook_type, hook_name):
         found_middleware, matching_hook_handler = None, None
         for middleware in self.middlewares:
             if hook_type in middleware.handlers:
@@ -64,10 +74,17 @@ class TykDispatcher:
                         matching_hook_handler = handler
         return found_middleware, matching_hook_handler
 
+    def find_hook_by_name(self, hook_name):
+        hook_handler, middleware = None, None
+        if hook_name in self.hook_table:
+            hook_handler = self.hook_table[hook_name]
+            middleware = hook_handler.middleware
+        return middleware, hook_handler
+
     def dispatch_hook(self, object_msg):
         try:
             object = TykCoProcessObject(object_msg)
-            middleware, hook_handler = self.find_hook(object.hook_type, object.hook_name)
+            middleware, hook_handler = self.find_hook_by_name(object.hook_name)
             if hook_handler:
                 object = middleware.process(hook_handler, object)
             else:
