@@ -63,7 +63,7 @@ func createMultiAuthKeyAuthSession() SessionState {
 	thisSession.Expires = 0
 	thisSession.QuotaRenewalRate = 300 // 5 minutes
 	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
+	thisSession.QuotaRemaining = 900
 	thisSession.QuotaMax = 10
 	thisSession.AccessRights = map[string]AccessDefinition{"55": AccessDefinition{APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 
@@ -108,7 +108,7 @@ func getMultiAuthStandardAndBasicAuthChain(spec APISpec) http.Handler {
 	return chain
 }
 
-func TestMultiSession_BA_STandard_OK(t *testing.T) {
+func TestMultiSession_BA_Standard_OK(t *testing.T) {
 	spec := createDefinitionFromString(multiAuthDev)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -143,11 +143,59 @@ func TestMultiSession_BA_STandard_OK(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+	}
+}
+
+func TestMultiSession_BA_Standard_Identity(t *testing.T) {
+	spec := createDefinitionFromString(multiAuthDev)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+
+	// Create BA
+	baSession := createMultiBasicAuthSession()
+	username := "0987876"
+	password := "TEST"
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
+
+	// Create key
+	thisSession := createMultiAuthKeyAuthSession()
+	customToken := "84573485734587384888723487243"
+	// AuthKey sessions are stored by {token}
+	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+
+	to_encode := strings.Join([]string{username, password}, ":")
+	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+	}
+
+	if recorder.Header().Get("X-Ratelimit-Remaining") == "-1" {
+		t.Error("Expected quota limit but found -1, wrong base identity became context")
+		t.Error(recorder.Header().Get("X-Ratelimit-Remaining"))
 	}
 }
 
@@ -186,11 +234,11 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	if recorder.Code != 403 {
-		t.Error("Wrong response code received, expected 403: \n", recorder.Code)
+	if recorder.Code != 401 {
+		t.Error("Wrong response code received, expected 401: \n", recorder.Code)
 	}
 }
 
@@ -229,7 +277,7 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getBasicAuthChain(spec)
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 403 {
