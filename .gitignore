@@ -47,3 +47,4 @@ tyk.benchmark.conf
 tyk_elasticache.conf
 coprocess_gen_test.go
 session_state_gen_test.go
+__pycache__
