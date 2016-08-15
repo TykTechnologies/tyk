@@ -20,18 +20,15 @@ package main
 
 #include "coprocess/python/tyk/gateway.h"
 
-PyThreadState* mainThreadState = NULL;
+PyGILState_STATE gilState;
 
 static int Python_Init() {
   CoProcess_Log( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
   Py_Initialize();
-
+	gilState = PyGILState_Ensure();
+	PyEval_InitThreads();
 	// This exposes the Cython interface as "gateway"
 	PyInit_gateway();
-
-	PyEval_InitThreads();
-	mainThreadState = PyEval_SaveThread();
-
   return Py_IsInitialized();
 }
 
@@ -118,25 +115,13 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 		return outputObject;
 	} else {
 
-		MutexLock();
-		PyEval_AcquireLock();
-		PyThreadState* ts = PyThreadState_New(mainThreadState->interp);
-		PyThreadState_Swap(ts);
-
+		gilState = PyGILState_Ensure();
 		PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
 
 		PyObject *result = PyObject_CallObject( dispatcher_hook, args );
 
-		PyThreadState_Swap(mainThreadState);
-		PyThreadState_Clear(ts);
-		PyThreadState_Delete(ts);
-		PyEval_ReleaseLock();
-		MutexUnlock();
-		
 		if( result == NULL ) {
-			// Py_DECREF(result);
 			PyErr_Print();
-			return outputObject;
 		} else {
 			PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
 			char* output = PyBytes_AsString(new_object_msg_item);
@@ -146,9 +131,11 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 
 			outputObject->p_data = (void*)output;
 			outputObject->length = msg_length;
-
-			return outputObject;
 		}
+
+		PyGILState_Release(gilState);
+
+		return outputObject;
 	}
 }
 
@@ -173,12 +160,8 @@ type PythonDispatcher struct {
 
 func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.struct_CoProcessMessage {
 
-	// GILMutex.Lock()
-
 	var newObjectPtr *C.struct_CoProcessMessage
 	newObjectPtr = C.Python_DispatchHook(objectPtr)
-
-	// GILMutex.Unlock()
 
 	return newObjectPtr
 }
@@ -242,12 +225,9 @@ func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
 	PythonSetEnv(dispatcherPath, middlewarePath, protoPath)
 
 	PythonInit()
-	C.PyEval_AcquireThread(C.mainThreadState);
 	PythonLoadDispatcher()
 
 	err, dispatcher = PythonNewDispatcher(middlewarePath)
-
-	C.PyThreadState_Swap(C.mainThreadState);
 
 	C.PyEval_ReleaseLock()
 
