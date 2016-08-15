@@ -5,8 +5,8 @@ package main
 import (
 	"github.com/Sirupsen/logrus"
 
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 
 	"net/http"
 )
@@ -32,6 +32,7 @@ func (m *DummyCoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 }
 
 type CoProcessEventHandler JSVMEventHandler
+
 func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 	return nil, nil
 }

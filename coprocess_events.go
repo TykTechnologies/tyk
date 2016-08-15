@@ -4,10 +4,11 @@ package main
 
 import (
 	"github.com/TykTechnologies/tykcommon"
-  // "fmt"
-  "encoding/json"
+	// "fmt"
+	"encoding/json"
 )
 
+// Constant for event system.
 const (
 	EH_CoProcessHandler tykcommon.TykEventHandlerName = "cp_dynamic_handler"
 )
@@ -19,9 +20,9 @@ type CoProcessEventHandler struct {
 }
 
 type CoProcessEventWrapper struct {
-  Event EventMessage  `json:"message"`
-  Handler string  `json:"handler_name"`
-  SpecJSON *json.RawMessage `json:"spec"`
+	Event    EventMessage     `json:"message"`
+	Handler  string           `json:"handler_name"`
+	SpecJSON *json.RawMessage `json:"spec"`
 }
 
 func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
@@ -41,7 +42,7 @@ func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, er
 	}
 
 	// thisHandler.SpecJSON = string(gValAsJSON)
-  thisHandler.SpecJSON = json.RawMessage(gValAsJSON)
+	thisHandler.SpecJSON = json.RawMessage(gValAsJSON)
 
 	return thisHandler, nil
 }
@@ -50,11 +51,11 @@ func (l CoProcessEventHandler) HandleEvent(em EventMessage) {
 	// 1. Get the methodName for the Event Handler
 	methodName := l.conf["name"].(string)
 
-  eventWrapper := CoProcessEventWrapper{
-    Event: em,
-    Handler: methodName,
-    SpecJSON: &l.SpecJSON,
-  }
+	eventWrapper := CoProcessEventWrapper{
+		Event:    em,
+		Handler:  methodName,
+		SpecJSON: &l.SpecJSON,
+	}
 
 	// 2. JSON-encode the event data object
 	msgAsJSON, encErr := json.Marshal(eventWrapper)
@@ -63,5 +64,5 @@ func (l CoProcessEventHandler) HandleEvent(em EventMessage) {
 		return
 	}
 
-  GlobalDispatcher.DispatchEvent(msgAsJSON)
+	GlobalDispatcher.DispatchEvent(msgAsJSON)
 }

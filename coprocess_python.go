@@ -23,7 +23,7 @@ package main
 PyGILState_STATE gilState;
 
 static int Python_Init() {
-  CoProcess_Log( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
+  CoProcessLog( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
   Py_Initialize();
 	gilState = PyGILState_Ensure();
 	PyEval_InitThreads();
@@ -108,7 +108,7 @@ static int Python_NewDispatcher(char* middleware_path, char* event_handler_path)
 }
 
 static void Python_SetEnv(char* python_path) {
-  CoProcess_Log( sdscatprintf(sdsempty(), "Setting PYTHONPATH to '%s'", python_path), "info");
+  CoProcessLog( sdscatprintf(sdsempty(), "Setting PYTHONPATH to '%s'", python_path), "info");
   setenv("PYTHONPATH", python_path, 1 );
 }
 
@@ -164,12 +164,15 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// CoProcessName declares the driver name.
 const CoProcessName string = "python"
 
+// PythonDispatcher implements a CoProcessDispatcher
 type PythonDispatcher struct {
 	CoProcessDispatcher
 }
 
+// Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.struct_CoProcessMessage {
 
 	var newObjectPtr *C.struct_CoProcessMessage
@@ -178,18 +181,21 @@ func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.str
 	return newObjectPtr
 }
 
-func(d *PythonDispatcher) DispatchEvent(eventJson []byte) {
-	var CEventJson *C.char
-	CEventJson = C.CString(string(eventJson))
-	C.Python_DispatchEvent(CEventJson)
-	C.free(unsafe.Pointer(CEventJson))
+// DispatchEvent dispatches a Tyk event.
+func (d *PythonDispatcher) DispatchEvent(eventJSON []byte) {
+	var CEventJSON *C.char
+	CEventJSON = C.CString(string(eventJSON))
+	C.Python_DispatchEvent(CEventJSON)
+	C.free(unsafe.Pointer(CEventJSON))
 	return
 }
 
+// Reload triggers a reload affecting CP middlewares and event handlers.
 func (d *PythonDispatcher) Reload() {
-	Python_ReloadDispatcher()
+	C.Python_ReloadDispatcher()
 }
 
+// PythonInit initializes the Python interpreter.
 func PythonInit() (err error) {
 	result := C.Python_Init()
 	if result == 0 {
@@ -198,6 +204,7 @@ func PythonInit() (err error) {
 	return err
 }
 
+// PythonLoadDispatcher creates reference to the dispatcher class.
 func PythonLoadDispatcher() (err error) {
 	result := C.Python_LoadDispatcher()
 	if result == -1 {
@@ -206,11 +213,8 @@ func PythonLoadDispatcher() (err error) {
 	return err
 }
 
-func Python_ReloadDispatcher() {
-	C.Python_ReloadDispatcher()
-}
-
-func PythonNewDispatcher(middlewarePath string, eventHandlerPath string) (err error, dispatcher CoProcessDispatcher) {
+// PythonNewDispatcher creates an instance of TykDispatcher.
+func PythonNewDispatcher(middlewarePath string, eventHandlerPath string) (dispatcher CoProcessDispatcher, err error) {
 	var CMiddlewarePath *C.char
 	CMiddlewarePath = C.CString(middlewarePath)
 
@@ -228,9 +232,10 @@ func PythonNewDispatcher(middlewarePath string, eventHandlerPath string) (err er
 	C.free(unsafe.Pointer(CMiddlewarePath))
 	C.free(unsafe.Pointer(CEventHandlerPath))
 
-	return err, dispatcher
+	return dispatcher, err
 }
 
+// PythonSetEnv sets PYTHONPATH, it's called before initializing the interpreter.
 func PythonSetEnv(pythonPaths ...string) {
 	var CPythonPath *C.char
 	CPythonPath = C.CString(strings.Join(pythonPaths, ":"))
@@ -239,6 +244,7 @@ func PythonSetEnv(pythonPaths ...string) {
 	C.free(unsafe.Pointer(CPythonPath))
 }
 
+// NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
 
 	workDir, _ := os.Getwd()
@@ -253,7 +259,7 @@ func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
 	PythonInit()
 	PythonLoadDispatcher()
 
-	err, dispatcher = PythonNewDispatcher(middlewarePath, eventHandlerPath)
+	dispatcher, err = PythonNewDispatcher(middlewarePath, eventHandlerPath)
 
 	C.PyEval_ReleaseLock()
 

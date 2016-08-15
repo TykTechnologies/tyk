@@ -23,8 +23,8 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 
 	"github.com/golang/protobuf/proto"
 
@@ -35,23 +35,26 @@ import (
 	"unsafe"
 )
 
-// config.EnableProcess will override this
-var EnableCoProcess bool = false
+// EnableCoProcess will be overridden by config.EnableCoProcess.
+var EnableCoProcess = false
 
+// GlobalDispatcher will be implemented by the current CoProcess driver.
 var GlobalDispatcher CoProcessDispatcher
 
+// CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {
 	*TykMiddleware
-	HookType coprocess.HookType
-	HookName string
+	HookType         coprocess.HookType
+	HookName         string
 	MiddlewareDriver tykcommon.MiddlewareDriver
 }
 
+// CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
 func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
-		TykMiddleware: tykMwSuper,
-		HookType:      hookType,
-		HookName:	hookName,
+		TykMiddleware:    tykMwSuper,
+		HookType:         hookType,
+		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
 	}
 
@@ -66,11 +69,13 @@ func doCoprocessReload() {
 
 }
 
+// CoProcessor represents a CoProcess during the request.
 type CoProcessor struct {
 	HookType   coprocess.HookType
 	Middleware *CoProcessMiddleware
 }
 
+// GetObjectFromRequest constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	defer r.Body.Close()
@@ -80,23 +85,22 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 	var miniRequestObject *coprocess.MiniRequestObject
 
 	miniRequestObject = &coprocess.MiniRequestObject{
-		Headers: ProtoMap(r.Header),
-		SetHeaders: make(map[string]string, 0),
-		DeleteHeaders: make([]string, 0),
-		Body: string(originalBody),
-		Url: r.URL.Path,
-		Params: ProtoMap(r.URL.Query()),
-		AddParams: make(map[string]string),
-		ExtendedParams: ProtoMap(nil),
-		DeleteParams: make([]string, 0),
+		Headers:         ProtoMap(r.Header),
+		SetHeaders:      make(map[string]string, 0),
+		DeleteHeaders:   make([]string, 0),
+		Body:            string(originalBody),
+		Url:             r.URL.Path,
+		Params:          ProtoMap(r.URL.Query()),
+		AddParams:       make(map[string]string),
+		ExtendedParams:  ProtoMap(nil),
+		DeleteParams:    make([]string, 0),
 		ReturnOverrides: &coprocess.ReturnOverrides{-1, ""},
 	}
 
 	object = &coprocess.Object{
-		Request: miniRequestObject,
+		Request:  miniRequestObject,
 		HookName: c.Middleware.HookName,
 	}
-
 
 	// If a middleware is set, take its HookType, otherwise override it with CoProcessor.HookType
 	if c.Middleware != nil && c.HookType == 0 {
@@ -131,6 +135,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 	return object
 }
 
+// ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
 func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) {
 	r.ContentLength = int64(len(object.Request.Body))
 	r.Body = ioutil.NopCloser(bytes.NewBufferString(object.Request.Body))
@@ -155,8 +160,8 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	r.URL.RawQuery = values.Encode()
 }
 
+// Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
 func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
-
 
 	objectMsg, _ := proto.Marshal(object)
 
@@ -187,12 +192,14 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	return newObject
 }
 
+// CoProcessDispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.
 type CoProcessDispatcher interface {
 	Dispatch(*C.struct_CoProcessMessage) *C.struct_CoProcessMessage
 	DispatchEvent([]byte)
 	Reload()
 }
 
+// CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
 func CoProcessInit() (err error) {
 	if config.EnableCoProcess {
 		GlobalDispatcher, err = NewCoProcessDispatcher()
@@ -201,33 +208,9 @@ func CoProcessInit() (err error) {
 	return err
 }
 
+// CoProcessMiddlewareConfig holds the middleware configuration.
 type CoProcessMiddlewareConfig struct {
 	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
-
-type CoProcessObject struct {
-	HookType string                     `json:"hook_type" msg:"hook_type"`
-	Request  CoProcessMiniRequestObject `json:"request,omitempty" msg:"request"`
-	Session  SessionState               `json:"session,omitempty" msg:"session"`
-	Metadata map[string]string          `json:"metadata,omitempty" msg:"metadata"`
-	Spec     map[string]string          `json:"spec,omitempty" msg:"spec"`
-}
-
-type CoProcessReturnOverrides struct {
-	ResponseCode  int    `json:"response_code" msg:"response_code"`
-	ResponseError string `json:"response_error" msg:"response_error"`
-}
-type CoProcessMiniRequestObject struct {
-	Headers         map[string][]string      `msg:"headers"`
-	SetHeaders      map[string]string        `msg:"set_headers"`
-	DeleteHeaders   []string                 `msg:"delete_headers"`
-	Body            string                   `msg:"body"`
-	URL             string                   `msg:"url"`
-	Params          map[string][]string      `msg:"params"`
-	AddParams       map[string]string        `msg:"add_params"`
-	ExtendedParams  map[string][]string      `msg:"extended_params"`
-	DeleteParams    []string                 `msg:"delete_params"`
-	ReturnOverrides CoProcessReturnOverrides `json:"return_overrides" msg:"return_overrides"`
 }
 
 // New lets you do any initialisations for the object can be done here
@@ -292,7 +275,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		if returnObject.Session != nil {
 			// context.Set(r, SessionData, ToTykSession(returnObject.Session))
-			context.Set(r, SessionData, TykSessionState(returnObject.Session) )
+			context.Set(r, SessionData, TykSessionState(returnObject.Session))
 			context.Set(r, AuthHeaderValue, authHeaderValue)
 		}
 	}
@@ -302,8 +285,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, 200
 }
 
-//export CoProcess_Log
-func CoProcess_Log(CMessage *C.char, CLogLevel *C.char) {
+// CoProcessLog is a bridge for using Tyk log from CP.
+//export CoProcessLog
+func CoProcessLog(CMessage *C.char, CLogLevel *C.char) {
 	var message, logLevel string
 	message = C.GoString(CMessage)
 	logLevel = C.GoString(CLogLevel)
