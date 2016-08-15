@@ -7,7 +7,7 @@ cdef extern from "coprocess/api.h":
   void TykStoreData(char* key, char* value, int ttl);
   char* TykGetData(char* key);
   void TykTriggerEvent(char* event_name, char* payload);
-  void CoProcess_Log(char *msg, char *level);
+  void CoProcessLog(char *msg, char *level);
 
 class TykGateway:
   def store_data(key, value, ttl):
@@ -18,7 +18,7 @@ class TykGateway:
   def trigger_event(event_name, payload):
     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
   def log(msg, level):
-    CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+    CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
   def log_error(*args):
     excp = exc_info()
     if len(args) == 0:

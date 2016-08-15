@@ -7,7 +7,7 @@
 {
     "distutils": {
         "depends": []
-    }, 
+    },
     "module_name": "gateway"
 }
 END: Cython Metadata */
@@ -1165,7 +1165,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_4trigger_event(CYTHON_UNUSED PyO
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))             # <<<<<<<<<<<<<<
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  */
   __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_event_name, __pyx_n_s_encode); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 19, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -1210,7 +1210,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_4trigger_event(CYTHON_UNUSED PyO
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):             # <<<<<<<<<<<<<<
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):
  */
 
@@ -1286,7 +1286,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__p
   /* "gateway.pyx":21
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )             # <<<<<<<<<<<<<<
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )             # <<<<<<<<<<<<<<
  *   def log_error(*args):
  *     excp = exc_info()
  */
@@ -1302,7 +1302,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__p
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_t_5 = __Pyx_PyObject_AsString(__pyx_t_4); if (unlikely((!__pyx_t_5) && PyErr_Occurred())) __PYX_ERR(0, 21, __pyx_L1_error)
-  CoProcess_Log(__pyx_t_3, __pyx_t_5);
+  CoProcessLog(__pyx_t_3, __pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
@@ -1310,7 +1310,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__p
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):             # <<<<<<<<<<<<<<
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):
  */
 
@@ -1331,7 +1331,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_6log(CYTHON_UNUSED PyObject *__p
 
 /* "gateway.pyx":22
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):             # <<<<<<<<<<<<<<
  *     excp = exc_info()
  *     if len(args) == 0:
@@ -1374,7 +1374,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_8log_error(CYTHON_UNUSED PyObjec
   __Pyx_RefNannySetupContext("log_error", 0);
 
   /* "gateway.pyx":23
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):
  *     excp = exc_info()             # <<<<<<<<<<<<<<
  *     if len(args) == 0:
@@ -1580,7 +1580,7 @@ static PyObject *__pyx_pf_7gateway_10TykGateway_8log_error(CYTHON_UNUSED PyObjec
 
   /* "gateway.pyx":22
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):             # <<<<<<<<<<<<<<
  *     excp = exc_info()
  *     if len(args) == 0:
@@ -1710,7 +1710,7 @@ static int __Pyx_InitCachedConstants(void) {
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))             # <<<<<<<<<<<<<<
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  */
   __pyx_tuple__4 = PyTuple_Pack(1, __pyx_kp_s_utf_8); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(0, 19, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__4);
@@ -1722,7 +1722,7 @@ static int __Pyx_InitCachedConstants(void) {
   /* "gateway.pyx":21
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )             # <<<<<<<<<<<<<<
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )             # <<<<<<<<<<<<<<
  *   def log_error(*args):
  *     excp = exc_info()
  */
@@ -1773,7 +1773,7 @@ static int __Pyx_InitCachedConstants(void) {
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):             # <<<<<<<<<<<<<<
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):
  */
   __pyx_tuple__14 = PyTuple_Pack(2, __pyx_n_s_msg, __pyx_n_s_level); if (unlikely(!__pyx_tuple__14)) __PYX_ERR(0, 20, __pyx_L1_error)
@@ -1783,7 +1783,7 @@ static int __Pyx_InitCachedConstants(void) {
 
   /* "gateway.pyx":22
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):             # <<<<<<<<<<<<<<
  *     excp = exc_info()
  *     if len(args) == 0:
@@ -1921,7 +1921,7 @@ PyMODINIT_FUNC PyInit_gateway(void)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "gateway.pyx":12
- *   void CoProcess_Log(char *msg, char *level);
+ *   void CoProcessLog(char *msg, char *level);
  * 
  * class TykGateway:             # <<<<<<<<<<<<<<
  *   def store_data(key, value, ttl):
@@ -1970,7 +1970,7 @@ PyMODINIT_FUNC PyInit_gateway(void)
  *   def trigger_event(event_name, payload):
  *     TykTriggerEvent( event_name.encode('utf-8'), payload.encode('utf-8'))
  *   def log(msg, level):             # <<<<<<<<<<<<<<
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):
  */
   __pyx_t_1 = __Pyx_CyFunction_NewEx(&__pyx_mdef_7gateway_10TykGateway_7log, 0, __pyx_n_s_TykGateway_log, NULL, __pyx_n_s_gateway, __pyx_d, ((PyObject *)__pyx_codeobj__15)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 20, __pyx_L1_error)
@@ -1980,7 +1980,7 @@ PyMODINIT_FUNC PyInit_gateway(void)
 
   /* "gateway.pyx":22
  *   def log(msg, level):
- *     CoProcess_Log( msg.encode('utf-8'), level.encode('utf-8') )
+ *     CoProcessLog( msg.encode('utf-8'), level.encode('utf-8') )
  *   def log_error(*args):             # <<<<<<<<<<<<<<
  *     excp = exc_info()
  *     if len(args) == 0:
@@ -1991,7 +1991,7 @@ PyMODINIT_FUNC PyInit_gateway(void)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "gateway.pyx":12
- *   void CoProcess_Log(char *msg, char *level);
+ *   void CoProcessLog(char *msg, char *level);
  * 
  * class TykGateway:             # <<<<<<<<<<<<<<
  *   def store_data(key, value, ttl):
