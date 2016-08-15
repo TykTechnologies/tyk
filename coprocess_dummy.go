@@ -11,6 +11,10 @@ import (
 	"net/http"
 )
 
+const (
+	EH_CoProcessHandler tykcommon.TykEventHandlerName = "cp_dynamic_handler"
+)
+
 var EnableCoProcess bool = false
 
 type DummyCoProcessMiddleware struct {
@@ -25,6 +29,11 @@ func (m *DummyCoProcessMiddleware) GetConfig() (interface{}, error) {
 
 func (m *DummyCoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	return nil, 200
+}
+
+type CoProcessEventHandler JSVMEventHandler
+func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+	return nil, nil
 }
 
 func CoProcessInit() {
