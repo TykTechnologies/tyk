@@ -9,6 +9,10 @@ static char* dispatcher_module_name = "dispatcher";
 static char* dispatcher_class_name = "TykDispatcher";
 static char* hook_name = "dispatch_hook";
 
+static char* dispatch_event_name_s = "dispatch_event";
+static PyObject* dispatch_event_name;
+static PyObject* dispatch_event;
+
 static PyObject* dispatcher_module;
 static PyObject* dispatcher_module_dict;
 static PyObject* dispatcher_class;
