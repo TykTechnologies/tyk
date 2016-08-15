@@ -20,6 +20,7 @@ import (
 
 const (
 	T_REDIRECT_URI     string = "http://client.oauth.com"
+	T_REDIRECT_URI2    string = "http://client2.oauth.com"
 	T_CLIENT_ID        string = "1234"
 	T_CLIENT_SECRET    string = "aabbccdd"
 	P_CLIENT_ID        string = "4321"
@@ -153,6 +154,78 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 	if recorder.Code != 307 {
 		t.Error("Request should have redirected, code should have been 307 but is: ", recorder.Code)
+		t.Error(recorder.Body)
+		t.Error(req.Body)
+	}
+}
+
+func TestAuthCodeRedirectMultipleURL(t *testing.T) {
+	// Enable multiple Redirect URIs
+	config.OauthRedirectUriSeparator = ","
+
+	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	testMuxer := mux.NewRouter()
+	getOAuthChain(thisSpec, testMuxer)
+
+	uri := "/APIID/oauth/authorize/"
+	method := "POST"
+
+	param := make(url.Values)
+	param.Set("response_type", "code")
+	param.Set("redirect_uri", T_REDIRECT_URI2)
+	param.Set("client_id", T_CLIENT_ID)
+	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+
+	if recorder.Code != 307 {
+		t.Error("Request should have redirected, code should have been 307 but is: ", recorder.Code)
+		t.Error(recorder.Body)
+		t.Error(req.Body)
+	}
+}
+
+func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
+	// Disable multiple Redirect URIs
+	config.OauthRedirectUriSeparator = ""
+
+	thisSpec := createOauthAppDefinition()
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	testMuxer := mux.NewRouter()
+	getOAuthChain(thisSpec, testMuxer)
+
+	uri := "/APIID/oauth/authorize/"
+	method := "POST"
+
+	param := make(url.Values)
+	param.Set("response_type", "code")
+	param.Set("redirect_uri", T_REDIRECT_URI2)
+	param.Set("client_id", T_CLIENT_ID)
+	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+
+	if recorder.Code == 307 {
+		t.Error("Request should have not been redirected, code should have been 403 but is: ", recorder.Code)
 		t.Error(recorder.Body)
 		t.Error(req.Body)
 	}
