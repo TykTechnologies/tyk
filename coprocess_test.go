@@ -5,7 +5,22 @@ package main
 import(
   "net/http"
   "net/http/httptest"
+  "io/ioutil"
+  "path"
+  "os"
+  "strings"
   "testing"
+  "bytes"
+  "net/url"
+
+  "github.com/justinas/alice"
+
+  "github.com/TykTechnologies/tykcommon"
+  "github.com/TykTechnologies/tyk/coprocess"
+)
+
+const(
+  baseMiddlewarePath = "middleware/python"
 )
 
 var basicCoProcessPreDef string = `
@@ -39,7 +54,7 @@ var basicCoProcessPreDef string = `
     "custom_middleware": {
       "pre": [
         {
-          "name": "SomePreHandler",
+          "name": "MyPreMiddleware",
           "require_session": false
         }
       ],
@@ -98,6 +113,52 @@ var basicCoProcessOttoDef string = `
 	}
 `
 
+var pythonTestPreMiddleware string = `
+from tyk.decorators import *
+from gateway import TykGateway as tyk
+
+@Pre
+def MyPreMiddleware(request, session, spec):
+    print("my_middleware: MyPreMiddleware")
+    return request, session
+`
+
+var _ = writeTestMiddleware("cp_test_test_middleware.py", pythonTestPreMiddleware)
+
+func writeTestMiddleware(filename string, testMiddleware string) bool {
+  middlewarePath := path.Join("middleware/python", filename)
+  ioutil.WriteFile(middlewarePath, []byte(testMiddleware), 0644)
+  return true
+}
+
+func removeTestMiddlewares() {
+  files , _ := ioutil.ReadDir(baseMiddlewarePath)
+  for _, f := range files {
+    isTestMiddleware := strings.Index(f.Name(), "cp_test")
+    middlewarePath := path.Join(baseMiddlewarePath, f.Name())
+
+    if isTestMiddleware == 0 {
+      os.Remove(middlewarePath)
+    }
+  }
+}
+
+func getCoProcessChain(spec APISpec, hookName string, hookType coprocess.HookType, driver tykcommon.MiddlewareDriver) http.Handler {
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	proxy := TykNewSingleHostReverseProxy(remote, &spec)
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
+	tykMiddleware := &TykMiddleware{&spec, proxy}
+	chain := alice.New(
+    CreateCoProcessMiddleware(hookName, hookType, driver, tykMiddleware),
+		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+
+	return chain
+}
 
 func MakeCoProcessSampleAPI(apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR IP WHITELIST")
@@ -110,6 +171,9 @@ func MakeCoProcessSampleAPI(apiTestDef string) *APISpec {
 }
 
 func TestCoProcessMiddleware(t *testing.T) {
+
+  writeTestMiddleware("cp_test_test_middleware.py", pythonTestPreMiddleware)
+
   spec := MakeCoProcessSampleAPI(basicCoProcessPreDef)
 
   thisSession := createNonThrottledSession()
@@ -120,17 +184,22 @@ func TestCoProcessMiddleware(t *testing.T) {
 
   recorder := httptest.NewRecorder()
 
-  req, err := http.NewRequest(method, uri, nil)
+  param := make(url.Values)
+
+  req, err := http.NewRequest(method, uri,  bytes.NewBufferString(param.Encode()) )
   req.Header.Add("authorization", "abc")
 
   if err != nil {
     t.Fatal(err)
   }
 
-  chain := getChain(*spec)
+  chain := getCoProcessChain(*spec, "abc", coprocess.HookType_Pre, "python")
+
   chain.ServeHTTP(recorder, req)
 
   if recorder.Code != 200 {
     t.Error("Invalid response code, should be 200:  \n", recorder.Code, recorder.Body, req.RemoteAddr)
   }
+
+  removeTestMiddlewares()
 }
