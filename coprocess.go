@@ -39,7 +39,7 @@ import (
 var EnableCoProcess = false
 
 // GlobalDispatcher will be implemented by the current CoProcess driver.
-var GlobalDispatcher CoProcessDispatcher
+var GlobalDispatcher coprocess.Dispatcher
 
 // CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {
@@ -177,7 +177,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	objectPtr.length = C.int(len(objectMsg))
 
 	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = GlobalDispatcher.Dispatch(objectPtr)
+	newObjectPtr = (*C.struct_CoProcessMessage)(GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr)))
 
 	var newObjectBytes []byte
 	newObjectBytes = C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
@@ -190,13 +190,6 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	C.free(unsafe.Pointer(newObjectPtr))
 
 	return newObject
-}
-
-// CoProcessDispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.
-type CoProcessDispatcher interface {
-	Dispatch(*C.struct_CoProcessMessage) *C.struct_CoProcessMessage
-	DispatchEvent([]byte)
-	Reload()
 }
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.

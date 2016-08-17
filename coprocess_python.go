@@ -161,24 +161,28 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/Sirupsen/logrus"
 )
 
 // CoProcessName declares the driver name.
 const CoProcessName string = "python"
 
-// PythonDispatcher implements a CoProcessDispatcher
+// PythonDispatcher implements a coprocess.Dispatcher
 type PythonDispatcher struct {
-	CoProcessDispatcher
+	coprocess.Dispatcher
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *PythonDispatcher) Dispatch(objectPtr *C.struct_CoProcessMessage) *C.struct_CoProcessMessage {
+func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
+
+	var object *C.struct_CoProcessMessage
+	object = (*C.struct_CoProcessMessage)(objectPtr)
 
 	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = C.Python_DispatchHook(objectPtr)
+	newObjectPtr = C.Python_DispatchHook(object)
 
-	return newObjectPtr
+	return unsafe.Pointer(newObjectPtr)
 }
 
 // DispatchEvent dispatches a Tyk event.
@@ -214,7 +218,7 @@ func PythonLoadDispatcher() (err error) {
 }
 
 // PythonNewDispatcher creates an instance of TykDispatcher.
-func PythonNewDispatcher(middlewarePath string, eventHandlerPath string) (dispatcher CoProcessDispatcher, err error) {
+func PythonNewDispatcher(middlewarePath string, eventHandlerPath string) (dispatcher coprocess.Dispatcher, err error) {
 	var CMiddlewarePath *C.char
 	CMiddlewarePath = C.CString(middlewarePath)
 
@@ -245,7 +249,7 @@ func PythonSetEnv(pythonPaths ...string) {
 }
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (dispatcher CoProcessDispatcher, err error) {
+func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
 	workDir, _ := os.Getwd()
 
