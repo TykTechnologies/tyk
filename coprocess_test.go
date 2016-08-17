@@ -1,4 +1,5 @@
 // +build coprocess
+// +build !python
 
 package main
 
@@ -10,7 +11,6 @@ import(
 
   // "github.com/TykTechnologies/tykcommon"
   "github.com/TykTechnologies/tyk/coprocess"
-  "github.com/TykTechnologies/tyk/coprocess/test"
 )
 
 const(
@@ -18,7 +18,7 @@ const(
 )
 
 
-var TestDispatcher, _ = coprocess_test.NewDispatcher()
+var thisTestDispatcher, _ = NewTestDispatcher()
 
 /* Dispatcher logic */
 
@@ -31,10 +31,10 @@ func TestCoProcessDispatch(t *testing.T) {
     HookName: "test_hook",
   }
 
-  messagePtr = coprocess_test.ToCoProcessMessage(object)
-  newMessagePtr = TestDispatcher.Dispatch(messagePtr)
+  messagePtr = thisTestDispatcher.ToCoProcessMessage(object)
+  newMessagePtr = thisTestDispatcher.Dispatch(messagePtr)
 
-  newObject = coprocess_test.ToCoProcessObject(newMessagePtr)
+  newObject = thisTestDispatcher.ToCoProcessObject(newMessagePtr)
 
   t.Log(newObject)
 
@@ -57,10 +57,10 @@ func TestCoProcessSerialization(t *testing.T) {
   }
 
   var messagePtr unsafe.Pointer
-  messagePtr = coprocess_test.ToCoProcessMessage(object)
+  messagePtr = thisTestDispatcher.ToCoProcessMessage(object)
 
   var length int
-  length = coprocess_test.TestMessageLength(messagePtr)
+  length = thisTestDispatcher.TestMessageLength(messagePtr)
 
   if len(data) != length {
     err := "The length of the serialized object doesn't match."
