@@ -60,7 +60,7 @@ func (d *TestDispatcher) Reload() {
 
 /* General test helpers */
 
-func NewTestDispatcher() (dispatcher *TestDispatcher, err error) {
+func NewCoProcessDispatcher() (dispatcher *TestDispatcher, err error) {
 	d := &TestDispatcher{}
 	return d, nil
 }
