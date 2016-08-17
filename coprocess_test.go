@@ -17,6 +17,8 @@ import(
 
   "github.com/TykTechnologies/tykcommon"
   "github.com/TykTechnologies/tyk/coprocess"
+
+  "github.com/TykTechnologies/tyk/coprocess/test"
 )
 
 const(
@@ -124,6 +126,8 @@ def MyPreMiddleware(request, session, spec):
 `
 
 var _ = writeTestMiddleware("cp_test_test_middleware.py", pythonTestPreMiddleware)
+
+var TestDispatcher, _ = coprocess_test.NewTestDispatcher()
 
 func writeTestMiddleware(filename string, testMiddleware string) bool {
   middlewarePath := path.Join("middleware/python", filename)
