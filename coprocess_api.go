@@ -9,8 +9,10 @@ package main
 
 #include "coprocess/api.h"
 
+#ifdef ENABLE_PYTHON
 #include "coprocess/python/dispatcher.h"
 #include "coprocess/python/binding.h"
+#endif
 */
 import "C"
 
