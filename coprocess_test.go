@@ -17,8 +17,8 @@ const(
   baseMiddlewarePath = "middleware/python"
 )
 
-
-var thisTestDispatcher, _ = NewTestDispatcher()
+var CoProcessName = "test"
+var thisTestDispatcher, _ = NewCoProcessDispatcher()
 
 /* Dispatcher logic */
 
