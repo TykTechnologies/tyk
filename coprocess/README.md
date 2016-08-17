@@ -109,6 +109,15 @@ go build
 
 ```coprocess_dummy.go``` provides a dummy ```CoProcessInit``` function that will be called if you perform a standard Tyk build. This file will be ignored when using the ```coprocess``` build tag, as we expect it to be implemented by a language.
 
+## Tests
+
+You must use the `coprocess` build tag to run the tests:
+
+```
+go test -tags 'coprocess'
+go test -run CoProcess -tags 'coprocess'
+```
+
 ## References
 
 [Trello note](https://trello.com/c/6QNWnF2n/265-coprocess-handlers-middleware-replacements-and-hooks)
