@@ -6,14 +6,18 @@
 package main
 
 /*
+#cgo python CFLAGS: -DENABLE_PYTHON
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "coprocess/sds/sds.h"
 
 #include "coprocess/api.h"
 
+#ifdef ENABLE_PYTHON
 #include "coprocess/python/dispatcher.h"
 #include "coprocess/python/binding.h"
+#endif
 
 */
 import "C"
