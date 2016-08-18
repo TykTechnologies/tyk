@@ -25,28 +25,9 @@
             }
         }
     },
-    "custom_middleware": {
-      "pre": [
-          {
-              "name": "MyPreMiddleware",
-              "require_session": false
-          },
-          {
-              "name": "AnotherPreMiddleware",
-              "require_session": false
-          }
-      ],
-      "post": [
-        {
-          "name": "MyPostMiddleware",
-          "require_session": false
-        }
-      ],
-      "driver": "python"
-    },
     "proxy": {
         "listen_path": "/quickstart/",
-        "target_url": "http://127.0.0.1/",
+        "target_url": "http://httpbin.org/",
         "strip_listen_path": true
     }
 }
