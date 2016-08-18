@@ -3,6 +3,107 @@
 This feature makes it possible to write Tyk middleware using [Python](https://www.python.org/), the current binding supports Python 3.x.
 The purpose of this README is to provide an overview of the architecture and a few implementation notes.
 
+## Usage
+
+You'll need to build Tyk with specific build tags, see build notes below.
+
+Basically `go build -tags 'coprocess python'`.
+
+### Setting up custom Python middleware
+
+The custom middleware should be specified in your API definition file, under `custom_middleware` (see [coprocess_app_sample.json](coprocess_app_sample.json)):
+
+```json
+"custom_middleware": {
+  "pre": [
+      {
+        "name": "MyPreMiddleware",
+        "require_session": false
+      }
+    ],
+  "post": [
+    {
+        "name": "MyPostMiddleware",
+        "require_session": false
+    }
+  ],
+  "driver": "python"
+}
+```
+
+You can chain multiple hook functions when the hook type is Pre, Post or PostAuthCheck.
+
+The "name" field represents the name of a Python function, a sample Python middleware matching the sample definition above will look like (see [middleware/python](middleware/python)):
+
+```python
+from tyk.decorators import *
+
+@Pre
+def MyPreMiddleware(request, session, spec):
+    print("my_middleware: MyPreMiddleware")
+    return request, session
+
+@Post
+def MyPreMiddleware(request, session, spec):
+    print("my_middleware: MyPreMiddleware")
+    return request, session
+```
+
+### Authenticating an API with Python
+
+This is a sample API definition that will let you authenticate your API using a custom Python middleware (see [coprocess_app_sample_protected.json](coprocess_app_sample_protected)):
+```json
+...
+"use_keyless": false,
+"enable_coprocess_auth": true,
+"custom_middleware": {
+  "post_key_auth": [
+    {
+      "name": "MyPostKeyAuthMiddleware",
+      "require_session": false
+    }
+  ],
+  "auth_check": {
+    "name": "MyAuthCheck"
+  },
+  "driver": "python"
+},
+...
+```
+
+The Python code for this middleware will look like this (see [my_auth_middleware.py](my_auth_middleware.py)):
+```python
+from tyk.decorators import *
+from gateway import TykGateway as tyk
+
+from tyk.session import AccessSpec, AccessDefinition, BasicAuthData, JWTData, Monitor
+
+@CustomKeyCheck
+def MyAuthCheck(request, session, metadata, spec):
+    print("my_auth_middleware: CustomKeyCheck hook")
+
+    print("my_auth_middleware - Request:", request)
+    print("my_auth_middleware - Session:", session)
+    print("my_auth_middleware - Spec:", spec)
+
+    valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
+    request_token = request.get_header('Authorization')
+
+    print("my_auth_middleware - Request Token:", request_token)
+
+    if request_token == valid_token:
+        session.rate = 1000.0
+        session.per = 1.0
+
+        metadata['token'] = 'mytoken'
+    else:
+        # Invalid token!
+        request.object.return_overrides.response_code = 401
+        request.object.return_overrides.response_error = 'Not authorized (Python middleware)'
+
+    return request, session, metadata
+```
+
 ## Build requirements
 
 * [Python 3.x](https://www.python.org/)
