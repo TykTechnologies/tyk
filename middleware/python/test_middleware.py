@@ -41,7 +41,7 @@ def PrintSession(request, session, spec):
 def MyPostKeyAuthMiddleware(request, session, spec):
     print("test_middleware: PostKeyAuth")
     print("session object:")
-    print(session.object)
+    print(session)
 
     return request, session
 
