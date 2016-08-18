@@ -33,6 +33,8 @@ The custom middleware should be specified in your API definition file, under `cu
 
 You can chain multiple hook functions when the hook type is Pre, Post or PostAuthCheck.
 
+Tyk will load all the modules inside `middleware/python`.
+
 The "name" field represents the name of a Python function, a sample Python middleware matching the sample definition above will look like (see [middleware/python](middleware/python)):
 
 ```python
