@@ -169,8 +169,9 @@ func applyTestHooks(objectPtr unsafe.Pointer) {
 	}
 
 	newObject, _ := proto.Marshal(object)
+	newObjectStr := string(newObject)
 
-	newObjectBytes := C.CBytes(newObject)
+	newObjectBytes := C.CString(newObjectStr)
 	newObjectLength := C.int(len(newObject))
 
 	objectStruct.p_data = unsafe.Pointer(newObjectBytes)
