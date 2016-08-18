@@ -42,6 +42,7 @@ import (
 )
 
 var CoProcessReload = make(chan bool)
+var CoProcessDispatchEvent = make(chan []byte)
 
 type TestDispatcher struct {
 	coprocess.Dispatcher
@@ -60,12 +61,7 @@ func (d *TestDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
 }
 
 func (d *TestDispatcher) DispatchEvent(eventJSON []byte) {
-	/*
-		var CEventJSON *C.char
-		CEventJSON = C.CString(string(eventJSON))
-		C.Python_DispatchEvent(CEventJSON)
-		C.free(unsafe.Pointer(CEventJSON))
-	*/
+	CoProcessDispatchEvent <- eventJSON
 	return
 }
 
