@@ -50,6 +50,9 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 
 // Makes sense when testing with -timeout
 func TestCoProcessReload(t *testing.T) {
+	if thisTestDispatcher == nil {
+		thisTestDispatcher, _ = NewCoProcessDispatcher()
+	}
 	ReloadURLStructure()
 	<-CoProcessReload
 }
