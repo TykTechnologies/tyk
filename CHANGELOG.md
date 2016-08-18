@@ -25,6 +25,17 @@ If the transport or address are empty, syslog will log to file
     "logstash_transport": "tcp",
     "logstash_network_addr": "172.17.0.2:9999"
     
+- Added support for multiple auth methods to be chained, e.g. Basic Auth and Standard auth tokens. This can be tricky because you must also specify which auth mechanism will provide the baseline identity that Tyk will use for applying rate limits / quotas, to set this, set the field: `base_identity_provided_by` to one of the enums below: 
+
+    AuthToken     AuthTypeEnum = "auth_token"
+    HMACKey       AuthTypeEnum = "hmac_key"
+    BasicAuthUser AuthTypeEnum = "basic_auth_user"
+    JWTClaim      AuthTypeEnum = "jwt_claim"
+    OIDCUser      AuthTypeEnum = "oidc_user"
+    OAuthKey      AuthTypeEnum = "oauth_key"
+    UnsetAuth     AuthTypeEnum = ""
+
+- (multi-auth continued) Tyk will chain the auth mechanisms as they appear in the code and will default to auth token if none are specified. You can explicitly set auth token by setting `use_standard_auth` to true.
 
 # v2.2
 

@@ -14,7 +14,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/logrus-graylog-hook"
 	osin "github.com/lonelycode/osin"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
 	"html/template"
@@ -144,10 +143,6 @@ func setupGlobals() {
 	// Set up global JSVM
 	if config.EnableJSVM {
 		GlobalEventsJSVM.Init(config.TykJSPath)
-	}
-
-	if config.EnableCoProcess {
-		CoProcessInit()
 	}
 
 	// Get the notifier ready
@@ -393,18 +388,10 @@ func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, tykcommon.MiddlewareDriver) {
+func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition) {
 	mwPaths := []string{}
-	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-	mwPostKeyAuthFuncs := []tykcommon.MiddlewareDefinition{}
-	mwDriver := tykcommon.OttoDriver
-
-	// Set AuthCheck hook
-	if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" {
-		mwAuthCheckFunc = referenceSpec.APIDefinition.CustomMiddleware.AuthCheck
-	}
 
 	// Load form the configuration
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
@@ -480,17 +467,8 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 		}
 	}
 
-	// Set middleware driver, defaults to OttoDriver
-	if referenceSpec.APIDefinition.CustomMiddleware.Driver != "" {
-		mwDriver = referenceSpec.APIDefinition.CustomMiddleware.Driver
-	}
+	return mwPaths, mwPreFuncs, mwPostFuncs
 
-	// Load PostAuthCheck hooks
-	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.PostKeyAuth {
-		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
-	}
-
-	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwDriver
 }
 
 func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
@@ -733,24 +711,16 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 			//Set up all the JSVM middleware
 			mwPaths := []string{}
-			var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-			mwPostAuthCheckFuncs := []tykcommon.MiddlewareDefinition{}
 
-			var mwDriver tykcommon.MiddlewareDriver
-
-			// TODO: use config.EnableCoProcess
-			if config.EnableJSVM || EnableCoProcess {
+			if config.EnableJSVM {
 				log.WithFields(logrus.Fields{
 					"prefix": "main",
 				}).Debug("----> Loading Middleware")
+				mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(referenceSpec)
 
-				mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
-
-				if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
-					referenceSpec.JSVM.LoadJSPaths(mwPaths)
-				}
+				referenceSpec.JSVM.LoadJSPaths(mwPaths)
 			}
 
 			if referenceSpec.EnableBatchRequestSupport {
@@ -826,14 +796,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				for _, obj := range mwPreFuncs {
-					if mwDriver != tykcommon.OttoDriver {
-						log.WithFields(logrus.Fields{
-							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
-					} else {
-						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
-					}
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
 				}
 
 				for _, baseMw := range baseChainArray {
@@ -841,14 +804,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				for _, obj := range mwPostFuncs {
-					if mwDriver != tykcommon.OttoDriver {
-						log.WithFields(logrus.Fields{
-							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
-					} else {
-						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
-					}
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 				}
 
 				// for KeyLessAccess we can't support rate limiting, versioning or access rules
@@ -860,80 +816,86 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 			} else {
 
-				// Select the keying method to use for setting session states
-				var keyCheck func(http.Handler) http.Handler
+				var chainArray = []alice.Constructor{}
 
+				handleCORS(&chainArray, referenceSpec)
+				var baseChainArray_PreAuth = []alice.Constructor{
+					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
+					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
+				}
+
+				// Add pre-process MW
+				for _, obj := range mwPreFuncs {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
+				}
+
+				for _, baseMw := range baseChainArray_PreAuth {
+					chainArray = append(chainArray, baseMw)
+				}
+
+				// Select the keying method to use for setting session states
+				var authArray = []alice.Constructor{}
 				if referenceSpec.APIDefinition.UseOauth2 {
 					// Oauth2
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: OAuth")
-					keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.APIDefinition.UseBasicAuth {
+					authArray = append(authArray, CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware))
+
+				}
+
+				if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: Basic")
-					keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.EnableSignatureChecking {
+					authArray = append(authArray, CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware))
+				}
+
+				if referenceSpec.EnableSignatureChecking {
 					// HMAC Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: HMAC")
-					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.EnableJWT {
+					authArray = append(authArray, CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware))
+				}
+
+				if referenceSpec.EnableJWT {
 					// JWT Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: JWT")
-					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.UseOpenID {
+					authArray = append(authArray, CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware))
+				}
+
+				if referenceSpec.UseOpenID {
 					// JWT Auth
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: OpenID")
 
 					// initialise the OID configuration on this reference Spec
-					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware)
-				} else if EnableCoProcess && mwDriver != tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth {
-					// TODO: check if mwAuthCheckFunc is available/valid
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("----> Checking security policy: CoProcess")
+					authArray = append(authArray, CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware))
+				}
 
-					log.WithFields(logrus.Fields{
-						"prefix": "coprocess",
-					}).Debug("----> Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver )
-
-					keyCheck = CreateCoProcessMiddleware(mwAuthCheckFunc.Name, coprocess.HookType_CustomKeyCheck, mwDriver, tykMiddleware)
-				} else {
+				if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.APIDefinition.UseBasicAuth && !referenceSpec.APIDefinition.UseOauth2) {
 					// Auth key
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: Token")
-					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
+					authArray = append(authArray, CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware))
 				}
 
-				log.Debug("Chain array start")
-
-				var chainArray = []alice.Constructor{}
-
-
-				handleCORS(&chainArray, referenceSpec)
-
-				var baseChainArray = []alice.Constructor{
-					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-					keyCheck,
+				for _, authMw := range authArray {
+					chainArray = append(chainArray, authMw)
 				}
 
-				var postAuthChainArray = []alice.Constructor{
+				var baseChainArray_PostAuth = []alice.Constructor{
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
@@ -944,47 +906,12 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
 				}
 
-
-				log.Debug("Chain array end")
-
-				// Add pre-process MW
-				for _, obj := range mwPreFuncs {
-					if mwDriver != tykcommon.OttoDriver {
-						log.WithFields(logrus.Fields{
-							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
-					} else {
-						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
-					}
-				}
-
-				for _, baseMw := range baseChainArray {
+				for _, baseMw := range baseChainArray_PostAuth {
 					chainArray = append(chainArray, baseMw)
 				}
 
-				for _, obj := range mwPostAuthCheckFuncs {
-					if mwDriver != tykcommon.OttoDriver {
-						log.WithFields(logrus.Fields{
-							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_PostKeyAuth, mwDriver, tykMiddleware))
-					}
-				}
-
-				for _, postAuthMw := range postAuthChainArray {
-					chainArray = append(chainArray, postAuthMw)
-				}
-
 				for _, obj := range mwPostFuncs {
-					if mwDriver != tykcommon.OttoDriver {
-						log.WithFields(logrus.Fields{
-							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
-					} else {
-						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
-					}
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 				}
 
 				log.WithFields(logrus.Fields{
@@ -997,13 +924,29 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				log.Debug("Chain completed")
 
 				userCheckHandler := http.HandlerFunc(UserRatesCheck())
-				simpleChain := alice.New(
+				simpleChain_PreAuth := []alice.Constructor{
 					CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					keyCheck,
+					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware)}
+
+				simpleChain_PostAuth := []alice.Constructor{
 					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
+					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)}
+
+				var fullSimpleChain = []alice.Constructor{}
+				for _, mw := range simpleChain_PreAuth {
+					fullSimpleChain = append(fullSimpleChain, mw)
+				}
+
+				for _, authMw := range authArray {
+					fullSimpleChain = append(fullSimpleChain, authMw)
+				}
+
+				for _, mw := range simpleChain_PostAuth {
+					fullSimpleChain = append(fullSimpleChain, mw)
+				}
+
+				simpleChain := alice.New(fullSimpleChain...).Then(userCheckHandler)
 
 				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
 				log.WithFields(logrus.Fields{
@@ -1129,7 +1072,6 @@ func ReloadURLStructure() {
 		reloadScheduled = true
 		log.Info("Initiating reload")
 		go doReload()
-		go doCoprocessReload()
 		go checkReloadTimeout()
 	}
 }
