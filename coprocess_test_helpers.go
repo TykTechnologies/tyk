@@ -50,8 +50,11 @@ type TestDispatcher struct {
 /* Basic CoProcessDispatcher functions */
 
 func (d *TestDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
+	var object *C.struct_CoProcessMessage
+	object = (*C.struct_CoProcessMessage)(objectPtr)
+
 	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = C.TestDispatchHook(objectPtr)
+	newObjectPtr = C.TestDispatchHook(object)
 
 	return unsafe.Pointer(newObjectPtr)
 }
