@@ -78,6 +78,8 @@ func (d *TestDispatcher) Reload() {
 
 func NewCoProcessDispatcher() (dispatcher *TestDispatcher, err error) {
 	d := &TestDispatcher{}
+	GlobalDispatcher = d
+	EnableCoProcess = true
 	return d, nil
 }
 
