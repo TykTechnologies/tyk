@@ -56,7 +56,7 @@ This component is in charge of dispatching your HTTP requests to the custom midd
 
 **PostKeyAuth:** gets executed right after the autentication process.
 
-**CustomKeyCheck:** gets executed as a custom authentication middleware, instead of the standard ones provided by Tyk. Use this to provide your own authentication mechanism.
+**CustomAuthCheck:** gets executed as a custom authentication middleware, instead of the standard ones provided by Tyk. Use this to provide your own authentication mechanism.
 
 ## Coprocess Gateway API
 
@@ -94,6 +94,45 @@ def call():
   payload = 'my payload'.encode('utf-8')
   TykTriggerEvent( event_name, payload )
 ```
+
+## Basic usage
+
+The intended way of using a Coprocess middleware is to specify it as part of an API definition:
+
+```json
+"custom_middleware": {
+  "pre": [
+      {
+          "name": "MyPreMiddleware",  
+          "require_session": false
+      },
+      {
+          "name": "AnotherPreMiddleware",
+          "require_session": false
+      }
+  ],
+  "post": [
+    {
+      "name": "MyPostMiddleware",
+      "require_session": false
+    }
+  ],
+  "post_key_auth": [
+    {
+      "name": "MyPostKeyAuthMiddleware",
+      "require_session": true
+    }
+  ],
+  "auth_check": {
+    "name": "MyAuthCheck"
+  },
+  "driver": "python"
+}
+```
+
+It's important to note that all hook types support chaining except the custom auth check (`auth_check`).
+
+
 
 ## Build notes
 
