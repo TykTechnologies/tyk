@@ -59,12 +59,6 @@ This is a sample API definition that will let you authenticate your API using a 
 "use_keyless": false,
 "enable_coprocess_auth": true,
 "custom_middleware": {
-  "post_key_auth": [
-    {
-      "name": "MyPostKeyAuthMiddleware",
-      "require_session": false
-    }
-  ],
   "auth_check": {
     "name": "MyAuthCheck"
   },
