@@ -71,6 +71,7 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 					// Host is down, skip
 					return GetNextTarget(targetData, spec, tryCount+1)
 				}
+
 				log.Error("[PROXY] [LOAD BALANCING] All hosts seem to be down, all uptime tests are failing!")
 			}
 		}
