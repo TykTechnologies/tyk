@@ -46,6 +46,43 @@ func TestCoProcessDispatch(t *testing.T) {
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
+	spec := MakeCoProcessSampleAPI(basicCoProcessDef)
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	tykMiddleware := &TykMiddleware{spec, proxy}
+
+	eventMessage := "Auth Failure"
+	eventPath := "/"
+	eventOrigin := "127.0.0.1"
+	eventKey := "abc"
+
+	go tykMiddleware.FireEvent(EVENT_AuthFailure,
+		EVENT_AuthFailureMeta{
+			EventMetaDefault: EventMetaDefault{Message: eventMessage},
+			Path:             eventPath,
+			Origin:           eventOrigin,
+			Key:              eventKey,
+		})
+
+	eventJSON := <-CoProcessDispatchEvent
+	eventWrapper := CoProcessEventWrapper{}
+	err := json.Unmarshal(eventJSON, &eventWrapper)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eventMetadata := eventWrapper.Event.EventMetaData.(map[string]interface{})
+
+	if eventWrapper.Event.EventType != EVENT_AuthFailure {
+		err := "Wrong event Type."
+		t.Fatal(err)
+	}
+
+	if eventMetadata["Message"] != eventMessage || eventMetadata["Path"] != eventPath || eventMetadata["Origin"] != eventOrigin || eventMetadata["Key"] != eventKey {
+		err := "Wrong event metadata."
+		t.Fatal(err)
+	}
 }
 
 // Makes sense when testing with -timeout
@@ -265,6 +302,18 @@ var basicCoProcessDef string = `
 						"black_list": []
 					}
 				}
+			}
+		},
+		"event_handlers": {
+			"events": {
+				"AuthFailure": [
+								{
+										"handler_name":"cp_dynamic_handler",
+										"handler_meta": {
+												"name": "my_handler"
+										}
+								}
+						]
 			}
 		},
     "custom_middleware": {
