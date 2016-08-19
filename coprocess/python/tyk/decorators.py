@@ -1,3 +1,5 @@
+from inspect import getargspec
+
 class HandlerDecorator(object):
     def __init__(self, f):
         self.name = f.__name__
@@ -5,6 +7,18 @@ class HandlerDecorator(object):
         return
     def __call__(self, req, sess, spec):
         self.f
+
+class Hook(object):
+    def __init__(self, f):
+        self.name = f.__name__
+        self.f = f
+        self.arg_count = len(getargspec(f)[0])
+        return
+    def __call__(self, *args, **kwargs):
+        if self.arg_count == 3:
+            return self.f(args[0], args[1], args[2])
+        if self.arg_count == 4:
+            return self.f(args[0], args[1], args[2], args[3])
 
 class Pre(HandlerDecorator):
     def __call__(self, req, sess, spec):
