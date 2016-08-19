@@ -11,7 +11,7 @@ Basically `go build -tags 'coprocess python'`.
 
 ### Setting up custom Python middleware
 
-The custom middleware should be specified in your API definition file, under `custom_middleware` (see [coprocess_app_sample.json](coprocess_app_sample.json)):
+The custom middleware should be specified in your API definition file, under `custom_middleware` (see [coprocess_app_sample.json](../../apps/coprocess_app_sample.json)):
 
 ```json
 "custom_middleware": {
@@ -35,7 +35,7 @@ You can chain multiple hook functions when the hook type is Pre, Post or PostAut
 
 Tyk will load all the modules inside `middleware/python`.
 
-The "name" field represents the name of a Python function, a sample Python middleware matching the sample definition above will look like (see [middleware/python](middleware/python)):
+The "name" field represents the name of a Python function, a sample Python middleware matching the sample definition above will look like (see [middleware/python](../../middleware/python)):
 
 ```python
 from tyk.decorators import *
@@ -53,7 +53,7 @@ def MyPreMiddleware(request, session, spec):
 
 ### Authenticating an API with Python
 
-This is a sample API definition that will let you authenticate your API using a custom Python middleware (see [coprocess_app_sample_protected.json](coprocess_app_sample_protected)):
+This is a sample API definition that will let you authenticate your API using a custom Python middleware (see [coprocess_app_sample_protected.json](../../apps/coprocess_app_sample_protected.json)):
 ```json
 ...
 "use_keyless": false,
@@ -67,7 +67,7 @@ This is a sample API definition that will let you authenticate your API using a 
 ...
 ```
 
-The Python code for this middleware will look like this (see [my_auth_middleware.py](my_auth_middleware.py)):
+The Python code for this middleware will look like this (see [my_auth_middleware.py](../../middleware/python/my_auth_middleware.py)):
 ```python
 from tyk.decorators import *
 from gateway import TykGateway as tyk
@@ -102,7 +102,7 @@ def MyAuthCheck(request, session, metadata, spec):
 
 ### Writing events handlers with Python
 
-It's also possible to write a Tyk event listener with Python. The first step is to set a custom event handler inside your API definition (see [coprocess_app_sample_protected](coprocess_app_sample_protected)):
+It's also possible to write a Tyk event listener with Python. The first step is to set a custom event handler inside your API definition (see [coprocess_app_sample_protected.json](../../apps/coprocess_app_sample_protected.json)):
 
 ```json
 ...
@@ -125,7 +125,7 @@ In the above sample we're setting an event handler for `AuthFailure` events, an 
 
 The `handler_name` must be `cp_dynamic_handler`.
 
-The `name` field inside `handler_meta` refers to a Python function name that can be written inside `event_handlers` (see [event_handlers/my_handler.py](event_handlers/my_handler.py)):
+The `name` field inside `handler_meta` refers to a Python function name that can be written inside `event_handlers` (see [event_handlers/my_handler.py](../../event_handlers/my_handler.py)):
 
 ```python
 from tyk.decorators import Event
