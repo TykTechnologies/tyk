@@ -165,6 +165,11 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 			}
 			return thisJSVMEventHandler, jsvmErr
 		}
+	case EH_CoProcessHandler:
+		if Spec != nil {
+			thisCoProcessEventHandler, err := CoProcessEventHandler{Spec: Spec}.New(thisConf)
+			return thisCoProcessEventHandler, err
+		}
 
 	}
 
