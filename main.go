@@ -10,6 +10,7 @@ import (
 	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
+	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/logrus-graylog-hook"
@@ -47,6 +48,7 @@ var DefaultQuotaStore = DefaultSessionManager{}
 var FallbackKeySesionManager SessionHandler = &DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
+var argumentsBackup map[string]interface{}
 
 var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
@@ -71,6 +73,9 @@ func displayConfig() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("--> Listening on port: ", config.ListenPort)
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("--> PID: ", HostDetails.PID)
 }
 
 func getHostName() string {
@@ -1154,36 +1159,7 @@ func setupLogger() {
 
 }
 
-func init() {
-
-	usage := `Tyk API Gateway.
-
-	Usage:
-		tyk [options]
-
-	Options:
-		-h --help                    Show this screen
-		--conf=FILE                  Load a named configuration file
-		--port=PORT                  Listen on PORT (overrides confg file)
-		--memprofile                 Generate a memory profile
-		--cpuprofile                 Generate a cpu profile
-		--debug                      Enable Debug output
-		--import-blueprint=<file>    Import an API Blueprint file
-		--import-swagger=<file>      Import a Swagger file
-		--create-api                 Creates a new API Definition from the blueprint
-		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
-		--upstream-target=<url>      Set the upstream target for the definition
-		--as-mock                    Creates the API as a mock based on example fields
-		--for-api=<path>             Adds blueprint to existing API Defintition as version
-		--as-version=<version>       The version number to use when inserting
-	`
-
-	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("Error while parsing arguments: ", err)
-	}
+func initialiseSystem(arguments map[string]interface{}) {
 
 	// Enable command mode
 	for k, _ := range CommandModeOptions {
@@ -1255,6 +1231,58 @@ func init() {
 	// Enable all the loggers
 	setupLogger()
 
+	if config.PIDFileLocation == "" {
+		config.PIDFileLocation = "/var/run/tyk-gateway.pid"
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("PIDFile location set to: ", config.PIDFileLocation)
+
+	pidfile.SetPidfilePath(config.PIDFileLocation)
+	pfErr := pidfile.Write()
+
+	if pfErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Error("Failed to write PIDFile: ", pfErr)
+	}
+
+	GetHostDetails()
+}
+
+func getCmdArguments() map[string]interface{} {
+	usage := `Tyk API Gateway.
+
+	Usage:
+		tyk [options]
+
+	Options:
+		-h --help                    Show this screen
+		--conf=FILE                  Load a named configuration file
+		--port=PORT                  Listen on PORT (overrides confg file)
+		--memprofile                 Generate a memory profile
+		--cpuprofile                 Generate a cpu profile
+		--debug                      Enable Debug output
+		--import-blueprint=<file>    Import an API Blueprint file
+		--import-swagger=<file>      Import a Swagger file
+		--create-api                 Creates a new API Definition from the blueprint
+		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
+		--upstream-target=<url>      Set the upstream target for the definition
+		--as-mock                    Creates the API as a mock based on example fields
+		--for-api=<path>             Adds blueprint to existing API Defintition as version
+		--as-version=<version>       The version number to use when inserting
+	`
+
+	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("Error while parsing arguments: ", err)
+	}
+
+	argumentsBackup = arguments
+	return arguments
 }
 
 func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
@@ -1308,6 +1336,58 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 }
 
 func main() {
+	arguments := getCmdArguments()
+	l, goAgainErr := goagain.Listener()
+
+	if nil != goAgainErr {
+		initialiseSystem(arguments)
+		start()
+
+		var listenerErr error
+		l, listenerErr = generateListener(l)
+
+		// Check if listener was started successfully.
+		if listenerErr != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalf("Error starting listener: %s", listenerErr)
+		}
+
+		listen(l, goAgainErr)
+	} else {
+		initialiseSystem(arguments)
+		start()
+
+		listen(l, goAgainErr)
+
+		// Kill the parent, now that the child has started successfully.
+		log.Debug("KILLING PARENT PROCESS")
+		if err := goagain.Kill(); nil != err {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalln(err)
+		}
+	}
+
+	// Block the main goroutine awaiting signals.
+	if _, err := goagain.Wait(l); nil != err {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatalln(err)
+	}
+
+	// Do whatever's necessary to ensure a graceful exit
+	// In this case, we'll simply stop listening and wait one second.
+	if err := l.Close(); nil != err {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Error("Listen handler exit: ", err)
+	}
+	time.Sleep(3 * time.Second)
+
+}
+
+func start() {
 	if doMemoryProfile {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1356,13 +1436,74 @@ func main() {
 		go RPCReloadLoop(config.SlaveOptions.RPCKey)
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
-
-	listen()
 }
 
-func listen() {
+func generateListener(l net.Listener) (net.Listener, error) {
+	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
+
+	if config.HttpServerOptions.UseSSL {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Using SSL (https)")
+		certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
+		certNameMap := make(map[string]*tls.Certificate)
+		for i, certData := range config.HttpServerOptions.Certificates {
+			cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Fatalf("Server error: loadkeys: %s", err)
+			}
+			certs[i] = cert
+			certNameMap[certData.Name] = &certs[i]
+		}
+
+		config := tls.Config{
+			Certificates:      certs,
+			NameToCertificate: certNameMap,
+			ServerName:        config.HttpServerOptions.ServerName,
+			MinVersion:        config.HttpServerOptions.MinVersion,
+		}
+		return tls.Listen("tcp", targetPort, &config)
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Standard listener (http)")
+		return net.Listen("tcp", targetPort)
+	}
+}
+
+func handleDashboardRegistration() {
+	if config.UseDBAppConfigs {
+		connStr := config.DBAppConfOptions.ConnectionString
+		if connStr == "" {
+			log.Fatal("Connection string is empty, failing.")
+		}
+
+		connStr = connStr + "/register/node"
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Registering node.")
+		RegisterNodeWithDashboard(connStr, config.NodeSecret)
+
+		heartbeatConnStr := config.DBAppConfOptions.ConnectionString
+		if heartbeatConnStr == "" {
+			log.Fatal("Connection string is empty, failing.")
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Starting heartbeat.")
+		heartbeatConnStr = heartbeatConnStr + "/register/ping"
+		go StartBeating(heartbeatConnStr, config.NodeSecret)
+
+	}
+}
+
+func listen(l net.Listener, err error) {
 	ReadTimeout := 120
 	WriteTimeout := 120
+	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 	if config.HttpServerOptions.ReadTimeout > 0 {
 		ReadTimeout = config.HttpServerOptions.ReadTimeout
 	}
@@ -1370,78 +1511,16 @@ func listen() {
 	if config.HttpServerOptions.WriteTimeout > 0 {
 		WriteTimeout = config.HttpServerOptions.WriteTimeout
 	}
-	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 
 	// Handle reload when SIGUSR2 is received
-	l, err := goagain.Listener()
 	if nil != err {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Setting up Server")
-		if config.HttpServerOptions.UseSSL {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("--> Using SSL (https)")
-			certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
-			certNameMap := make(map[string]*tls.Certificate)
-			for i, certData := range config.HttpServerOptions.Certificates {
-				cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Fatalf("Server error: loadkeys: %s", err)
-				}
-				certs[i] = cert
-				certNameMap[certData.Name] = &certs[i]
-			}
 
-			config := tls.Config{
-				Certificates:      certs,
-				NameToCertificate: certNameMap,
-				ServerName:        config.HttpServerOptions.ServerName,
-				MinVersion:        config.HttpServerOptions.MinVersion,
-			}
-			l, err = tls.Listen("tcp", targetPort, &config)
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("--> Standard listener (http)")
-			l, err = net.Listen("tcp", targetPort)
-		}
-
-		// Check if listener was started successfully.
-		if nil != err {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalf("Error starting listener: %s", err)
-		}
-
-		// Accept connections in a new goroutine.
-		if config.UseDBAppConfigs {
-			connStr := config.DBAppConfOptions.ConnectionString
-			if connStr == "" {
-				log.Fatal("Connection string is empty, failing.")
-			}
-
-			connStr = connStr + "/register/node"
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Registering node.")
-			RegisterNodeWithDashboard(connStr, config.NodeSecret)
-
-			heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-			if heartbeatConnStr == "" {
-				log.Fatal("Connection string is empty, failing.")
-			}
-
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Starting heartbeat.")
-			heartbeatConnStr = heartbeatConnStr + "/register/ping"
-			go StartBeating(heartbeatConnStr, config.NodeSecret)
-
-		}
+		// handle dashboard registration and nonces if available
+		handleDashboardRegistration()
 
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
@@ -1464,6 +1543,7 @@ func listen() {
 				Handler:      defaultRouter,
 			}
 
+			// Accept connections in a new goroutine.
 			go s.Serve(l)
 			displayConfig()
 		} else {
@@ -1479,13 +1559,15 @@ func listen() {
 
 	} else {
 
+		// handle dashboard registration and nonces if available
+		handleDashboardRegistration()
+
 		// Resume accepting connections in a new goroutine.
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Resuming listening on", l.Addr())
-		specs := getAPISpecs()
-		loadApps(specs, defaultRouter)
-		getPolicies()
+		if !RPC_EmergencyMode {
+			specs := getAPISpecs()
+			loadApps(specs, defaultRouter)
+			getPolicies()
+		}
 
 		if config.HttpServerOptions.OverrideDefaults {
 			log.WithFields(logrus.Fields{
@@ -1509,33 +1591,12 @@ func listen() {
 			}).Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
 			http.Handle("/", mainRouter)
-			http.Serve(l, nil)
+			go http.Serve(l, nil)
 		}
 
-		// Kill the parent, now that the child has started successfully.
-		if err := goagain.Kill(); nil != err {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalln(err)
-		}
-
-	}
-
-	// Block the main goroutine awaiting signals.
-	if _, err := goagain.Wait(l); nil != err {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Fatalln(err)
-	}
+		}).Info("Resuming on", l.Addr())
 
-	// Do whatever's necessary to ensure a graceful exit like waiting for
-	// goroutines to terminate or a channel to become closed.
-	//
-	// In this case, we'll simply stop listening and wait one second.
-	if err := l.Close(); nil != err {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatalln(err)
 	}
-	//time.Sleep(1e9)
 }

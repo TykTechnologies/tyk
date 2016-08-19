@@ -92,10 +92,10 @@ type Config struct {
 		MonitorUserKeys       bool               `json:"monitor_user_keys"`
 		MonitorOrgKeys        bool               `json:"monitor_org_keys"`
 	}
-	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
-	OauthTokenExpire   int32 `json:"oauth_token_expire"`
-	OauthRedirectUriSeparator   string `json:"oauth_redirect_uri_separator"`
-	SlaveOptions       struct {
+	OauthRefreshExpire        int64  `json:"oauth_refresh_token_expire"`
+	OauthTokenExpire          int32  `json:"oauth_token_expire"`
+	OauthRedirectUriSeparator string `json:"oauth_redirect_uri_separator"`
+	SlaveOptions              struct {
 		UseRPC                          bool   `json:"use_rpc"`
 		ConnectionString                string `json:"connection_string"`
 		RPCKey                          string `json:"rpc_key"`
@@ -150,6 +150,7 @@ type Config struct {
 	HideGeneratorHeader  bool                                     `json:"hide_generator_header"`
 	EventHandlers        tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
 	EventTriggers        map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
+	PIDFileLocation      string                                   `json:"pid_file_location"`
 }
 
 type CertData struct {

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2"
 	"io/ioutil"
@@ -326,14 +326,26 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	return nil
 }
 
+var heartBeatStopSentinel = false
+
 func StartBeating(endpoint, secret string) {
 	for {
+		if heartBeatStopSentinel == true {
+			break
+		}
 		failure := SendHeartBeat(endpoint, secret)
 		if failure != nil {
 			log.Warning(failure)
 		}
 		time.Sleep(time.Second * 5)
 	}
+
+	log.Info("Stopped Heartbeat")
+	heartBeatStopSentinel = false
+}
+
+func StopBeating() {
+	heartBeatStopSentinel = true
 }
 
 func SendHeartBeat(endpoint string, secret string) error {

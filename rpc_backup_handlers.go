@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
+	"github.com/rcrowley/goagain"
 	"io"
 	"net/http"
 	"strings"
@@ -122,7 +123,16 @@ func doLoadWithBackup(specs *[]*APISpec) {
 
 	log.Warning("[RPC Backup] --> Ready to listen")
 	RPC_EmergencyModeLoaded = true
-	listen()
+
+	l, goAgainErr := goagain.Listener()
+	var listenerErr error
+	
+	l, listenerErr = generateListener(l) 
+	if listenerErr != nil {
+		log.Info("Failed to generate listener!")
+	}
+
+	listen(l, goAgainErr)
 }
 
 // encrypt string to base64 crypto using AES
