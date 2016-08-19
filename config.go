@@ -151,6 +151,7 @@ type Config struct {
 	EventHandlers        tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
 	EventTriggers        map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
 	PIDFileLocation      string                                   `json:"pid_file_location"`
+	AllowInsecureConfigs bool                                     `json:"allow_insecure_configs"`
 }
 
 type CertData struct {

@@ -265,6 +265,7 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	}
 
 	newRequest.Header.Add("authorization", secret)
+	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
@@ -358,6 +359,8 @@ func SendHeartBeat(endpoint string, secret string) error {
 
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
+
 	log.Debug("Sending Heartbeat as: ", NodeID)
 
 	ServiceNonceMutex.Lock()

@@ -1370,7 +1370,7 @@ func main() {
 	}
 
 	// Block the main goroutine awaiting signals.
-	if _, err := goagain.Wait(l); nil != err {
+	if sig, err := goagain.Wait(l); nil != err {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Fatalln(err)

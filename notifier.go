@@ -12,6 +12,7 @@ const (
 	NoticeApiAdded      NotificationCommand = "ApiAdded"
 	NoticeGroupReload   NotificationCommand = "GroupReload"
 	NoticePolicyChanged NotificationCommand = "PolicyChanged"
+	NoticeConfigUpdate  NotificationCommand = "NoticeConfigUpdated"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel
