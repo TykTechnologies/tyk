@@ -3,7 +3,7 @@ from gateway import TykGateway as tyk
 
 from tyk.session import AccessSpec, AccessDefinition, BasicAuthData, JWTData, Monitor
 
-@CustomKeyCheck
+@Hook
 def MyAuthCheck(request, session, metadata, spec):
     print("my_auth_middleware: CustomKeyCheck hook")
 
@@ -28,7 +28,7 @@ def MyAuthCheck(request, session, metadata, spec):
 
     return request, session, metadata
 
-@PostKeyAuth
+@Hook
 def MyPostKeyAuthMiddleware(request, session, spec):
     print("my_auth_middleware: PostKeyAuth hook")
     return request, session

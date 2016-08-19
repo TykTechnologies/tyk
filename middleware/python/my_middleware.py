@@ -1,18 +1,17 @@
 from tyk.decorators import *
 from gateway import TykGateway as tyk
 
-@Pre
+@Hook
 def MyPreMiddleware(request, session, spec):
     print("my_middleware: MyPreMiddleware")
     return request, session
 
-@Pre
+@Hook
 def AnotherPreMiddleware(request, session, spec):
     print("my_middleware: AnotherPreMiddleware")
     return request, session
 
-@Post
+@Hook
 def MyPostMiddleware(request, session, spec):
     print("my_middleware: MyPostMiddleware")
     return request, session
-    
