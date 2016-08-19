@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 	logger "github.com/TykTechnologies/tykcommon-logger"
 	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/docopt/docopt.go"
@@ -16,7 +17,6 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/logrus-graylog-hook"
 	osin "github.com/lonelycode/osin"
-	"github.com/rcrowley/goagain"
 	"github.com/rs/cors"
 	"html/template"
 	"io/ioutil"
@@ -834,7 +834,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
@@ -849,7 +849,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
@@ -881,7 +881,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
@@ -947,7 +947,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 					log.WithFields(logrus.Fields{
 						"prefix": "coprocess",
-					}).Debug("----> Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver )
+					}).Debug("----> Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 					authArray = append(authArray, CreateCoProcessMiddleware(mwAuthCheckFunc.Name, coprocess.HookType_CustomKeyCheck, mwDriver, tykMiddleware))
 				}
@@ -968,7 +968,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver )
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_PostKeyAuth, mwDriver, tykMiddleware))
 					}
 				}
@@ -994,7 +994,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
-						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver )
+						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
@@ -1418,9 +1418,23 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 	return nil
 }
 
+// Handles pre-fork actions if we get a SIGHUP2
+func onFork() {
+	log.Info("Stopping heartbeat")
+	StopBeating()
+
+	log.Info("Waiting to de-register")
+	time.Sleep(10 * time.Second)
+
+	ServiceNonceMutex.Lock()
+	os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+	os.Setenv("TYK_SERVICE_NODEID", NodeID)
+	ServiceNonceMutex.Unlock()
+}
+
 func main() {
 	arguments := getCmdArguments()
-	l, goAgainErr := goagain.Listener()
+	l, goAgainErr := goagain.Listener(onFork)
 
 	if nil != goAgainErr {
 		initialiseSystem(arguments)
@@ -1453,7 +1467,7 @@ func main() {
 	}
 
 	// Block the main goroutine awaiting signals.
-	if sig, err := goagain.Wait(l); nil != err {
+	if _, err := goagain.Wait(l); nil != err {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Fatalln(err)
@@ -1569,18 +1583,21 @@ func handleDashboardRegistration() {
 		}).Info("Registering node.")
 		RegisterNodeWithDashboard(connStr, config.NodeSecret)
 
-		heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-		if heartbeatConnStr == "" {
-			log.Fatal("Connection string is empty, failing.")
-		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Starting heartbeat.")
-		heartbeatConnStr = heartbeatConnStr + "/register/ping"
-		go StartBeating(heartbeatConnStr, config.NodeSecret)
-
+		startHeartBeat()
 	}
+}
+
+func startHeartBeat() {
+	heartbeatConnStr := config.DBAppConfOptions.ConnectionString
+	if heartbeatConnStr == "" {
+		log.Fatal("Connection string is empty, failing.")
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Starting heartbeat.")
+	heartbeatConnStr = heartbeatConnStr + "/register/ping"
+	go StartBeating(heartbeatConnStr, config.NodeSecret)
 }
 
 func listen(l net.Listener, err error) {
@@ -1643,13 +1660,32 @@ func listen(l net.Listener, err error) {
 	} else {
 
 		// handle dashboard registration and nonces if available
-		handleDashboardRegistration()
+		thisNonce := os.Getenv("TYK_SERVICE_NONCE")
+		thisID := os.Getenv("TYK_SERVICE_NODEID")
+		if thisNonce == "" || thisID == "" {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			})..Warning("No nonce found, re-registering")
+			handleDashboardRegistration()
+		} else {
+			NodeID = thisID
+			ServiceNonceMutex.Lock()
+			ServiceNonce = thisNonce
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			})..Info("State recovered")
+			
+			ServiceNonceMutex.Unlock()
+			os.Setenv("TYK_SERVICE_NONCE", "")
+			os.Setenv("TYK_SERVICE_NODEID", "")
+		}
 
 		// Resume accepting connections in a new goroutine.
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
 			loadApps(specs, defaultRouter)
 			getPolicies()
+			startHeartBeat()
 		}
 
 		if config.HttpServerOptions.OverrideDefaults {
