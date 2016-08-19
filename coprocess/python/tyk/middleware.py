@@ -44,8 +44,8 @@ class TykMiddleware:
     def process(self, handler, object):
         handlerType = type(handler)
 
-        if handlerType == decorators.CustomKeyCheck:
+        if handler.arg_count == 4:
             object.request, object.session, object.metadata = handler(object.request, object.session, object.metadata, object.spec)
-        else :
+        elif handler.arg_count == 3:
             object.request, object.session = handler(object.request, object.session, object.spec)
         return object
