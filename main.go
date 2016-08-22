@@ -133,10 +133,6 @@ func setupGlobals() {
 			thisPurger.Connect()
 			analytics.Clean = &thisPurger
 			go analytics.Clean.StartPurgeLoop(10)
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Warn("Cache purging is no longer part of Tyk Gateway, please use Tyk-Pump.")
 		}
 
 	}
@@ -182,6 +178,32 @@ func setupGlobals() {
 
 }
 
+func waitForZeroConf() {
+	if config.DBAppConfOptions.ConnectionString == "" {
+		time.Sleep(1 * time.Second)
+		waitForZeroConf()
+	}
+}
+
+func buildConnStr(resource string) string {
+
+	if config.DBAppConfOptions.ConnectionString == "" && config.DisableDashboardZeroConf {
+			log.Fatal("Connection string is empty, failing.")
+			return ""
+	}
+
+	if config.DisableDashboardZeroConf == false && config.DBAppConfOptions.ConnectionString == "" {
+		log.WithFields(logrus.Fields{
+				"prefix": "main",
+		}).Info("Waiting for zeroconf signal...")
+		waitForZeroConf()
+	}
+
+	connStr := config.DBAppConfOptions.ConnectionString
+	connStr = connStr + resource 
+	return connStr
+}
+
 // Pull API Specs from configuration
 var APILoader APIDefinitionLoader = APIDefinitionLoader{}
 
@@ -189,17 +211,9 @@ func getAPISpecs() *[]*APISpec {
 	var APISpecs *[]*APISpec
 
 	if config.UseDBAppConfigs {
-		if config.DBAppConfOptions.ConnectionString != "" {
-			connStr := config.DBAppConfOptions.ConnectionString
-			connStr = connStr + "/system/apis"
 
-			APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
-
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatal("No connection string or node ID present. Failing.")
-		}
+		connStr := buildConnStr("/system/apis")
+		APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1572,12 +1586,9 @@ func generateListener(l net.Listener) (net.Listener, error) {
 
 func handleDashboardRegistration() {
 	if config.UseDBAppConfigs {
-		connStr := config.DBAppConfOptions.ConnectionString
-		if connStr == "" {
-			log.Fatal("Connection string is empty, failing.")
-		}
 
-		connStr = connStr + "/register/node"
+		connStr := buildConnStr("/register/node")
+		
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Registering node.")
@@ -1589,7 +1600,7 @@ func handleDashboardRegistration() {
 
 func startHeartBeat() {
 	heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-	if heartbeatConnStr == "" {
+	if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
 		log.Fatal("Connection string is empty, failing.")
 	}
 
@@ -1665,7 +1676,7 @@ func listen(l net.Listener, err error) {
 		if thisNonce == "" || thisID == "" {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			})..Warning("No nonce found, re-registering")
+			}).Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
 		} else {
 			NodeID = thisID
@@ -1673,8 +1684,8 @@ func listen(l net.Listener, err error) {
 			ServiceNonce = thisNonce
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			})..Info("State recovered")
-			
+			}).Info("State recovered")
+
 			ServiceNonceMutex.Unlock()
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")

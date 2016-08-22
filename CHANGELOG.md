@@ -5,7 +5,6 @@
 - Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}`
 - It is now possible to rewrite a URL with a new host and have the host act as an override to any target settings that are in the API Definition
 - Added more remote logger support: Graylog, Syslog and Logstash
-- It's now possible to write custom middleware in Python (see [Coprocess](https://github.com/TykTechnologies/tyk/tree/experiment/coprocess/coprocess)).
 
 ### Graylog:
 
@@ -37,6 +36,9 @@ If the transport or address are empty, syslog will log to file
     UnsetAuth     AuthTypeEnum = ""
 
 - (multi-auth continued) Tyk will chain the auth mechanisms as they appear in the code and will default to auth token if none are specified. You can explicitly set auth token by setting `use_standard_auth` to true.
+- It's now possible to write custom middleware in Python (see [Coprocess](https://github.com/TykTechnologies/tyk/tree/experiment/coprocess/coprocess)).
+- Tyk gateway can now be hot-restarted with a new configuration / binary using the -SUGUSR2 signal
+- Tyk gateway (with dashboard) no longer needs the dashboard URL configured as it will auto-discover this so long as it is set in the dashboard configuration file
 
 # v2.2
 

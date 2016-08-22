@@ -7,18 +7,20 @@ import (
 type NotificationCommand string
 
 const (
-	NoticeApiUpdated    NotificationCommand = "ApiUpdated"
-	NoticeApiRemoved    NotificationCommand = "ApiRemoved"
-	NoticeApiAdded      NotificationCommand = "ApiAdded"
-	NoticeGroupReload   NotificationCommand = "GroupReload"
-	NoticePolicyChanged NotificationCommand = "PolicyChanged"
-	NoticeConfigUpdate  NotificationCommand = "NoticeConfigUpdated"
+	NoticeApiUpdated        NotificationCommand = "ApiUpdated"
+	NoticeApiRemoved        NotificationCommand = "ApiRemoved"
+	NoticeApiAdded          NotificationCommand = "ApiAdded"
+	NoticeGroupReload       NotificationCommand = "GroupReload"
+	NoticePolicyChanged     NotificationCommand = "PolicyChanged"
+	NoticeConfigUpdate      NotificationCommand = "NoticeConfigUpdated"
+	NoticeDashboardZeroConf NotificationCommand = "NoticeDashboardZeroConf"
 )
 
-// Notification is a type that encodes a message published to a pub sub channel
+// Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
 type Notification struct {
-	Command NotificationCommand `json:"command"`
-	Payload string              `json:"payload"`
+	Command   NotificationCommand `json:"command"`
+	Payload   string              `json:"payload"`
+	Signature string              `json:"signature"`
 }
 
 // Notifier is an interface that sends notifications

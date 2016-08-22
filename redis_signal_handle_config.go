@@ -4,74 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/garyburd/redigo/redis"
 	"io/ioutil"
 	"time"
 )
 
-const (
-	RedisPubSubChannel string = "tyk.cluster.notifications"
-)
-
-func StartPubSubLoop() {
-	CacheStore := RedisClusterStorageManager{}
-	CacheStore.Connect()
-	// On message, synchronise
-	for {
-		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisMsg)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-				"err":    err,
-			}).Error("Connection to Redis failed, reconnect in 10s")
-
-			time.Sleep(10 * time.Second)
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-			}).Warning("Reconnecting")
-
-			CacheStore.Connect()
-			CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisMsg)
-		}
-
-	}
-}
-
-func HandleRedisMsg(message redis.Message) {
-	thisMessage := Notification{}
-	err := json.Unmarshal(message.Data, &thisMessage)
-	if err != nil {
-		log.Error("Unmarshalling message body failed, malformed: ", err)
-		return
-	}
-
-	if thisMessage.Command == NoticeConfigUpdate {
-		HandleNewConfiguration(thisMessage.Payload)
-	} else {
-		HandleReloadMsg()
-	}
-}
-
-func IsConfigSignatureValid(payload ConfigPayload) bool {
-	if payload.Signature == "" && config.AllowInsecureConfigs {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Warning("Insecure configuration detected!")
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Warning("--> Allowing (to block please update allow_insecure_configs)")
-		return true
-	}
-
-	return false
-}
-
 type ConfigPayload struct {
 	Configuration Config
-	Signature     string
 	ForHostname   string
 	ForNodeID     string
-	TimeStamp     string
+	TimeStamp     int64
 }
 
 func BackupConfiguration() error {
@@ -113,6 +54,11 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 func HandleNewConfiguration(payload string) {
 	// Decode the configuration from the payload
 	thisConfigPayload := ConfigPayload{}
+
+	// We actually want to merge into the existing configuration
+	// so as not to lose data through automatic defaults
+	thisConfigPayload.Configuration = config
+
 	err := json.Unmarshal([]byte(payload), &thisConfigPayload)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -126,14 +72,6 @@ func HandleNewConfiguration(payload string) {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Info("Configuration update received, no NodeID/Hostname match found")
-		return
-	}
-
-	// Then:
-	if !IsConfigSignatureValid(thisConfigPayload) {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Configuration update signature is invalid!")
 		return
 	}
 
@@ -158,11 +96,4 @@ func HandleNewConfiguration(payload string) {
 	}).Info("Initiating configuration reload")
 
 	ReloadConfiguration()
-}
-
-func HandleReloadMsg() {
-	log.WithFields(logrus.Fields{
-		"prefix": "pub-sub",
-	}).Info("Reloading endpoints")
-	ReloadURLStructure()
 }

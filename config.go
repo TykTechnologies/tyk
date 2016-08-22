@@ -30,8 +30,9 @@ type Config struct {
 		NodeIsSegmented  bool     `json:"node_is_segmented"`
 		Tags             []string `json:"tags"`
 	} `json:"db_app_conf_options"`
-	AppPath string `json:"app_path"`
-	Storage struct {
+	DisableDashboardZeroConf bool   `json:"disable_dashboard_zeroconf"`
+	AppPath                  string `json:"app_path"`
+	Storage                  struct {
 		Type          string            `json:"type"`
 		Host          string            `json:"host"`
 		Port          int               `json:"port"`
@@ -147,7 +148,7 @@ type Config struct {
 	ControlAPIHostname   string                                   `json:"control_api_hostname"`
 	EnableCustomDomains  bool                                     `json:"enable_custom_domains"`
 	EnableJSVM           bool                                     `json:"enable_jsvm"`
-	EnableCoProcess           bool                                     `json:"enable_coprocess"`
+	EnableCoProcess      bool                                     `json:"enable_coprocess"`
 	HideGeneratorHeader  bool                                     `json:"hide_generator_header"`
 	EventHandlers        tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
 	EventTriggers        map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`

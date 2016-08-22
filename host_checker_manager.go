@@ -121,11 +121,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 	}
 }
 
-func (hc *HostCheckerManager) UptimePurgeLoop() {
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Warning("Host checker data is no longer purged by Tyk Gateway, please use Tyk-Pump.")
-}
+func (hc *HostCheckerManager) UptimePurgeLoop() {}
 
 func (hc *HostCheckerManager) AmIPolling() bool {
 	if hc.store == nil {
