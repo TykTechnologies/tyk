@@ -11,7 +11,7 @@ Basically `go build -tags 'coprocess python'`.
 
 ### Setting up custom Python middleware
 
-The custom middleware should be specified in your API definition file, under `custom_middleware` (see [coprocess_app_sample.json](coprocess_app_sample.json)):
+The custom middleware should be specified in your API definition file, under `custom_middleware` (see [coprocess_app_sample.json](../../apps/coprocess_app_sample.json)):
 
 ```json
 "custom_middleware": {
@@ -35,7 +35,7 @@ You can chain multiple hook functions when the hook type is Pre, Post or PostAut
 
 Tyk will load all the modules inside `middleware/python`.
 
-The "name" field represents the name of a Python function, a sample Python middleware matching the sample definition above will look like (see [middleware/python](middleware/python)):
+The "name" field represents the name of a Python function, a sample Python middleware matching the sample definition above will look like (see [middleware/python](../../middleware/python)):
 
 ```python
 from tyk.decorators import *
@@ -53,7 +53,7 @@ def MyPreMiddleware(request, session, spec):
 
 ### Authenticating an API with Python
 
-This is a sample API definition that will let you authenticate your API using a custom Python middleware (see [coprocess_app_sample_protected.json](coprocess_app_sample_protected)):
+This is a sample API definition that will let you authenticate your API using a custom Python middleware (see [coprocess_app_sample_protected.json](../../apps/coprocess_app_sample_protected.json)):
 ```json
 ...
 "use_keyless": false,
@@ -67,7 +67,7 @@ This is a sample API definition that will let you authenticate your API using a 
 ...
 ```
 
-The Python code for this middleware will look like this (see [my_auth_middleware.py](my_auth_middleware.py)):
+The Python code for this middleware will look like this (see [my_auth_middleware.py](../../middleware/python/my_auth_middleware.py)):
 ```python
 from tyk.decorators import *
 from gateway import TykGateway as tyk
@@ -98,6 +98,65 @@ def MyAuthCheck(request, session, metadata, spec):
         request.object.return_overrides.response_error = 'Not authorized (Python middleware)'
 
     return request, session, metadata
+```
+
+### Writing events handlers with Python
+
+It's also possible to write a Tyk event listener with Python. The first step is to set a custom event handler inside your API definition (see [coprocess_app_sample_protected.json](../../apps/coprocess_app_sample_protected.json)):
+
+```json
+...
+"event_handlers": {
+  "events": {
+    "AuthFailure": [
+      {
+        "handler_name": "cp_dynamic_handler",
+        "handler_meta": {
+          "name": "my_handler"
+        }
+      }
+    ]
+  }
+},
+...
+```
+
+In the above sample we're setting an event handler for `AuthFailure` events, an event that's triggered everytime a failed authentication occurs.
+
+The `handler_name` must be `cp_dynamic_handler`.
+
+The `name` field inside `handler_meta` refers to a Python function name that can be written inside `event_handlers` (see [event_handlers/my_handler.py](../../event_handlers/my_handler.py)):
+
+```python
+from tyk.decorators import Event
+
+@Event
+def my_handler(event, spec):
+    print("-- my_handler:")
+    print(" Event:", event)
+    print(" Spec:", spec)
+```
+
+This function will be called when the specified event occurs, Tyk will pass a Python object like this:
+
+```json
+{  
+   "TimeStamp": "2016-08-19 11:13:31.537047694 -0400 PYT",
+   "EventMetaData":{  
+      "Path":"/coprocess-auth-tyk-api-test/",
+      "Origin":"127.0.0.1",
+      "Message":"Auth Failure",
+      "OriginatingRequest":"R0VUIC9jb3Byb2Nlc3MtYXV0aC10eWstYXBpLXRlc3QvIEhUVFAvMS4xDQpIb3N0OiAxMjcuMC4wLjE6ODA4MA0KVXNlci1BZ2VudDogY3VybC83LjQzLjANCkFjY2VwdDogKi8qDQpBdXRob3JpemF0aW9uOiAxDQoNCg==",
+      "Key":""
+   },
+   "EventType": "AuthFailure"
+}
+```
+
+The above handler can be tested by sending a HTTP request to the protected Coprocess API, with an invalid authorization header:
+
+```
+curl http://127.0.0.1:8080/coprocess-auth-tyk-api-test/ -H 'Authorization: invalidtoken'
 ```
 
 ## Build requirements
