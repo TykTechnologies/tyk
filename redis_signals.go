@@ -1,8 +1,10 @@
 package main
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/goverify"
 	"github.com/garyburd/redigo/redis"
 	"time"
 )
@@ -66,16 +68,49 @@ func HandleRedisMsg(message redis.Message) {
 }
 
 var warnedOnce bool
+var notificationVerifier goverify.Verifier
 
 func IsPayloadSignatureValid(notification Notification) bool {
 	if notification.Signature == "" && config.AllowInsecureConfigs {
 		if warnedOnce == false {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
-			}).Warning("Insecure configuration detected (allowing)!")	
+			}).Warning("Insecure configuration detected (allowing)!")
 			warnedOnce = true
 		}
-		
+
+		return true
+	}
+
+	if config.PublicKeyPath != "" {
+		if notificationVerifier == nil {
+			var loadErr error
+			notificationVerifier, loadErr = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
+			if loadErr != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "pub-sub",
+				}).Error("Notification signer: Failed loading private key from path: ", loadErr)
+				return false
+			}
+		}
+	}
+
+	if notificationVerifier != nil {
+		signed, decErr := b64.StdEncoding.DecodeString(notification.Signature)
+		if decErr != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "pub-sub",
+			}).Error("Failed to decode signature: ", decErr)
+			return false
+		}
+		err := notificationVerifier.Verify([]byte(notification.Payload), signed)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "pub-sub",
+			}).Error("Could not verify notification: ", err)
+			return false
+		}
+
 		return true
 	}
 
