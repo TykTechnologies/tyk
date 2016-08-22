@@ -11,7 +11,13 @@ import (
 	"strings"
 	"testing"
 	"time"
-)
+	"fmt"
+)	
+
+func init() {
+	fmt.Println("THIS IS THE TEST SETUP INIT")
+	initialiseSystem(map[string]interface{}{})
+}
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
