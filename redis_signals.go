@@ -60,6 +60,8 @@ func HandleRedisMsg(message redis.Message) {
 	case NoticeConfigUpdate:
 		HandleNewConfiguration(thisMessage.Payload)
 		break
+	case NoticeDashboardConfigRequest:
+		HandleSendMiniConfig(thisMessage.Payload)
 	default:
 		HandleReloadMsg()
 		break
