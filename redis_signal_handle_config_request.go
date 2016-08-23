@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Sirupsen/logrus"
-	"github.com/TykTechnologies/tykcommon"
 	"io/ioutil"
 	"time"
 )
@@ -22,35 +21,23 @@ type ReturnConfigPayload struct {
 	TimeStamp     int64
 }
 
-// This is what gets sent by the dashboard
-type MicroConfig struct {
-	EnableAnalytics bool `json:"enable_analytics,omitempty"`
-	AnalyticsConfig struct {
-		IgnoredIPs              []string `json:"ignored_ips,omitempty"`
-		EnableDetailedRecording bool     `json:"enable_detailed_recording,omitempty"`
-		EnableGeoIP             bool     `json:"enable_geo_ip,omitempty"`
-		GeoIPDBLocation         string   `json:"geo_ip_db_path,omitempty"`
-		NormaliseUrls           struct {
-			Enabled          bool     `json:"enabled,omitempty"`
-			NormaliseUUIDs   bool     `json:"normalise_uuids,omitempty"`
-			NormaliseNumbers bool     `json:"normalise_numbers,omitempty"`
-			Custom           []string `json:"custom_patterns,omitempty"`
-		} `json:"normalise_urls,omitempty"`
-	} `json:"analytics_config,omitempty"`
-	HealthCheck struct {
-		EnableHealthChecks      bool  `json:"enable_health_checks,omitempty"`
-		HealthCheckValueTimeout int64 `json:"health_check_value_timeouts,omitempty"`
-	} `json:"health_check,omitempty"`
-	Monitor struct {
-		EnableTriggerMonitors bool               `json:"enable_trigger_monitors,omitempty"`
-		Config                WebHookHandlerConf `json:"configuration,omitempty"`
-		GlobalTriggerLimit    float64            `json:"global_trigger_limit,omitempty"`
-		MonitorUserKeys       bool               `json:"monitor_user_keys,omitempty"`
+type MicroConfig map[string]interface{}
+
+func SanitizeConfig(mc MicroConfig) MicroConfig {
+
+	SanitzeFields := []string{
+		"secret",
+		"node_secret",
+		"storage",
+		"slave_options",
+		"auth_override",
 	}
-	EnableCustomDomains bool                             `json:"enable_custom_domains,omitempty"`
-	EnableJSVM          bool                             `json:"enable_jsvm,omitempty"`
-	EnableCoProcess     bool                             `json:"enable_coprocess,omitempty"`
-	EventHandlers       tykcommon.EventHandlerMetaConfig `json:"event_handlers,omitempty"`
+
+	for _, field_name := range SanitzeFields {
+		delete(mc, field_name)
+	}
+
+	return mc
 }
 
 func GetExistingConfig() (MicroConfig, error) {
@@ -80,12 +67,21 @@ func GetExistingConfig() (MicroConfig, error) {
 		return thisMicroConfig, jsErr
 	}
 
+	thisMicroConfig = SanitizeConfig(thisMicroConfig)
+
 	return thisMicroConfig, nil
 }
 
 func HandleSendMiniConfig(payload string) {
 	// Decode the configuration from the payload
 	thisConfigPayload := GetConfigPayload{}
+	jsErr := json.Unmarshal([]byte(payload), &thisConfigPayload)
+	if jsErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "pub-sub",
+		}).Error("Failed unmarshal request: ", jsErr)
+		return
+	}
 
 	// Make sure payload matches nodeID and hostname
 	if (thisConfigPayload.FromHostname != HostDetails.Hostname) && (thisConfigPayload.FromNodeID != NodeID) {
