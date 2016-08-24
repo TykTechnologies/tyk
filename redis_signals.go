@@ -45,6 +45,17 @@ func HandleRedisMsg(message redis.Message) {
 		return
 	}
 
+	// Add messages to ignore here
+	ignoreMessageList := map[NotificationCommand]bool{
+		NoticeGatewayConfigResponse: true,
+	}
+
+	// Don't react to all messages
+	_, ignore := ignoreMessageList[thisMessage.Command]
+	if ignore {
+		return
+	}
+
 	// Check for a signature, if not signature found, handle
 	if !IsPayloadSignatureValid(thisMessage) {
 		log.WithFields(logrus.Fields{
@@ -60,6 +71,8 @@ func HandleRedisMsg(message redis.Message) {
 	case NoticeConfigUpdate:
 		HandleNewConfiguration(thisMessage.Payload)
 		break
+	case NoticeDashboardConfigRequest:
+		HandleSendMiniConfig(thisMessage.Payload)
 	default:
 		HandleReloadMsg()
 		break
@@ -108,6 +121,7 @@ func IsPayloadSignatureValid(notification Notification) bool {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Error("Could not verify notification: ", err)
+			log.Info(notification)
 			return false
 		}
 

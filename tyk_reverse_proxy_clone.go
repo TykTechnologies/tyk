@@ -52,7 +52,16 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a list
 		spec.RoundRobin.SetMax(targetData)
-		td := *targetData.(*[]string)
+		var td []string
+
+		switch targetData.(type) {
+		case *[]string:
+			td = *targetData.(*[]string)
+		case []string:
+			td = targetData.([]string)
+		}
+
+		//td := *targetData.(*[]string)
 
 		pos := spec.RoundRobin.GetPos()
 		if pos > (len(td) - 1) {

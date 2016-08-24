@@ -23,6 +23,8 @@ test.*.conf
 *.mprof
 apps/test.json
 logs
+live_hybrid.conf
+tyk.zeroconf.conf
 lint_results.txt
 build/
 test_apps/
