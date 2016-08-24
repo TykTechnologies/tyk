@@ -16,7 +16,13 @@ package main
 
 #include "coprocess/lua/binding.h"
 
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+
 static void LuaInit() {
+  L = luaL_newstate();
+  luaL_openlibs(L);
 }
 
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object) {
