@@ -23,10 +23,23 @@ package main
 static void LuaInit() {
   L = luaL_newstate();
   luaL_openlibs(L);
+
+  luaL_dofile(L, "coprocess/lua/tyk/core.lua");
 }
 
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object) {
+
 	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
+
+  lua_getglobal(L, "dispatch");
+  lua_pushlstring(L, object->p_data, object->length);
+  lua_pcall(L, 1, 1, 0);
+
+  size_t output_length = lua_tointeger(L, 0);
+  const char* output_data = lua_tolstring(L, 1, &output_length);
+
+  outputObject->p_data = (void*)output_data;
+  outputObject->length = output_length;
 
   return outputObject;
 }
