@@ -12,6 +12,4 @@ static void LuaInit();
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage*);
 // static void Python_DispatchEvent(char*);
 
-lua_State *L;
-
 #endif

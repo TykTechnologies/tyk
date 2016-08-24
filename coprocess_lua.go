@@ -21,13 +21,14 @@ package main
 #include <lauxlib.h>
 
 static void LuaInit() {
-  L = luaL_newstate();
-  luaL_openlibs(L);
-
-  luaL_dofile(L, "coprocess/lua/tyk/core.lua");
 }
 
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object) {
+
+  lua_State *L = luaL_newstate();
+
+  luaL_openlibs(L);
+  luaL_dofile(L, "coprocess/lua/tyk/core.lua");
 
 	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
 
@@ -63,7 +64,6 @@ type LuaDispatcher struct {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
-
 	var object *C.struct_CoProcessMessage
 	object = (*C.struct_CoProcessMessage)(objectPtr)
 
