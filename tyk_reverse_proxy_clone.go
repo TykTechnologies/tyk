@@ -396,6 +396,10 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 
 	}
 
+	if config.CloseIdleConnections {
+		thisTransport.CloseIdleConnections()
+	}
+
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{*thisTransport, rw, p.TLSClientConfig}
 		return wsTransport
