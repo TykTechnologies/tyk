@@ -63,7 +63,7 @@ func HandleNewConfiguration(payload string) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed to decode configuration payload")
+		}).Error("Failed to decode configuration payload: ", err)
 		return
 	}
 
