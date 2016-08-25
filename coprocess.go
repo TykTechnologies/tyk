@@ -31,6 +31,7 @@ import (
 	"github.com/TykTechnologies/tykcommon"
 
 	"github.com/golang/protobuf/proto"
+	"encoding/json"
 
 	"bytes"
 	"errors"
@@ -41,9 +42,6 @@ import (
 
 // EnableCoProcess will be overridden by config.EnableCoProcess.
 var EnableCoProcess = false
-
-// MessageType sets the default message type.
-var MessageType = coprocess.ProtobufMessage
 
 // GlobalDispatcher will be implemented by the current CoProcess driver.
 var GlobalDispatcher coprocess.Dispatcher
@@ -170,7 +168,13 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
 func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 
-	objectMsg, _ := proto.Marshal(object)
+	var objectMsg []byte
+
+	if MessageType == coprocess.ProtobufMessage {
+		objectMsg, _ = proto.Marshal(object)
+	} else if MessageType == coprocess.JsonMessage {
+		objectMsg, _ = json.Marshal(object)
+	}
 
 	objectMsgStr := string(objectMsg)
 
@@ -190,7 +194,12 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	newObjectBytes = C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 
 	newObject := &coprocess.Object{}
-	proto.Unmarshal(newObjectBytes, newObject)
+
+	if MessageType == coprocess.ProtobufMessage {
+		proto.Unmarshal(newObjectBytes, newObject)
+	} else if MessageType == coprocess.JsonMessage {
+		json.Unmarshal(newObjectBytes, newObject)
+	}
 
 	C.free(unsafe.Pointer(CObjectStr))
 	C.free(unsafe.Pointer(objectPtr))
