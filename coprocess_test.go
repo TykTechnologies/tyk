@@ -23,6 +23,7 @@ const (
 )
 
 var CoProcessName = "test"
+var MessageType = coprocess.ProtobufMessage
 var thisTestDispatcher, _ = NewCoProcessDispatcher()
 
 /* Dispatcher functions */
