@@ -42,6 +42,9 @@ import (
 // EnableCoProcess will be overridden by config.EnableCoProcess.
 var EnableCoProcess = false
 
+// MessageType sets the default message type.
+var MessageType = coprocess.ProtobufMessage
+
 // GlobalDispatcher will be implemented by the current CoProcess driver.
 var GlobalDispatcher coprocess.Dispatcher
 

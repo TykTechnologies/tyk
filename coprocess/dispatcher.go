@@ -11,6 +11,12 @@ package coprocess
 import "C"
 import "unsafe"
 
+const(
+	_ = iota
+	JsonMessage
+	ProtobufMessage
+)
+
 // CoProcessDispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.
 type Dispatcher interface {
 	Dispatch(unsafe.Pointer) unsafe.Pointer
