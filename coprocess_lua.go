@@ -63,6 +63,9 @@ import(
 // CoProcessName declares the driver name.
 const CoProcessName string = "lua"
 
+// MessageType sets the default message type.
+var MessageType = coprocess.JsonMessage
+
 // LuaDispatcher implements a coprocess.Dispatcher
 type LuaDispatcher struct {
 	coprocess.Dispatcher
