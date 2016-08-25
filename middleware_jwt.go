@@ -265,8 +265,8 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 			if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
 				context.Set(r, SessionData, thisSessionState)
 				context.Set(r, AuthHeaderValue, SessionID)
-				k.setContextVars(r, token)
 			}
+			k.setContextVars(r, token)
 			return nil, 200
 		}
 
