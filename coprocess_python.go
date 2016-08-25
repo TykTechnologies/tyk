@@ -168,6 +168,9 @@ import (
 // CoProcessName declares the driver name.
 const CoProcessName string = "python"
 
+// MessageType sets the default message type.
+var MessageType = coprocess.ProtobufMessage
+
 // PythonDispatcher implements a coprocess.Dispatcher
 type PythonDispatcher struct {
 	coprocess.Dispatcher
