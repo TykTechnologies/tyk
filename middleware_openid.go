@@ -202,6 +202,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		context.Set(r, SessionData, thisSessionState)
 		context.Set(r, AuthHeaderValue, SessionID)
 	}
+	k.setContextVars(r, token)
 
 	return nil, 200
 }
@@ -217,4 +218,28 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 
 	// Report in health check
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+}
+
+func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
+	// Flatten claims and add to context
+	if k.Spec.EnableContextVars {
+		cnt, contextFound := context.GetOk(r, ContextData)
+		var contextDataObject map[string]interface{}
+		if contextFound {
+			contextDataObject = cnt.(map[string]interface{})
+			claimPrefix := "jwt_claims_"
+
+			for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
+				thisClaim := claimPrefix + claimName
+				contextDataObject[thisClaim] = claimValue
+			}
+
+			// Key data
+			authHeaderValue := context.Get(r, AuthHeaderValue)
+			contextDataObject["token"] = authHeaderValue
+
+			context.Set(r, ContextData, contextDataObject)
+		}
+
+	}
 }
