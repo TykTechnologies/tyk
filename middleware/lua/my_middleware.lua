@@ -1,9 +1,10 @@
 function MyPostMiddleware(request, session, spec)
   print("MyPostMiddleware, request=", request, "session=", session, "spec=", spec)
-  return request, session, spec
+  tyk.req.set_header("myluaheader", "myluavalue")
+  return request, session
 end
 
 function MyAuthCheck(request, session, metadata, spec)
   print("MyPostMiddleware, request=", request, "session=", session, "metadata=", metadata, "spec=", spec)
-  return request, session, metadata, spec
+  return request, session, metadata
 end
