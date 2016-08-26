@@ -7,9 +7,11 @@
 #include <lauxlib.h>
 
 static void LuaInit();
+static void LuaReload();
 // static void Node_SetEnv(char*);
 
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage*);
+static void LuaDispatchEvent(char*);
 // static void Python_DispatchEvent(char*);
 
 #endif
