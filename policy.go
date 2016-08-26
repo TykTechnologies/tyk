@@ -101,7 +101,6 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 
 	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
@@ -134,7 +133,6 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 		return policies
 	}
 
-	ServiceNonceMutex.Lock()
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
 	ServiceNonceMutex.Unlock()

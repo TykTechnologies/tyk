@@ -51,19 +51,39 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 	return nil
 }
 
+func GetExistingRawConfig() Config {
+	value, _ := argumentsBackup["--conf"]
+	var filename string = "./tyk.conf"
+	if value != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "pub-sub",
+		}).Info(fmt.Sprintf("Using %s for configuration", value.(string)))
+		filename = argumentsBackup["--conf"].(string)
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "pub-sub",
+		}).Info("No configuration file defined, will try to use default (./tyk.conf)")
+	}
+
+	existingConfig := Config{}
+	loadConfig(filename, &existingConfig)
+
+	return existingConfig
+}
+
 func HandleNewConfiguration(payload string) {
 	// Decode the configuration from the payload
 	thisConfigPayload := ConfigPayload{}
 
 	// We actually want to merge into the existing configuration
 	// so as not to lose data through automatic defaults
-	thisConfigPayload.Configuration = config
+	thisConfigPayload.Configuration = GetExistingRawConfig()
 
 	err := json.Unmarshal([]byte(payload), &thisConfigPayload)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed to decode configuration payload")
+		}).Error("Failed to decode configuration payload: ", err)
 		return
 	}
 

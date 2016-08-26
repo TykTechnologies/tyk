@@ -155,6 +155,7 @@ type Config struct {
 	PIDFileLocation      string                                   `json:"pid_file_location"`
 	AllowInsecureConfigs bool                                     `json:"allow_insecure_configs"`
 	PublicKeyPath        string                                   `json:"public_key_path"`
+	CloseIdleConnections bool                                     `json:"close_idle_connections"`
 }
 
 type CertData struct {
