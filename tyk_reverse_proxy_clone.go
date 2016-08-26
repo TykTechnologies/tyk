@@ -51,7 +51,6 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a list
-		spec.RoundRobin.SetMax(targetData)
 		var td []string
 
 		switch targetData.(type) {
@@ -62,7 +61,7 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 		}
 
 		//td := *targetData.(*[]string)
-
+		spec.RoundRobin.SetMax(td)
 		pos := spec.RoundRobin.GetPos()
 		if pos > (len(td) - 1) {
 			// problem
@@ -101,7 +100,7 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
 	// initalise round robin
 	spec.RoundRobin = &RoundRobin{}
-	spec.RoundRobin.SetMax(&[]string{})
+	spec.RoundRobin.SetMax([]string{})
 
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")
@@ -154,7 +153,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.TargetList, spec, 0))
+				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.TargetList, spec, 0))
 				if lbErr != nil {
 					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
