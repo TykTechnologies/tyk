@@ -24,6 +24,9 @@ static void LuaInit() {
   // TODO: Cache the middlewares.
 }
 
+static void LuaReload() {
+}
+
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object) {
 
   struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
@@ -49,6 +52,9 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
   outputObject->length = lua_output_length;
 
   return outputObject;
+}
+
+static void LuaDispatchEvent(char* event_json) {
 }
 */
 import "C"
@@ -80,6 +86,18 @@ func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
 	newObjectPtr = C.LuaDispatchHook(object)
 
 	return unsafe.Pointer(newObjectPtr)
+}
+
+func (d *LuaDispatcher) Reload() {
+  C.LuaReload()
+}
+
+func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
+  var CEventJSON *C.char
+  CEventJSON = C.CString(string(eventJSON))
+  C.LuaDispatchEvent(CEventJSON)
+  C.free(unsafe.Pointer(CEventJSON))
+  return
 }
 
 func LuaInit() {
