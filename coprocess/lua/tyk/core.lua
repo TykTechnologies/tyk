@@ -2,13 +2,14 @@ print("Loading core")
 
 local cjson = require "cjson"
 
--- TODO: Cache additional modules
-tyk = {
-  req=require("coprocess.lua.tyk.request")
-}
-
 -- Make the current object accessible for helpers.
 object = nil
+
+-- TODO: Cache additional modules
+tyk = {
+  req=require("coprocess.lua.tyk.request"),
+  header=nil
+}
 
 function dispatch(raw_object)
   object = cjson.decode(raw_object)
@@ -26,6 +27,8 @@ function dispatch(raw_object)
   -- Call the hook and return a serialized version of the modified object.
   if hook_f then
     local new_request, new_session, metadata
+
+    tyk.header = object['request']['headers']
 
     if custom_key_auth then
       new_request, new_session, metadata = hook_f(object['request'], object['session'], object['metadata'], object['spec'])
