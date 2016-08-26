@@ -20,11 +20,20 @@ package main
 #include <lualib.h>
 #include <lauxlib.h>
 
+void LoadCachedMiddleware();
+
 static void LuaInit() {
   // TODO: Cache the middlewares.
 }
 
 static void LuaReload() {
+}
+
+static void LoadMiddleware(char* middleware_file, char* middleware_contents) {
+}
+
+static void LoadMiddlewareIntoState(lua_State* L, char* middleware_name, char* middleware_contents) {
+  luaL_dostring(L, middleware_contents);
 }
 
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object) {
@@ -35,6 +44,8 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
 
   luaL_openlibs(L);
   luaL_dofile(L, "coprocess/lua/tyk/core.lua");
+
+  LoadCachedMiddleware(L);
 
   lua_getglobal(L, "dispatch");
   lua_pushlstring(L, object->p_data, object->length);
@@ -60,7 +71,9 @@ static void LuaDispatchEvent(char* event_json) {
 import "C"
 
 import(
+  "io/ioutil"
   "unsafe"
+  "path"
 
   "github.com/TykTechnologies/tyk/coprocess"
   "github.com/Sirupsen/logrus"
@@ -69,12 +82,17 @@ import(
 // CoProcessName declares the driver name.
 const CoProcessName string = "lua"
 
+const MiddlewareBasePath = "middleware/lua"
+
 // MessageType sets the default message type.
 var MessageType = coprocess.JsonMessage
+
+var gMiddlewareCache *map[string]string
 
 // LuaDispatcher implements a coprocess.Dispatcher
 type LuaDispatcher struct {
 	coprocess.Dispatcher
+  MiddlewareCache map[string]string
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
@@ -89,7 +107,41 @@ func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
 }
 
 func (d *LuaDispatcher) Reload() {
+  files, _ := ioutil.ReadDir("./middleware/lua")
+  if d.MiddlewareCache == nil {
+    d.MiddlewareCache = make(map[string]string, len(files))
+    gMiddlewareCache = &d.MiddlewareCache
+  } else {
+    for k := range d.MiddlewareCache {
+      delete(d.MiddlewareCache, k)
+    }
+  }
+
+  for _, f := range files {
+    middlewarePath := path.Join(MiddlewareBasePath, f.Name())
+    contents, err := ioutil.ReadFile(middlewarePath)
+    if err != nil {
+      log.WithFields(logrus.Fields{
+        "prefix": "coprocess",
+      }).Error("Failed to read middleware file: ", err)
+    }
+    d.MiddlewareCache[f.Name()] = string(contents)
+  }
+
   C.LuaReload()
+}
+
+//export LoadCachedMiddleware
+func LoadCachedMiddleware(luaState unsafe.Pointer) {
+  for middlewareName, middlewareContents := range *gMiddlewareCache {
+    var cMiddlewareName, cMiddlewareContents *C.char
+    cMiddlewareName = C.CString(middlewareName)
+    cMiddlewareContents = C.CString(middlewareContents)
+    C.LoadMiddlewareIntoState(luaState, cMiddlewareName, cMiddlewareContents);
+    C.free(unsafe.Pointer(cMiddlewareName))
+    C.free(unsafe.Pointer(cMiddlewareContents))
+  }
+  return
 }
 
 func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
@@ -110,6 +162,8 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
   LuaInit()
 
   dispatcher, err = &LuaDispatcher{}, nil
+
+  dispatcher.Reload()
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
