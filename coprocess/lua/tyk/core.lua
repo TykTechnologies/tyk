@@ -5,7 +5,7 @@ local cjson = require "cjson"
 function dispatch(raw_object)
   object = cjson.decode(raw_object)
   object['request']['set_headers'] = {}
-  object['request']['set_headers']["testkey"] = "testvalue"
+  object['request']['set_headers']["luaheader"] = "luavalue"
   new_object = cjson.encode(object)
   return new_object, #new_object
 end
