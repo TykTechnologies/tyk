@@ -349,9 +349,9 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 		if config.OauthRedirectUriSeparator == "" {
 			redirectURI = "http://client.oauth.com"
 
-		// If separator config is set that means multiple redirect uris are supported
+			// If separator config is set that means multiple redirect uris are supported
 		} else {
-			redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com","http://client3.oauth.com"}, config.OauthRedirectUriSeparator)
+			redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.OauthRedirectUriSeparator)
 		}
 		testClient := OAuthClient{
 			ClientID:          "1234",
@@ -685,7 +685,6 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				authStore = thisStorageEngine
 				orgStore = &rpcOrgStore // &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 				config.EnforceOrgDataAge = true
-				config.EnforceOrgQuotas = true
 
 			default:
 				authStore = &redisStore
