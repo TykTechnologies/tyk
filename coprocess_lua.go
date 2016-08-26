@@ -79,19 +79,27 @@ import(
   "github.com/Sirupsen/logrus"
 )
 
-// CoProcessName declares the driver name.
+// CoProcessName specifies the driver name.
 const CoProcessName string = "lua"
 
-const MiddlewareBasePath = "middleware/lua"
+const(
+  // ModuleBasePath points to the Tyk modules path.
+  ModuleBasePath = "coprocess/lua/tyk"
+  // MiddlewareBasePath points to the custom middleware path.
+  MiddlewareBasePath = "middleware/lua"
+)
 
 // MessageType sets the default message type.
 var MessageType = coprocess.JsonMessage
 
+// gMiddlewareCache will hold a pointer to LuaDispatcher.gMiddlewareCache.
 var gMiddlewareCache *map[string]string
 
 // LuaDispatcher implements a coprocess.Dispatcher
 type LuaDispatcher struct {
+  // LuaDispatcher implements the coprocess.Dispatcher interface.
 	coprocess.Dispatcher
+  // MiddlewareCache will keep the middleware file name and contents in memory, the contents will be accessed when a Lua state is initialized.
   MiddlewareCache map[string]string
 }
 
@@ -106,8 +114,11 @@ func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
 	return unsafe.Pointer(newObjectPtr)
 }
 
+// Reload will perform a middleware reload when a hot reload is triggered.
 func (d *LuaDispatcher) Reload() {
-  files, _ := ioutil.ReadDir("./middleware/lua")
+  modules, _ := ioutil.ReadDir(ModuleBasePath)
+  files, _ := ioutil.ReadDir(MiddlewareBasePath)
+
   if d.MiddlewareCache == nil {
     d.MiddlewareCache = make(map[string]string, len(files))
     gMiddlewareCache = &d.MiddlewareCache
@@ -117,7 +128,10 @@ func (d *LuaDispatcher) Reload() {
     }
   }
 
-  for _, f := range files {
+  // Append the custom middleware files at the end of the module array.
+  modules = append(modules, files...)
+
+  for _, f := range modules {
     middlewarePath := path.Join(MiddlewareBasePath, f.Name())
     contents, err := ioutil.ReadFile(middlewarePath)
     if err != nil {
@@ -125,10 +139,9 @@ func (d *LuaDispatcher) Reload() {
         "prefix": "coprocess",
       }).Error("Failed to read middleware file: ", err)
     }
+
     d.MiddlewareCache[f.Name()] = string(contents)
   }
-
-  C.LuaReload()
 }
 
 //export LoadCachedMiddleware
