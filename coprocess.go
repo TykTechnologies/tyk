@@ -30,8 +30,8 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
 
-	"github.com/golang/protobuf/proto"
 	"encoding/json"
+	"github.com/golang/protobuf/proto"
 
 	"bytes"
 	"errors"

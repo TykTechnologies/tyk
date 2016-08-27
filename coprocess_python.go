@@ -161,8 +161,8 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tyk/coprocess"
 )
 
 // CoProcessName declares the driver name.
