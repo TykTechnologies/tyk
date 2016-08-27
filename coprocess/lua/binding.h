@@ -12,6 +12,10 @@ static void LuaReload();
 
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage*);
 static void LuaDispatchEvent(char*);
+
+void LoadCachedMiddleware(void*);
+void LoadCachedModules(void*);
+// void LoadCachedModules(*lua_State);
 // static void Python_DispatchEvent(char*);
 
 #endif
