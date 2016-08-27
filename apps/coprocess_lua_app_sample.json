@@ -37,12 +37,6 @@
           "require_session": false
         }
       ],
-      "post": [
-        {
-          "name": "MyPostMiddleware",
-          "require_session": false
-        }
-      ],
       "driver": "lua"
     },
     "enable_batch_request_support": true
