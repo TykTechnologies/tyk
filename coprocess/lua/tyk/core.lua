@@ -1,5 +1,3 @@
-print("Loading core")
-
 local cjson = require "cjson"
 
 -- Make the current object accessible for helpers.
@@ -7,12 +5,14 @@ object = nil
 
 -- TODO: Cache additional modules
 tyk = {
+  -- req = {},
   req=require("coprocess.lua.tyk.request"),
   header=nil
 }
 
 function dispatch(raw_object)
   object = cjson.decode(raw_object)
+  raw_new_object = nil
 
   -- Environment reference to hook.
   hook_name = object['hook_name']
@@ -28,7 +28,7 @@ function dispatch(raw_object)
   if hook_f then
     local new_request, new_session, metadata
 
-    tyk.header = object['request']['headers']
+    -- tyk.header = object['request']['headers']
 
     if custom_key_auth then
       new_request, new_session, metadata = hook_f(object['request'], object['session'], object['metadata'], object['spec'])
@@ -43,12 +43,12 @@ function dispatch(raw_object)
 
     raw_new_object = cjson.encode(object)
 
-    return raw_new_object, #raw_new_object
+    -- return raw_new_object, #raw_new_object
 
   -- Return the original object and print an error.
   else
-    print("Lua: hook doesn't exist!")
     return raw_object, #raw_object
   end
 
+  return raw_new_object, #raw_new_object
 end
