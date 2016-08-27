@@ -51,17 +51,17 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a list
+		spec.RoundRobin.SetMax(targetData)
 		var td []string
 
 		switch targetData.(type) {
 		case *[]string:
 			td = *targetData.(*[]string)
 		case []string:
+			log.Warning("Raw array found!")
 			td = targetData.([]string)
 		}
 
-		//td := *targetData.(*[]string)
-		spec.RoundRobin.SetMax(td)
 		pos := spec.RoundRobin.GetPos()
 		if pos > (len(td) - 1) {
 			// problem
@@ -79,7 +79,6 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 					// Host is down, skip
 					return GetNextTarget(targetData, spec, tryCount+1)
 				}
-
 				log.Error("[PROXY] [LOAD BALANCING] All hosts seem to be down, all uptime tests are failing!")
 			}
 		}
@@ -100,7 +99,7 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
 	// initalise round robin
 	spec.RoundRobin = &RoundRobin{}
-	spec.RoundRobin.SetMax([]string{})
+	spec.RoundRobin.SetMax(&[]string{})
 
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")
@@ -153,7 +152,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.TargetList, spec, 0))
+				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.TargetList, spec, 0))
 				if lbErr != nil {
 					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
@@ -393,10 +392,6 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 		}).Dial)
 		thisTransport.SetTimeout(timeOut)
 
-	}
-
-	if config.CloseIdleConnections {
-		thisTransport.CloseIdleConnections()
 	}
 
 	if IsWebsocket(req) {

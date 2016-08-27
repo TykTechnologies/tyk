@@ -6,8 +6,8 @@ type RoundRobin struct {
 	cur int
 }
 
-func (r *RoundRobin) SetMax(rp []string) {
-	r.max = len(rp)-1 //len(*rp.(*[]string)) - 1
+func (r *RoundRobin) SetMax(rp interface{}) {
+	r.max = len(*rp.(*[]string)) - 1
 
 	if r.max < 0 {
 		r.max = 0
