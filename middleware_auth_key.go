@@ -25,6 +25,10 @@ func (k *AuthKey) GetConfig() (interface{}, error) {
 	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
 }
 
+func (a *AuthKey) IsEnabledForSpec() bool {
+	return true
+}
+
 func (k *AuthKey) copyResponse(dst io.Writer, src io.Reader) {
 	io.Copy(dst, src)
 }

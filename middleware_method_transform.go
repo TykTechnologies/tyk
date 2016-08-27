@@ -22,6 +22,17 @@ func (t *TransformMethod) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (t *TransformMethod) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.MethodTransforms) > 0 {
+			used = true
+		}
+	}
+
+	return used
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Uee the request status validator to see if it's in our cache list

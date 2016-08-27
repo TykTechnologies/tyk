@@ -4,8 +4,8 @@ import (
 	"bytes"
 	b64 "encoding/base64"
 	"encoding/json"
-	"github.com/gorilla/context"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"io"
 	"io/ioutil"
@@ -94,6 +94,17 @@ func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
 	}
 
 	return thisModuleConfig, nil
+}
+
+func (d *VirtualEndpoint) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range d.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.Virtual) > 0 {
+			used = true
+		}
+	}
+
+	return used
 }
 
 func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {

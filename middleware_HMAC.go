@@ -27,6 +27,10 @@ type HMACMiddleware struct {
 // New lets you do any initializations for the object can be done here
 func (hm *HMACMiddleware) New() {}
 
+func (a *HMACMiddleware) IsEnabledForSpec() bool {
+	return true
+}
+
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (hm *HMACMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil

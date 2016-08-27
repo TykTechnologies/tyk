@@ -40,6 +40,10 @@ func (k *OpenIDMW) New() {
 	}
 }
 
+func (a *OpenIDMW) IsEnabledForSpec() bool {
+	return true
+}
+
 func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 	providers := []openid.Provider{}
 	log.Debug("Setting up providers: ", k.TykMiddleware.Spec.OpenIDOptions.Providers)

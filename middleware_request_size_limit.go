@@ -23,6 +23,17 @@ func (t *RequestSizeLimitMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (t *RequestSizeLimitMiddleware) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.SizeLimit) > 0 {
+			used = true
+		}
+	}
+
+	return used
+}
+
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {
 	statedCL := r.Header.Get("Content-Length")
 	if statedCL == "" {

@@ -21,6 +21,13 @@ func (m *MiddlewareContextVars) GetConfig() (interface{}, error) {
 	return thisModuleConfig, nil
 }
 
+func (a *MiddlewareContextVars) IsEnabledForSpec() bool {
+	if a.Spec.EnableContextVars {
+		return true
+	}
+	return false
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
