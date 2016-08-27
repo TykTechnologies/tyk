@@ -21,5 +21,6 @@ const(
 type Dispatcher interface {
 	Dispatch(unsafe.Pointer) unsafe.Pointer
 	DispatchEvent([]byte)
+	LoadModules()
 	Reload()
 }
