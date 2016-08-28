@@ -19,6 +19,7 @@ tyk.rpc.local.conf
 tyk.rpc.local2.conf
 live_hybrid.conf
 /tyk
+/tyk-bench
 logs/
 test.*.conf
 *.mprof
