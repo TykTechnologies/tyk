@@ -73,8 +73,26 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				// Sentinel is set, fail
 				return false, 1
 			}
-		} else {
+		} else if config.EnableRedisRollingLimiter {
 			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
+				return false, 1
+			}
+		} else {
+			//log.Debug("Using in-memory limiter")
+			// In-memory limiter
+			if BucketStore == nil {
+				InitBucketStore()
+			}
+			thisUserBucket, cErr := BucketStore.Create(key, uint(currentSession.Rate), time.Duration(currentSession.Per)*time.Second)
+
+			if cErr != nil {
+				log.Error("Failed to create bucket!")
+				return false, 1
+			}
+
+			_, errF := thisUserBucket.Add(1)
+			
+			if errF != nil {
 				return false, 1
 			}
 		}
