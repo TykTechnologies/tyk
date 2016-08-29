@@ -1573,6 +1573,7 @@ func start() {
 		go RPCReloadLoop(config.SlaveOptions.RPCKey)
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
+
 }
 
 func generateListener(l net.Listener) (net.Listener, error) {
@@ -1637,6 +1638,16 @@ func startHeartBeat() {
 	go StartBeating(heartbeatConnStr, config.NodeSecret)
 }
 
+func StartDRL() {
+	if !config.EnableSentinelRateLImiter && !config.EnableRedisRollingLimiter {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Initialising distributed rate limiter")
+		SetupDRL()
+		StartRateLimitNotifications()
+	}
+}
+
 func listen(l net.Listener, err error) {
 	ReadTimeout := 120
 	WriteTimeout := 120
@@ -1658,6 +1669,8 @@ func listen(l net.Listener, err error) {
 
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
+
+		StartDRL()
 
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
@@ -1704,6 +1717,7 @@ func listen(l net.Listener, err error) {
 				"prefix": "main",
 			}).Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
+			StartDRL()
 		} else {
 			NodeID = thisID
 			ServiceNonceMutex.Lock()

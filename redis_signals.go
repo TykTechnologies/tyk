@@ -73,6 +73,8 @@ func HandleRedisMsg(message redis.Message) {
 		break
 	case NoticeDashboardConfigRequest:
 		HandleSendMiniConfig(thisMessage.Payload)
+	case NoticeGatewayDRLNotification:
+		OnServerStatusReceivedHandler(thisMessage.Payload)
 	default:
 		HandleReloadMsg()
 		break

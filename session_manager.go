@@ -78,19 +78,22 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				return false, 1
 			}
 		} else {
-			//log.Debug("Using in-memory limiter")
+			log.Info("Using in-memory limiter")
 			// In-memory limiter
 			if BucketStore == nil {
 				InitBucketStore()
 			}
-			thisUserBucket, cErr := BucketStore.Create(key, uint(currentSession.Rate), time.Duration(currentSession.Per)*time.Second)
+			thisUserBucket, cErr := BucketStore.Create(key, 
+				uint(currentSession.Rate * float64(DRLManager.RequestTokenValue)), 
+				time.Duration(currentSession.Per)*time.Second)
 
 			if cErr != nil {
 				log.Error("Failed to create bucket!")
 				return false, 1
 			}
 
-			_, errF := thisUserBucket.Add(1)
+			log.Info("Add is: ", DRLManager.CurrentTokenValue)
+			_, errF := thisUserBucket.Add(uint(DRLManager.CurrentTokenValue))
 			
 			if errF != nil {
 				return false, 1
