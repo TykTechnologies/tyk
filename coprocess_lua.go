@@ -20,9 +20,6 @@ package main
 #include <lualib.h>
 #include <lauxlib.h>
 
-static void LuaReload() {
-}
-
 static void LoadMiddleware(char* middleware_file, char* middleware_contents) {
 }
 
@@ -61,6 +58,15 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
 }
 
 static void LuaDispatchEvent(char* event_json) {
+	lua_State *L = luaL_newstate();
+	luaL_openlibs(L);
+	luaL_dofile(L, "coprocess/lua/tyk/core.lua");
+
+	lua_getglobal(L, "dispatch_event");
+	// lua_pushlstring(L, object->p_data, object->length);
+	int call_result = lua_pcall(L, 1, 1, 0);
+
+	lua_close(L);
 }
 */
 import "C"

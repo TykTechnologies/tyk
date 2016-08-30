@@ -52,3 +52,7 @@ function dispatch(raw_object)
 
   return raw_new_object, #raw_new_object
 end
+
+function dispatch_event(raw_event)
+  print("dispatch_event:", raw_event)
+end
