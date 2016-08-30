@@ -48,6 +48,7 @@ type Config struct {
 	AnalyticsConfig struct {
 		Type                    string   `json:"type"`
 		IgnoredIPs              []string `json:"ignored_ips"`
+		PoolSize int `json:"pool_size"`
 		EnableDetailedRecording bool     `json:"enable_detailed_recording"`
 		EnableGeoIP             bool     `json:"enable_geo_ip"`
 		GeoIPDBLocation         string   `json:"geo_ip_db_path"`
