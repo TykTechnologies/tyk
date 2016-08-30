@@ -783,7 +783,7 @@ func TestWithAnalytics(t *testing.T) {
 	analytics = RedisAnalyticsHandler{
 		Store: &AnalyticsStore,
 	}
-	analytics.Store.Connect()
+	analytics.Init()
 
 	spec := createNonVersionedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
