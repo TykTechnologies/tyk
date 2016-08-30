@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/md5"
+	b64 "encoding/base64"
 	"encoding/hex"
 	"errors"
 	"github.com/gorilla/context"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -68,11 +70,67 @@ func GetIP(ip string) (string, error) {
 	if len(IPWithoutPort) > 1 {
 		ip = IPWithoutPort[0]
 	} else {
-		log.Warning("Strange IP found: ", ip)
-		return "", errors.New("IP Address malformed")
+		if len(IPWithoutPort) == 1 {
+			return ip, nil
+		} else {
+			log.Warning(IPWithoutPort)
+			return ip, errors.New("IP Address malformed")
+		}
+
 	}
 
 	return ip, nil
+}
+
+func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {
+	timeNow := time.Now().Unix()
+	newTTL := timeNow + cacheTTL
+	asStr := strconv.Itoa(int(newTTL))
+	return asStr
+}
+
+func (m *RedisCacheMiddleware) isTimeStampExpired(timestamp string) bool {
+	now := time.Now()
+
+	i, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		log.Error(err)
+	}
+	tm := time.Unix(i, 0)
+
+	log.Debug("Time Now: ", now)
+	log.Debug("Expires: ", tm)
+	if tm.Before(now) {
+		log.Debug("Expriy caught in TS!")
+		return true
+	}
+
+	return false
+}
+
+func (m *RedisCacheMiddleware) encodePayload(payload, timestamp string) string {
+	sEnc := b64.StdEncoding.EncodeToString([]byte(payload))
+	return sEnc + "|" + timestamp
+}
+
+func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, error) {
+	data := strings.Split(payload, "|")
+
+	if len(data) == 1 {
+		return data[0], "", nil
+	}
+
+	if len(data) == 2 {
+		sDec, decodeErr := b64.StdEncoding.DecodeString(data[0])
+		if decodeErr != nil {
+			return "", "", decodeErr
+		}
+
+		return string(sDec), data[1], nil
+	}
+
+	return "", "", errors.New("Decoding failed, array length wrong")
+
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -186,15 +244,28 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 					var wireFormatReq bytes.Buffer
 					reqVal.Write(&wireFormatReq)
 					log.Debug("Cache TTL is:", cacheTTL)
-					go m.CacheStore.SetKey(thisKey, wireFormatReq.String(), cacheTTL)
+					ts := m.getTimeTTL(cacheTTL)
+					toStore := m.encodePayload(wireFormatReq.String(), ts)
+					go m.CacheStore.SetKey(thisKey, toStore, cacheTTL)
 
 				}
 				return nil, 666
 
 			}
 
-			retObj := bytes.NewReader([]byte(retBlob))
-			log.Debug("Cache got: ", retBlob)
+			cachedData, timestamp, decErr := m.decodePayload(string(retBlob))
+			if decErr != nil {
+				log.Error(decErr)
+				return nil, 200
+			}
+
+			if m.isTimeStampExpired(timestamp) {
+				m.CacheStore.DeleteKey(thisKey)
+				return nil, 200
+			}
+
+			retObj := bytes.NewReader([]byte(cachedData))
+			log.Debug("Cache got: ", cachedData)
 
 			asBufioReader := bufio.NewReader(retObj)
 			newRes, resErr := http.ReadResponse(asBufioReader, r)
