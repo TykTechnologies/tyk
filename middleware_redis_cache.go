@@ -57,8 +57,13 @@ func GetIP(ip string) (string, error) {
 	if len(IPWithoutPort) > 1 {
 		ip = IPWithoutPort[0]
 	} else {
-		log.Warning("Strange IP found: ", ip)
-		return "", errors.New("IP Address malformed")
+		if len(IPWithoutPort) == 1 {
+			return ip, nil
+		} else {
+			log.Warning(IPWithoutPort)
+			return ip, errors.New("IP Address malformed")
+		}
+
 	}
 
 	return ip, nil

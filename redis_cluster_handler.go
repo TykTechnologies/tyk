@@ -395,7 +395,7 @@ func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
 	log.Debug("Deleting: ", pattern)
 
 	// here we'll store our iterator value
-	iter := 0
+	iter := "0"
 
 	// this will store the keys of each iteration
 	var keys []string
@@ -403,23 +403,38 @@ func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
 
 		// we scan with our iter offset, starting at 0
 		if arr, err := redis.MultiBulk(r.db.Do("SCAN", iter, "MATCH", pattern)); err != nil {
-			log.Error(err)
+			log.Error("SCAN Token Get Failure: ", err)
 			return false
 		} else {
 
 			// now we get the iter and the keys from the multi-bulk reply
-			iter, _ = redis.Int(arr[0], nil)
+			iter, _ = redis.String(arr[0], nil)
 			theseKeys, _ := redis.Strings(arr[1], nil)
 			keys = append(keys, theseKeys...)
 		}
 
 		// check if we need to stop...
-		if iter == 0 {
+		if iter == "0" {
 			break
 		}
 	}
 
-	return r.DeleteRawKeys(keys, "")
+	if len(keys) > 0 {
+		for _, v := range keys {
+			name := "" + v
+			log.Info("Deleting: ", name)
+			_, err := r.db.Do("DEL", name)
+			if err != nil {
+				log.Error("Error trying to delete key: ", v, " - ", err)
+
+			}
+		}
+		log.Info("Deleted: ", len(keys), " records")
+	} else {
+		log.Debug("RedisClusterStorageManager called DEL - Nothing to delete")
+	}
+
+	return true
 }
 
 // DeleteKeys will remove a group of keys in bulk
