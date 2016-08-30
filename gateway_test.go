@@ -809,6 +809,10 @@ func TestWithAnalytics(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 	chain.ServeHTTP(recorder, req)
 	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req)
+	
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
