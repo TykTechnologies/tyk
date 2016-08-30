@@ -1,8 +1,12 @@
 package main
 
-import "net/http"
+import (
+	"github.com/paulbellamy/ratecounter"
+	"net/http"
+	"time"
+)
 
-import ()
+var GlobalRate *ratecounter.RateCounter = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddlewareImplementation interface {
 	New()

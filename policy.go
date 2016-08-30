@@ -27,6 +27,7 @@ type Policy struct {
 		RateLimit bool `bson:"rate_limit" json:"rate_limit"`
 		Acl       bool `bson:"acl" json:"acl"`
 	} `bson:"partitions" json:"partitions"`
+	LastUpdated string `bson:"last_updated" json:"last_updated"`
 }
 
 type DBAccessDefinition struct {

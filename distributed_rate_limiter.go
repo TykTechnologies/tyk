@@ -1,16 +1,15 @@
 package main
 
 import (
-	"github.com/TykTechnologies/drl"
-	"time"
 	"encoding/json"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/drl"
+	"time"
 )
 
 // TODO:
 /*
 
-1. How to update keys if the token changes? Need to be able to remove the token bucket
 2. Add rate check to init so that we have a load indication
 
 */
@@ -26,20 +25,30 @@ func SetupDRL() {
 }
 
 func StartRateLimitNotifications() {
+	notificationFreq := config.DRLNotificationFrequency
+	if notificationFreq == 0 {
+		notificationFreq = 5
+	}
+
 	go func() {
 		log.Info("Starting gateway rate imiter notifications...")
 		for {
 			NotifyCurrentServerStatus()
-			time.Sleep(5 * time.Second)
+			time.Sleep(time.Duration(notificationFreq) * time.Second)
 		}
 	}()
 }
 
 func NotifyCurrentServerStatus() {
+	rate := GlobalRate.Rate()
+	if rate == 0 {
+		rate = 1
+	}
+
 	thisServer := drl.Server{
 		HostName:   HostDetails.Hostname,
 		ID:         NodeID,
-		LoadPerSec: 1000,
+		LoadPerSec: rate,
 	}
 
 	asJson, jsErr := json.Marshal(thisServer)

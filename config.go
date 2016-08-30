@@ -144,19 +144,20 @@ type Config struct {
 			EnableUptimeAnalytics    bool `json:"enable_uptime_analytics"`
 		} `json:"config"`
 	} `json:"uptime_tests"`
-	HostName             string                                   `json:"hostname"`
-	EnableAPISegregation bool                                     `json:"enable_api_segregation"`
-	ControlAPIHostname   string                                   `json:"control_api_hostname"`
-	EnableCustomDomains  bool                                     `json:"enable_custom_domains"`
-	EnableJSVM           bool                                     `json:"enable_jsvm"`
-	EnableCoProcess      bool                                     `json:"enable_coprocess"`
-	HideGeneratorHeader  bool                                     `json:"hide_generator_header"`
-	EventHandlers        tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
-	EventTriggers        map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
-	PIDFileLocation      string                                   `json:"pid_file_location"`
-	AllowInsecureConfigs bool                                     `json:"allow_insecure_configs"`
-	PublicKeyPath        string                                   `json:"public_key_path"`
-	CloseIdleConnections bool                                     `json:"close_idle_connections"`
+	HostName                 string                                   `json:"hostname"`
+	EnableAPISegregation     bool                                     `json:"enable_api_segregation"`
+	ControlAPIHostname       string                                   `json:"control_api_hostname"`
+	EnableCustomDomains      bool                                     `json:"enable_custom_domains"`
+	EnableJSVM               bool                                     `json:"enable_jsvm"`
+	EnableCoProcess          bool                                     `json:"enable_coprocess"`
+	HideGeneratorHeader      bool                                     `json:"hide_generator_header"`
+	EventHandlers            tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
+	EventTriggers            map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
+	PIDFileLocation          string                                   `json:"pid_file_location"`
+	AllowInsecureConfigs     bool                                     `json:"allow_insecure_configs"`
+	PublicKeyPath            string                                   `json:"public_key_path"`
+	CloseIdleConnections     bool                                     `json:"close_idle_connections"`
+	DRLNotificationFrequency int                                      `json:"drl_notification_frequency"`
 }
 
 type CertData struct {
