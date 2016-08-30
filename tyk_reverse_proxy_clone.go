@@ -51,17 +51,17 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a list
+		spec.RoundRobin.SetMax(targetData)
 		var td []string
 
 		switch targetData.(type) {
 		case *[]string:
 			td = *targetData.(*[]string)
 		case []string:
+			log.Warning("Raw array found!")
 			td = targetData.([]string)
 		}
 
-		//td := *targetData.(*[]string)
-		spec.RoundRobin.SetMax(td)
 		pos := spec.RoundRobin.GetPos()
 		if pos > (len(td) - 1) {
 			// problem
@@ -79,7 +79,6 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 					// Host is down, skip
 					return GetNextTarget(targetData, spec, tryCount+1)
 				}
-
 				log.Error("[PROXY] [LOAD BALANCING] All hosts seem to be down, all uptime tests are failing!")
 			}
 		}
@@ -100,7 +99,7 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
 	// initalise round robin
 	spec.RoundRobin = &RoundRobin{}
-	spec.RoundRobin.SetMax([]string{})
+	spec.RoundRobin.SetMax(&[]string{})
 
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")
@@ -153,7 +152,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.TargetList, spec, 0))
+				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.TargetList, spec, 0))
 				if lbErr != nil {
 					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
@@ -167,18 +166,21 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		// Specifically override with a URL rewrite
 		var newTarget *url.URL
 		switchTargets := false
-		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
-		if found {
-			if URLRewriteContainsTarget.(bool) {
-				log.Debug("Detected host rewrite, overriding target")
-				tmpTarget, pErr := url.Parse(req.URL.String())
-				if pErr != nil {
-					log.Error("Failed to parse URL! Err: ", pErr)
-				} else {
-					newTarget = tmpTarget
-					switchTargets = true
+
+		if spec.URLRewriteEnabled {
+			URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+			if found {
+				if URLRewriteContainsTarget.(bool) {
+					log.Info("Detected host rewrite, overriding target")
+					tmpTarget, pErr := url.Parse(req.URL.String())
+					if pErr != nil {
+						log.Error("Failed to parse URL! Err: ", pErr)
+					} else {
+						newTarget = tmpTarget
+						switchTargets = true
+					}
+					context.Clear(req)
 				}
-				context.Clear(req)
 			}
 		}
 
@@ -342,6 +344,10 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 }
 
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
+	if !spec.EnforcedTimeoutEnabled {
+		return false, 0
+	}
+
 	var stat RequestStatus
 	var meta interface{}
 	var found bool
@@ -362,6 +368,10 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 }
 
 func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Request) (bool, *ExtendedCircuitBreakerMeta) {
+	if !spec.CircuitBreakerEnabled {
+		return false, nil
+	}
+
 	var stat RequestStatus
 	var meta interface{}
 	var found bool
@@ -395,10 +405,6 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 
 	}
 
-	if config.CloseIdleConnections {
-		thisTransport.CloseIdleConnections()
-	}
-
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{*thisTransport, rw, p.TLSClientConfig}
 		return wsTransport
@@ -421,11 +427,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
-	URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
-	if found {
-		if URLRewriteContainsTarget.(bool) {
-			log.Debug("Detected host rewrite, notifying director")
-			context.Set(outreq, RetainHost, true)
+	if p.TykAPISpec.URLRewriteEnabled {
+		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+		if found {
+			if URLRewriteContainsTarget.(bool) {
+				log.Info("Detected host rewrite, notifying director")
+				context.Set(outreq, RetainHost, true)
+			}
 		}
 	}
 
@@ -479,10 +487,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
-	// TODO:
-	// 1. If the circuit breaker is active - wrap the RoundTrip call with a breaker function
-	// 2. when we init the APISpec, we need to create CBs for each monitored endpoint, this means extending the APISpec so we can store pointers
-	// 3. Set up monitoring functions and hook them up to the event handler
 
 	var res *http.Response
 	var err error
@@ -581,10 +585,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ses = sessVal.(SessionState)
 	}
 
-	// Middleware chain handling here - very simple, but should do the trick
-	chainErr := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
-	if chainErr != nil {
-		log.Error("Response chain failed! ", chainErr)
+	if p.TykAPISpec.ResponseHandlersActive {
+		// Middleware chain handling here - very simple, but should do the trick
+		chainErr := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
+		if chainErr != nil {
+			log.Error("Response chain failed! ", chainErr)
+		}
 	}
 
 	// We should at least copy the status code in

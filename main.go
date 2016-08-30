@@ -188,19 +188,19 @@ func waitForZeroConf() {
 func buildConnStr(resource string) string {
 
 	if config.DBAppConfOptions.ConnectionString == "" && config.DisableDashboardZeroConf {
-			log.Fatal("Connection string is empty, failing.")
-			return ""
+		log.Fatal("Connection string is empty, failing.")
+		return ""
 	}
 
 	if config.DisableDashboardZeroConf == false && config.DBAppConfOptions.ConnectionString == "" {
 		log.WithFields(logrus.Fields{
-				"prefix": "main",
+			"prefix": "main",
 		}).Info("Waiting for zeroconf signal...")
 		waitForZeroConf()
 	}
 
 	connStr := config.DBAppConfOptions.ConnectionString
-	connStr = connStr + resource 
+	connStr = connStr + resource
 	return connStr
 }
 
@@ -531,6 +531,9 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 		responseChain[i] = thisProcessor
 	}
 	referenceSpec.ResponseChain = &responseChain
+	if len(responseChain) > 0 {
+		referenceSpec.ResponseHandlersActive = true
+	}
 }
 
 func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
@@ -816,6 +819,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 			//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
 			tykMiddleware := &TykMiddleware{referenceSpec, proxy}
+			CheckCBEnabled(tykMiddleware)
+			CheckETEnabled(tykMiddleware)
 
 			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
 			CacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix}
@@ -830,19 +835,20 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				var chainArray = []alice.Constructor{}
 				handleCORS(&chainArray, referenceSpec)
 
-				var baseChainArray = []alice.Constructor{
-					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
-					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
-				}
+				var baseChainArray = []alice.Constructor{}
+				AppendMiddleware(&baseChainArray, &IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &TransformMiddleware{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware)
+
+				log.Debug(referenceSpec.APIDefinition.Name, " - CHAIN SIZE: ", len(baseChainArray))
 
 				for _, obj := range mwPreFuncs {
 					if mwDriver != tykcommon.OttoDriver {
@@ -882,13 +888,21 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				var chainArray = []alice.Constructor{}
 
 				handleCORS(&chainArray, referenceSpec)
-				var baseChainArray_PreAuth = []alice.Constructor{
-					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-				}
+
+				var baseChainArray_PreAuth = []alice.Constructor{}
+				AppendMiddleware(&baseChainArray_PreAuth, &IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PreAuth, &OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PreAuth, &VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PreAuth, &RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PreAuth, &MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware)
+
+				// var baseChainArray_PreAuth = []alice.Constructor{
+				// 	CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// }
 
 				// Add pre-process MW
 				for _, obj := range mwPreFuncs {
@@ -987,18 +1001,30 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					}
 				}
 
-				var baseChainArray_PostAuth = []alice.Constructor{
-					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
-					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
-				}
+				var baseChainArray_PostAuth = []alice.Constructor{}
+				AppendMiddleware(&baseChainArray_PostAuth, &KeyExpired{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &AccessRightsCheck{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &GranularAccessMiddleware{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &TransformMiddleware{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray_PostAuth, &VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware)
+
+				// var baseChainArray_PostAuth = []alice.Constructor{
+				// 	CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
+				// 	CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// 	CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
+				// }
 
 				for _, baseMw := range baseChainArray_PostAuth {
 					chainArray = append(chainArray, baseMw)
@@ -1588,7 +1614,7 @@ func handleDashboardRegistration() {
 	if config.UseDBAppConfigs {
 
 		connStr := buildConnStr("/register/node")
-		
+
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Registering node.")

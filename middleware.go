@@ -8,6 +8,7 @@ type TykMiddlewareImplementation interface {
 	New()
 	GetConfig() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) // Handles request
+	IsEnabledForSpec() bool
 }
 
 func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {

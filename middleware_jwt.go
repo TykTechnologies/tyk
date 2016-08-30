@@ -49,6 +49,10 @@ func (k *JWTMiddleware) GetConfig() (interface{}, error) {
 	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
 }
 
+func (a *JWTMiddleware) IsEnabledForSpec() bool {
+	return true
+}
+
 func (k *JWTMiddleware) copyResponse(dst io.Writer, src io.Reader) {
 	io.Copy(dst, src)
 }
