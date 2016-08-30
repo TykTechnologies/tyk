@@ -322,7 +322,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			thisRecord.NormalisePath()
 		}
 
-		go analytics.RecordHit(thisRecord)
+		analytics.RecordHit(thisRecord)
 	}
 
 	// Report in health check
