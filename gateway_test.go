@@ -774,7 +774,7 @@ func TestQuota(t *testing.T) {
 	}
 }
 
-func TestWithAnalytics(t *testing.T) {
+func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
 	config.EnableAnalytics = true
 
 	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
@@ -783,6 +783,7 @@ func TestWithAnalytics(t *testing.T) {
 	analytics = RedisAnalyticsHandler{
 		Store: &AnalyticsStore,
 	}
+	analytics.Store.Connect()
 	analytics.Init()
 
 	spec := createNonVersionedDefinition()
@@ -809,10 +810,6 @@ func TestWithAnalytics(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 	chain.ServeHTTP(recorder, req)
 	chain.ServeHTTP(recorder, req)
-	chain.ServeHTTP(recorder, req)
-	chain.ServeHTTP(recorder, req)
-	chain.ServeHTTP(recorder, req)
-	
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code)
@@ -836,6 +833,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 		Store: &AnalyticsStore,
 	}
 	analytics.Store.Connect()
+	analytics.Init()
 
 	spec := createNonVersionedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}

@@ -191,7 +191,7 @@ func (r *RedisAnalyticsHandler) Init() {
 		ps = 50
 	}
 
-	AnalyticsPool, err = tunny.CreatePoolGeneric(config.AnalyticsConfig.PoolSize).Open()
+	AnalyticsPool, err = tunny.CreatePoolGeneric(ps).Open()
 	if err != nil {
 		log.Error("Failed to init analytics pool")
 	}
