@@ -51,6 +51,7 @@ type AnalyticsConfigConfig struct {
 	EnableGeoIP             bool                `json:"enable_geo_ip"`
 	GeoIPDBLocation         string              `json:"geo_ip_db_path"`
 	NormaliseUrls           NormalisedURLConfig `json:"normalise_urls"`
+	PoolSize                int                 `json:"pool_size"`
 	ignoredIPsCompiled      map[string]bool
 }
 
@@ -159,6 +160,7 @@ type Config struct {
 	ExperimentalProcessOrgOffThread   bool                   `json:"experimental_process_org_off_thread"`
 	EnableNonTransactionalRateLimiter bool                   `json:"enable_non_transactional_rate_limiter"`
 	EnableSentinelRateLImiter         bool                   `json:"enable_sentinel_rate_limiter"`
+	EnableRedisRollingLimiter         bool                   `json:"enable_redis_rolling_limiter"`
 	Monitor                           MonitorConfig
 	OauthRefreshExpire                int64                                    `json:"oauth_refresh_token_expire"`
 	OauthTokenExpire                  int32                                    `json:"oauth_token_expire"`
@@ -184,6 +186,7 @@ type Config struct {
 	AllowInsecureConfigs              bool                                     `json:"allow_insecure_configs"`
 	PublicKeyPath                     string                                   `json:"public_key_path"`
 	CloseIdleConnections              bool                                     `json:"close_idle_connections"`
+	DRLNotificationFrequency          int                                      `json:"drl_notification_frequency"`
 }
 
 type CertData struct {

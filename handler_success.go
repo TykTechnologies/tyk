@@ -124,6 +124,9 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 					thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 					thisSession.Rate = policy.Rate
 					thisSession.Per = policy.Per
+					if policy.LastUpdated != "" {
+						thisSession.LastUpdated = policy.LastUpdated
+					}
 				}
 
 				if policy.Partitions.Acl {
@@ -144,6 +147,9 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 				thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 				thisSession.Rate = policy.Rate
 				thisSession.Per = policy.Per
+				if policy.LastUpdated != "" {
+					thisSession.LastUpdated = policy.LastUpdated
+				}
 
 				// ACL
 				thisSession.AccessRights = policy.AccessRights

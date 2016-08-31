@@ -25,6 +25,10 @@ func (k *BasicAuthKeyIsValid) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (a *BasicAuthKeyIsValid) IsEnabledForSpec() bool {
+	return true
+}
+
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
 func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {
 	authReply := "Basic realm=\"" + k.TykMiddleware.Spec.Name + "\""

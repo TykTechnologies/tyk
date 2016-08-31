@@ -25,6 +25,13 @@ func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
+	if k.TykMiddleware.Spec.DisableRateLimit && k.TykMiddleware.Spec.DisableQuota {
+		return false
+	}
+	return true
+}
+
 func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(w http.ResponseWriter, r *http.Request, authHeaderValue string) (error, int) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,

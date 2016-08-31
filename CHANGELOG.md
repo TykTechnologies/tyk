@@ -39,6 +39,9 @@ If the transport or address are empty, syslog will log to file
 - It's now possible to write custom middleware in Python (see [Coprocess](https://github.com/TykTechnologies/tyk/tree/experiment/coprocess/coprocess)).
 - Tyk gateway can now be hot-restarted with a new configuration / binary using the -SUGUSR2 signal
 - Tyk gateway (with dashboard) no longer needs the dashboard URL configured as it will auto-discover this so long as it is set in the dashboard configuration file
+- Tyk Gateway now uses "lazy loading" of middleware, so only the absolute minimum required processing is done for each request, this includes CB and other features
+- Introduced a new in-memory distributed rate limiter, this removes the dependency on redis and makes performance much smoother, the DRL will measure load on each node and modify rate limits accordingly (so for example, on two nodes, the rate limit must be split between them), depending on the way the load is being distributed, one node may be getting less traffic than the others, the trate limiter will attempt to compensate for this. Load information is broadcast via redis pub/sub every 5s, this can be changed in tyk.conf. it is possible to use the old rate limiter too, simply ensure that `enable_redis_rolling_limiter` is set to true.
+- Analytics riter now uses a managed pool, this mean a smoother performance curve under very high load (2k req p/s)
 
 # v2.2
 

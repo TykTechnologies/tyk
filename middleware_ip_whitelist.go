@@ -20,6 +20,18 @@ func (i *IPWhiteListMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (i *IPWhiteListMiddleware) IsEnabledForSpec() bool {
+	if !i.TykMiddleware.Spec.EnableIpWhiteListing {
+		return false
+	}
+
+	if len(i.TykMiddleware.Spec.AllowedIPs) == 0 {
+		return false
+	}
+
+	return true
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Disabled, pass through

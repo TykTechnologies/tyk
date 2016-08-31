@@ -103,6 +103,10 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func IsWebsocket(req *http.Request) bool {
+	if !config.HttpServerOptions.EnableWebSockets {
+		return false
+	}
+
 	connection := strings.ToLower(strings.TrimSpace(req.Header.Get("Connection")))
 	if connection != "upgrade" {
 		return false

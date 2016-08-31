@@ -23,6 +23,10 @@ type DummyCoProcessMiddleware struct {
 
 func (m *DummyCoProcessMiddleware) New() {}
 
+func (a *DummyCoProcessMiddleware) IsEnabledForSpec() bool {
+	return false
+}
+
 func (m *DummyCoProcessMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }

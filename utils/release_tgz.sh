@@ -48,7 +48,7 @@ mkdir -p $armTGZDIR
 
 
 echo "Building binaries"
-gox -os="linux"
+gox -osarch="linux/arm linux/amd64 linux/386"
 
 rc=$?
 if [[ $rc != 0 ]] ; then

@@ -24,6 +24,10 @@ func (k *Oauth2KeyExists) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (a *Oauth2KeyExists) IsEnabledForSpec() bool {
+	return true
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
