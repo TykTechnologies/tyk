@@ -7,7 +7,12 @@ type RoundRobin struct {
 }
 
 func (r *RoundRobin) SetMax(rp interface{}) {
-	r.max = len(*rp.(*[]string)) - 1
+	switch rp.(type) {
+	case *[]string:
+		r.max = len(*rp.(*[]string)) - 1
+	case []string:
+		r.max = len(rp.([]string)) - 1
+	}
 
 	if r.max < 0 {
 		r.max = 0
