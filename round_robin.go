@@ -14,8 +14,6 @@ func (r *RoundRobin) SetMax(rp interface{}) {
 		r.max = len(rp.([]string)) - 1
 	}
 
-	r.max = len(*rp.(*[]string)) - 1
-
 	if r.max < 0 {
 		r.max = 0
 	}
