@@ -1,12 +1,14 @@
 package main
 
 import "testing"
+import "github.com/TykTechnologies/tykcommon"
 
 func TestRR(t *testing.T) {
 	thisArr1 := []string{"1", "2", "3"}
 
 	thisRR := RoundRobin{}
-	thisRR.SetMax(&thisArr1)
+	asHL := tykcommon.NewHostListFromList(thisArr1)
+	thisRR.SetMax(asHL)
 
 	val := thisRR.GetPos()
 
