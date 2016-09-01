@@ -109,7 +109,7 @@ func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
 	subContainer := gabs.Container{}
 	switch parentData.(type) {
 	default:
-		log.Info("Get Nested Object: parentData is not a string")
+		log.Debug("Get Nested Object: parentData is not a string")
 		return ""
 	case string:
 	}
@@ -119,7 +119,7 @@ func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
 	hostnameData := s.decodeToNameSpace(s.dataPath, &subContainer)
 	switch hostnameData.(type) {
 	default:
-		log.Info("Get Nested Object: hostname is not a string")
+		log.Debug("Get Nested Object: hostname is not a string")
 		return ""
 	case string:
 	}
@@ -181,7 +181,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 
 			switch parentData.(type) {
 			default:
-				log.Info("parentData is not a string")
+				log.Debug("parentData is not a string")
 				return &hostList
 			case string:
 			}
@@ -206,7 +206,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 				log.Debug("Not a list")
 				switch parentData.(type) {
 				default:
-					log.Info("parentData is not a string")
+					log.Debug("parentData is not a string")
 				case string:
 					s.ParseObject(parentData.(string), &subContainer)
 					thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
@@ -227,7 +227,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 			hostList = append(hostList, hostname)
 		}
 	} else {
-		log.Info("Set is nil")
+		log.Debug("Set is nil")
 	}
 	return &hostList
 }
@@ -256,10 +256,10 @@ func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Contain
 	return pErr
 }
 
-func (s *ServiceDiscovery) ProcessRawData(rawData string) (interface{}, error) {
+func (s *ServiceDiscovery) ProcessRawData(rawData string) (*tykcommon.HostList, error) {
 	var jsonParsed gabs.Container
 
-	var hostlist *[]string
+	hostlist := tykcommon.NewHostList()
 
 	if s.endpointReturnsList {
 		// Convert to an object
@@ -274,8 +274,9 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (interface{}, error) {
 		// Treat JSON as a list and then apply the data path
 		if s.isTargetList {
 			// Get all values
-			hostlist = s.GetSubObjectFromList(&jsonParsed)
-			log.Debug("Host list:", hostlist)
+			asList := s.GetSubObjectFromList(&jsonParsed)
+			log.Debug("Host list:", asList)
+			hostlist.Set(*asList)
 			return hostlist, nil
 		}
 
@@ -287,7 +288,8 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (interface{}, error) {
 			break
 		}
 
-		return host, nil
+		hostlist.Set([]string{host})
+		return hostlist, nil
 	}
 
 	// It's an object
@@ -296,17 +298,21 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (interface{}, error) {
 		// It's a list object
 		log.Debug("It's a target list - getting sub object from list")
 		log.Debug("Passing in: ", jsonParsed)
-		hostlist = s.GetSubObjectFromList(&jsonParsed)
+
+		asList := s.GetSubObjectFromList(&jsonParsed)
+		hostlist.Set(*asList)
 		log.Debug("Got from object: ", hostlist)
 		return hostlist, nil
 	}
 
 	// It's a single object
 	host := s.GetSubObject(&jsonParsed)
-	return host, nil
+	hostlist.Set([]string{host})
+
+	return hostlist, nil
 }
 
-func (s *ServiceDiscovery) GetTarget(serviceURL string) (interface{}, error) {
+func (s *ServiceDiscovery) GetTarget(serviceURL string) (*tykcommon.HostList, error) {
 	// Get the data
 	rawData, err := s.getServiceData(serviceURL)
 	if err != nil {

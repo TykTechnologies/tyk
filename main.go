@@ -694,6 +694,12 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			}).Error("Culdn't parse target URL: ", err)
 		}
 
+		// Set up LB targets:
+		if referenceSpec.Proxy.EnableLoadBalancing {
+			thisSL := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
+			referenceSpec.Proxy.StructuredTargetList = *thisSL
+		}
+
 		if !skip {
 
 			listenPaths[referenceSpec.Proxy.ListenPath] = append(listenPaths[referenceSpec.Proxy.ListenPath], referenceSpec.Domain)

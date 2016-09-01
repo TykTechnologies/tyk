@@ -112,6 +112,7 @@ type ExtendedCircuitBreakerMeta struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	tykcommon.APIDefinition
+
 	RxPaths                map[string][]URLSpec
 	WhiteListEnabled       map[string]bool
 	target                 *url.URL
@@ -128,6 +129,9 @@ type APISpec struct {
 	CircuitBreakerEnabled  bool
 	EnforcedTimeoutEnabled bool
 	ResponseHandlersActive bool
+	LastGoodHostList  *tykcommon.HostList
+	HasRun          bool
+	ServiceRefreshInProgress bool
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
