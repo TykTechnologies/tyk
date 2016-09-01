@@ -1,18 +1,20 @@
 package main
 
+import (
+	"github.com/TykTechnologies/tykcommon"
+)
+
 type RoundRobin struct {
 	pos int
 	max int
 	cur int
 }
 
-func (r *RoundRobin) SetMax(rp interface{}) {
-	switch rp.(type) {
-	case *[]string:
-		r.max = len(*rp.(*[]string)) - 1
-	case []string:
-		r.max = len(rp.([]string)) - 1
-	}
+func (r *RoundRobin) SetMax(rp *tykcommon.HostList) {
+	
+	// r.max = len(*rp.(*[]string)) - 1
+	r.max = rp.Len() - 1
+	
 
 	if r.max < 0 {
 		r.max = 0

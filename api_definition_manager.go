@@ -124,6 +124,9 @@ type APISpec struct {
 	JSVM              *JSVM
 	ResponseChain     *[]TykResponseHandler
 	RoundRobin        *RoundRobin
+	LastGoodHostList  *tykcommon.HostList
+	HasRun          bool
+	ServiceRefreshInProgress bool
 }
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
