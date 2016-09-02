@@ -328,7 +328,7 @@ var basicCoProcessDef string = `
     },
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://izumi.tykbeta.com",
+			"target_url": "http://httpbin.org",
 			"strip_listen_path": false
 		}
 	}
