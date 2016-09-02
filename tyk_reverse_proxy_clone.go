@@ -21,16 +21,56 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"github.com/TykTechnologies/tykcommon"
+
 )
 
 var ServiceCache *cache.Cache
 
-func GetURLFromService(spec *APISpec) (interface{}, error) {
-	sd := ServiceDiscovery{}
-	sd.New(&spec.Proxy.ServiceDiscovery)
-	data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
+func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 
-	return data, err
+	doCacheRefresh := func () (*tykcommon.HostList, error) {
+		log.Debug("--> Refreshing")
+		spec.ServiceRefreshInProgress = true
+		sd := ServiceDiscovery{}
+		sd.New(&spec.Proxy.ServiceDiscovery)
+		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)	
+		if err == nil {
+			// Set the cached value
+			ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
+			// Stash it too
+			spec.LastGoodHostList = data
+			spec.HasRun = true
+			spec.ServiceRefreshInProgress = false
+			return data, err
+		}
+		spec.ServiceRefreshInProgress = false
+		return nil, err
+	}
+
+	// First time? Refresh the cache and return that
+	if !spec.HasRun {
+		log.Debug("First run! Setting cache")
+		return doCacheRefresh()
+	}
+
+	// Not first run - check the cache
+	cachedServiceData, found := ServiceCache.Get(spec.APIID)
+	if !found {
+		if spec.ServiceRefreshInProgress {
+			// Are we already refreshing the cache? skip and return last good conf
+			log.Debug("Cache expired! But service refresh in progress")
+			return spec.LastGoodHostList, nil
+		} else {
+			// Refresh the spec
+			log.Debug("Cache expired! Refreshing...")
+			return doCacheRefresh()
+		}
+		
+	}
+
+	log.Debug("Returning from cache.")
+	return cachedServiceData.(*tykcommon.HostList), nil
 }
 
 func EnsureTransport(host string) string {
@@ -47,35 +87,32 @@ func EnsureTransport(host string) string {
 	return host
 }
 
-func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
+func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec, tryCount int) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
-		// Use a list
+		// Use a HostList
 		spec.RoundRobin.SetMax(targetData)
-		var td []string
-
-		switch targetData.(type) {
-		case *[]string:
-			td = *targetData.(*[]string)
-		case []string:
-			log.Warning("Raw array found!")
-			td = targetData.([]string)
-		}
 
 		pos := spec.RoundRobin.GetPos()
-		if pos > (len(td) - 1) {
+		if pos > (targetData.Len() - 1) {
 			// problem
-			spec.RoundRobin.SetMax(td)
+			spec.RoundRobin.SetMax(targetData)
 			pos = 0
 		}
 
-		thisHost := EnsureTransport(td[pos])
+		gotHost, err := targetData.GetIndex(pos)
+		if err != nil {
+			log.Error("[PROXY] [LOAD BALANCING] ", err)
+			return gotHost
+		}
+
+		thisHost := EnsureTransport(gotHost)
 
 		// Check hosts against uptime tests
 		if spec.Proxy.CheckHostAgainstUptimeTests {
 			if !GlobalHostChecker.IsHostDown(thisHost) {
 				// Don't overdo it
-				if tryCount < len(td) {
+				if tryCount < targetData.Len() {
 					// Host is down, skip
 					return GetNextTarget(targetData, spec, tryCount+1)
 				}
@@ -87,7 +124,13 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 	}
 	// Use standard target - might still be service data
 	log.Debug("TARGET DATA:", targetData)
-	return EnsureTransport(targetData.(string))
+
+	gotHost, err := targetData.GetIndex(0)
+	if err != nil {
+		log.Error("[PROXY] ", err)
+		return gotHost
+	}
+	return EnsureTransport(gotHost)
 }
 
 // TykNewSingleHostReverseProxy returns a new ReverseProxy that rewrites
@@ -99,7 +142,7 @@ func GetNextTarget(targetData interface{}, spec *APISpec, tryCount int) string {
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
 	// initalise round robin
 	spec.RoundRobin = &RoundRobin{}
-	spec.RoundRobin.SetMax(&[]string{})
+	spec.RoundRobin.SetMax(tykcommon.NewHostList())
 
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")
@@ -123,8 +166,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			} else {
 				// No error, replace the target
 				if spec.Proxy.EnableLoadBalancing {
-					var targetPtr *[]string = tempTargetURL.(*[]string)
-					remote, err := url.Parse(GetNextTarget(targetPtr, spec, 0))
+					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec, 0))
 					if err != nil {
 						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
 					} else {
@@ -133,8 +175,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 						targetQuery = target.RawQuery
 					}
 				} else {
-					var targetPtr string = tempTargetURL.(string)
-					remote, err := url.Parse(GetNextTarget(targetPtr, spec, 0))
+					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec, 0))
 					if err != nil {
 						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
 					} else {
@@ -152,7 +193,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.TargetList, spec, 0))
+				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.StructuredTargetList, spec, 0))
 				if lbErr != nil {
 					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
@@ -171,7 +212,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
 			if found {
 				if URLRewriteContainsTarget.(bool) {
-					log.Info("Detected host rewrite, overriding target")
+					log.Debug("Detected host rewrite, overriding target")
 					tmpTarget, pErr := url.Parse(req.URL.String())
 					if pErr != nil {
 						log.Error("Failed to parse URL! Err: ", pErr)
@@ -431,7 +472,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
 		if found {
 			if URLRewriteContainsTarget.(bool) {
-				log.Info("Detected host rewrite, notifying director")
+				log.Debug("Detected host rewrite, notifying director")
 				context.Set(outreq, RetainHost, true)
 			}
 		}

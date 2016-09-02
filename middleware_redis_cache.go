@@ -202,6 +202,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				cacheThisRequest := true
 				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
 
+				if reqVal == nil {
+					log.Warning("Upstream request musthave failed, response is empty")
+					return nil, 200
+				}
+
 				// make sure the status codes match if specified
 				if len(m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes) > 0 {
 					foundCode := false
@@ -255,7 +260,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			cachedData, timestamp, decErr := m.decodePayload(string(retBlob))
 			if decErr != nil {
-				log.Error(decErr)
+				// Tere was an issue with this cache entry - lets remove it:
+				m.CacheStore.DeleteKey(thisKey)
 				return nil, 200
 			}
 

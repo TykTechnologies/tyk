@@ -694,6 +694,12 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			}).Error("Culdn't parse target URL: ", err)
 		}
 
+		// Set up LB targets:
+		if referenceSpec.Proxy.EnableLoadBalancing {
+			thisSL := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
+			referenceSpec.Proxy.StructuredTargetList = *thisSL
+		}
+
 		if !skip {
 
 			listenPaths[referenceSpec.Proxy.ListenPath] = append(listenPaths[referenceSpec.Proxy.ListenPath], referenceSpec.Domain)
@@ -836,6 +842,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				handleCORS(&chainArray, referenceSpec)
 
 				var baseChainArray = []alice.Constructor{}
+				AppendMiddleware(&baseChainArray, &RateCheckMW{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware)
@@ -890,6 +897,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				handleCORS(&chainArray, referenceSpec)
 
 				var baseChainArray_PreAuth = []alice.Constructor{}
+				AppendMiddleware(&baseChainArray_PreAuth, &RateCheckMW{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray_PreAuth, &IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray_PreAuth, &OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray_PreAuth, &VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware)
@@ -1573,6 +1581,7 @@ func start() {
 		go RPCReloadLoop(config.SlaveOptions.RPCKey)
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
+
 }
 
 func generateListener(l net.Listener) (net.Listener, error) {
@@ -1637,6 +1646,16 @@ func startHeartBeat() {
 	go StartBeating(heartbeatConnStr, config.NodeSecret)
 }
 
+func StartDRL() {
+	if !config.EnableSentinelRateLImiter && !config.EnableRedisRollingLimiter {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Initialising distributed rate limiter")
+		SetupDRL()
+		StartRateLimitNotifications()
+	}
+}
+
 func listen(l net.Listener, err error) {
 	ReadTimeout := 120
 	WriteTimeout := 120
@@ -1658,6 +1677,8 @@ func listen(l net.Listener, err error) {
 
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
+
+		StartDRL()
 
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
@@ -1704,6 +1725,7 @@ func listen(l net.Listener, err error) {
 				"prefix": "main",
 			}).Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
+			StartDRL()
 		} else {
 			NodeID = thisID
 			ServiceNonceMutex.Lock()

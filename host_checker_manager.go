@@ -399,7 +399,8 @@ func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, erro
 
 	// The returned data is a string, so lets unmarshal it:
 	checkTargets := make([]tykcommon.HostCheckObject, 0)
-	decodeErr := json.Unmarshal([]byte(data.(string)), &checkTargets)
+	thisData, _ := data.GetIndex(0)
+	decodeErr := json.Unmarshal([]byte(thisData), &checkTargets)
 
 	if decodeErr != nil {
 		log.WithFields(logrus.Fields{
