@@ -260,7 +260,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			cachedData, timestamp, decErr := m.decodePayload(string(retBlob))
 			if decErr != nil {
-				log.Error(decErr)
+				// Tere was an issue with this cache entry - lets remove it:
+				m.CacheStore.DeleteKey(thisKey)
 				return nil, 200
 			}
 
