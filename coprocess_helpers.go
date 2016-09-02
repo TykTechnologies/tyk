@@ -72,6 +72,7 @@ func TykSessionState(sessionState *coprocess.SessionState) SessionState {
 		nil,
 		sessionState.Tags,
 		sessionState.Alias,
+		sessionState.LastUpdated,
 	}
 
 	return session
@@ -132,6 +133,7 @@ func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
 		"",
 		sessionState.Tags,
 		sessionState.Alias,
+		sessionState.LastUpdated,
 	}
 
 	return session
