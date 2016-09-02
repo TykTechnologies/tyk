@@ -34,8 +34,8 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
   lua_State *L = luaL_newstate();
 
   luaL_openlibs(L);
-  luaL_dofile(L, "coprocess/lua/tyk/core.lua");
-  // LoadCachedModules(L);
+  // luaL_dofile(L, "coprocess/lua/tyk/core.lua");
+  LoadCachedModules(L);
 
   LoadCachedMiddleware(L);
   lua_getglobal(L, "dispatch");
@@ -75,6 +75,7 @@ import (
 	"io/ioutil"
 	"path"
 	"unsafe"
+	// "strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -85,7 +86,7 @@ const CoProcessName string = "lua"
 
 const (
 	// ModuleBasePath points to the Tyk modules path.
-	ModuleBasePath = "coprocess/lua/tyk"
+	ModuleBasePath = "coprocess/lua"
 	// MiddlewareBasePath points to the custom middleware path.
 	MiddlewareBasePath = "middleware/lua"
 )
@@ -145,34 +146,31 @@ func (d *LuaDispatcher) Reload() {
 }
 
 func (d *LuaDispatcher) LoadModules() {
+	log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	}).Info("Loading Tyk/Lua modules.")
+
 	if d.ModuleCache == nil {
 		d.ModuleCache = make(map[string]string, 0)
 		gModuleCache = &d.ModuleCache
 	}
 
-	modules, _ := ioutil.ReadDir(ModuleBasePath)
-	for _, f := range modules {
-		middlewarePath := path.Join(ModuleBasePath, f.Name())
-		contents, err := ioutil.ReadFile(middlewarePath)
-		// log.Println("*** Reading module", f.Name(), contents)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "coprocess",
-			}).Error("Failed to read middleware file: ", err)
-		}
+	middlewarePath := path.Join(ModuleBasePath, "bundle.lua")
+	contents, err := ioutil.ReadFile(middlewarePath)
 
-		d.ModuleCache[f.Name()] = string(contents)
+	if err == nil {
+		d.ModuleCache["bundle.lua"] = string(contents)
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Error("Failed to read bundle file: ", err)
 	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Info("Loading Tyk/Lua modules.")
 }
 
 //export LoadCachedModules
 func LoadCachedModules(luaState unsafe.Pointer) {
 	for moduleName, moduleContents := range *gModuleCache {
-		log.Println("Loading", moduleName)
+		log.Println("Loading cached module:", moduleName)
 		var cModuleName, cModuleContents *C.char
 		cModuleName = C.CString(moduleName)
 		cModuleContents = C.CString(moduleContents)
@@ -186,7 +184,7 @@ func LoadCachedModules(luaState unsafe.Pointer) {
 //export LoadCachedMiddleware
 func LoadCachedMiddleware(luaState unsafe.Pointer) {
 	for middlewareName, middlewareContents := range *gMiddlewareCache {
-		log.Println("Loading", middlewareName)
+		log.Println("Loading cached middleware:", middlewareName)
 		var cMiddlewareName, cMiddlewareContents *C.char
 		cMiddlewareName = C.CString(middlewareName)
 		cMiddlewareContents = C.CString(middlewareContents)
