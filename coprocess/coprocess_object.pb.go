@@ -59,8 +59,6 @@ func init() {
 	proto.RegisterType((*Object)(nil), "coprocess.Object")
 }
 
-func init() { proto.RegisterFile("coprocess_object.proto", fileDescriptor2) }
-
 var fileDescriptor2 = []byte{
 	// 306 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x94, 0x91, 0xc1, 0x4b, 0xc3, 0x30,

@@ -64,4 +64,5 @@ message SessionState {
 
   repeated string tags = 24;
   string alias = 25;
+  string last_updated = 26;
 }
