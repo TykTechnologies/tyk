@@ -705,13 +705,14 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 			return 0, []interface{}{}
 		}
 
+		if err != nil {
+			log.Error("Multi command failed: ", err)
+			return 0, make([]interface{}, 0)
+		}
+
 		intVal := len(redVal[1].([]interface{}))
 
 		log.Debug("Returned: ", intVal)
-
-		if err != nil {
-			log.Error("Multi command failed: ", err)
-		}
 
 		return intVal, redVal[1].([]interface{})
 	}
@@ -755,13 +756,13 @@ func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, pe
 
 		redVal, err := redis.Values(r.db.DoPipeline([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
 
-		intVal := len(redVal[1].([]interface{}))
-
-		log.Debug("Returned: ", intVal)
-
 		if err != nil {
 			log.Error("Multi command failed: ", err)
+			return 0, make([]interface{}, 0)
 		}
+
+		intVal := len(redVal[1].([]interface{}))
+		log.Debug("Returned: ", intVal)
 
 		return intVal, redVal[1].([]interface{})
 	}
