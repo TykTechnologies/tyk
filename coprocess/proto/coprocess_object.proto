@@ -14,3 +14,7 @@ message Object {
   map<string, string> metadata = 5;
   map<string, string> spec = 6;
 }
+
+service Dispatcher {
+  rpc Dispatch (Object) returns (Object) {}
+}
