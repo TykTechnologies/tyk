@@ -177,7 +177,6 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	}
 
 	if CoProcessName == "grpc" {
-		log.Println("CoProcessName == grpc")
 		GlobalDispatcher.DispatchObject(object)
 		return object
 	}

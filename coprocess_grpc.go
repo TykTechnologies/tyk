@@ -43,7 +43,9 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) *coprocess.Object {
 	newObject, err := grpcClient.Dispatch(context.Background(), object)
 	if err != nil {
-		panic(err)
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess-grpc",
+		}).Error(err)
 	}
 	return newObject
 }
@@ -58,17 +60,12 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	dispatcher, err = &GRPCDispatcher{}, nil
 
 	grpcConnection, err = grpc.Dial(address, grpc.WithInsecure())
-	// defer grpcConnection.Close()
 
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
-	// dispatcher.LoadModules()
-
-	// dispatcher.Reload()
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
+			"prefix": "coprocess-grpc",
 		}).Error(err)
 	}
 
