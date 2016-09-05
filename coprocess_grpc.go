@@ -41,21 +41,11 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) *coprocess.Object {
-	log.Println("GRPCDispatcher.DispatchObject")
-	r, err := grpcClient.Dispatch(context.Background(), object)
-
-	log.Println("r =", r, "err=", err)
-
-	/*
-	var object *C.struct_CoProcessMessage
-	object = (*C.struct_CoProcessMessage)(objectPtr)
-
-	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = C.LuaDispatchHook(object)
-
-	return unsafe.Pointer(newObjectPtr)
-	*/
-	return object
+	newObject, err := grpcClient.Dispatch(context.Background(), object)
+	if err != nil {
+		panic(err)
+	}
+	return newObject
 }
 
 // Reload will perform a middleware reload when a hot reload is triggered.
