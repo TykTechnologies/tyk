@@ -6,6 +6,7 @@ cd .. ; ls -l *.pb.go ; cd -
 echo "Generating bindings for Python."
 mkdir -p ../bindings/python
 protoc -I. --python_out=../bindings/python *.proto
+python codegen.py
 cd ../bindings/python ; ls -l *.py ; cd -
 
 echo "Generating bindings for Ruby."
