@@ -20,6 +20,7 @@ const(
 // CoProcessDispatcher defines a basic interface for the CP dispatcher, check PythonDispatcher for reference.
 type Dispatcher interface {
 	Dispatch(unsafe.Pointer) unsafe.Pointer
+	DispatchObject(*Object) *Object
 	DispatchEvent([]byte)
 	LoadModules()
 	Reload()
