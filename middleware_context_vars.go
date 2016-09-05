@@ -44,6 +44,13 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		// Form params (map[string][]string)
 		contextDataObject["request_data"] = copiedRequest.Form
 
+		contextDataObject["headers"] = map[string][]string(copiedRequest.Header)
+
+		for hname, vals := range copiedRequest.Header {
+			n := "headers_" + strings.Replace(hname, "-", "_", -1)
+			contextDataObject[n] = vals[0]
+		}
+
 		// Path parts
 		segmentedPathArray := strings.Split(copiedRequest.URL.Path, "/")
 		contextDataObject["path_parts"] = segmentedPathArray
