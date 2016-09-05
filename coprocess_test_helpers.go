@@ -1,6 +1,7 @@
 // +build coprocess
 // +build !python
 // +build !lua
+// +build !grpc
 
 package main
 
