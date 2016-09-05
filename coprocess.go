@@ -176,6 +176,12 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 		objectMsg, _ = json.Marshal(object)
 	}
 
+	if CoProcessName == "grpc" {
+		log.Println("CoProcessName == grpc")
+		GlobalDispatcher.DispatchObject(object)
+		return object
+	}
+
 	objectMsgStr := string(objectMsg)
 
 	var CObjectStr *C.char
