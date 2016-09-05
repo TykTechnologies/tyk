@@ -1,6 +1,6 @@
 #!/bin/sh
 echo "Generating bindings for Go."
-protoc -I. --go_out=../ *.proto
+protoc -I. --go_out=plugins=grpc:../ *.proto
 cd .. ; ls -l *.pb.go ; cd -
 
 echo "Generating bindings for Python."
