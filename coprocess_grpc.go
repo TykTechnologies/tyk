@@ -50,10 +50,6 @@ func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) *coprocess.Obj
 	return newObject
 }
 
-// Reload will perform a middleware reload when a hot reload is triggered.
-func (d *GRPCDispatcher) Reload() {
-}
-
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
