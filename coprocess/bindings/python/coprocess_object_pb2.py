@@ -206,4 +206,84 @@ _OBJECT_METADATAENTRY.has_options = True
 _OBJECT_METADATAENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
 _OBJECT_SPECENTRY.has_options = True
 _OBJECT_SPECENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
+import grpc
+from grpc.beta import implementations as beta_implementations
+from grpc.beta import interfaces as beta_interfaces
+from grpc.framework.common import cardinality
+from grpc.framework.interfaces.face import utilities as face_utilities
+
+
+class DispatcherStub(object):
+
+  def __init__(self, channel):
+    """Constructor.
+
+    Args:
+      channel: A grpc.Channel.
+    """
+    self.Dispatch = channel.unary_unary(
+        '/coprocess.Dispatcher/Dispatch',
+        request_serializer=Object.SerializeToString,
+        response_deserializer=Object.FromString,
+        )
+
+
+class DispatcherServicer(object):
+
+  def Dispatch(self, request, context):
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+
+def add_DispatcherServicer_to_server(servicer, server):
+  rpc_method_handlers = {
+      'Dispatch': grpc.unary_unary_rpc_method_handler(
+          servicer.Dispatch,
+          request_deserializer=Object.FromString,
+          response_serializer=Object.SerializeToString,
+      ),
+  }
+  generic_handler = grpc.method_handlers_generic_handler(
+      'coprocess.Dispatcher', rpc_method_handlers)
+  server.add_generic_rpc_handlers((generic_handler,))
+
+
+class BetaDispatcherServicer(object):
+  def Dispatch(self, request, context):
+    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+
+
+class BetaDispatcherStub(object):
+  def Dispatch(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+    raise NotImplementedError()
+  Dispatch.future = None
+
+
+def beta_create_Dispatcher_server(servicer, pool=None, pool_size=None, default_timeout=None, maximum_timeout=None):
+  request_deserializers = {
+    ('coprocess.Dispatcher', 'Dispatch'): Object.FromString,
+  }
+  response_serializers = {
+    ('coprocess.Dispatcher', 'Dispatch'): Object.SerializeToString,
+  }
+  method_implementations = {
+    ('coprocess.Dispatcher', 'Dispatch'): face_utilities.unary_unary_inline(servicer.Dispatch),
+  }
+  server_options = beta_implementations.server_options(request_deserializers=request_deserializers, response_serializers=response_serializers, thread_pool=pool, thread_pool_size=pool_size, default_timeout=default_timeout, maximum_timeout=maximum_timeout)
+  return beta_implementations.server(method_implementations, options=server_options)
+
+
+def beta_create_Dispatcher_stub(channel, host=None, metadata_transformer=None, pool=None, pool_size=None):
+  request_serializers = {
+    ('coprocess.Dispatcher', 'Dispatch'): Object.SerializeToString,
+  }
+  response_deserializers = {
+    ('coprocess.Dispatcher', 'Dispatch'): Object.FromString,
+  }
+  cardinalities = {
+    'Dispatch': cardinality.Cardinality.UNARY_UNARY,
+  }
+  stub_options = beta_implementations.stub_options(host=host, metadata_transformer=metadata_transformer, request_serializers=request_serializers, response_deserializers=response_deserializers, thread_pool=pool, thread_pool_size=pool_size)
+  return beta_implementations.dynamic_stub(channel, 'coprocess.Dispatcher', cardinalities, options=stub_options)
 # @@protoc_insertion_point(module_scope)
