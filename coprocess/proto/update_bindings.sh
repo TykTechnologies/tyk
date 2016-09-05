@@ -8,5 +8,10 @@ mkdir -p ../bindings/python
 protoc -I. --python_out=../bindings/python *.proto
 cd ../bindings/python ; ls -l *.py ; cd -
 
+echo "Generating bindings for Ruby."
+mkdir -p ../bindings/ruby
+protoc -I. --ruby_out=plugins=grpc:../bindings/ruby *.proto
+cd ../bindings/ruby ; ls -l *.rb ; cd -
+
 echo
 echo "Done"
