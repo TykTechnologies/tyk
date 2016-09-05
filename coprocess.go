@@ -152,7 +152,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	for h, v := range object.Request.SetHeaders {
 		r.Header.Set(h, v)
 	}
-
+	
 	values := r.URL.Query()
 	for _, k := range object.Request.DeleteParams {
 		values.Del(k)
@@ -177,7 +177,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	}
 
 	if CoProcessName == "grpc" {
-		GlobalDispatcher.DispatchObject(object)
+		object = GlobalDispatcher.DispatchObject(object)
 		return object
 	}
 
