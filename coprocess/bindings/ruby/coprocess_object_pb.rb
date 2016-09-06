@@ -5,8 +5,8 @@ $LOAD_PATH.unshift(lib_dir) unless $LOAD_PATH.include?(lib_dir)
 require 'google/protobuf'
 
 require File.join(this_dir, 'coprocess_mini_request_object_pb')
-require File.join(this_dir, 'coprocess_session_state' )
-require File.join(this_dir, 'coprocess_common' )
+require File.join(this_dir, 'coprocess_session_state_pb' )
+require File.join(this_dir, 'coprocess_common_pb' )
 
 Google::Protobuf::DescriptorPool.generated_pool.build do
   add_message "coprocess.Object" do
