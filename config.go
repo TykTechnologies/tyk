@@ -173,6 +173,7 @@ type Config struct {
 	EnableCustomDomains               bool                                     `json:"enable_custom_domains"`
 	EnableJSVM                        bool                                     `json:"enable_jsvm"`
 	EnableCoProcess                   bool                                     `json:"enable_coprocess"`
+	CoProcessGRPCServer								string																		`json:"coprocess_grpc_server"`
 	HideGeneratorHeader               bool                                     `json:"hide_generator_header"`
 	EventHandlers                     tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
 	EventTriggers                     map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
