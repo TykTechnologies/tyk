@@ -19,6 +19,7 @@ module Coprocess
       self.service_name = 'coprocess.Dispatcher'
 
       rpc :Dispatch, Coprocess::Object, Coprocess::Object
+      rpc :DispatchEvent, Coprocess::Event, Coprocess::EventReply
     end
 
     Stub = Service.rpc_stub_class
