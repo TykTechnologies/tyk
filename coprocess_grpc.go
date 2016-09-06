@@ -6,6 +6,7 @@ package main
 import (
 	"C"
 	"net"
+	"net/url"
 	"time"
 	// "strings"
 
@@ -17,10 +18,6 @@ import (
 
 // CoProcessName specifies the driver name.
 const CoProcessName string = "grpc"
-
-const (
-	address = "127.0.0.1:5555"
-)
 
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage
@@ -34,9 +31,20 @@ type GRPCDispatcher struct {
 	coprocess.Dispatcher
 }
 
-func dialer(addr string, timeout time.Duration) (net.Conn, error) {
-	// return net.DialTimeout("unix", addr, timeout)
-	return net.DialTimeout("tcp", addr, timeout)
+func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
+	var grpcUrl *url.URL
+	grpcUrl, err = url.Parse(config.CoProcessGRPCServer)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess-grpc",
+		}).Error(err)
+		return nil, err
+	}
+
+	grpcUrlString := config.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:len(config.CoProcessGRPCServer)]
+
+	return net.DialTimeout(grpcUrl.Scheme, grpcUrlString, timeout)
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
@@ -71,7 +79,7 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
 	dispatcher, err = &GRPCDispatcher{}, nil
 
-	grpcConnection, err = grpc.Dial(address, grpc.WithInsecure())
+	grpcConnection, err = grpc.Dial("", grpc.WithInsecure(), grpc.WithDialer(dialer))
 
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
