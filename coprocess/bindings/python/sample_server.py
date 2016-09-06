@@ -1,4 +1,5 @@
 import coprocess_object_pb2
+from coprocess_session_state_pb2 import SessionState
 
 import grpc, time, json
 
@@ -14,6 +15,23 @@ def MyPostMiddleware(coprocess_object):
   coprocess_object.request.set_headers["anotherheader"] = "anothervalue"
   return coprocess_object
 
+def MyAuthCheck(coprocess_object):
+  valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
+  request_token = coprocess_object.request.headers["Authorization"]
+
+  if request_token == valid_token:
+      new_session = SessionState()
+      new_session.rate = 1000.0
+      new_session.per = 1.0
+      coprocess_object.metadata["token"] = "mytoken"
+      coprocess_object.session.CopyFrom(new_session)
+
+  else:
+      coprocess_object.request.return_overrides.response_code = 401
+      coprocess_object.request.return_overrides.response_error = 'Not authorized (Python middleware)'
+
+  return coprocess_object
+
 class MyDispatcher(coprocess_object_pb2.DispatcherServicer):
   def Dispatch(self, coprocess_object, context):
     if coprocess_object.hook_name == "MyPreMiddleware":
@@ -22,11 +40,13 @@ class MyDispatcher(coprocess_object_pb2.DispatcherServicer):
     if coprocess_object.hook_name == "MyPostMiddleware":
         coprocess_object = MyPostMiddleware(coprocess_object)
 
+    if coprocess_object.hook_name == "MyAuthCheck":
+        coprocess_object = MyAuthCheck(coprocess_object)
+
     return coprocess_object
 
   def DispatchEvent(self, event_wrapper, context):
     event = json.loads(event_wrapper.payload)
-    print("DispatchEvent:", event)
     return coprocess_object_pb2.EventReply()
 
 
