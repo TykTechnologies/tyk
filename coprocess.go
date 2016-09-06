@@ -215,7 +215,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
 func CoProcessInit() (err error) {
-	if config.EnableCoProcess {
+	if config.CoProcessOptions.EnableCoProcess {
 		GlobalDispatcher, err = NewCoProcessDispatcher()
 		EnableCoProcess = true
 	}

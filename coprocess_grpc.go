@@ -31,7 +31,7 @@ type GRPCDispatcher struct {
 
 func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 	var grpcUrl *url.URL
-	grpcUrl, err = url.Parse(config.CoProcessGRPCServer)
+	grpcUrl, err = url.Parse(config.CoProcessOptions.CoProcessGRPCServer)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -40,7 +40,7 @@ func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 		return nil, err
 	}
 
-	grpcUrlString := config.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:len(config.CoProcessGRPCServer)]
+	grpcUrlString := config.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:len(config.CoProcessOptions.CoProcessGRPCServer)]
 
 	return net.DialTimeout(grpcUrl.Scheme, grpcUrlString, timeout)
 }

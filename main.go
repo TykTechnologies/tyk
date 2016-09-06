@@ -147,7 +147,7 @@ func setupGlobals() {
 		GlobalEventsJSVM.Init(config.TykJSPath)
 	}
 
-	if config.EnableCoProcess {
+	if config.CoProcessOptions.EnableCoProcess {
 		CoProcessInit()
 	}
 
