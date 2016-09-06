@@ -985,6 +985,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						"prefix": "coprocess",
 					}).Debug("----> Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
+					authArray = append(authArray, CreateIdExtractorMiddleware(mwDriver, tykMiddleware))
 					authArray = append(authArray, CreateCoProcessMiddleware(mwAuthCheckFunc.Name, coprocess.HookType_CustomKeyCheck, mwDriver, tykMiddleware))
 				}
 
