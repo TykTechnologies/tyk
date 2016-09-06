@@ -17,8 +17,15 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     map :metadata, :string, :string, 5
     map :spec, :string, :string, 6
   end
+  add_message "coprocess.Event" do
+    optional :payload, :string, 1
+  end
+  add_message "coprocess.EventReply" do
+  end
 end
 
 module Coprocess
   Object = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Object").msgclass
+  Event = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.Event").msgclass
+  EventReply = Google::Protobuf::DescriptorPool.generated_pool.lookup("coprocess.EventReply").msgclass
 end
