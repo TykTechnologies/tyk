@@ -16,6 +16,8 @@ It has these top-level messages:
 	StringSlice
 	MiniRequestObject
 	Object
+	Event
+	EventReply
 	ReturnOverrides
 	AccessSpec
 	AccessDefinition
