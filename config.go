@@ -177,7 +177,7 @@ type Config struct {
 	ControlAPIHostname                string                                   `json:"control_api_hostname"`
 	EnableCustomDomains               bool                                     `json:"enable_custom_domains"`
 	EnableJSVM                        bool                                     `json:"enable_jsvm"`
-	CoProcessOptions                  CoProcessConfig                          `json:"coprocess"`
+	CoProcessOptions                  CoProcessConfig                          `json:"coprocess_options"`
 	HideGeneratorHeader               bool                                     `json:"hide_generator_header"`
 	EventHandlers                     tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
 	EventTriggers                     map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
