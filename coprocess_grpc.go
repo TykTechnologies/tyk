@@ -4,7 +4,6 @@
 package main
 
 import (
-	"C"
 	"net"
 	"net/url"
 	"time"
@@ -27,7 +26,6 @@ var grpcClient coprocess.DispatcherClient
 
 // GRPCDispatcher implements a coprocess.Dispatcher
 type GRPCDispatcher struct {
-	// GRPCDispatcher implements the coprocess.Dispatcher interface.
 	coprocess.Dispatcher
 }
 
