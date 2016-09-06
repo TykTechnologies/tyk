@@ -51,6 +51,21 @@ func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) *coprocess.Obj
 	return newObject
 }
 
+// DispatchEvent dispatches a Tyk event.
+func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
+	eventObject := &coprocess.Event{string(eventJSON)}
+
+	_, err := grpcClient.DispatchEvent(context.Background(), eventObject)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess-grpc",
+		}).Error(err)
+	}
+
+	return
+}
+
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
