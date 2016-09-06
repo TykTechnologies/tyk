@@ -15,6 +15,13 @@ message Object {
   map<string, string> spec = 6;
 }
 
+message Event {
+  string payload = 1;
+}
+
+message EventReply {}
+
 service Dispatcher {
   rpc Dispatch (Object) returns (Object) {}
+  rpc DispatchEvent (Event) returns (EventReply) {}
 }
