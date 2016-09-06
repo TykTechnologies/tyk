@@ -2,13 +2,13 @@
 
 package main
 
-import(
-  "github.com/Sirupsen/logrus"
-  // "github.com/gorilla/context"
-  "github.com/mitchellh/mapstructure"
-  // "github.com/TykTechnologies/tykcommon"
+import (
+	"github.com/Sirupsen/logrus"
+	// "github.com/gorilla/context"
+	"github.com/mitchellh/mapstructure"
+	// "github.com/TykTechnologies/tykcommon"
 
-  "net/http"
+	"net/http"
 )
 
 // IdExtractorMiddleware is the basic CP middleware struct.
@@ -18,7 +18,7 @@ type IdExtractorMiddleware struct {
 
 func CreateIdExtractorMiddleware(tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &IdExtractorMiddleware{
-		TykMiddleware:    tykMwSuper,
+		TykMiddleware: tykMwSuper,
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
@@ -48,14 +48,14 @@ func (m *IdExtractorMiddleware) GetConfig() (interface{}, error) {
 }
 
 func (m *IdExtractorMiddleware) IsEnabledForSpec() bool {
-  var used bool
-  if(len(m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractorConfig) > 0 ) {
-      used = true
-  }
+	var used bool
+	if len(m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractorConfig) > 0 {
+		used = true
+	}
 	return used
 }
 
 func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-  log.Println("*** IdExtractorMiddleware")
-  return nil, 200
+	log.Println("*** IdExtractorMiddleware")
+	return nil, 200
 }

@@ -40,7 +40,7 @@ func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 		return nil, err
 	}
 
-	grpcUrlString := config.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:len(config.CoProcessOptions.CoProcessGRPCServer)]
+	grpcUrlString := config.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3 : len(config.CoProcessOptions.CoProcessGRPCServer)]
 
 	return net.DialTimeout(grpcUrl.Scheme, grpcUrlString, timeout)
 }

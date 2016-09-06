@@ -60,9 +60,9 @@ type IdExtractorMiddleware struct {
 	*TykMiddleware
 }
 
-func (m *IdExtractorMiddleware) New() {}
+func (m *IdExtractorMiddleware) New()                            {}
 func (m *IdExtractorMiddleware) GetConfig() (interface{}, error) { return nil, nil }
-func (m *IdExtractorMiddleware) IsEnabledForSpec() bool { return false }
+func (m *IdExtractorMiddleware) IsEnabledForSpec() bool          { return false }
 func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	return nil, 200
 }
