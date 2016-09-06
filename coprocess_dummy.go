@@ -55,3 +55,7 @@ func doCoprocessReload() {
 func CreateCoProcessMiddleware(MiddlewareName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
 }
+
+func CreateIdExtractorMiddleware(mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
+}
