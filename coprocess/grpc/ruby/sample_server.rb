@@ -2,36 +2,11 @@ require '../../bindings/ruby/dispatcher'
 
 require '../../bindings/ruby/coprocess_session_state_pb'
 
+require 'json'
+
 class SampleServer < Coprocess::Dispatcher::Service
 
-  def MyPreMiddleware(coprocess_object)
-    coprocess_object.request.set_headers["rubyheader"] = "rubyvalue"
-    return coprocess_object
-  end
-
-  def MyAuthCheck(coprocess_object)
-    puts "Calling MyAuthCheck"
-
-    valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
-    request_token = coprocess_object.request.headers["Authorization"]
-
-    if request_token == valid_token
-      puts "request_token == valid_token"
-      new_session = Coprocess::SessionState.new
-      new_session.rate = 1000
-      new_session.per = 1
-      coprocess_object.metadata["token"] = "mytoken"
-      coprocess_object.session = new_session
-    else
-      puts "request_token != valid_token :("
-      coprocess_object.request.return_overrides.response_code = 401
-      coprocess_object.request.return_overrides.response_error = 'Not authorized (gRPC/Ruby middleware)'
-    end
-
-    return coprocess_object
-  end
-
-  # Implements a dynamic dispatcher, this class should implement your hooks.
+  # Implements a dynamic dispatcher for CP objects, this class should provide methods for your hooks (see MyPreMiddleware).
   def dispatch(coprocess_object, _unused_call)
     begin
       if self.respond_to?(coprocess_object.hook_name)
@@ -43,6 +18,36 @@ class SampleServer < Coprocess::Dispatcher::Service
       puts "Hook not implemented: #{coprocess_object.hook_name}"
     rescue Exception => e
       puts "Couldn't dispatch: #{e}"
+    end
+
+    return coprocess_object
+  end
+
+  # Implements an event dispatcher.
+  def dispatch_event(event_wrapper, _unused_call)
+    event = JSON.parse(event_wrapper.payload)
+    puts "dispatch_event: #{event}"
+    return Coprocess::EventReply.new
+  end
+
+  def MyPreMiddleware(coprocess_object)
+    coprocess_object.request.set_headers["rubyheader"] = "rubyvalue"
+    return coprocess_object
+  end
+
+  def MyAuthCheck(coprocess_object)
+    valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
+    request_token = coprocess_object.request.headers["Authorization"]
+
+    if request_token == valid_token
+      new_session = Coprocess::SessionState.new
+      new_session.rate = 1000
+      new_session.per = 1
+      coprocess_object.metadata["token"] = "mytoken"
+      coprocess_object.session = new_session
+    else
+      coprocess_object.request.return_overrides.response_code = 401
+      coprocess_object.request.return_overrides.response_error = 'Not authorized (gRPC/Ruby middleware)'
     end
 
     return coprocess_object
