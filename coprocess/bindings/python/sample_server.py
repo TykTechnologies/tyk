@@ -1,6 +1,6 @@
 import coprocess_object_pb2
 
-import grpc, time
+import grpc, time, json
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
@@ -16,7 +16,6 @@ def MyPostMiddleware(coprocess_object):
 
 class MyDispatcher(coprocess_object_pb2.DispatcherServicer):
   def Dispatch(self, coprocess_object, context):
-
     if coprocess_object.hook_name == "MyPreMiddleware":
         coprocess_object = MyPreMiddleware(coprocess_object)
 
@@ -24,6 +23,11 @@ class MyDispatcher(coprocess_object_pb2.DispatcherServicer):
         coprocess_object = MyPostMiddleware(coprocess_object)
 
     return coprocess_object
+
+  def DispatchEvent(self, event_wrapper, context):
+    event = json.loads(event_wrapper.payload)
+    print("DispatchEvent:", event)
+    return coprocess_object_pb2.EventReply()
 
 
 def serve():
