@@ -46,6 +46,7 @@ func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) *coprocess.Obj
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
 		}).Error(err)
+		return object
 	}
 	return newObject
 }
