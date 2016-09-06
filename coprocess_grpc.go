@@ -9,16 +9,16 @@ import (
 	"time"
 	// "strings"
 
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 // CoProcessName specifies the driver name.
 const CoProcessName string = "grpc"
 
-const(
+const (
 	address = "127.0.0.1:5555"
 )
 
