@@ -114,6 +114,11 @@ type ServiceDiscoveryConf struct {
 	DefaultCacheTimeout int `json:"default_cache_timeout"`
 }
 
+type CoProcessConfig struct {
+	EnableCoProcess     bool   `json:"enable_coprocess"`
+	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
+}
+
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
 	ListenAddress                     string                 `json:"listen_address"`
@@ -172,8 +177,7 @@ type Config struct {
 	ControlAPIHostname                string                                   `json:"control_api_hostname"`
 	EnableCustomDomains               bool                                     `json:"enable_custom_domains"`
 	EnableJSVM                        bool                                     `json:"enable_jsvm"`
-	EnableCoProcess                   bool                                     `json:"enable_coprocess"`
-	CoProcessGRPCServer								string																		`json:"coprocess_grpc_server"`
+	CoProcessOptions                  CoProcessConfig                          `json:"coprocess"`
 	HideGeneratorHeader               bool                                     `json:"hide_generator_header"`
 	EventHandlers                     tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
 	EventTriggers                     map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
