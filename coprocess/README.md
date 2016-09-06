@@ -4,7 +4,15 @@ This feature makes it possible to write Tyk middleware using your favorite langu
 
 ## Python support
 
-[Python](https://www.python.org/) support is an ongoing task, more notes [here](python/README.md).
+[Python](https://www.python.org/) support is available, more notes [here](python/README.md).
+
+## Lua support
+
+[Lua](https://www.lua.org/) support is available as well. Notes [here](lua/README.md).
+
+## gRPC support
+
+Tyk provides support for [gRPC](http://www.grpc.io/), you may use any of the gRPC supported languages (e.g. Ruby, Java, etc.). Check the [gRPC support README](grpc/README.md).
 
 ## Interoperability
 
