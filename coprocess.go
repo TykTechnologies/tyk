@@ -35,9 +35,11 @@ import (
 
 	"bytes"
 	"errors"
+	"crypto/md5"
 	"io/ioutil"
 	"net/http"
 	"unsafe"
+	"fmt"
 )
 
 // EnableCoProcess will be overridden by config.EnableCoProcess.
@@ -259,6 +261,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, 200
 	}
 
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
+		log.Println("This is a coprocess/CustomKeyCheck. Should we skip this?")
+		_, found := context.GetOk(r, SkipCoProcessAuth)
+		if found {
+			log.Println("Skipping, this session is cached :)")
+
+			return nil, 200
+		}
+	}
+
 	// It's also possible to override the HookType:
 	thisCoProcessor := CoProcessor{
 		Middleware: m,
@@ -292,6 +304,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		if returnObject.Session != nil {
+			log.Println("coprocess: This is a CustomKeyCheck and it was successful?")
+			m.ExtractAndCache(r, TykSessionState(returnObject.Session))
 			// context.Set(r, SessionData, ToTykSession(returnObject.Session))
 			context.Set(r, SessionData, TykSessionState(returnObject.Session))
 			context.Set(r, AuthHeaderValue, authHeaderValue)
@@ -301,6 +315,56 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// context.GetOk(r, SessionData)
 
 	return nil, 200
+}
+
+func(m *CoProcessMiddleware) ExtractAndCache(r *http.Request, thisSessionState SessionState) {
+	log.Println("Calling ExtractAndCache")
+	var thisExtractor IdExtractor
+	var extractorOutput, tokenID, SessionID string
+
+	// Initialize a extractor based on the API spec.
+	switch m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractWith {
+	case tykcommon.ValueExtractor:
+		log.Println("Is a ValueExtractor.")
+		thisExtractor = &ValueExtractor{
+			Config: &m.TykMiddleware.Spec.CustomMiddleware.IdExtractor,
+		}
+	}
+
+	// Check the extractor source, take the value and perform the extraction.
+	switch m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractFrom {
+	case tykcommon.HeaderSource:
+		var headerName, headerValue string
+
+		// TODO: check if header_name is set
+		headerName = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractorConfig["header_name"].(string)
+		headerValue = r.Header.Get(headerName)
+
+		log.Println("Uses a HeaderSource.")
+		extractorOutput = thisExtractor.Extract(headerValue)
+	}
+
+	// Prepare a session ID.
+
+	data := []byte(extractorOutput)
+	tokenID = fmt.Sprintf("%x", md5.Sum(data))
+	SessionID = m.TykMiddleware.Spec.OrgID + tokenID
+
+	fmt.Println("tokenID is", tokenID)
+	fmt.Println("SessionID is", SessionID)
+
+	_, keyExists := m.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+
+	log.Println("thisSessionState is", thisSessionState)
+	log.Println("keyExists is", keyExists)
+
+	if !keyExists {
+		log.Println("Storing key")
+		// Store the session!
+		// thisSessionState = SessionState{}
+		// thisSessionState.MetaData = map[string]interface{}{"TykCPSessionID": SessionID}
+		m.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, m.Spec.APIDefinition.SessionLifetime)
+	}
 }
 
 // CoProcessLog is a bridge for using Tyk log from CP.
