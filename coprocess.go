@@ -363,7 +363,7 @@ func(m *CoProcessMiddleware) ExtractAndCache(r *http.Request, thisSessionState S
 		// Store the session!
 		// thisSessionState = SessionState{}
 		// thisSessionState.MetaData = map[string]interface{}{"TykCPSessionID": SessionID}
-		m.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, m.Spec.APIDefinition.SessionLifetime)
+		m.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, 10)
 	}
 }
 
