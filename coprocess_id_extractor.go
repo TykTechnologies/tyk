@@ -17,6 +17,8 @@ import (
 // IdExtractorMiddleware is the basic CP middleware struct.
 type IdExtractorMiddleware struct {
 	*TykMiddleware
+	cache bool
+	sessionState *SessionState
 }
 
 type IdExtractor interface {
@@ -80,19 +82,12 @@ func (m *IdExtractorMiddleware) IsEnabledForSpec() bool {
 }
 
 func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	log.Println("*** IdExtractorMiddleware")
-	log.Println("*** configuration", configuration)
-	log.Println("*** spec (IdExtractorMiddleware)", m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractorConfig)
-
-	log.Println("*** extractwith", m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractWith)
-
 	var thisExtractor IdExtractor
 	var extractorOutput, tokenID, SessionID string
 
 	// Initialize a extractor based on the API spec.
 	switch m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractWith {
 	case tykcommon.ValueExtractor:
-		log.Println("Is a ValueExtractor.")
 		thisExtractor = &ValueExtractor{
 			Config: &m.TykMiddleware.Spec.CustomMiddleware.IdExtractor,
 		}
@@ -121,36 +116,31 @@ func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 			return errors.New("Authorization field missing"), 400
 		}
 
-		log.Println("Uses a HeaderSource.")
 		// TODO: check if header_name setting exists!
 		rawHeader := r.Header.Get(headerName)
-		log.Println("rawHeader is", rawHeader)
 		extractorOutput = thisExtractor.Extract(rawHeader)
 	}
 
 	// Prepare a session ID.
-
 	data := []byte(extractorOutput)
 	tokenID = fmt.Sprintf("%x", md5.Sum(data))
 	SessionID = m.TykMiddleware.Spec.OrgID + tokenID
 
-	fmt.Println("tokenID is", tokenID)
-	fmt.Println("SessionID is", SessionID)
-
 	thisSessionState, keyExists := m.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
-
-	log.Println("thisSessionState is", thisSessionState)
-	log.Println("keyExists is", keyExists)
 
 	if keyExists {
 		// Set context flag and ignore the CP auth!
-		context.Set(r, SessionData, thisSessionState)
-		context.Set(r, AuthHeaderValue, tokenID)
-
 		context.Set(r, SkipCoProcessAuth, true)
 	} else {
-		// Follow the chain, the CP auth will be called.
+		if m.sessionState != nil {
+			thisSessionState = *m.sessionState
+			thisSessionState.MetaData = map[string]interface{}{"TykCPSessionID": SessionID}
+			m.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, m.Spec.APIDefinition.SessionLifetime)
+		}
 	}
+
+	context.Set(r, SessionData, thisSessionState)
+	context.Set(r, AuthHeaderValue, SessionID)
 
 	return nil, 200
 }
