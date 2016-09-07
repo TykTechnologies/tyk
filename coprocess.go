@@ -306,9 +306,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if returnObject.Session != nil {
 			log.Println("coprocess: This is a CustomKeyCheck and it was successful?")
 			m.ExtractAndCache(r, TykSessionState(returnObject.Session))
-			// context.Set(r, SessionData, ToTykSession(returnObject.Session))
-			context.Set(r, SessionData, TykSessionState(returnObject.Session))
-			context.Set(r, AuthHeaderValue, authHeaderValue)
+			// context.Set(r, SessionData, TykSessionState(returnObject.Session))
+			// context.Set(r, AuthHeaderValue, authHeaderValue)
 		}
 	}
 
@@ -361,9 +360,10 @@ func(m *CoProcessMiddleware) ExtractAndCache(r *http.Request, thisSessionState S
 	if !keyExists {
 		log.Println("Storing key")
 		// Store the session!
-		// thisSessionState = SessionState{}
-		// thisSessionState.MetaData = map[string]interface{}{"TykCPSessionID": SessionID}
+		thisSessionState.MetaData = map[string]interface{}{"TykCPSessionID": SessionID}
 		m.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, 10)
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, SessionID)
 	}
 }
 
