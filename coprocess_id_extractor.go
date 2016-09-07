@@ -4,7 +4,7 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
-	// "github.com/gorilla/context"
+	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"github.com/TykTechnologies/tykcommon"
 
@@ -136,6 +136,21 @@ func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 
 	fmt.Println("tokenID is", tokenID)
 	fmt.Println("SessionID is", SessionID)
+
+	thisSessionState, keyExists := m.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+
+	log.Println("thisSessionState is", thisSessionState)
+	log.Println("keyExists is", keyExists)
+
+	if keyExists {
+		// Set context flag and ignore the CP auth!
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, tokenID)
+
+		context.Set(r, SkipCoProcessAuth, true)
+	} else {
+		// Follow the chain, the CP auth will be called.
+	}
 
 	return nil, 200
 }
