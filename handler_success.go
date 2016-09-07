@@ -26,6 +26,7 @@ const (
 	OrgSessionContext = 4
 	ContextData       = 5
 	RetainHost        = 6
+	SkipCoProcessAuth	= 7
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
