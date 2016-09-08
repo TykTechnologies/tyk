@@ -48,7 +48,7 @@ class SampleServer < Coprocess::Dispatcher::Service
       new_session.quota_renews = 1473342821
       new_session.quota_remaining = 0
       new_session.quota_renewal_rate = 120
-      new_session.expires = 1473342821
+      new_session.expires = 1483342821
       coprocess_object.metadata["token"] = "mytoken"
       coprocess_object.session = new_session
     else
