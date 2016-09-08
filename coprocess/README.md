@@ -14,6 +14,33 @@ This feature makes it possible to write Tyk middleware using your favorite langu
 
 Tyk provides support for [gRPC](http://www.grpc.io/), you may use any of the gRPC supported languages (e.g. Ruby, Java, etc.). Check the [gRPC support README](grpc/README.md).
 
+## ID Extractor & auth cache
+
+The ID extractor is a very useful mechanism that will let you cache your authentication IDs and prevent certain requests from hitting your CP backend. It takes a set of rules from your API configuration (the rules are set per API).
+
+A sample configuration will look like this:
+
+```json
+"custom_middleware": {
+  "pre": [
+    {
+      "name": "MyPreMiddleware",
+      "require_session": false
+    }
+  ],
+  "id_extractor": {
+    "extract_from": "header",
+    "extract_with": "value",
+    "extractor_config": {
+      "header_name": "Authorization"
+    }
+  },
+  "driver": "grpc"
+},
+```
+
+Tyk provides a set of ID extractors that aim to cover the most common use cases, a very simple one is the **value extractor**.
+
 ## Interoperability
 
 This feature implements an in-process message passing mechanism, based on [Protocol Buffers](https://developers.google.com/protocol-buffers/), any supported languages should provide a function to receive, unmarshal and process this kind of messages.
