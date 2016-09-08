@@ -60,6 +60,42 @@ func TestValueExtractor(t *testing.T) {
 }
 
 func TestValueExtractorRequirements(t *testing.T) {
+	fmt.Println("TestValueExtractor")
+	spec := MakeCoProcessSampleAPI(IdExtractorCoProcessDef)
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	tykMiddleware := &TykMiddleware{spec, proxy}
+
+	newExtractor(spec, tykMiddleware)
+
+	var thisExtractor IdExtractor
+	thisExtractor = tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+
+	thisSession := createBasicAuthSession()
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	// req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getBasicAuthChain(*spec)
+	chain.ServeHTTP(recorder, req)
+
+	var returnOverrides ReturnOverrides
+	_, returnOverrides = thisExtractor.ExtractAndCheck(req, &thisSession)
+
+	if returnOverrides.ResponseCode != 400 && returnOverrides.ResponseError != "Authorization field missing" {
+		t.Fatal("ValueExtractor should return an error when the header is missing.")
+	}
 }
 
 var IdExtractorCoProcessDef string = `
