@@ -259,10 +259,22 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, 200
 	}
 
+	thisExtractor := m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	var thisSessionState *SessionState
+	var returnOverrides ReturnOverrides
+	var SessionID string
+
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
-		_, found := context.GetOk(r, SkipCoProcessAuth)
-		if found {
-			return nil, 200
+
+		SessionID, returnOverrides = thisExtractor.ExtractAndCheck(r, thisSessionState)
+
+		if returnOverrides.ResponseCode != 0 {
+			if returnOverrides.ResponseError == "" {
+				return nil, returnOverrides.ResponseCode
+			} else {
+				err := errors.New(returnOverrides.ResponseError)
+				return err, returnOverrides.ResponseCode
+			}
 		}
 	}
 
@@ -299,13 +311,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck {
 		if returnObject.Session != nil {
-			var thisSessionState = TykSessionState(returnObject.Session)
-			extractMiddleware := IdExtractorMiddleware{m.TykMiddleware, true, &thisSessionState}
-			return extractMiddleware.ProcessRequest(w, r, configuration)
+			returnedSessionState := TykSessionState(returnObject.Session)
+			thisExtractor.PostProcess(r, returnedSessionState, SessionID)
+			return nil, 200
 		}
 	}
-
-	// context.GetOk(r, SessionData)
 
 	return nil, 200
 }
