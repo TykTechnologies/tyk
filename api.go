@@ -1340,7 +1340,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						thisSessionManager := FallbackKeySesionManager
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						thisSessionManager.ResetQuota(newKey, newSession)
-						err := thisSessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+						err := thisSessionManager.UpdateSession(newKey, newSession, -1)
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
 							DoJSONWrite(w, 403, responseMessage)
