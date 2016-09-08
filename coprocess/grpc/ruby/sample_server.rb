@@ -36,13 +36,19 @@ class SampleServer < Coprocess::Dispatcher::Service
   end
 
   def MyAuthCheck(coprocess_object)
+    puts "Calling MyAuthCheck"
     valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
     request_token = coprocess_object.request.headers["Authorization"]
 
     if request_token == valid_token
       new_session = Coprocess::SessionState.new
       new_session.rate = 1000
-      new_session.per = 1
+      new_session.per = 10
+      new_session.quota_max = 60
+      new_session.quota_renews = 1473342821
+      new_session.quota_remaining = 0
+      new_session.quota_renewal_rate = 120
+      new_session.expires = 1473342821
       coprocess_object.metadata["token"] = "mytoken"
       coprocess_object.session = new_session
     else
