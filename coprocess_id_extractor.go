@@ -29,10 +29,11 @@ func(e *ValueExtractor) Extract(input interface{}) string {
 }
 
 func(e *ValueExtractor) PostProcess(r *http.Request, thisSessionState SessionState, SessionID string) {
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, SessionID)
 
 	e.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, e.Spec.APIDefinition.SessionLifetime)
+
+	context.Set(r, SessionData, thisSessionState)
+	context.Set(r, AuthHeaderValue, SessionID)
 
 	return
 }
