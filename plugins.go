@@ -199,7 +199,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		if d.UseSession {
 			if len(newRequestData.SessionMeta) > 0 {
 				thisSessionState.MetaData = newRequestData.SessionMeta
-				d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+				d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, d.Spec.SessionLifetime)
 			}
 
 		}
