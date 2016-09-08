@@ -92,10 +92,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	if k.Spec.DisableRateLimit == false || k.Spec.DisableQuota == false {
 		// Ensure quota and rate data for this session are recorded
 		if !config.UseAsyncSessionWrite {
-			k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+			k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, k.Spec.SessionLifetime)
 			context.Set(r, SessionData, thisSessionState)
 		} else {
-			go k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+			go k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, k.Spec.SessionLifetime)
 			go context.Set(r, SessionData, thisSessionState)
 		}
 	}
