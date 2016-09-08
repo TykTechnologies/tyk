@@ -48,6 +48,7 @@ petstore.json
 *.mmdb
 ty.clonedash.conf
 tyk.dashboard.conf
+tyk.dashcluster.conf
 tyk.benchmark.conf
 tyk_elasticache.conf
 coprocess_gen_test.go
