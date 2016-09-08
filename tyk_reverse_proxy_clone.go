@@ -37,6 +37,13 @@ func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)	
 		if err == nil {
 			// Set the cached value
+			if data.Len() == 0 {
+				spec.HasRun = true
+				spec.ServiceRefreshInProgress = false
+				log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
+				return spec.LastGoodHostList, nil
+			}
+
 			ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
 			// Stash it too
 			spec.LastGoodHostList = data
