@@ -5,28 +5,22 @@ package main
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	"github.com/mitchellh/mapstructure"
 	"github.com/TykTechnologies/tykcommon"
 
 	"crypto/md5"
 	"net/http"
-	"errors"
 	"fmt"
 )
 
-// IdExtractorMiddleware is the basic CP middleware struct.
-type IdExtractorMiddleware struct {
-	*TykMiddleware
-	cache bool
-	sessionState *SessionState
-}
-
 type IdExtractor interface {
-	Extract(interface{}) string
+	ExtractAndCheck(*http.Request, *SessionState) (string, ReturnOverrides)
+	PostProcess(*http.Request, SessionState, string)
 }
 
 type ValueExtractor struct {
 	Config *tykcommon.MiddlewareIdExtractor
+	TykMiddleware *TykMiddleware
+	Spec *APISpec
 }
 
 func(e *ValueExtractor) Extract(input interface{}) string {
@@ -34,72 +28,24 @@ func(e *ValueExtractor) Extract(input interface{}) string {
 	return headerValue
 }
 
-/*
-"extract_from": "header",
-"extract_with": "value",
-"extractor_config": {
-	"header_name": "Authorization"
-}
-*/
+func(e *ValueExtractor) PostProcess(r *http.Request, thisSessionState SessionState, SessionID string) {
+	context.Set(r, SessionData, thisSessionState)
+	context.Set(r, AuthHeaderValue, SessionID)
 
-func CreateIdExtractorMiddleware(tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
-	dMiddleware := &IdExtractorMiddleware{
-		TykMiddleware: tykMwSuper,
-	}
+	e.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, e.Spec.APIDefinition.SessionLifetime)
 
-	return CreateMiddleware(dMiddleware, tykMwSuper)
+	return
 }
 
-// CoProcessMiddlewareConfig holds the middleware configuration.
-type IdExtractorMiddlewareConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
+func(e *ValueExtractor) ExtractAndCheck(r *http.Request, thisSessionState *SessionState) (SessionID string, returnOverrides ReturnOverrides) {
+	var extractorOutput, tokenID string
 
-// New lets you do any initialisations for the object can be done here
-func (m *IdExtractorMiddleware) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *IdExtractorMiddleware) GetConfig() (interface{}, error) {
-	var thisModuleConfig IdExtractorMiddlewareConfig
-
-	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "jsvm",
-		}).Error(err)
-		return nil, err
-	}
-
-	return thisModuleConfig, nil
-}
-
-func (m *IdExtractorMiddleware) IsEnabledForSpec() bool {
-	var used bool
-	if len(m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractorConfig) > 0 {
-		used = true
-	}
-	return used
-}
-
-func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	var thisExtractor IdExtractor
-	var extractorOutput, tokenID, SessionID string
-
-	// Initialize a extractor based on the API spec.
-	switch m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractWith {
-	case tykcommon.ValueExtractor:
-		thisExtractor = &ValueExtractor{
-			Config: &m.TykMiddleware.Spec.CustomMiddleware.IdExtractor,
-		}
-	}
-
-	// Check the extractor source, take the value and perform the extraction.
-	switch m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractFrom {
+	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
 		var headerName, headerValue string
 
 		// TODO: check if header_name is set
-		headerName = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.ExtractorConfig["header_name"].(string)
+		headerName = e.Config.ExtractorConfig["header_name"].(string)
 		headerValue = r.Header.Get(headerName)
 
 		if headerValue == "" {
@@ -112,35 +58,45 @@ func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 			log.Debug("Raw data was: ", headerValue)
 			log.Debug("Headers are: ", r.Header)
 
+			returnOverrides = ReturnOverrides{
+				ResponseCode: 400,
+				ResponseError: "Authorization field missing",
+			}
+
 			// m.reportLoginFailure(tykId, r)
-			return errors.New("Authorization field missing"), 400
 		}
 
 		// TODO: check if header_name setting exists!
-		rawHeader := r.Header.Get(headerName)
-		extractorOutput = thisExtractor.Extract(rawHeader)
+		extractorOutput = r.Header.Get(headerName)
 	}
 
 	// Prepare a session ID.
 	data := []byte(extractorOutput)
 	tokenID = fmt.Sprintf("%x", md5.Sum(data))
-	SessionID = m.TykMiddleware.Spec.OrgID + tokenID
+	SessionID = e.TykMiddleware.Spec.OrgID + tokenID
 
-	thisSessionState, keyExists := m.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	var keyExists bool
+	var previousSessionState SessionState
+	previousSessionState, keyExists = e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
-		// Set context flag and ignore the CP auth!
-		context.Set(r, SkipCoProcessAuth, true)
-	} else {
-		if m.sessionState != nil {
-			thisSessionState = *m.sessionState
-			thisSessionState.MetaData = map[string]interface{}{"TykCPSessionID": SessionID}
-			m.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, m.Spec.APIDefinition.SessionLifetime)
+		e.PostProcess(r, previousSessionState, SessionID)
+		returnOverrides = ReturnOverrides{
+			ResponseCode: 200,
 		}
 	}
 
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, SessionID)
+	return SessionID, returnOverrides
+}
 
-	return nil, 200
+func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
+	var thisExtractor IdExtractor
+
+	// Initialize a extractor based on the API spec.
+	switch referenceSpec.CustomMiddleware.IdExtractor.ExtractWith {
+	case tykcommon.ValueExtractor:
+		thisExtractor = &ValueExtractor{ &referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}
+	}
+
+	referenceSpec.CustomMiddleware.IdExtractor.Extractor = thisExtractor
 }
