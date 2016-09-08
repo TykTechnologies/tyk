@@ -4,8 +4,63 @@
 package main
 
 import (
-
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"encoding/base64"
+	"strings"
+	"testing"
+	"fmt"
 )
+
+func TestValueExtractor(t *testing.T) {
+	fmt.Println("TestValueExtractor")
+	spec := MakeCoProcessSampleAPI(IdExtractorCoProcessDef)
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	tykMiddleware := &TykMiddleware{spec, proxy}
+
+	newExtractor(spec, tykMiddleware)
+
+	var thisExtractor IdExtractor
+	thisExtractor = tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+
+	thisSession := createBasicAuthSession()
+	username := "4321"
+	password := "TEST"
+
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+
+	to_encode := strings.Join([]string{username, password}, ":")
+	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getBasicAuthChain(*spec)
+	chain.ServeHTTP(recorder, req)
+
+	var returnOverrides ReturnOverrides
+	var SessionID string
+
+	SessionID, returnOverrides = thisExtractor.ExtractAndCheck(req, &thisSession)
+
+	fmt.Println("SessionID=", SessionID)
+	fmt.Println("returnOverrides", returnOverrides)
+
+}
+
+func TestValueExtractorRequirements(t *testing.T) {
+}
 
 var IdExtractorCoProcessDef string = `
 
@@ -47,14 +102,21 @@ var IdExtractorCoProcessDef string = `
 						]
 			}
 		},
-    "custom_middleware": {
+		"custom_middleware": {
       "pre": [
         {
           "name": "MyPreMiddleware",
           "require_session": false
         }
       ],
-      "driver": "python"
+      "id_extractor": {
+        "extract_from": "header",
+        "extract_with": "value",
+        "extractor_config": {
+          "header_name": "Authorization"
+        }
+      },
+      "driver": "grpc"
     },
 		"proxy": {
 			"listen_path": "/v1",
