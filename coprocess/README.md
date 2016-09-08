@@ -18,7 +18,7 @@ Tyk provides support for [gRPC](http://www.grpc.io/), you may use any of the gRP
 
 The ID extractor is a very useful mechanism that will let you cache your authentication IDs and prevent certain requests from hitting your CP backend. It takes a set of rules from your API configuration (the rules are set per API).
 
-A sample configuration will look like this:
+A sample usage will look like this:
 
 ```json
 "custom_middleware": {
