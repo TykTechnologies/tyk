@@ -1,5 +1,6 @@
 // +build coprocess
 // +build !python
+// +build !grpc
 
 package main
 
