@@ -56,17 +56,5 @@ func CreateCoProcessMiddleware(MiddlewareName string, hookType coprocess.HookTyp
 	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
 }
 
-type IdExtractorMiddleware struct {
-	*TykMiddleware
-}
-
-func (m *IdExtractorMiddleware) New()                            {}
-func (m *IdExtractorMiddleware) GetConfig() (interface{}, error) { return nil, nil }
-func (m *IdExtractorMiddleware) IsEnabledForSpec() bool          { return false }
-func (m *IdExtractorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	return nil, 200
-}
-
-func CreateIdExtractorMiddleware(mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
-	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
+func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
 }
