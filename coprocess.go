@@ -259,13 +259,17 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, 200
 	}
 
-	thisExtractor := m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	useCoProcessAuth := m.TykMiddleware.Spec.EnableCoProcessAuth && m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor != nil
+	var thisExtractor IdExtractor
+	if useCoProcessAuth {
+		thisExtractor = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	}
+
 	var thisSessionState *SessionState
 	var returnOverrides ReturnOverrides
 	var SessionID string
 
-	if m.HookType == coprocess.HookType_CustomKeyCheck {
-
+	if m.HookType == coprocess.HookType_CustomKeyCheck && useCoProcessAuth {
 		SessionID, returnOverrides = thisExtractor.ExtractAndCheck(r, thisSessionState)
 
 		if returnOverrides.ResponseCode != 0 {
@@ -309,7 +313,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Key not authorised"), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
-	if m.HookType == coprocess.HookType_CustomKeyCheck {
+	if m.HookType == coprocess.HookType_CustomKeyCheck && useCoProcessAuth {
 		if returnObject.Session != nil {
 			returnedSessionState := TykSessionState(returnObject.Session)
 			thisExtractor.PostProcess(r, returnedSessionState, SessionID)
