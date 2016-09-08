@@ -79,7 +79,7 @@ func RPCKeepAliveCheck(r *RPCStorageHandler) {
 		case <-time.After(time.Second * 10):
 			log.WithFields(logrus.Fields{
 				"prefix": "RPC Conn Mgr",
-			}).Info("Handler seems to have disconnected, attempting reconnect")
+			}).Warning("Handler seems to have disconnected, attempting reconnect")
 			r.ReConnect()
 		}
 
