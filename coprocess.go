@@ -248,11 +248,23 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 // IsEnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
-	var enableCoProcess bool = config.CoProcessConfig.EnableCoProcess && EnableCoProcesss
+	var enableCoProcess bool = config.CoProcessOptions.EnableCoProcess && EnableCoProcess
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 
+	var supportedDrivers = []tykcommon.MiddlewareDriver{tykcommon.PythonDriver, tykcommon.LuaDriver, tykcommon.GrpcDriver,}
+
+	for _, driver := range supportedDrivers {
+		if m.TykMiddleware.Spec.CustomMiddleware.Driver == driver && CoProcessName == string(driver) {
+			usesCoProcessMiddleware = true
+			break
+		}
+	}
+
 	if usesCoProcessMiddleware && enableCoProcess {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Debug("Enabling CP middleware.")
 		return true
 	}
 
@@ -260,6 +272,12 @@ func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
+	}
+
+	if !usesCoProcessMiddleware && m.TykMiddleware.Spec.CustomMiddleware.Driver != "" {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Error("CP Driver not supported: ", m.TykMiddleware.Spec.CustomMiddleware.Driver)
 	}
 
 	return false
