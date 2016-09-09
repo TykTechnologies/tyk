@@ -353,7 +353,7 @@ func SendHeartBeat(endpoint string, secret string) error {
 
 	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
-	ServiceNonceMutex.Unlock()
+	
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
@@ -388,7 +388,7 @@ func SendHeartBeat(endpoint string, secret string) error {
 	}
 
 	// Set the nonce
-	ServiceNonceMutex.Lock()
+	
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
 	ServiceNonceMutex.Unlock()
@@ -413,7 +413,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 
 	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
-	ServiceNonceMutex.Unlock()
+	
 
 	c := &http.Client{}
 	response, reqErr := c.Do(newRequest)
@@ -500,7 +500,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	}
 
 	// Set the nonce
-	ServiceNonceMutex.Lock()
+	
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 	ServiceNonceMutex.Unlock()
