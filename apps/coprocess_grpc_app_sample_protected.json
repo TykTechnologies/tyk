@@ -44,7 +44,6 @@
       "id_extractor": {
         "extract_from": "header",
         "extract_with": "value",
-        "ttl": 5000,
         "extractor_config": {
           "header_name": "Authorization"
         }
