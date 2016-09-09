@@ -14,6 +14,7 @@ tyk.compose.local_rpc.conf
 tyk.compose.cluster.conf
 tyk.zeroconf.conf
 tyk.zeroconf2.conf
+tyk.zeroconf3.conf
 tyk.zerobench.conf
 tyk.rpc.conf
 tyk.zerobench.conf

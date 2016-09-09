@@ -64,8 +64,6 @@ func NotifyCurrentServerStatus() {
 		Payload: string(asJson),
 	}
 
-	log.Debug("Sending DRL notification")
-
 	MainNotifier.Notify(n)
 
 }
@@ -84,7 +82,7 @@ func OnServerStatusReceivedHandler(payload string) {
 
 	if DRLManager.Ready {
 		DRLManager.AddOrUpdateServer(thisServerData)
-		log.Info(DRLManager.Report())
+		log.Debug(DRLManager.Report())
 	} else {
 		log.Warning("DRL not ready, skipping this notification")
 	}
