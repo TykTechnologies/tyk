@@ -710,7 +710,18 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 			return 0, make([]interface{}, 0)
 		}
 
+		// Check for nil array
 		if redVal == nil {
+			return 0, make([]interface{}, 0)
+		}
+
+		// Check for nil length
+		if len(redVal) == 0 {
+			return 0, make([]interface{}, 0)
+		}
+
+		// Check actual value
+		if redVal[1] == nil {
 			return 0, make([]interface{}, 0)
 		}
 
@@ -765,10 +776,22 @@ func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, pe
 			return 0, make([]interface{}, 0)
 		}
 
+		// Check for nil array
 		if redVal == nil {
 			return 0, make([]interface{}, 0)
 		}
 
+		// Check for nil length
+		if len(redVal) == 0 {
+			return 0, make([]interface{}, 0)
+		}
+
+		// Check actual value
+		if redVal[1] == nil {
+			return 0, make([]interface{}, 0)
+		}
+
+		// All clear
 		intVal := len(redVal[1].([]interface{}))
 		log.Debug("Returned: ", intVal)
 
