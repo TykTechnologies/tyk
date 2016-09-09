@@ -245,8 +245,24 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 	return thisModuleConfig, nil
 }
 
+// IsEnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
-	return true
+	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
+	var enableCoProcess bool = config.CoProcessConfig.EnableCoProcess && EnableCoProcesss
+	// This flag indicates if the current spec specifies any CP custom middleware.
+	var usesCoProcessMiddleware bool
+
+	if usesCoProcessMiddleware && enableCoProcess {
+		return true
+	}
+
+	if usesCoProcessMiddleware && !enableCoProcess {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
+	}
+
+	return false
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
