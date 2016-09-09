@@ -862,7 +862,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
+						AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Pre, obj.Name, mwDriver}, tykMiddleware)
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
 					}
@@ -877,7 +877,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
+						AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Post, obj.Name, mwDriver}, tykMiddleware)
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 					}
@@ -918,7 +918,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Pre, mwDriver, tykMiddleware))
+						AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Pre, obj.Name, mwDriver}, tykMiddleware)
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
 					}
@@ -987,8 +987,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 					if useCoProcessAuth {
 						newExtractor(referenceSpec, tykMiddleware)
+						AppendMiddleware(&authArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver}, tykMiddleware)
 					}
-					authArray = append(authArray, CreateCoProcessMiddleware(mwAuthCheckFunc.Name, coprocess.HookType_CustomKeyCheck, mwDriver, tykMiddleware))
 				}
 
 				if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.APIDefinition.UseBasicAuth && !referenceSpec.APIDefinition.UseOauth2 && !useCoProcessAuth) {
@@ -1004,12 +1004,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 
 				for _, obj := range mwPostAuthCheckFuncs {
-					if mwDriver != tykcommon.OttoDriver {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_PostKeyAuth, mwDriver, tykMiddleware))
-					}
+						AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver}, tykMiddleware)
 				}
 
 				var baseChainArray_PostAuth = []alice.Constructor{}
@@ -1046,7 +1044,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						log.WithFields(logrus.Fields{
 							"prefix": "coprocess",
 						}).Debug("----> Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-						chainArray = append(chainArray, CreateCoProcessMiddleware(obj.Name, coprocess.HookType_Post, mwDriver, tykMiddleware))
+						AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Post, obj.Name, mwDriver}, tykMiddleware)
 					} else {
 						chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
 					}
