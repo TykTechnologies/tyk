@@ -20,19 +20,28 @@ func SetupDRL() {
 func StartRateLimitNotifications() {
 	notificationFreq := config.DRLNotificationFrequency
 	if notificationFreq == 0 {
-		notificationFreq = 5
+		notificationFreq = 2
 	}
 
 	go func() {
 		log.Info("Starting gateway rate imiter notifications...")
 		for {
-			NotifyCurrentServerStatus()
+			if NodeID != "" {
+				NotifyCurrentServerStatus()
+			} else {
+				log.Warning("Node not registered yet, skipping DRL Notification")
+			}
+
 			time.Sleep(time.Duration(notificationFreq) * time.Second)
 		}
 	}()
 }
 
 func NotifyCurrentServerStatus() {
+	if DRLManager.Ready == false {
+		return
+	}
+
 	rate := GlobalRate.Rate()
 	if rate == 0 {
 		rate = 1
@@ -73,5 +82,10 @@ func OnServerStatusReceivedHandler(payload string) {
 
 	log.Debug("Received DRL data: ", thisServerData)
 
-	DRLManager.AddOrUpdateServer(thisServerData)
+	if DRLManager.Ready {
+		DRLManager.AddOrUpdateServer(thisServerData)
+		log.Info(DRLManager.Report())
+	} else {
+		log.Warning("DRL not ready, skipping this notification")
+	}
 }

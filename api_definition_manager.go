@@ -346,7 +346,7 @@ func StartBeating(endpoint, secret string) {
 		if failure != nil {
 			log.Warning(failure)
 		}
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 2)
 	}
 
 	log.Info("Stopped Heartbeat")
