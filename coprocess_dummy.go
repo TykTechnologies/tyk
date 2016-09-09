@@ -17,21 +17,24 @@ const (
 
 var EnableCoProcess bool = false
 
-type DummyCoProcessMiddleware struct {
+type CoProcessMiddleware struct {
 	*TykMiddleware
+	HookType         coprocess.HookType
+	HookName         string
+	MiddlewareDriver tykcommon.MiddlewareDriver
 }
 
-func (m *DummyCoProcessMiddleware) New() {}
+func (m *CoProcessMiddleware) New() {}
 
-func (a *DummyCoProcessMiddleware) IsEnabledForSpec() bool {
+func (a *CoProcessMiddleware) IsEnabledForSpec() bool {
 	return false
 }
 
-func (m *DummyCoProcessMiddleware) GetConfig() (interface{}, error) {
+func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (m *DummyCoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	return nil, 200
 }
 
@@ -50,10 +53,6 @@ func CoProcessInit() {
 
 func doCoprocessReload() {
 	return
-}
-
-func CreateCoProcessMiddleware(MiddlewareName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
-	return CreateMiddleware(&DummyCoProcessMiddleware{tykMwSuper}, tykMwSuper)
 }
 
 func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
