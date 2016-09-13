@@ -1,3 +1,5 @@
+// +build coprocess
+
 package coprocess
 
 /*
