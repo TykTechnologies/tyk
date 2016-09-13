@@ -58,5 +58,5 @@ type SessionState struct {
 	Tags                    []string    `json:"tags" msg:"tags"`
 	Alias                   string      `json:"alias" msg:"alias"`
 	LastUpdated             string      `json:"last_updated" msg:"last_updated"`
-	IdExtractorDeadline			int					`json:"id_extractor_deadline" msg:"id_extractor_deadline"`
+	IdExtractorDeadline			int64					`json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 }
