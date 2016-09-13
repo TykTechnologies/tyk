@@ -182,10 +182,19 @@ type Config struct {
 	CloseIdleConnections              bool                                     `json:"close_idle_connections"`
 	DRLNotificationFrequency          int                                      `json:"drl_notification_frequency"`
 	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
+	ForceGlobalSessionLifetime        bool                                     `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 }
 
 type CertData struct {
 	Name     string `json:"domain_name"`
 	CertFile string `json:"cert_file"`
 	KeyFile  string `json:"key_file"`
+}
+
+func GetLifetime(spec *APISpec, token string) int64 {
+	if config.ForceGlobalSessionLifetime {
+		return config.GlobalSessionLifetime
+	}
+
+	return 0
 }
