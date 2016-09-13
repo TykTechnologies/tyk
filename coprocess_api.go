@@ -17,6 +17,7 @@ package main
 import "C"
 
 import (
+	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tykcommon"
 )
 
