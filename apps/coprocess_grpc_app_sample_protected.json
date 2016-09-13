@@ -48,7 +48,8 @@
           "header_name": "Authorization"
         }
       },
-      "driver": "grpc"
+      "driver": "grpc",
+      "session_lifetime": 35
     },
     "enable_batch_request_support": true
 }
