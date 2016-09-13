@@ -203,7 +203,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
 
 				if reqVal == nil {
-					log.Warning("Upstream request musthave failed, response is empty")
+					log.Warning("Upstream request must have failed, response is empty")
 					return nil, 200
 				}
 
