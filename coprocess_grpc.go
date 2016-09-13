@@ -92,5 +92,6 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
 func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
+	object = GlobalDispatcher.DispatchObject(object)
 	return object
 }
