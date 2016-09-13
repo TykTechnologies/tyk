@@ -20,12 +20,12 @@ package main
 */
 import "C"
 
-import(
-  "github.com/TykTechnologies/tyk/coprocess"
-  "github.com/golang/protobuf/proto"
+import (
+	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/golang/protobuf/proto"
 
-  "encoding/json"
-  "unsafe"
+	"encoding/json"
+	"unsafe"
 )
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.

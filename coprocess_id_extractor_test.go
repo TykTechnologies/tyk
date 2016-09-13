@@ -4,13 +4,13 @@
 package main
 
 import (
+	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"encoding/base64"
 	"strings"
 	"testing"
-	"fmt"
 )
 
 func TestValueExtractor(t *testing.T) {

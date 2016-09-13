@@ -183,7 +183,7 @@ func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 
-	var supportedDrivers = []tykcommon.MiddlewareDriver{tykcommon.PythonDriver, tykcommon.LuaDriver, tykcommon.GrpcDriver,}
+	var supportedDrivers = []tykcommon.MiddlewareDriver{tykcommon.PythonDriver, tykcommon.LuaDriver, tykcommon.GrpcDriver}
 
 	for _, driver := range supportedDrivers {
 		if m.TykMiddleware.Spec.CustomMiddleware.Driver == driver && CoProcessName == string(driver) {

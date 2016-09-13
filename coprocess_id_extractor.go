@@ -4,14 +4,14 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 
 	"crypto/md5"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
-	"fmt"
 )
 
 type IdExtractor interface {
@@ -20,17 +20,17 @@ type IdExtractor interface {
 }
 
 type ValueExtractor struct {
-	Config *tykcommon.MiddlewareIdExtractor
+	Config        *tykcommon.MiddlewareIdExtractor
 	TykMiddleware *TykMiddleware
-	Spec *APISpec
+	Spec          *APISpec
 }
 
-func(e *ValueExtractor) Extract(input interface{}) string {
+func (e *ValueExtractor) Extract(input interface{}) string {
 	headerValue := input.(string)
 	return headerValue
 }
 
-func(e *ValueExtractor) PostProcess(r *http.Request, thisSessionState SessionState, SessionID string) {
+func (e *ValueExtractor) PostProcess(r *http.Request, thisSessionState SessionState, SessionID string) {
 
 	e.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, e.Spec.APIDefinition.SessionLifetime)
 
@@ -40,7 +40,7 @@ func(e *ValueExtractor) PostProcess(r *http.Request, thisSessionState SessionSta
 	return
 }
 
-func(e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
+func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput, tokenID string
 
 	switch e.Config.ExtractFrom {
@@ -62,7 +62,7 @@ func(e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, retu
 			log.Debug("Headers are: ", r.Header)
 
 			returnOverrides = ReturnOverrides{
-				ResponseCode: 400,
+				ResponseCode:  400,
 				ResponseError: "Authorization field missing",
 			}
 
@@ -105,7 +105,7 @@ func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
 	// Initialize a extractor based on the API spec.
 	switch referenceSpec.CustomMiddleware.IdExtractor.ExtractWith {
 	case tykcommon.ValueExtractor:
-		thisExtractor = &ValueExtractor{ &referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}
+		thisExtractor = &ValueExtractor{&referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}
 	}
 
 	referenceSpec.CustomMiddleware.IdExtractor.Extractor = thisExtractor
