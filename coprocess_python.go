@@ -5,6 +5,8 @@ package main
 
 /*
 #cgo pkg-config: python3
+#cgo python CFLAGS: -DENABLE_PYTHON
+
 
 #include <Python.h>
 
