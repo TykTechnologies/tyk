@@ -357,30 +357,3 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	return nil, 200
 }
-
-// CoProcessLog is a bridge for using Tyk log from CP.
-//export CoProcessLog
-func CoProcessLog(CMessage *C.char, CLogLevel *C.char) {
-	var message, logLevel string
-	message = C.GoString(CMessage)
-	logLevel = C.GoString(CLogLevel)
-
-	switch logLevel {
-	case "debug":
-		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
-		}).Debug(message)
-	case "error":
-		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
-		}).Error(message)
-	case "warning":
-		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
-		}).Warning(message)
-	default:
-		log.WithFields(logrus.Fields{
-			"prefix": CoProcessName,
-		}).Info(message)
-	}
-}
