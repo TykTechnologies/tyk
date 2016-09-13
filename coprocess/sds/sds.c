@@ -1,4 +1,5 @@
 // +build coprocess
+// +build !grpc
 
 /* SDSLib 2.0 -- A C dynamic strings library
  *
