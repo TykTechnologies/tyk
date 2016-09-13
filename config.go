@@ -187,10 +187,7 @@ type Config struct {
 	CloseIdleConnections              bool                                     `json:"close_idle_connections"`
 	DRLNotificationFrequency          int                                      `json:"drl_notification_frequency"`
 	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
-<<<<<<< HEAD
-=======
 	ForceGlobalSessionLifetime        bool                                     `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
->>>>>>> develop
 }
 
 type CertData struct {
