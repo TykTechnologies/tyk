@@ -9,11 +9,13 @@ import (
 
 	"crypto/md5"
 	"net/http"
+	"strconv"
+	"time"
 	"fmt"
 )
 
 type IdExtractor interface {
-	ExtractAndCheck(*http.Request, *SessionState) (string, ReturnOverrides)
+	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
 	PostProcess(*http.Request, SessionState, string)
 }
 
@@ -38,7 +40,7 @@ func(e *ValueExtractor) PostProcess(r *http.Request, thisSessionState SessionSta
 	return
 }
 
-func(e *ValueExtractor) ExtractAndCheck(r *http.Request, thisSessionState *SessionState) (SessionID string, returnOverrides ReturnOverrides) {
+func(e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput, tokenID string
 
 	switch e.Config.ExtractFrom {
@@ -81,9 +83,16 @@ func(e *ValueExtractor) ExtractAndCheck(r *http.Request, thisSessionState *Sessi
 	previousSessionState, keyExists = e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
-		e.PostProcess(r, previousSessionState, SessionID)
-		returnOverrides = ReturnOverrides{
-			ResponseCode: 200,
+
+		lastUpdated, _ := strconv.Atoi(previousSessionState.LastUpdated)
+
+		deadlineTs := int64(lastUpdated) + previousSessionState.IdExtractorDeadline
+
+		if deadlineTs > time.Now().Unix() {
+			e.PostProcess(r, previousSessionState, SessionID)
+			returnOverrides = ReturnOverrides{
+				ResponseCode: 200,
+			}
 		}
 	}
 
