@@ -230,12 +230,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		thisExtractor = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 	}
 
-	var thisSessionState *SessionState
 	var returnOverrides ReturnOverrides
 	var SessionID string
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck && useCoProcessAuth {
-		SessionID, returnOverrides = thisExtractor.ExtractAndCheck(r, thisSessionState)
+		SessionID, returnOverrides = thisExtractor.ExtractAndCheck(r)
 
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
