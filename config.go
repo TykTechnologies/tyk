@@ -181,6 +181,7 @@ type Config struct {
 	PublicKeyPath                     string                                   `json:"public_key_path"`
 	CloseIdleConnections              bool                                     `json:"close_idle_connections"`
 	DRLNotificationFrequency          int                                      `json:"drl_notification_frequency"`
+	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
 }
 
 type CertData struct {
