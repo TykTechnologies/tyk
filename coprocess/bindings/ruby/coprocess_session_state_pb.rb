@@ -48,6 +48,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     repeated :tags, :string, 24
     optional :alias, :string, 25
     optional :last_updated, :string, 26
+    optional :id_extractor_deadline, :int64, 27
   end
 end
 
