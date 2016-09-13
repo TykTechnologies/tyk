@@ -1,4 +1,5 @@
 // +build coprocess
+// +build !grpc
 
 package coprocess
 
