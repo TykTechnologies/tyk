@@ -39,7 +39,7 @@ class SampleServer < Coprocess::Dispatcher::Service
     puts "Calling MyAuthCheck"
     valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
     request_token = coprocess_object.request.headers["Authorization"]
-    
+
     if request_token.include?(valid_token)
       new_session = Coprocess::SessionState.new
       new_session.rate = 1000
@@ -55,6 +55,8 @@ class SampleServer < Coprocess::Dispatcher::Service
 
       # ID Extractor Deadline!
       new_session.id_extractor_deadline = 20
+
+      # new_session.session_lifetime = 99
 
       coprocess_object.metadata["token"] = "mytoken"
       coprocess_object.session = new_session
