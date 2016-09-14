@@ -59,3 +59,11 @@ type SessionState struct {
 	Alias                   string      `json:"alias" msg:"alias"`
 	LastUpdated             string      `json:"last_updated" msg:"last_updated"`
 }
+
+func GetLifetime(spec *APISpec, token string) int64 {
+	if config.ForceGlobalSessionLifetime {
+		return config.GlobalSessionLifetime
+	}
+
+	return 0
+}
