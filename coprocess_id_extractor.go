@@ -194,6 +194,10 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	return SessionID, returnOverrides
 }
 
+type XPathExtractor struct {
+	BaseExtractor
+}
+
 func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
 	var thisExtractor IdExtractor
 
