@@ -254,7 +254,15 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	object := thisCoProcessor.GetObjectFromRequest(r)
 
-	returnObject := thisCoProcessor.Dispatch(object)
+	returnObject, dispatchErr := thisCoProcessor.Dispatch(object)
+
+	if dispatchErr != nil {
+		if m.HookType == coprocess.HookType_CustomKeyCheck {
+			return errors.New("Key not authorised"), 403
+		} else {
+			return errors.New("Middleware error"), 500
+		}
+	}
 
 	thisCoProcessor.ObjectPostProcess(returnObject, r)
 
@@ -279,7 +287,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Is this a CP authentication middleware?
-	if m.HookType == coprocess.HookType_CustomKeyCheck {
+	if m.TykMiddleware.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
 		// The CP middleware didn't setup a session:
 		if returnObject.Session == nil {
 			return errors.New("Key not authorised"), 403
