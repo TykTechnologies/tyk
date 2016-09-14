@@ -162,7 +162,7 @@ var IdExtractorCoProcessDef string = `
 	}
 `
 
-var RegexExtractor string = `
+var RegexExtractorDef string = `
 
 	{
 		"name": "Tyk Test API - ValueExtractor/XPath",
