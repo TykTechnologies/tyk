@@ -169,6 +169,16 @@ func applyTestHooks(objectPtr unsafe.Pointer) {
 			"customparam": "customvalue",
 		}
 		object.Request.DeleteParams = []string{"remove"}
+	case "hook_test_bad_auth":
+		object.Request.ReturnOverrides = &coprocess.ReturnOverrides{403, "Key not authorised"}
+	case "hook_test_bad_auth_using_id_extractor":
+		break
+	case "hook_test_bad_auth_cp_error":
+		break
+	case "hook_test_successful_auth":
+		break
+	case "hook_test_successful_auth_using_id_extractor":
+		break
 	}
 
 	newObject, _ := proto.Marshal(object)
