@@ -85,6 +85,8 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 		// TODO: check if header_name setting exists!
 		extractorOutput = r.Header.Get(headerName)
+	case tykcommon.FormSource:
+		log.Println("Using ValueExtractor with FormSource")
 	}
 
 	// Prepare a session ID.
@@ -161,6 +163,10 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 		// TODO: check if header_name setting exists!
 		extractorOutput = r.Header.Get(headerName)
+	case tykcommon.BodySource:
+		log.Println("Using RegexExtractor with BodySource")
+	case tykcommon.FormSource:
+		log.Println("Using RegexExtractor with FormSource")
 	}
 
 	var regexOutput []string
