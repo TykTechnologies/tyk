@@ -278,7 +278,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck && useCoProcessAuth {
-		if returnObject.Session != nil {
+		if returnObject.Session == nil {
+			return errors.New("Key not authorised"), 403
+		} else {
 			returnedSessionState := TykSessionState(returnObject.Session)
 			thisExtractor.PostProcess(r, returnedSessionState, SessionID)
 			return nil, 200
