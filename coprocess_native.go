@@ -29,7 +29,7 @@ import (
 )
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
-func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
+func (c *CoProcessor) Dispatch(object *coprocess.Object) (newObject *coprocess.Object, err error) {
 
 	var objectMsg []byte
 
@@ -37,11 +37,6 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 		objectMsg, _ = proto.Marshal(object)
 	} else if MessageType == coprocess.JsonMessage {
 		objectMsg, _ = json.Marshal(object)
-	}
-
-	if CoProcessName == "grpc" {
-		object = GlobalDispatcher.DispatchObject(object)
-		return object
 	}
 
 	objectMsgStr := string(objectMsg)
@@ -61,7 +56,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	var newObjectBytes []byte
 	newObjectBytes = C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 
-	newObject := &coprocess.Object{}
+	newObject = &coprocess.Object{}
 
 	if MessageType == coprocess.ProtobufMessage {
 		proto.Unmarshal(newObjectBytes, newObject)
@@ -73,5 +68,5 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
 	C.free(unsafe.Pointer(objectPtr))
 	C.free(unsafe.Pointer(newObjectPtr))
 
-	return newObject
+	return newObject, err
 }

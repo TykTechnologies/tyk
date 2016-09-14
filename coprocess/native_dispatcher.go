@@ -29,7 +29,7 @@ type Dispatcher interface {
 	DispatchEvent([]byte)
 
 	// DispatchObject takes and returns a coprocess.Object pointer, this is used by gRPC.
-	DispatchObject(*Object) *Object
+	DispatchObject(*Object) (*Object, error)
 
 	// LoadModules is called the first time a CP binding starts. Used by Lua.
 	LoadModules()
