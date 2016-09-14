@@ -39,8 +39,8 @@ class SampleServer < Coprocess::Dispatcher::Service
     puts "Calling MyAuthCheck"
     valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
     request_token = coprocess_object.request.headers["Authorization"]
-
-    if request_token == valid_token
+    
+    if request_token.include?(valid_token)
       new_session = Coprocess::SessionState.new
       new_session.rate = 1000
       new_session.per = 10

@@ -43,9 +43,10 @@
       },
       "id_extractor": {
         "extract_from": "header",
-        "extract_with": "value",
+        "extract_with": "regex",
         "extractor_config": {
-          "header_name": "Authorization"
+          "header_name": "Authorization",
+          "regex_expression": "[^\\\\-]+"
         }
       },
       "driver": "grpc",

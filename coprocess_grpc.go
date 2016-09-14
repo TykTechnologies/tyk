@@ -46,15 +46,14 @@ func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) *coprocess.Object {
+func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
 	newObject, err := grpcClient.Dispatch(context.Background(), object)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
 		}).Error(err)
-		return object
 	}
-	return newObject
+	return newObject, err
 }
 
 // DispatchEvent dispatches a Tyk event.
@@ -91,7 +90,7 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 }
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
-func (c *CoProcessor) Dispatch(object *coprocess.Object) *coprocess.Object {
-	object = GlobalDispatcher.DispatchObject(object)
-	return object
+func (c *CoProcessor) Dispatch(object *coprocess.Object) (newObject *coprocess.Object, err error) {
+	newObject, err = GlobalDispatcher.DispatchObject(object)
+	return newObject, err
 }
