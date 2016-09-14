@@ -58,9 +58,13 @@ type SessionState struct {
 	Tags                    []string    `json:"tags" msg:"tags"`
 	Alias                   string      `json:"alias" msg:"alias"`
 	LastUpdated             string      `json:"last_updated" msg:"last_updated"`
+	SessionLifetime         int64       `bson:"session_lifetime" json:"session_lifetime"`
 }
 
-func GetLifetime(spec *APISpec, token string) int64 {
+func GetLifetime(spec *APISpec, session SessionState) int64 {
+	log.Println("config.GlobalSessionLifetime", config.GlobalSessionLifetime)
+	log.Println("spec.SessionLifetime", spec.SessionLifetime)
+	log.Println("SessionState.SessionLifetime", session.SessionLifetime)
 	if config.ForceGlobalSessionLifetime {
 		return config.GlobalSessionLifetime
 	}
