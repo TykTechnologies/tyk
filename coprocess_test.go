@@ -278,6 +278,38 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 }
 
+/* CP authentication */
+
+func TestCoProcessAuth(t *testing.T) {
+	t.Log("CP AUTH")
+	spec := MakeCoProcessSampleAPI(protectedCoProcessDef)
+
+	chain := BuildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, tykcommon.MiddlewareDriver("python"))
+
+	thisSession := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("abc", thisSession, 60)
+
+	uri := "/headers"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+
+	param := make(url.Values)
+
+	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req.Header.Add("authorization", "abc")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 403 {
+		t.Fatal("Authentication should fail! But it's returning:", recorder.Code)
+	}
+}
+
 var basicCoProcessDef string = `
 
 	{
@@ -325,6 +357,62 @@ var basicCoProcessDef string = `
           "require_session": false
         }
       ],
+      "driver": "python"
+    },
+		"proxy": {
+			"listen_path": "/v1",
+			"target_url": "http://httpbin.org",
+			"strip_listen_path": false
+		}
+	}
+`
+
+var protectedCoProcessDef string = `
+
+	{
+		"name": "Tyk Test API",
+		"api_id": "1",
+		"org_id": "default",
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {
+			"auth_header_name": "authorization"
+		},
+		"enable_coprocess_auth": true,
+		"use_keyless": false,
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"v1": {
+					"name": "v1",
+					"expires": "2100-01-02 15:04",
+					"use_extended_paths": true,
+					"paths": {
+						"ignored": [],
+						"white_list": [],
+						"black_list": []
+					}
+				}
+			}
+		},
+		"event_handlers": {
+			"events": {
+				"AuthFailure": [
+								{
+										"handler_name":"cp_dynamic_handler",
+										"handler_meta": {
+												"name": "my_handler"
+										}
+								}
+						]
+			}
+		},
+    "custom_middleware": {
+      "auth_check": {
+        "name": "TestAuthCheck"
+      },
       "driver": "python"
     },
 		"proxy": {
