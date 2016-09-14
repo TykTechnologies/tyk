@@ -253,13 +253,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	object := thisCoProcessor.GetObjectFromRequest(r)
-	
+
 	returnObject := thisCoProcessor.Dispatch(object)
 
 	thisCoProcessor.ObjectPostProcess(returnObject, r)
 
 	authHeaderValue := returnObject.Metadata["token"]
 
+	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
 
 		log.WithFields(logrus.Fields{
@@ -277,14 +278,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Key not authorised"), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
-	if m.HookType == coprocess.HookType_CustomKeyCheck && thisExtractor != nil {
-		if returnObject.Session == nil {
-			return errors.New("Key not authorised"), 403
-		} else {
-			returnedSessionState := TykSessionState(returnObject.Session)
-			thisExtractor.PostProcess(r, returnedSessionState, SessionID)
-			return nil, 200
-		}
+	// The CP middleware didn't setup a session:
+	if m.HookType == coprocess.HookType_CustomKeyCheck && returnObject.Session == nil {
+		return errors.New("Key not authorised"), 403
+	}
+
+	// The CP middleware did setup a session, and we should pass it to the ID extractor (and cache it):
+	if thisExtractor != nil {
+		returnedSessionState := TykSessionState(returnObject.Session)
+		thisExtractor.PostProcess(r, returnedSessionState, SessionID)
+		return nil, 200
 	}
 
 	return nil, 200
