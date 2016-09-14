@@ -224,16 +224,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, 200
 	}
 
-	useCoProcessAuth := m.TykMiddleware.Spec.EnableCoProcessAuth && m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor != nil
 	var thisExtractor IdExtractor
-	if useCoProcessAuth {
+	if m.TykMiddleware.Spec.EnableCoProcessAuth && m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
+		log.Println("Using extractor, defining thisExtractor")
 		thisExtractor = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 	}
 
 	var returnOverrides ReturnOverrides
 	var SessionID string
 
-	if m.HookType == coprocess.HookType_CustomKeyCheck && useCoProcessAuth {
+	if m.HookType == coprocess.HookType_CustomKeyCheck && thisExtractor != nil {
 		SessionID, returnOverrides = thisExtractor.ExtractAndCheck(r)
 
 		if returnOverrides.ResponseCode != 0 {
@@ -253,7 +253,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	object := thisCoProcessor.GetObjectFromRequest(r)
-
+	
 	returnObject := thisCoProcessor.Dispatch(object)
 
 	thisCoProcessor.ObjectPostProcess(returnObject, r)
@@ -277,7 +277,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Key not authorised"), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
-	if m.HookType == coprocess.HookType_CustomKeyCheck && useCoProcessAuth {
+	if m.HookType == coprocess.HookType_CustomKeyCheck && thisExtractor != nil {
 		if returnObject.Session == nil {
 			return errors.New("Key not authorised"), 403
 		} else {
