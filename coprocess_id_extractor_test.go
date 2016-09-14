@@ -52,7 +52,7 @@ func TestValueExtractor(t *testing.T) {
 	var returnOverrides ReturnOverrides
 	var SessionID string
 
-	SessionID, returnOverrides = thisExtractor.ExtractAndCheck(req, &thisSession)
+	SessionID, returnOverrides = thisExtractor.ExtractAndCheck(req)
 
 	fmt.Println("SessionID=", SessionID)
 	fmt.Println("returnOverrides", returnOverrides)
@@ -91,7 +91,7 @@ func TestValueExtractorRequirements(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 
 	var returnOverrides ReturnOverrides
-	_, returnOverrides = thisExtractor.ExtractAndCheck(req, &thisSession)
+	_, returnOverrides = thisExtractor.ExtractAndCheck(req)
 
 	if returnOverrides.ResponseCode != 400 && returnOverrides.ResponseError != "Authorization field missing" {
 		t.Fatal("ValueExtractor should return an error when the header is missing.")
