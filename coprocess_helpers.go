@@ -74,6 +74,7 @@ func TykSessionState(sessionState *coprocess.SessionState) SessionState {
 		sessionState.Alias,
 		sessionState.LastUpdated,
 		sessionState.IdExtractorDeadline,
+		sessionState.SessionLifetime,
 	}
 
 	return session
@@ -136,6 +137,7 @@ func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
 		sessionState.Alias,
 		sessionState.LastUpdated,
 		sessionState.IdExtractorDeadline,
+		sessionState.SessionLifetime,
 	}
 
 	return session
