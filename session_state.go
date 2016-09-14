@@ -62,11 +62,19 @@ type SessionState struct {
 	SessionLifetime         int64       `bson:"session_lifetime" json:"session_lifetime"`
 }
 
-func GetLifetime(spec *APISpec, session SessionState) int64 {
-	log.Println("config.GlobalSessionLifetime", config.GlobalSessionLifetime)
-	log.Println("spec.SessionLifetime", spec.SessionLifetime)
-	log.Println("SessionState.SessionLifetime", session.SessionLifetime)
+func GetLifetime(spec *APISpec, session *SessionState) int64 {
 	if config.ForceGlobalSessionLifetime {
+		return config.GlobalSessionLifetime
+	}
+
+	if session.SessionLifetime > 0 {
+		log.Println("Use SessionLifetime")
+		return session.SessionLifetime
+	} else if spec.SessionLifetime > 0 {
+		log.Println("Use Spec SessionLifetime")
+		return spec.SessionLifetime
+	} else if config.GlobalSessionLifetime > 0 {
+		log.Println("Use GlobalSessionLifetime")
 		return config.GlobalSessionLifetime
 	}
 
