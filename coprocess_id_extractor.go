@@ -35,8 +35,8 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (SessionID string, retu
 }
 
 func (e *BaseExtractor) PostProcess(r *http.Request, thisSessionState SessionState, SessionID string) {
-
-	e.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, e.Spec.APIDefinition.SessionLifetime)
+	var sessionLifetime = GetLifetime(e.Spec, &thisSessionState)
+	e.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, sessionLifetime)
 
 	context.Set(r, SessionData, thisSessionState)
 	context.Set(r, AuthHeaderValue, SessionID)
@@ -169,7 +169,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	var matchIndex = 1
 
 	// Prepare a session ID.
-	data := []byte(regexOutput[1])
+	data := []byte(regexOutput[matchIndex])
 	tokenID = fmt.Sprintf("%x", md5.Sum(data))
 	SessionID = e.TykMiddleware.Spec.OrgID + tokenID
 
