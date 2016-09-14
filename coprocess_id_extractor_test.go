@@ -11,10 +11,12 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"crypto/md5"
 )
 
-func TestValueExtractor(t *testing.T) {
-	fmt.Println("TestValueExtractor")
+/* Value Extractor tests, using "header" source */
+
+func TestValueExtractorHeaderSource(t *testing.T) {
 	spec := MakeCoProcessSampleAPI(IdExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
@@ -59,8 +61,7 @@ func TestValueExtractor(t *testing.T) {
 
 }
 
-func TestValueExtractorRequirements(t *testing.T) {
-	fmt.Println("TestValueExtractor")
+func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 	spec := MakeCoProcessSampleAPI(IdExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
@@ -96,6 +97,61 @@ func TestValueExtractorRequirements(t *testing.T) {
 	if returnOverrides.ResponseCode != 400 && returnOverrides.ResponseError != "Authorization field missing" {
 		t.Fatal("ValueExtractor should return an error when the header is missing.")
 	}
+}
+
+/* Regex Extractor tests, using "header" source */
+
+func TestRegexExtractorHeaderSource(t *testing.T) {
+	spec := MakeCoProcessSampleAPI(RegexExtractorDef)
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	tykMiddleware := &TykMiddleware{spec, proxy}
+
+	newExtractor(spec, tykMiddleware)
+
+	var thisExtractor IdExtractor
+	thisExtractor = tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+
+	thisSession := createBasicAuthSession()
+
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+
+	fullHeaderValue := "token-12345"
+	matchedHeaderValue := []byte("12345")
+
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req.Header.Add("Authorization", fullHeaderValue)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getBasicAuthChain(*spec)
+	chain.ServeHTTP(recorder, req)
+
+	var returnOverrides ReturnOverrides
+	var SessionID string
+
+	SessionID, returnOverrides = thisExtractor.ExtractAndCheck(req)
+	expectedSessionID := computeSessionID(matchedHeaderValue, tykMiddleware)
+
+	if SessionID != expectedSessionID {
+		t.Fatal("Regex Extractor output doesn't match the computed session ID.")
+	}
+
+}
+
+func computeSessionID(input []byte, tykMiddleware *TykMiddleware) (sessionID string) {
+	tokenID := fmt.Sprintf("%x", md5.Sum(input))
+	sessionID = tykMiddleware.Spec.OrgID + tokenID
+
+	return sessionID
 }
 
 var IdExtractorCoProcessDef string = `
@@ -203,17 +259,12 @@ var RegexExtractorDef string = `
 			}
 		},
 		"custom_middleware": {
-      "pre": [
-        {
-          "name": "MyPreMiddleware",
-          "require_session": false
-        }
-      ],
-      "id_extractor": {
+			"id_extractor": {
         "extract_from": "header",
-        "extract_with": "value",
+        "extract_with": "regex",
         "extractor_config": {
-          "header_name": "Authorization"
+          "header_name": "Authorization",
+          "regex_expression": "[^\\\\-]+"
         }
       },
       "driver": "grpc"
