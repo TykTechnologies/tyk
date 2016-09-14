@@ -71,6 +71,11 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 	return
 }
 
+// Reload triggers a reload affecting CP middlewares and event handlers.
+func (d *GRPCDispatcher) Reload() {
+	return
+}
+
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
