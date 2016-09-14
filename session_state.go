@@ -71,5 +71,4 @@ func GetLifetime(spec *APISpec, session SessionState) int64 {
 	}
 
 	return 0
->>>>>>> develop
 }
