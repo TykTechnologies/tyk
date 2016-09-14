@@ -278,16 +278,24 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return errors.New("Key not authorised"), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
-	// The CP middleware didn't setup a session:
-	if m.HookType == coprocess.HookType_CustomKeyCheck && returnObject.Session == nil {
-		return errors.New("Key not authorised"), 403
-	}
+	// Is this a CP authentication middleware?
+	if m.HookType == coprocess.HookType_CustomKeyCheck {
+		// The CP middleware didn't setup a session:
+		if returnObject.Session == nil {
+			return errors.New("Key not authorised"), 403
+		}
 
-	// The CP middleware did setup a session, and we should pass it to the ID extractor (and cache it):
-	if thisExtractor != nil {
 		returnedSessionState := TykSessionState(returnObject.Session)
-		thisExtractor.PostProcess(r, returnedSessionState, SessionID)
-		return nil, 200
+
+		if thisExtractor == nil {
+			// This API is not using the ID extractor, but we've got a session:
+			m.Spec.SessionManager.UpdateSession(authHeaderValue, returnedSessionState, m.Spec.APIDefinition.SessionLifetime)
+			context.Set(r, SessionData, returnedSessionState)
+			context.Set(r, AuthHeaderValue, authHeaderValue)
+		} else {
+			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
+			thisExtractor.PostProcess(r, returnedSessionState, SessionID)
+		}
 	}
 
 	return nil, 200
