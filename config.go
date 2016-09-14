@@ -195,11 +195,3 @@ type CertData struct {
 	CertFile string `json:"cert_file"`
 	KeyFile  string `json:"key_file"`
 }
-
-func GetLifetime(spec *APISpec, token string) int64 {
-	if config.ForceGlobalSessionLifetime {
-		return config.GlobalSessionLifetime
-	}
-
-	return 0
-}
