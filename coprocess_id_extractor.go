@@ -19,6 +19,7 @@ import (
 type IdExtractor interface {
 	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
 	PostProcess(*http.Request, SessionState, string)
+	GenerateSessionID(string, *TykMiddleware) string
 }
 
 type BaseExtractor struct {
@@ -46,6 +47,13 @@ func (e *BaseExtractor) PostProcess(r *http.Request, thisSessionState SessionSta
 
 type ValueExtractor struct {
 	BaseExtractor
+}
+
+func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (SessionID string) {
+	data := []byte(input)
+	tokenID := fmt.Sprintf("%x", md5.Sum(data))
+	SessionID = mw.Spec.OrgID + tokenID
+	return SessionID
 }
 
 
@@ -89,10 +97,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		log.Println("Using ValueExtractor with FormSource")
 	}
 
-	// Prepare a session ID.
-	data := []byte(extractorOutput)
-	tokenID = fmt.Sprintf("%x", md5.Sum(data))
-	SessionID = e.TykMiddleware.Spec.OrgID + tokenID
+	SessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
 
 	var keyExists bool
 	var previousSessionState SessionState
@@ -202,6 +207,87 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 type XPathExtractor struct {
 	BaseExtractor
+}
+
+func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
+	var extractorOutput, tokenID string
+
+	if e.Config.ExtractorConfig["regex_expression"] == nil {
+		// TODO: Error, no expression set!
+	}
+
+	var expressionString string
+	expressionString = e.Config.ExtractorConfig["regex_expression"].(string)
+
+	expression, err := regexp.Compile(expressionString)
+
+	if err != nil {
+		// TODO: error, the expression is bad!
+	}
+
+	switch e.Config.ExtractFrom {
+	case tykcommon.HeaderSource:
+		var headerName, headerValue string
+
+		// TODO: check if header_name is set
+		headerName = e.Config.ExtractorConfig["header_name"].(string)
+		headerValue = r.Header.Get(headerName)
+
+		if headerValue == "" {
+			log.WithFields(logrus.Fields{
+				"path":   r.URL.Path,
+				"origin": GetIPFromRequest(r),
+			}).Info("Attempted access with malformed header, no auth header found.")
+
+			log.Debug("Looked in: ", headerName)
+			log.Debug("Raw data was: ", headerValue)
+			log.Debug("Headers are: ", r.Header)
+
+			returnOverrides = ReturnOverrides{
+				ResponseCode:  400,
+				ResponseError: "Authorization field missing",
+			}
+
+			// m.reportLoginFailure(tykId, r)
+		}
+
+		// TODO: check if header_name setting exists!
+		extractorOutput = r.Header.Get(headerName)
+	case tykcommon.BodySource:
+		log.Println("Using RegexExtractor with BodySource")
+	case tykcommon.FormSource:
+		log.Println("Using RegexExtractor with FormSource")
+	}
+
+	var regexOutput []string
+	regexOutput = expression.FindAllString(extractorOutput, -1)
+
+	var matchIndex = 1
+
+	// Prepare a session ID.
+	data := []byte(regexOutput[matchIndex])
+	tokenID = fmt.Sprintf("%x", md5.Sum(data))
+	SessionID = e.TykMiddleware.Spec.OrgID + tokenID
+
+	var keyExists bool
+	var previousSessionState SessionState
+	previousSessionState, keyExists = e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+
+	if keyExists {
+
+		lastUpdated, _ := strconv.Atoi(previousSessionState.LastUpdated)
+
+		deadlineTs := int64(lastUpdated) + previousSessionState.IdExtractorDeadline
+
+		if deadlineTs > time.Now().Unix() {
+			e.PostProcess(r, previousSessionState, SessionID)
+			returnOverrides = ReturnOverrides{
+				ResponseCode: 200,
+			}
+		}
+	}
+
+	return SessionID, returnOverrides
 }
 
 func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
