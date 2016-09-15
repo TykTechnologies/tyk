@@ -41,9 +41,8 @@ class SampleServer < Coprocess::Dispatcher::Service
     request_token = coprocess_object.request.headers["Authorization"]
 
     if request_token == nil
-      puts "Using form?"
-      p coprocess_object.request
-      request_token = "123"
+      puts "(Using form)"
+      request_token = coprocess_object.request.params["key"]
     end
 
     if request_token.include?(valid_token)
@@ -51,10 +50,10 @@ class SampleServer < Coprocess::Dispatcher::Service
       new_session.rate = 1000
       new_session.per = 10
       new_session.quota_max = 60
-      new_session.quota_renews = 1473881185
+      new_session.quota_renews = 1474057703
       new_session.quota_remaining = 0
       new_session.quota_renewal_rate = 120
-      new_session.expires = 1473881185
+      new_session.expires = 1474057703
 
       # Only set this on create!
       new_session.last_updated = (Time.now.to_i + 10).to_s
