@@ -42,6 +42,13 @@
         "name": "MyAuthCheck"
       },
       "id_extractor": {
+        "extract_from": "form",
+        "extract_with": "value",
+        "extractor_config": {
+          "param_name": "key"
+        }
+      },
+      "id_extractor__": {
         "extract_from": "header",
         "extract_with": "regex",
         "extractor_config": {
