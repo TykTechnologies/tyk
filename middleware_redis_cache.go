@@ -35,6 +35,17 @@ func (m *RedisCacheMiddleware) New() {
 	m.sh = SuccessHandler{m.TykMiddleware}
 }
 
+func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range m.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.Cached) > 0 {
+			used = true
+		}
+	}
+
+	return used
+}
+
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
 	var thisModuleConfig RedisCacheMiddlewareConfig
@@ -255,6 +266,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 
 			if m.isTimeStampExpired(timestamp) {
+				m.CacheStore.DeleteKey(thisKey)
+				return nil, 200
+			}
+
+			if len(cachedData) == 0 {
 				m.CacheStore.DeleteKey(thisKey)
 				return nil, 200
 			}
