@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -50,6 +51,11 @@ type ValueExtractor struct {
 	BaseExtractor
 }
 
+type ValueExtractorConfig struct {
+	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	FormParamName string	`mapstructure:"param_name" bson:"param_name" json:"param_name"`
+}
+
 func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (SessionID string) {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
@@ -65,6 +71,10 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 
 func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
+
+	var config ValueExtractorConfig
+	// TODO: handle this error
+	mapstructure.Decode(e.Config.ExtractorConfig, &config)
 
 	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
@@ -96,9 +106,24 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		extractorOutput = r.Header.Get(headerName)
 	case tykcommon.FormSource:
 		log.Println("Using ValueExtractor with FormSource")
+		r.ParseForm()
+
+		if config.FormParamName == "" {
+			// No param name, error!
+		}
+
+		values := r.Form[config.FormParamName]
+
+		if len(values) > 0 {
+			extractorOutput = strings.Join(values, "")
+		} else {
+			// Error, no value!
+		}
 	}
 
 	SessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
+
+	log.Println("SessionID", SessionID)
 
 	var keyExists bool
 	var previousSessionState SessionState
