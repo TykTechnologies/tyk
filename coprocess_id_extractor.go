@@ -6,6 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
+	"github.com/mitchellh/mapstructure"
 	// "gopkg.in/xmlpath.v2"
 	"regexp"
 
@@ -63,7 +64,7 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 }
 
 func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
-	var extractorOutput, tokenID string
+	var extractorOutput string
 
 	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
@@ -124,17 +125,24 @@ type RegexExtractor struct {
 	BaseExtractor
 }
 
-func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
-	var extractorOutput, tokenID string
+type RegexExtractorConfig struct {
+	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	RegexExpression string	`mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	RegexMatchIndex int	`mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+}
 
+func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
+	var extractorOutput string
+
+	var config RegexExtractorConfig
+	// TODO: handle this error
+	mapstructure.Decode(e.Config.ExtractorConfig, &config)
+
+	// TODO: handle this error: no expression set!
 	if e.Config.ExtractorConfig["regex_expression"] == nil {
-		// TODO: Error, no expression set!
 	}
 
-	var expressionString string
-	expressionString = e.Config.ExtractorConfig["regex_expression"].(string)
-
-	expression, err := regexp.Compile(expressionString)
+	expression, err := regexp.Compile(config.RegexExpression)
 
 	if err != nil {
 		// TODO: error, the expression is bad!
@@ -177,12 +185,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	var regexOutput []string
 	regexOutput = expression.FindAllString(extractorOutput, -1)
 
-	var matchIndex = 1
-
-	// Prepare a session ID.
-	data := []byte(regexOutput[matchIndex])
-	tokenID = fmt.Sprintf("%x", md5.Sum(data))
-	SessionID = e.TykMiddleware.Spec.OrgID + tokenID
+	SessionID = e.GenerateSessionID(regexOutput[config.RegexMatchIndex], e.TykMiddleware)
 
 	var keyExists bool
 	var previousSessionState SessionState
@@ -210,7 +213,7 @@ type XPathExtractor struct {
 }
 
 func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
-	var extractorOutput, tokenID string
+	var extractorOutput string
 
 	if e.Config.ExtractorConfig["regex_expression"] == nil {
 		// TODO: Error, no expression set!
@@ -264,10 +267,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	var matchIndex = 1
 
-	// Prepare a session ID.
-	data := []byte(regexOutput[matchIndex])
-	tokenID = fmt.Sprintf("%x", md5.Sum(data))
-	SessionID = e.TykMiddleware.Spec.OrgID + tokenID
+	SessionID = e.GenerateSessionID(regexOutput[matchIndex], e.TykMiddleware)
 
 	var keyExists bool
 	var previousSessionState SessionState
