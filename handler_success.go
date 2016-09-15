@@ -165,7 +165,7 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 			log.Debug("Policy Applied, Access rights were: ", policy.AccessRights)
 
 			// Update the session in the session manager in case it gets called again
-			t.Spec.SessionManager.UpdateSession(key, *thisSession, t.Spec.APIDefinition.SessionLifetime)
+			t.Spec.SessionManager.UpdateSession(key, *thisSession, GetLifetime(t.Spec, thisSession))
 			log.Debug("Policy applied to key")
 		}
 	}
@@ -214,7 +214,7 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
-		t.Spec.SessionManager.UpdateSession(key, thisSession, t.Spec.APIDefinition.SessionLifetime)
+		t.Spec.SessionManager.UpdateSession(key, thisSession, GetLifetime(t.Spec, &thisSession))
 	}
 
 	return thisSession, found
