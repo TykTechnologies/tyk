@@ -40,6 +40,12 @@ class SampleServer < Coprocess::Dispatcher::Service
     valid_token = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
     request_token = coprocess_object.request.headers["Authorization"]
 
+    if request_token == nil
+      puts "Using form?"
+      p coprocess_object.request
+      request_token = "123"
+    end
+
     if request_token.include?(valid_token)
       new_session = Coprocess::SessionState.new
       new_session.rate = 1000
