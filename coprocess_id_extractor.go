@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"errors"
 	"time"
 )
 
@@ -47,6 +48,16 @@ func (e *BaseExtractor) PostProcess(r *http.Request, thisSessionState SessionSta
 	return
 }
 
+// ExtractHeader is used when a HeaderSource is specified.
+func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err error) {
+	var headerName = e.Config.ExtractorConfig["header_name"].(string)
+	headerValue = r.Header.Get(headerName)
+	if headerValue == "" {
+		err = errors.New("Bad header value.")
+	}
+	return headerValue, err
+}
+
 type ValueExtractor struct {
 	BaseExtractor
 }
@@ -71,6 +82,7 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 
 func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
+	var err error
 
 	var config ValueExtractorConfig
 	// TODO: handle this error
@@ -78,32 +90,19 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
-		var headerName, headerValue string
+		extractorOutput, err = e.ExtractHeader(r)
 
-		// TODO: check if header_name is set
-		headerName = e.Config.ExtractorConfig["header_name"].(string)
-		headerValue = r.Header.Get(headerName)
-
-		if headerValue == "" {
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
 				"origin": GetIPFromRequest(r),
 			}).Info("Attempted access with malformed header, no auth header found.")
 
-			log.Debug("Looked in: ", headerName)
-			log.Debug("Raw data was: ", headerValue)
-			log.Debug("Headers are: ", r.Header)
-
 			returnOverrides = ReturnOverrides{
 				ResponseCode:  400,
 				ResponseError: "Authorization field missing",
 			}
-
-			// m.reportLoginFailure(tykId, r)
 		}
-
-		// TODO: check if header_name setting exists!
-		extractorOutput = r.Header.Get(headerName)
 	case tykcommon.FormSource:
 		log.Println("Using ValueExtractor with FormSource")
 		r.ParseForm()
@@ -175,32 +174,19 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
-		var headerName, headerValue string
+		extractorOutput, err = e.ExtractHeader(r)
 
-		// TODO: check if header_name is set
-		headerName = e.Config.ExtractorConfig["header_name"].(string)
-		headerValue = r.Header.Get(headerName)
-
-		if headerValue == "" {
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
 				"origin": GetIPFromRequest(r),
 			}).Info("Attempted access with malformed header, no auth header found.")
 
-			log.Debug("Looked in: ", headerName)
-			log.Debug("Raw data was: ", headerValue)
-			log.Debug("Headers are: ", r.Header)
-
 			returnOverrides = ReturnOverrides{
 				ResponseCode:  400,
 				ResponseError: "Authorization field missing",
 			}
-
-			// m.reportLoginFailure(tykId, r)
 		}
-
-		// TODO: check if header_name setting exists!
-		extractorOutput = r.Header.Get(headerName)
 	case tykcommon.BodySource:
 		log.Println("Using RegexExtractor with BodySource")
 	case tykcommon.FormSource:
