@@ -50,6 +50,7 @@ var FallbackKeySesionManager SessionHandler = &DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
 var argumentsBackup map[string]interface{}
+var DashService DashboardServiceSender  
 
 var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
@@ -1469,7 +1470,7 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 // Handles pre-fork actions if we get a SIGHUP2
 func onFork() {
 	log.Info("Stopping heartbeat")
-	StopBeating()
+	DashService.StopBeating()
 
 	log.Info("Waiting to de-register")
 	time.Sleep(10 * time.Second)
@@ -1622,28 +1623,36 @@ func generateListener(l net.Listener) (net.Listener, error) {
 func handleDashboardRegistration() {
 	if config.UseDBAppConfigs {
 
-		connStr := buildConnStr("/register/node")
+		if DashService == nil {
+			DashService = &HTTPDashboardHandler{}
+			DashService.Init()
+		}
+
+		// connStr := buildConnStr("/register/node")
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Registering node.")
-		RegisterNodeWithDashboard(connStr, config.NodeSecret)
+		err := DashService.Register()
+		if err != nil {
+			log.Fatal("Registration failed: ", err)
+		}
 
 		startHeartBeat()
 	}
 }
 
 func startHeartBeat() {
-	heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-	if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
-		log.Fatal("Connection string is empty, failing.")
-	}
+	// heartbeatConnStr := config.DBAppConfOptions.ConnectionString
+	// if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
+	// 	log.Fatal("Connection string is empty, failing.")
+	// }
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Starting heartbeat.")
-	heartbeatConnStr = heartbeatConnStr + "/register/ping"
-	go StartBeating(heartbeatConnStr, config.NodeSecret)
+	// log.WithFields(logrus.Fields{
+	// 	"prefix": "main",
+	// }).Info("Starting heartbeat.")
+	// heartbeatConnStr = heartbeatConnStr + "/register/ping"
+	go DashService.StartBeating()
 }
 
 func StartDRL() {
