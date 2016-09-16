@@ -781,6 +781,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}
 			}
 
+			if EnableCoProcess {
+				loadBundle(referenceSpec)
+			}
+
 			if referenceSpec.EnableBatchRequestSupport {
 				addBatchEndpoint(referenceSpec, subrouter)
 			}
