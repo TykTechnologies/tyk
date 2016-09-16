@@ -60,5 +60,9 @@
       "driver": "grpc",
       "session_lifetime": 35
     },
+    "custom_middleware_bundles": [
+      "abc123",
+      "abc321"
+    ],
     "enable_batch_request_support": true
 }
