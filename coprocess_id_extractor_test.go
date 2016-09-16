@@ -135,10 +135,10 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	chain := getBasicAuthChain(*spec)
 	chain.ServeHTTP(recorder, req)
 
-	var returnOverrides ReturnOverrides
+	// var returnOverrides ReturnOverrides
 	var SessionID string
 
-	SessionID, returnOverrides = thisExtractor.ExtractAndCheck(req)
+	SessionID, _ = thisExtractor.ExtractAndCheck(req)
 	expectedSessionID := computeSessionID(matchedHeaderValue, tykMiddleware)
 
 	if SessionID != expectedSessionID {
