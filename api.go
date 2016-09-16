@@ -115,7 +115,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 					}
 
-					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(thisAPISpec, &newSession))
 					if err != nil {
 						return err
 					}
@@ -144,7 +144,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				checkAndApplyTrialPeriod(keyName, spec.APIID, &newSession)
-				err := spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+				err := spec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(spec, &newSession))
 				if err != nil {
 					return err
 				}
@@ -1329,7 +1329,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 							thisAPISpec.SessionManager.ResetQuota(newKey, newSession)
 							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						}
-						err := thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+						err := thisAPISpec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(thisAPISpec, &newSession))
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
 							DoJSONWrite(w, 403, responseMessage)
@@ -1369,7 +1369,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 							spec.SessionManager.ResetQuota(newKey, newSession)
 							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						}
-						err := spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
+						err := spec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(spec, &newSession))
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
 							DoJSONWrite(w, 403, responseMessage)

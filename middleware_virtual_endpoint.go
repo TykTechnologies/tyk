@@ -207,7 +207,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Save the sesison data (if modified)
 	if thisMeta.UseSession {
 		thisSessionState.MetaData = newResponseData.SessionMeta
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, d.Spec.SessionLifetime)
+		d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(d.Spec, &thisSessionState))
 	}
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
