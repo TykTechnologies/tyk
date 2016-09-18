@@ -269,7 +269,9 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 
 	newRequest.Header.Add("authorization", secret)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5*time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -322,9 +324,10 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 
 	// Set the nonce
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
+	
 
 	return nil
 }
@@ -352,10 +355,14 @@ func SendHeartBeat(endpoint string, secret string) error {
 	log.Debug("Sending Heartbeat as: ", NodeID)
 
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
+
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 	
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5*time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -391,7 +398,6 @@ func SendHeartBeat(endpoint string, secret string) error {
 	
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return nil
 }
@@ -412,10 +418,13 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 	
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5*time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -503,7 +512,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return &APISpecs
 }
