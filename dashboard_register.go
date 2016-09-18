@@ -33,22 +33,23 @@ type HTTPDashboardHandler struct {
 }
 
 func ReLogin() {
-	// connStr := config.DBAppConfOptions.ConnectionString
-	// if connStr == "" {
-	// 	log.Fatal("Connection string is empty, failing.")
-	// }
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Registering node (again).")
+	DashService.StopBeating()
+	DashService.DeRegister()
 
-	// connStr := connStr + "/register/node"
-	// log.WithFields(logrus.Fields{
-	// 	"prefix": "main",
-	// }).Info("Registering node (again).")
-	
 	err := DashService.Register()
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Error(err)
 	}
+
+	if err == nil {
+		go DashService.StartBeating()	
+	}
+	
 }
 
 func (h *HTTPDashboardHandler) Init() error {
@@ -75,7 +76,9 @@ func (h *HTTPDashboardHandler) Register() error {
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5*time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -89,7 +92,7 @@ func (h *HTTPDashboardHandler) Register() error {
 
 	if response.StatusCode != 200 {
 		log.Error("Failed to register node, retrying in 5s")
-		log.Debug("Response was: ", string(retBody))
+		log.Error(" --> Response was: ", string(retBody))
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
@@ -164,9 +167,12 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 	log.Debug("Sending Heartbeat as: ", NodeID)
 
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5*time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -194,7 +200,6 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 	// Set the nonce
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return nil
 }
@@ -220,7 +225,9 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5*time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {

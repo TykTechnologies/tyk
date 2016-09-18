@@ -266,6 +266,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{}
@@ -355,7 +356,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	// Set the nonce
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return &APISpecs
 }

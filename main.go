@@ -257,13 +257,13 @@ func getPolicies() {
 	}).Debug("Loading policies")
 
 	if config.Policies.PolicySource == "service" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Using Policies from Dashboard Service")
-
 		if config.Policies.PolicyConnectionString != "" {
 			connStr := config.Policies.PolicyConnectionString
 			connStr = connStr + "/system/policies"
+
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Using Policies from Dashboard Service")
 
 			thesePolicies = LoadPoliciesFromDashboard(connStr, config.NodeSecret, config.Policies.AllowExplicitPolicyID)
 

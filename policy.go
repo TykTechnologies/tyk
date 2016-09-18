@@ -6,6 +6,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 type Policy struct {
@@ -91,7 +92,6 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	policies := make(map[string]Policy)
 
 	// Get the definitions
-	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
 		log.Error("Failed to create request: ", err)
@@ -101,11 +101,16 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5*time.Second,
+	}
+	
+	log.Debug("Calling: ", endpoint)
 	response, reqErr := c.Do(newRequest)
-
+	
 	if reqErr != nil {
 		log.Error("Request failed: ", reqErr)
 		return policies
@@ -136,7 +141,6 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	for _, p := range thisList.Message {
 		thisID := p.MID.Hex()
