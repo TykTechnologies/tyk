@@ -223,8 +223,10 @@ func getAPISpecs() *[]*APISpec {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
+		NodeID = generateRandomNodeID() // Needed for non-dash DRL
 		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
+		NodeID = generateRandomNodeID() // Needed for non-dash DRL
 		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
@@ -1471,16 +1473,19 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 var amForked bool
 
 func onFork() {
-	log.Info("Stopping heartbeat")
-	DashService.StopBeating()
+	if config.UseDBAppConfigs {
+		log.Info("Stopping heartbeat")
+		DashService.StopBeating()
 
-	log.Info("Waiting to de-register")
-	time.Sleep(10 * time.Second)
+		log.Info("Waiting to de-register")
+		time.Sleep(10 * time.Second)
 
-	ServiceNonceMutex.Lock()
-	os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-	os.Setenv("TYK_SERVICE_NODEID", NodeID)
-	ServiceNonceMutex.Unlock()
+		ServiceNonceMutex.Lock()
+		os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+		os.Setenv("TYK_SERVICE_NODEID", NodeID)
+		ServiceNonceMutex.Unlock()
+	}
+
 	amForked = true
 }
 
@@ -1535,10 +1540,14 @@ func main() {
 
 	if !amForked {
 		log.Info("Stop signal received.")
-		log.Info("Stopping heartbeat...")
-		DashService.StopBeating()
-		time.Sleep(2 * time.Second)
-		DashService.DeRegister()
+
+		if config.UseDBAppConfigs {
+			log.Info("Stopping heartbeat...")
+			DashService.StopBeating()
+			time.Sleep(2 * time.Second)
+			DashService.DeRegister()
+		}
+
 		log.Info("Terminating.")
 	} else {
 		log.Info("Terminated from fork.")
@@ -1667,12 +1676,15 @@ func startHeartBeat() {
 	// 	"prefix": "main",
 	// }).Info("Starting heartbeat.")
 	// heartbeatConnStr = heartbeatConnStr + "/register/ping"
-	if DashService == nil {
-		DashService = &HTTPDashboardHandler{}
-		DashService.Init()	
+	if config.UseDBAppConfigs {
+		if DashService == nil {
+			DashService = &HTTPDashboardHandler{}
+			DashService.Init()
+		}
+
+		go DashService.StartBeating()
 	}
-	
-	go DashService.StartBeating()
+
 }
 
 func StartDRL() {
@@ -1754,7 +1766,7 @@ func listen(l net.Listener, err error) {
 				"prefix": "main",
 			}).Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
-			StartDRL()
+			
 		} else {
 			NodeID = thisID
 			ServiceNonceMutex.Lock()
@@ -1767,6 +1779,7 @@ func listen(l net.Listener, err error) {
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")
 		}
+		StartDRL()
 
 		// Resume accepting connections in a new goroutine.
 		if !RPC_EmergencyMode {
