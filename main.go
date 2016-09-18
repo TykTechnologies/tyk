@@ -50,7 +50,7 @@ var FallbackKeySesionManager SessionHandler = &DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
 var argumentsBackup map[string]interface{}
-var DashService DashboardServiceSender  
+var DashService DashboardServiceSender
 
 var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
@@ -1468,6 +1468,8 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 }
 
 // Handles pre-fork actions if we get a SIGHUP2
+var amForked bool
+
 func onFork() {
 	log.Info("Stopping heartbeat")
 	DashService.StopBeating()
@@ -1479,6 +1481,7 @@ func onFork() {
 	os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
 	os.Setenv("TYK_SERVICE_NODEID", NodeID)
 	ServiceNonceMutex.Unlock()
+	amForked = true
 }
 
 func main() {
@@ -1529,6 +1532,18 @@ func main() {
 			"prefix": "main",
 		}).Error("Listen handler exit: ", err)
 	}
+
+	if !amForked {
+		log.Info("Stop signal received.")
+		log.Info("Stopping heartbeat...")
+		DashService.StopBeating()
+		time.Sleep(2 * time.Second)
+		DashService.DeRegister()
+		log.Info("Terminating.")
+	} else {
+		log.Info("Terminated from fork.")
+	}
+
 	time.Sleep(3 * time.Second)
 
 }
@@ -1652,6 +1667,11 @@ func startHeartBeat() {
 	// 	"prefix": "main",
 	// }).Info("Starting heartbeat.")
 	// heartbeatConnStr = heartbeatConnStr + "/register/ping"
+	if DashService == nil {
+		DashService = &HTTPDashboardHandler{}
+		DashService.Init()	
+	}
+	
 	go DashService.StartBeating()
 }
 

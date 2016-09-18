@@ -18,12 +18,14 @@ type NodeResponseOK struct {
 type DashboardServiceSender interface {
 	Init() error
 	Register() error
+	DeRegister() error
 	StartBeating() error
 	StopBeating()
 }
 
 type HTTPDashboardHandler struct {
 	RegistrationEndpoint string
+	DeRegistrationEndpoint string
 	HeartBeatEndpoint    string
 	Secret               string
 
@@ -51,6 +53,7 @@ func ReLogin() {
 
 func (h *HTTPDashboardHandler) Init() error {
 	h.RegistrationEndpoint = buildConnStr("/register/node")
+	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
 
 	h.Secret = config.NodeSecret
@@ -191,6 +194,62 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 	// Set the nonce
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
+	ServiceNonceMutex.Unlock()
+
+	return nil
+}
+
+func (h *HTTPDashboardHandler) DeRegister() error {
+	// Get the definitions
+
+	endpoint := h.DeRegistrationEndpoint
+	secret := h.Secret
+
+	log.Debug("Calling: ", endpoint)
+	newRequest, err := http.NewRequest("DELETE", endpoint, nil)
+	if err != nil {
+		log.Error("Failed to create request: ", err)
+	}
+
+	newRequest.Header.Add("authorization", secret)
+	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
+
+	log.Info("De-registering: ", NodeID)
+
+	ServiceNonceMutex.Lock()
+	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+
+	c := &http.Client{}
+	response, reqErr := c.Do(newRequest)
+
+	if reqErr != nil {
+		log.Error("Dashboard is down? Failed fo de-register: ", reqErr)
+		return reqErr
+	}
+
+	if response.StatusCode != 200 {
+		log.Error("Dashboard is down? Failed fo de-register, incorrect status: ", response.StatusCode)
+		return errors.New("Incorrect status code")
+	}
+
+	defer response.Body.Close()
+	retBody, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		return err
+	}
+
+	thisVal := NodeResponseOK{}
+	decErr := json.Unmarshal(retBody, &thisVal)
+	if decErr != nil {
+		log.Error("Failed to decode body: ", decErr)
+		return decErr
+	}
+
+	// Set the nonce
+	ServiceNonce = thisVal.Nonce
+	log.Info("De-registered.")
 	ServiceNonceMutex.Unlock()
 
 	return nil
