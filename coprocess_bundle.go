@@ -15,10 +15,6 @@ import (
 	"strings"
 )
 
-const (
-	baseBundleUrl = "http://127.0.0.1/dev/"
-)
-
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
 	Name string
@@ -110,7 +106,7 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 func fetchBundle(name string) (thisBundle Bundle, err error) {
 	var bundleUrl string
 
-	bundleUrl = strings.Join([]string{baseBundleUrl, name}, "")
+	bundleUrl = strings.Join([]string{config.BundleBaseURL, name}, "")
 
 	var thisGetter BundleGetter
 
