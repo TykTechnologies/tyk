@@ -164,6 +164,7 @@ func loadBundle(spec *APISpec) {
 		return
 	}
 
+  // Skip if no bundle base URL is set.
 	if spec.BundleBaseURL == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
