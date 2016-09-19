@@ -165,7 +165,7 @@ func loadBundle(spec *APISpec) {
 	}
 
   // Skip if no bundle base URL is set.
-	if spec.BundleBaseURL == "" {
+	if config.BundleBaseURL == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Error("An API specifies a custom middleware bundle, but no bundle base URL is set in your tyk.conf! Skipping bundle: ", spec.CustomMiddlewareBundle)
