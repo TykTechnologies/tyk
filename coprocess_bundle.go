@@ -60,13 +60,15 @@ func(g *HttpBundleGetter) Get() (bundleData []byte, err error) {
 
 
 type BundleSaver interface {
-  Save(*Bundle, *APISpec) (error)
+  Save(*Bundle, string, *APISpec) (error)
 }
+
+type BaseBundleSaver struct {}
 
 type ZipBundleSaver struct {
 }
 
-func(s *ZipBundleSaver) Save(bundle *Bundle, spec *APISpec) (err error) {
+func(s *ZipBundleSaver) Save(bundle *Bundle, destPath string, spec *APISpec) (err error) {
   buf := bytes.NewReader(bundle.Data)
   reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
 
@@ -126,7 +128,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
     bundleSaver = &ZipBundleSaver{}
   }
 
-  bundleSaver.Save(bundle, spec)
+  bundleSaver.Save(bundle, destPath, spec)
 
   return err
 }

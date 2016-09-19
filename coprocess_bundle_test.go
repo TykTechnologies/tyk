@@ -13,6 +13,22 @@ func TestHttpBundleGetter(t *testing.T) {
   thisGetter = &HttpBundleGetter{}
 
   thisGetter.Get()
-  
+
   fmt.Println(thisGetter)
+}
+
+func TestBundleSaver(t *testing.T) {
+}
+
+func TestZipBundleSaver(t *testing.T) {
+
+}
+
+func TestFetchBundle(t *testing.T) {
+}
+
+func TestSaveBundle(t *testing.T) {
+  // var testBundleFormat = "zip"
+  var testBundleSaver BundleSaver
+  testBundleSaver = &ZipBundleSaver{}
 }
