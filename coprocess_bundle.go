@@ -35,6 +35,7 @@ type HttpBundleGetter struct {
   Url string
 }
 
+// Get performs an HTTP GET request.
 func(g *HttpBundleGetter) Get() (bundleData []byte, err error) {
   log.Println("Calling HttpBundleGetter", g.Url)
   // bundleData = []byte("hello")
@@ -159,7 +160,19 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 func loadBundle(spec *APISpec) {
   var err error
 
+  // Skip if no custom middleware bundle name is set.
   if spec.CustomMiddlewareBundle == "" {
+    return
+  }
+
+  // Skip if the bundle destination path already exists.
+  bundlePath := strings.Join([]string{spec.APIID, spec.CustomMiddlewareBundle}, "-")
+  log.Println("bundlePath =", bundlePath)
+  destPath := filepath.Join("/Users/matias/dev/tyk", "middleware/bundles", bundlePath)
+  log.Println("destPath =", destPath)
+
+  if _, err := os.Stat(destPath); err == nil {
+    log.Println("destPath exists!")
     return
   }
 
@@ -177,16 +190,6 @@ func loadBundle(spec *APISpec) {
       "prefix": "main",
     }).Error("----> Error when loading bundle: ", spec.CustomMiddlewareBundle, ", ", err)
     return
-  }
-
-  bundlePath := strings.Join([]string{spec.APIID, spec.CustomMiddlewareBundle}, "-")
-  log.Println("bundlePath =", bundlePath)
-  destPath := filepath.Join("/Users/matias/dev/tyk", "middleware/bundles", bundlePath)
-  log.Println("destPath =", destPath)
-
-  if _, err := os.Stat(destPath); err == nil {
-    log.Println("destPath exists!")
-    // return
   }
 
   log.Println("destPath doesn't exist, save!", destPath)
