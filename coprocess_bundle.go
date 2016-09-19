@@ -156,7 +156,7 @@ func loadBundle(spec *APISpec) {
 
   bundlePath := strings.Join([]string{spec.APIID, spec.CustomMiddlewareBundle}, "-")
   log.Println("bundlePath =", bundlePath)
-  destPath := filepath.Join("/Users/matias/dev/tyk", "bundles", bundlePath)
+  destPath := filepath.Join("/Users/matias/dev/tyk", "middleware/bundles", bundlePath)
   log.Println("destPath =", destPath)
 
   if _, err := os.Stat(destPath); err == nil {
