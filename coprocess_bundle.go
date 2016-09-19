@@ -7,6 +7,7 @@ import(
   "strings"
   "net/http"
   "net/url"
+  "io"
   "io/ioutil"
   "path/filepath"
   "archive/zip"
@@ -65,7 +66,21 @@ type BundleSaver interface {
 type ZipBundleSaver struct {
 }
 
-func(s *ZipBundleSaver) Save(thisBundle *Bundle, spec *APISpec) (err error) {
+func(s *ZipBundleSaver) Save(bundle *Bundle, spec *APISpec) (err error) {
+  buf := bytes.NewReader(bundle.Data)
+  reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
+
+  for _, f := range reader.File {
+    log.Println("*** File: ", f.Name)
+    var rc io.ReadCloser
+    rc, err = f.Open()
+    if err != nil {
+      return err
+    }
+    // _, err = io.Copy()
+  }
+
+  log.Println("zipreader =", reader)
   return err
 }
 
@@ -113,14 +128,6 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 
   bundleSaver.Save(bundle, spec)
 
-  buf := bytes.NewReader(bundle.Data)
-  reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
-
-  for _, f := range reader.File {
-    log.Println("*** File: ", f.Name)
-  }
-
-  log.Println("zipreader =", reader)
   return err
 }
 
