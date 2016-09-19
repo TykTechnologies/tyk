@@ -25,7 +25,7 @@ type Bundle struct {
   Data []byte
 }
 
-// BundleGetter is used for downloading bundle data, check HttpBundleGetter for reference.
+// BundleGetter is used for downloading bundle data, see HttpBundleGetter for reference.
 type BundleGetter interface {
   Get() ([]byte, error)
 }
@@ -59,15 +59,16 @@ func(g *HttpBundleGetter) Get() (bundleData []byte, err error) {
 }
 
 
+// BundleSaver is an interface used by bundle saver structures.
 type BundleSaver interface {
   Save(*Bundle, string, *APISpec) (error)
 }
 
-type BaseBundleSaver struct {}
-
+// ZipBundleSaver is a BundleSaver for ZIP files.
 type ZipBundleSaver struct {
 }
 
+// Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
 func(s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) (err error) {
   buf := bytes.NewReader(bundle.Data)
   reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
@@ -105,6 +106,7 @@ func(s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) (
   return err
 }
 
+// fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
 func fetchBundle(name string) (thisBundle Bundle, err error) {
   var bundleUrl string
 
@@ -134,6 +136,7 @@ func fetchBundle(name string) (thisBundle Bundle, err error) {
   return thisBundle, err
 }
 
+// saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.
 func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
   log.Println("saveBundle:", bundle, ", to: ", destPath)
 
@@ -152,6 +155,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
   return err
 }
 
+// loadBundle wraps the load and save steps, it will return if an error occurs at any point.
 func loadBundle(spec *APISpec) {
   var err error
 
