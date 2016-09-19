@@ -117,7 +117,6 @@ type ServiceDiscoveryConf struct {
 type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
-	BundleBaseURL       string `json:"bundle_base_url"`
 }
 
 // Config is the configuration object used by tyk to set up various parameters.
@@ -189,6 +188,7 @@ type Config struct {
 	DRLNotificationFrequency          int                                      `json:"drl_notification_frequency"`
 	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime        bool                                     `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	BundleBaseURL                     string                                   `bson:"bundle_base_url" json:"bundle_base_url"`
 }
 
 type CertData struct {
