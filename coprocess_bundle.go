@@ -68,21 +68,40 @@ type BaseBundleSaver struct {}
 type ZipBundleSaver struct {
 }
 
-func(s *ZipBundleSaver) Save(bundle *Bundle, destPath string, spec *APISpec) (err error) {
+func(s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) (err error) {
   buf := bytes.NewReader(bundle.Data)
   reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
 
   for _, f := range reader.File {
-    log.Println("*** File: ", f.Name)
     var rc io.ReadCloser
     rc, err = f.Open()
+
     if err != nil {
       return err
     }
-    // _, err = io.Copy()
-  }
 
-  log.Println("zipreader =", reader)
+    var destPath string
+    destPath = filepath.Join(bundlePath, f.Name)
+
+    isDir := f.FileHeader.Mode().IsDir()
+
+    if isDir {
+      err = os.Mkdir(destPath, 0755)
+      if err != nil {
+        return err
+      }
+    } else {
+      var newFile *os.File
+      newFile, err = os.Create(destPath)
+      if err != nil {
+        return err
+      }
+      _, err = io.Copy(newFile, rc)
+      if err != nil {
+        return err
+      }
+    }
+  }
   return err
 }
 
