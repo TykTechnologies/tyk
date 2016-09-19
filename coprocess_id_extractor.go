@@ -11,11 +11,11 @@ import (
 	"regexp"
 
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-	"errors"
 	"time"
 )
 
@@ -63,8 +63,8 @@ type ValueExtractor struct {
 }
 
 type ValueExtractorConfig struct {
-	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
-	FormParamName string	`mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	HeaderName    string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 }
 
 func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (SessionID string) {
@@ -73,7 +73,6 @@ func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (Sess
 	SessionID = mw.Spec.OrgID + tokenID
 	return SessionID
 }
-
 
 func (e *ValueExtractor) Extract(input interface{}) string {
 	headerValue := input.(string)
@@ -150,9 +149,9 @@ type RegexExtractor struct {
 }
 
 type RegexExtractorConfig struct {
-	HeaderName string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
-	RegexExpression string	`mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
-	RegexMatchIndex int	`mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
 }
 
 func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {

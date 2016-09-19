@@ -4,6 +4,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"crypto/md5"
 )
 
 /* Value Extractor tests, using "header" source */
