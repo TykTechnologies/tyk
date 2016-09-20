@@ -12,6 +12,7 @@ import (
 	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
+	"rsc.io/letsencrypt"
 	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -57,6 +58,8 @@ var keyGen = DefaultKeyGenerator{}
 
 var mainRouter *mux.Router
 var defaultRouter *mux.Router
+var LE_MANAGER letsencrypt.Manager
+var LE_FIRSTRUN bool
 
 var NodeID string
 
@@ -1407,6 +1410,8 @@ func initialiseSystem(arguments map[string]interface{}) {
 	}
 
 	GetHostDetails()
+
+	go StartPeriodicStateBackup(&LE_MANAGER)
 }
 
 func getCmdArguments() map[string]interface{} {
@@ -1660,6 +1665,20 @@ func generateListener(l net.Listener) (net.Listener, error) {
 			MinVersion:        config.HttpServerOptions.MinVersion,
 		}
 		return tls.Listen("tcp", targetPort, &config)
+
+	} else if config.HttpServerOptions.UseLE_SSL {
+		
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Using SSL LE (https)")
+		
+		GetLEState(&LE_MANAGER)
+
+		config := tls.Config{
+			GetCertificate: LE_MANAGER.GetCertificate,
+		}
+		return tls.Listen("tcp", targetPort, &config)
+
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",

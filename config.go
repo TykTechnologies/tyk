@@ -84,6 +84,7 @@ type HttpServerOptionsConfig struct {
 	ReadTimeout      int        `json:"read_timeout"`
 	WriteTimeout     int        `json:"write_timeout"`
 	UseSSL           bool       `json:"use_ssl"`
+	UseLE_SSL        bool       `json:"use_ssl_le"`
 	EnableWebSockets bool       `json:"enable_websockets"`
 	Certificates     []CertData `json:"certificates"`
 	ServerName       string     `json:"server_name"`
