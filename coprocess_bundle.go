@@ -34,6 +34,10 @@ func(b *Bundle) Verify() (err error) {
 	return err
 }
 
+func(b *Bundle) AddToSpec() {
+	b.Spec.APIDefinition.CustomMiddleware = b.Manifest.CustomMiddleware
+}
+
 // BundleGetter is used for downloading bundle data, see HttpBundleGetter for reference.
 type BundleGetter interface {
 	Get() ([]byte, error)
@@ -163,7 +167,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
-func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
+func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) (err error) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
@@ -184,17 +188,14 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
 		return err
 	}
 
-	err = bundle.Verify()
-
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle, err)
-		return err
+	if !skipVerification {
+		err = bundle.Verify()
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+				}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
+		}
 	}
-
-	// Set the custom middleware block:
-	spec.APIDefinition.CustomMiddleware = bundle.Manifest.CustomMiddleware
 
 	return err
 }
@@ -234,7 +235,19 @@ func loadBundle(spec *APISpec) {
 			Spec: spec,
 		}
 
-		loadBundleManifest(&bundle, spec)
+		err = loadBundleManifest(&bundle, spec, true)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, err)
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("----> Using bundle: ", spec.CustomMiddlewareBundle)
+
+		bundle.AddToSpec()
+
 		return
 	}
 
@@ -248,7 +261,7 @@ func loadBundle(spec *APISpec) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Error("----> Error when loading bundle: ", spec.CustomMiddlewareBundle, ", ", err)
+		}).Error("----> Couldn't fetch bundle: ", spec.CustomMiddlewareBundle, ", ", err)
 		return
 	}
 
@@ -263,22 +276,35 @@ func loadBundle(spec *APISpec) {
 		// return
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Debug("----> Saving Bundle: ", spec.CustomMiddlewareBundle)
-
 	err = saveBundle(&bundle, destPath, spec)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Error("----> Error when saving bundle: ", spec.CustomMiddlewareBundle, ", ", err)
+		}).Error("----> Couldn't save bundle: ", spec.CustomMiddlewareBundle, ", ", err)
 		return
 	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("----> Saving Bundle: ", spec.CustomMiddlewareBundle)
 
 	// Set the destination path:
 	bundle.Path = destPath
 
-	// Load the manifest settings:
-	loadBundleManifest(&bundle, spec)
+	err = loadBundleManifest(&bundle, spec, false)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, err)
+		return
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Bundle is valid, adding to spec: ", spec.CustomMiddlewareBundle)
+
+	bundle.AddToSpec()
+
 }
