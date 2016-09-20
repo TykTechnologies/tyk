@@ -5,6 +5,7 @@
 - Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}`
 - It is now possible to rewrite a URL with a new host and have the host act as an override to any target settings that are in the API Definition
 - Added more remote logger support: Graylog, Syslog and Logstash
+- Added a global setting for middleware bundles, to set the global base URL for middleware bundles use `"bundle_base_url":"http://mybundles.com/"` in tyk.conf.
 
 ### Graylog:
 
