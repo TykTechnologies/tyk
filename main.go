@@ -597,6 +597,20 @@ func (s SortableAPISpecListByHost) Less(i, j int) bool {
 	return len(s[i].Domain) > len(s[j].Domain)
 }
 
+func notifyAPILoaded(spec *APISpec) {
+	if config.UseRedisLog {
+		log.WithFields(logrus.Fields{
+			"prefix":      "gateway",
+			"user_ip":     "--",
+			"server_name": "--",
+			"user_id":     "--",
+			"org_id":      spec.APIDefinition.OrgID,
+			"api_id":      spec.APIDefinition.APIID,
+		}).Info("Loaded: ", spec.APIDefinition.Name)	
+	}
+	
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// load the APi defs
@@ -668,6 +682,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					if onDomain == referenceSpec.Domain {
 						log.WithFields(logrus.Fields{
 							"prefix": "main",
+							"org_id": referenceSpec.APIDefinition.OrgID,
+							"api_id": referenceSpec.APIDefinition.APIID,
 						}).Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
 						skip = true
 						break
@@ -679,6 +695,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		if referenceSpec.Proxy.ListenPath == "" {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
+				"org_id": referenceSpec.APIDefinition.OrgID,
+				"api_id": referenceSpec.APIDefinition.APIID,
 			}).Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
 			skip = true
 		}
@@ -686,6 +704,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
+				"org_id": referenceSpec.APIDefinition.OrgID,
+				"api_id": referenceSpec.APIDefinition.APIID,
 			}).Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
 			skip = true
 		}
@@ -694,6 +714,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
+				"org_id": referenceSpec.APIDefinition.OrgID,
+				"api_id": referenceSpec.APIDefinition.APIID,
 			}).Error("Culdn't parse target URL: ", err)
 		}
 
@@ -1096,6 +1118,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}).Info("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 				log.Debug("Subrouter done")
+
+				notifyAPILoaded(referenceSpec)
 
 			}
 
