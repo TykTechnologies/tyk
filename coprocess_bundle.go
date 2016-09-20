@@ -164,6 +164,10 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
 	var manifest tykcommon.BundleManifest
 	err = json.Unmarshal(manifestData, &manifest)
 	log.Println("manifest = ", manifest)
+
+	// Set the custom middleware block:
+	spec.APIDefinition.CustomMiddleware = manifest.CustomMiddleware
+
 	return err
 }
 
