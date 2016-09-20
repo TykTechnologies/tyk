@@ -19,6 +19,7 @@ import (
 type Bundle struct {
 	Name string
 	Data []byte
+	Path string
 }
 
 // BundleGetter is used for downloading bundle data, see HttpBundleGetter for reference.
@@ -151,6 +152,12 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 	return err
 }
 
+func loadManifest(bundle *Bundle, spec *APISpec) {
+	log.Println("loadManifest: ", bundle, ", destPath: ", ", spec: ", spec)
+	manifestPath := filepath.Join(bundle.Path, "manifest.json")
+	log.Println("loadManifest, manifestPath: ", manifestPath)
+}
+
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
 func loadBundle(spec *APISpec) {
 	var err error
@@ -216,5 +223,11 @@ func loadBundle(spec *APISpec) {
 		}).Error("----> Error when saving bundle: ", spec.CustomMiddlewareBundle, ", ", err)
 		return
 	}
+
+	// Set the destination path:
+	bundle.Path = destPath
+
+	// Load the manifest settings:
+	loadManifest(&bundle, spec)
 
 }
