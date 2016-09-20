@@ -154,7 +154,8 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 	return err
 }
 
-func loadManifest(bundle *Bundle, spec *APISpec) (err error) {
+// loadBundleManifest will parse the manifest file and return the bundle parameters.
+func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
 	log.Println("loadManifest: ", bundle, ", destPath: ", ", spec: ", spec)
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
 	log.Println("loadManifest, manifestPath: ", manifestPath)
@@ -196,7 +197,7 @@ func loadBundle(spec *APISpec) {
 			Name: spec.CustomMiddlewareBundle,
 			Path: destPath,
 		}
-		loadManifest(&bundle, spec)
+		loadBundleManifest(&bundle, spec)
 		return
 	}
 
@@ -242,6 +243,6 @@ func loadBundle(spec *APISpec) {
 	bundle.Path = destPath
 
 	// Load the manifest settings:
-	loadManifest(&bundle, spec)
+	loadBundleManifest(&bundle, spec)
 
 }
