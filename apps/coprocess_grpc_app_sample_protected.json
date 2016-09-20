@@ -31,7 +31,7 @@
         "strip_listen_path": true
     },
     "enable_coprocess_auth": true,
-    "custom_middleware": {
+    "custom_middleware_": {
       "pre": [
         {
           "name": "MyPreMiddleware",
