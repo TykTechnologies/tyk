@@ -768,6 +768,11 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 			var mwDriver tykcommon.MiddlewareDriver
 
+
+			if EnableCoProcess {
+				loadBundle(referenceSpec)
+			}
+
 			// TODO: use config.EnableCoProcess
 			if config.EnableJSVM || EnableCoProcess {
 				log.WithFields(logrus.Fields{
@@ -779,10 +784,6 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
 					referenceSpec.JSVM.LoadJSPaths(mwPaths)
 				}
-			}
-
-			if EnableCoProcess {
-				loadBundle(referenceSpec)
 			}
 
 			if referenceSpec.EnableBatchRequestSupport {
