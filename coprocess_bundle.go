@@ -156,6 +156,10 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
 func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
+
 	log.Println("loadManifest: ", bundle, ", destPath: ", ", spec: ", spec)
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
 	log.Println("loadManifest, manifestPath: ", manifestPath)
@@ -163,7 +167,6 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
 	manifestData, err = ioutil.ReadFile(manifestPath)
 	var manifest tykcommon.BundleManifest
 	err = json.Unmarshal(manifestData, &manifest)
-	log.Println("manifest = ", manifest)
 
 	// Set the custom middleware block:
 	spec.APIDefinition.CustomMiddleware = manifest.CustomMiddleware
@@ -207,7 +210,7 @@ func loadBundle(spec *APISpec) {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("----> Loading Bundle: ", spec.CustomMiddlewareBundle)
+	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
 	var bundle Bundle
 	bundle, err = fetchBundle(spec.CustomMiddlewareBundle)
@@ -232,7 +235,9 @@ func loadBundle(spec *APISpec) {
 		// return
 	}
 
-	log.Println("destPath created", destPath)
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("----> Saving Bundle: ", spec.CustomMiddlewareBundle)
 
 	err = saveBundle(&bundle, destPath, spec)
 
