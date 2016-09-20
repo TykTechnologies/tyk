@@ -4,11 +4,13 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tykcommon"
 
+	"crypto/md5"
+	"io"
+	"encoding/hex"
 	"encoding/json"
 	"archive/zip"
 	"bytes"
 	"errors"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -31,6 +33,19 @@ func(b *Bundle) Verify() (err error) {
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 	log.Println("*** Manifest: ", b.Manifest)
+
+	log.Println("*** Expected signature: ", b.Manifest.Signature)
+	log.Println("*** Expected checksum: ", b.Manifest.Checksum)
+
+	h := md5.New()
+	h.Write(b.Data)
+	checksum := hex.EncodeToString(h.Sum(nil))
+
+	log.Println("*** Computed checksum: ", checksum)
+
+	for i, f := range b.Manifest.FileList {
+		log.Println("*** Manifest file: ", i, f)
+	}
 	return err
 }
 
