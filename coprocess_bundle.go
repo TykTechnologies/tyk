@@ -22,6 +22,16 @@ type Bundle struct {
 	Name string
 	Data []byte
 	Path string
+	Spec *APISpec
+	Manifest tykcommon.BundleManifest
+}
+
+func(b *Bundle) Verify() (err error) {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
+	log.Println("*** Manifest: ", b.Manifest)
+	return err
 }
 
 // BundleGetter is used for downloading bundle data, see HttpBundleGetter for reference.
@@ -36,15 +46,11 @@ type HttpBundleGetter struct {
 
 // Get performs an HTTP GET request.
 func (g *HttpBundleGetter) Get() (bundleData []byte, err error) {
-	log.Println("Calling HttpBundleGetter", g.Url)
-	// bundleData = []byte("hello")
-
 	var resp *http.Response
 
 	resp, err = http.Get(g.Url)
 
 	if err != nil {
-		log.Println("err", err)
 		return nil, err
 	}
 
@@ -106,10 +112,10 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 }
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
-func fetchBundle(name string) (thisBundle Bundle, err error) {
+func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
 	var bundleUrl string
 
-	bundleUrl = strings.Join([]string{config.BundleBaseURL, name}, "")
+	bundleUrl = strings.Join([]string{config.BundleBaseURL, spec.CustomMiddlewareBundle}, "")
 
 	var thisGetter BundleGetter
 
@@ -128,8 +134,9 @@ func fetchBundle(name string) (thisBundle Bundle, err error) {
 	bundleData, err := thisGetter.Get()
 
 	thisBundle = Bundle{
-		Name: name,
+		Name: spec.CustomMiddlewareBundle,
 		Data: bundleData,
+		Spec: spec,
 	}
 
 	return thisBundle, err
@@ -154,6 +161,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 	return err
 }
 
+
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
 func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
 	log.WithFields(logrus.Fields{
@@ -165,11 +173,28 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec) (err error) {
 	log.Println("loadManifest, manifestPath: ", manifestPath)
 	var manifestData []byte
 	manifestData, err = ioutil.ReadFile(manifestPath)
-	var manifest tykcommon.BundleManifest
-	err = json.Unmarshal(manifestData, &manifest)
+
+	// var manifest tykcommon.BundleManifest
+	err = json.Unmarshal(manifestData, &bundle.Manifest)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("----> Couldn't unmarshal the manifest file for bundle: ", spec.CustomMiddlewareBundle)
+		return err
+	}
+
+	err = bundle.Verify()
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle, err)
+		return err
+	}
 
 	// Set the custom middleware block:
-	spec.APIDefinition.CustomMiddleware = manifest.CustomMiddleware
+	spec.APIDefinition.CustomMiddleware = bundle.Manifest.CustomMiddleware
 
 	return err
 }
@@ -197,13 +222,18 @@ func loadBundle(spec *APISpec) {
 	destPath := filepath.Join("/Users/matias/dev/tyk", "middleware/bundles", bundlePath)
 	log.Println("destPath =", destPath)
 
+	// The bundle exists, load and return:
 	if _, err := os.Stat(destPath); err == nil {
-		log.Println("destPath exists!")
-		// Load the manifest settings:
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Loading existing bundle: ", spec.CustomMiddlewareBundle)
+
 		bundle := Bundle{
 			Name: spec.CustomMiddlewareBundle,
 			Path: destPath,
+			Spec: spec,
 		}
+
 		loadBundleManifest(&bundle, spec)
 		return
 	}
@@ -213,9 +243,7 @@ func loadBundle(spec *APISpec) {
 	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
 	var bundle Bundle
-	bundle, err = fetchBundle(spec.CustomMiddlewareBundle)
-
-	log.Println("bundle, err", bundle, err)
+	bundle, err = fetchBundle(spec)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -253,5 +281,4 @@ func loadBundle(spec *APISpec) {
 
 	// Load the manifest settings:
 	loadBundleManifest(&bundle, spec)
-
 }
