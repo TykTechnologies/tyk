@@ -2,7 +2,9 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 
+	"encoding/json"
 	"archive/zip"
 	"bytes"
 	"errors"
@@ -152,10 +154,16 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 	return err
 }
 
-func loadManifest(bundle *Bundle, spec *APISpec) {
+func loadManifest(bundle *Bundle, spec *APISpec) (err error) {
 	log.Println("loadManifest: ", bundle, ", destPath: ", ", spec: ", spec)
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
 	log.Println("loadManifest, manifestPath: ", manifestPath)
+	var manifestData []byte
+	manifestData, err = ioutil.ReadFile(manifestPath)
+	var manifest tykcommon.BundleManifest
+	err = json.Unmarshal(manifestData, &manifest)
+	log.Println("manifest = ", manifest)
+	return err
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
@@ -183,6 +191,12 @@ func loadBundle(spec *APISpec) {
 
 	if _, err := os.Stat(destPath); err == nil {
 		log.Println("destPath exists!")
+		// Load the manifest settings:
+		bundle := Bundle{
+			Name: spec.CustomMiddlewareBundle,
+			Path: destPath,
+		}
+		loadManifest(&bundle, spec)
 		return
 	}
 
