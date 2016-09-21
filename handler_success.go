@@ -29,7 +29,7 @@ const (
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
-var ExpiryCache *cache.Cache = cache.New(600*time.Second, 5*time.Second)
+var ExpiryCache *cache.Cache = cache.New(600*time.Second, 10*time.Minute)
 
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response
@@ -85,6 +85,7 @@ func (t TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 	log.Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
+		go t.GetOrgSession(orgid)
 		log.Debug("no cached entry found, returning 7 days")
 		return 604800
 	}

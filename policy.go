@@ -105,12 +105,11 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 5 * time.Second,
 	}
-	
-	log.Debug("Calling: ", endpoint)
+
 	response, reqErr := c.Do(newRequest)
-	
+
 	if reqErr != nil {
 		log.Error("Request failed: ", reqErr)
 		return policies

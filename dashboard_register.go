@@ -24,10 +24,10 @@ type DashboardServiceSender interface {
 }
 
 type HTTPDashboardHandler struct {
-	RegistrationEndpoint string
+	RegistrationEndpoint   string
 	DeRegistrationEndpoint string
-	HeartBeatEndpoint    string
-	Secret               string
+	HeartBeatEndpoint      string
+	Secret                 string
 
 	heartBeatStopSentinel bool
 }
@@ -47,9 +47,9 @@ func ReLogin() {
 	}
 
 	if err == nil {
-		go DashService.StartBeating()	
+		go DashService.StartBeating()
 	}
-	
+
 }
 
 func (h *HTTPDashboardHandler) Init() error {
@@ -77,7 +77,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
 
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 5 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 
@@ -171,7 +171,7 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 5 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 
@@ -226,7 +226,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 5 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 

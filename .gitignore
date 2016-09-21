@@ -29,6 +29,8 @@ apps/test.json
 logs
 live_hybrid.conf
 tyk.zeroconf.conf
+tyk.zeroconf2.conf
+tyk.zeroconf3.conf
 lint_results.txt
 build/
 test_apps/
