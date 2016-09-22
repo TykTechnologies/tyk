@@ -43,7 +43,8 @@ If the transport or address are empty, syslog will log to file
 - Introduced a new in-memory distributed rate limiter, this removes the dependency on redis and makes performance much smoother, the DRL will measure load on each node and modify rate limits accordingly (so for example, on two nodes, the rate limit must be split between them), depending on the way the load is being distributed, one node may be getting less traffic than the others, the trate limiter will attempt to compensate for this. Load information is broadcast via redis pub/sub every 5s, this can be changed in tyk.conf. it is possible to use the old rate limiter too, simply ensure that `enable_redis_rolling_limiter` is set to true.
 - Analytics writer now uses a managed pool, this mean a smoother performance curve under very high load (2k req p/s)
 - All config settings can now be overriden with an environmnt variable, env variables must start with TYK_GW and must use the configuration object names specified in the `config.go`, NOT in the JSON file
-- Added LetsEncrypt support, the gateway will cache domain data as it sees it and synchronise / cache ssl certificates in Redis, to enable simply set `"http_server_options.use_ssl_le": true`
+- Added (experimental, beta) LetsEncrypt support, the gateway will cache domain data as it sees it and synchronise / cache ssl certificates in Redis, to enable simply set `"http_server_options.use_ssl_le": true`
+- Fixed a bug in which HMAC signatures generated in some libraries where URL-encoded cahracters result in a lower-cased octet pair instead of upper-cased (Golang / Java Default) caused valid HMAC strings to fail. We now check for this after an intiial failure just in case.
 
 # v2.2
 
