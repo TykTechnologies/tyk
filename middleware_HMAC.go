@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/context"
 	"math"
 	"net/http"
+	"regexp"
 	"net/url"
 	"strings"
 	"time"
@@ -22,10 +23,13 @@ const HMACClockSkewLimitInMs float64 = 1000
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
 	*TykMiddleware
+	lowercasePattern *regexp.Regexp
 }
 
 // New lets you do any initializations for the object can be done here
-func (hm *HMACMiddleware) New() {}
+func (hm *HMACMiddleware) New() {
+	hm.lowercasePattern, _ = regexp.Compile("%[a-f0-9][a-f0-9]")
+}
 
 func (a *HMACMiddleware) IsEnabledForSpec() bool {
 	return true
@@ -84,7 +88,25 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	encodedSignature := generateEncodedSignature(signatureString, thisSecret)
 
 	// Compare
-	if encodedSignature != fieldValues.Signature {
+	matchPass := false
+	if encodedSignature == fieldValues.Signature {
+		matchPass = true
+	}
+
+	// Check for lower case encoding (.Net issues, again)
+	if !matchPass {
+		isLower, lowerList := hm.hasLowerCaseEscaped(fieldValues.Signature)
+		if isLower {
+			log.Debug("--- Detected lower case encoding! ---")
+			upperedSignature := hm.replaceWithUpperCase(fieldValues.Signature, lowerList)
+			if encodedSignature == upperedSignature {
+				matchPass = true
+				encodedSignature = upperedSignature
+			}
+		}
+	}
+
+	if matchPass == false {
 		log.WithFields(logrus.Fields{
 			"prefix":   "hmac",
 			"expected": encodedSignature,
@@ -112,6 +134,25 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Everything seems in order let the request through
 	return nil, 200
 
+}
+
+func (hm *HMACMiddleware) hasLowerCaseEscaped(signature string) (bool, []string) {
+	foundList := hm.lowercasePattern.FindAllString(signature, -1)
+	if len(foundList) > 0 {
+		return true, foundList
+	}
+
+	return false, foundList
+}
+
+func (hm *HMACMiddleware) replaceWithUpperCase(originalSignature string, lowercaseList []string) string {
+	newSignature := originalSignature
+	for _, lStr := range(lowercaseList) {
+		asUpper := strings.ToUpper(lStr)
+		newSignature = strings.Replace(newSignature, lStr, asUpper, -1)
+	}
+
+	return newSignature
 }
 
 func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {

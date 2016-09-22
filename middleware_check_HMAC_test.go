@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -75,13 +76,13 @@ func getHMACAuthChain(spec APISpec) http.Handler {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	remote, _ := url.Parse("http://lonelycode.com/")
+	remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&HMACMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
@@ -409,6 +410,91 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", encodedString))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chain := getHMACAuthChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+	}
+}
+
+func getUpperCaseEscaped(signature string) (bool, []string) {
+	r, _:= regexp.Compile("%[A-F0-9][A-F0-9]")
+	foundList := r.FindAllString(signature, -1)
+	if len(foundList) > 0 {
+		return true, foundList
+	}
+
+	return false, foundList
+}
+
+func replaceUpperCase(originalSignature string, lowercaseList []string) string {
+	log.Warning("ORIGINAL: ", originalSignature)
+	newSignature := originalSignature
+	for _, lStr := range(lowercaseList) {
+		asUpper := strings.ToLower(lStr)
+		newSignature = strings.Replace(newSignature, lStr, asUpper, -1)
+	}
+
+	log.Warning("LOWER: ", newSignature)
+	return newSignature
+}
+
+func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
+	spec := createDefinitionFromString(HMACAuthDef)
+	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	thisSession := createHMACAuthSession()
+
+	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
+	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+
+	uri := "/"
+	method := "GET"
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+
+	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+
+	// Signature needs to be: Authorization: Signature keyId="hmac-key-1",algorithm="hmac-sha1",signature="Base64(HMAC-SHA1(signing string))"
+
+	// Prep the signature string
+	tim := time.Now().Format(refDate)
+	req.Header.Add("Date", tim)
+	req.Header.Add("X-Test-1", "hello?")
+	req.Header.Add("X-Test-2", "world£")
+	signatureString := strings.ToLower("(request-target): ") + "get /\n"
+	signatureString += strings.ToLower("Date") + ": " + tim + "\n"
+	signatureString += strings.ToLower("X-Test-1") + ": " + "hello?" + "\n"
+	signatureString += strings.ToLower("X-Test-2") + ": " + "world£"
+	log.Info("[TEST] Signature string before encoding: ", signatureString)
+
+	// Encode it
+	key := []byte(thisSession.HmacSecret)
+	h := hmac.New(sha1.New, key)
+	h.Write([]byte(signatureString))
+
+	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	encodedString := url.QueryEscape(sigString)
+
+	_, upperCaseList := getUpperCaseEscaped(encodedString)
+	newEncodedSignature := replaceUpperCase(encodedString, upperCaseList)
+
+	log.Debug("Encoded signature string: ", newEncodedSignature)
+	log.Info("[TEST] URL Encoded: ", url.QueryEscape(newEncodedSignature))
+
+	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", newEncodedSignature))
+
+	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", newEncodedSignature))
 
 	if err != nil {
 		t.Fatal(err)

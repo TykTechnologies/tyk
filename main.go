@@ -982,7 +982,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: HMAC")
-					authArray = append(authArray, CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware))
+					authArray = append(authArray, CreateMiddleware(&HMACMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware))
 				}
 
 				if referenceSpec.EnableJWT {
