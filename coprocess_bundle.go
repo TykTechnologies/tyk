@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"fmt"
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -32,20 +33,32 @@ func(b *Bundle) Verify() (err error) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
-	log.Println("*** Manifest: ", b.Manifest)
-
-	log.Println("*** Expected signature: ", b.Manifest.Signature)
-	log.Println("*** Expected checksum: ", b.Manifest.Checksum)
 
 	h := md5.New()
 	h.Write(b.Data)
 	checksum := hex.EncodeToString(h.Sum(nil))
 
-	log.Println("*** Computed checksum: ", checksum)
+	var bundleChecksums []string
 
-	for i, f := range b.Manifest.FileList {
-		log.Println("*** Manifest file: ", i, f)
+	for _, f := range b.Manifest.FileList {
+		extractedFilePath := filepath.Join(b.Path, f)
+
+		var data []byte
+		data, err = ioutil.ReadFile(extractedFilePath)
+		if err != nil {
+			break
+		}
+		hash := fmt.Sprintf("%x", md5.Sum(data))
+		bundleChecksums = append(bundleChecksums, hash)
 	}
+
+	mergedChecksums := strings.Join(bundleChecksums, "")
+	checksum = fmt.Sprintf("%x", md5.Sum([]byte(mergedChecksums)))
+
+	if checksum != b.Manifest.Checksum {
+		err = errors.New("Invalid checksum")
+	}
+
 	return err
 }
 
