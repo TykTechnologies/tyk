@@ -268,9 +268,7 @@ func loadBundle(spec *APISpec) {
 
 	// Skip if no bundle base URL is set.
 	if config.BundleBaseURL == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("An API specifies a custom middleware bundle, but no bundle base URL is set in your tyk.conf! Skipping bundle: ", spec.CustomMiddlewareBundle)
+		bundleError(spec, err, "No bundle base URL set, skipping bundle")
 		return
 	}
 
@@ -316,27 +314,21 @@ func loadBundle(spec *APISpec) {
 	bundle, err = fetchBundle(spec)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("----> Couldn't fetch bundle: ", spec.CustomMiddlewareBundle, ", ", err)
+		bundleError(spec, err, "Couldn't fetch bundle")
 		return
 	}
 
 	err = os.Mkdir(destPath, 0755)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("----> Error when creating bundle directory: ", spec.CustomMiddlewareBundle, ", ", err)
-		// return
+		bundleError(spec, err, "Couldn't create bundle directory")
+		return
 	}
 
 	err = saveBundle(&bundle, destPath, spec)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("----> Couldn't save bundle: ", spec.CustomMiddlewareBundle, ", ", err)
+		bundleError(spec, err, "Couldn't save bundle")
 		return
 	}
 
@@ -350,15 +342,11 @@ func loadBundle(spec *APISpec) {
 	err = loadBundleManifest(&bundle, spec, false)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, " ", err)
+		bundleError(spec, err, "Couldn't load bundle")
 
 		removeErr := os.RemoveAll(bundle.Path)
 		if removeErr != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("----> Couldn't remove bundle: ", spec.CustomMiddlewareBundle, removeErr)
+			bundleError(spec, err, "Couldn't remove bundle")
 		}
 		return
 	}
@@ -369,4 +357,16 @@ func loadBundle(spec *APISpec) {
 
 	bundle.AddToSpec()
 
+}
+
+func bundleError(spec *APISpec, err error, message string) {
+	log.WithFields(logrus.Fields{
+		"prefix":      "main",
+		"user_ip":     "-",
+		"server_name": spec.APIDefinition.Proxy.TargetURL,
+		"user_id":     "-",
+		"org_id":      spec.APIDefinition.OrgID,
+		"api_id":      spec.APIDefinition.APIID,
+		"path":        "-",
+	}).Error(message, ": ", err)
 }
