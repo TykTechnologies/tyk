@@ -2,43 +2,66 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tykcommon"
 
-	"crypto/md5"
-	"io"
-	"encoding/hex"
-	"encoding/json"
 	"archive/zip"
 	"bytes"
+	"crypto/md5"
+	b64 "encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"fmt"
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
-	Name string
-	Data []byte
-	Path string
-	Spec *APISpec
+	Name     string
+	Data     []byte
+	Path     string
+	Spec     *APISpec
 	Manifest tykcommon.BundleManifest
 }
 
-func(b *Bundle) Verify() (err error) {
+func (b *Bundle) Verify() (err error) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
+
+	var useSignature bool
+	var bundleVerifier goverify.Verifier
+
+	// Perform signature verification if a public key path is set:
+	if config.PublicKeyPath != "" {
+		if b.Manifest.Signature == "" {
+			// Error: A public key is set, but the bundle isn't signed.
+			err = errors.New("Bundle isn't signed")
+		}
+		if notificationVerifier == nil {
+			bundleVerifier, err = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
+			fmt.Println(bundleVerifier)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		useSignature = true
+	}
 
 	h := md5.New()
 	h.Write(b.Data)
 	checksum := hex.EncodeToString(h.Sum(nil))
 
-	var bundleChecksums []string
+	var bundleData bytes.Buffer
 
 	for _, f := range b.Manifest.FileList {
 		extractedFilePath := filepath.Join(b.Path, f)
@@ -48,21 +71,39 @@ func(b *Bundle) Verify() (err error) {
 		if err != nil {
 			break
 		}
-		hash := fmt.Sprintf("%x", md5.Sum(data))
-		bundleChecksums = append(bundleChecksums, hash)
+
+		bundleData.Write(data)
 	}
 
-	mergedChecksums := strings.Join(bundleChecksums, "")
-	checksum = fmt.Sprintf("%x", md5.Sum([]byte(mergedChecksums)))
+	checksum = fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
 
 	if checksum != b.Manifest.Checksum {
 		err = errors.New("Invalid checksum")
 	}
 
+	if useSignature {
+		var signed []byte
+		signed, err = b64.StdEncoding.DecodeString(b.Manifest.Signature)
+		fmt.Println(signed)
+		if err != nil {
+			// Failed to decode signature
+			return err
+		}
+		err = bundleVerifier.Verify([]byte(bundleData.Bytes()), signed)
+		if err != nil {
+			// Couldn't verify
+			fmt.Println("*** Couldn't verify!")
+			return err
+		}
+
+		fmt.Println("*** Verified!")
+
+	}
+
 	return err
 }
 
-func(b *Bundle) AddToSpec() {
+func (b *Bundle) AddToSpec() {
 	b.Spec.APIDefinition.CustomMiddleware = b.Manifest.CustomMiddleware
 }
 
@@ -193,7 +234,6 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 	return err
 }
 
-
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
 func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) (err error) {
 	log.WithFields(logrus.Fields{
@@ -239,7 +279,7 @@ func loadBundle(spec *APISpec) {
 		return
 	}
 
-  // Skip if no bundle base URL is set.
+	// Skip if no bundle base URL is set.
 	if config.BundleBaseURL == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -328,6 +368,7 @@ func loadBundle(spec *APISpec) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, err)
+		// TODO: remove the directory!
 		return
 	}
 
