@@ -184,6 +184,7 @@ type Config struct {
 	DRLNotificationFrequency          int                                      `json:"drl_notification_frequency"`
 	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime        bool                                     `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	AllowRemoteConfig                 bool                                     `bson:"allow_remote_config" json:"allow_remote_config"`
 }
 
 type CertData struct {
