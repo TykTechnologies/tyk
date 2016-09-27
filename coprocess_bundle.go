@@ -274,9 +274,11 @@ func loadBundle(spec *APISpec) {
 		return
 	}
 
+	workDir, _ := os.Getwd()
+
 	// Skip if the bundle destination path already exists.
 	bundlePath := strings.Join([]string{spec.APIID, spec.CustomMiddlewareBundle}, "-")
-	destPath := filepath.Join("/Users/matias/dev/tyk", "middleware/bundles", bundlePath)
+	destPath := filepath.Join(workDir, "middleware/bundles", bundlePath)
 
 	// The bundle exists, load and return:
 	if _, err := os.Stat(destPath); err == nil {
