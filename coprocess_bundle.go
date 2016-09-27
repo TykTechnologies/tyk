@@ -367,8 +367,14 @@ func loadBundle(spec *APISpec) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, err)
-		// TODO: remove the directory!
+		}).Error("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, err)
+	
+		removeErr := os.RemoveAll(bundle.Path)
+		if removeErr != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("----> Couldn't remove bundle: ", spec.CustomMiddlewareBundle, removeErr)
+		}
 		return
 	}
 
