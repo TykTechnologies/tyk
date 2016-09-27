@@ -47,7 +47,6 @@ func (b *Bundle) Verify() (err error) {
 		}
 		if notificationVerifier == nil {
 			bundleVerifier, err = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
-			fmt.Println(bundleVerifier)
 		}
 
 		if err != nil {
@@ -84,19 +83,13 @@ func (b *Bundle) Verify() (err error) {
 	if useSignature {
 		var signed []byte
 		signed, err = b64.StdEncoding.DecodeString(b.Manifest.Signature)
-		fmt.Println(signed)
 		if err != nil {
-			// Failed to decode signature
 			return err
 		}
 		err = bundleVerifier.Verify([]byte(bundleData.Bytes()), signed)
 		if err != nil {
-			// Couldn't verify
-			fmt.Println("*** Couldn't verify!")
 			return err
 		}
-
-		fmt.Println("*** Verified!")
 
 	}
 
@@ -128,7 +121,6 @@ func (g *HttpBundleGetter) Get() (bundleData []byte, err error) {
 	}
 
 	if resp.StatusCode != 200 {
-		log.Println("err", resp.Status, resp.StatusCode)
 		return nil, errors.New("HTTP Error")
 	}
 
@@ -217,8 +209,6 @@ func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
 
 // saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.
 func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
-	log.Println("saveBundle:", bundle, ", to: ", destPath)
-
 	var bundleFormat = "zip"
 
 	var bundleSaver BundleSaver
@@ -240,13 +230,10 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) (e
 		"prefix": "main",
 	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
 
-	log.Println("loadManifest: ", bundle, ", destPath: ", ", spec: ", spec)
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
-	log.Println("loadManifest, manifestPath: ", manifestPath)
 	var manifestData []byte
 	manifestData, err = ioutil.ReadFile(manifestPath)
 
-	// var manifest tykcommon.BundleManifest
 	err = json.Unmarshal(manifestData, &bundle.Manifest)
 
 	if err != nil {
@@ -289,9 +276,7 @@ func loadBundle(spec *APISpec) {
 
 	// Skip if the bundle destination path already exists.
 	bundlePath := strings.Join([]string{spec.APIID, spec.CustomMiddlewareBundle}, "-")
-	log.Println("bundlePath =", bundlePath)
 	destPath := filepath.Join("/Users/matias/dev/tyk", "middleware/bundles", bundlePath)
-	log.Println("destPath =", destPath)
 
 	// The bundle exists, load and return:
 	if _, err := os.Stat(destPath); err == nil {
@@ -309,7 +294,7 @@ func loadBundle(spec *APISpec) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, err)
+			}).Info("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, " ", err)
 		}
 
 		log.WithFields(logrus.Fields{
@@ -334,8 +319,6 @@ func loadBundle(spec *APISpec) {
 		}).Error("----> Couldn't fetch bundle: ", spec.CustomMiddlewareBundle, ", ", err)
 		return
 	}
-
-	log.Println("destPath doesn't exist, save!", destPath)
 
 	err = os.Mkdir(destPath, 0755)
 
@@ -367,8 +350,8 @@ func loadBundle(spec *APISpec) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Error("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, err)
-	
+		}).Error("----> Couldn't load bundle: ", spec.CustomMiddlewareBundle, " ", err)
+
 		removeErr := os.RemoveAll(bundle.Path)
 		if removeErr != nil {
 			log.WithFields(logrus.Fields{
