@@ -113,24 +113,24 @@ type ExtendedCircuitBreakerMeta struct {
 type APISpec struct {
 	tykcommon.APIDefinition
 
-	RxPaths                map[string][]URLSpec
-	WhiteListEnabled       map[string]bool
-	target                 *url.URL
-	AuthManager            AuthorisationHandler
-	SessionManager         SessionHandler
-	OAuthManager           *OAuthManager
-	OrgSessionManager      SessionHandler
-	EventPaths             map[tykcommon.TykEvent][]TykEventHandler
-	Health                 HealthChecker
-	JSVM                   *JSVM
-	ResponseChain          *[]TykResponseHandler
-	RoundRobin             *RoundRobin
-	URLRewriteEnabled      bool
-	CircuitBreakerEnabled  bool
-	EnforcedTimeoutEnabled bool
-	ResponseHandlersActive bool
-	LastGoodHostList  *tykcommon.HostList
-	HasRun          bool
+	RxPaths                  map[string][]URLSpec
+	WhiteListEnabled         map[string]bool
+	target                   *url.URL
+	AuthManager              AuthorisationHandler
+	SessionManager           SessionHandler
+	OAuthManager             *OAuthManager
+	OrgSessionManager        SessionHandler
+	EventPaths               map[tykcommon.TykEvent][]TykEventHandler
+	Health                   HealthChecker
+	JSVM                     *JSVM
+	ResponseChain            *[]TykResponseHandler
+	RoundRobin               *RoundRobin
+	URLRewriteEnabled        bool
+	CircuitBreakerEnabled    bool
+	EnforcedTimeoutEnabled   bool
+	ResponseHandlersActive   bool
+	LastGoodHostList         *tykcommon.HostList
+	HasRun                   bool
 	ServiceRefreshInProgress bool
 }
 
@@ -251,19 +251,6 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 
 }
 
-func ReLogin() {
-	connStr := config.DBAppConfOptions.ConnectionString
-	if connStr == "" {
-		log.Fatal("Connection string is empty, failing.")
-	}
-
-	connStr = connStr + "/register/node"
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Registering node.")
-	RegisterNodeWithDashboard(connStr, config.NodeSecret)
-}
-
 func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
@@ -273,9 +260,10 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	}
 
 	newRequest.Header.Add("authorization", secret)
-	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -328,33 +316,21 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 
 	// Set the nonce
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return nil
 }
 
-var heartBeatStopSentinel = false
-
 func StartBeating(endpoint, secret string) {
 	for {
-		if heartBeatStopSentinel == true {
-			break
-		}
 		failure := SendHeartBeat(endpoint, secret)
 		if failure != nil {
 			log.Warning(failure)
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 5)
 	}
-
-	log.Info("Stopped Heartbeat")
-	heartBeatStopSentinel = false
-}
-
-func StopBeating() {
-	heartBeatStopSentinel = true
 }
 
 func SendHeartBeat(endpoint string, secret string) error {
@@ -367,14 +343,16 @@ func SendHeartBeat(endpoint string, secret string) error {
 
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
-	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
-
 	log.Debug("Sending Heartbeat as: ", NodeID)
 
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
+
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -407,9 +385,9 @@ func SendHeartBeat(endpoint string, secret string) error {
 	}
 
 	// Set the nonce
+
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return nil
 }
@@ -430,9 +408,12 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 
 	ServiceNonceMutex.Lock()
+	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{}
+	c := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
@@ -519,7 +500,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	// Set the nonce
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return &APISpecs
 }

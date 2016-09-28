@@ -270,6 +270,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				return nil, 200
 			}
 
+			if len(cachedData) == 0 {
+				m.CacheStore.DeleteKey(thisKey)
+				return nil, 200
+			}
+
 			retObj := bytes.NewReader([]byte(cachedData))
 			log.Debug("Cache got: ", cachedData)
 

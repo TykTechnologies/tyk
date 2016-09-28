@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/oschwald/maxminddb-golang"
 	"github.com/jeffail/tunny"
+	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"net"
 	"regexp"
@@ -66,6 +66,11 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 
 	// Not great, tightly coupled
 	if analytics.GeoIPDB == nil {
+		return
+	}
+
+	// Sometimes it is empty, we can't look up mpty IP addresses
+	if ipStr == "" {
 		return
 	}
 
@@ -185,7 +190,7 @@ func (r *RedisAnalyticsHandler) Init() {
 
 	analytics.Store.Connect()
 	var err error
-	
+
 	ps := config.AnalyticsConfig.PoolSize
 	if ps == 0 {
 		ps = 50
@@ -250,5 +255,5 @@ func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
 	})
 
 	return nil
-	
+
 }

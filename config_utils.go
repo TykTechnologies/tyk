@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/nu7hatch/gouuid"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -104,4 +105,9 @@ func (c Config) StoreAnalytics(r *http.Request) bool {
 	_, ignore := c.AnalyticsConfig.ignoredIPsCompiled[ip]
 
 	return !ignore
+}
+
+func generateRandomNodeID() string {
+	u, _ := uuid.NewV4()
+	return "solo-" + u.String()
 }

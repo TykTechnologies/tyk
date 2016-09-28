@@ -33,6 +33,12 @@ func (t *TransformHeaders) IsEnabledForSpec() bool {
 		if len(thisVersion.ExtendedPaths.TransformHeader) > 0 {
 			used = true
 		}
+		if len(thisVersion.GlobalHeaders) > 0 {
+			used = true
+		}
+		if len(thisVersion.GlobalHeadersRemove) > 0 {
+			used = true
+		}
 	}
 
 	return used

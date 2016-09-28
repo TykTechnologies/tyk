@@ -12,6 +12,7 @@ import (
 	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
+	"rsc.io/letsencrypt"
 	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -50,12 +51,15 @@ var FallbackKeySesionManager SessionHandler = &DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
 var argumentsBackup map[string]interface{}
+var DashService DashboardServiceSender
 
 var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
 
 var mainRouter *mux.Router
 var defaultRouter *mux.Router
+var LE_MANAGER letsencrypt.Manager
+var LE_FIRSTRUN bool
 
 var NodeID string
 
@@ -222,8 +226,10 @@ func getAPISpecs() *[]*APISpec {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
+		NodeID = generateRandomNodeID() // Needed for non-dash DRL
 		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
+		NodeID = generateRandomNodeID() // Needed for non-dash DRL
 		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
@@ -254,13 +260,13 @@ func getPolicies() {
 	}).Debug("Loading policies")
 
 	if config.Policies.PolicySource == "service" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Using Policies from Dashboard Service")
-
 		if config.Policies.PolicyConnectionString != "" {
 			connStr := config.Policies.PolicyConnectionString
 			connStr = connStr + "/system/policies"
+
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Using Policies from Dashboard Service")
 
 			thesePolicies = LoadPoliciesFromDashboard(connStr, config.NodeSecret, config.Policies.AllowExplicitPolicyID)
 
@@ -594,6 +600,20 @@ func (s SortableAPISpecListByHost) Less(i, j int) bool {
 	return len(s[i].Domain) > len(s[j].Domain)
 }
 
+func notifyAPILoaded(spec *APISpec) {
+	if config.UseRedisLog {
+		log.WithFields(logrus.Fields{
+			"prefix":      "gateway",
+			"user_ip":     "--",
+			"server_name": "--",
+			"user_id":     "--",
+			"org_id":      spec.APIDefinition.OrgID,
+			"api_id":      spec.APIDefinition.APIID,
+		}).Info("Loaded: ", spec.APIDefinition.Name)	
+	}
+	
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// load the APi defs
@@ -665,6 +685,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					if onDomain == referenceSpec.Domain {
 						log.WithFields(logrus.Fields{
 							"prefix": "main",
+							"org_id": referenceSpec.APIDefinition.OrgID,
+							"api_id": referenceSpec.APIDefinition.APIID,
 						}).Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
 						skip = true
 						break
@@ -676,6 +698,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		if referenceSpec.Proxy.ListenPath == "" {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
+				"org_id": referenceSpec.APIDefinition.OrgID,
+				"api_id": referenceSpec.APIDefinition.APIID,
 			}).Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
 			skip = true
 		}
@@ -683,6 +707,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
+				"org_id": referenceSpec.APIDefinition.OrgID,
+				"api_id": referenceSpec.APIDefinition.APIID,
 			}).Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
 			skip = true
 		}
@@ -691,6 +717,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
+				"org_id": referenceSpec.APIDefinition.OrgID,
+				"api_id": referenceSpec.APIDefinition.APIID,
 			}).Error("Culdn't parse target URL: ", err)
 		}
 
@@ -959,7 +987,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
 					}).Info("----> Checking security policy: HMAC")
-					authArray = append(authArray, CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware))
+					authArray = append(authArray, CreateMiddleware(&HMACMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware))
 				}
 
 				if referenceSpec.EnableJWT {
@@ -1099,6 +1127,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				}).Info("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 				log.Debug("Subrouter done")
+
+				notifyAPILoaded(referenceSpec)
 
 			}
 
@@ -1386,6 +1416,8 @@ func initialiseSystem(arguments map[string]interface{}) {
 	}
 
 	GetHostDetails()
+
+	go StartPeriodicStateBackup(&LE_MANAGER)
 }
 
 func getCmdArguments() map[string]interface{} {
@@ -1473,17 +1505,23 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 }
 
 // Handles pre-fork actions if we get a SIGHUP2
+var amForked bool
+
 func onFork() {
-	log.Info("Stopping heartbeat")
-	StopBeating()
+	if config.UseDBAppConfigs {
+		log.Info("Stopping heartbeat")
+		DashService.StopBeating()
 
-	log.Info("Waiting to de-register")
-	time.Sleep(10 * time.Second)
+		log.Info("Waiting to de-register")
+		time.Sleep(10 * time.Second)
 
-	ServiceNonceMutex.Lock()
-	os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-	os.Setenv("TYK_SERVICE_NODEID", NodeID)
-	ServiceNonceMutex.Unlock()
+		ServiceNonceMutex.Lock()
+		os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+		os.Setenv("TYK_SERVICE_NODEID", NodeID)
+		ServiceNonceMutex.Unlock()
+	}
+
+	amForked = true
 }
 
 func main() {
@@ -1534,6 +1572,22 @@ func main() {
 			"prefix": "main",
 		}).Error("Listen handler exit: ", err)
 	}
+
+	if !amForked {
+		log.Info("Stop signal received.")
+
+		if config.UseDBAppConfigs {
+			log.Info("Stopping heartbeat...")
+			DashService.StopBeating()
+			time.Sleep(2 * time.Second)
+			DashService.DeRegister()
+		}
+
+		log.Info("Terminating.")
+	} else {
+		log.Info("Terminated from fork.")
+	}
+
 	time.Sleep(3 * time.Second)
 
 }
@@ -1617,6 +1671,20 @@ func generateListener(l net.Listener) (net.Listener, error) {
 			MinVersion:        config.HttpServerOptions.MinVersion,
 		}
 		return tls.Listen("tcp", targetPort, &config)
+
+	} else if config.HttpServerOptions.UseLE_SSL {
+		
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Using SSL LE (https)")
+		
+		GetLEState(&LE_MANAGER)
+
+		config := tls.Config{
+			GetCertificate: LE_MANAGER.GetCertificate,
+		}
+		return tls.Listen("tcp", targetPort, &config)
+
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1628,28 +1696,44 @@ func generateListener(l net.Listener) (net.Listener, error) {
 func handleDashboardRegistration() {
 	if config.UseDBAppConfigs {
 
-		connStr := buildConnStr("/register/node")
+		if DashService == nil {
+			DashService = &HTTPDashboardHandler{}
+			DashService.Init()
+		}
+
+		// connStr := buildConnStr("/register/node")
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Registering node.")
-		RegisterNodeWithDashboard(connStr, config.NodeSecret)
+		err := DashService.Register()
+		if err != nil {
+			log.Fatal("Registration failed: ", err)
+		}
 
 		startHeartBeat()
 	}
 }
 
 func startHeartBeat() {
-	heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-	if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
-		log.Fatal("Connection string is empty, failing.")
+	// heartbeatConnStr := config.DBAppConfOptions.ConnectionString
+	// if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
+	// 	log.Fatal("Connection string is empty, failing.")
+	// }
+
+	// log.WithFields(logrus.Fields{
+	// 	"prefix": "main",
+	// }).Info("Starting heartbeat.")
+	// heartbeatConnStr = heartbeatConnStr + "/register/ping"
+	if config.UseDBAppConfigs {
+		if DashService == nil {
+			DashService = &HTTPDashboardHandler{}
+			DashService.Init()
+		}
+
+		go DashService.StartBeating()
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Starting heartbeat.")
-	heartbeatConnStr = heartbeatConnStr + "/register/ping"
-	go StartBeating(heartbeatConnStr, config.NodeSecret)
 }
 
 func StartDRL() {
@@ -1731,7 +1815,7 @@ func listen(l net.Listener, err error) {
 				"prefix": "main",
 			}).Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
-			StartDRL()
+			
 		} else {
 			NodeID = thisID
 			ServiceNonceMutex.Lock()
@@ -1744,6 +1828,7 @@ func listen(l net.Listener, err error) {
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")
 		}
+		StartDRL()
 
 		// Resume accepting connections in a new goroutine.
 		if !RPC_EmergencyMode {

@@ -46,6 +46,8 @@ If the transport or address are empty, syslog will log to file
 - All config settings can now be overriden with an environmnt variable, env variables must start with TYK_GW and must use the configuration object names specified in the `config.go`, NOT in the JSON file
 - Implemented a cache mechanism for APIs that use the CP (CoProcess) feature, see "ID extractor".
 - Session lifetime can be set globally (and forced, with a flag), add `"global_session_lifetime": 10` to your `tyk.conf`, where `10` is the session lifetime value you want to use. To force this value across all the APIs and override the per-API session lifetime, add `"force_global_session_lifetime": true` to your `tyk.conf`.
+- Added (experimental, beta) LetsEncrypt support, the gateway will cache domain data as it sees it and synchronise / cache ssl certificates in Redis, to enable simply set `"http_server_options.use_ssl_le": true`
+- Fixed a bug in which HMAC signatures generated in some libraries where URL-encoded cahracters result in a lower-cased octet pair instead of upper-cased (Golang / Java Default) caused valid HMAC strings to fail. We now check for this after an intiial failure just in case.
 
 # v2.2
 

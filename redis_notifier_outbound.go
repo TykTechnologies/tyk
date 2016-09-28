@@ -17,6 +17,7 @@ const (
 	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"
 	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
+	NoticeGatewayLENotification  NotificationCommand = "NoticeGatewayLENotification"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)

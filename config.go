@@ -84,6 +84,7 @@ type HttpServerOptionsConfig struct {
 	ReadTimeout      int        `json:"read_timeout"`
 	WriteTimeout     int        `json:"write_timeout"`
 	UseSSL           bool       `json:"use_ssl"`
+	UseLE_SSL        bool       `json:"use_ssl_le"`
 	EnableWebSockets bool       `json:"enable_websockets"`
 	Certificates     []CertData `json:"certificates"`
 	ServerName       string     `json:"server_name"`
@@ -189,6 +190,7 @@ type Config struct {
 	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime        bool                                     `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 	BundleBaseURL                     string                                   `bson:"bundle_base_url" json:"bundle_base_url"`
+	AllowRemoteConfig                 bool                                     `bson:"allow_remote_config" json:"allow_remote_config"`
 }
 
 type CertData struct {
