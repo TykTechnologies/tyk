@@ -263,7 +263,15 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	eventHandlerPath := path.Join(workDir, "event_handlers")
 	protoPath := path.Join(workDir, "coprocess/python/proto")
 
-	PythonSetEnv(dispatcherPath, middlewarePath, protoPath, eventHandlerPath)
+	paths := []string{dispatcherPath, middlewarePath, eventHandlerPath, protoPath}
+
+	// Append bundle paths:
+	bundlePaths := getBundlePaths()
+	for _, v := range bundlePaths {
+		paths = append(paths, v)
+	}
+
+	PythonSetEnv(paths...)
 
 	PythonInit()
 	PythonLoadDispatcher()
