@@ -359,6 +359,7 @@ func loadBundle(spec *APISpec) {
 
 }
 
+// bundleError is a log helper.
 func bundleError(spec *APISpec, err error, message string) {
 	log.WithFields(logrus.Fields{
 		"prefix":      "main",
@@ -369,4 +370,19 @@ func bundleError(spec *APISpec, err error, message string) {
 		"api_id":      spec.APIDefinition.APIID,
 		"path":        "-",
 	}).Error(message, ": ", err)
+}
+
+// getBundlePaths will return an array of the available bundle directories:
+func getBundlePaths() []string {
+	directories := make([]string, 0)
+	workDir, _ := os.Getwd()
+	bundlesPath := filepath.Join(workDir, "middleware/bundles")
+	bundles, _ :=ioutil.ReadDir(bundlesPath)
+	for _, f := range bundles {
+		if f.IsDir() {
+			fullPath := filepath.Join(bundlesPath, f.Name())
+			directories = append(directories, fullPath)
+		}
+	}
+	return directories
 }
