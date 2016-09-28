@@ -9,7 +9,7 @@
     "auth": {
         "auth_header_name": "authorization"
     },
-    "use_keyless": false,
+    "use_keyless": true,
     "version_data": {
         "not_versioned": true,
         "versions": {
@@ -30,7 +30,7 @@
         "target_url": "http://httpbin.org",
         "strip_listen_path": true
     },
-    "enable_coprocess_auth": true,
+    "enable_coprocess_auth": false,
     "custom_middleware_": {
       "pre": [
         {
