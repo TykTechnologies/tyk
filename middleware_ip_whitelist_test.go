@@ -38,7 +38,7 @@ var ipMiddlewareTestDefinitionEnabledFail string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		},
 		"enable_ip_whitelisting": true,
@@ -76,7 +76,7 @@ var ipMiddlewareTestDefinitionEnabledPass string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		},
 		"enable_ip_whitelisting": true,
@@ -114,7 +114,7 @@ var ipMiddlewareTestDefinitionDisabled string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		},
 		"enable_ip_whitelisting": false,
@@ -152,7 +152,7 @@ var ipMiddlewareTestDefinitionMissing string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		}
 	}
