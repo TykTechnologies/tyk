@@ -429,6 +429,10 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 	// Set AuthCheck hook
 	if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = referenceSpec.APIDefinition.CustomMiddleware.AuthCheck
+		if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Path != "" {
+			// Feed a JS file to Otto
+			mwPaths = append(mwPaths, referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Path)
+		}
 	}
 
 	// Load form the configuration
@@ -969,6 +973,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				useCoProcessAuth := EnableCoProcess && mwDriver != tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth
 
+				useOttoAuth := mwDriver == tykcommon.OttoDriver && referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" && referenceSpec.EnableCoProcessAuth
+
 				if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
 					log.WithFields(logrus.Fields{
@@ -1007,7 +1013,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					// TODO: check if mwAuthCheckFunc is available/valid
 					log.WithFields(logrus.Fields{
 						"prefix": "main",
-					}).Info("----> Checking security policy: CoProcess")
+					}).Info("----> Checking security policy: CoProcess Plugin")
 
 					log.WithFields(logrus.Fields{
 						"prefix": "coprocess",
@@ -1016,7 +1022,15 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 					authArray = append(authArray, CreateCoProcessMiddleware(mwAuthCheckFunc.Name, coprocess.HookType_CustomKeyCheck, mwDriver, tykMiddleware))
 				}
 
-				if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.APIDefinition.UseBasicAuth && !referenceSpec.APIDefinition.UseOauth2 && !useCoProcessAuth) {
+				if useOttoAuth {
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("----> Checking security policy: JS Plugin")
+
+					authArray = append(authArray, CreateDynamicAuthMiddleware(mwAuthCheckFunc.Name, tykMiddleware))
+				}
+
+				if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.APIDefinition.UseBasicAuth && !referenceSpec.APIDefinition.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
 					// Auth key
 					log.WithFields(logrus.Fields{
 						"prefix": "main",

@@ -40,6 +40,8 @@ type MiniRequestObject struct {
 type VMReturnObject struct {
 	Request     MiniRequestObject
 	SessionMeta map[string]string
+	Session 	SessionState
+	AuthValue   string
 }
 
 type nopCloser struct {
@@ -56,6 +58,7 @@ type DynamicMiddleware struct {
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool
+	Auth 				bool
 }
 
 type DynamicMiddlewareConfig struct {
@@ -150,6 +153,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Decode the return object
 	newRequestData := VMReturnObject{}
+
 	decErr := json.Unmarshal([]byte(returnDataStr), &newRequestData)
 
 	if decErr != nil {
@@ -212,6 +216,12 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 {
 		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
 	}
+
+	if d.Auth {	
+		context.Set(r, SessionData, newRequestData.Session)
+		context.Set(r, AuthHeaderValue, newRequestData.AuthValue)
+	}
+
 	return nil, 200
 }
 

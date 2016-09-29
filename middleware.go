@@ -26,6 +26,17 @@ func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykM
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
+func CreateDynamicAuthMiddleware(MiddlewareName string, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+	dMiddleware := &DynamicMiddleware{
+		TykMiddleware:       tykMwSuper,
+		MiddlewareClassName: MiddlewareName,
+		Auth:                true,
+		UseSession:          false,
+	}
+
+	return CreateMiddleware(dMiddleware, tykMwSuper)
+}
+
 // Generic middleware caller to make extension easier
 func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	// construct a new instance
