@@ -435,7 +435,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 		}
 	}
 
-	// Load form the configuration
+	// Load from the configuration
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
@@ -481,6 +481,61 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 		}
 	}
 
+
+	// Get Auth folder path
+	middlewareAuthFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "auth")
+	mwAuthFiles, _ := ioutil.ReadDir(middlewareAuthFolderPath)
+	for _, f := range mwAuthFiles {
+		if strings.Contains(f.Name(), ".js") {
+			filePath := filepath.Join(middlewareAuthFolderPath, f.Name())
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Loading Auth file middleware from ", filePath)
+			middlewareObjectName := strings.Split(f.Name(), ".")[0]
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware name ", middlewareObjectName)
+
+			thisMWDef := tykcommon.MiddlewareDefinition{}
+			thisMWDef.Name = middlewareObjectName
+			thisMWDef.Path = filePath
+			thisMWDef.RequireSession = false
+
+			mwPaths = append(mwPaths, filePath)
+			mwAuthCheckFunc = thisMWDef
+			// only one allowed!
+			break
+		}
+	}
+
+	// Get POSTKeyAuth folder path
+	middlewarePostKeyAuthFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post_auth")
+	mwPostKeyAuthFiles, _ := ioutil.ReadDir(middlewarePostKeyAuthFolderPath)
+	for _, f := range mwPostKeyAuthFiles {
+		if strings.Contains(f.Name(), ".js") {
+			filePath := filepath.Join(middlewarePostKeyAuthFolderPath, f.Name())
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Loading POST-KEY-AUTH-PROCESSOR file middleware from ", filePath)
+			middlewareObjectName := strings.Split(f.Name(), ".")[0]
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware name ", middlewareObjectName)
+
+			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware requires session: ", requiresSession)
+			thisMWDef := tykcommon.MiddlewareDefinition{}
+			thisMWDef.Name = middlewareObjectName
+			thisMWDef.Path = filePath
+			thisMWDef.RequireSession = requiresSession
+
+			mwPaths = append(mwPaths, filePath)
+			mwPostKeyAuthFuncs = append(mwPostFuncs, thisMWDef)
+		}
+	}
+
 	// Get POST folder path
 	middlewarePostFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post")
 	mwPostFiles, _ := ioutil.ReadDir(middlewarePostFolderPath)
@@ -516,6 +571,10 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 
 	// Load PostAuthCheck hooks
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.PostKeyAuth {
+		if mwObj.Path != "" {
+			// Otto files are specified here
+			mwPaths = append(mwPaths, mwObj.Path)	
+		}
 		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
 	}
 
@@ -973,7 +1032,11 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				useCoProcessAuth := EnableCoProcess && mwDriver != tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth
 
-				useOttoAuth := mwDriver == tykcommon.OttoDriver && referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" && referenceSpec.EnableCoProcessAuth
+				var useOttoAuth bool = false
+				if !useCoProcessAuth {
+					useOttoAuth = mwDriver == tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth	
+				}
+				
 
 				if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
