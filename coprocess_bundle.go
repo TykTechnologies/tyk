@@ -185,6 +185,15 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
 func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
+
+	if !config.EnableBundleDownloader {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("Bundle downloader is disabled.")
+		err = errors.New("Bundle downloader is disabled.")
+		return thisBundle, err
+	}
+
 	var bundleUrl string
 
 	bundleUrl = strings.Join([]string{config.BundleBaseURL, spec.CustomMiddlewareBundle}, "")
@@ -380,7 +389,7 @@ func bundleError(spec *APISpec, err error, message string) {
 // getBundlePaths will return an array of the available bundle directories:
 func getBundlePaths() []string {
 	directories := make([]string, 0)
-	bundles, _ :=ioutil.ReadDir(tykBundlePath)
+	bundles, _ := ioutil.ReadDir(tykBundlePath)
 	for _, f := range bundles {
 		if f.IsDir() {
 			fullPath := filepath.Join(tykBundlePath, f.Name())
