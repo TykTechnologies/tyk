@@ -226,10 +226,10 @@ func getAPISpecs() *[]*APISpec {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
-		NodeID = generateRandomNodeID() // Needed for non-dash DRL
+		
 		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
-		NodeID = generateRandomNodeID() // Needed for non-dash DRL
+		
 		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
@@ -1597,6 +1597,7 @@ func onFork() {
 
 func main() {
 	arguments := getCmdArguments()
+	NodeID = generateRandomNodeID()
 	l, goAgainErr := goagain.Listener(onFork)
 
 	if nil != goAgainErr {

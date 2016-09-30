@@ -142,7 +142,8 @@ func encrypt(key []byte, text string) string {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err)
+		log.Error(err)
+		return ""
 	}
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
@@ -150,7 +151,8 @@ func encrypt(key []byte, text string) string {
 	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
 	iv := ciphertext[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		panic(err)
+		log.Error(err)
+		return ""
 	}
 
 	stream := cipher.NewCFBEncrypter(block, iv)
@@ -166,13 +168,15 @@ func decrypt(key []byte, cryptoText string) string {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err)
+		log.Error(err)
+		return ""
 	}
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
 	// include it at the beginning of the ciphertext.
 	if len(ciphertext) < aes.BlockSize {
-		panic("ciphertext too short")
+		log.Error("ciphertext too short")
+		return ""
 	}
 	iv := ciphertext[:aes.BlockSize]
 	ciphertext = ciphertext[aes.BlockSize:]

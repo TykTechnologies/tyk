@@ -50,6 +50,7 @@ petstore.json
 *.prof
 *.pdf
 *.mmdb
+*.pid
 ty.clonedash.conf
 tyk.dashboard.conf
 tyk.dashcluster.conf
