@@ -22,6 +22,13 @@ import (
 	"strings"
 )
 
+var tykBundlePath string
+
+func init() {
+	workDir, _ := os.Getwd()
+	tykBundlePath = filepath.Join(workDir, "middleware/bundles")
+}
+
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
 	Name     string
@@ -272,11 +279,9 @@ func loadBundle(spec *APISpec) {
 		return
 	}
 
-	workDir, _ := os.Getwd()
-
 	// Skip if the bundle destination path already exists.
 	bundlePath := strings.Join([]string{spec.APIID, spec.CustomMiddlewareBundle}, "-")
-	destPath := filepath.Join(workDir, "middleware/bundles", bundlePath)
+	destPath := filepath.Join(tykBundlePath, bundlePath)
 
 	// The bundle exists, load and return:
 	if _, err := os.Stat(destPath); err == nil {
@@ -375,12 +380,10 @@ func bundleError(spec *APISpec, err error, message string) {
 // getBundlePaths will return an array of the available bundle directories:
 func getBundlePaths() []string {
 	directories := make([]string, 0)
-	workDir, _ := os.Getwd()
-	bundlesPath := filepath.Join(workDir, "middleware/bundles")
-	bundles, _ :=ioutil.ReadDir(bundlesPath)
+	bundles, _ :=ioutil.ReadDir(tykBundlePath)
 	for _, f := range bundles {
 		if f.IsDir() {
-			fullPath := filepath.Join(bundlesPath, f.Name())
+			fullPath := filepath.Join(tykBundlePath, f.Name())
 			directories = append(directories, fullPath)
 		}
 	}
