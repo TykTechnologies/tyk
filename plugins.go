@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
@@ -217,7 +218,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
 	}
 
-	if d.Auth {	
+	if d.Auth {
 		context.Set(r, SessionData, newRequestData.Session)
 		context.Set(r, AuthHeaderValue, newRequestData.AuthValue)
 	}
@@ -246,8 +247,11 @@ func (j *JSVM) Init(coreJS string) {
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
-func (j *JSVM) LoadJSPaths(paths []string) {
+func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
 	for _, mwPath := range paths {
+		if pathPrefix != "" {
+			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
+		}
 		js, loadErr := ioutil.ReadFile(mwPath)
 		if loadErr != nil {
 			log.WithFields(logrus.Fields{
