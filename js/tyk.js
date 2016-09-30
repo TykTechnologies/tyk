@@ -47,6 +47,10 @@ TykJS.TykMiddleware.NewMiddleware.prototype.ReturnData = function(request, sessi
     return {Request: request, SessionMeta: session}
 };
 
+TykJS.TykMiddleware.NewMiddleware.prototype.ReturnAuthData = function(request, session) {
+    return {Request: request, Session: session}
+};
+
 // ---- End middleware implementation for global context ----
 
 // -- Start Event Handler implementation ----

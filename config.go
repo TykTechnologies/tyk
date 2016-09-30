@@ -71,6 +71,7 @@ type SlaveOptionsConfig struct {
 	BindToSlugsInsteadOfListenPaths bool   `json:"bind_to_slugs"`
 	DisableKeySpaceSync             bool   `json:"disable_keyspace_sync"`
 	GroupID                         string `json:"group_id"`
+	CallTimeout 					int 	`json:"call_timeout"`
 }
 
 type LocalSessionCacheConf struct {

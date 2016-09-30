@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const ENV_PREVIX string = "TYK_GW"
@@ -75,6 +76,11 @@ func loadConfig(filePath string, configStruct *Config) {
 		}
 	}
 
+	if configStruct.SlaveOptions.CallTimeout == 0 {
+		configStruct.SlaveOptions.CallTimeout = 30
+	}
+
+	GlobalRPCCallTimeout = time.Second * time.Duration(configStruct.SlaveOptions.CallTimeout)
 	configStruct.EventTriggers = InitGenericEventHandlers(configStruct.EventHandlers)
 }
 

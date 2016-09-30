@@ -48,6 +48,8 @@ If the transport or address are empty, syslog will log to file
 - Session lifetime can be set globally (and forced, with a flag), add `"global_session_lifetime": 10` to your `tyk.conf`, where `10` is the session lifetime value you want to use. To force this value across all the APIs and override the per-API session lifetime, add `"force_global_session_lifetime": true` to your `tyk.conf`.
 - Added (experimental, beta) LetsEncrypt support, the gateway will cache domain data as it sees it and synchronise / cache ssl certificates in Redis, to enable simply set `"http_server_options.use_ssl_le": true`
 - Fixed a bug in which HMAC signatures generated in some libraries where URL-encoded cahracters result in a lower-cased octet pair instead of upper-cased (Golang / Java Default) caused valid HMAC strings to fail. We now check for this after an intiial failure just in case.
+- Adding an `auth` or `post_auth` folder to a middleware api-id folder will let you add custom auth middleware and post-auth middleware that uses the JSVM
+- Adding JSVM middleware for post key auth and auth can now also be done in the api definition itself
 
 # v2.2
 
