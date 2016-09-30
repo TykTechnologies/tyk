@@ -573,7 +573,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.PostKeyAuth {
 		if mwObj.Path != "" {
 			// Otto files are specified here
-			mwPaths = append(mwPaths, mwObj.Path)	
+			mwPaths = append(mwPaths, mwObj.Path)
 		}
 		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
 	}
@@ -672,9 +672,9 @@ func notifyAPILoaded(spec *APISpec) {
 			"user_id":     "--",
 			"org_id":      spec.APIDefinition.OrgID,
 			"api_id":      spec.APIDefinition.APIID,
-		}).Info("Loaded: ", spec.APIDefinition.Name)	
+		}).Info("Loaded: ", spec.APIDefinition.Name)
 	}
-	
+
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -873,7 +873,11 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
 				if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
-					referenceSpec.JSVM.LoadJSPaths(mwPaths)
+					var pathPrefix string
+					if referenceSpec.CustomMiddlewareBundle != "" {
+						pathPrefix = strings.Join([]string{referenceSpec.APIID, referenceSpec.CustomMiddlewareBundle}, "-")
+					}
+					referenceSpec.JSVM.LoadJSPaths(mwPaths, pathPrefix)
 				}
 			}
 
@@ -1039,9 +1043,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 				var useOttoAuth bool = false
 				if !useCoProcessAuth {
-					useOttoAuth = mwDriver == tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth	
+					useOttoAuth = mwDriver == tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth
 				}
-				
+
 
 				if referenceSpec.APIDefinition.UseBasicAuth {
 					// Basic Auth
@@ -1750,11 +1754,11 @@ func generateListener(l net.Listener) (net.Listener, error) {
 		return tls.Listen("tcp", targetPort, &config)
 
 	} else if config.HttpServerOptions.UseLE_SSL {
-		
+
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("--> Using SSL LE (https)")
-		
+
 		GetLEState(&LE_MANAGER)
 
 		config := tls.Config{
@@ -1892,7 +1896,7 @@ func listen(l net.Listener, err error) {
 				"prefix": "main",
 			}).Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
-			
+
 		} else {
 			NodeID = thisID
 			ServiceNonceMutex.Lock()
