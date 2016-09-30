@@ -78,7 +78,6 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				return false, 1
 			}
 		} else {
-
 			// In-memory limiter
 			if BucketStore == nil {
 				InitBucketStore()

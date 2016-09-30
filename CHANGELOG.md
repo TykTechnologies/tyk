@@ -50,6 +50,16 @@ If the transport or address are empty, syslog will log to file
 - Fixed a bug in which HMAC signatures generated in some libraries where URL-encoded cahracters result in a lower-cased octet pair instead of upper-cased (Golang / Java Default) caused valid HMAC strings to fail. We now check for this after an intiial failure just in case.
 - Adding an `auth` or `post_auth` folder to a middleware api-id folder will let you add custom auth middleware and post-auth middleware that uses the JSVM
 - Adding JSVM middleware for post key auth and auth can now also be done in the api definition itself
+- Generate a key using:
+
+```
+# private key
+openssl genrsa -out privkey.pem 2048
+
+# public key
+openssl rsa -in privkey.pem -pubout -out pubkey.pem
+```
+
 
 # v2.2
 

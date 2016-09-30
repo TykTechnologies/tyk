@@ -65,7 +65,6 @@ func NotifyCurrentServerStatus() {
 	}
 
 	MainNotifier.Notify(n)
-
 }
 
 func OnServerStatusReceivedHandler(payload string) {
