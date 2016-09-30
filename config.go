@@ -71,7 +71,7 @@ type SlaveOptionsConfig struct {
 	BindToSlugsInsteadOfListenPaths bool   `json:"bind_to_slugs"`
 	DisableKeySpaceSync             bool   `json:"disable_keyspace_sync"`
 	GroupID                         string `json:"group_id"`
-	CallTimeout 					int 	`json:"call_timeout"`
+	CallTimeout                     int    `json:"call_timeout"`
 }
 
 type LocalSessionCacheConf struct {
@@ -191,6 +191,7 @@ type Config struct {
 	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime        bool                                     `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 	BundleBaseURL                     string                                   `bson:"bundle_base_url" json:"bundle_base_url"`
+	EnableBundleDownloader            bool                                     `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
 	AllowRemoteConfig                 bool                                     `bson:"allow_remote_config" json:"allow_remote_config"`
 }
 
