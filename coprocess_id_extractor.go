@@ -58,6 +58,41 @@ func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err 
 	return headerValue, err
 }
 
+func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValue string, err error) {
+	r.ParseForm()
+	if paramName == "" {
+		// No param name, error?
+		err = errors.New("No form param name set")
+		return formValue, err
+	}
+
+	values := r.Form[paramName]
+
+	if len(values) > 0 {
+		formValue = strings.Join(values, "")
+	} else {
+		// Error, no value!
+		err = errors.New("No form value")
+	}
+	return formValue, err
+}
+
+func (e *BaseExtractor) ExtractBody(r *http.Request) (bodyValue string, err error) {
+	return bodyValue, err
+}
+
+func (e *BaseExtractor) Error(r *http.Request, err error, message string) (returnOverrides ReturnOverrides) {
+	log.WithFields(logrus.Fields{
+		"path":   r.URL.Path,
+		"origin": GetIPFromRequest(r),
+	}).Info("Extractor error: ", message, ", ", err)
+
+	return ReturnOverrides{
+		ResponseCode:  400,
+		ResponseError: "Authorization field missing",
+	}
+}
+
 type ValueExtractor struct {
 	BaseExtractor
 }
@@ -82,46 +117,27 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
 	var err error
-
 	var config ValueExtractorConfig
-	// TODO: handle this error
-	mapstructure.Decode(e.Config.ExtractorConfig, &config)
+
+	err = mapstructure.Decode(e.Config.ExtractorConfig, &config)
+	if err != nil {
+		returnOverrides = e.Error(r, err, "Couldn't decode ValueExtractor configuration")
+		return SessionID, returnOverrides
+	}
 
 	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-			}).Info("Attempted access with malformed header, no auth header found.")
-
-			returnOverrides = ReturnOverrides{
-				ResponseCode:  400,
-				ResponseError: "Authorization field missing",
-			}
-		}
 	case tykcommon.FormSource:
-		log.Println("Using ValueExtractor with FormSource")
-		r.ParseForm()
+		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
+	}
 
-		if config.FormParamName == "" {
-			// No param name, error!
-		}
-
-		values := r.Form[config.FormParamName]
-
-		if len(values) > 0 {
-			extractorOutput = strings.Join(values, "")
-		} else {
-			// Error, no value!
-		}
+	if err != nil {
+		returnOverrides = e.Error(r, err, "ValueExtractor error")
+		return SessionID, returnOverrides
 	}
 
 	SessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
-
-	log.Println("SessionID", SessionID)
 
 	var keyExists bool
 	var previousSessionState SessionState
@@ -152,44 +168,47 @@ type RegexExtractorConfig struct {
 	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
 	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
 	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	FormParamName   string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 }
 
 func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
+	var err error
 
 	var config RegexExtractorConfig
-	// TODO: handle this error
-	mapstructure.Decode(e.Config.ExtractorConfig, &config)
 
-	// TODO: handle this error: no expression set!
-	if e.Config.ExtractorConfig["regex_expression"] == nil {
-	}
-
-	expression, err := regexp.Compile(config.RegexExpression)
+	err = mapstructure.Decode(e.Config.ExtractorConfig, &config)
 
 	if err != nil {
-		// TODO: error, the expression is bad!
+		returnOverrides = e.Error(r, err, "Can't decode RegexExtractor configuration")
+		return SessionID, returnOverrides
+	}
+
+	if e.Config.ExtractorConfig["regex_expression"] == nil {
+		returnOverrides = e.Error(r, nil, "RegexExtractor expects an expression")
+		return SessionID, returnOverrides
+	}
+
+	var expression *regexp.Regexp
+	expression, err = regexp.Compile(config.RegexExpression)
+
+	if err != nil {
+		returnOverrides = e.Error(r, nil, "RegexExtractor found an invalid expression")
+		return SessionID, returnOverrides
 	}
 
 	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-			}).Info("Attempted access with malformed header, no auth header found.")
-
-			returnOverrides = ReturnOverrides{
-				ResponseCode:  400,
-				ResponseError: "Authorization field missing",
-			}
-		}
 	case tykcommon.BodySource:
-		log.Println("Using RegexExtractor with BodySource")
+		extractorOutput, err = e.ExtractBody(r)
 	case tykcommon.FormSource:
-		log.Println("Using RegexExtractor with FormSource")
+		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
+	}
+
+	if err != nil {
+		returnOverrides = e.Error(r, err, "RegexExtractor error")
+		return SessionID, returnOverrides
 	}
 
 	var regexOutput []string
@@ -311,6 +330,8 @@ func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
 		thisExtractor = &ValueExtractor{baseExtractor}
 	case tykcommon.RegexExtractor:
 		thisExtractor = &RegexExtractor{baseExtractor}
+	case tykcommon.XPathExtractor:
+		thisExtractor = &XPathExtractor{baseExtractor}
 	}
 
 	referenceSpec.CustomMiddleware.IdExtractor.Extractor = thisExtractor
