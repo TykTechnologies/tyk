@@ -19,18 +19,21 @@ import (
 	"time"
 )
 
+// IdExtractor is the base interface for an ID extractor.
 type IdExtractor interface {
 	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
 	PostProcess(*http.Request, SessionState, string)
 	GenerateSessionID(string, *TykMiddleware) string
 }
 
+// BaseExtractor is the base structure for an ID extractor, it implements the IdExtractor interface. Other extractors may override some of its methods.
 type BaseExtractor struct {
 	Config        *tykcommon.MiddlewareIdExtractor
 	TykMiddleware *TykMiddleware
 	Spec          *APISpec
 }
 
+// ExtractAndCheck is called from the CP middleware, if ID extractor is enabled for the current API.
 func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	log.WithFields(logrus.Fields{
 		"prefix": "idextractor",
@@ -38,6 +41,7 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (SessionID string, retu
 	return "", ReturnOverrides{403, "Key not authorised"}
 }
 
+// PostProcess sets context variables and updates the storage.
 func (e *BaseExtractor) PostProcess(r *http.Request, thisSessionState SessionState, SessionID string) {
 	var sessionLifetime = GetLifetime(e.Spec, &thisSessionState)
 	e.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, sessionLifetime)
@@ -58,6 +62,7 @@ func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err 
 	return headerValue, err
 }
 
+// ExtractForm is used when a FormSource is specified.
 func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValue string, err error) {
 	r.ParseForm()
 	if paramName == "" {
@@ -81,6 +86,7 @@ func (e *BaseExtractor) ExtractBody(r *http.Request) (bodyValue string, err erro
 	return bodyValue, err
 }
 
+// Error is a helper for logging the extractor errors. It always returns HTTP 400 (so we don't expose any details).
 func (e *BaseExtractor) Error(r *http.Request, err error, message string) (returnOverrides ReturnOverrides) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
@@ -93,6 +99,14 @@ func (e *BaseExtractor) Error(r *http.Request, err error, message string) (retur
 	}
 }
 
+// GenerateSessionID is a helper for generating session IDs, it takes an input (usually the extractor output) and a middleware pointer.
+func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (SessionID string) {
+	data := []byte(input)
+	tokenID := fmt.Sprintf("%x", md5.Sum(data))
+	SessionID = mw.Spec.OrgID + tokenID
+	return SessionID
+}
+
 type ValueExtractor struct {
 	BaseExtractor
 }
@@ -100,13 +114,6 @@ type ValueExtractor struct {
 type ValueExtractorConfig struct {
 	HeaderName    string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
 	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
-}
-
-func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (SessionID string) {
-	data := []byte(input)
-	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	SessionID = mw.Spec.OrgID + tokenID
-	return SessionID
 }
 
 func (e *ValueExtractor) Extract(input interface{}) string {
@@ -319,6 +326,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	return SessionID, returnOverrides
 }
 
+// newExtractor is called from the CP middleware for every API that specifies extractor settings.
 func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
 	var thisExtractor IdExtractor
 
