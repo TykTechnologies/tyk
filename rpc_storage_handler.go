@@ -57,7 +57,15 @@ var RPCClients = map[string]chan int{}
 func ClearRPCClients() {
 	log.Info("Found: ", len(RPCClients), " RPC connections, terminating")
 	for _, c := range RPCClients {
-		c <- 1
+
+		select {
+	    case c <- 1:
+	        log.Debug("Disconnect sent")
+	    default:
+	        log.Debug("Disconnect chan failed")
+	    }
+
+		go func(){ c <- 1 }()
 	}
 }
 
