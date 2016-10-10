@@ -647,7 +647,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Error("Culdn't parse target URL: ", err)
+			}).Error("Couldn't parse target URL: ", err)
+			skip = true
 		}
 
 		// Set up LB targets:
