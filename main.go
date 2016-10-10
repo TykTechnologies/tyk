@@ -226,10 +226,10 @@ func getAPISpecs() *[]*APISpec {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
-		
+
 		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
-		
+
 		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
@@ -782,7 +782,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				"prefix": "main",
 				"org_id": referenceSpec.APIDefinition.OrgID,
 				"api_id": referenceSpec.APIDefinition.APIID,
-			}).Error("Culdn't parse target URL: ", err)
+			}).Error("Couldn't parse target URL: ", err)
+			skip = true
 		}
 
 		// Set up LB targets:
