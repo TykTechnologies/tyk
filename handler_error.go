@@ -15,9 +15,10 @@ import (
 	"time"
 )
 
-const(
-	defaultTemplateName = "error"
+const (
+	defaultTemplateName   = "error"
 	defaultTemplateFormat = "json"
+	defaultContentType    = "application/json"
 )
 
 // APIError is generic error object returned if there is something wrong with the request
@@ -34,17 +35,19 @@ type ErrorHandler struct {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
 	if e.Spec.DoNotTrack {
-		// Need to return the correct error code!
-		w.WriteHeader(errCode)
-
 		var templateExtension string
-		var contentType string = r.Header.Get("Content-Type")
-		switch contentType {
+		var thisContentType string
+
+		switch r.Header.Get("Content-Type") {
 		case "application/xml":
 			templateExtension = "xml"
+			thisContentType = "application/xml"
 		default:
 			templateExtension = "json"
+			thisContentType = "application/json"
 		}
+
+		w.Header().Set("Content-Type", thisContentType)
 
 		var thisTemplate *template.Template
 		var templateName string = fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
@@ -53,10 +56,12 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
 		thisTemplate = templates.Lookup(templateName)
+		log.Println("Looking for: ", templateName)
 
 		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 		if thisTemplate == nil {
 			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
+			log.Println("Looking for: ", templateName)
 			thisTemplate = templates.Lookup(templateName)
 		}
 
@@ -64,7 +69,11 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		if thisTemplate == nil {
 			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
 			thisTemplate = templates.Lookup(templateName)
+			w.Header().Set("Content-Type", defaultContentType)
 		}
+
+		// Need to return the correct error code!
+		w.WriteHeader(errCode)
 
 		thisError := APIError{fmt.Sprintf("%s", err)}
 		thisTemplate.Execute(w, &thisError)
