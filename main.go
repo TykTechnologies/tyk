@@ -143,8 +143,9 @@ func setupGlobals() {
 
 	//genericOsinStorage = MakeNewOsinServer()
 
-	templateFile := fmt.Sprintf("%s/error.json", config.TemplatePath)
-	templates = template.Must(template.ParseFiles(templateFile))
+	// Load all the files that have the "error" prefix.
+	templatesDir := filepath.Join(config.TemplatePath, "error*")
+	templates = template.Must(template.ParseGlob(templatesDir))
 
 	// Set up global JSVM
 	if config.EnableJSVM {
