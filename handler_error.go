@@ -6,11 +6,18 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"html/template"
 	"net"
 	"net/http"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"time"
+)
+
+const(
+	defaultTemplateName = "error"
+	defaultTemplateFormat = "json"
 )
 
 // APIError is generic error object returned if there is something wrong with the request
@@ -29,8 +36,39 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 	if e.Spec.DoNotTrack {
 		// Need to return the correct error code!
 		w.WriteHeader(errCode)
+
+		var templateExtension string
+		var contentType string = r.Header.Get("Content-Type")
+		switch contentType {
+		case "application/xml":
+			templateExtension = "xml"
+		default:
+			templateExtension = "json"
+		}
+
+		var thisTemplate *template.Template
+		var templateName string = fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
+
+		// templateError := templates.ExecuteTemplate(w, templateName, &thisError)
+
+		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
+		thisTemplate = templates.Lookup(templateName)
+
+		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
+		if thisTemplate == nil {
+			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
+			thisTemplate = templates.Lookup(templateName)
+		}
+
+		// If no template is available for this content type, fallback to "error.json".
+		if thisTemplate == nil {
+			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
+			thisTemplate = templates.Lookup(templateName)
+		}
+
 		thisError := APIError{fmt.Sprintf("%s", err)}
-		templates.ExecuteTemplate(w, "error.json", &thisError)
+		thisTemplate.Execute(w, &thisError)
+
 		if doMemoryProfile {
 			pprof.WriteHeapProfile(profileFile)
 		}
