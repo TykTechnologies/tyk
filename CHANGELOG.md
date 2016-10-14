@@ -5,11 +5,8 @@
 - Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}`
 - It is now possible to rewrite a URL with a new host and have the host act as an override to any target settings that are in the API Definition
 - Added more remote logger support: Graylog, Syslog and Logstash
-<<<<<<< HEAD
 - Added a global setting for middleware bundles, to set the global base URL for middleware bundles use `"bundle_base_url":"http://mybundles.com/"` in tyk.conf.
-=======
 - The error handler now supports custom error templates. XML templates are supported as well. It's possible to have templates for specific HTTP errors, like "error_500.json".
->>>>>>> develop
 
 ### Graylog:
 
