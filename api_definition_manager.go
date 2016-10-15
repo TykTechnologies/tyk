@@ -48,6 +48,8 @@ const (
 	VirtualPath            URLStatus = 12
 	RequestSizeLimit       URLStatus = 13
 	MethodTransformed      URLStatus = 14
+	RequestTracked         URLStatus = 15
+	RequestNotTracked      URLStatus = 16
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -77,6 +79,8 @@ const (
 	StatusURLRewrite               RequestStatus = "URL Rewritten"
 	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
 	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
+	StatusRequesTracked            RequestStatus = "Request Tracked"
+	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -96,6 +100,8 @@ type URLSpec struct {
 	VirtualPathSpec         tykcommon.VirtualMeta
 	RequestSize             tykcommon.RequestSizeMeta
 	MethodTransform         tykcommon.MethodTransformMeta
+	TrackEndpoint           tykcommon.TrackEndpointMeta
+	DoNotTrackEndpoint      tykcommon.TrackEndpointMeta
 }
 
 type TransformSpec struct {
@@ -942,6 +948,34 @@ func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []tykcommon.Virt
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []tykcommon.TrackEndpointMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.TrackEndpoint = stringSpec
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
+func (a *APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []tykcommon.TrackEndpointMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.DoNotTrackEndpoint = stringSpec
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -959,6 +993,8 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
 	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
+	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, apiSpec)
+	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, apiSpec)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -975,6 +1011,8 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, requestSizes...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
+	combinedPath = append(combinedPath, trackedPaths...)
+	combinedPath = append(combinedPath, unTrackedPaths...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -1020,6 +1058,10 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestSizeControlled
 	case MethodTransformed:
 		return StatusMethodTransformed
+	case RequestTracked:
+		return StatusRequesTracked
+	case RequestNotTracked:
+		return StatusRequestNotTracked
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1143,6 +1185,15 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 				case MethodTransformed:
 					if method != nil && method.(string) == v.MethodTransform.Method {
 						return true, &v.MethodTransform
+					}
+
+				case RequestTracked:
+					if method != nil && method.(string) == v.TrackEndpoint.Method {
+						return true, &v.TrackEndpoint
+					}
+				case RequestNotTracked:
+					if method != nil && method.(string) == v.DoNotTrackEndpoint.Method {
+						return true, &v.DoNotTrackEndpoint
 					}
 				}
 

@@ -35,6 +35,7 @@ type AnalyticsRecord struct {
 	Geo           GeoData
 	Tags          []string
 	Alias         string
+	TrackPath     bool
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
 

@@ -19,14 +19,16 @@ type ContextKey int
 // Enums for keys to be stored in a session context - this is how gorilla expects
 // these to be implemented and is lifted pretty much from docs
 const (
-	SessionData       = 0
-	AuthHeaderValue   = 1
-	VersionData       = 2
-	VersionKeyContext = 3
-	OrgSessionContext = 4
-	ContextData       = 5
-	RetainHost        = 6
-	SkipCoProcessAuth	= 7
+	SessionData            = 0
+	AuthHeaderValue        = 1
+	VersionData            = 2
+	VersionKeyContext      = 3
+	OrgSessionContext      = 4
+	ContextData            = 5
+	RetainHost             = 6
+	SkipCoProcessAuth      = 7
+	TrackThisEndpoint      = 8
+	DoNotTrackThisEndpoint = 8
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
@@ -278,9 +280,23 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			}
 		}
 
+		trackThisEndpoint := context.Get(r, AuthHeaderValue)
+		trackedPath := r.URL.Path
+		trackEP := false
+		if trackThisEndpoint != nil {
+			trackEP = true
+			trackedPath = trackThisEndpoint.(string)
+		}
+
+		dnTrackThisEndpoint := context.Get(r, AuthHeaderValue)
+		if dnTrackThisEndpoint != nil {
+			trackEP = false
+			trackedPath = r.URL.Path
+		}
+
 		thisRecord := AnalyticsRecord{
 			r.Method,
-			r.URL.Path,
+			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
 			r.Header.Get("User-Agent"),
@@ -303,6 +319,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			GeoData{},
 			tags,
 			alias,
+			trackEP,
 			time.Now(),
 		}
 

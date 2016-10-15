@@ -141,9 +141,23 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			}
 		}
 
+		trackThisEndpoint := context.Get(r, AuthHeaderValue)
+		trackedPath := r.URL.Path
+		trackEP := false
+		if trackThisEndpoint != nil {
+			trackEP = true
+			trackedPath = trackThisEndpoint.(string)
+		}
+
+		dnTrackThisEndpoint := context.Get(r, AuthHeaderValue)
+		if dnTrackThisEndpoint != nil {
+			trackEP = false
+			trackedPath = r.URL.Path
+		}
+
 		thisRecord := AnalyticsRecord{
 			r.Method,
-			r.URL.Path,
+			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
 			r.Header.Get("User-Agent"),
@@ -166,6 +180,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			GeoData{},
 			tags,
 			alias,
+			trackEP,
 			time.Now(),
 		}
 
