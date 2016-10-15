@@ -141,16 +141,16 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			}
 		}
 
-		trackThisEndpoint := context.Get(r, AuthHeaderValue)
+		trackThisEndpoint, ok := context.GetOk(r, TrackThisEndpoint)
 		trackedPath := r.URL.Path
 		trackEP := false
-		if trackThisEndpoint != nil {
+		if ok {
 			trackEP = true
 			trackedPath = trackThisEndpoint.(string)
 		}
 
-		dnTrackThisEndpoint := context.Get(r, AuthHeaderValue)
-		if dnTrackThisEndpoint != nil {
+		_, dnOk := context.GetOk(r, DoNotTrackThisEndpoint)
+		if dnOk {
 			trackEP = false
 			trackedPath = r.URL.Path
 		}

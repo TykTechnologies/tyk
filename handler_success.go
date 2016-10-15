@@ -28,7 +28,7 @@ const (
 	RetainHost             = 6
 	SkipCoProcessAuth      = 7
 	TrackThisEndpoint      = 8
-	DoNotTrackThisEndpoint = 8
+	DoNotTrackThisEndpoint = 9
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
@@ -280,16 +280,16 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			}
 		}
 
-		trackThisEndpoint := context.Get(r, AuthHeaderValue)
+		trackThisEndpoint, ok := context.GetOk(r, TrackThisEndpoint)
 		trackedPath := r.URL.Path
 		trackEP := false
-		if trackThisEndpoint != nil {
+		if ok {
 			trackEP = true
 			trackedPath = trackThisEndpoint.(string)
 		}
 
-		dnTrackThisEndpoint := context.Get(r, AuthHeaderValue)
-		if dnTrackThisEndpoint != nil {
+		_, dnOk := context.GetOk(r, DoNotTrackThisEndpoint)
+		if dnOk {
 			trackEP = false
 			trackedPath = r.URL.Path
 		}
