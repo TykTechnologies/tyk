@@ -29,14 +29,12 @@ func (a *TrackEndpointMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 	_, versionPaths, _, _ := a.TykMiddleware.Spec.GetVersionData(r)
 	foundTracked, metaTrack := a.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestTracked)
 	if foundTracked {
-		context.Set(r, TrackThisEndpoint, metaTrack.(tykcommon.TrackEndpointMeta).Path)
-		log.Info("Endpoint is tracked")
+		context.Set(r, TrackThisEndpoint, metaTrack.(*tykcommon.TrackEndpointMeta).Path)
 	}
 
 	foundDnTrack, meta_dnTrack := a.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestNotTracked)
 	if foundDnTrack {
-		context.Set(r, DoNotTrackThisEndpoint, meta_dnTrack.(tykcommon.TrackEndpointMeta).Path)
-		log.Info("Endpoint is not tracked")
+		context.Set(r, DoNotTrackThisEndpoint, meta_dnTrack.(*tykcommon.TrackEndpointMeta).Path)
 	}
 
 	return nil, 200

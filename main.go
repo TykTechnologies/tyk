@@ -950,6 +950,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				AppendMiddleware(&baseChainArray, &MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware)
+				AppendMiddleware(&baseChainArray, &TrackEndpointMiddleware{tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &TransformMiddleware{tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray, &RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware)
@@ -1005,7 +1006,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				AppendMiddleware(&baseChainArray_PreAuth, &VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray_PreAuth, &RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware)
 				AppendMiddleware(&baseChainArray_PreAuth, &MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware)
-
+				AppendMiddleware(&baseChainArray_PreAuth, &TrackEndpointMiddleware{tykMiddleware}, tykMiddleware)
 				// var baseChainArray_PreAuth = []alice.Constructor{
 				// 	CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
 				// 	CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
