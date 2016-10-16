@@ -848,10 +848,7 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.Ci
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
 		events := newSpec.CircuitBreaker.CB.Subscribe()
-		go func() {
-			path := stringSpec.Path
-			spec := apiSpec
-			breakerPtr := newSpec.CircuitBreaker.CB
+		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false
 			for {
 				e := <-events
@@ -898,7 +895,7 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.Ci
 
 				}
 			}
-		}()
+		}(stringSpec.Path, apiSpec, newSpec.CircuitBreaker.CB)
 
 		thisURLSpec = append(thisURLSpec, newSpec)
 	}
