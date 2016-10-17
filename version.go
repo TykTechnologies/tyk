@@ -1,3 +1,3 @@
 package main
 
-var VERSION string = "v2.2.0.27"
+var VERSION string = "v2.2.0.28"
