@@ -7,9 +7,10 @@ import (
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
-	// "gopkg.in/xmlpath.v2"
+	"gopkg.in/xmlpath.v2"
 	"regexp"
 
+	"bytes"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -248,62 +249,66 @@ type XPathExtractor struct {
 	BaseExtractor
 }
 
+type XPathExtractorConfig struct {
+	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	FormParamName   string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+}
+
 func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
+	var err error
 
-	if e.Config.ExtractorConfig["regex_expression"] == nil {
-		// TODO: Error, no expression set!
+	var config XPathExtractorConfig
+	err = mapstructure.Decode(e.Config.ExtractorConfig, &config)
+
+	if e.Config.ExtractorConfig["xpath_expression"] == nil {
+		returnOverrides = e.Error(r, err, "XPathExtractor: no expression set")
+		return SessionID, returnOverrides
 	}
 
 	var expressionString string
-	expressionString = e.Config.ExtractorConfig["regex_expression"].(string)
+	expressionString = e.Config.ExtractorConfig["xpath_expression"].(string)
 
-	expression, err := regexp.Compile(expressionString)
+	var expression *xmlpath.Path
+	expression, err = xmlpath.Compile(expressionString)
 
 	if err != nil {
-		// TODO: error, the expression is bad!
+		returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
+		return SessionID, returnOverrides
 	}
 
 	switch e.Config.ExtractFrom {
 	case tykcommon.HeaderSource:
-		var headerName, headerValue string
-
-		// TODO: check if header_name is set
-		headerName = e.Config.ExtractorConfig["header_name"].(string)
-		headerValue = r.Header.Get(headerName)
-
-		if headerValue == "" {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-			}).Info("Attempted access with malformed header, no auth header found.")
-
-			log.Debug("Looked in: ", headerName)
-			log.Debug("Raw data was: ", headerValue)
-			log.Debug("Headers are: ", r.Header)
-
-			returnOverrides = ReturnOverrides{
-				ResponseCode:  400,
-				ResponseError: "Authorization field missing",
-			}
-
-			// m.reportLoginFailure(tykId, r)
-		}
-
-		// TODO: check if header_name setting exists!
-		extractorOutput = r.Header.Get(headerName)
+		extractorOutput, err = e.ExtractHeader(r)
 	case tykcommon.BodySource:
-		log.Println("Using RegexExtractor with BodySource")
+		extractorOutput, err = e.ExtractBody(r)
 	case tykcommon.FormSource:
-		log.Println("Using RegexExtractor with FormSource")
+		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
 	}
 
-	var regexOutput []string
-	regexOutput = expression.FindAllString(extractorOutput, -1)
+	if err != nil {
+		returnOverrides = e.Error(r, err, "XPathExtractor error")
+		return SessionID, returnOverrides
+	}
 
-	var matchIndex = 1
+	var extractedXml *xmlpath.Node
+	extractedXml, err = xmlpath.Parse(bytes.NewBufferString(extractorOutput))
 
-	SessionID = e.GenerateSessionID(regexOutput[matchIndex], e.TykMiddleware)
+	if err != nil {
+		returnOverrides = e.Error(r, err, "XPathExtractor: couldn't parse input")
+		return SessionID, returnOverrides
+	}
+
+	output, ok := expression.String(extractedXml)
+
+	if !ok {
+		returnOverrides = e.Error(r, err, "XPathExtractor: no input")
+		return SessionID, returnOverrides
+	}
+
+	SessionID = e.GenerateSessionID(output, e.TykMiddleware)
 
 	var keyExists bool
 	var previousSessionState SessionState
