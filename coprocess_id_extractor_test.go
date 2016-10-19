@@ -386,7 +386,8 @@ var RegexExtractorDef string = `
         "extract_with": "regex",
         "extractor_config": {
           "header_name": "Authorization",
-          "regex_expression": "[^\\\\-]+"
+          "regex_expression": "[^\\\\-]+",
+					"regex_match_index": 1
         }
       },
       "driver": "grpc"
