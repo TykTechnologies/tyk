@@ -147,7 +147,6 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 
 static void Python_DispatchEvent(char* event_json) {
 	gilState = PyGILState_Ensure();
-	printf("Python_DispatchEvent (C): %s\n", event_json);
 	PyObject *args = PyTuple_Pack( 1, PyUnicode_FromString(event_json) );
 	PyObject *result = PyObject_CallObject( dispatch_event, args );
 	PyGILState_Release(gilState);
