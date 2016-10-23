@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
@@ -15,6 +14,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"time"
 )
 
@@ -36,12 +36,13 @@ type MiniRequestObject struct {
 	ExtendedParams  map[string][]string
 	DeleteParams    []string
 	ReturnOverrides ReturnOverrides
+	IgnoreBody      bool
 }
 
 type VMReturnObject struct {
 	Request     MiniRequestObject
 	SessionMeta map[string]string
-	Session 	SessionState
+	Session     SessionState
 	AuthValue   string
 }
 
@@ -59,7 +60,7 @@ type DynamicMiddleware struct {
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool
-	Auth 				bool
+	Auth                bool
 }
 
 type DynamicMiddlewareConfig struct {
@@ -113,6 +114,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		AddParams:      make(map[string]string),
 		ExtendedParams: make(map[string][]string),
 		DeleteParams:   make([]string, 0),
+		IgnoreBody:     false,
 	}
 
 	asJsonRequestObj, encErr := json.Marshal(thisRequestData)
@@ -168,8 +170,13 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Reconstruct the request parts
-	r.ContentLength = int64(len(newRequestData.Request.Body))
-	r.Body = nopCloser{bytes.NewBufferString(newRequestData.Request.Body)}
+	if newRequestData.Request.IgnoreBody {
+		r.ContentLength = int64(len(originalBody))
+		r.Body = nopCloser{bytes.NewBuffer(originalBody)}
+	} else {
+		r.ContentLength = int64(len(newRequestData.Request.Body))
+		r.Body = nopCloser{bytes.NewBufferString(newRequestData.Request.Body)}
+	}
 	r.URL.Path = newRequestData.Request.URL
 
 	// Delete and set headers
