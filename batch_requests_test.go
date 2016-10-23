@@ -172,8 +172,8 @@ func TestMakeSyncRequest(t *testing.T) {
 
 	batchHandler := BatchRequestHandler{API: &spec}
 
-	relURL := "/about-lonelycoder"
-	thisRequest, _ := http.NewRequest("GET", "http://lonelycode.com/about-lonelycoder", nil)
+	relURL := "/"
+	thisRequest, _ := http.NewRequest("GET", "http://example.com/", nil)
 
 	replyUnit := batchHandler.doSyncRequest(thisRequest, relURL)
 
@@ -200,8 +200,8 @@ func TestMakeASyncRequest(t *testing.T) {
 
 	batchHandler := BatchRequestHandler{API: &spec}
 
-	relURL := "/about-lonelycoder"
-	thisRequest, _ := http.NewRequest("GET", "http://lonelycode.com/about-lonelycoder", nil)
+	relURL := "/"
+	thisRequest, _ := http.NewRequest("GET", "http://example.com/", nil)
 
 	replies := make(chan BatchReplyUnit)
 	go batchHandler.doAsyncRequest(thisRequest, relURL, replies)
@@ -213,7 +213,7 @@ func TestMakeASyncRequest(t *testing.T) {
 	}
 
 	if replyUnit.Code != 200 {
-		t.Error("Repsonse reported a non-200 reponse (could be because http://lonelycode.com/about-lonelycoder is down)")
+		t.Error("Repsonse reported a non-200 reponse (could be because http://example.com/ is down)")
 	}
 
 	if len(replyUnit.Body) < 1 {
