@@ -46,10 +46,12 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 }
 
 func doCoprocessReload() {
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Info("Reloading middlewares")
-	GlobalDispatcher.Reload()
+	if GlobalDispatcher != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Info("Reloading middlewares")
+		GlobalDispatcher.Reload()
+	}
 
 }
 
