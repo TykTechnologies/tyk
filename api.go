@@ -10,11 +10,12 @@ import (
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
-	"net"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -96,6 +97,8 @@ func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionS
 }
 
 func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) error {
+	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
 		for apiId, _ := range newSession.AccessRights {
@@ -112,20 +115,20 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 					}
 
-					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, thisAPISpec.SessionLifetime)
+					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(thisAPISpec, &newSession))
 					if err != nil {
 						return err
 					}
 				}
 			} else {
 				log.WithFields(logrus.Fields{
-					"prefix": "api",
-					"key":    keyName,
-					"org_id": newSession.OrgID,
-					"api_id":  apiId,
-					"user_id": "system",
-					"user_ip": "--",
-					"path": "--",
+					"prefix":      "api",
+					"key":         keyName,
+					"org_id":      newSession.OrgID,
+					"api_id":      apiId,
+					"user_id":     "system",
+					"user_ip":     "--",
+					"path":        "--",
 					"server_name": "system",
 				}).Error("Could not add key for this API ID, API doesn't exist.")
 				return errors.New("API must be active to add keys")
@@ -141,7 +144,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 				checkAndApplyTrialPeriod(keyName, spec.APIID, &newSession)
-				err := spec.SessionManager.UpdateSession(keyName, newSession, spec.SessionLifetime)
+				err := spec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(spec, &newSession))
 				if err != nil {
 					return err
 				}
@@ -154,14 +157,14 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 	}
 
 	log.WithFields(logrus.Fields{
-		"prefix":  "api",
-		"key":     ObfuscateKeyString(keyName),
-		"expires": newSession.Expires,
-		"org_id": newSession.OrgID,
-		"api_id":  "--",
-		"user_id": "system",
-		"user_ip": "--",
-		"path": "--",
+		"prefix":      "api",
+		"key":         ObfuscateKeyString(keyName),
+		"expires":     newSession.Expires,
+		"org_id":      newSession.OrgID,
+		"api_id":      "--",
+		"user_id":     "system",
+		"user_ip":     "--",
+		"path":        "--",
 		"server_name": "system",
 	}).Info("Key added or updated.")
 	return nil
@@ -927,6 +930,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	}
 
 	// Set the policy
+	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	sess.ApplyPolicyID = policyId
 
 	sessAsJS, encErr := json.Marshal(sess)
@@ -1312,6 +1316,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				newSession.HmacSecret = keyGen.GenerateHMACSecret()
 			}
 
+			newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+
 			if len(newSession.AccessRights) > 0 {
 				for apiId, _ := range newSession.AccessRights {
 					thisAPISpec := GetSpecForApi(apiId)
@@ -1323,7 +1329,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 							thisAPISpec.SessionManager.ResetQuota(newKey, newSession)
 							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						}
-						err := thisAPISpec.SessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+						err := thisAPISpec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(thisAPISpec, &newSession))
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
 							DoJSONWrite(w, 403, responseMessage)
@@ -1334,7 +1340,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						thisSessionManager := FallbackKeySesionManager
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						thisSessionManager.ResetQuota(newKey, newSession)
-						err := thisSessionManager.UpdateSession(newKey, newSession, thisAPISpec.SessionLifetime)
+						err := thisSessionManager.UpdateSession(newKey, newSession, -1)
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
 							DoJSONWrite(w, 403, responseMessage)
@@ -1346,13 +1352,13 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				if config.AllowMasterKeys {
 					// nothing defined, add key to ALL
 					log.WithFields(logrus.Fields{
-						"prefix": "api",
-						"status": "warning",
-						"org_id": newSession.OrgID,
-						"api_id":  "--",
-						"user_id": "system",
-						"user_ip": getIPHelper(r),
-						"path": "--",
+						"prefix":      "api",
+						"status":      "warning",
+						"org_id":      newSession.OrgID,
+						"api_id":      "--",
+						"user_id":     "system",
+						"user_ip":     getIPHelper(r),
+						"path":        "--",
 						"server_name": "system",
 					}).Warning("No API Access Rights set on key session, adding key to all APIs.")
 
@@ -1363,7 +1369,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 							spec.SessionManager.ResetQuota(newKey, newSession)
 							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 						}
-						err := spec.SessionManager.UpdateSession(newKey, newSession, spec.SessionLifetime)
+						err := spec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(spec, &newSession))
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
 							DoJSONWrite(w, 403, responseMessage)
@@ -1372,14 +1378,14 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				} else {
 					log.WithFields(logrus.Fields{
-						"prefix": "api",
-						"status": "error",
-						"err":    "master keys disabled",
-						"org_id": newSession.OrgID,
-						"api_id":  "--",
-						"user_id": "system",
-						"user_ip": getIPHelper(r),
-						"path": "--",
+						"prefix":      "api",
+						"status":      "error",
+						"err":         "master keys disabled",
+						"org_id":      newSession.OrgID,
+						"api_id":      "--",
+						"user_id":     "system",
+						"user_ip":     getIPHelper(r),
+						"path":        "--",
 						"server_name": "system",
 					}).Error("Master keys disallowed in configuration, key not added.")
 
@@ -1399,14 +1405,14 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 			if err != nil {
 				log.WithFields(logrus.Fields{
-					"prefix": "api",
-					"status": "error",
-					"err":    err,
-					"org_id": newSession.OrgID,
-					"api_id":  "--",
-					"user_id": "system",
-					"user_ip": getIPHelper(r),
-					"path": "--",
+					"prefix":      "api",
+					"status":      "error",
+					"err":         err,
+					"org_id":      newSession.OrgID,
+					"api_id":      "--",
+					"user_id":     "system",
+					"user_ip":     getIPHelper(r),
+					"path":        "--",
 					"server_name": "system",
 				}).Error("System error, failed to generate key.")
 
@@ -1424,14 +1430,14 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				})
 
 				log.WithFields(logrus.Fields{
-					"prefix": "api",
-					"key":    ObfuscateKeyString(newKey),
-					"status": "ok",
-					"api_id":  "--",
-					"org_id": newSession.OrgID,
-					"user_id": "system",
-					"user_ip": getIPHelper(r),
-					"path": "--",
+					"prefix":      "api",
+					"key":         ObfuscateKeyString(newKey),
+					"status":      "ok",
+					"api_id":      "--",
+					"org_id":      newSession.OrgID,
+					"user_id":     "system",
+					"user_ip":     getIPHelper(r),
+					"path":        "--",
 					"server_name": "system",
 				}).Info("Generated new key: (", ObfuscateKeyString(newKey), ")")
 			}
@@ -1987,24 +1993,24 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 		spec := GetSpecForApi(APIID)
 		var orgid string
-		if spec!= nil {
+		if spec != nil {
 			orgid = spec.OrgID
 		}
 
 		err := HandleInvalidateAPICache(APIID)
 		if err != nil {
 			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"api_id":  APIID,
-				"status": "fail",
-				"err":    err,
-				"org_id": orgid,
-				"user_id": "system",
-				"user_ip": getIPHelper(r),
-				"path": "--",
+				"prefix":      "api",
+				"api_id":      APIID,
+				"status":      "fail",
+				"err":         err,
+				"org_id":      orgid,
+				"user_id":     "system",
+				"user_ip":     getIPHelper(r),
+				"path":        "--",
 				"server_name": "system",
 			}).Error("Failed to delete cache: ", err)
-			
+
 			code = 500
 			responseMessage = createError("Cache invalidation failed")
 			DoJSONWrite(w, code, responseMessage)
@@ -2014,13 +2020,13 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 		okMsg := APIStatusMessage{"ok", "cache invalidated"}
 		responseMessage, _ = json.Marshal(&okMsg)
 		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"status": "ok",
-			"org_id": orgid,
-			"api_id":  APIID,
-			"user_id": "system",
-			"user_ip": getIPHelper(r),
-			"path": "--",
+			"prefix":      "api",
+			"status":      "ok",
+			"org_id":      orgid,
+			"api_id":      APIID,
+			"user_id":     "system",
+			"user_ip":     getIPHelper(r),
+			"path":        "--",
 			"server_name": "system",
 		}).Info("Cache invalidated successfully")
 		code = 200

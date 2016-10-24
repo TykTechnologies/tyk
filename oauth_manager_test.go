@@ -71,7 +71,7 @@ var oauthDefinition string = `
 		},
 		"proxy": {
 			"listen_path": "/APIID/",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		}
 	}
@@ -89,7 +89,7 @@ func getOAuthChain(spec APISpec, Muxer *mux.Router) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	addOAuthHandlers(&spec, Muxer, true)
-	remote, _ := url.Parse("http://lonelycode.com/")
+	remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}

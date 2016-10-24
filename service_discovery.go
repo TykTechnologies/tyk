@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/lonelycode/gabs"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/lonelycode/gabs"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -85,8 +85,8 @@ func (s *ServiceDiscovery) GetPortFromObject(host *string, obj *gabs.Container) 
 		port := s.decodeToNameSpace(s.portPath, obj)
 
 		switch port.(type) {
-		case []interface {}:
-			port = port.([]interface {})[0]
+		case []interface{}:
+			port = port.([]interface{})[0]
 		}
 
 		var portToUse string
@@ -133,7 +133,7 @@ func (s *ServiceDiscovery) GetObject(item *gabs.Container) string {
 	hostnameData := s.decodeToNameSpace(s.dataPath, item)
 	switch hostnameData.(type) {
 	default:
-		log.Debug("Get Object: hostname is not a string")
+		log.Warning("Get Object: hostname is not a string")
 		return ""
 	case string:
 	}
@@ -219,7 +219,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 
 	}
 
-	if (thisSet != nil) {
+	if thisSet != nil {
 		for _, item := range *thisSet {
 			log.Debug("Child in list: ", item)
 			hostname = s.GetHostname(item) + s.targetPath

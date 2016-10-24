@@ -99,3 +99,4 @@ func RecordDetail(r *http.Request) bool {
 	thisSessionState = ses.(SessionState)
 	return thisSessionState.EnableDetailedRecording
 }
+

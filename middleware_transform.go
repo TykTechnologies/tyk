@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/context"
-	"github.com/TykTechnologies/tykcommon"
 	"golang.org/x/net/html/charset"
 	"io"
 	"io/ioutil"
@@ -30,6 +30,17 @@ func (m *TransformMiddleware) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (t *TransformMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (t *TransformMiddleware) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.Transform) > 0 {
+			used = true
+		}
+	}
+
+	return used
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

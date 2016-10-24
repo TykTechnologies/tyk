@@ -1,0 +1,65 @@
+{
+    "name": "Tyk Test API (Coprocess + gRPC)",
+    "api_id": "7",
+    "org_id": "default",
+    "definition": {
+        "location": "header",
+        "key": "version"
+    },
+    "auth": {
+        "auth_header_name": "authorization"
+    },
+    "use_keyless": true,
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "Default": {
+                "name": "Default",
+                "expires": "3000-01-02 15:04",
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                }
+            }
+        }
+    },
+    "proxy": {
+        "listen_path": "/grpc-protected/",
+        "target_url": "http://httpbin.org",
+        "strip_listen_path": true
+    },
+    "enable_coprocess_auth": false,
+    "custom_middleware_": {
+      "pre": [
+        {
+          "name": "MyPreMiddleware",
+          "require_session": false
+        }
+      ],
+      "auth_check": {
+        "name": "MyAuthCheck"
+      },
+      "id_extractor": {
+        "extract_from": "form",
+        "extract_with": "value",
+        "extractor_config": {
+          "param_name": "key"
+        }
+      },
+      "id_extractor__": {
+        "extract_from": "header",
+        "extract_with": "regex",
+        "extractor_config": {
+          "header_name": "Authorization",
+          "regex_expression": "[^\\\\-]+",
+          "regex_match_index": 1
+        }
+      },
+      "driver": "grpc",
+      "session_lifetime": 35
+    },
+    "custom_middleware_bundle": "test-bundle",
+    "enable_batch_request_support": true
+}

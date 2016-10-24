@@ -5,6 +5,7 @@ import "net/http"
 import (
 	"errors"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"strings"
 )
@@ -21,6 +22,10 @@ func (k *Oauth2KeyExists) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (k *Oauth2KeyExists) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (a *Oauth2KeyExists) IsEnabledForSpec() bool {
+	return true
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -66,8 +71,10 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Set session state on context, we will need it later
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, accessToken)
+	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.OAuthKey) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, accessToken)
+	}
 
 	// Request is valid, carry on
 	return nil, 200

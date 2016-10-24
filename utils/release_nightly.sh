@@ -35,6 +35,11 @@ cd $SOURCEBINPATH
 echo "Getting deps"
 go get -t -d -v ./...
 
+echo "Fixing MGO Version"
+cd $GOPATH/src/gopkg.in/mgo.v2/
+git checkout tags/r2016.02.04
+cd $SOURCEBINPATH
+
 echo "Installing cross-compiler"
 go get github.com/mitchellh/gox
 

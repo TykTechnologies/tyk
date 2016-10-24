@@ -23,6 +23,10 @@ func (v *VersionCheck) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (a *VersionCheck) IsEnabledForSpec() bool {
+	return true
+}
+
 func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 	// Reply with some alternate data
 	thisMeta := meta.(*tykcommon.EndpointMethodMeta)

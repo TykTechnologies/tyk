@@ -48,6 +48,8 @@ var RPC_EmergencyModeLoaded bool
 
 var ErrorDenied error = errors.New("Access Denied")
 
+var GlobalRPCCallTimeout time.Duration
+
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
 var RPCClients = map[string]chan int{}
@@ -87,7 +89,7 @@ func RPCKeepAliveCheck(r *RPCStorageHandler) {
 		case <-time.After(time.Second * 10):
 			log.WithFields(logrus.Fields{
 				"prefix": "RPC Conn Mgr",
-			}).Info("Handler seems to have disconnected, attempting reconnect")
+			}).Warning("Handler seems to have disconnected, attempting reconnect")
 			r.ReConnect()
 		}
 
@@ -239,7 +241,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		UserKey: r.UserKey,
 		GroupID: config.SlaveOptions.GroupID,
 	}
-	ok, err := r.Client.Call("LoginWithGroup", groupLoginData)
+	ok, err := r.Client.CallTimeout("LoginWithGroup", groupLoginData, GlobalRPCCallTimeout)
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
 		r.ReAttemptLogin(err)
@@ -268,7 +270,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 
-	ok, err := r.Client.Call("Login", r.UserKey)
+	ok, err := r.Client.CallTimeout("Login", r.UserKey, GlobalRPCCallTimeout)
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
 		r.ReAttemptLogin(err)
@@ -302,7 +304,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	}
 
 	// Not cached
-	value, err := r.Client.Call("GetKey", r.fixKey(keyName))
+	value, err := r.Client.CallTimeout("GetKey", r.fixKey(keyName), GlobalRPCCallTimeout)
 
 	if err != nil {
 		if r.IsAccessError(err) {
@@ -332,7 +334,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
-	value, err := r.Client.Call("GetExp", r.fixKey(keyName))
+	value, err := r.Client.CallTimeout("GetExp", r.fixKey(keyName), GlobalRPCCallTimeout)
 
 	if err != nil {
 		if r.IsAccessError(err) {
@@ -356,7 +358,7 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 		Timeout:      timeout,
 	}
 
-	_, err := r.Client.Call("SetKey", ibd)
+	_, err := r.Client.CallTimeout("SetKey", ibd, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -376,7 +378,7 @@ func (r *RPCStorageHandler) SetRawKey(keyName string, sessionState string, timeo
 // Decrement will decrement a key in redis
 func (r *RPCStorageHandler) Decrement(keyName string) {
 	log.Warning("Decrement called")
-	_, err := r.Client.Call("Decrement", keyName)
+	_, err := r.Client.CallTimeout("Decrement", keyName, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		r.Decrement(keyName)
@@ -392,7 +394,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		Expire:  expire,
 	}
 
-	val, err := r.Client.Call("IncrememntWithExpire", ibd)
+	val, err := r.Client.CallTimeout("IncrememntWithExpire", ibd, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -422,7 +424,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 
-	kvPair, err := r.Client.Call("GetKeysAndValuesWithFilter", searchStr)
+	kvPair, err := r.Client.CallTimeout("GetKeysAndValuesWithFilter", searchStr, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -442,7 +444,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 
 	searchStr := r.KeyPrefix + "*"
-	kvPair, err := r.Client.Call("GetKeysAndValues", searchStr)
+	kvPair, err := r.Client.CallTimeout("GetKeysAndValues", searchStr, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -463,25 +465,31 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
-	ok, err := r.Client.Call("DeleteKey", r.fixKey(keyName))
+	ok, err := r.Client.CallTimeout("DeleteKey", r.fixKey(keyName), GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.DeleteKey(keyName)
 	}
 
+	if ok == nil {
+		return false
+	}
 	return ok.(bool)
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
-	ok, err := r.Client.Call("DeleteRawKey", keyName)
+	ok, err := r.Client.CallTimeout("DeleteRawKey", keyName, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.DeleteRawKey(keyName)
 	}
 
+	if ok == nil {
+		return false
+	}
 	return ok.(bool)
 }
 
@@ -494,11 +502,15 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 		}
 
 		log.Debug("Deleting: ", asInterface)
-		ok, err := r.Client.Call("DeleteKeys", asInterface)
+		ok, err := r.Client.CallTimeout("DeleteKeys", asInterface, GlobalRPCCallTimeout)
 
 		if r.IsAccessError(err) {
 			r.Login()
 			return r.DeleteKeys(keys)
+		}
+
+		if ok == nil {
+			return false
 		}
 
 		return ok.(bool)
@@ -540,7 +552,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName string, value string) {
 		Value:   value,
 	}
 
-	_, err := r.Client.Call("AppendToSet", ibd)
+	_, err := r.Client.CallTimeout("AppendToSet", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		r.AppendToSet(keyName, value)
@@ -558,7 +570,7 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 		Expire:  -1,
 	}
 
-	intVal, err := r.Client.Call("SetRollingWindow", ibd)
+	intVal, err := r.Client.CallTimeout("SetRollingWindow", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.SetRollingWindow(keyName, per, val)
@@ -566,6 +578,11 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 	elapsed := time.Since(start)
 	log.Debug("SetRollingWindow took ", elapsed)
+
+	if intVal == nil {
+		log.Warning("RPC Handler: SetRollingWindow() returned nil, returning 0")
+		return 0, []interface{}{}
+	}
 
 	return intVal.(int), []interface{}{}
 
@@ -580,7 +597,7 @@ func (r *RPCStorageHandler) SetRollingWindowPipeline(keyName string, per int64, 
 		Expire:  -1,
 	}
 
-	intVal, err := r.Client.Call("SetRollingWindow", ibd)
+	intVal, err := r.Client.CallTimeout("SetRollingWindow", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.SetRollingWindow(keyName, per, val)
@@ -588,6 +605,11 @@ func (r *RPCStorageHandler) SetRollingWindowPipeline(keyName string, per int64, 
 
 	elapsed := time.Since(start)
 	log.Debug("SetRollingWindow took ", elapsed)
+
+	if intVal == nil {
+		log.Warning("RPC Handler: SetRollingWindowPipeline() returned nil, returning 0")
+		return 0, []interface{}{}
+	}
 
 	return intVal.(int), []interface{}{}
 
@@ -623,7 +645,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		Tags:  tags,
 	}
 
-	defString, err := r.Client.Call("GetApiDefinitions", dr)
+	defString, err := r.Client.CallTimeout("GetApiDefinitions", dr, GlobalRPCCallTimeout)
 
 	if err != nil {
 		if r.IsAccessError(err) {
@@ -632,13 +654,19 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		}
 	}
 	log.Debug("API Definitions retrieved")
+
+	if defString == nil {
+		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
+		return ""
+	}
+
 	return defString.(string)
 
 }
 
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) GetPolicies(orgId string) string {
-	defString, err := r.Client.Call("GetPolicies", orgId)
+	defString, err := r.Client.CallTimeout("GetPolicies", orgId, GlobalRPCCallTimeout)
 	if err != nil {
 		if r.IsAccessError(err) {
 			r.Login()
@@ -699,14 +727,14 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var err error
 
 	if config.SlaveOptions.GroupID == "" {
-		keys, err = r.Client.Call("GetKeySpaceUpdate", orgId)
+		keys, err = r.Client.CallTimeout("GetKeySpaceUpdate", orgId, GlobalRPCCallTimeout)
 	} else {
 
 		grpReq := GroupKeySpaceRequest{
 			OrgID:   orgId,
 			GroupID: config.SlaveOptions.GroupID,
 		}
-		keys, err = r.Client.Call("GetGroupKeySpaceUpdate", grpReq)
+		keys, err = r.Client.CallTimeout("GetGroupKeySpaceUpdate", grpReq, GlobalRPCCallTimeout)
 	}
 
 	if err != nil {

@@ -25,6 +25,13 @@ func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
+	if k.TykMiddleware.Spec.DisableRateLimit && k.TykMiddleware.Spec.DisableQuota {
+		return false
+	}
+	return true
+}
+
 func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(w http.ResponseWriter, r *http.Request, authHeaderValue string) (error, int) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
@@ -85,10 +92,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	if k.Spec.DisableRateLimit == false || k.Spec.DisableQuota == false {
 		// Ensure quota and rate data for this session are recorded
 		if !config.UseAsyncSessionWrite {
-			k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+			k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
 			context.Set(r, SessionData, thisSessionState)
 		} else {
-			go k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+			go k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
 			go context.Set(r, SessionData, thisSessionState)
 		}
 	}

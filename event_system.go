@@ -161,9 +161,14 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 		if Spec != nil {
 			thisJSVMEventHandler, jsvmErr := JSVMEventHandler{Spec: Spec}.New(thisConf)
 			if jsvmErr == nil {
-				GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})
+				GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)}, "")
 			}
 			return thisJSVMEventHandler, jsvmErr
+		}
+	case EH_CoProcessHandler:
+		if Spec != nil {
+			thisCoProcessEventHandler, err := CoProcessEventHandler{Spec: Spec}.New(thisConf)
+			return thisCoProcessEventHandler, err
 		}
 
 	}

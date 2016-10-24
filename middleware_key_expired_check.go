@@ -21,6 +21,10 @@ func (k *KeyExpired) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (a *KeyExpired) IsEnabledForSpec() bool {
+	return true
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	sess, ok := context.GetOk(r, SessionData)

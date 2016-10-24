@@ -6,11 +6,19 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"html/template"
 	"net"
 	"net/http"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"time"
+)
+
+const (
+	defaultTemplateName   = "error"
+	defaultTemplateFormat = "json"
+	defaultContentType    = "application/json"
 )
 
 // APIError is generic error object returned if there is something wrong with the request
@@ -27,10 +35,49 @@ type ErrorHandler struct {
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
 	if e.Spec.DoNotTrack {
+		var templateExtension string
+		var thisContentType string
+
+		switch r.Header.Get("Content-Type") {
+		case "application/xml":
+			templateExtension = "xml"
+			thisContentType = "application/xml"
+		default:
+			templateExtension = "json"
+			thisContentType = "application/json"
+		}
+
+		w.Header().Set("Content-Type", thisContentType)
+
+		var thisTemplate *template.Template
+		var templateName string = fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
+
+		// templateError := templates.ExecuteTemplate(w, templateName, &thisError)
+
+		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
+		thisTemplate = templates.Lookup(templateName)
+		log.Println("Looking for: ", templateName)
+
+		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
+		if thisTemplate == nil {
+			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
+			log.Println("Looking for: ", templateName)
+			thisTemplate = templates.Lookup(templateName)
+		}
+
+		// If no template is available for this content type, fallback to "error.json".
+		if thisTemplate == nil {
+			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
+			thisTemplate = templates.Lookup(templateName)
+			w.Header().Set("Content-Type", defaultContentType)
+		}
+
 		// Need to return the correct error code!
 		w.WriteHeader(errCode)
+
 		thisError := APIError{fmt.Sprintf("%s", err)}
-		templates.ExecuteTemplate(w, "error.json", &thisError)
+		thisTemplate.Execute(w, &thisError)
+
 		if doMemoryProfile {
 			pprof.WriteHeapProfile(profileFile)
 		}
@@ -94,9 +141,23 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			}
 		}
 
+		trackThisEndpoint, ok := context.GetOk(r, TrackThisEndpoint)
+		trackedPath := r.URL.Path
+		trackEP := false
+		if ok {
+			trackEP = true
+			trackedPath = trackThisEndpoint.(string)
+		}
+
+		_, dnOk := context.GetOk(r, DoNotTrackThisEndpoint)
+		if dnOk {
+			trackEP = false
+			trackedPath = r.URL.Path
+		}
+
 		thisRecord := AnalyticsRecord{
 			r.Method,
-			r.URL.Path,
+			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
 			r.Header.Get("User-Agent"),
@@ -119,6 +180,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			GeoData{},
 			tags,
 			alias,
+			trackEP,
 			time.Now(),
 		}
 

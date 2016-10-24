@@ -25,21 +25,6 @@ const (
 
 func (u *RedisNotificationHandler) Start() {
 	go u.StartUIPubSubConn()
-
-	// go func() {
-	// 	for {
-	// 		n := InterfaceNotification{
-	// 			Type:      "debug",
-	// 			Message:   "Test Debug",
-	// 			OrgID:     "53ac07777cbb8c2d53000002",
-	// 			Timestamp: time.Now(),
-	// 		}
-
-	// 		u.Notify(n)
-	// 		time.Sleep(time.Second * 5)
-	// 	}
-
-	// }()
 }
 
 func (u *RedisNotificationHandler) Notify(n InterfaceNotification) error {

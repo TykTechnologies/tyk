@@ -294,7 +294,7 @@ func getJWTChain(spec APISpec) http.Handler {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	remote, _ := url.Parse("http://lonelycode.com/")
+	remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, &spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
 	tykMiddleware := &TykMiddleware{&spec, proxy}

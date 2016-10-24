@@ -1,13 +1,18 @@
 package main
 
-import "net/http"
+import (
+	"github.com/paulbellamy/ratecounter"
+	"net/http"
+	"time"
+)
 
-import ()
+var GlobalRate *ratecounter.RateCounter = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddlewareImplementation interface {
 	New()
 	GetConfig() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) // Handles request
+	IsEnabledForSpec() bool
 }
 
 func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
@@ -16,6 +21,17 @@ func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykM
 		MiddlewareClassName: MiddlewareName,
 		Pre:                 IsPre,
 		UseSession:          UseSession,
+	}
+
+	return CreateMiddleware(dMiddleware, tykMwSuper)
+}
+
+func CreateDynamicAuthMiddleware(MiddlewareName string, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+	dMiddleware := &DynamicMiddleware{
+		TykMiddleware:       tykMwSuper,
+		MiddlewareClassName: MiddlewareName,
+		Auth:                true,
+		UseSession:          false,
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)

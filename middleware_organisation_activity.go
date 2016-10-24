@@ -36,6 +36,16 @@ func (k *OrganizationMonitor) New() {
 	k.mon = Monitor{}
 }
 
+func (a *OrganizationMonitor) IsEnabledForSpec() bool {
+
+	if !config.EnforceOrgQuotas {
+		// We aren't enforcing quotas, so skip this mw altogether
+		return false
+	}
+
+	return true
+}
+
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (k *OrganizationMonitor) GetConfig() (interface{}, error) {
 	return nil, nil
@@ -80,7 +90,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.GetStore(), false, false)
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, thisSessionState, 0)
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
 
 	if !forwardMessage {
 		if reason == 2 {
@@ -190,7 +200,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	// We found a session, apply the quota limiter
 	isQuotaExceeded := k.sessionlimiter.IsRedisQuotaExceeded(&thisSessionState, k.Spec.OrgID, k.Spec.OrgSessionManager.GetStore())
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, thisSessionState, 0)
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
 
 	if isQuotaExceeded {
 		log.WithFields(logrus.Fields{
