@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/url"
 	"time"
-	// "strings"
+	"errors"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -38,6 +38,14 @@ func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 			"prefix": "coprocess-grpc",
 		}).Error(err)
 		return nil, err
+	}
+
+	if grpcUrl == nil || addr == "" {
+		var errString = "No gRPC URL is set!"
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess-grpc",
+		}).Error(errString)
+		return nil, errors.New(errString)
 	}
 
 	grpcUrlString := config.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3 : len(config.CoProcessOptions.CoProcessGRPCServer)]
