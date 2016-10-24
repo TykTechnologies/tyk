@@ -228,7 +228,6 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	var thisExtractor IdExtractor
 	if m.TykMiddleware.Spec.EnableCoProcessAuth && m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
-		log.Println("Using extractor, defining thisExtractor")
 		thisExtractor = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 	}
 
