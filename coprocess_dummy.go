@@ -15,6 +15,16 @@ const (
 	EH_CoProcessHandler tykcommon.TykEventHandlerName = "cp_dynamic_handler"
 )
 
+type Dispatcher interface {
+	DispatchEvent([]byte)
+	LoadModules()
+	HandleMiddlewareCache(*tykcommon.BundleManifest, string)
+	Reload()
+}
+
+
+var GlobalDispatcher Dispatcher
+
 var EnableCoProcess bool = false
 
 type CoProcessMiddleware struct {
