@@ -71,8 +71,6 @@ func GetLifetime(spec *APISpec, session *SessionState) int64 {
 		return session.SessionLifetime
 	} else if spec.SessionLifetime > 0 {
 		return spec.SessionLifetime
-	} else if config.GlobalSessionLifetime > 0 {
-		return config.GlobalSessionLifetime
 	}
 
 	return 0
