@@ -1,5 +1,6 @@
 from glob import glob
 from os import getcwd, chdir, path
+import sys
 
 import tyk
 from tyk.middleware import TykMiddleware
@@ -11,7 +12,7 @@ from gateway import TykGateway as tyk
 class TykDispatcher:
     '''A simple dispatcher'''
 
-    def __init__(self, middleware_path, event_handler_path):
+    def __init__(self, middleware_path, event_handler_path, bundle_paths):
         tyk.log( "Initializing dispatcher", "info" )
 
         self.event_handler_path = path.join(event_handler_path, '*.py')
@@ -19,6 +20,9 @@ class TykDispatcher:
         self.load_event_handlers()
 
         self.middleware_path = path.join(middleware_path, '*.py')
+
+        self.bundle_paths = bundle_paths.split(":")
+
         self.middlewares = []
         self.hook_table = {}
         self.load_middlewares()
@@ -37,10 +41,24 @@ class TykDispatcher:
                     break
         return found_middleware
 
+    def load_bundle(self, base_bundle_path):
+        bundle_path = path.join(base_bundle_path, '*.py')
+        bundle_modules = self.get_modules(bundle_path)
+        sys.path.append(base_bundle_path)
+        for module_name in bundle_modules:
+            middleware = self.find_middleware(module_name)
+            if middleware:
+                middleware.reload()
+            else:
+                middleware = TykMiddleware(module_name)
+                self.middlewares.append(middleware)
+        self.update_hook_table()
+
+
     def load_middlewares(self):
         tyk.log( "Loading middlewares.", "debug" )
-        # chdir(self.middleware_path)
-        for module_name in self.get_modules(self.middleware_path):
+        available_modules = self.get_modules(self.middleware_path)
+        for module_name in available_modules:
             middleware = self.find_middleware(module_name)
             if middleware:
                 middleware.reload()

@@ -64,6 +64,7 @@ static int Python_LoadDispatcher() {
 }
 
 static void Python_ReloadDispatcher() {
+	gilState = PyGILState_Ensure();
 	PyObject *hook_name = PyUnicode_FromString(dispatcher_reload);
 	if( dispatcher_reload_hook == NULL ) {
 		dispatcher_reload_hook = PyObject_GetAttr(dispatcher, hook_name);
@@ -71,14 +72,22 @@ static void Python_ReloadDispatcher() {
 
 	PyObject* result = PyObject_CallObject( dispatcher_reload_hook, NULL );
 
-	Py_DECREF(hook_name);
-	Py_DECREF(result);
+	PyGILState_Release(gilState);
 
 }
 
-static int Python_NewDispatcher(char* middleware_path, char* event_handler_path) {
+static void Python_HandleMiddlewareCache(char* bundle_path) {
+  gilState = PyGILState_Ensure();
+	if( PyCallable_Check(dispatcher_load_bundle) ) {
+		PyObject* load_bundle_args = PyTuple_Pack( 1, PyUnicode_FromString(bundle_path) );
+		PyObject_CallObject( dispatcher_load_bundle, load_bundle_args );
+	}
+	PyGILState_Release(gilState);
+}
+
+static int Python_NewDispatcher(char* middleware_path, char* event_handler_path, char* bundle_paths) {
   if( PyCallable_Check(dispatcher_class) ) {
-    dispatcher_args = PyTuple_Pack( 2, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path) );
+    dispatcher_args = PyTuple_Pack( 3, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path), PyUnicode_FromString(bundle_paths) );
     dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
 
 		Py_DECREF(dispatcher_args);
@@ -97,6 +106,9 @@ static int Python_NewDispatcher(char* middleware_path, char* event_handler_path)
 
 	dispatch_event_name = PyUnicode_FromString( dispatch_event_name_s );
 	dispatch_event = PyObject_GetAttr(dispatcher, dispatch_event_name );
+
+	dispatcher_load_bundle_name = PyUnicode_FromString( load_bundle_name );
+	dispatcher_load_bundle = PyObject_GetAttr(dispatcher, dispatcher_load_bundle_name);
 
 	Py_DECREF(dispatcher_hook_name);
 	Py_DECREF(dispatch_event_name);
@@ -206,6 +218,9 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d* PythonDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+	var CBundlePath *C.char
+	CBundlePath = C.CString(basePath)
+	C.Python_HandleMiddlewareCache(CBundlePath)
 	return
 }
 
@@ -228,14 +243,17 @@ func PythonLoadDispatcher() (err error) {
 }
 
 // PythonNewDispatcher creates an instance of TykDispatcher.
-func PythonNewDispatcher(middlewarePath string, eventHandlerPath string) (dispatcher coprocess.Dispatcher, err error) {
+func PythonNewDispatcher(middlewarePath string, eventHandlerPath string, bundlePaths []string) (dispatcher coprocess.Dispatcher, err error) {
 	var CMiddlewarePath *C.char
 	CMiddlewarePath = C.CString(middlewarePath)
 
 	var CEventHandlerPath *C.char
 	CEventHandlerPath = C.CString(eventHandlerPath)
 
-	result := C.Python_NewDispatcher(CMiddlewarePath, CEventHandlerPath)
+	var CBundlePaths *C.char
+	CBundlePaths = C.CString(strings.Join(bundlePaths, ":"))
+
+	result := C.Python_NewDispatcher(CMiddlewarePath, CEventHandlerPath, CBundlePaths)
 
 	if result == -1 {
 		err = errors.New("Can't initialize a dispatcher")
@@ -281,7 +299,7 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	PythonInit()
 	PythonLoadDispatcher()
 
-	dispatcher, err = PythonNewDispatcher(middlewarePath, eventHandlerPath)
+	dispatcher, err = PythonNewDispatcher(middlewarePath, eventHandlerPath, bundlePaths)
 
 	C.PyEval_ReleaseLock()
 
