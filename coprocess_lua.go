@@ -41,13 +41,13 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
   lua_getglobal(L, "dispatch");
 
   lua_pushlstring(L, object->p_data, object->length);
-  int call_result = lua_pcall(L, 1, 1, 0);
+  int call_result = lua_pcall(L, 1, 2, 0);
 
-  size_t lua_output_length = lua_tointeger(L, 0);
-  const char* lua_output_data = lua_tolstring(L, 1, &lua_output_length);
+	size_t lua_output_length = lua_tointeger(L, -1);
+	const char* lua_output_data = lua_tolstring(L, 0, &lua_output_length);
 
-  char* output = malloc(lua_output_length);
-  memmove(output, lua_output_data, lua_output_length);
+	char* output = malloc(lua_output_length);
+	memmove(output, lua_output_data, lua_output_length);
 
   lua_close(L);
 
