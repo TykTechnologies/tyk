@@ -64,5 +64,7 @@ func (l CoProcessEventHandler) HandleEvent(em EventMessage) {
 		return
 	}
 
-	GlobalDispatcher.DispatchEvent(msgAsJSON)
+	if GlobalDispatcher != nil {
+		GlobalDispatcher.DispatchEvent(msgAsJSON)
+	}
 }

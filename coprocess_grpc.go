@@ -7,10 +7,11 @@ import (
 	"net"
 	"net/url"
 	"time"
-	// "strings"
+	"errors"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -38,6 +39,14 @@ func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 			"prefix": "coprocess-grpc",
 		}).Error(err)
 		return nil, err
+	}
+
+	if grpcUrl == nil || addr == "" {
+		var errString = "No gRPC URL is set!"
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess-grpc",
+		}).Error(errString)
+		return nil, errors.New(errString)
 	}
 
 	grpcUrlString := config.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3 : len(config.CoProcessOptions.CoProcessGRPCServer)]
@@ -73,6 +82,11 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 
 // Reload triggers a reload affecting CP middlewares and event handlers.
 func (d *GRPCDispatcher) Reload() {
+	return
+}
+
+// HandleMiddlewareCache isn't used by gRPC.
+func (d* GRPCDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
 	return
 }
 

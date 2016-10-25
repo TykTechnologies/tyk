@@ -105,6 +105,10 @@ func (b *Bundle) Verify() (err error) {
 
 func (b *Bundle) AddToSpec() {
 	b.Spec.APIDefinition.CustomMiddleware = b.Manifest.CustomMiddleware
+
+	if GlobalDispatcher != nil {
+		GlobalDispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
+	}
 }
 
 // BundleGetter is used for downloading bundle data, see HttpBundleGetter for reference.

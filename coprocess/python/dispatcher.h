@@ -8,6 +8,7 @@ extern void dispatch_hook(char*, char*);
 static char* dispatcher_module_name = "dispatcher";
 static char* dispatcher_class_name = "TykDispatcher";
 static char* hook_name = "dispatch_hook";
+static char* load_bundle_name = "load_bundle";
 
 static char* dispatch_event_name_s = "dispatch_event";
 static PyObject* dispatch_event_name;
@@ -22,6 +23,9 @@ static PyObject* dispatcher;
 
 static PyObject* dispatcher_hook_name;
 static PyObject* dispatcher_hook;
+
+static PyObject* dispatcher_load_bundle_name;
+static PyObject* dispatcher_load_bundle;
 
 static char* dispatcher_reload = "reload";
 static PyObject* dispatcher_reload_hook;

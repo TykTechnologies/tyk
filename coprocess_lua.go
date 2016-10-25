@@ -74,11 +74,12 @@ import "C"
 import (
 	"io/ioutil"
 	"path"
+	"path/filepath"
 	"unsafe"
-	// "strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 )
 
 // CoProcessName specifies the driver name.
@@ -142,6 +143,20 @@ func (d *LuaDispatcher) Reload() {
 		}
 
 		d.MiddlewareCache[f.Name()] = string(contents)
+	}
+}
+
+func (d* LuaDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+	for _, f := range b.FileList {
+		fullPath := filepath.Join(basePath, f)
+		contents, err := ioutil.ReadFile(fullPath)
+		if err == nil {
+			d.ModuleCache[f] = string(contents)
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).Error("Failed to read bundle file: ", err)
+		}
 	}
 }
 
