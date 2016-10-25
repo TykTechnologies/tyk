@@ -41,7 +41,7 @@ func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 		return nil, err
 	}
 
-	if grpcUrl == nil || addr == "" {
+	if grpcUrl == nil || config.CoProcessOptions.CoProcessGRPCServer == "" {
 		var errString = "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
