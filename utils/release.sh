@@ -76,6 +76,7 @@ cp $SOURCEBINPATH/js/*.js $i386TGZDIR/js
 cp $SOURCEBINPATH/policies/*.json $i386TGZDIR/policies
 cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/
 cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/tyk.conf
+cp -R $SOURCEBINPATH/coprocess $BUILD_DIR/
 
 cp -R $i386TGZDIR/* $amd64TGZDIR
 cp -R $i386TGZDIR/* $armTGZDIR
