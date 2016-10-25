@@ -164,6 +164,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 )
 
 // CoProcessName declares the driver name.
@@ -201,6 +202,11 @@ func (d *PythonDispatcher) DispatchEvent(eventJSON []byte) {
 // Reload triggers a reload affecting CP middlewares and event handlers.
 func (d *PythonDispatcher) Reload() {
 	C.Python_ReloadDispatcher()
+}
+
+// HandleMiddlewareCache isn't used by Python.
+func (d* PythonDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+	return
 }
 
 // PythonInit initializes the Python interpreter.
