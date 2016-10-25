@@ -3,6 +3,10 @@
 
 package coprocess
 
+import(
+	"github.com/TykTechnologies/tykcommon"
+)
+
 const(
 	_ = iota
 	JsonMessage
@@ -22,6 +26,9 @@ type Dispatcher interface {
 
 	// LoadModules is called the first time a CP binding starts. Used by Lua.
 	LoadModules()
+
+	// HandleMiddlewareCache is called when a bundle has been loaded and the dispatcher needs to cache its contents. Used by Lua.
+	HandleMiddlewareCache(*tykcommon.BundleManifest, string)
 
 	// Reload is called when a hot reload is triggered. Used by all the CPs.
 	Reload()
