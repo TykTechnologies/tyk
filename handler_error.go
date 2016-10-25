@@ -56,12 +56,10 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
 		thisTemplate = templates.Lookup(templateName)
-		log.Println("Looking for: ", templateName)
 
 		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 		if thisTemplate == nil {
 			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
-			log.Println("Looking for: ", templateName)
 			thisTemplate = templates.Lookup(templateName)
 		}
 
