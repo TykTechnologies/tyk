@@ -11,6 +11,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -81,6 +82,11 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 
 // Reload triggers a reload affecting CP middlewares and event handlers.
 func (d *GRPCDispatcher) Reload() {
+	return
+}
+
+// HandleMiddlewareCache isn't used by gRPC.
+func (d* GRPCDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
 	return
 }
 
