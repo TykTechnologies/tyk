@@ -41,13 +41,13 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
   lua_getglobal(L, "dispatch");
 
   lua_pushlstring(L, object->p_data, object->length);
-  int call_result = lua_pcall(L, 1, 1, 0);
+  int call_result = lua_pcall(L, 1, 2, 0);
 
-  size_t lua_output_length = lua_tointeger(L, 0);
-  const char* lua_output_data = lua_tolstring(L, 1, &lua_output_length);
+	size_t lua_output_length = lua_tointeger(L, -1);
+	const char* lua_output_data = lua_tolstring(L, 0, &lua_output_length);
 
-  char* output = malloc(lua_output_length);
-  memmove(output, lua_output_data, lua_output_length);
+	char* output = malloc(lua_output_length);
+	memmove(output, lua_output_data, lua_output_length);
 
   lua_close(L);
 
@@ -185,7 +185,6 @@ func (d *LuaDispatcher) LoadModules() {
 //export LoadCachedModules
 func LoadCachedModules(luaState unsafe.Pointer) {
 	for moduleName, moduleContents := range *gModuleCache {
-		log.Println("Loading cached module:", moduleName)
 		var cModuleName, cModuleContents *C.char
 		cModuleName = C.CString(moduleName)
 		cModuleContents = C.CString(moduleContents)
@@ -199,7 +198,6 @@ func LoadCachedModules(luaState unsafe.Pointer) {
 //export LoadCachedMiddleware
 func LoadCachedMiddleware(luaState unsafe.Pointer) {
 	for middlewareName, middlewareContents := range *gMiddlewareCache {
-		log.Println("Loading cached middleware:", middlewareName)
 		var cMiddlewareName, cMiddlewareContents *C.char
 		cMiddlewareName = C.CString(middlewareName)
 		cMiddlewareContents = C.CString(middlewareContents)
