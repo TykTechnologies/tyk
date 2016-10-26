@@ -21,9 +21,9 @@ authorisation middleware.
 
 ## Key Features of Tyk ##
 
-Tyk offers powerful, yet lightweight features that allow fine gained control over your API ecosystem.
+Tyk offers powerful, yet lightweight features that allow fine grained control over your API ecosystem.
 
-* **RESTFul API** - Full programatic access to the internals makes it easy to manage your API users, keys and Api Configuration from within your systems
+* **RESTFul API** - Full programmatic access to the internals makes it easy to manage your API users, keys and Api Configuration from within your systems
 * **Multiple access protocols** - Out of the box, Tyk supports Token-based, HMAC Signed, Basic Auth and Keyless access methods
 * **Rate Limiting** - Easily rate limit your API users, rate limiting is granular and can be applied on a per-key basis
 * **Quotas** - Enforce usage quotas on users to manage capacity or charge for tiered access
@@ -89,7 +89,7 @@ when you need redis and kill it later. Just make sure you are forwarding the def
 
 ### Dev versus stable
 
-The master branch is NOT the stable releases, check the tags for stable releases that can be patched, please se the CHANGELOG for breaking changes or to see how things stand.
+The master branch is NOT the stable releases, check the tags for stable releases that can be patched, please see the CHANGELOG for breaking changes or to see how things stand.
 
 ### Geo IP features
 
