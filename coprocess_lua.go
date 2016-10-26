@@ -185,7 +185,6 @@ func (d *LuaDispatcher) LoadModules() {
 //export LoadCachedModules
 func LoadCachedModules(luaState unsafe.Pointer) {
 	for moduleName, moduleContents := range *gModuleCache {
-		log.Println("Loading cached module:", moduleName)
 		var cModuleName, cModuleContents *C.char
 		cModuleName = C.CString(moduleName)
 		cModuleContents = C.CString(moduleContents)
@@ -199,7 +198,6 @@ func LoadCachedModules(luaState unsafe.Pointer) {
 //export LoadCachedMiddleware
 func LoadCachedMiddleware(luaState unsafe.Pointer) {
 	for middlewareName, middlewareContents := range *gMiddlewareCache {
-		log.Println("Loading cached middleware:", middlewareName)
 		var cMiddlewareName, cMiddlewareContents *C.char
 		cMiddlewareName = C.CString(middlewareName)
 		cMiddlewareContents = C.CString(middlewareContents)
