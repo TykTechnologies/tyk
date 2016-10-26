@@ -444,6 +444,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 		// Go through ALL managed API's and delete the key
 		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
+			spec.SessionManager.ResetQuota(keyName, SessionState{})
 		}
 
 		log.WithFields(logrus.Fields{
@@ -469,6 +470,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	}
 
 	thisSessionManager.RemoveSession(keyName)
+	thisSessionManager.ResetQuota(keyName, SessionState{})
 	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
