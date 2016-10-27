@@ -76,12 +76,13 @@ class TykDispatcher:
                 self.middlewares.remove(middleware)
 
     def update_hook_table(self):
-        self.hook_table = {}
+        new_hook_table = {}
         for middleware in self.middlewares:
             for hook_type in middleware.handlers:
                 for handler in middleware.handlers[hook_type]:
                     handler.middleware = middleware
-                    self.hook_table[handler.name] = handler
+                    new_hook_table[handler.name] = handler
+        self.hook_table = new_hook_table
 
     def find_hook_by_type_and_name(self, hook_type, hook_name):
         found_middleware, matching_hook_handler = None, None
