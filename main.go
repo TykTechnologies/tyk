@@ -1153,7 +1153,7 @@ func init() {
 		--as-version=<version>       The version number to use when inserting
 	`
 
-	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
+	arguments, err := docopt.Parse(usage, nil, true, VERSION, false)//fix use -h|--help process not exit
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
