@@ -9,6 +9,7 @@ vendor/github.com/dgrijalva_hotfix/
 utils/release_live.sh
 utils/release_rc.sh
 tyk.conf
+tyk.zeroconf.cluster.conf
 tyk_elasticache.conf
 tyk.compose.rpc.conf
 tyk.compose.local_rpc.conf

@@ -129,8 +129,8 @@ func IsPayloadSignatureValid(notification Notification) bool {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
-			}).Error("Could not verify notification: ", err)
-			log.Info(notification)
+			}).Error("Could not verify notification: ", err, ": ", notification)
+			
 			return false
 		}
 
