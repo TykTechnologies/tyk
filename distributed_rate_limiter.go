@@ -37,6 +37,14 @@ func StartRateLimitNotifications() {
 	}()
 }
 
+func getTagHash() string {
+	th := ""
+	for _, tag := range(config.DBAppConfOptions.Tags) {
+		th += tag
+	}
+	return th
+}
+
 func NotifyCurrentServerStatus() {
 	if DRLManager.Ready == false {
 		return
@@ -51,6 +59,7 @@ func NotifyCurrentServerStatus() {
 		HostName:   HostDetails.Hostname,
 		ID:         NodeID,
 		LoadPerSec: rate,
+		TagHash:    getTagHash(),
 	}
 
 	asJson, jsErr := json.Marshal(thisServer)
