@@ -3,9 +3,10 @@
 package main
 
 import (
-	"crypto/md5"
+	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"fmt"
+	"hash"
 )
 
 type HashType string
@@ -70,6 +71,8 @@ type SessionState struct {
 	firstSeenHash string
 }
 
+var murmurHasher hash.Hash32 = murmur3.New32()
+
 func (s *SessionState) SetFirstSeenHash() {
 	encoded, err := msgpack.Marshal(s)
 	if err != nil {
@@ -77,7 +80,7 @@ func (s *SessionState) SetFirstSeenHash() {
 		return
 	}
 
-    s.firstSeenHash = fmt.Sprintf("%x", md5.Sum(encoded))
+    s.firstSeenHash = fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
 func (s *SessionState) GetHash() string {
@@ -87,7 +90,7 @@ func (s *SessionState) GetHash() string {
 		return ""
 	}
 
-    return fmt.Sprintf("%x", md5.Sum(encoded))
+    return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
 func (s *SessionState) HasChanged() bool {
