@@ -106,7 +106,10 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 	}
 
 	if enableQ {
-		currentSession.Allowance--
+		if config.LegacyEnableAllowanceCountdown {
+			currentSession.Allowance--	
+		}
+		
 		if l.IsRedisQuotaExceeded(currentSession, key, store) {
 			return false, 2
 		}

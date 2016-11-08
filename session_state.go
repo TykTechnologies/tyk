@@ -2,6 +2,12 @@
 
 package main
 
+import (
+	"crypto/md5"
+	"gopkg.in/vmihailenco/msgpack.v2"
+	"fmt"
+)
+
 type HashType string
 
 const (
@@ -58,8 +64,43 @@ type SessionState struct {
 	Tags                    []string    `json:"tags" msg:"tags"`
 	Alias                   string      `json:"alias" msg:"alias"`
 	LastUpdated             string      `json:"last_updated" msg:"last_updated"`
-	IdExtractorDeadline			int64					`json:"id_extractor_deadline" msg:"id_extractor_deadline"`
+	IdExtractorDeadline		int64	`json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64       `bson:"session_lifetime" json:"session_lifetime"`
+
+	firstSeenHash string
+}
+
+func (s *SessionState) SetFirstSeenHash() {
+	encoded, err := msgpack.Marshal(s)
+	if err != nil {
+		log.Error("Error encoding session data: ", err)
+		return
+	}
+
+    s.firstSeenHash = fmt.Sprintf("%x", md5.Sum(encoded))
+}
+
+func (s *SessionState) GetHash() string {
+	encoded, err := msgpack.Marshal(s)
+	if err != nil {
+		log.Error("Error encoding session data: ", err)
+		return ""
+	}
+
+    return fmt.Sprintf("%x", md5.Sum(encoded))
+}
+
+func (s *SessionState) HasChanged() bool {
+	if s.firstSeenHash == "" {
+		return true
+	}
+
+	if s.firstSeenHash == s.GetHash() {
+		return false
+	}
+
+	// log.Debug("s.firstSeenHash: ", s.firstSeenHash, " current hash: ", s.GetHash())
+	return true
 }
 
 func GetLifetime(spec *APISpec, session *SessionState) int64 {

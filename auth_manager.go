@@ -70,6 +70,7 @@ func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSta
 		return newSession, false
 	}
 
+	newSession.SetFirstSeenHash()
 	return newSession, true
 }
 
@@ -113,6 +114,11 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 
 // UpdateSession updates the session state in the storage engine
 func (b DefaultSessionManager) UpdateSession(keyName string, session SessionState, resetTTLTo int64) error {
+	if !session.HasChanged() {
+		log.Debug("Session has not changed, not updating")
+		return nil
+	}
+
 	v, _ := json.Marshal(session)
 
 	// Keep the TTL
@@ -146,6 +152,8 @@ func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, b
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", marshalErr)
 		return thisSession, false
 	}
+
+	thisSession.SetFirstSeenHash()
 
 	return thisSession, true
 }

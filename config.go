@@ -193,6 +193,7 @@ type Config struct {
 	BundleBaseURL                     string                                   `bson:"bundle_base_url" json:"bundle_base_url"`
 	EnableBundleDownloader            bool                                     `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
 	AllowRemoteConfig                 bool                                     `bson:"allow_remote_config" json:"allow_remote_config"`
+	LegacyEnableAllowanceCountdown    bool 									   `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 }
 
 type CertData struct {
