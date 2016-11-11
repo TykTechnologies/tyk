@@ -2042,9 +2042,9 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleInvalidateAPICache(APIID string) error {
-	keyPrefix := "cache-" + APIID
+	keyPrefix := "cache-" + strings.Replace(APIID, "/", "", -1)
 	matchPattern := keyPrefix + "*"
-	thisStore := GetGlobalLocalStorageHandler(keyPrefix, false)
+	thisStore := GetGlobalLocalCacheStorageHandler(keyPrefix, false)
 
 	ok := thisStore.DeleteScanMatch(matchPattern)
 	if !ok {

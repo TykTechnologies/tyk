@@ -1565,6 +1565,10 @@ func GetGlobalLocalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandle
 	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 }
 
+func GetGlobalLocalCacheStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
+	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys, IsCache: true}
+}
+
 func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 	var Name tykcommon.StorageEngineCode
 	// Select configuration options
