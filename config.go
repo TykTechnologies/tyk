@@ -153,6 +153,8 @@ type Config struct {
 	DisableDashboardZeroConf          bool                   `json:"disable_dashboard_zeroconf"`
 	AppPath                           string                 `json:"app_path"`
 	Storage                           StorageOptionsConf     `json:"storage"`
+	EnableSeperateCacheStore	      bool       			 `json:"enable_separate_cache_store"`
+	CacheStorage                      StorageOptionsConf     `json:"cache_storage"`
 	EnableAnalytics                   bool                   `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig  `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig      `json:"health_check"`

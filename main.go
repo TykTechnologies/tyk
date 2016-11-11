@@ -931,7 +931,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 			CheckETEnabled(tykMiddleware)
 
 			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
-			CacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix}
+			CacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
 			CacheStore.Connect()
 
 			if referenceSpec.APIDefinition.UseKeylessAccess {

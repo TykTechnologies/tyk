@@ -12,39 +12,51 @@ import (
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
 
 var redisClusterSingleton *rediscluster.RedisCluster
+var redisCacheClusterSingleton *rediscluster.RedisCluster
 
 // RedisClusterStorageManager is a storage manager that uses the redis database.
 type RedisClusterStorageManager struct {
 	db        *rediscluster.RedisCluster
 	KeyPrefix string
 	HashKeys  bool
+	IsCache   bool
 }
 
-func NewRedisClusterPool(forceReconnect bool) *rediscluster.RedisCluster {
+func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisCluster {
+	var redisPtr *rediscluster.RedisCluster = redisClusterSingleton
+	var cfg StorageOptionsConf = config.Storage
+	if isCache {
+		if config.EnableSeperateCacheStore {
+			redisPtr = redisCacheClusterSingleton
+			cfg = config.CacheStorage
+		}
+		
+	}
+
 	if !forceReconnect {
-		if redisClusterSingleton != nil {
+		if redisPtr != nil {
 			log.Debug("Redis pool already INITIALISED")
-			return redisClusterSingleton
+			return redisPtr
 		}
 	} else {
-		if redisClusterSingleton != nil {
-			redisClusterSingleton.CloseConnection()
+		if redisPtr != nil {
+			redisPtr.CloseConnection()
 		}
 	}
 
 	log.Debug("Creating new Redis connection pool")
 
 	maxIdle := 100
-	if config.Storage.MaxIdle > 0 {
-		maxIdle = config.Storage.MaxIdle
+	if cfg.MaxIdle > 0 {
+		maxIdle = cfg.MaxIdle
 	}
 
 	maxActive := 500
-	if config.Storage.MaxActive > 0 {
-		maxActive = config.Storage.MaxActive
+	if cfg.MaxActive > 0 {
+		maxActive = cfg.MaxActive
 	}
 
-	if config.Storage.EnableCluster {
+	if cfg.EnableCluster {
 		log.Info("--> Using clustered mode")
 	}
 
@@ -52,24 +64,24 @@ func NewRedisClusterPool(forceReconnect bool) *rediscluster.RedisCluster {
 		MaxIdle:     maxIdle,
 		MaxActive:   maxActive,
 		IdleTimeout: 240 * time.Second,
-		Database:    config.Storage.Database,
-		Password:    config.Storage.Password,
-		IsCluster:   config.Storage.EnableCluster,
+		Database:    cfg.Database,
+		Password:    cfg.Password,
+		IsCluster:   cfg.EnableCluster,
 	}
 
 	seed_redii := []map[string]string{}
 
-	if len(config.Storage.Hosts) > 0 {
-		for h, p := range config.Storage.Hosts {
+	if len(cfg.Hosts) > 0 {
+		for h, p := range cfg.Hosts {
 			seed_redii = append(seed_redii, map[string]string{h: p})
 		}
 	} else {
-		seed_redii = append(seed_redii, map[string]string{config.Storage.Host: strconv.Itoa(config.Storage.Port)})
+		seed_redii = append(seed_redii, map[string]string{cfg.Host: strconv.Itoa(cfg.Port)})
 	}
 
 	thisInstance := rediscluster.NewRedisCluster(seed_redii, thisPoolConf, false)
 
-	redisClusterSingleton = &thisInstance
+	redisPtr = &thisInstance
 
 	return &thisInstance
 }
@@ -78,7 +90,7 @@ func NewRedisClusterPool(forceReconnect bool) *rediscluster.RedisCluster {
 func (r *RedisClusterStorageManager) Connect() bool {
 	if r.db == nil {
 		log.Debug("Connecting to redis cluster")
-		r.db = NewRedisClusterPool(false)
+		r.db = NewRedisClusterPool(false, r.IsCache)
 		return true
 	}
 
