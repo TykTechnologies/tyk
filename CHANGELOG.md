@@ -1,5 +1,6 @@
 # Develop
 
+- It is now possible to separate out the cache data store from the main redis store
 - Context Data now includes JWT Claims, claims are added as individual keys as $tyk_context.jwt_claims_CLAIMNAME.
 - Meta data is now available to the URL Rewriter (for e.g. to inject a custom querystring for key holders.)
 - Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}`
