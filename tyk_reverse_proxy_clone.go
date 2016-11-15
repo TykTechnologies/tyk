@@ -299,8 +299,17 @@ func (t *TykTransporter) SetTimeout(timeOut int) {
 	t.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 }
 
+func getMaxIdleConns() int {
+	if config.MaxIdleConnsPerHost > 0 {
+		return config.MaxIdleConnsPerHost
+	}
+
+	return 80
+}
+
 var TykDefaultTransport *TykTransporter = &TykTransporter{http.Transport{
 	Proxy: http.ProxyFromEnvironment,
+	MaxIdleConnsPerHost: getMaxIdleConns(),
 	Dial: (&net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
