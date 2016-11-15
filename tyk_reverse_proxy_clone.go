@@ -300,11 +300,7 @@ func (t *TykTransporter) SetTimeout(timeOut int) {
 }
 
 func getMaxIdleConns() int {
-	if config.MaxIdleConnsPerHost > 0 {
-		return config.MaxIdleConnsPerHost
-	}
-
-	return 80
+	return config.MaxIdleConnsPerHost
 }
 
 var TykDefaultTransport *TykTransporter = &TykTransporter{http.Transport{
