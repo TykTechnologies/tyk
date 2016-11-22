@@ -2,11 +2,12 @@ package main
 
 import (
 	"errors"
-	"github.com/garyburd/redigo/redis"
-	"github.com/lonelycode/redigocluster/rediscluster"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/lonelycode/redigocluster/rediscluster"
 )
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
@@ -30,7 +31,7 @@ func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisC
 			redisPtr = redisCacheClusterSingleton
 			cfg = config.CacheStorage
 		}
-		
+
 	}
 
 	if !forceReconnect {
@@ -95,7 +96,6 @@ func (r *RedisClusterStorageManager) Connect() bool {
 	}
 
 	log.Debug("Storage Engine already initialised...")
-	log.Debug("Redis handles: ", len(r.db.Handles))
 
 	// Reset it just in case
 	r.db = redisClusterSingleton
