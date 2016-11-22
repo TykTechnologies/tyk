@@ -30,7 +30,7 @@ type ChainObject struct {
 
 var ListenPathMap cmap.ConcurrentMap
 
-func prepareStorage() (RedisClusterStorageManager, RedisClusterStorageManager, *RedisClusterStorageManager, RPCStorageHandler, RPCStorageHandler) {
+func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -39,7 +39,7 @@ func prepareStorage() (RedisClusterStorageManager, RedisClusterStorageManager, *
 
 	FallbackKeySesionManager.Init(&redisStore)
 
-	return redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore
+	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
 func prepareSortOrder(APISpecs *[]*APISpec) {
@@ -126,11 +126,11 @@ func generateListenPathMap(APISpecs *[]*APISpec) {
 func processSpec(referenceSpec *APISpec,
 	Muxer *mux.Router,
 	index int,
-	redisStore RedisClusterStorageManager,
-	redisOrgStore RedisClusterStorageManager,
+	redisStore *RedisClusterStorageManager,
+	redisOrgStore *RedisClusterStorageManager,
 	healthStore *RedisClusterStorageManager,
-	rpcAuthStore RPCStorageHandler,
-	rpcOrgStore RPCStorageHandler,
+	rpcAuthStore *RPCStorageHandler,
+	rpcOrgStore *RPCStorageHandler,
 	subrouter *mux.Router) *ChainObject {
 
 	var thisChainDefinition = ChainObject{}
@@ -168,22 +168,22 @@ func processSpec(referenceSpec *APISpec,
 
 	switch authStorageEngineToUse {
 	case DefaultStorageEngine:
-		authStore = &redisStore
-		orgStore = &redisOrgStore
+		authStore = redisStore
+		orgStore = redisOrgStore
 	case LDAPStorageEngine:
 		thisStorageEngine := LDAPStorageHandler{}
 		thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
 		authStore = &thisStorageEngine
-		orgStore = &redisOrgStore
+		orgStore = redisOrgStore
 	case RPCStorageEngine:
-		thisStorageEngine := &rpcAuthStore // &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		thisStorageEngine := rpcAuthStore // &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 		authStore = thisStorageEngine
-		orgStore = &rpcOrgStore // &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		orgStore = rpcOrgStore // &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 		config.EnforceOrgDataAge = true
 
 	default:
-		authStore = &redisStore
-		orgStore = &redisOrgStore
+		authStore = redisStore
+		orgStore = redisOrgStore
 	}
 
 	SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
@@ -193,12 +193,12 @@ func processSpec(referenceSpec *APISpec,
 
 	switch SessionStorageEngineToUse {
 	case DefaultStorageEngine:
-		sessionStore = &redisStore
+		sessionStore = redisStore
 
 	case RPCStorageEngine:
 		sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	default:
-		sessionStore = &redisStore
+		sessionStore = redisStore
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
@@ -588,8 +588,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
 
 	if config.SlaveOptions.UseRPC {
-		StartRPCKeepaliveWatcher(&rpcAuthStore)
-		StartRPCKeepaliveWatcher(&rpcOrgStore)
+		StartRPCKeepaliveWatcher(rpcAuthStore)
+		StartRPCKeepaliveWatcher(rpcOrgStore)
 	}
 
 	prepareSortOrder(APISpecs)
