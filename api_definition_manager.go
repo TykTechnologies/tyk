@@ -4,11 +4,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/Sirupsen/logrus"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
-	"github.com/rubyist/circuitbreaker"
-	"gopkg.in/mgo.v2"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -18,6 +13,12 @@ import (
 	"sync"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
+	"github.com/rubyist/circuitbreaker"
+	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -418,7 +419,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 120 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 
