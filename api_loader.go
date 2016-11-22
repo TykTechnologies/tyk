@@ -77,43 +77,50 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 		return true
 	}
 
-	val, listenPathExists := ListenPathMap.Get(referenceSpec.Proxy.ListenPath)
+	domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
+	val, listenPathExists := ListenPathMap.Get(domainHash)
 	if listenPathExists {
-		onDomains := val.([]string)
-		if config.EnableCustomDomains == false {
+		if val.(int) > 1 {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
+				"org_id": referenceSpec.APIDefinition.OrgID,
+				"api_id": referenceSpec.APIDefinition.APIID,
+			}).Error("Listen path is a duplicate: ", domainHash)
 			return true
 		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Domain check...")
-		for _, onDomain := range onDomains {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Checking Domain: ", onDomain)
-			if onDomain == referenceSpec.Domain {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-					"org_id": referenceSpec.APIDefinition.OrgID,
-					"api_id": referenceSpec.APIDefinition.APIID,
-				}).Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
-				return true
-			}
-		}
-
-	}
-
-	val, ok := ListenPathMap.Get(referenceSpec.Proxy.ListenPath)
-	if ok {
-		thisArr := val.([]string)
-		thisArr = append(thisArr, referenceSpec.Domain)
-		ListenPathMap.Set(referenceSpec.Proxy.ListenPath, thisArr)
 	}
 
 	return false
+}
+
+func generateDomainPath(hostname string, listenPath string) string {
+	return hostname + listenPath
+}
+
+func generateListenPathMap(APISpecs *[]*APISpec) {
+	// We must track the hostname no matter what
+	for _, referenceSpec := range *APISpecs {
+		domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
+		log.Info(domainHash)
+		val, ok := ListenPathMap.Get(domainHash)
+		if ok {
+			thisVal := val.(int)
+			thisVal += 1
+			ListenPathMap.Set(domainHash, thisVal)
+		} else {
+			ListenPathMap.Set(domainHash, 1)
+			dN := referenceSpec.Domain
+			if dN == "" {
+				dN = "(no host)"
+			}
+			log.WithFields(logrus.Fields{
+				"prefix":   "main",
+				"api_name": referenceSpec.APIDefinition.Name,
+				"domain":   dN,
+			}).Info("Tracking hostname")
+
+		}
+	}
 }
 
 func processSpec(referenceSpec *APISpec,
@@ -148,16 +155,6 @@ func processSpec(referenceSpec *APISpec,
 		thisSL := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
 		referenceSpec.Proxy.StructuredTargetList = *thisSL
 	}
-
-	dN := referenceSpec.Domain
-	if dN == "" {
-		dN = "(no host)"
-	}
-	log.WithFields(logrus.Fields{
-		"prefix":   "main",
-		"api_name": referenceSpec.APIDefinition.Name,
-		"domain":   dN,
-	}).Info("Tracking hostname")
 
 	// Initialise the auth and session managers (use Redis for now)
 	var authStore StorageHandler
@@ -603,6 +600,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	wg.Add(len(*APISpecs))
 	// Create a new handler for each API spec
 	loadList := make([]*ChainObject, len(*APISpecs))
+	generateListenPathMap(APISpecs)
 	for i, referenceSpec := range *APISpecs {
 		var subrouter *mux.Router
 
@@ -615,7 +613,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						"prefix":   "main",
 						"api_name": referenceSpec.APIDefinition.Name,
 						"domain":   referenceSpec.Domain,
-					}).Info("----> Custom Domain set.")
+					}).Info("Custom Domain set.")
 					subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
 				} else {
 					subrouter = Muxer
