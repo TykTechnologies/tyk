@@ -48,36 +48,6 @@ func prepareSortOrder(APISpecs *[]*APISpec) {
 }
 
 func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
-	skip := false
-	val, listenPathExists := ListenPathMap.Get(referenceSpec.Proxy.ListenPath)
-
-	if listenPathExists {
-		onDomains := val.([]string)
-		if config.EnableCustomDomains == false {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
-			skip = true
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Domain check...")
-			for _, onDomain := range onDomains {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Info("Checking Domain: ", onDomain)
-				if onDomain == referenceSpec.Domain {
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-						"org_id": referenceSpec.APIDefinition.OrgID,
-						"api_id": referenceSpec.APIDefinition.APIID,
-					}).Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
-					skip = true
-					break
-				}
-			}
-		}
-	}
 
 	if referenceSpec.Proxy.ListenPath == "" {
 		log.WithFields(logrus.Fields{
@@ -85,7 +55,7 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 			"org_id": referenceSpec.APIDefinition.OrgID,
 			"api_id": referenceSpec.APIDefinition.APIID,
 		}).Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
-		skip = true
+		return true
 	}
 
 	if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
@@ -94,7 +64,7 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 			"org_id": referenceSpec.APIDefinition.OrgID,
 			"api_id": referenceSpec.APIDefinition.APIID,
 		}).Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
-		skip = true
+		return true
 	}
 
 	_, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
@@ -104,10 +74,46 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 			"org_id": referenceSpec.APIDefinition.OrgID,
 			"api_id": referenceSpec.APIDefinition.APIID,
 		}).Error("Couldn't parse target URL: ", err)
-		skip = true
+		return true
 	}
 
-	return skip
+	val, listenPathExists := ListenPathMap.Get(referenceSpec.Proxy.ListenPath)
+	if listenPathExists {
+		onDomains := val.([]string)
+		if config.EnableCustomDomains == false {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
+			return true
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Domain check...")
+		for _, onDomain := range onDomains {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Checking Domain: ", onDomain)
+			if onDomain == referenceSpec.Domain {
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+					"org_id": referenceSpec.APIDefinition.OrgID,
+					"api_id": referenceSpec.APIDefinition.APIID,
+				}).Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
+				return true
+			}
+		}
+
+	}
+
+	val, ok := ListenPathMap.Get(referenceSpec.Proxy.ListenPath)
+	if ok {
+		thisArr := val.([]string)
+		thisArr = append(thisArr, referenceSpec.Domain)
+		ListenPathMap.Set(referenceSpec.Proxy.ListenPath, thisArr)
+	}
+
+	return false
 }
 
 func processSpec(referenceSpec *APISpec,
@@ -141,13 +147,6 @@ func processSpec(referenceSpec *APISpec,
 	if referenceSpec.Proxy.EnableLoadBalancing {
 		thisSL := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
 		referenceSpec.Proxy.StructuredTargetList = *thisSL
-	}
-
-	val, ok := ListenPathMap.Get(referenceSpec.Proxy.ListenPath)
-	if ok {
-		thisArr := val.([]string)
-		thisArr = append(thisArr, referenceSpec.Domain)
-		ListenPathMap.Set(referenceSpec.Proxy.ListenPath, thisArr)
 	}
 
 	dN := referenceSpec.Domain
