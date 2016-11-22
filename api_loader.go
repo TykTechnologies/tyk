@@ -654,6 +654,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		}
 	}
 
+	// All APIs processed, now we can healthcheck
+	// Add a root message to check all is OK
+	Muxer.HandleFunc("/hello", pingTest)
+
 	// Swap in the new register
 	ApiSpecRegister = &tempSpecRegister
 

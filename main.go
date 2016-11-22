@@ -308,9 +308,6 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 		}
 	}
 
-	// Add a root message to check all is OK
-	ApiMuxer.HandleFunc("/hello", pingTest)
-
 	// set up main API handlers
 	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
 	ApiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
