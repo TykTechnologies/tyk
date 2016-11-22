@@ -8,15 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"strings"
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
-	"io"
-	"io/ioutil"
-	"strings"
-	"time"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -134,7 +135,7 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 		}
 	}
 
-	log.Info("Found: ", tykId)
+	log.Debug("Found: ", tykId)
 	return tykId, idFound
 }
 
@@ -303,7 +304,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(w http.ResponseWriter, r *http.R
 		return errors.New("Key id not found"), 403
 	}
 
-	log.Info("Using raw key ID: ", tykId)
+	log.Debug("Using raw key ID: ", tykId)
 	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !keyExists {
 		k.reportLoginFailure(tykId, r)
