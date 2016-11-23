@@ -144,7 +144,7 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 
 	decErr := json.Unmarshal(retBody, &thisList)
 	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
+		log.Error("Failed to decode policy body: ", decErr, "Returned: ", string(retBody))
 		return policies
 	}
 

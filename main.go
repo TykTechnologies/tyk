@@ -754,8 +754,6 @@ func checkReloadTimeout() {
 		if reloadScheduled {
 			log.Warning("Reloader timed out! Removing sentinel")
 			reloadScheduled = false
-			log.Warning("Releasing sync mutex")
-			ServiceNonceMutex.Unlock()
 		}
 	}
 }
