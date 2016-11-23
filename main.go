@@ -70,9 +70,13 @@ const (
 
 // Display configuration options
 func displayConfig() {
+	address := config.ListenAddress
+	if config.ListenAddress == "" {
+		address = "(open interface)"
+	}
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("--> Listening on address: ", config.ListenAddress)
+	}).Info("--> Listening on address: ", address)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("--> Listening on port: ", config.ListenPort)
@@ -220,7 +224,7 @@ func getAPISpecs() *[]*APISpec {
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debug("Using App Configuration from Dashboard Service")
+		}).Debug("Downloading API Configurations from Dashboard Service")
 	} else if config.SlaveOptions.UseRPC {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -256,7 +260,7 @@ func getPolicies() {
 	thesePolicies := make(map[string]Policy)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Debug("Loading policies")
+	}).Info("Loading policies")
 
 	if config.Policies.PolicySource == "service" {
 		if config.Policies.PolicyConnectionString != "" {
@@ -299,6 +303,9 @@ func getPolicies() {
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(Muxer *mux.Router) {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Initialising Tyk REST API Endpoints")
 
 	var ApiMuxer *mux.Router
 	ApiMuxer = Muxer
@@ -703,8 +710,13 @@ func doReload() {
 	}
 
 	// Reset the JSVM
-	GlobalEventsJSVM.Init(config.TykJSPath)
+	if config.EnableJSVM {
+		GlobalEventsJSVM.Init(config.TykJSPath)
+	}
 
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Preparing new router")
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
 
@@ -738,7 +750,7 @@ var reloadScheduled bool
 
 func checkReloadTimeout() {
 	if reloadScheduled {
-		time.Sleep(30 * time.Second)
+		time.Sleep(60 * time.Second)
 		if reloadScheduled {
 			log.Warning("Reloader timed out! Removing sentinel")
 			reloadScheduled = false
@@ -754,7 +766,9 @@ func ReloadURLStructure() {
 		reloadScheduled = true
 		log.Info("Initiating reload")
 		go doReload()
+		log.Info("Initiating coprocess reload")
 		go doCoprocessReload()
+		log.Info("Starting reload monitor...")
 		go checkReloadTimeout()
 	}
 }

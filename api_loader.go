@@ -101,11 +101,10 @@ func generateListenPathMap(APISpecs *[]*APISpec) {
 	// We must track the hostname no matter what
 	for _, referenceSpec := range *APISpecs {
 		domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
-		log.Info(domainHash)
 		val, ok := ListenPathMap.Get(domainHash)
 		if ok {
 			thisVal := val.(int)
-			thisVal += 1
+			thisVal++
 			ListenPathMap.Set(domainHash, thisVal)
 		} else {
 			ListenPathMap.Set(domainHash, 1)

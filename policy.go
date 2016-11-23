@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/Sirupsen/logrus"
-	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"gopkg.in/mgo.v2/bson"
 )
 
 type Policy struct {
@@ -108,10 +109,13 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 		Timeout: 5 * time.Second,
 	}
 
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Calling dashboard service for policy list")
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
-		log.Error("Request failed: ", reqErr)
+		log.Error("Policy request failed: ", reqErr)
 		return policies
 	}
 
@@ -119,7 +123,7 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	retBody, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
-		log.Error("Failed to read body: ", err)
+		log.Error("Failed to read policy body: ", err)
 		return policies
 	}
 
@@ -141,6 +145,9 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
 
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Processing policy list")
 	for _, p := range thisList.Message {
 		thisID := p.MID.Hex()
 		if allowExplicit {
