@@ -451,6 +451,9 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	if decErr != nil {
 		log.Error("Failed to decode body: ", decErr)
 		log.Debug("Response was: ", string(retBody))
+
+		// Explicitly unlocking because otherwise we wait for 20s!
+		ServiceNonceMutex.Unlock()
 		log.Info("--> Retrying in 20s")
 		time.Sleep(time.Second * 20)
 		ReLogin()
