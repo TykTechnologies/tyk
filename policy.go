@@ -101,10 +101,16 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Getting mutex lock")
 	ServiceNonceMutex.Lock()
 	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Mutex lock acquired... calling")
 	c := &http.Client{
 		Timeout: 5 * time.Second,
 	}
