@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tykcommon"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
 )
 
 type PoliciesConfig struct {
@@ -19,32 +20,33 @@ type DBAppConfOptionsConfig struct {
 }
 
 type EnvMapString map[string]string
+
 func (e *EnvMapString) Decode(value string) error {
-    units := strings.Split(value, ",")
-    m := make(map[string]string)
-    for _, unit := range(units) {
-    	kvArr := strings.Split(unit, ":")
-    	if len(kvArr) > 1 {
-    		m[kvArr[0]] = kvArr[1]
-    	}
-    }
+	units := strings.Split(value, ",")
+	m := make(map[string]string)
+	for _, unit := range units {
+		kvArr := strings.Split(unit, ":")
+		if len(kvArr) > 1 {
+			m[kvArr[0]] = kvArr[1]
+		}
+	}
 
-    *e = m
+	*e = m
 
-    return nil
+	return nil
 }
 
 type StorageOptionsConf struct {
-	Type          string            `json:"type"`
-	Host          string            `json:"host"`
-	Port          int               `json:"port"`
-	Hosts         EnvMapString      `json:"hosts"`
-	Username      string            `json:"username"`
-	Password      string            `json:"password"`
-	Database      int               `json:"database"`
-	MaxIdle       int               `json:"optimisation_max_idle"`
-	MaxActive     int               `json:"optimisation_max_active"`
-	EnableCluster bool              `json:"enable_cluster"`
+	Type          string       `json:"type"`
+	Host          string       `json:"host"`
+	Port          int          `json:"port"`
+	Hosts         EnvMapString `json:"hosts"`
+	Username      string       `json:"username"`
+	Password      string       `json:"password"`
+	Database      int          `json:"database"`
+	MaxIdle       int          `json:"optimisation_max_idle"`
+	MaxActive     int          `json:"optimisation_max_active"`
+	EnableCluster bool         `json:"enable_cluster"`
 }
 
 type NormalisedURLConfig struct {
@@ -153,7 +155,7 @@ type Config struct {
 	DisableDashboardZeroConf          bool                   `json:"disable_dashboard_zeroconf"`
 	AppPath                           string                 `json:"app_path"`
 	Storage                           StorageOptionsConf     `json:"storage"`
-	EnableSeperateCacheStore	      bool       			 `json:"enable_separate_cache_store"`
+	EnableSeperateCacheStore          bool                   `json:"enable_separate_cache_store"`
 	CacheStorage                      StorageOptionsConf     `json:"cache_storage"`
 	EnableAnalytics                   bool                   `json:"enable_analytics"`
 	AnalyticsConfig                   AnalyticsConfigConfig  `json:"analytics_config"`
@@ -212,8 +214,9 @@ type Config struct {
 	BundleBaseURL                     string                                   `bson:"bundle_base_url" json:"bundle_base_url"`
 	EnableBundleDownloader            bool                                     `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
 	AllowRemoteConfig                 bool                                     `bson:"allow_remote_config" json:"allow_remote_config"`
-	LegacyEnableAllowanceCountdown    bool 									   `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
-	MaxIdleConnsPerHost 			  int 									   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	LegacyEnableAllowanceCountdown    bool                                     `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
+	MaxIdleConnsPerHost               int                                      `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	ReloadWaitTime                    int                                      `bson:"reload_wait_time" json:"reload_wait_time"`
 }
 
 type CertData struct {

@@ -750,7 +750,11 @@ var reloadScheduled bool
 
 func checkReloadTimeout() {
 	if reloadScheduled {
-		time.Sleep(60 * time.Second)
+		wait := config.ReloadWaitTime
+		if config.ReloadWaitTime == 0 {
+			wait = 10
+		}
+		time.Sleep(time.Duration(wait) * time.Second)
 		if reloadScheduled {
 			log.Warning("Reloader timed out! Removing sentinel")
 			reloadScheduled = false
