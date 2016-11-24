@@ -4,14 +4,15 @@ import (
 	"bytes"
 	b64 "encoding/base64"
 	"encoding/json"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
-	"github.com/mitchellh/mapstructure"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
+	"github.com/mitchellh/mapstructure"
 )
 
 // RequestObject is marshalled to JSON string and pased into JSON middleware
@@ -100,9 +101,9 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 	var used bool
 
 	if config.EnableJSVM == false {
-		retrun false
+		return false
 	}
-	
+
 	for _, thisVersion := range d.TykMiddleware.Spec.VersionData.Versions {
 		if len(thisVersion.ExtendedPaths.Virtual) > 0 {
 			used = true
