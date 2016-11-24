@@ -3,14 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"io/ioutil"
+	"net/http"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/context"
 	"golang.org/x/net/html/charset"
-	"io"
-	"io/ioutil"
-	"net/http"
 )
 
 func WrappedCharsetReader(s string, i io.Reader) (io.Reader, error) {
@@ -37,6 +38,7 @@ func (t *TransformMiddleware) IsEnabledForSpec() bool {
 	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
 		if len(thisVersion.ExtendedPaths.Transform) > 0 {
 			used = true
+			break
 		}
 	}
 

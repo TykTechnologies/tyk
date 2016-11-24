@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
 	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 )
 
 type URLRewriter struct{}
@@ -165,6 +166,7 @@ func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
 		if len(thisVersion.ExtendedPaths.URLRewrite) > 0 {
 			used = true
 			m.TykMiddleware.Spec.URLRewriteEnabled = true
+			break
 		}
 	}
 

@@ -2,9 +2,10 @@ package main
 
 import (
 	"errors"
-	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -27,6 +28,7 @@ func (t *TransformMethod) IsEnabledForSpec() bool {
 	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
 		if len(thisVersion.ExtendedPaths.MethodTransforms) > 0 {
 			used = true
+			break
 		}
 	}
 

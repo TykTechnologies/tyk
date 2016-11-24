@@ -98,9 +98,15 @@ func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 	var used bool
+
+	if config.EnableJSVM == false {
+		retrun false
+	}
+	
 	for _, thisVersion := range d.TykMiddleware.Spec.VersionData.Versions {
 		if len(thisVersion.ExtendedPaths.Virtual) > 0 {
 			used = true
+			break
 		}
 	}
 

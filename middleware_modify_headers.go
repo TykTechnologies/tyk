@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -32,12 +33,15 @@ func (t *TransformHeaders) IsEnabledForSpec() bool {
 	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
 		if len(thisVersion.ExtendedPaths.TransformHeader) > 0 {
 			used = true
+			break
 		}
 		if len(thisVersion.GlobalHeaders) > 0 {
 			used = true
+			break
 		}
 		if len(thisVersion.GlobalHeadersRemove) > 0 {
 			used = true
+			break
 		}
 	}
 
