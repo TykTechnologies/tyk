@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/Sirupsen/logrus"
 )
 
 type NodeResponseOK struct {
@@ -38,6 +39,8 @@ func ReLogin() {
 	}).Info("Registering node (again).")
 	DashService.StopBeating()
 	DashService.DeRegister()
+
+	time.Sleep(5 * time.Second)
 
 	err := DashService.Register()
 	if err != nil {
