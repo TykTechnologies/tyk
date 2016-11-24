@@ -40,7 +40,7 @@ func ReLogin() {
 	DashService.StopBeating()
 	DashService.DeRegister()
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(30 * time.Second)
 
 	err := DashService.Register()
 	if err != nil {
@@ -53,6 +53,10 @@ func ReLogin() {
 		go DashService.StartBeating()
 	}
 
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Recovering configurations, reloading...")
+	doReload()
 }
 
 func (h *HTTPDashboardHandler) Init() error {

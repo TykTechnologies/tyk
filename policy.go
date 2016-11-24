@@ -142,7 +142,7 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	}
 
 	if response.StatusCode == 403 {
-		log.Error("Login failure, Response was: ", string(retBody))
+		log.Error("Policy request login failure, Response was: ", string(retBody))
 		reloadScheduled = false
 		ServiceNonceMutex.Unlock()
 		ReLogin()
