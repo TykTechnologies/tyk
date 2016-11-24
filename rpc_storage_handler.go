@@ -2,14 +2,15 @@ package main
 
 import (
 	"errors"
+	"io"
+	"strings"
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/gorpc"
 	"github.com/pmylund/go-cache"
-	"io"
-	"strings"
-	"time"
 )
 
 type InboundData struct {
@@ -59,13 +60,13 @@ func ClearRPCClients() {
 	for _, c := range RPCClients {
 
 		select {
-	    case c <- 1:
-	        log.Debug("Disconnect sent")
-	    default:
-	        log.Debug("Disconnect chan failed")
-	    }
+		case c <- 1:
+			log.Debug("Disconnect sent")
+		default:
+			log.Debug("Disconnect chan failed")
+		}
 
-		go func(){ c <- 1 }()
+		go func() { c <- 1 }()
 	}
 }
 
@@ -758,8 +759,17 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
-		log.Info("--> removing cached key: ", key)
-		handleDeleteKey(key, "-1")
+		splitKeys := strings.Split(key, ":")
+		if len(splitKeys) > 1 {
+			if splitKeys[1] == "hashed" {
+				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				handleDeleteHashedKey(splitKeys[0], "")
+			}
+		} else {
+			log.Info("--> removing cached key: ", key)
+			handleDeleteKey(key, "-1")
+		}
+
 	}
 }
 
