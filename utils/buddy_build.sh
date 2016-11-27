@@ -75,61 +75,77 @@ tar -pczf $amd64TGZDIR/../tyk-linux-amd64-$VERSION.tar.gz tyk.linux.amd64-$VERSI
 cd $armTGZDIR/../
 tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION/
 
+echo setting locales
+locale-gen "en_US.UTF-8"
+dpkg-reconfigure locales
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+
 echo Creating Deb Package for AMD64
 cd $amd64TGZDIR/
 fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t deb ./=/opt/tyk-gateway
 fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm ./=/opt/tyk-gateway
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise *.deb
+AMDDEBNAME=tyk-gateway_$VERSION_arm64.deb
+AMDRPMNAME=tyk-gateway-$VERSION-1.x86_64.rpm
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty *.deb
+package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie *.deb
+package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 *.rpm
-package_cloud push tyk/$PACKAGECLOUDREPO/el/6 *.rpm
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 *.rpm
-package_cloud push tyk/$PACKAGECLOUDREPO/el/7 *.rpm
+package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie $AMDDEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $AMDDEBNAME
+
+package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 $AMDRPMNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $AMDRPMNAME
+package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 $AMDRPMNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $AMDRPMNAME
 
 echo Creating Deb Package for i386
 cd $i386TGZDIR/
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb ./=/opt/tyk-gateway
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t rpm ./=/opt/tyk-gateway
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise *.deb
+i386DEBNAME=tyk-gateway_$VERSION_i386.deb
+i386RPMNAME=tyk-gateway-$VERSION-1.i386.rpm
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty *.deb
+package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise $i386DEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $i386DEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie *.deb
+package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty $i386DEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $i386DEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 *.rpm
-package_cloud push tyk/$PACKAGECLOUDREPO/el/6 *.rpm
+package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie $i386DEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $i386DEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 *.rpm
-package_cloud push tyk/$PACKAGECLOUDREPO/el/7 *.rpm
+package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 $i386RPMNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $i386RPMNAME
+
+package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 $i386RPMNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $i386RPMNAME
 
 echo Creating Deb Package for ARM
 cd $armTGZDIR/
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t deb ./=/opt/tyk-gateway
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t rpm ./=/opt/tyk-gateway
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise *.deb
+ARMDEBNAME=tyk-gateway_$VERSION_arm64.deb
+ARMRPMNAME=tyk-gateway-$VERSION-1.arm64.rpm
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty *.deb
+package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise $ARMDEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $ARMDEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie *.deb
-package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie *.deb
+package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty $ARMDEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $ARMDEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 *.rpm
-package_cloud push tyk/$PACKAGECLOUDREPO/el/6 *.rpm
+package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie $ARMDEBNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $ARMDEBNAME
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 *.rpm
-package_cloud push tyk/$PACKAGECLOUDREPO/el/7 *.rpm
+package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 $ARMRPMNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $ARMRPMNAME
+
+package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 $ARMRPMNAME
+package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $ARMRPMNAME
