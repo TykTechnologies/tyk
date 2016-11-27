@@ -83,7 +83,7 @@ echo Setting locales
 LANG=en_US.UTF-8
 sed -i -e "s/# $LANG.*/$LANG.UTF-8 UTF-8/" /etc/locale.gen
 dpkg-reconfigure --frontend=noninteractive locales
-update-locale LANG=$LANG
+update-locale 
 
 # echo Creating Deb Package for AMD64
 # cd $amd64TGZDIR/
