@@ -79,14 +79,6 @@ tar -pczf $amd64TGZDIR/../tyk-linux-amd64-$VERSION.tar.gz tyk.linux.amd64-$VERSI
 cd $armTGZDIR/../
 tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION/
 
-echo Setting locales
-LANG=en_US.UTF-8
-sed -i -e "s/# $LANG.*/$LANG.UTF-8 UTF-8/" /etc/locale.gen
-dpkg-reconfigure --frontend=noninteractive locales
-update-locale 
-export LANG=en_US.utf-8
-localectl set-locale LANG=en_US.UTF-8
-
 echo "Removing old builds"
 [ -e *.deb ] && rm *.deb
 [ -e *.rpm ] && rm *.rpm
