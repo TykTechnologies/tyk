@@ -33,17 +33,17 @@ gox -osarch="linux/amd64" -tags 'coprocess python' -output '{{.Dir}}_{{.OS}}_{{.
 gox -osarch="linux/amd64" -tags 'coprocess lua' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_lua'
 
 echo Preping TGZ Dirs
-mkdir $i386TGZDIR/apps
-mkdir $i386TGZDIR/js
-mkdir $i386TGZDIR/middleware
-mkdir $i386TGZDIR/middleware/python
-mkdir $i386TGZDIR/middleware/lua
-mkdir $i386TGZDIR/event_handlers
-mkdir $i386TGZDIR/event_handlers/sample
-mkdir $i386TGZDIR/templates
-mkdir $i386TGZDIR/policies
-mkdir $i386TGZDIR/utils
-mkdir $i386TGZDIR/install
+mkdir -p $i386TGZDIR/apps
+mkdir -p $i386TGZDIR/js
+mkdir -p $i386TGZDIR/middleware
+mkdir -p $i386TGZDIR/middleware/python
+mkdir -p $i386TGZDIR/middleware/lua
+mkdir -p $i386TGZDIR/event_handlers
+mkdir -p $i386TGZDIR/event_handlers/sample
+mkdir -p $i386TGZDIR/templates
+mkdir -p $i386TGZDIR/policies
+mkdir -p $i386TGZDIR/utils
+mkdir -p $i386TGZDIR/install
 
 cp $SOURCEBINPATH/apps/app_sample.json $i386TGZDIR/apps
 cp $SOURCEBINPATH/templates/*.json $i386TGZDIR/templates
@@ -76,7 +76,8 @@ cd $armTGZDIR/../
 tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION/
 
 echo setting locales
-locale-gen --purge en_US.UTF-8
+locale-gen --purge "en_US.UTF-8"
+locale-gen "en_US.UTF-8"
 echo -e 'LANG="en_US.UTF-8"\nLANGUAGE="en_US:en"\n' > /etc/default/locale
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
@@ -90,18 +91,10 @@ fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_instal
 AMDDEBNAME=tyk-gateway_$VERSION_arm64.deb
 AMDRPMNAME=tyk-gateway-$VERSION-1.x86_64.rpm
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $AMDDEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 $AMDRPMNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $AMDRPMNAME
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 $AMDRPMNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $AMDRPMNAME
 
 echo Creating Deb Package for i386
@@ -112,19 +105,10 @@ fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install
 i386DEBNAME=tyk-gateway_$VERSION_i386.deb
 i386RPMNAME=tyk-gateway-$VERSION-1.i386.rpm
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise $i386DEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $i386DEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty $i386DEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $i386DEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie $i386DEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $i386DEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 $i386RPMNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $i386RPMNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 $i386RPMNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $i386RPMNAME
 
 echo Creating Deb Package for ARM
@@ -135,17 +119,8 @@ fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install
 ARMDEBNAME=tyk-gateway_$VERSION_arm64.deb
 ARMRPMNAME=tyk-gateway-$VERSION-1.arm64.rpm
 
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/precise $ARMDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $ARMDEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/ubuntu/trusty $ARMDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $ARMDEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/debian/jessie $ARMDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $ARMDEBNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/6 $ARMRPMNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $ARMRPMNAME
-
-package_cloud yank tyk/$PACKAGECLOUDREPO/el/7 $ARMRPMNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $ARMRPMNAME
