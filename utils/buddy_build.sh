@@ -84,10 +84,11 @@ LANG=en_US.UTF-8
 sed -i -e "s/# $LANG.*/$LANG.UTF-8 UTF-8/" /etc/locale.gen
 dpkg-reconfigure --frontend=noninteractive locales
 update-locale 
+export LANG
 
 echo "Removing old builds"
-rm *.deb 
-rm *.rpm
+[ -e *.deb ] && rm *.deb
+[ -e *.rpm ] && rm *.rpm
 
 echo Creating Deb Package for AMD64
 cd $amd64TGZDIR/
