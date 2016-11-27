@@ -80,10 +80,11 @@ cd $armTGZDIR/../
 tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION/
 
 echo setting locales
-export LANG=en_GB.UTF-8
+export LANG=en_US.UTF-8
 sed -i -e "s/# $LANG.*/$LANG.UTF-8 UTF-8/" /etc/locale.gen
-dpkg-reconfigure --frontend=noninteractive locales && \
+dpkg-reconfigure --frontend=noninteractive locales
 update-locale LANG=$LANG
+export LANG=en_US.UTF-8
 
 echo Creating Deb Package for AMD64
 cd $amd64TGZDIR/
