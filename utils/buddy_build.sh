@@ -88,7 +88,7 @@ cd $amd64TGZDIR/
 fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t deb ./=/opt/tyk-gateway
 fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm ./=/opt/tyk-gateway
 
-AMDDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
+AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
 AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
 
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
