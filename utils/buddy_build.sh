@@ -91,6 +91,7 @@ fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_instal
 AMDDEBNAME=tyk-gateway_$VERSION_arm64.deb
 AMDRPMNAME=tyk-gateway-$VERSION-1.x86_64.rpm
 
+export LC_ALL="en_US.UTF-8" 
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $AMDDEBNAME
