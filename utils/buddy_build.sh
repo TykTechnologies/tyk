@@ -92,7 +92,7 @@ AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
 AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
 
 echo "Signing AMD RPM"
-./rpm-sign.exp $AMDRPMNAME
+~/build_tools/rpm-sign.exp $amd64TGZDIR/$AMDRPMNAME
 
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
@@ -109,7 +109,7 @@ i386DEBNAME="tyk-gateway_"$VERSION"_i386.deb"
 i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
 
 echo "Signing i386 RPM"
-./rpm-sign.exp $i386RPMNAME
+~/build_tools/rpm-sign.exp $i386TGZDIR/$i386RPMNAME
 
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $i386DEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $i386DEBNAME
@@ -126,7 +126,7 @@ ARMDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
 ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
 
 echo "Signing Arm RPM"
-./rpm-sign.exp $ARMRPMNAME
+~/build_tools/rpm-sign.exp $armTGZDIR/$ARMRPMNAME
 
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $ARMDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $ARMDEBNAME
