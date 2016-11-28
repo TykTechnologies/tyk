@@ -130,10 +130,8 @@ func (h *HTTPDashboardHandler) Register() error {
 	}).Info("Node registered")
 
 	// Set the nonce
-	ServiceNonceMutex.Lock()
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
-	ServiceNonceMutex.Unlock()
 
 	return nil
 }
@@ -173,8 +171,6 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 
 	log.Debug("Sending Heartbeat as: ", NodeID)
 
-	ServiceNonceMutex.Lock()
-	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
@@ -229,7 +225,6 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 
 	log.Info("De-registering: ", NodeID)
 
-	ServiceNonceMutex.Lock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
@@ -264,7 +259,6 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	// Set the nonce
 	ServiceNonce = thisVal.Nonce
 	log.Info("De-registered.")
-	ServiceNonceMutex.Unlock()
 
 	return nil
 }

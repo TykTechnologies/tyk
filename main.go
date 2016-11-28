@@ -1048,10 +1048,8 @@ func onFork() {
 		log.Info("Waiting to de-register")
 		time.Sleep(10 * time.Second)
 
-		ServiceNonceMutex.Lock()
 		os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
 		os.Setenv("TYK_SERVICE_NODEID", NodeID)
-		ServiceNonceMutex.Unlock()
 	}
 
 	amForked = true
@@ -1352,13 +1350,11 @@ func listen(l net.Listener, err error) {
 
 		} else {
 			NodeID = thisID
-			ServiceNonceMutex.Lock()
 			ServiceNonce = thisNonce
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("State recovered")
 
-			ServiceNonceMutex.Unlock()
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")
 		}
