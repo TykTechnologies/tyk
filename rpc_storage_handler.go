@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -53,6 +54,7 @@ var GlobalRPCCallTimeout time.Duration
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
+var RPCCLientRWMutex sync.RWMutex = sync.RWMutex{}
 var RPCClients = map[string]chan int{}
 
 func ClearRPCClients() {
@@ -125,7 +127,9 @@ func handleReconnect(r *RPCStorageHandler) {
 func (r *RPCStorageHandler) Register() {
 	r.ID = uuid.NewUUID().String()
 	myChan := make(chan int)
+	RPCCLientRWMutex.Lock()
 	RPCClients[r.ID] = myChan
+	RPCCLientRWMutex.Unlock()
 	r.killChan = myChan
 	log.Debug("RPC Client registered")
 }
@@ -185,7 +189,9 @@ func (r *RPCStorageHandler) Disconnect() bool {
 	if r.Connected {
 		go r.RPCClient.Stop()
 		r.Connected = false
+		RPCCLientRWMutex.Lock()
 		delete(RPCClients, r.ID)
+		RPCCLientRWMutex.Unlock()
 	}
 	return true
 }
