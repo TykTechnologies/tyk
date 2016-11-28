@@ -91,6 +91,9 @@ fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_instal
 AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
 AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
 
+echo "Signing AMD RPM"
+./rpm-sign.exp $AMDRPMNAME
+
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $AMDDEBNAME
@@ -105,6 +108,9 @@ fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install
 i386DEBNAME="tyk-gateway_"$VERSION"_i386.deb"
 i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
 
+echo "Signing i386 RPM"
+./rpm-sign.exp $i386RPMNAME
+
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $i386DEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $i386DEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $i386DEBNAME
@@ -118,6 +124,9 @@ fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install
 
 ARMDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
 ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
+
+echo "Signing Arm RPM"
+./rpm-sign.exp $ARMRPMNAME
 
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $ARMDEBNAME
 package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $ARMDEBNAME
