@@ -117,8 +117,8 @@ cd $armTGZDIR/../
 tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION/
 
 echo "Removing old builds"
-[ -e *.deb ] && rm *.deb
-[ -e *.rpm ] && rm *.rpm
+rm -f *.deb
+rm -f *.rpm
 
 echo Creating Deb Package for AMD64
 cd $amd64TGZDIR/
