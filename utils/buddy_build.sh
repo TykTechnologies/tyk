@@ -31,6 +31,7 @@ cd $orgDir
 git clone https://github.com/TykTechnologies/tyk-cli.git
 cd $cliDIR
 git checkout master
+go get -v ./...
 gox -osarch="linux/arm64 linux/amd64 linux/386"
 
 echo "Copying CLI Build files"
