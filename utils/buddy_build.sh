@@ -16,7 +16,7 @@ export armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm64-$VERSION
 export i386TGZDIR=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
 export amd64TGZDIR=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
 export armTGZDIR=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
-export PACKAGECLOUDREPO=tyk-gateway-auto
+export PACKAGECLOUDREPO=tyk-gateway
 
 orgDir=/src/github.com/TykTechnologies
 cliDIR=/src/github.com/TykTechnologies/tyk-cli
