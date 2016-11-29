@@ -2,6 +2,9 @@
 echo Set version number
 export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3\.$4"' version.go)
 
+echo Generating key
+[[ $(gpg --list-keys | grep -w 729EA673) ]] && echo "Key exists" || gpg --import build_key.key
+
 echo Prepare the release directories
 export SOURCEBIN=tyk
 export SOURCEBINPATH=/src/github.com/TykTechnologies/tyk
