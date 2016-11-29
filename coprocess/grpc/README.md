@@ -31,7 +31,17 @@ This is a section of `tyk.conf` that will:
   "enable_coprocess": true,
   "coprocess_grpc_server": "tcp://127.0.0.1:5555"
 },
+"enable_bundle_downloader": true,
+"bundle_base_url": "http://my-bundle-server.com/bundles/",
+"public_key_path": "/path/to/my/pubkey",
 ```
+
+
+* `enable_coprocess`: Enables the rich plugins feature.
+* `coprocess_grpc_server`: Sets the gRPC server host address. This is only required for gRPC plugins.
+* `enable_bundle_downloader`: Enables the bundle downloader.
+* `bundle_base_url`: A base URL that will be used to download the bundle, in this example we have "test-bundle" specified in the API settings, Tyk will fetch the following URL: "http://my-bundle-server.com/bundles/test-bundle".
+* `public_key_path`: Sets a public key, this is used for verifying signed bundles, you may omit this if unsigned bundles are used.
 
 ## API settings
 
