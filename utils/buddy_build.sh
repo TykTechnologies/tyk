@@ -1,6 +1,6 @@
 #!/bin/bash
 echo Set version number
-export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3\.$4"' version.go)
+export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3\.$4"' version.go)
 
 echo Generating key
 [[ $(gpg --list-keys | grep -w 729EA673) ]] && echo "Key exists" || gpg --import build_key.key
@@ -16,7 +16,7 @@ export armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm64-$VERSION
 export i386TGZDIR=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
 export amd64TGZDIR=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
 export armTGZDIR=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
-export PACKAGECLOUDREPO=tyk-gateway
+export PACKAGECLOUDREPO=tyk-gateway-auto
 
 orgDir=/src/github.com/TykTechnologies
 cliDIR=/src/github.com/TykTechnologies/tyk-cli
