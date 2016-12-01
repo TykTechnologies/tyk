@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"io/ioutil"
 	"time"
 )

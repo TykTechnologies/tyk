@@ -17,7 +17,7 @@ import (
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
 

@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 	"net/http"
 	"regexp"

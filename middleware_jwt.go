@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"

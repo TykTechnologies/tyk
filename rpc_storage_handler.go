@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/gorpc"

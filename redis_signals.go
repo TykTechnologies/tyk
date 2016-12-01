@@ -3,7 +3,7 @@ package main
 import (
 	b64 "encoding/base64"
 	"encoding/json"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/goverify"
 	"github.com/garyburd/redigo/redis"
 	"time"

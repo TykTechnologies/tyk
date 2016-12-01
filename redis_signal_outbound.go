@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
 	"time"
 )

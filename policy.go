@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"gopkg.in/mgo.v2/bson"
 )
 

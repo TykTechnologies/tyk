@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/mux"

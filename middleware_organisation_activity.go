@@ -8,7 +8,7 @@ import (
 
 import (
 	"errors"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 )
 
 var orgChanMap = make(map[string]chan bool)

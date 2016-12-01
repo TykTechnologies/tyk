@@ -4,7 +4,7 @@ import (
 	"bytes"
 	b64 "encoding/base64"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 	"html/template"
 	"net"

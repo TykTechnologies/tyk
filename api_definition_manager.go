@@ -14,7 +14,7 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/rubyist/circuitbreaker"

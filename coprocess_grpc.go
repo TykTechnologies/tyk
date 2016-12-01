@@ -9,7 +9,7 @@ import (
 	"time"
 	"errors"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
 	"golang.org/x/net/context"

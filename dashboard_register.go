@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 )
 
 type NodeResponseOK struct {

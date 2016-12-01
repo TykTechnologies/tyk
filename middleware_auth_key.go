@@ -5,7 +5,7 @@ import "net/http"
 import (
 	"bytes"
 	"errors"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"io"

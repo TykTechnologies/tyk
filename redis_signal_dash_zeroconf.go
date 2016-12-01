@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"strings"
 	"strconv"
 )

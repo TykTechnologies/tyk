@@ -4,7 +4,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/TykTechnologies/tykcommon"
 	"gopkg.in/vmihailenco/msgpack.v2"
