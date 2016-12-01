@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/clbanning/mxj"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/mitchellh/mapstructure"

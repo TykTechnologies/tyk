@@ -7,7 +7,7 @@ import (
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/dgrijalva/jwt-go"

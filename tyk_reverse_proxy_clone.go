@@ -9,7 +9,7 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 	"io"
