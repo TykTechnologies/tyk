@@ -5,11 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
-	"github.com/nu7hatch/gouuid"
-	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -18,6 +13,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
+	"github.com/nu7hatch/gouuid"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
