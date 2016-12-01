@@ -268,7 +268,7 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	newRequest.Header.Add("authorization", secret)
 
 	c := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 20 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 
