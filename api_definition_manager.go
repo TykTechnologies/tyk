@@ -268,7 +268,7 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	newRequest.Header.Add("authorization", secret)
 
 	c := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 10 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 
@@ -352,7 +352,7 @@ func SendHeartBeat(endpoint string, secret string) error {
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 10 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 	defer response.Body.Close()
