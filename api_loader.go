@@ -586,11 +586,6 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
 
-	if config.SlaveOptions.UseRPC {
-		StartRPCKeepaliveWatcher(rpcAuthStore)
-		StartRPCKeepaliveWatcher(rpcOrgStore)
-	}
-
 	prepareSortOrder(APISpecs)
 
 	chainChannel := make(chan *ChainObject)
@@ -672,5 +667,11 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialised API Definitions")
+
+	if config.SlaveOptions.UseRPC {
+		//log.Warning("TODO: PUT THE KEEPALIVE WATCHER BACK")
+		StartRPCKeepaliveWatcher(rpcAuthStore)
+		StartRPCKeepaliveWatcher(rpcOrgStore)
+	}
 
 }

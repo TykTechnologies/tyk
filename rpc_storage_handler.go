@@ -58,6 +58,7 @@ var RPCCLientRWMutex sync.RWMutex = sync.RWMutex{}
 var RPCClients = map[string]chan int{}
 
 func ClearRPCClients() {
+	return
 	log.Info("Found: ", len(RPCClients), " RPC connections, terminating")
 	for _, c := range RPCClients {
 
@@ -74,12 +75,14 @@ func ClearRPCClients() {
 
 func RPCKeepAliveCheck(r *RPCStorageHandler) {
 	// Only run when connected
-	if r.Connected {
+	if RPCClientIsConnected && r.cache != nil {
 		// Make sure the auth back end is still alive
 		c1 := make(chan string, 1)
 
 		go func() {
+			log.Debug("Getting keyspace check test key")
 			r.GetKey("0000")
+			log.Debug("--> done")
 			c1 <- "1"
 			close(c1)
 		}()
@@ -145,31 +148,47 @@ func (r *RPCStorageHandler) checkDisconnect() {
 
 func (r *RPCStorageHandler) ReConnect() {
 	// Should only be used by reload checker
-	r.Disconnect()
+	// r.Disconnect()
 	r.Connect()
 	log.Info("Reconnected.")
 }
 
+var RPCCLientSingleton *gorpc.Client
+var RPCFuncClientSingleton *gorpc.DispatcherClient
+var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
+var RPCClientIsConnected bool
+
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
-	// We don't want to constantly connect
-	if r.Connected {
+
+	if RPCClientIsConnected {
+		log.Debug("Using RPC singleton for connection")
+		r.RPCClient = RPCCLientSingleton
+		r.Client = RPCFuncClientSingleton
+		r.cache = RPCGlobalCache
 		return true
 	}
 
+	// RPC Client is unset
 	// Set up the cache
-	r.cache = cache.New(30*time.Second, 15*time.Second)
-	r.RPCClient = gorpc.NewTCPClient(r.Address)
+	log.Info("Setting new RPC connection!")
+	r.cache = RPCGlobalCache
+	RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
+	r.RPCClient = RPCCLientSingleton
 
 	if log.Level != logrus.DebugLevel {
 		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
 	}
 
 	r.RPCClient.OnConnect = r.OnConnectFunc
-	r.RPCClient.Conns = 10
+	r.RPCClient.Conns = 50
 	r.RPCClient.Start()
 	d := GetDispatcher()
-	r.Client = d.NewFuncClient(r.RPCClient)
+
+	if RPCFuncClientSingleton == nil {
+		RPCFuncClientSingleton = d.NewFuncClient(r.RPCClient)
+	}
+	r.Client = RPCFuncClientSingleton
 	r.Login()
 
 	if !r.SuppressRegister {
@@ -181,14 +200,14 @@ func (r *RPCStorageHandler) Connect() bool {
 }
 
 func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteCloser) (io.ReadWriteCloser, error) {
-	r.Connected = true
+	RPCClientIsConnected = true
 	return rwc, nil
 }
 
 func (r *RPCStorageHandler) Disconnect() bool {
-	if r.Connected {
+	if RPCClientIsConnected {
 		go r.RPCClient.Stop()
-		r.Connected = false
+		RPCClientIsConnected = false
 		RPCCLientRWMutex.Lock()
 		delete(RPCClients, r.ID)
 		RPCCLientRWMutex.Unlock()
@@ -301,7 +320,9 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 	// Check the cache first
 	if config.SlaveOptions.EnableRPCCache {
+		log.Debug("Using cache for: ", keyName)
 		cachedVal, found := r.cache.Get(r.fixKey(keyName))
+		log.Debug("--> Found? ", found)
 		if found {
 			elapsed := time.Since(start)
 			log.Debug("GetKey took ", elapsed)
@@ -718,7 +739,7 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 		return
 	}
 
-	log.Info("Starting keyspace poller")
+	log.Info("[RPC] Starting keyspace poller")
 
 	for {
 		r.CheckForKeyspaceChanges(orgId)

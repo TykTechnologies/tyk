@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
-	"github.com/TykTechnologies/logrus"
-	"github.com/nu7hatch/gouuid"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/nu7hatch/gouuid"
 )
 
 // AuthorisationHandler is used to validate a session key,

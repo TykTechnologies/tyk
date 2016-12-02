@@ -983,23 +983,32 @@ func getCmdArguments() map[string]interface{} {
 	return arguments
 }
 
+var KeepaliveRunning bool
+
 func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
+	if KeepaliveRunning {
+		return
+	}
+
 	go func() {
 		log.WithFields(logrus.Fields{
 			"prefix": "RPC Conn Mgr",
 		}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 		for {
+			KeepaliveRunning = true
 			RPCKeepAliveCheck(engine)
 			if engine == nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "RPC Conn Mgr",
 				}).Info("No engine, break")
+				KeepaliveRunning = false
 				break
 			}
 			if engine.Killed == true {
 				log.WithFields(logrus.Fields{
 					"prefix": "RPC Conn Mgr",
 				}).Debug("[RPC Conn Mgr] this connection killed")
+				KeepaliveRunning = false
 				break
 			}
 		}

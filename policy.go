@@ -196,7 +196,7 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 
 	rpcPolicies := store.GetPolicies(orgId)
 
-	store.Disconnect()
+	//store.Disconnect()
 
 	jErr1 := json.Unmarshal([]byte(rpcPolicies), &dbPolicyList)
 

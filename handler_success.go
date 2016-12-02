@@ -3,14 +3,15 @@ package main
 import (
 	"bytes"
 	b64 "encoding/base64"
-	"github.com/gorilla/context"
-	"github.com/pmylund/go-cache"
 	"io"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gorilla/context"
+	"github.com/pmylund/go-cache"
 )
 
 // ContextKey is a key type to avoid collisions
@@ -181,11 +182,12 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	var thisSession SessionState
 	var found bool
 
+	log.Debug("Querying local cache")
 	// Check in-memory cache
 	if !config.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(key)
 		if found {
-			log.Debug("Key found in local cache")
+			log.Debug("--> Key found in local cache")
 			thisSession = cachedVal.(SessionState)
 			t.ApplyPolicyIfExists(key, &thisSession)
 			return thisSession, true
@@ -202,10 +204,11 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
-		log.Debug("Got key")
+		log.Debug("--> Got key")
 		return thisSession, true
 	}
 
+	log.Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	thisSession, found = t.Spec.AuthManager.IsKeyAuthorised(key)
 	if found {
@@ -217,6 +220,10 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
+
+		log.Debug("Lifetime is: ", GetLifetime(t.Spec, &thisSession))
+		// Need to set this in order for the write to work!
+		thisSession.LastUpdated = time.Now().String()
 		t.Spec.SessionManager.UpdateSession(key, thisSession, GetLifetime(t.Spec, &thisSession))
 	}
 

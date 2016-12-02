@@ -522,7 +522,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
 
-	store.Disconnect()
+	//store.Disconnect()
 
 	if RPC_LoadCount > 0 {
 		SaveRPCDefinitionsBackup(apiCollection)
