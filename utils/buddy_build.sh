@@ -16,7 +16,7 @@ export armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm64-$VERSION
 export i386TGZDIR=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
 export amd64TGZDIR=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
 export armTGZDIR=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
-export PACKAGECLOUDREPO=tyk-gateway-auto
+export PACKAGECLOUDREPO=$PC_TARGET
 
 orgDir=/src/github.com/TykTechnologies
 cliDIR=/src/github.com/TykTechnologies/tyk-cli
@@ -131,12 +131,6 @@ AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
 echo "Signing AMD RPM"
 ~/build_tools/rpm-sign.exp $amd64TGZDIR/$AMDRPMNAME
 
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $AMDDEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $AMDDEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $AMDDEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $AMDRPMNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $AMDRPMNAME
-
 echo Creating Deb Package for i386
 cd $i386TGZDIR/
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb ./=/opt/tyk-gateway
@@ -148,12 +142,6 @@ i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
 echo "Signing i386 RPM"
 ~/build_tools/rpm-sign.exp $i386TGZDIR/$i386RPMNAME
 
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $i386DEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $i386DEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $i386DEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $i386RPMNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $i386RPMNAME
-
 echo Creating Deb Package for ARM
 cd $armTGZDIR/
 fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t deb ./=/opt/tyk-gateway
@@ -164,9 +152,3 @@ ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
 
 echo "Signing Arm RPM"
 ~/build_tools/rpm-sign.exp $armTGZDIR/$ARMRPMNAME
-
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $ARMDEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $ARMDEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $ARMDEBNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $ARMRPMNAME
-package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $ARMRPMNAME
