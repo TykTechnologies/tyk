@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/gorilla/context"
-	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -25,6 +26,26 @@ func (t *TransformHeaders) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (t *TransformHeaders) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (t *TransformHeaders) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.TransformHeader) > 0 {
+			used = true
+			break
+		}
+		if len(thisVersion.GlobalHeaders) > 0 {
+			used = true
+			break
+		}
+		if len(thisVersion.GlobalHeadersRemove) > 0 {
+			used = true
+			break
+		}
+	}
+
+	return used
 }
 
 // iterateAddHeaders is a helper functino that will iterate of a map and inject the key and value as a header in the request.

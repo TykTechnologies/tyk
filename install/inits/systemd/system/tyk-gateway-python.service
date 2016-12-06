@@ -1,0 +1,13 @@
+[Unit]
+Description=Tyk API Gateway (Python Support)
+ 
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/opt/tyk-gateway/tyk-python --conf=/opt/tyk-gateway/tyk.conf
+Restart=always
+WorkingDirectory=/opt/tyk-gateway
+
+[Install]
+WantedBy=multi-user.target

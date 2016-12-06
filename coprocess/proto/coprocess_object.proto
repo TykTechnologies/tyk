@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+import "coprocess_mini_request_object.proto";
+import "coprocess_session_state.proto";
+import "coprocess_common.proto";
+
+package coprocess;
+
+message Object {
+  HookType hook_type = 1;
+  string hook_name = 2;
+  MiniRequestObject request = 3;
+  SessionState session = 4;
+  map<string, string> metadata = 5;
+  map<string, string> spec = 6;
+}
+
+message Event {
+  string payload = 1;
+}
+
+message EventReply {}
+
+service Dispatcher {
+  rpc Dispatch (Object) returns (Object) {}
+  rpc DispatchEvent (Event) returns (EventReply) {}
+}

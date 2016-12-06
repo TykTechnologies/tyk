@@ -9,7 +9,7 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 	"io"
@@ -214,18 +214,21 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		// Specifically override with a URL rewrite
 		var newTarget *url.URL
 		switchTargets := false
-		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
-		if found {
-			if URLRewriteContainsTarget.(bool) {
-				log.Debug("Detected host rewrite, overriding target")
-				tmpTarget, pErr := url.Parse(req.URL.String())
-				if pErr != nil {
-					log.Error("Failed to parse URL! Err: ", pErr)
-				} else {
-					newTarget = tmpTarget
-					switchTargets = true
+
+		if spec.URLRewriteEnabled {
+			URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+			if found {
+				if URLRewriteContainsTarget.(bool) {
+					log.Debug("Detected host rewrite, overriding target")
+					tmpTarget, pErr := url.Parse(req.URL.String())
+					if pErr != nil {
+						log.Error("Failed to parse URL! Err: ", pErr)
+					} else {
+						newTarget = tmpTarget
+						switchTargets = true
+					}
+					context.Clear(req)
 				}
-				context.Clear(req)
 			}
 		}
 
@@ -296,8 +299,13 @@ func (t *TykTransporter) SetTimeout(timeOut int) {
 	t.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 }
 
+func getMaxIdleConns() int {
+	return config.MaxIdleConnsPerHost
+}
+
 var TykDefaultTransport *TykTransporter = &TykTransporter{http.Transport{
 	Proxy: http.ProxyFromEnvironment,
+	MaxIdleConnsPerHost: getMaxIdleConns(),
 	Dial: (&net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -389,6 +397,10 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 }
 
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
+	if !spec.EnforcedTimeoutEnabled {
+		return false, 0
+	}
+
 	var stat RequestStatus
 	var meta interface{}
 	var found bool
@@ -409,6 +421,10 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 }
 
 func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Request) (bool, *ExtendedCircuitBreakerMeta) {
+	if !spec.CircuitBreakerEnabled {
+		return false, nil
+	}
+
 	var stat RequestStatus
 	var meta interface{}
 	var found bool
@@ -464,11 +480,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
-	URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
-	if found {
-		if URLRewriteContainsTarget.(bool) {
-			log.Debug("Detected host rewrite, notifying director")
-			context.Set(outreq, RetainHost, true)
+	if p.TykAPISpec.URLRewriteEnabled {
+		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+		if found {
+			if URLRewriteContainsTarget.(bool) {
+				log.Debug("Detected host rewrite, notifying director")
+				context.Set(outreq, RetainHost, true)
+			}
 		}
 	}
 
@@ -522,10 +540,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
-	// TODO:
-	// 1. If the circuit breaker is active - wrap the RoundTrip call with a breaker function
-	// 2. when we init the APISpec, we need to create CBs for each monitored endpoint, this means extending the APISpec so we can store pointers
-	// 3. Set up monitoring functions and hook them up to the event handler
 
 	var res *http.Response
 	var err error
@@ -624,10 +638,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ses = sessVal.(SessionState)
 	}
 
-	// Middleware chain handling here - very simple, but should do the trick
-	chainErr := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
-	if chainErr != nil {
-		log.Error("Response chain failed! ", chainErr)
+	if p.TykAPISpec.ResponseHandlersActive {
+		// Middleware chain handling here - very simple, but should do the trick
+		chainErr := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
+		if chainErr != nil {
+			log.Error("Response chain failed! ", chainErr)
+		}
 	}
 
 	// We should at least copy the status code in

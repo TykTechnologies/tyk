@@ -8,14 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/context"
-	"github.com/pmylund/go-cache"
 	"io"
 	"io/ioutil"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/context"
+	"github.com/pmylund/go-cache"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -46,6 +48,10 @@ func (k JWTMiddleware) New() {}
 // GetConfig retrieves the configuration from the API config
 func (k *JWTMiddleware) GetConfig() (interface{}, error) {
 	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
+}
+
+func (a *JWTMiddleware) IsEnabledForSpec() bool {
+	return true
 }
 
 func (k *JWTMiddleware) copyResponse(dst io.Writer, src io.Reader) {
@@ -129,7 +135,7 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 		}
 	}
 
-	log.Info("Found: ", tykId)
+	log.Debug("Found: ", tykId)
 	return tykId, idFound
 }
 
@@ -258,11 +264,13 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 			thisSessionState.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again
-			k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, k.Spec.APIDefinition.SessionLifetime)
+			k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
 			log.Debug("Policy applied to key")
 
-			context.Set(r, SessionData, thisSessionState)
-			context.Set(r, AuthHeaderValue, SessionID)
+			if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+				context.Set(r, SessionData, thisSessionState)
+				context.Set(r, AuthHeaderValue, SessionID)
+			}
 			k.setContextVars(r, token)
 			return nil, 200
 		}
@@ -273,9 +281,10 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	}
 
 	log.Debug("Key found")
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, SessionID)
-	k.setContextVars(r, token)
+	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, SessionID)
+	}
 	return nil, 200
 }
 
@@ -295,7 +304,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(w http.ResponseWriter, r *http.R
 		return errors.New("Key id not found"), 403
 	}
 
-	log.Info("Using raw key ID: ", tykId)
+	log.Debug("Using raw key ID: ", tykId)
 	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !keyExists {
 		k.reportLoginFailure(tykId, r)
@@ -438,10 +447,10 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 			// Key data
 			authHeaderValue := context.Get(r, AuthHeaderValue)
 			contextDataObject["token"] = authHeaderValue
-			
+
 			context.Set(r, ContextData, contextDataObject)
 		}
-		
+
 	}
 }
 

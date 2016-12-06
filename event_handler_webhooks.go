@@ -5,8 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/Sirupsen/logrus"
-	"github.com/TykTechnologies/tykcommon"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -14,6 +12,9 @@ import (
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
 )
 
 type WebHookRequestMethod string

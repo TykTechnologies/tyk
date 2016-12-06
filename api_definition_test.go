@@ -39,7 +39,7 @@ var sampleDefiniton string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		}
 	}
@@ -75,7 +75,7 @@ var nonExpiringDef string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		}
 	}
@@ -120,7 +120,7 @@ var nonExpiringMultiDef string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		}
 	}

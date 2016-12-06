@@ -2,9 +2,10 @@ package main
 
 import (
 	"errors"
-	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -20,6 +21,18 @@ func (t *TransformMethod) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (t *TransformMethod) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (t *TransformMethod) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.MethodTransforms) > 0 {
+			used = true
+			break
+		}
+	}
+
+	return used
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

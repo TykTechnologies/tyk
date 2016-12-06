@@ -3,14 +3,15 @@ package main
 import (
 	"bytes"
 	b64 "encoding/base64"
-	"github.com/gorilla/context"
-	"github.com/pmylund/go-cache"
 	"io"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gorilla/context"
+	"github.com/pmylund/go-cache"
 )
 
 // ContextKey is a key type to avoid collisions
@@ -19,13 +20,16 @@ type ContextKey int
 // Enums for keys to be stored in a session context - this is how gorilla expects
 // these to be implemented and is lifted pretty much from docs
 const (
-	SessionData       = 0
-	AuthHeaderValue   = 1
-	VersionData       = 2
-	VersionKeyContext = 3
-	OrgSessionContext = 4
-	ContextData       = 5
-	RetainHost        = 6
+	SessionData            = 0
+	AuthHeaderValue        = 1
+	VersionData            = 2
+	VersionKeyContext      = 3
+	OrgSessionContext      = 4
+	ContextData            = 5
+	RetainHost             = 6
+	SkipCoProcessAuth      = 7
+	TrackThisEndpoint      = 8
+	DoNotTrackThisEndpoint = 9
 )
 
 var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
@@ -125,6 +129,9 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 					thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 					thisSession.Rate = policy.Rate
 					thisSession.Per = policy.Per
+					if policy.LastUpdated != "" {
+						thisSession.LastUpdated = policy.LastUpdated
+					}
 				}
 
 				if policy.Partitions.Acl {
@@ -145,6 +152,9 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 				thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 				thisSession.Rate = policy.Rate
 				thisSession.Per = policy.Per
+				if policy.LastUpdated != "" {
+					thisSession.LastUpdated = policy.LastUpdated
+				}
 
 				// ACL
 				thisSession.AccessRights = policy.AccessRights
@@ -159,7 +169,7 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 			log.Debug("Policy Applied, Access rights were: ", policy.AccessRights)
 
 			// Update the session in the session manager in case it gets called again
-			t.Spec.SessionManager.UpdateSession(key, *thisSession, t.Spec.APIDefinition.SessionLifetime)
+			t.Spec.SessionManager.UpdateSession(key, *thisSession, GetLifetime(t.Spec, thisSession))
 			log.Debug("Policy applied to key")
 		}
 	}
@@ -172,11 +182,12 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 	var thisSession SessionState
 	var found bool
 
+	log.Debug("Querying local cache")
 	// Check in-memory cache
 	if !config.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(key)
 		if found {
-			log.Debug("Key found in local cache")
+			log.Debug("--> Key found in local cache")
 			thisSession = cachedVal.(SessionState)
 			t.ApplyPolicyIfExists(key, &thisSession)
 			return thisSession, true
@@ -193,10 +204,11 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
-		log.Debug("Got key")
+		log.Debug("--> Got key")
 		return thisSession, true
 	}
 
+	log.Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	thisSession, found = t.Spec.AuthManager.IsKeyAuthorised(key)
 	if found {
@@ -208,7 +220,11 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &thisSession)
-		t.Spec.SessionManager.UpdateSession(key, thisSession, t.Spec.APIDefinition.SessionLifetime)
+
+		log.Debug("Lifetime is: ", GetLifetime(t.Spec, &thisSession))
+		// Need to set this in order for the write to work!
+		thisSession.LastUpdated = time.Now().String()
+		t.Spec.SessionManager.UpdateSession(key, thisSession, GetLifetime(t.Spec, &thisSession))
 	}
 
 	return thisSession, found
@@ -271,9 +287,23 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			}
 		}
 
+		trackThisEndpoint, ok := context.GetOk(r, TrackThisEndpoint)
+		trackedPath := r.URL.Path
+		trackEP := false
+		if ok {
+			trackEP = true
+			trackedPath = trackThisEndpoint.(string)
+		}
+
+		_, dnOk := context.GetOk(r, DoNotTrackThisEndpoint)
+		if dnOk {
+			trackEP = false
+			trackedPath = r.URL.Path
+		}
+
 		thisRecord := AnalyticsRecord{
 			r.Method,
-			r.URL.Path,
+			trackedPath,
 			r.URL.Path,
 			r.ContentLength,
 			r.Header.Get("User-Agent"),
@@ -296,6 +326,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			GeoData{},
 			tags,
 			alias,
+			trackEP,
 			time.Now(),
 		}
 

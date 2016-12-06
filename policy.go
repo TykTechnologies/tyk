@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/Sirupsen/logrus"
-	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"gopkg.in/mgo.v2/bson"
 )
 
 type Policy struct {
@@ -28,6 +29,7 @@ type Policy struct {
 		RateLimit bool `bson:"rate_limit" json:"rate_limit"`
 		Acl       bool `bson:"acl" json:"acl"`
 	} `bson:"partitions" json:"partitions"`
+	LastUpdated string `bson:"last_updated" json:"last_updated"`
 }
 
 type DBAccessDefinition struct {
@@ -91,7 +93,6 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	policies := make(map[string]Policy)
 
 	// Get the definitions
-	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
 		log.Error("Failed to create request: ", err)
@@ -100,17 +101,23 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	newRequest.Header.Add("authorization", secret)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 
-	ServiceNonceMutex.Lock()
-	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
 
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Mutex lock acquired... calling")
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 10 * time.Second,
 	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Calling dashboard service for policy list")
 	response, reqErr := c.Do(newRequest)
 
 	if reqErr != nil {
-		log.Error("Request failed: ", reqErr)
+		log.Error("Policy request failed: ", reqErr)
+
 		return policies
 	}
 
@@ -118,7 +125,8 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	retBody, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
-		log.Error("Failed to read body: ", err)
+		log.Error("Failed to read policy body: ", err)
+
 		return policies
 	}
 
@@ -129,18 +137,29 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 		Nonce   string
 	}
 
+	if response.StatusCode == 403 {
+		log.Error("Policy request login failure, Response was: ", string(retBody))
+		reloadScheduled = false
+
+		ReLogin()
+		return policies
+	}
+
 	thisList := NodeResponseOK{}
 
 	decErr := json.Unmarshal(retBody, &thisList)
 	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
+		log.Error("Failed to decode policy body: ", decErr, "Returned: ", string(retBody))
+
 		return policies
 	}
 
-	
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
 
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Processing policy list")
 	for _, p := range thisList.Message {
 		thisID := p.MID.Hex()
 		if allowExplicit {
@@ -177,7 +196,7 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 
 	rpcPolicies := store.GetPolicies(orgId)
 
-	store.Disconnect()
+	//store.Disconnect()
 
 	jErr1 := json.Unmarshal([]byte(rpcPolicies), &dbPolicyList)
 

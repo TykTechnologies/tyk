@@ -5,7 +5,8 @@ import "net/http"
 import (
 	"encoding/base64"
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"golang.org/x/crypto/bcrypt"
 	"strings"
@@ -22,6 +23,10 @@ func (k *BasicAuthKeyIsValid) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (k *BasicAuthKeyIsValid) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (a *BasicAuthKeyIsValid) IsEnabledForSpec() bool {
+	return true
 }
 
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
@@ -130,8 +135,10 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Set session state on context, we will need it later
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, keyName)
+	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.BasicAuthUser) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, keyName)
+	}
 
 	// Request is valid, carry on
 	return nil, 200

@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
 	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 )
 
 type URLRewriter struct{}
@@ -158,6 +159,19 @@ type URLRewriteMiddlewareConfig struct{}
 
 // New lets you do any initialisations for the object can be done here
 func (m *URLRewriteMiddleware) New() {}
+
+func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range m.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.URLRewrite) > 0 {
+			used = true
+			m.TykMiddleware.Spec.URLRewriteEnabled = true
+			break
+		}
+	}
+
+	return used
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {

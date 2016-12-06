@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/Sirupsen/logrus"
+	"time"
+
+	"github.com/TykTechnologies/logrus"
 	"github.com/lonelycode/gorpc"
 	"gopkg.in/vmihailenco/msgpack.v2"
-	"time"
 )
 
 // Purger is an interface that will define how the in-memory store will be purged
@@ -31,6 +32,17 @@ func (r *RPCPurger) ReConnect() {
 
 // Connect Connects to RPC
 func (r *RPCPurger) Connect() {
+	if RPCClientIsConnected {
+		if RPCCLientSingleton != nil {
+			if RPCFuncClientSingleton != nil {
+				log.Info("RPC Analytics client using singleton")
+				r.RPCClient = RPCCLientSingleton
+				r.Client = RPCFuncClientSingleton
+				return
+			}
+		}
+	}
+
 	log.Info("Connecting to RPC Analytics service")
 	r.RPCClient = gorpc.NewTCPClient(r.Address)
 

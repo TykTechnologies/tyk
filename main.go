@@ -3,33 +3,34 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	"github.com/TykTechnologies/tykcommon"
-	logger "github.com/TykTechnologies/tykcommon-logger"
-	"github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/docopt/docopt.go"
-	"github.com/evalphobia/logrus_sentry"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-	"github.com/lonelycode/logrus-graylog-hook"
-	osin "github.com/lonelycode/osin"
-	"github.com/rcrowley/goagain"
-	"github.com/rs/cors"
 	"html/template"
 	"io/ioutil"
 	"log/syslog"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime/pprof"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/goagain"
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/logrus-logstash-hook"
+	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
+	"github.com/TykTechnologies/logrus_sentry"
+	"github.com/TykTechnologies/tykcommon"
+	logger "github.com/TykTechnologies/tykcommon-logger"
+	"github.com/docopt/docopt.go"
+	"github.com/facebookgo/pidfile"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
+	"github.com/lonelycode/logrus-graylog-hook"
+	osin "github.com/lonelycode/osin"
+	"github.com/rs/cors"
+	"rsc.io/letsencrypt"
 )
 
 var log = logger.GetLogger()
@@ -47,12 +48,16 @@ var DefaultQuotaStore = DefaultSessionManager{}
 var FallbackKeySesionManager SessionHandler = &DefaultSessionManager{}
 var MonitoringHandler TykEventHandler
 var RPCListener = RPCStorageHandler{}
+var argumentsBackup map[string]interface{}
+var DashService DashboardServiceSender
 
 var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
 
 var mainRouter *mux.Router
 var defaultRouter *mux.Router
+var LE_MANAGER letsencrypt.Manager
+var LE_FIRSTRUN bool
 
 var NodeID string
 
@@ -65,12 +70,19 @@ const (
 
 // Display configuration options
 func displayConfig() {
+	address := config.ListenAddress
+	if config.ListenAddress == "" {
+		address = "(open interface)"
+	}
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("--> Listening on address: ", config.ListenAddress)
+	}).Info("--> Listening on address: ", address)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("--> Listening on port: ", config.ListenPort)
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("--> PID: ", HostDetails.PID)
 }
 
 func getHostName() string {
@@ -127,22 +139,23 @@ func setupGlobals() {
 			thisPurger.Connect()
 			analytics.Clean = &thisPurger
 			go analytics.Clean.StartPurgeLoop(10)
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Warn("Cache purging is no longer part of Tyk Gateway, please use Tyk-Pump.")
 		}
 
 	}
 
 	//genericOsinStorage = MakeNewOsinServer()
 
-	templateFile := fmt.Sprintf("%s/error.json", config.TemplatePath)
-	templates = template.Must(template.ParseFiles(templateFile))
+	// Load all the files that have the "error" prefix.
+	templatesDir := filepath.Join(config.TemplatePath, "error*")
+	templates = template.Must(template.ParseGlob(templatesDir))
 
 	// Set up global JSVM
 	if config.EnableJSVM {
 		GlobalEventsJSVM.Init(config.TykJSPath)
+	}
+
+	if config.CoProcessOptions.EnableCoProcess {
+		CoProcessInit()
 	}
 
 	// Get the notifier ready
@@ -172,6 +185,32 @@ func setupGlobals() {
 
 }
 
+func waitForZeroConf() {
+	if config.DBAppConfOptions.ConnectionString == "" {
+		time.Sleep(1 * time.Second)
+		waitForZeroConf()
+	}
+}
+
+func buildConnStr(resource string) string {
+
+	if config.DBAppConfOptions.ConnectionString == "" && config.DisableDashboardZeroConf {
+		log.Fatal("Connection string is empty, failing.")
+		return ""
+	}
+
+	if config.DisableDashboardZeroConf == false && config.DBAppConfOptions.ConnectionString == "" {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Waiting for zeroconf signal...")
+		waitForZeroConf()
+	}
+
+	connStr := config.DBAppConfOptions.ConnectionString
+	connStr = connStr + resource
+	return connStr
+}
+
 // Pull API Specs from configuration
 var APILoader APIDefinitionLoader = APIDefinitionLoader{}
 
@@ -179,27 +218,21 @@ func getAPISpecs() *[]*APISpec {
 	var APISpecs *[]*APISpec
 
 	if config.UseDBAppConfigs {
-		if config.DBAppConfOptions.ConnectionString != "" {
-			connStr := config.DBAppConfOptions.ConnectionString
-			connStr = connStr + "/system/apis"
 
-			APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
-
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatal("No connection string or node ID present. Failing.")
-		}
+		connStr := buildConnStr("/system/apis")
+		APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debug("Using App Configuration from Dashboard Service")
+		}).Debug("Downloading API Configurations from Dashboard Service")
 	} else if config.SlaveOptions.UseRPC {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
+
 		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
+
 		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
@@ -227,16 +260,16 @@ func getPolicies() {
 	thesePolicies := make(map[string]Policy)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Debug("Loading policies")
+	}).Info("Loading policies")
 
 	if config.Policies.PolicySource == "service" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Using Policies from Dashboard Service")
-
 		if config.Policies.PolicyConnectionString != "" {
 			connStr := config.Policies.PolicyConnectionString
 			connStr = connStr + "/system/policies"
+
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Using Policies from Dashboard Service")
 
 			thesePolicies = LoadPoliciesFromDashboard(connStr, config.NodeSecret, config.Policies.AllowExplicitPolicyID)
 
@@ -270,6 +303,9 @@ func getPolicies() {
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(Muxer *mux.Router) {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Initialising Tyk REST API Endpoints")
 
 	var ApiMuxer *mux.Router
 	ApiMuxer = Muxer
@@ -278,9 +314,6 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 			ApiMuxer = Muxer.Host(config.ControlAPIHostname).Subrouter()
 		}
 	}
-
-	// Add a root message to check all is OK
-	ApiMuxer.HandleFunc("/hello", pingTest)
 
 	// set up main API handlers
 	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
@@ -388,12 +421,24 @@ func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
 	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition) {
+func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, tykcommon.MiddlewareDriver) {
 	mwPaths := []string{}
+	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
+	mwPostKeyAuthFuncs := []tykcommon.MiddlewareDefinition{}
+	mwDriver := tykcommon.OttoDriver
 
-	// Load form the configuration
+	// Set AuthCheck hook
+	if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" {
+		mwAuthCheckFunc = referenceSpec.APIDefinition.CustomMiddleware.AuthCheck
+		if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Path != "" {
+			// Feed a JS file to Otto
+			mwPaths = append(mwPaths, referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Path)
+		}
+	}
+
+	// Load from the configuration
 	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
@@ -439,6 +484,60 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 		}
 	}
 
+	// Get Auth folder path
+	middlewareAuthFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "auth")
+	mwAuthFiles, _ := ioutil.ReadDir(middlewareAuthFolderPath)
+	for _, f := range mwAuthFiles {
+		if strings.Contains(f.Name(), ".js") {
+			filePath := filepath.Join(middlewareAuthFolderPath, f.Name())
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Loading Auth file middleware from ", filePath)
+			middlewareObjectName := strings.Split(f.Name(), ".")[0]
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware name ", middlewareObjectName)
+
+			thisMWDef := tykcommon.MiddlewareDefinition{}
+			thisMWDef.Name = middlewareObjectName
+			thisMWDef.Path = filePath
+			thisMWDef.RequireSession = false
+
+			mwPaths = append(mwPaths, filePath)
+			mwAuthCheckFunc = thisMWDef
+			// only one allowed!
+			break
+		}
+	}
+
+	// Get POSTKeyAuth folder path
+	middlewarePostKeyAuthFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post_auth")
+	mwPostKeyAuthFiles, _ := ioutil.ReadDir(middlewarePostKeyAuthFolderPath)
+	for _, f := range mwPostKeyAuthFiles {
+		if strings.Contains(f.Name(), ".js") {
+			filePath := filepath.Join(middlewarePostKeyAuthFolderPath, f.Name())
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Loading POST-KEY-AUTH-PROCESSOR file middleware from ", filePath)
+			middlewareObjectName := strings.Split(f.Name(), ".")[0]
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware name ", middlewareObjectName)
+
+			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware requires session: ", requiresSession)
+			thisMWDef := tykcommon.MiddlewareDefinition{}
+			thisMWDef.Name = middlewareObjectName
+			thisMWDef.Path = filePath
+			thisMWDef.RequireSession = requiresSession
+
+			mwPaths = append(mwPaths, filePath)
+			mwPostKeyAuthFuncs = append(mwPostFuncs, thisMWDef)
+		}
+	}
+
 	// Get POST folder path
 	middlewarePostFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post")
 	mwPostFiles, _ := ioutil.ReadDir(middlewarePostFolderPath)
@@ -467,8 +566,21 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, []tykcommon.Middlew
 		}
 	}
 
-	return mwPaths, mwPreFuncs, mwPostFuncs
+	// Set middleware driver, defaults to OttoDriver
+	if referenceSpec.APIDefinition.CustomMiddleware.Driver != "" {
+		mwDriver = referenceSpec.APIDefinition.CustomMiddleware.Driver
+	}
 
+	// Load PostAuthCheck hooks
+	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.PostKeyAuth {
+		if mwObj.Path != "" {
+			// Otto files are specified here
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
+		mwPostKeyAuthFuncs = append(mwPostKeyAuthFuncs, mwObj)
+	}
+
+	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwDriver
 }
 
 func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
@@ -490,6 +602,9 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 		responseChain[i] = thisProcessor
 	}
 	referenceSpec.ResponseChain = &responseChain
+	if len(responseChain) > 0 {
+		referenceSpec.ResponseHandlersActive = true
+	}
 }
 
 func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
@@ -550,418 +665,17 @@ func (s SortableAPISpecListByHost) Less(i, j int) bool {
 	return len(s[i].Domain) > len(s[j].Domain)
 }
 
-// Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
-	// load the APi defs
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Loading API configurations.")
-
-	var tempSpecRegister = make(map[string]*APISpec)
-
-	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
-	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-
-	if config.SlaveOptions.UseRPC {
-		StartRPCKeepaliveWatcher(&rpcAuthStore)
-		StartRPCKeepaliveWatcher(&rpcOrgStore)
-	}
-
-	listenPaths := make(map[string][]string)
-
-	FallbackKeySesionManager.Init(&redisStore)
-
-	sort.Sort(SortableAPISpecListByHost(*APISpecs))
-	sort.Sort(SortableAPISpecListByListen(*APISpecs))
-
-	// Create a new handler for each API spec
-	for _, referenceSpec := range *APISpecs {
-		var skip bool
-		// We need a reference to this as we change it on the go and re-use it in a global index
-		//referenceSpec := (*APISpecs)[apiIndex]
-
+func notifyAPILoaded(spec *APISpec) {
+	if config.UseRedisLog {
 		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("--> Loading API: ", referenceSpec.APIDefinition.Name)
-
-		// Handle custom domains
-		var subrouter *mux.Router
-		if config.EnableCustomDomains {
-			if referenceSpec.Domain != "" {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Info("----> Custom Domain: ", referenceSpec.Domain)
-				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
-			} else {
-				subrouter = Muxer
-			}
-		} else {
-			subrouter = Muxer
-		}
-
-		onDomains, listenPathExists := listenPaths[referenceSpec.Proxy.ListenPath]
-		if listenPathExists {
-			if config.EnableCustomDomains == false {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Error("Duplicate listen path found, skipping. API ID: ", referenceSpec.APIID)
-				skip = true
-			} else {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Info("Domain check...")
-				for _, onDomain := range onDomains {
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("Checking Domain: ", onDomain)
-					if onDomain == referenceSpec.Domain {
-						log.WithFields(logrus.Fields{
-							"prefix": "main",
-						}).Error("Duplicate listen path found on domain, skipping. API ID: ", referenceSpec.APIID)
-						skip = true
-						break
-					}
-				}
-			}
-		}
-
-		if referenceSpec.Proxy.ListenPath == "" {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
-			skip = true
-		}
-
-		if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
-			skip = true
-		}
-
-		remote, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("Couldn't parse target URL: ", err)
-			skip = true
-		}
-
-		// Set up LB targets:
-		if referenceSpec.Proxy.EnableLoadBalancing {
-			thisSL := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
-			referenceSpec.Proxy.StructuredTargetList = *thisSL
-		}
-
-		if !skip {
-
-			listenPaths[referenceSpec.Proxy.ListenPath] = append(listenPaths[referenceSpec.Proxy.ListenPath], referenceSpec.Domain)
-			dN := referenceSpec.Domain
-			if dN == "" {
-				dN = "(no host)"
-			}
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("----> Tracking: ", dN)
-
-			// Initialise the auth and session managers (use Redis for now)
-			var authStore StorageHandler
-			var sessionStore StorageHandler
-			var orgStore StorageHandler
-
-			authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
-			// if config.SlaveOptions.OverrideDefinitionStorageSettings {
-			// 	authStorageEngineToUse = RPCStorageEngine
-			// }
-
-			switch authStorageEngineToUse {
-			case DefaultStorageEngine:
-				authStore = &redisStore
-				orgStore = &redisOrgStore
-			case LDAPStorageEngine:
-				thisStorageEngine := LDAPStorageHandler{}
-				thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
-				authStore = &thisStorageEngine
-				orgStore = &redisOrgStore
-			case RPCStorageEngine:
-				thisStorageEngine := &rpcAuthStore // &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-				authStore = thisStorageEngine
-				orgStore = &rpcOrgStore // &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-				config.EnforceOrgDataAge = true
-
-			default:
-				authStore = &redisStore
-				orgStore = &redisOrgStore
-			}
-
-			SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
-			// if config.SlaveOptions.OverrideDefinitionStorageSettings {
-			// 	SessionStorageEngineToUse = RPCStorageEngine
-			// }
-
-			switch SessionStorageEngineToUse {
-			case DefaultStorageEngine:
-				sessionStore = &redisStore
-
-			case RPCStorageEngine:
-				sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-			default:
-				sessionStore = &redisStore
-			}
-
-			// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
-			referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
-
-			//Set up all the JSVM middleware
-			mwPaths := []string{}
-			mwPreFuncs := []tykcommon.MiddlewareDefinition{}
-			mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-
-			if config.EnableJSVM {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Debug("----> Loading Middleware")
-				mwPaths, mwPreFuncs, mwPostFuncs = loadCustomMiddleware(referenceSpec)
-
-				referenceSpec.JSVM.LoadJSPaths(mwPaths)
-			}
-
-			if referenceSpec.EnableBatchRequestSupport {
-				addBatchEndpoint(referenceSpec, subrouter)
-			}
-
-			if referenceSpec.UseOauth2 {
-				log.Debug("Loading OAuth Manager")
-				if !RPC_EmergencyMode {
-					thisOauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
-					log.Debug("-- Added OAuth Handlers")
-
-					referenceSpec.OAuthManager = thisOauthManager
-					log.Debug("Done loading OAuth Manager")
-				} else {
-					log.Warning("RPC Emergency mode detected! OAuth APIs will not function!")
-				}
-			}
-
-			enableVersionOverrides := false
-			for _, versionData := range referenceSpec.VersionData.Versions {
-				if versionData.OverrideTarget != "" {
-					enableVersionOverrides = true
-					break
-				}
-			}
-
-			referenceSpec.target = remote
-			var proxy ReturningHttpHandler
-			if enableVersionOverrides {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Info("----> Multi target enabled")
-				proxy = &MultiTargetProxy{}
-			} else {
-				proxy = TykNewSingleHostReverseProxy(remote, referenceSpec)
-			}
-
-			// initialise the proxy
-			proxy.New(nil, referenceSpec)
-
-			// Create the response processors
-			creeateResponseMiddlewareChain(referenceSpec)
-
-			//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
-			tykMiddleware := &TykMiddleware{referenceSpec, proxy}
-
-			keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
-			CacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix}
-			CacheStore.Connect()
-
-			if referenceSpec.APIDefinition.UseKeylessAccess {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Info("----> Checking security policy: Open")
-
-				// Add pre-process MW
-				var chainArray = []alice.Constructor{}
-				handleCORS(&chainArray, referenceSpec)
-
-				var baseChainArray = []alice.Constructor{
-					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
-					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
-				}
-
-				for _, obj := range mwPreFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
-				}
-
-				for _, baseMw := range baseChainArray {
-					chainArray = append(chainArray, baseMw)
-				}
-
-				for _, obj := range mwPostFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
-				}
-
-				// for KeyLessAccess we can't support rate limiting, versioning or access rules
-				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Debug("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
-				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
-
-			} else {
-
-				// Select the keying method to use for setting session states
-				var keyCheck func(http.Handler) http.Handler
-
-				if referenceSpec.APIDefinition.UseOauth2 {
-					// Oauth2
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("----> Checking security policy: OAuth")
-					keyCheck = CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.APIDefinition.UseBasicAuth {
-					// Basic Auth
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("----> Checking security policy: Basic")
-					keyCheck = CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.EnableSignatureChecking {
-					// HMAC Auth
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("----> Checking security policy: HMAC")
-					keyCheck = CreateMiddleware(&HMACMiddleware{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.EnableJWT {
-					// JWT Auth
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("----> Checking security policy: JWT")
-					keyCheck = CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware)
-				} else if referenceSpec.UseOpenID {
-					// JWT Auth
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("----> Checking security policy: OpenID")
-
-					// initialise the OID configuration on this reference Spec
-					keyCheck = CreateMiddleware(&OpenIDMW{TykMiddleware: tykMiddleware}, tykMiddleware)
-				} else {
-					// Auth key
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("----> Checking security policy: Token")
-					keyCheck = CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware)
-				}
-
-				log.Debug("Chain array start")
-
-				var chainArray = []alice.Constructor{}
-
-				handleCORS(&chainArray, referenceSpec)
-				var baseChainArray = []alice.Constructor{
-					CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RequestSizeLimitMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-					keyCheck,
-					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-					//CreateMiddleware(&WebsockethandlerMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&GranularAccessMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&TransformHeaders{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&RedisCacheMiddleware{TykMiddleware: tykMiddleware, CacheStore: CacheStore}, tykMiddleware),
-					CreateMiddleware(&TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware),
-				}
-
-				log.Debug("Chain array end")
-				// Add pre-process MW
-				for _, obj := range mwPreFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, tykMiddleware))
-				}
-
-				for _, baseMw := range baseChainArray {
-					chainArray = append(chainArray, baseMw)
-				}
-
-				for _, obj := range mwPostFuncs {
-					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, tykMiddleware))
-				}
-
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Debug("----> Custom middleware processed")
-
-				// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
-				chain := alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
-
-				log.Debug("Chain completed")
-
-				userCheckHandler := http.HandlerFunc(UserRatesCheck())
-				simpleChain := alice.New(
-					CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-					keyCheck,
-					CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-					CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)).Then(userCheckHandler)
-
-				rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Debug("----> Rate limits available at: ", rateLimitPath)
-				subrouter.Handle(rateLimitPath, simpleChain)
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Info("----> Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
-				subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
-				log.Debug("Subrouter done")
-
-			}
-
-			tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
-			log.Debug("tempSpecRegister done")
-
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Warning("----> Skipped!")
-		}
-
+			"prefix":      "gateway",
+			"user_ip":     "--",
+			"server_name": "--",
+			"user_id":     "--",
+			"org_id":      spec.APIDefinition.OrgID,
+			"api_id":      spec.APIDefinition.APIID,
+		}).Info("Loaded: ", spec.APIDefinition.Name)
 	}
-
-	// Swap in the new register
-	ApiSpecRegister = &tempSpecRegister
-
-	log.Debug("Checker host list")
-
-	// Kick off our host checkers
-	if config.UptimeTests.Disable == false {
-		SetCheckerHostList()
-	}
-
-	log.Debug("Checker host Done")
-
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Initialised API Definitions")
 
 }
 
@@ -996,8 +710,13 @@ func doReload() {
 	}
 
 	// Reset the JSVM
-	GlobalEventsJSVM.Init(config.TykJSPath)
+	if config.EnableJSVM {
+		GlobalEventsJSVM.Init(config.TykJSPath)
+	}
 
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Preparing new router")
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
 
@@ -1031,7 +750,11 @@ var reloadScheduled bool
 
 func checkReloadTimeout() {
 	if reloadScheduled {
-		time.Sleep(30 * time.Second)
+		wait := config.ReloadWaitTime
+		if config.ReloadWaitTime == 0 {
+			wait = 10
+		}
+		time.Sleep(time.Duration(wait) * time.Second)
 		if reloadScheduled {
 			log.Warning("Reloader timed out! Removing sentinel")
 			reloadScheduled = false
@@ -1047,6 +770,9 @@ func ReloadURLStructure() {
 		reloadScheduled = true
 		log.Info("Initiating reload")
 		go doReload()
+		log.Info("Initiating coprocess reload")
+		go doCoprocessReload()
+		log.Info("Starting reload monitor...")
 		go checkReloadTimeout()
 	}
 }
@@ -1129,36 +855,7 @@ func setupLogger() {
 
 }
 
-func init() {
-
-	usage := `Tyk API Gateway.
-
-	Usage:
-		tyk [options]
-
-	Options:
-		-h --help                    Show this screen
-		--conf=FILE                  Load a named configuration file
-		--port=PORT                  Listen on PORT (overrides confg file)
-		--memprofile                 Generate a memory profile
-		--cpuprofile                 Generate a cpu profile
-		--debug                      Enable Debug output
-		--import-blueprint=<file>    Import an API Blueprint file
-		--import-swagger=<file>      Import a Swagger file
-		--create-api                 Creates a new API Definition from the blueprint
-		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
-		--upstream-target=<url>      Set the upstream target for the definition
-		--as-mock                    Creates the API as a mock based on example fields
-		--for-api=<path>             Adds blueprint to existing API Defintition as version
-		--as-version=<version>       The version number to use when inserting
-	`
-
-	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("Error while parsing arguments: ", err)
-	}
+func initialiseSystem(arguments map[string]interface{}) {
 
 	// Enable command mode
 	for k, _ := range CommandModeOptions {
@@ -1230,25 +927,88 @@ func init() {
 	// Enable all the loggers
 	setupLogger()
 
+	if config.PIDFileLocation == "" {
+		config.PIDFileLocation = "/var/run/tyk-gateway.pid"
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("PIDFile location set to: ", config.PIDFileLocation)
+
+	pidfile.SetPidfilePath(config.PIDFileLocation)
+	pfErr := pidfile.Write()
+
+	if pfErr != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Error("Failed to write PIDFile: ", pfErr)
+	}
+
+	GetHostDetails()
+
+	go StartPeriodicStateBackup(&LE_MANAGER)
 }
 
+func getCmdArguments() map[string]interface{} {
+	usage := `Tyk API Gateway.
+
+	Usage:
+		tyk [options]
+
+	Options:
+		-h --help                    Show this screen
+		--conf=FILE                  Load a named configuration file
+		--port=PORT                  Listen on PORT (overrides confg file)
+		--memprofile                 Generate a memory profile
+		--cpuprofile                 Generate a cpu profile
+		--debug                      Enable Debug output
+		--import-blueprint=<file>    Import an API Blueprint file
+		--import-swagger=<file>      Import a Swagger file
+		--create-api                 Creates a new API Definition from the blueprint
+		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
+		--upstream-target=<url>      Set the upstream target for the definition
+		--as-mock                    Creates the API as a mock based on example fields
+		--for-api=<path>             Adds blueprint to existing API Defintition as version
+		--as-version=<version>       The version number to use when inserting
+	`
+
+	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("Error while parsing arguments: ", err)
+	}
+
+	argumentsBackup = arguments
+	return arguments
+}
+
+var KeepaliveRunning bool
+
 func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
+	if KeepaliveRunning {
+		return
+	}
+
 	go func() {
 		log.WithFields(logrus.Fields{
 			"prefix": "RPC Conn Mgr",
 		}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 		for {
+			KeepaliveRunning = true
 			RPCKeepAliveCheck(engine)
 			if engine == nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "RPC Conn Mgr",
 				}).Info("No engine, break")
+				KeepaliveRunning = false
 				break
 			}
 			if engine.Killed == true {
 				log.WithFields(logrus.Fields{
 					"prefix": "RPC Conn Mgr",
 				}).Debug("[RPC Conn Mgr] this connection killed")
+				KeepaliveRunning = false
 				break
 			}
 		}
@@ -1257,6 +1017,10 @@ func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 
 func GetGlobalLocalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+}
+
+func GetGlobalLocalCacheStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
+	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys, IsCache: true}
 }
 
 func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
@@ -1282,7 +1046,94 @@ func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
 	return nil
 }
 
+// Handles pre-fork actions if we get a SIGHUP2
+var amForked bool
+
+func onFork() {
+	if config.UseDBAppConfigs {
+		log.Info("Stopping heartbeat")
+		DashService.StopBeating()
+
+		log.Info("Waiting to de-register")
+		time.Sleep(10 * time.Second)
+
+		os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+		os.Setenv("TYK_SERVICE_NODEID", NodeID)
+	}
+
+	amForked = true
+}
+
 func main() {
+	arguments := getCmdArguments()
+	NodeID = generateRandomNodeID()
+	l, goAgainErr := goagain.Listener(onFork)
+
+	if nil != goAgainErr {
+		initialiseSystem(arguments)
+		start()
+
+		var listenerErr error
+		l, listenerErr = generateListener(l)
+
+		// Check if listener was started successfully.
+		if listenerErr != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalf("Error starting listener: %s", listenerErr)
+		}
+
+		listen(l, goAgainErr)
+	} else {
+		initialiseSystem(arguments)
+		start()
+
+		listen(l, goAgainErr)
+
+		// Kill the parent, now that the child has started successfully.
+		log.Debug("KILLING PARENT PROCESS")
+		if err := goagain.Kill(); nil != err {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalln(err)
+		}
+	}
+
+	// Block the main goroutine awaiting signals.
+	if _, err := goagain.Wait(l); nil != err {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatalln(err)
+	}
+
+	// Do whatever's necessary to ensure a graceful exit
+	// In this case, we'll simply stop listening and wait one second.
+	if err := l.Close(); nil != err {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Error("Listen handler exit: ", err)
+	}
+
+	if !amForked {
+		log.Info("Stop signal received.")
+
+		if config.UseDBAppConfigs {
+			log.Info("Stopping heartbeat...")
+			DashService.StopBeating()
+			time.Sleep(2 * time.Second)
+			DashService.DeRegister()
+		}
+
+		log.Info("Terminating.")
+	} else {
+		log.Info("Terminated from fork.")
+	}
+
+	time.Sleep(3 * time.Second)
+
+}
+
+func start() {
 	if doMemoryProfile {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1332,12 +1183,114 @@ func main() {
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
 
-	listen()
 }
 
-func listen() {
+func generateListener(l net.Listener) (net.Listener, error) {
+	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
+
+	if config.HttpServerOptions.UseSSL {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Using SSL (https)")
+		certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
+		certNameMap := make(map[string]*tls.Certificate)
+		for i, certData := range config.HttpServerOptions.Certificates {
+			cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Fatalf("Server error: loadkeys: %s", err)
+			}
+			certs[i] = cert
+			certNameMap[certData.Name] = &certs[i]
+		}
+
+		config := tls.Config{
+			Certificates:      certs,
+			NameToCertificate: certNameMap,
+			ServerName:        config.HttpServerOptions.ServerName,
+			MinVersion:        config.HttpServerOptions.MinVersion,
+		}
+		return tls.Listen("tcp", targetPort, &config)
+
+	} else if config.HttpServerOptions.UseLE_SSL {
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Using SSL LE (https)")
+
+		GetLEState(&LE_MANAGER)
+
+		config := tls.Config{
+			GetCertificate: LE_MANAGER.GetCertificate,
+		}
+		return tls.Listen("tcp", targetPort, &config)
+
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("--> Standard listener (http)")
+		return net.Listen("tcp", targetPort)
+	}
+}
+
+func handleDashboardRegistration() {
+	if config.UseDBAppConfigs {
+
+		if DashService == nil {
+			DashService = &HTTPDashboardHandler{}
+			DashService.Init()
+		}
+
+		// connStr := buildConnStr("/register/node")
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Registering node.")
+		err := DashService.Register()
+		if err != nil {
+			log.Fatal("Registration failed: ", err)
+		}
+
+		startHeartBeat()
+	}
+}
+
+func startHeartBeat() {
+	// heartbeatConnStr := config.DBAppConfOptions.ConnectionString
+	// if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
+	// 	log.Fatal("Connection string is empty, failing.")
+	// }
+
+	// log.WithFields(logrus.Fields{
+	// 	"prefix": "main",
+	// }).Info("Starting heartbeat.")
+	// heartbeatConnStr = heartbeatConnStr + "/register/ping"
+	if config.UseDBAppConfigs {
+		if DashService == nil {
+			DashService = &HTTPDashboardHandler{}
+			DashService.Init()
+		}
+
+		go DashService.StartBeating()
+	}
+
+}
+
+func StartDRL() {
+	if !config.EnableSentinelRateLImiter && !config.EnableRedisRollingLimiter {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Initialising distributed rate limiter")
+		SetupDRL()
+		StartRateLimitNotifications()
+	}
+}
+
+func listen(l net.Listener, err error) {
 	ReadTimeout := 120
 	WriteTimeout := 120
+	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 	if config.HttpServerOptions.ReadTimeout > 0 {
 		ReadTimeout = config.HttpServerOptions.ReadTimeout
 	}
@@ -1345,78 +1298,18 @@ func listen() {
 	if config.HttpServerOptions.WriteTimeout > 0 {
 		WriteTimeout = config.HttpServerOptions.WriteTimeout
 	}
-	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 
 	// Handle reload when SIGUSR2 is received
-	l, err := goagain.Listener()
 	if nil != err {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Setting up Server")
-		if config.HttpServerOptions.UseSSL {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("--> Using SSL (https)")
-			certs := make([]tls.Certificate, len(config.HttpServerOptions.Certificates))
-			certNameMap := make(map[string]*tls.Certificate)
-			for i, certData := range config.HttpServerOptions.Certificates {
-				cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Fatalf("Server error: loadkeys: %s", err)
-				}
-				certs[i] = cert
-				certNameMap[certData.Name] = &certs[i]
-			}
 
-			config := tls.Config{
-				Certificates:      certs,
-				NameToCertificate: certNameMap,
-				ServerName:        config.HttpServerOptions.ServerName,
-				MinVersion:        config.HttpServerOptions.MinVersion,
-			}
-			l, err = tls.Listen("tcp", targetPort, &config)
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("--> Standard listener (http)")
-			l, err = net.Listen("tcp", targetPort)
-		}
+		// handle dashboard registration and nonces if available
+		handleDashboardRegistration()
 
-		// Check if listener was started successfully.
-		if nil != err {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalf("Error starting listener: %s", err)
-		}
-
-		// Accept connections in a new goroutine.
-		if config.UseDBAppConfigs {
-			connStr := config.DBAppConfOptions.ConnectionString
-			if connStr == "" {
-				log.Fatal("Connection string is empty, failing.")
-			}
-
-			connStr = connStr + "/register/node"
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Registering node.")
-			RegisterNodeWithDashboard(connStr, config.NodeSecret)
-
-			heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-			if heartbeatConnStr == "" {
-				log.Fatal("Connection string is empty, failing.")
-			}
-
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Starting heartbeat.")
-			heartbeatConnStr = heartbeatConnStr + "/register/ping"
-			go StartBeating(heartbeatConnStr, config.NodeSecret)
-
-		}
+		StartDRL()
 
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
@@ -1439,6 +1332,7 @@ func listen() {
 				Handler:      defaultRouter,
 			}
 
+			// Accept connections in a new goroutine.
 			go s.Serve(l)
 			displayConfig()
 		} else {
@@ -1454,13 +1348,34 @@ func listen() {
 
 	} else {
 
+		// handle dashboard registration and nonces if available
+		thisNonce := os.Getenv("TYK_SERVICE_NONCE")
+		thisID := os.Getenv("TYK_SERVICE_NODEID")
+		if thisNonce == "" || thisID == "" {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Warning("No nonce found, re-registering")
+			handleDashboardRegistration()
+
+		} else {
+			NodeID = thisID
+			ServiceNonce = thisNonce
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("State recovered")
+
+			os.Setenv("TYK_SERVICE_NONCE", "")
+			os.Setenv("TYK_SERVICE_NODEID", "")
+		}
+		StartDRL()
+
 		// Resume accepting connections in a new goroutine.
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Resuming listening on", l.Addr())
-		specs := getAPISpecs()
-		loadApps(specs, defaultRouter)
-		getPolicies()
+		if !RPC_EmergencyMode {
+			specs := getAPISpecs()
+			loadApps(specs, defaultRouter)
+			getPolicies()
+			startHeartBeat()
+		}
 
 		if config.HttpServerOptions.OverrideDefaults {
 			log.WithFields(logrus.Fields{
@@ -1484,33 +1399,12 @@ func listen() {
 			}).Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
 			http.Handle("/", mainRouter)
-			http.Serve(l, nil)
+			go http.Serve(l, nil)
 		}
 
-		// Kill the parent, now that the child has started successfully.
-		if err := goagain.Kill(); nil != err {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalln(err)
-		}
-
-	}
-
-	// Block the main goroutine awaiting signals.
-	if _, err := goagain.Wait(l); nil != err {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Fatalln(err)
-	}
+		}).Info("Resuming on", l.Addr())
 
-	// Do whatever's necessary to ensure a graceful exit like waiting for
-	// goroutines to terminate or a channel to become closed.
-	//
-	// In this case, we'll simply stop listening and wait one second.
-	if err := l.Close(); nil != err {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatalln(err)
 	}
-	//time.Sleep(1e9)
 }

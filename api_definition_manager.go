@@ -4,20 +4,21 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/rubyist/circuitbreaker"
-	"gopkg.in/mgo.v2"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	textTemplate "text/template"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
+	"github.com/rubyist/circuitbreaker"
+	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -48,6 +49,8 @@ const (
 	VirtualPath            URLStatus = 12
 	RequestSizeLimit       URLStatus = 13
 	MethodTransformed      URLStatus = 14
+	RequestTracked         URLStatus = 15
+	RequestNotTracked      URLStatus = 16
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -77,6 +80,8 @@ const (
 	StatusURLRewrite               RequestStatus = "URL Rewritten"
 	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
 	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
+	StatusRequesTracked            RequestStatus = "Request Tracked"
+	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -96,6 +101,8 @@ type URLSpec struct {
 	VirtualPathSpec         tykcommon.VirtualMeta
 	RequestSize             tykcommon.RequestSizeMeta
 	MethodTransform         tykcommon.MethodTransformMeta
+	TrackEndpoint           tykcommon.TrackEndpointMeta
+	DoNotTrackEndpoint      tykcommon.TrackEndpointMeta
 }
 
 type TransformSpec struct {
@@ -112,20 +119,25 @@ type ExtendedCircuitBreakerMeta struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	tykcommon.APIDefinition
-	RxPaths           map[string][]URLSpec
-	WhiteListEnabled  map[string]bool
-	target            *url.URL
-	AuthManager       AuthorisationHandler
-	SessionManager    SessionHandler
-	OAuthManager      *OAuthManager
-	OrgSessionManager SessionHandler
-	EventPaths        map[tykcommon.TykEvent][]TykEventHandler
-	Health            HealthChecker
-	JSVM              *JSVM
-	ResponseChain     *[]TykResponseHandler
-	RoundRobin        *RoundRobin
-	LastGoodHostList  *tykcommon.HostList
-	HasRun          bool
+
+	RxPaths                  map[string][]URLSpec
+	WhiteListEnabled         map[string]bool
+	target                   *url.URL
+	AuthManager              AuthorisationHandler
+	SessionManager           SessionHandler
+	OAuthManager             *OAuthManager
+	OrgSessionManager        SessionHandler
+	EventPaths               map[tykcommon.TykEvent][]TykEventHandler
+	Health                   HealthChecker
+	JSVM                     *JSVM
+	ResponseChain            *[]TykResponseHandler
+	RoundRobin               *RoundRobin
+	URLRewriteEnabled        bool
+	CircuitBreakerEnabled    bool
+	EnforcedTimeoutEnabled   bool
+	ResponseHandlersActive   bool
+	LastGoodHostList         *tykcommon.HostList
+	HasRun                   bool
 	ServiceRefreshInProgress bool
 }
 
@@ -136,7 +148,6 @@ type APIDefinitionLoader struct {
 }
 
 // Nonce to use when interacting with the dashboard service
-var ServiceNonceMutex = &sync.Mutex{}
 var ServiceNonce string
 
 // Connect connects to the storage engine - can be null
@@ -246,19 +257,6 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 
 }
 
-func ReLogin() {
-	connStr := config.DBAppConfOptions.ConnectionString
-	if connStr == "" {
-		log.Fatal("Connection string is empty, failing.")
-	}
-
-	connStr = connStr + "/register/node"
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Registering node.")
-	RegisterNodeWithDashboard(connStr, config.NodeSecret)
-}
-
 func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
@@ -270,7 +268,7 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	newRequest.Header.Add("authorization", secret)
 
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 20 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 
@@ -323,11 +321,8 @@ func RegisterNodeWithDashboard(endpoint string, secret string) error {
 	}).Info("Node registered")
 
 	// Set the nonce
-	ServiceNonceMutex.Lock()
-	defer ServiceNonceMutex.Unlock()
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
-	
 
 	return nil
 }
@@ -354,27 +349,22 @@ func SendHeartBeat(endpoint string, secret string) error {
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 	log.Debug("Sending Heartbeat as: ", NodeID)
 
-	ServiceNonceMutex.Lock()
-	defer ServiceNonceMutex.Unlock()
-
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
-	
 
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 10 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
+	defer response.Body.Close()
+	retBody, err := ioutil.ReadAll(response.Body)
 
 	if reqErr != nil {
-		return errors.New("Dashboard is down? Heartbeat is failing.")
+		return fmt.Errorf("Dashboard is down? Heartbeat is failing. (err: %v), response was: %s", reqErr, string(retBody))
 	}
 
 	if response.StatusCode != 200 {
-		return errors.New("Dashboard is down? Heartbeat is failing.")
+		return fmt.Errorf("Dashboard is down? Heartbeat is failing. (code invalid: %v), response was: %s", response.StatusCode, string(retBody))
 	}
-
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
 		return err
@@ -395,7 +385,7 @@ func SendHeartBeat(endpoint string, secret string) error {
 	}
 
 	// Set the nonce
-	
+
 	ServiceNonce = thisVal.Nonce
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
 
@@ -417,13 +407,10 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	log.Debug("Using: NodeID: ", NodeID)
 	newRequest.Header.Add("x-tyk-nodeid", NodeID)
 
-	ServiceNonceMutex.Lock()
-	defer ServiceNonceMutex.Unlock()
 	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
-	
 
 	c := &http.Client{
-		Timeout: 5*time.Second,
+		Timeout: 120 * time.Second,
 	}
 	response, reqErr := c.Do(newRequest)
 
@@ -435,6 +422,13 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	retBody, bErr := a.readBody(response)
 	if bErr != nil {
 		log.Error("Failed to read body: ", bErr)
+		return &APISpecs
+	}
+
+	if response.StatusCode == 403 {
+		log.Error("Login failure, Response was: ", string(retBody))
+		reloadScheduled = false
+		ReLogin()
 		return &APISpecs
 	}
 
@@ -453,12 +447,9 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 
 	decErr := json.Unmarshal(retBody, &thisList)
 	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
-		log.Debug("Response was: ", string(retBody))
-		log.Info("--> Retrying in 20s")
-		time.Sleep(time.Second * 20)
-		ReLogin()
-		return a.LoadDefinitionsFromDashboardService(endpoint, secret)
+		log.Error("Failed to decode body: ", decErr, "Response was: ", string(retBody))
+		log.Info("--> Retrying in 5s")
+		return &APISpecs
 		// return &APISpecs
 	}
 
@@ -509,7 +500,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	}
 
 	// Set the nonce
-	
 	ServiceNonce = thisList.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
@@ -532,7 +522,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
 
-	store.Disconnect()
+	//store.Disconnect()
 
 	if RPC_LoadCount > 0 {
 		SaveRPCDefinitionsBackup(apiCollection)
@@ -854,10 +844,7 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.Ci
 		log.Debug("Initialising circuit breaker for: ", stringSpec.Path)
 		newSpec.CircuitBreaker.CB = circuit.NewRateBreaker(stringSpec.ThresholdPercent, stringSpec.Samples)
 		events := newSpec.CircuitBreaker.CB.Subscribe()
-		go func() {
-			path := stringSpec.Path
-			spec := apiSpec
-			breakerPtr := newSpec.CircuitBreaker.CB
+		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false
 			for {
 				e := <-events
@@ -904,7 +891,7 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []tykcommon.Ci
 
 				}
 			}
-		}()
+		}(stringSpec.Path, apiSpec, newSpec.CircuitBreaker.CB)
 
 		thisURLSpec = append(thisURLSpec, newSpec)
 	}
@@ -954,6 +941,34 @@ func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []tykcommon.Virt
 	return thisURLSpec
 }
 
+func (a *APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []tykcommon.TrackEndpointMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.TrackEndpoint = stringSpec
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
+func (a *APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []tykcommon.TrackEndpointMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+	thisURLSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.DoNotTrackEndpoint = stringSpec
+		thisURLSpec = append(thisURLSpec, newSpec)
+	}
+
+	return thisURLSpec
+}
+
 func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -971,6 +986,8 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit)
 	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
+	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, apiSpec)
+	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, apiSpec)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -987,6 +1004,8 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef tykcommon.Versi
 	combinedPath = append(combinedPath, requestSizes...)
 	combinedPath = append(combinedPath, virtualPaths...)
 	combinedPath = append(combinedPath, methodTransforms...)
+	combinedPath = append(combinedPath, trackedPaths...)
+	combinedPath = append(combinedPath, unTrackedPaths...)
 
 	if len(whiteListPaths) > 0 {
 		return combinedPath, true
@@ -1032,6 +1051,10 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestSizeControlled
 	case MethodTransformed:
 		return StatusMethodTransformed
+	case RequestTracked:
+		return StatusRequesTracked
+	case RequestNotTracked:
+		return StatusRequestNotTracked
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1155,6 +1178,15 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 				case MethodTransformed:
 					if method != nil && method.(string) == v.MethodTransform.Method {
 						return true, &v.MethodTransform
+					}
+
+				case RequestTracked:
+					if method != nil && method.(string) == v.TrackEndpoint.Method {
+						return true, &v.TrackEndpoint
+					}
+				case RequestNotTracked:
+					if method != nil && method.(string) == v.DoNotTrackEndpoint.Method {
+						return true, &v.DoNotTrackEndpoint
 					}
 				}
 

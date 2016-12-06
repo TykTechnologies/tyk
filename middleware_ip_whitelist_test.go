@@ -38,7 +38,7 @@ var ipMiddlewareTestDefinitionEnabledFail string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		},
 		"enable_ip_whitelisting": true,
@@ -76,7 +76,7 @@ var ipMiddlewareTestDefinitionEnabledPass string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		},
 		"enable_ip_whitelisting": true,
@@ -114,7 +114,7 @@ var ipMiddlewareTestDefinitionDisabled string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		},
 		"enable_ip_whitelisting": false,
@@ -152,7 +152,7 @@ var ipMiddlewareTestDefinitionMissing string = `
 		},
 		"proxy": {
 			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
+			"target_url": "http://example.com",
 			"strip_listen_path": false
 		}
 	}
@@ -187,7 +187,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234wer", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -216,7 +216,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -245,7 +245,7 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -274,7 +274,7 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -303,7 +303,7 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -333,7 +333,7 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234rtyrty", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()
@@ -361,7 +361,7 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234iuouio", thisSession, 60)
-	uri := "/about-lonelycoder/"
+	uri := "/"
 	method := "GET"
 
 	recorder := httptest.NewRecorder()

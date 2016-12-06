@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"time"
 )
 
@@ -41,6 +42,8 @@ type MiniRequestObject struct {
 type VMReturnObject struct {
 	Request     MiniRequestObject
 	SessionMeta map[string]string
+	Session     SessionState
+	AuthValue   string
 }
 
 type nopCloser struct {
@@ -57,6 +60,7 @@ type DynamicMiddleware struct {
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool
+	Auth                bool
 }
 
 type DynamicMiddlewareConfig struct {
@@ -65,6 +69,10 @@ type DynamicMiddlewareConfig struct {
 
 // New lets you do any initialisations for the object can be done here
 func (d *DynamicMiddleware) New() {}
+
+func (a *DynamicMiddleware) IsEnabledForSpec() bool {
+	return true
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
@@ -148,6 +156,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Decode the return object
 	newRequestData := VMReturnObject{}
+
 	decErr := json.Unmarshal([]byte(returnDataStr), &newRequestData)
 
 	if decErr != nil {
@@ -203,7 +212,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		if d.UseSession {
 			if len(newRequestData.SessionMeta) > 0 {
 				thisSessionState.MetaData = newRequestData.SessionMeta
-				d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, 0)
+				d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(d.Spec, &thisSessionState))
 			}
 
 		}
@@ -216,6 +225,12 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 {
 		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
 	}
+
+	if d.Auth {
+		context.Set(r, SessionData, newRequestData.Session)
+		context.Set(r, AuthHeaderValue, newRequestData.AuthValue)
+	}
+
 	return nil, 200
 }
 
@@ -240,8 +255,11 @@ func (j *JSVM) Init(coreJS string) {
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
-func (j *JSVM) LoadJSPaths(paths []string) {
+func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
 	for _, mwPath := range paths {
+		if pathPrefix != "" {
+			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
+		}
 		js, loadErr := ioutil.ReadFile(mwPath)
 		if loadErr != nil {
 			log.WithFields(logrus.Fields{

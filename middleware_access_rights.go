@@ -4,7 +4,7 @@ import "net/http"
 
 import (
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 )
 
@@ -21,6 +21,10 @@ func (a *AccessRightsCheck) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (a *AccessRightsCheck) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (a *AccessRightsCheck) IsEnabledForSpec() bool {
+	return true
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

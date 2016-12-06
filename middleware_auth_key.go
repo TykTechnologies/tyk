@@ -5,7 +5,8 @@ import "net/http"
 import (
 	"bytes"
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"io"
 	"io/ioutil"
@@ -22,6 +23,10 @@ func (k AuthKey) New() {}
 // GetConfig retrieves the configuration from the API config
 func (k *AuthKey) GetConfig() (interface{}, error) {
 	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
+}
+
+func (a *AuthKey) IsEnabledForSpec() bool {
+	return true
 }
 
 func (k *AuthKey) copyResponse(dst io.Writer, src io.Reader) {
@@ -59,7 +64,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 			contextDataObject["token"] = token
 			context.Set(r, ContextData, contextDataObject)
 		}
-		
+
 	}
 }
 
@@ -137,9 +142,12 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	// Set session state on context, we will need it later
-	context.Set(r, SessionData, thisSessionState)
-	context.Set(r, AuthHeaderValue, key)
-	k.setContextVars(r, key)
+	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.AuthToken) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, AuthHeaderValue, key)
+		k.setContextVars(r, key)
+	}
+
 	return nil, 200
 }
 

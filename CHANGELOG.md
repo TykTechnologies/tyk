@@ -1,10 +1,13 @@
 # Develop
 
+- It is now possible to separate out the cache data store from the main redis store
 - Context Data now includes JWT Claims, claims are added as individual keys as $tyk_context.jwt_claims_CLAIMNAME.
 - Meta data is now available to the URL Rewriter (for e.g. to inject a custom querystring for key holders.)
-- Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}` 
+- Added API to invalidate a cache for an API: `DELETE /tyk/cache/{api-id}`
 - It is now possible to rewrite a URL with a new host and have the host act as an override to any target settings that are in the API Definition
 - Added more remote logger support: Graylog, Syslog and Logstash
+- Added a global setting for middleware bundles, to set the global base URL for middleware bundles use `"bundle_base_url":"http://mybundles.com/"` in tyk.conf.
+- The error handler now supports custom error templates. XML templates are supported as well. It's possible to have templates for specific HTTP errors, like "error_500.json".
 
 ### Graylog:
 
@@ -24,13 +27,47 @@ If the transport or address are empty, syslog will log to file
     "use_logstash": "true"
     "logstash_transport": "tcp",
     "logstash_network_addr": "172.17.0.2:9999"
-    
+
+- Added support for multiple auth methods to be chained, e.g. Basic Auth and Standard auth tokens. This can be tricky because you must also specify which auth mechanism will provide the baseline identity that Tyk will use for applying rate limits / quotas, to set this, set the field: `base_identity_provided_by` to one of the enums below:
+
+    AuthToken     AuthTypeEnum = "auth_token"
+    HMACKey       AuthTypeEnum = "hmac_key"
+    BasicAuthUser AuthTypeEnum = "basic_auth_user"
+    JWTClaim      AuthTypeEnum = "jwt_claim"
+    OIDCUser      AuthTypeEnum = "oidc_user"
+    OAuthKey      AuthTypeEnum = "oauth_key"
+    UnsetAuth     AuthTypeEnum = ""
+
+- (multi-auth continued) Tyk will chain the auth mechanisms as they appear in the code and will default to auth token if none are specified. You can explicitly set auth token by setting `use_standard_auth` to true.
+- It's now possible to write custom middleware in Python (see [Coprocess](https://github.com/TykTechnologies/tyk/tree/experiment/coprocess/coprocess)).
+- Tyk gateway can now be hot-restarted with a new configuration / binary using the -SUGUSR2 signal
+- Tyk gateway (with dashboard) no longer needs the dashboard URL configured as it will auto-discover this so long as it is set in the dashboard configuration file
+- Tyk Gateway now uses "lazy loading" of middleware, so only the absolute minimum required processing is done for each request, this includes CB and other features
+- Introduced a new in-memory distributed rate limiter, this removes the dependency on redis and makes performance much smoother, the DRL will measure load on each node and modify rate limits accordingly (so for example, on two nodes, the rate limit must be split between them), depending on the way the load is being distributed, one node may be getting less traffic than the others, the trate limiter will attempt to compensate for this. Load information is broadcast via redis pub/sub every 5s, this can be changed in tyk.conf. it is possible to use the old rate limiter too, simply ensure that `enable_redis_rolling_limiter` is set to true.
+- Analytics writer now uses a managed pool, this mean a smoother performance curve under very high load (2k req p/s)
+- All config settings can now be overriden with an environmnt variable, env variables must start with TYK_GW and must use the configuration object names specified in the `config.go`, NOT in the JSON file
+- Implemented a cache mechanism for APIs that use the CP (CoProcess) feature, see "ID extractor".
+- Session lifetime can be set globally (and forced, with a flag), add `"global_session_lifetime": 10` to your `tyk.conf`, where `10` is the session lifetime value you want to use. To force this value across all the APIs and override the per-API session lifetime, add `"force_global_session_lifetime": true` to your `tyk.conf`.
+- Added (experimental, beta) LetsEncrypt support, the gateway will cache domain data as it sees it and synchronise / cache ssl certificates in Redis, to enable simply set `"http_server_options.use_ssl_le": true`
+- Fixed a bug in which HMAC signatures generated in some libraries where URL-encoded cahracters result in a lower-cased octet pair instead of upper-cased (Golang / Java Default) caused valid HMAC strings to fail. We now check for this after an intiial failure just in case.
+- Adding an `auth` or `post_auth` folder to a middleware api-id folder will let you add custom auth middleware and post-auth middleware that uses the JSVM
+- Adding JSVM middleware for post key auth and auth can now also be done in the api definition itself
+- Generate a key using:
+
+```
+# private key
+openssl genrsa -out privkey.pem 2048
+
+# public key
+openssl rsa -in privkey.pem -pubout -out pubkey.pem
+```
+
 
 # v2.2
 
 - Added the option to set the listen path (defaults to binding to all addresses)
 - Fixed URL Rewriter to better handle query strings
-- Added XML transform support for requests and responses, simply set the data type to `xml` int he transforms section and create your template the same way you would for JSON. 
+- Added XML transform support for requests and responses, simply set the data type to `xml` int he transforms section and create your template the same way you would for JSON.
 
 ### XML transform demo
 
@@ -93,7 +130,7 @@ Add the following section to the policy object:
         "acl": false
     }
 
-Then set the partitions that you want to overwrite to "true", the partitions that are marked as true will then be applied to the token instead of the full policy. 
+Then set the partitions that you want to overwrite to "true", the partitions that are marked as true will then be applied to the token instead of the full policy.
 
 - Added context variable support, this middleware will extract the path, the path parts (break on `/`), and try to pull all form-related data (url-form-encoded or query string params) and put them into a context variable that is available to other middleware. Currently this is only integrated with the body transform middleware as `_tyk_context`. To enable set `"enable_context_vars": true` in the API Definition. Transform sample:
 
@@ -104,13 +141,13 @@ Path: {{._tyk_context.path}}
     --> {{$v}}
     {{ end }}
 
-    Form/QueryString Data: {{._tyk_context.request_data}} 
+    Form/QueryString Data: {{._tyk_context.request_data}}
     Token: {{._tyk_context.token}}
 
 - Context variables also available in headers using `$tyk_context.` namespace
 - WARNING: POTENTIALLY BREAKING CHANGE: Flush interval is now in milliseconds, not seconds, before upgrading, if you are using flush interval, make sure that the value has been updated.
 - Context variables also available in URL rewriter
-- Added Websockets support (beta), websockets can now be proxied like a regular HTP request, tyk will detect the upgrade and initiate a proxy to the upstream websocket host. This can be TLS enabled and Tyk can proxy over HTTPS -> WSS upstream. 
+- Added Websockets support (beta), websockets can now be proxied like a regular HTP request, tyk will detect the upgrade and initiate a proxy to the upstream websocket host. This can be TLS enabled and Tyk can proxy over HTTPS -> WSS upstream.
 - Websockets execute at the end of the middleware chain, so all the benefits of CB and auth middleware can be enabled (within the limits of the WebSockets protocol)
 - No analytics are gatthered for these requests, but rate limiting, quotas and auth will work fully for initial connection requsts (e.g . to prevent connection flooding)
 
@@ -216,8 +253,8 @@ What happens:
 
 # v2.0
 
-- Limited multi-target support on a per-version basis: simply add "override_target": "http://domain.com" to the version section in your API Definition. Round Robin LB and Servie Discovery are *not* supported. 
-- Centralised JWT keys are now supported, adding `jwt_source` to an API definition will enable a central cert to validate all incoming tokens. 
+- Limited multi-target support on a per-version basis: simply add "override_target": "http://domain.com" to the version section in your API Definition. Round Robin LB and Servie Discovery are *not* supported.
+- Centralised JWT keys are now supported, adding `jwt_source` to an API definition will enable a central cert to validate all incoming tokens.
 - `jwt_source` can either be a base64 encoded valid RSA/HMAC key OR a JWK URL, if it is a JWK URL then the `kid` must match the one in the JWK
 - Centralised JWT keys need a `jwt_identity_base_field` that basically identifies the user in the Claims of the JWT, this will fallback to `sub` if not found. This field forms the basis of a new "virtual" token that gets used after validation, it means policy attributes are carried forward through Tyk for attribution purposes.
 - Centralised JWT keys also need a `jwt_policy_field_name` which sets the policy to apply to the "virtual" key
@@ -235,7 +272,7 @@ What happens:
 - REMOVED: MongoDB Policy poller
 - ADDED: Service-based API Definition loader (dashboard)
 - ADDED: Service-based Policy loader (dashboard)
-- To configure for API Defs: 
+- To configure for API Defs:
 
 	"use_db_app_configs": true,
     "db_app_conf_options": {
@@ -244,7 +281,7 @@ What happens:
         "tags": []
     },
 
-- To configure for Policies: 
+- To configure for Policies:
 
 	"policies": {
     	"policy_source": "service",
@@ -255,7 +292,7 @@ What happens:
 - X-Forwarded For now used to log IP addresses in event log
 - Analytics now records IP Address (OR X-F-F)
 - Analytics now records GeoIP data, to enable add (DB is MaxMind):
-	
+
 	```
 	"enable_geo_ip": true,
     "geo_ip_db_path": "./GeoLite2-City.mmdb"
@@ -285,14 +322,14 @@ What happens:
                 }
             }
         ]
-        
+
     }
 }
 ```
 
 - Nw Multi-DC / segregated environment / single dashboard support added for API and Keyspace propagation
 - Added new rate limit handler that is non-transactional, this can be enabled by setting `enable_non_transactional_rate_limiter` to true, this can provide exceptional performance improvements
-- Added option to enable or disable the sentinel-based rate-limiter, sentinel-based rate limiter provides a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cooldown for clients. Disabling the sentinel based limiter will make rate-limit calculations happen on-thread and therefore offers staggered cool-down and a smoother rate-limit experience for the client and similar performance as the sentinel-based limiter. This is disabled by default. To enable, set `enable_sentinel_rate_limiter` to `true` 
+- Added option to enable or disable the sentinel-based rate-limiter, sentinel-based rate limiter provides a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cooldown for clients. Disabling the sentinel based limiter will make rate-limit calculations happen on-thread and therefore offers staggered cool-down and a smoother rate-limit experience for the client and similar performance as the sentinel-based limiter. This is disabled by default. To enable, set `enable_sentinel_rate_limiter` to `true`
 
 # 1.9.1.1
 
@@ -349,7 +386,7 @@ What happens:
 
 - HMAC JWT secrets can be any string, but the secret is shared. RSA secrets must be a PEM encoded PKCS1 or PKCS8 RSA private key, these can be generated on a linux box using:
 
-	> openssl genrsa -out key.rsa 
+	> openssl genrsa -out key.rsa
 	> openssl rsa -in key.rsa -pubout > key.rsa.pub
 
 - Tyk JWT's MUST use the "kid" header attribute, as this is the internal access token (when creating a key) that is used to set the rate limits, policies and quotas for the user. The benefit here is that if RSA is used, then al that is stored in a Tyk installatino that uses hashed keys is the hashed ID of the end user and their public key, and so very secure.
@@ -442,7 +479,7 @@ What happens:
 	- Set the `allowed_access_types` array to include `password`
 	- Generate a valid access request with the client_id:client_secret as a Basic auth header and the u/p in the form of the body.
 	- POST to: `/oauth/token/` endpoint on your OAuth-enabled API
-	- If successfull, the user will get: 
+	- If successfull, the user will get:
 
 	```
 	{"access_token":"4i0VmSYMQ2iN7ivX0LaYBw","expires_in":3600,"refresh_token":"B_99PjEmQquufNWs8QYbow","token_type":"bearer"}
@@ -458,7 +495,7 @@ What happens:
 
 
 
-- Experimental Redis Cluster support, in tyk.conf: 
+- Experimental Redis Cluster support, in tyk.conf:
 
 	"storage": {
         "type": "redis",
@@ -496,9 +533,9 @@ What happens:
 # v1.8
 
 - Security option added for shared nodes: Set `disable_virtual_path_blobs=true` to stop virtual paths from loading blob fields
-- Added session meta data variables to transform middleware: 
+- Added session meta data variables to transform middleware:
 
-	You can reference session metadata attached to a key in the header injector using: 
+	You can reference session metadata attached to a key in the header injector using:
 
 	```
 	$tyk_meta.KEY_NAME
@@ -519,7 +556,7 @@ What happens:
 	To the path entry
 
 - Added CORS support, add a CORS section to your API definition:
-	 
+
 	 ```
 	 CORS: {
 	    enable: false,
@@ -575,7 +612,7 @@ What happens:
     ```
 
 - Virtual endpoint functions are pretty clean:
-	
+
 	```
 	function thisTest(request, session, config) {
 		log("Virtual Test running")
@@ -595,14 +632,14 @@ What happens:
 		var responseObject = {
 			Body: "THIS IS A  VIRTUAL RESPONSE"
 			Headers: {
-				"test": "virtual", 
+				"test": "virtual",
 				"test-2": "virtual"
 			},
 			Code: 200
 		}
 
 		return TykJsResponse(responseObject, session.meta_data)
-		
+
 	}
 	log("Virtual Test initialised")
 	```
@@ -643,7 +680,7 @@ Circuit breakers use a thresh-old-breaker pattern, so of sample size x if y% req
 The circuit breaker works across hosts (i.e. if you have multiple targets for an API, the samnple is across *all* upstream requests)
 
 When a circuit breaker trips, it will fire and event: `BreakerTriggered` which you can define actions for in the `event_handlers` section:
-	
+
 	```
 	event_handlers: {
 	    events: {
@@ -672,7 +709,7 @@ When a circuit breaker trips, it will fire and event: `BreakerTriggered` which y
 	```
 
 Status codes are:
-	
+
 	```
 	// BreakerTripped is sent when a breaker trips
 	BreakerTripped = 0
@@ -680,14 +717,14 @@ Status codes are:
 	// BreakerReset is sent when a breaker resets
 	BreakerReset = 1
 	```
-	
+
 - Added round-robin load balancing support, to enable, set up in the API Definition under the `proxy` section:
-	
+
 	...
 	"enable_load_balancing": true,
 	"target_list": [
-		"http://server1", 
-		"http://server2", 
+		"http://server1",
+		"http://server2",
 		"http://server3"
 	],
 	...
@@ -726,9 +763,9 @@ Status codes are:
 	- The response data is in JSON
 	- The response data can have a nested value set that will be an encoded JSON string, e.g. from etcd:
 
-	``` 
+	```
 	$ curl -L http://127.0.0.1:4001/v2/keys/services/solo
-	
+
 	{
 	    "action": "get",
 	    "node": {
@@ -742,7 +779,7 @@ Status codes are:
 
 	```
 	$ curl -L http://127.0.0.1:4001/v2/keys/services/multiobj
-	
+
 	{
 	    "action": "get",
 	    "node": {
@@ -754,7 +791,7 @@ Status codes are:
 	}
 	```
 
-	Here the key value is actually an encoded JSON string, which needs to be decoded separately to get to the data. 
+	Here the key value is actually an encoded JSON string, which needs to be decoded separately to get to the data.
 
 	- In some cases port data will be separate from host data, if you specify a `port_data_path`, the values will be zipped together and concatenated into a valid proxy string.
 	- If use_target_list is enabled, then enable_load_balancing msut also be enabled, as Tyk will treat the list as a target list.
@@ -786,7 +823,7 @@ Status codes are:
           ]
     }
     ...
- 
+
 
 # v1.7
 - Open APIs now support caching, body transforms and header transforms
@@ -853,7 +890,7 @@ Status codes are:
 - Added Policies feature, you can now define key policies for keys you generate:
     - Create a policies/policies.json file
     - Set the appropriate arguments in tyk.conf file:
-		
+
 		```
 		"policies": {
 			"policy_source": "file",
@@ -862,7 +899,7 @@ Status codes are:
 		```
 
 	- Create a policy, they look like this:
-	
+
 		```
 		{
 			"default": {
@@ -884,7 +921,7 @@ Status codes are:
 			}
 		}
 		```
-	
+
 	- Add a `apply_policy_id` field to your Session object when you create a key with your policy ID (in this case the ID is `default`)
 	- Reload Tyk
 	- Policies will be applied to Keys when they are loaded form Redis, and the updated i nRedis so they can be ueried if necessary
@@ -908,9 +945,9 @@ Status codes are:
 						"Default"
 					],
 					"allowed_urls": [
-						{	
+						{
 							"url": "/resource/(.*),
-							"methods": ["GET", "POST"] 
+							"methods": ["GET", "POST"]
 						}
 					]
 				}
@@ -925,7 +962,7 @@ Status codes are:
 - Added `cache_options.enable_upstream_cache_control` flag to API definitions
     - Upstream cache control is exclusive, caching must be enabled on the API, and the path to listen for upstream headers *must be defined in the `extended_paths` section*, otherwise the middleware will not activate for the path
     - Modified caching middleware to listen for two response headers: `x-tyk-cache-action-set` and `x-tyk-cache-action-set-ttl`.
-    - If an upstream application replies with the header `x-tyk-cache-action-set` set to `1` (or anything non empty), and upstream control is enabled. Tyk will cache the response. 
+    - If an upstream application replies with the header `x-tyk-cache-action-set` set to `1` (or anything non empty), and upstream control is enabled. Tyk will cache the response.
     - If the upstream application sets `x-tyk-cache-action-set-ttl` to a numeric value, and upstream control is enabled, the cached object will be created for whatever number of seconds this value is set to.
 - Added `auth.use_param` option to API Definitions, set to tru if you want Tyk to check for the API Token in the request parameters instead of the header, it will look for the value set in `auth.auth_header_name` and is *case sensitive*
 - Host manager now supports Portal NginX tempalte maangement, will generate portal configuration files for NginX on load for each organisation in DB
@@ -976,17 +1013,17 @@ Status codes are:
 - Added a `?reset_quota=1` parameter check to `/tyk/orgs/key` endpoint so that quotas can be reset for organisation-wide locks
 - Organisations can now have quotas
 - Keys and organisations can be made inactive without deleting
- 
+
 
 # v1.3:
 
-- It is now possible to set IP's that shouldn't be tracked by analytics by setting the `ignored_ips` flag in the config file (e.g. for health checks) 
+- It is now possible to set IP's that shouldn't be tracked by analytics by setting the `ignored_ips` flag in the config file (e.g. for health checks)
 - Many core middleware configs moved into tyk common, tyk common can now be cross-seeded into other apps if necessary and is go gettable.
 - Added a healthcheck function, calling `GET /tyk/health` with an `api_id` param, and the `X-Tyk-Authorization` header will return upstream latency average, requests per second, throttles per second, quota violations per second and key failure events per second. Can be easily extended to add more data.
 - Tyk now reports quote status in response headers (Issue #27)
 - Calling `/{api-id}/tyk/rate-limits` with an authorised header will return the rate limit for the current user without affecting them. Fixes issue #27
 - Extended path listing (issue #16) now enabled, legacy paths will still work. You can now create an extended path set which supports forced replies (for mocking) as well as limiting by method, so `GET /widget/1234` will work and `POST /windget/1234` will not.
-- You can now import API Blueprint files (JSON format) as new version definitions for your API, this includes mocking out responses. Blueprints can be added to existing API's as new versions or generate independent API definitions. 
+- You can now import API Blueprint files (JSON format) as new version definitions for your API, this includes mocking out responses. Blueprints can be added to existing API's as new versions or generate independent API definitions.
   - Create a new definition from blueprint: `./tyk --import-blueprint=blueprint.json --create-api --org-id=<id> --upstream-target="http://widgets.com/api/"`
   - Add a version to a definition: `./tyk --import-blueprint=blueprint.json --for-api=<api_id> --as-version="2.0"`
   - Create a mock for either: use the `--as-mock` parameter.

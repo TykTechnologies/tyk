@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"io"
 	"net/http"
 	"net/url"

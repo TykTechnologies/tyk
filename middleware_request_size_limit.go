@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
-	"github.com/Sirupsen/logrus"
-	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 	"strconv"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -21,6 +22,18 @@ func (t *RequestSizeLimitMiddleware) New() {}
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (t *RequestSizeLimitMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (t *RequestSizeLimitMiddleware) IsEnabledForSpec() bool {
+	var used bool
+	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(thisVersion.ExtendedPaths.SizeLimit) > 0 {
+			used = true
+			break
+		}
+	}
+
+	return used
 }
 
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {

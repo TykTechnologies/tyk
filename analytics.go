@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/jeffail/tunny"
 	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"net"
@@ -34,6 +35,7 @@ type AnalyticsRecord struct {
 	Geo           GeoData
 	Tags          []string
 	Alias         string
+	TrackPath     bool
 	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
 }
 
@@ -65,6 +67,11 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 
 	// Not great, tightly coupled
 	if analytics.GeoIPDB == nil {
+		return
+	}
+
+	// Sometimes it is empty, we can't look up mpty IP addresses
+	if ipStr == "" {
 		return
 	}
 
@@ -167,6 +174,8 @@ type AnalyticsHandler interface {
 	RecordHit(AnalyticsRecord) error
 }
 
+var AnalyticsPool *tunny.WorkPool
+
 // RedisAnalyticsHandler implements AnalyticsHandler and will record analytics
 // data to a redis back end as defined in the Config object
 type RedisAnalyticsHandler struct {
@@ -181,6 +190,17 @@ func (r *RedisAnalyticsHandler) Init() {
 	}
 
 	analytics.Store.Connect()
+	var err error
+
+	ps := config.AnalyticsConfig.PoolSize
+	if ps == 0 {
+		ps = 50
+	}
+
+	AnalyticsPool, err = tunny.CreatePoolGeneric(ps).Open()
+	if err != nil {
+		log.Error("Failed to init analytics pool")
+	}
 }
 
 func (r *RedisAnalyticsHandler) reloadDB() {
@@ -200,39 +220,41 @@ func (r *RedisAnalyticsHandler) reloadDB() {
 
 // RecordHit will store an AnalyticsRecord in Redis
 func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
-	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-	thisRecord.APIKey = publicHash(thisRecord.APIKey)
 
-	if config.SlaveOptions.UseRPC {
-		// Extend tag list to include this data so wecan segment by node if necessary
-		thisRecord.Tags = append(thisRecord.Tags, "tyk-hybrid-rpc")
-	}
+	AnalyticsPool.SendWork(func() {
+		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
+		thisRecord.APIKey = publicHash(thisRecord.APIKey)
 
-	if config.DBAppConfOptions.NodeIsSegmented {
-		// Extend tag list to include this data so wecan segment by node if necessary
-		thisRecord.Tags = append(thisRecord.Tags, config.DBAppConfOptions.Tags...)
-	}
+		if config.SlaveOptions.UseRPC {
+			// Extend tag list to include this data so wecan segment by node if necessary
+			thisRecord.Tags = append(thisRecord.Tags, "tyk-hybrid-rpc")
+		}
 
-	// Lets add some metadata
-	if thisRecord.APIKey != "" {
-		thisRecord.Tags = append(thisRecord.Tags, "key-"+thisRecord.APIKey)
-	}
+		if config.DBAppConfOptions.NodeIsSegmented {
+			// Extend tag list to include this data so wecan segment by node if necessary
+			thisRecord.Tags = append(thisRecord.Tags, config.DBAppConfOptions.Tags...)
+		}
 
-	if thisRecord.OrgID != "" {
-		thisRecord.Tags = append(thisRecord.Tags, "org-"+thisRecord.OrgID)
-	}
+		// Lets add some metadata
+		if thisRecord.APIKey != "" {
+			thisRecord.Tags = append(thisRecord.Tags, "key-"+thisRecord.APIKey)
+		}
 
-	thisRecord.Tags = append(thisRecord.Tags, "api-"+thisRecord.APIID)
+		if thisRecord.OrgID != "" {
+			thisRecord.Tags = append(thisRecord.Tags, "org-"+thisRecord.OrgID)
+		}
 
-	encoded, err := msgpack.Marshal(thisRecord)
+		thisRecord.Tags = append(thisRecord.Tags, "api-"+thisRecord.APIID)
 
-	if err != nil {
-		log.Error("Error encoding analytics data:")
-		log.Error(err)
-		return AnalyticsError{}
-	}
+		encoded, err := msgpack.Marshal(thisRecord)
 
-	r.Store.AppendToSet(ANALYTICS_KEYNAME, string(encoded))
+		if err != nil {
+			log.Error("Error encoding analytics data: ", err)
+		}
+
+		r.Store.AppendToSet(ANALYTICS_KEYNAME, string(encoded))
+	})
 
 	return nil
+
 }

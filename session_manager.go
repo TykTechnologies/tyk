@@ -73,15 +73,49 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				// Sentinel is set, fail
 				return false, 1
 			}
-		} else {
+		} else if config.EnableRedisRollingLimiter {
 			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
+				return false, 1
+			}
+		} else {
+			// In-memory limiter
+			if BucketStore == nil {
+				InitBucketStore()
+			}
+
+			// If a token has been updated, we must ensure we dont use
+			// an old bucket an let the cache deal with it
+			bucketKey := key + ":" + currentSession.LastUpdated
+
+			// DRL will always overflow with more servers on low rates
+			thisRate := uint(currentSession.Rate*float64(DRLManager.RequestTokenValue))
+			if thisRate < uint(DRLManager.CurrentTokenValue) {
+				thisRate = uint(DRLManager.CurrentTokenValue)
+			}
+
+			thisUserBucket, cErr := BucketStore.Create(bucketKey,
+				thisRate,
+				time.Duration(currentSession.Per)*time.Second)
+
+			if cErr != nil {
+				log.Error("Failed to create bucket!")
+				return false, 1
+			}
+
+			//log.Info("Add is: ", DRLManager.CurrentTokenValue)
+			_, errF := thisUserBucket.Add(uint(DRLManager.CurrentTokenValue))
+
+			if errF != nil {
 				return false, 1
 			}
 		}
 	}
 
 	if enableQ {
-		currentSession.Allowance--
+		if config.LegacyEnableAllowanceCountdown {
+			currentSession.Allowance--	
+		}
+		
 		if l.IsRedisQuotaExceeded(currentSession, key, store) {
 			return false, 2
 		}

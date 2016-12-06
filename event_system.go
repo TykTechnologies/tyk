@@ -161,9 +161,20 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 		if Spec != nil {
 			thisJSVMEventHandler, jsvmErr := JSVMEventHandler{Spec: Spec}.New(thisConf)
 			if jsvmErr == nil {
-				GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)})
+				GlobalEventsJSVM.LoadJSPaths([]string{thisConf.(map[string]interface{})["path"].(string)}, "")
 			}
 			return thisJSVMEventHandler, jsvmErr
+		}
+	case EH_CoProcessHandler:
+		if Spec != nil {
+			var thisCoProcessEventHandler TykEventHandler
+			var err error
+			if GlobalDispatcher == nil {
+				err = errors.New("No CP available!")
+			} else {
+				thisCoProcessEventHandler, err = CoProcessEventHandler{Spec: Spec}.New(thisConf)
+			}
+			return thisCoProcessEventHandler, err
 		}
 
 	}

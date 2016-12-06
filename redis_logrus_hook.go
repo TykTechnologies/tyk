@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"time"
 )
 

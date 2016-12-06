@@ -2,14 +2,16 @@ package main
 
 import (
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"io"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/gorpc"
 	"github.com/pmylund/go-cache"
-	"io"
-	"strings"
-	"time"
 )
 
 type InboundData struct {
@@ -48,33 +50,39 @@ var RPC_EmergencyModeLoaded bool
 
 var ErrorDenied error = errors.New("Access Denied")
 
+var GlobalRPCCallTimeout time.Duration
+
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
+var RPCCLientRWMutex sync.RWMutex = sync.RWMutex{}
 var RPCClients = map[string]chan int{}
 
 func ClearRPCClients() {
+	return
 	log.Info("Found: ", len(RPCClients), " RPC connections, terminating")
 	for _, c := range RPCClients {
 
 		select {
-	    case c <- 1:
-	        log.Debug("Disconnect sent")
-	    default:
-	        log.Debug("Disconnect chan failed")
-	    }
+		case c <- 1:
+			log.Debug("Disconnect sent")
+		default:
+			log.Debug("Disconnect chan failed")
+		}
 
-		go func(){ c <- 1 }()
+		go func() { c <- 1 }()
 	}
 }
 
 func RPCKeepAliveCheck(r *RPCStorageHandler) {
 	// Only run when connected
-	if r.Connected {
+	if RPCClientIsConnected {
 		// Make sure the auth back end is still alive
 		c1 := make(chan string, 1)
 
 		go func() {
+			log.Debug("Getting keyspace check test key")
 			r.GetKey("0000")
+			log.Debug("--> done")
 			c1 <- "1"
 			close(c1)
 		}()
@@ -87,7 +95,7 @@ func RPCKeepAliveCheck(r *RPCStorageHandler) {
 		case <-time.After(time.Second * 10):
 			log.WithFields(logrus.Fields{
 				"prefix": "RPC Conn Mgr",
-			}).Info("Handler seems to have disconnected, attempting reconnect")
+			}).Warning("Handler seems to have disconnected, attempting reconnect")
 			r.ReConnect()
 		}
 
@@ -100,13 +108,10 @@ func RPCKeepAliveCheck(r *RPCStorageHandler) {
 
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
-	RPCClient        *gorpc.Client
-	Client           *gorpc.DispatcherClient
 	KeyPrefix        string
 	HashKeys         bool
 	UserKey          string
 	Address          string
-	cache            *cache.Cache
 	killChan         chan int
 	Killed           bool
 	Connected        bool
@@ -122,7 +127,9 @@ func handleReconnect(r *RPCStorageHandler) {
 func (r *RPCStorageHandler) Register() {
 	r.ID = uuid.NewUUID().String()
 	myChan := make(chan int)
+	RPCCLientRWMutex.Lock()
 	RPCClients[r.ID] = myChan
+	RPCCLientRWMutex.Unlock()
 	r.killChan = myChan
 	log.Debug("RPC Client registered")
 }
@@ -138,31 +145,43 @@ func (r *RPCStorageHandler) checkDisconnect() {
 
 func (r *RPCStorageHandler) ReConnect() {
 	// Should only be used by reload checker
-	r.Disconnect()
+	// r.Disconnect()
+	RPCClientIsConnected = false
 	r.Connect()
 	log.Info("Reconnected.")
 }
 
+var RPCCLientSingleton *gorpc.Client
+var RPCFuncClientSingleton *gorpc.DispatcherClient
+var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
+var RPCClientIsConnected bool
+
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
-	// We don't want to constantly connect
-	if r.Connected {
+
+	if RPCClientIsConnected {
+		log.Debug("Using RPC singleton for connection")
 		return true
 	}
 
+	// RPC Client is unset
 	// Set up the cache
-	r.cache = cache.New(30*time.Second, 15*time.Second)
-	r.RPCClient = gorpc.NewTCPClient(r.Address)
+	log.Info("Setting new RPC connection!")
+	RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
 
 	if log.Level != logrus.DebugLevel {
 		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
 	}
 
-	r.RPCClient.OnConnect = r.OnConnectFunc
-	r.RPCClient.Conns = 10
-	r.RPCClient.Start()
+	RPCCLientSingleton.OnConnect = r.OnConnectFunc
+	RPCCLientSingleton.Conns = 50
+	RPCCLientSingleton.Start()
 	d := GetDispatcher()
-	r.Client = d.NewFuncClient(r.RPCClient)
+
+	if RPCFuncClientSingleton == nil {
+		RPCFuncClientSingleton = d.NewFuncClient(RPCCLientSingleton)
+	}
+
 	r.Login()
 
 	if !r.SuppressRegister {
@@ -174,15 +193,16 @@ func (r *RPCStorageHandler) Connect() bool {
 }
 
 func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteCloser) (io.ReadWriteCloser, error) {
-	r.Connected = true
+	RPCClientIsConnected = true
 	return rwc, nil
 }
 
 func (r *RPCStorageHandler) Disconnect() bool {
-	if r.Connected {
-		go r.RPCClient.Stop()
-		r.Connected = false
+	if RPCClientIsConnected {
+		RPCClientIsConnected = false
+		RPCCLientRWMutex.Lock()
 		delete(RPCClients, r.ID)
+		RPCCLientRWMutex.Unlock()
 	}
 	return true
 }
@@ -239,7 +259,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		UserKey: r.UserKey,
 		GroupID: config.SlaveOptions.GroupID,
 	}
-	ok, err := r.Client.Call("LoginWithGroup", groupLoginData)
+	ok, err := RPCFuncClientSingleton.CallTimeout("LoginWithGroup", groupLoginData, GlobalRPCCallTimeout)
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
 		r.ReAttemptLogin(err)
@@ -268,7 +288,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 
-	ok, err := r.Client.Call("Login", r.UserKey)
+	ok, err := RPCFuncClientSingleton.CallTimeout("Login", r.UserKey, GlobalRPCCallTimeout)
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
 		r.ReAttemptLogin(err)
@@ -292,7 +312,9 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 	// Check the cache first
 	if config.SlaveOptions.EnableRPCCache {
-		cachedVal, found := r.cache.Get(r.fixKey(keyName))
+		log.Debug("Using cache for: ", keyName)
+		cachedVal, found := RPCGlobalCache.Get(r.fixKey(keyName))
+		log.Debug("--> Found? ", found)
 		if found {
 			elapsed := time.Since(start)
 			log.Debug("GetKey took ", elapsed)
@@ -302,7 +324,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	}
 
 	// Not cached
-	value, err := r.Client.Call("GetKey", r.fixKey(keyName))
+	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", r.fixKey(keyName), GlobalRPCCallTimeout)
 
 	if err != nil {
 		if r.IsAccessError(err) {
@@ -318,7 +340,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 	if config.SlaveOptions.EnableRPCCache {
 		// Cache it
-		r.cache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
+		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
 	}
 
 	return value.(string), nil
@@ -332,7 +354,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
-	value, err := r.Client.Call("GetExp", r.fixKey(keyName))
+	value, err := RPCFuncClientSingleton.CallTimeout("GetExp", r.fixKey(keyName), GlobalRPCCallTimeout)
 
 	if err != nil {
 		if r.IsAccessError(err) {
@@ -356,7 +378,7 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 		Timeout:      timeout,
 	}
 
-	_, err := r.Client.Call("SetKey", ibd)
+	_, err := RPCFuncClientSingleton.CallTimeout("SetKey", ibd, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -376,7 +398,7 @@ func (r *RPCStorageHandler) SetRawKey(keyName string, sessionState string, timeo
 // Decrement will decrement a key in redis
 func (r *RPCStorageHandler) Decrement(keyName string) {
 	log.Warning("Decrement called")
-	_, err := r.Client.Call("Decrement", keyName)
+	_, err := RPCFuncClientSingleton.CallTimeout("Decrement", keyName, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		r.Decrement(keyName)
@@ -392,7 +414,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		Expire:  expire,
 	}
 
-	val, err := r.Client.Call("IncrememntWithExpire", ibd)
+	val, err := RPCFuncClientSingleton.CallTimeout("IncrememntWithExpire", ibd, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -422,7 +444,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 
-	kvPair, err := r.Client.Call("GetKeysAndValuesWithFilter", searchStr)
+	kvPair, err := RPCFuncClientSingleton.CallTimeout("GetKeysAndValuesWithFilter", searchStr, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -442,7 +464,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 
 	searchStr := r.KeyPrefix + "*"
-	kvPair, err := r.Client.Call("GetKeysAndValues", searchStr)
+	kvPair, err := RPCFuncClientSingleton.CallTimeout("GetKeysAndValues", searchStr, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
@@ -463,25 +485,31 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
-	ok, err := r.Client.Call("DeleteKey", r.fixKey(keyName))
+	ok, err := RPCFuncClientSingleton.CallTimeout("DeleteKey", r.fixKey(keyName), GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.DeleteKey(keyName)
 	}
 
+	if ok == nil {
+		return false
+	}
 	return ok.(bool)
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
-	ok, err := r.Client.Call("DeleteRawKey", keyName)
+	ok, err := RPCFuncClientSingleton.CallTimeout("DeleteRawKey", keyName, GlobalRPCCallTimeout)
 
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.DeleteRawKey(keyName)
 	}
 
+	if ok == nil {
+		return false
+	}
 	return ok.(bool)
 }
 
@@ -494,11 +522,15 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 		}
 
 		log.Debug("Deleting: ", asInterface)
-		ok, err := r.Client.Call("DeleteKeys", asInterface)
+		ok, err := RPCFuncClientSingleton.CallTimeout("DeleteKeys", asInterface, GlobalRPCCallTimeout)
 
 		if r.IsAccessError(err) {
 			r.Login()
 			return r.DeleteKeys(keys)
+		}
+
+		if ok == nil {
+			return false
 		}
 
 		return ok.(bool)
@@ -540,7 +572,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName string, value string) {
 		Value:   value,
 	}
 
-	_, err := r.Client.Call("AppendToSet", ibd)
+	_, err := RPCFuncClientSingleton.CallTimeout("AppendToSet", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		r.AppendToSet(keyName, value)
@@ -558,7 +590,7 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 		Expire:  -1,
 	}
 
-	intVal, err := r.Client.Call("SetRollingWindow", ibd)
+	intVal, err := RPCFuncClientSingleton.CallTimeout("SetRollingWindow", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.SetRollingWindow(keyName, per, val)
@@ -566,6 +598,11 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 	elapsed := time.Since(start)
 	log.Debug("SetRollingWindow took ", elapsed)
+
+	if intVal == nil {
+		log.Warning("RPC Handler: SetRollingWindow() returned nil, returning 0")
+		return 0, []interface{}{}
+	}
 
 	return intVal.(int), []interface{}{}
 
@@ -580,7 +617,7 @@ func (r *RPCStorageHandler) SetRollingWindowPipeline(keyName string, per int64, 
 		Expire:  -1,
 	}
 
-	intVal, err := r.Client.Call("SetRollingWindow", ibd)
+	intVal, err := RPCFuncClientSingleton.CallTimeout("SetRollingWindow", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.SetRollingWindow(keyName, per, val)
@@ -588,6 +625,11 @@ func (r *RPCStorageHandler) SetRollingWindowPipeline(keyName string, per int64, 
 
 	elapsed := time.Since(start)
 	log.Debug("SetRollingWindow took ", elapsed)
+
+	if intVal == nil {
+		log.Warning("RPC Handler: SetRollingWindowPipeline() returned nil, returning 0")
+		return 0, []interface{}{}
+	}
 
 	return intVal.(int), []interface{}{}
 
@@ -623,7 +665,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		Tags:  tags,
 	}
 
-	defString, err := r.Client.Call("GetApiDefinitions", dr)
+	defString, err := RPCFuncClientSingleton.CallTimeout("GetApiDefinitions", dr, GlobalRPCCallTimeout)
 
 	if err != nil {
 		if r.IsAccessError(err) {
@@ -632,13 +674,19 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		}
 	}
 	log.Debug("API Definitions retrieved")
+
+	if defString == nil {
+		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
+		return ""
+	}
+
 	return defString.(string)
 
 }
 
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) GetPolicies(orgId string) string {
-	defString, err := r.Client.Call("GetPolicies", orgId)
+	defString, err := RPCFuncClientSingleton.CallTimeout("GetPolicies", orgId, GlobalRPCCallTimeout)
 	if err != nil {
 		if r.IsAccessError(err) {
 			r.Login()
@@ -657,7 +705,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 // CheckForReload will start a long poll
 func (r *RPCStorageHandler) CheckForReload(orgId string) {
 	log.Debug("[RPC STORE] Check Reload called...")
-	reload, err := r.Client.CallTimeout("CheckReload", orgId, time.Second*60)
+	reload, err := RPCFuncClientSingleton.CallTimeout("CheckReload", orgId, time.Second*60)
 	if err != nil {
 		if r.IsAccessError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
@@ -683,7 +731,7 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 		return
 	}
 
-	log.Info("Starting keyspace poller")
+	log.Info("[RPC] Starting keyspace poller")
 
 	for {
 		r.CheckForKeyspaceChanges(orgId)
@@ -699,14 +747,14 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var err error
 
 	if config.SlaveOptions.GroupID == "" {
-		keys, err = r.Client.Call("GetKeySpaceUpdate", orgId)
+		keys, err = RPCFuncClientSingleton.CallTimeout("GetKeySpaceUpdate", orgId, GlobalRPCCallTimeout)
 	} else {
 
 		grpReq := GroupKeySpaceRequest{
 			OrgID:   orgId,
 			GroupID: config.SlaveOptions.GroupID,
 		}
-		keys, err = r.Client.Call("GetGroupKeySpaceUpdate", grpReq)
+		keys, err = RPCFuncClientSingleton.CallTimeout("GetGroupKeySpaceUpdate", grpReq, GlobalRPCCallTimeout)
 	}
 
 	if err != nil {
@@ -730,8 +778,17 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
-		log.Info("--> removing cached key: ", key)
-		handleDeleteKey(key, "-1")
+		splitKeys := strings.Split(key, ":")
+		if len(splitKeys) > 1 {
+			if splitKeys[1] == "hashed" {
+				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				handleDeleteHashedKey(splitKeys[0], "")
+			}
+		} else {
+			log.Info("--> removing cached key: ", key)
+			handleDeleteKey(key, "-1")
+		}
+
 	}
 }
 

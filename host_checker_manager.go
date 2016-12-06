@@ -4,7 +4,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/TykTechnologies/tykcommon"
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -121,11 +121,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 	}
 }
 
-func (hc *HostCheckerManager) UptimePurgeLoop() {
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Warning("Host checker data is no longer purged by Tyk Gateway, please use Tyk-Pump.")
-}
+func (hc *HostCheckerManager) UptimePurgeLoop() {}
 
 func (hc *HostCheckerManager) AmIPolling() bool {
 	if hc.store == nil {
@@ -210,7 +206,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", hc.getHostKey(report))
-	hc.store.SetKey(hc.getHostKey(report), "1", int64(config.UptimeTests.Config.TimeWait))
+	hc.store.SetKey(hc.getHostKey(report), "1", int64(config.UptimeTests.Config.TimeWait + 1))
 
 	thisSpec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	if !found {

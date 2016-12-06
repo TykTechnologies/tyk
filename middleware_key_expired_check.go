@@ -4,7 +4,7 @@ import "net/http"
 
 import (
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 )
 
@@ -19,6 +19,10 @@ func (k *KeyExpired) New() {}
 // GetConfig retrieves the configuration from the API config - Not used for this middleware
 func (k *KeyExpired) GetConfig() (interface{}, error) {
 	return nil, nil
+}
+
+func (a *KeyExpired) IsEnabledForSpec() bool {
+	return true
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
