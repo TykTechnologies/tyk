@@ -79,7 +79,10 @@ func loadConfig(filePath string, configStruct *Config) {
 	if configStruct.SlaveOptions.CallTimeout == 0 {
 		configStruct.SlaveOptions.CallTimeout = 30
 	}
-
+	if configStruct.SlaveOptions.PingTimeout == 0 {
+		configStruct.SlaveOptions.PingTimeout = 60
+	}
+	GlobalRPCPingTimeout = time.Second * time.Duration(configStruct.SlaveOptions.PingTimeout)
 	GlobalRPCCallTimeout = time.Second * time.Duration(configStruct.SlaveOptions.CallTimeout)
 	configStruct.EventTriggers = InitGenericEventHandlers(configStruct.EventHandlers)
 }

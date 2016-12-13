@@ -51,6 +51,8 @@ var RPC_EmergencyModeLoaded bool
 var ErrorDenied error = errors.New("Access Denied")
 
 var GlobalRPCCallTimeout time.Duration
+var GlobalRPCPingTimeout time.Duration
+
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
@@ -705,7 +707,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 // CheckForReload will start a long poll
 func (r *RPCStorageHandler) CheckForReload(orgId string) {
 	log.Debug("[RPC STORE] Check Reload called...")
-	reload, err := RPCFuncClientSingleton.CallTimeout("CheckReload", orgId, time.Second*60)
+	reload, err := RPCFuncClientSingleton.CallTimeout("CheckReload", orgId, GlobalRPCPingTimeout)
 	if err != nil {
 		if r.IsAccessError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
