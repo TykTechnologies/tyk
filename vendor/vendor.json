@@ -709,6 +709,12 @@
 			"path": "gopkg.in/vmihailenco/msgpack.v2/codes",
 			"revision": "200315d5c8aab339f5a5cd44219f4b50ad0782df",
 			"revisionTime": "2016-11-14T09:30:20Z"
+		},
+		{
+			"checksumSHA1": "gY2M/3SCxqgrPz+P/N6JQ+m/wnA=",
+			"path": "gopkg.in/xmlpath.v2",
+			"revision": "860cbeca3ebcc600db0b213c0e83ad6ce91f5739",
+			"revisionTime": "2015-08-20T20:48:37Z"
 		}
 	],
 	"rootPath": "github.com/TykTechnologies/tyk"
