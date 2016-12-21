@@ -20,6 +20,10 @@ func (a *TrackEndpointMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
+func (mw *TrackEndpointMiddleware) GetName() string {
+	return "TrackEndpointMiddleware"
+}
+
 func (a *TrackEndpointMiddleware) IsEnabledForSpec() bool {
 	return true
 }

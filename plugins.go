@@ -5,17 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/logrus"
-	"github.com/gorilla/context"
-	"github.com/mitchellh/mapstructure"
-	"github.com/robertkrimen/otto"
-	_ "github.com/robertkrimen/otto/underscore"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/gorilla/context"
+	"github.com/mitchellh/mapstructure"
+	"github.com/robertkrimen/otto"
+	_ "github.com/robertkrimen/otto/underscore"
 )
 
 // Lets the user override and return a response from middleware
@@ -65,6 +66,10 @@ type DynamicMiddleware struct {
 
 type DynamicMiddlewareConfig struct {
 	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+}
+
+func (mw *DynamicMiddleware) GetName() string {
+	return "DynamicMiddleware"
 }
 
 // New lets you do any initialisations for the object can be done here

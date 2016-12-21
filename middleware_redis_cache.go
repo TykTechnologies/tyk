@@ -7,12 +7,13 @@ import (
 	b64 "encoding/base64"
 	"encoding/hex"
 	"errors"
-	"github.com/gorilla/context"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gorilla/context"
 )
 
 const (
@@ -25,6 +26,10 @@ type RedisCacheMiddleware struct {
 	*TykMiddleware
 	CacheStore StorageHandler
 	sh         SuccessHandler
+}
+
+func (mw *RedisCacheMiddleware) GetName() string {
+	return "RedisCacheMiddleware"
 }
 
 type RedisCacheMiddlewareConfig struct {

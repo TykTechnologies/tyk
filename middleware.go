@@ -1,9 +1,13 @@
 package main
 
 import (
-	"github.com/paulbellamy/ratecounter"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/gocraft/health"
+	"github.com/paulbellamy/ratecounter"
 )
 
 var GlobalRate *ratecounter.RateCounter = ratecounter.NewRateCounter(1 * time.Second)
@@ -13,6 +17,7 @@ type TykMiddlewareImplementation interface {
 	GetConfig() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) // Handles request
 	IsEnabledForSpec() bool
+	GetName() string
 }
 
 func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
@@ -53,6 +58,17 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
+			job := instrument.NewJob("gw_mw")
+			meta := health.Kvs{
+				"from_ip":  fmt.Sprint(r.RemoteAddr),
+				"method":   r.Method,
+				"endpoint": r.URL.Path,
+				"raw_url":  r.URL.String(),
+				"size":     strconv.Itoa(int(r.ContentLength)),
+				"mw_name":  mw.GetName(),
+			}
+			job.EventKv("executed", meta)
+			startTime := time.Now()
 
 			if (tykMwSuper.Spec.CORS.OptionsPassthrough) && (r.Method == "OPTIONS") {
 				h.ServeHTTP(w, r)
@@ -61,6 +77,8 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 				if reqErr != nil {
 					handler := ErrorHandler{tykMwSuper}
 					handler.HandleError(w, r, reqErr.Error(), errCode)
+					meta["error"] = reqErr.Error()
+					job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 					return
 				}
 
@@ -68,14 +86,19 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 				if errCode == 1666 {
 					// Stop
 					log.Info("[Middleware] Received stop code")
+					meta["stopped"] = "1"
+					job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 					return
 				}
 
 				// Special code, bypasses all other execution
 				if errCode != 666 {
 					// No error, carry on...
+					meta["bypass"] = "1"
 					h.ServeHTTP(w, r)
 				}
+
+				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 			}
 
 		}

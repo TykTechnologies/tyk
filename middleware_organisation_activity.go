@@ -1,13 +1,15 @@
 package main
 
 import (
-	"github.com/gorilla/context"
 	"net/http"
 	"sync"
+
+	"github.com/gorilla/context"
 )
 
 import (
 	"errors"
+
 	"github.com/TykTechnologies/logrus"
 )
 
@@ -28,6 +30,10 @@ type OrganizationMonitor struct {
 	*TykMiddleware
 	sessionlimiter SessionLimiter
 	mon            Monitor
+}
+
+func (mw *OrganizationMonitor) GetName() string {
+	return "OrganizationMonitor"
 }
 
 // New lets you do any initialisations for the object can be done here

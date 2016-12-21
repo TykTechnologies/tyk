@@ -40,6 +40,10 @@ type VirtualEndpoint struct {
 	sh SuccessHandler
 }
 
+func (mw *VirtualEndpoint) GetName() string {
+	return "VirtualEndpoint"
+}
+
 func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
 	if j == nil {
 		log.Error("No JSVM loaded, cannot init methods")

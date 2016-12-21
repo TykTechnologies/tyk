@@ -26,6 +26,10 @@ type JWTMiddleware struct {
 	*TykMiddleware
 }
 
+func (mw *JWTMiddleware) GetName() string {
+	return "JWTMiddleware"
+}
+
 var JWKCache *cache.Cache
 
 type JWK struct {

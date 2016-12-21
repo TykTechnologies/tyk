@@ -5,16 +5,21 @@ import "net/http"
 import (
 	"encoding/base64"
 	"errors"
+	"strings"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"golang.org/x/crypto/bcrypt"
-	"strings"
 )
 
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
 	*TykMiddleware
+}
+
+func (mw *BasicAuthKeyIsValid) GetName() string {
+	return "BasicAuthKeyIsValid"
 }
 
 // New lets you do any initialisations for the object can be done here

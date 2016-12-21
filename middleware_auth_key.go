@@ -5,17 +5,22 @@ import "net/http"
 import (
 	"bytes"
 	"errors"
+	"io"
+	"io/ioutil"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
-	"io"
-	"io/ioutil"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type AuthKey struct {
 	*TykMiddleware
+}
+
+func (mw *AuthKey) GetName() string {
+	return "AuthKey"
 }
 
 func (k AuthKey) New() {}

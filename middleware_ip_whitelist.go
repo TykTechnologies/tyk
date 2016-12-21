@@ -12,6 +12,10 @@ type IPWhiteListMiddleware struct {
 	*TykMiddleware
 }
 
+func (mw *IPWhiteListMiddleware) GetName() string {
+	return "IPWhiteListMiddleware"
+}
+
 // New lets you do any initialisations for the object can be done here
 func (i *IPWhiteListMiddleware) New() {}
 

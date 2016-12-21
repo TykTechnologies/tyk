@@ -23,6 +23,10 @@ type TransformMiddleware struct {
 	*TykMiddleware
 }
 
+func (mw *TransformMiddleware) GetName() string {
+	return "TransformMiddleware"
+}
+
 type TransformMiddlewareConfig struct{}
 
 // New lets you do any initialisations for the object can be done here

@@ -5,15 +5,16 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
+	"math"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
-	"math"
-	"net/http"
-	"regexp"
-	"net/url"
-	"strings"
-	"time"
 )
 
 const DateHeaderSpec string = "Date"
@@ -24,6 +25,10 @@ const HMACClockSkewLimitInMs float64 = 1000
 type HMACMiddleware struct {
 	*TykMiddleware
 	lowercasePattern *regexp.Regexp
+}
+
+func (mw *HMACMiddleware) GetName() string {
+	return "HMAC"
 }
 
 // New lets you do any initializations for the object can be done here
@@ -147,7 +152,7 @@ func (hm *HMACMiddleware) hasLowerCaseEscaped(signature string) (bool, []string)
 
 func (hm *HMACMiddleware) replaceWithUpperCase(originalSignature string, lowercaseList []string) string {
 	newSignature := originalSignature
-	for _, lStr := range(lowercaseList) {
+	for _, lStr := range lowercaseList {
 		asUpper := strings.ToUpper(lStr)
 		newSignature = strings.Replace(newSignature, lStr, asUpper, -1)
 	}

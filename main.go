@@ -25,6 +25,7 @@ import (
 	logger "github.com/TykTechnologies/tykcommon-logger"
 	"github.com/docopt/docopt.go"
 	"github.com/facebookgo/pidfile"
+	"github.com/gocraft/health"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/logrus-graylog-hook"
@@ -34,6 +35,7 @@ import (
 )
 
 var log = logger.GetLogger()
+var instrument = health.NewStream()
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
@@ -316,26 +318,26 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 	}
 
 	// set up main API handlers
-	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(groupResetHandler))
-	ApiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(resetHandler))
+	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(InstrumentationMW(groupResetHandler)))
+	ApiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(InstrumentationMW(resetHandler)))
 
 	if !IsRPCMode() {
-		ApiMuxer.HandleFunc("/tyk/org/keys/"+"{rest:.*}", CheckIsAPIOwner(orgHandler))
-		ApiMuxer.HandleFunc("/tyk/keys/policy/"+"{rest:.*}", CheckIsAPIOwner(policyUpdateHandler))
-		ApiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(createKeyHandler))
-		ApiMuxer.HandleFunc("/tyk/apis/"+"{rest:.*}", CheckIsAPIOwner(apiHandler))
-		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(healthCheckhandler))
-		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(createOauthClient))
-		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(invalidateOauthRefresh))
-		ApiMuxer.HandleFunc("/tyk/cache/"+"{rest:.*}", CheckIsAPIOwner(invalidateCacheHandler))
+		ApiMuxer.HandleFunc("/tyk/org/keys/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(orgHandler)))
+		ApiMuxer.HandleFunc("/tyk/keys/policy/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
+		ApiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(InstrumentationMW(createKeyHandler)))
+		ApiMuxer.HandleFunc("/tyk/apis/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
+		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(InstrumentationMW(healthCheckhandler)))
+		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(InstrumentationMW(createOauthClient)))
+		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
+		ApiMuxer.HandleFunc("/tyk/cache/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	ApiMuxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(keyHandler))
-	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(oAuthClientHandler))
+	ApiMuxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(keyHandler)))
+	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -944,6 +946,15 @@ func initialiseSystem(arguments map[string]interface{}) {
 		}).Error("Failed to write PIDFile: ", pfErr)
 	}
 
+	doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
+
+	if doInstrumentation == true {
+		instrument.AddSink(&health.WriterSink{os.Stdout})
+	}
+
+	log.Warning("TODO: Disable auto-instrumentation logging")
+	instrument.AddSink(&health.WriterSink{os.Stdout})
+
 	GetHostDetails()
 
 	go StartPeriodicStateBackup(&LE_MANAGER)
@@ -970,6 +981,7 @@ func getCmdArguments() map[string]interface{} {
 		--as-mock                    Creates the API as a mock based on example fields
 		--for-api=<path>             Adds blueprint to existing API Defintition as version
 		--as-version=<version>       The version number to use when inserting
+		--log-instrumentation        Output instrumentation data to stdout
 	`
 
 	arguments, err := docopt.Parse(usage, nil, true, VERSION, false, false)

@@ -33,6 +33,10 @@ type CoProcessMiddleware struct {
 	MiddlewareDriver tykcommon.MiddlewareDriver
 }
 
+func (mw *CoProcessMiddleware) GetName() string {
+	return "CoProcessMiddleware"
+}
+
 // CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
 func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{

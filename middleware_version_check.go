@@ -3,8 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tykcommon"
 	"net/http"
+
+	"github.com/TykTechnologies/tykcommon"
 )
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
@@ -16,6 +17,10 @@ type VersionCheck struct {
 // New lets you do any initialisations for the object can be done here
 func (v *VersionCheck) New() {
 	v.sh = SuccessHandler{v.TykMiddleware}
+}
+
+func (mw *VersionCheck) GetName() string {
+	return "VersionCheck"
 }
 
 // GetConfig retrieves the configuration from the API config

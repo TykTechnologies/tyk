@@ -4,10 +4,11 @@ import "net/http"
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
-	"strings"
 )
 
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,
@@ -18,6 +19,10 @@ type Oauth2KeyExists struct {
 
 // New lets you do any initialisations for the object can be done here
 func (k *Oauth2KeyExists) New() {}
+
+func (mw *Oauth2KeyExists) GetName() string {
+	return "Oauth2KeyExists"
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (k *Oauth2KeyExists) GetConfig() (interface{}, error) {

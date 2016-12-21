@@ -4,6 +4,7 @@ import "net/http"
 
 import (
 	"errors"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 )
@@ -15,6 +16,10 @@ type KeyExpired struct {
 
 // New lets you do any initialisations for the object can be done here
 func (k *KeyExpired) New() {}
+
+func (mw *KeyExpired) GetName() string {
+	return "KeyExpired"
+}
 
 // GetConfig retrieves the configuration from the API config - Not used for this middleware
 func (k *KeyExpired) GetConfig() (interface{}, error) {

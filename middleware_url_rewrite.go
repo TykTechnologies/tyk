@@ -155,6 +155,10 @@ type URLRewriteMiddleware struct {
 	Rewriter *URLRewriter
 }
 
+func (mw *URLRewriteMiddleware) GetName() string {
+	return "URLRewriteMiddleware"
+}
+
 type URLRewriteMiddlewareConfig struct{}
 
 // New lets you do any initialisations for the object can be done here

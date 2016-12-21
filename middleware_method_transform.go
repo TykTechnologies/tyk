@@ -15,6 +15,10 @@ type TransformMethod struct {
 
 type TransformMethodConfig struct{}
 
+func (mw *TransformMethod) GetName() string {
+	return "TransformMethod"
+}
+
 // New lets you do any initialisations for the object can be done here
 func (t *TransformMethod) New() {}
 

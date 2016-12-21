@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/gorilla/context"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/context"
 )
 
 type MiddlewareContextVars struct {
@@ -14,6 +15,10 @@ type MiddlewareContextVarsConfig struct{}
 
 // New lets you do any initialisations for the object can be done here
 func (m *MiddlewareContextVars) New() {}
+
+func (mw *MiddlewareContextVars) GetName() string {
+	return "MiddlewareContextVars"
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *MiddlewareContextVars) GetConfig() (interface{}, error) {

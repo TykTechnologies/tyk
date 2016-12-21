@@ -4,6 +4,7 @@ import "net/http"
 
 import (
 	"errors"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 )
@@ -15,6 +16,10 @@ var sessionMonitor = Monitor{}
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
 	*TykMiddleware
+}
+
+func (mw *RateLimitAndQuotaCheck) GetName() string {
+	return "RateLimitAndQuotaCheck"
 }
 
 // New lets you do any initialisations for the object can be done here

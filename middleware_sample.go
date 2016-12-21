@@ -2,8 +2,9 @@ package main
 
 import (
 	"errors"
-	"github.com/mitchellh/mapstructure"
 	"net/http"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 // It's very easy to create custom middleware
@@ -17,6 +18,10 @@ type ModifiedMiddleware struct {
 
 type ModifiedMiddlewareConfig struct {
 	CustomConfigVar string `mapstructure:"custom_config_var" bson:"custom_config_var" json:"custom_config_var"`
+}
+
+func (mw *ModifiedMiddleware) GetName() string {
+	return "ModifiedMiddleware"
 }
 
 // New lets you do any initialisations for the object can be done here

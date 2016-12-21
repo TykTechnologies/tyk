@@ -12,6 +12,10 @@ type RateCheckMW struct {
 
 type RateCheckMWConfig struct{}
 
+func (mw *RateCheckMW) GetName() string {
+	return "RateCheckMW"
+}
+
 // New lets you do any initialisations for the object can be done here
 func (m *RateCheckMW) New() {}
 

@@ -7,12 +7,13 @@ import (
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
-	"sync"
 )
 
 var OIDPREFIX string = "openid"
@@ -22,6 +23,10 @@ type OpenIDMW struct {
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 	lock                      sync.RWMutex
+}
+
+func (mw *OpenIDMW) GetName() string {
+	return "OpenIDMW"
 }
 
 func (k *OpenIDMW) New() {

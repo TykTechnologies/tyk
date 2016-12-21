@@ -4,6 +4,7 @@ import "net/http"
 
 import (
 	"errors"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 )
@@ -13,6 +14,10 @@ import (
 // it is assumed that the user can go through.
 type AccessRightsCheck struct {
 	*TykMiddleware
+}
+
+func (mw *AccessRightsCheck) GetName() string {
+	return "AccessRightsCheck"
 }
 
 // New lets you do any initialisations for the object can be done here

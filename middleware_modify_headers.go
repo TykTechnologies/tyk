@@ -20,6 +20,10 @@ const TYK_CONTEXT_LABEL string = "$tyk_context."
 
 type TransformHeadersConfig struct{}
 
+func (mw *TransformHeaders) GetName() string {
+	return "TransformHeaders"
+}
+
 // New lets you do any initialisations for the object can be done here
 func (t *TransformHeaders) New() {}
 

@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
-	"github.com/TykTechnologies/logrus"
-	"github.com/gorilla/context"
 	"net/http"
 	"regexp"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/gorilla/context"
 )
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key
@@ -16,6 +17,10 @@ type GranularAccessMiddleware struct {
 type GranularAccessMiddlewareConfig struct{}
 
 func (m *GranularAccessMiddleware) New() {}
+
+func (mw *GranularAccessMiddleware) GetName() string {
+	return "GranularAccessMiddleware"
+}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *GranularAccessMiddleware) GetConfig() (interface{}, error) {

@@ -22,7 +22,6 @@ type Dispatcher interface {
 	Reload()
 }
 
-
 var GlobalDispatcher Dispatcher
 
 var EnableCoProcess bool = false
@@ -32,6 +31,10 @@ type CoProcessMiddleware struct {
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver tykcommon.MiddlewareDriver
+}
+
+func (mw *CoProcessMiddleware) GetName() string {
+	return "CoProcessMiddlewareDummy"
 }
 
 func (m *CoProcessMiddleware) New() {}
