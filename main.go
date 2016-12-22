@@ -950,12 +950,14 @@ func initialiseSystem(arguments map[string]interface{}) {
 
 	if doInstrumentation == true {
 		instrument.AddSink(&health.WriterSink{os.Stdout})
+		MonitorApplicationInstrumentation()
 	}
+
+	GetHostDetails()
 
 	log.Warning("TODO: Disable auto-instrumentation logging")
 	instrument.AddSink(&health.WriterSink{os.Stdout})
-
-	GetHostDetails()
+	MonitorApplicationInstrumentation()
 
 	go StartPeriodicStateBackup(&LE_MANAGER)
 }
