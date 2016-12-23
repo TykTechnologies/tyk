@@ -58,7 +58,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
-			job := instrument.NewJob("gw_mw")
+			job := instrument.NewJob("gwMiddleware")
 			meta := health.Kvs{
 				"from_ip":  fmt.Sprint(r.RemoteAddr),
 				"method":   r.Method,

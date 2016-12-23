@@ -25,7 +25,6 @@ import (
 	logger "github.com/TykTechnologies/tykcommon-logger"
 	"github.com/docopt/docopt.go"
 	"github.com/facebookgo/pidfile"
-	"github.com/gocraft/health"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/logrus-graylog-hook"
@@ -35,7 +34,6 @@ import (
 )
 
 var log = logger.GetLogger()
-var instrument = health.NewStream()
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
@@ -946,17 +944,12 @@ func initialiseSystem(arguments map[string]interface{}) {
 		}).Error("Failed to write PIDFile: ", pfErr)
 	}
 
-	doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
-
-	if doInstrumentation == true {
-		instrument.AddSink(&health.WriterSink{os.Stdout})
-		MonitorApplicationInstrumentation()
-	}
-
 	GetHostDetails()
 
-	log.Warning("TODO: Disable auto-instrumentation logging")
-	instrument.AddSink(&health.WriterSink{os.Stdout})
+	//doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
+	//SetupInstrumentation(doInstrumentation)
+	SetupInstrumentation(true)
+
 	MonitorApplicationInstrumentation()
 
 	go StartPeriodicStateBackup(&LE_MANAGER)
