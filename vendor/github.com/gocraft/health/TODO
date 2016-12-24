@@ -1,0 +1,6 @@
+ - make sure bugsnag works w/o Hostname and ReleaseStage (eg defaults work)
+ - make sure healthtop default sort works or at least figure out what it is
+ - in readme make sure I have the right syntax for http.Handle.
+ - in readme make sure I get samples of how everything is logged.
+ - screenshots for healthtop
+ - remove self-logging in healthd

@@ -165,6 +165,18 @@
 			"revisionTime": "2016-11-15T13:54:11Z"
 		},
 		{
+			"checksumSHA1": "YhswBYH9lPkmLN5kVz3nqlu6K5Q=",
+			"path": "github.com/gocraft/health",
+			"revision": "25b40f8580168c1f905a6dba35d471cdc51ca629",
+			"revisionTime": "2016-07-11T12:47:28Z"
+		},
+		{
+			"checksumSHA1": "AGGHyqsM4MN/lfBGXguLtb6xd38=",
+			"path": "github.com/gocraft/health/stack",
+			"revision": "25b40f8580168c1f905a6dba35d471cdc51ca629",
+			"revisionTime": "2016-07-11T12:47:28Z"
+		},
+		{
 			"checksumSHA1": "kBeNcaKk56FguvPSUCEaH6AxpRc=",
 			"path": "github.com/golang/protobuf/proto",
 			"revision": "8ee79997227bf9b34611aee7946ae64735e6fd93",
