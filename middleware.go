@@ -52,8 +52,6 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 
 	if confErr != nil {
 		log.Fatal("[Middleware] Configuration load failed")
-		//handler := ErrorHandler{tykMwSuper}
-		//handler.HandleError(w, r, confErr.Error(), 403)
 	}
 
 	aliceHandler := func(h http.Handler) http.Handler {
@@ -67,7 +65,9 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 				"size":     strconv.Itoa(int(r.ContentLength)),
 				"mw_name":  mw.GetName(),
 			}
+			eventName := mw.GetName() + "." + "executed"
 			job.EventKv("executed", meta)
+			job.EventKv(eventName, meta)
 			startTime := time.Now()
 
 			if (tykMwSuper.Spec.CORS.OptionsPassthrough) && (r.Method == "OPTIONS") {
@@ -79,6 +79,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 					handler.HandleError(w, r, reqErr.Error(), errCode)
 					meta["error"] = reqErr.Error()
 					job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
+					job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
 					return
 				}
 
@@ -88,6 +89,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 					log.Info("[Middleware] Received stop code")
 					meta["stopped"] = "1"
 					job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
+					job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
 					return
 				}
 
@@ -99,6 +101,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 				}
 
 				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
+				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
 			}
 
 		}
