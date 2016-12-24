@@ -16,26 +16,32 @@ var instrument = health.NewStream()
 
 // SetupInstrumentation handles all the intialisation of the instrumentation handler
 func SetupInstrumentation(enabled bool) {
+	thisInstr := os.Getenv("TYK_INSTRUMENTATION")
+
+	if thisInstr == "1" {
+		enabled = true
+	}
+
 	if !enabled {
 		return
 	}
 
-	// TODO: REMOVE THIS BLOCK
-	log.Warning("TODO: Disable auto-instrumentation logging")
-	instrument.AddSink(&health.WriterSink{os.Stdout})
+	if config.StatsdConnectionString == "" {
+		log.Error("Instrumentation is enabled, but no connectionstring set for statsd")
+		return
+	}
 
-	log.Info("-------------- StatsD Sink Starting --------------")
-	statsdSink, err := health.NewStatsDSink("statsd.hostedgraphite.com:8125",
-		&health.StatsDSinkOptions{Prefix: "dc3e8f2f-c8fe-48f8-a389-fefd88855a98"})
+	log.Info("Sending stats to: ", config.StatsdConnectionString, " with prefix: ", config.StatsdPrefix)
+	statsdSink, err := NewStatsDSink(config.StatsdConnectionString,
+		&StatsDSinkOptions{Prefix: config.StatsdPrefix})
 
-	log.Info("-------------- StatsD Sink Started! --------------")
 	if err != nil {
 		log.Fatal("Failed to start StatsD check: ", err)
 		return
 	}
 
+	log.Info("StatsD instrumentation sink started")
 	instrument.AddSink(statsdSink)
-	// REMOVE ABOVE THIS LINE
 
 	MonitorApplicationInstrumentation()
 }
@@ -43,7 +49,7 @@ func SetupInstrumentation(enabled bool) {
 // InstrumentationMW will set basic instrumentation events, variables and timers on API jobs
 func InstrumentationMW(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		job := instrument.NewJob("gwSystemAPICall")
+		job := instrument.NewJob("SystemAPICall")
 
 		handler(w, r)
 		job.EventKv("called", health.Kvs{
@@ -58,13 +64,13 @@ func InstrumentationMW(handler func(http.ResponseWriter, *http.Request)) func(ht
 }
 
 func MonitorApplicationInstrumentation() {
-	job := instrument.NewJob("gwGCActivity")
-	job_rl := instrument.NewJob("gwLoad")
-	metadata := health.Kvs{"host": HostDetails.Hostname}
-	applicationGCStats.PauseQuantiles = make([]time.Duration, 5)
-
 	log.Info("Starting application monitoring...")
 	go func() {
+		job := instrument.NewJob("GCActivity")
+		job_rl := instrument.NewJob("Load")
+		metadata := health.Kvs{"host": HostDetails.Hostname}
+		applicationGCStats.PauseQuantiles = make([]time.Duration, 5)
+
 		for {
 			debug.ReadGCStats(&applicationGCStats)
 			job.GaugeKv("pauses_quantile_min", float64(applicationGCStats.PauseQuantiles[0].Nanoseconds()), metadata)

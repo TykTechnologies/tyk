@@ -950,8 +950,6 @@ func initialiseSystem(arguments map[string]interface{}) {
 	//SetupInstrumentation(doInstrumentation)
 	SetupInstrumentation(true)
 
-	MonitorApplicationInstrumentation()
-
 	go StartPeriodicStateBackup(&LE_MANAGER)
 }
 

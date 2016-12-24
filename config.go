@@ -177,6 +177,8 @@ type Config struct {
 	SyslogTransport                   string                 `json:"syslog_transport"`
 	LogstashTransport                 string                 `json:"logstash_transport"`
 	SyslogNetworkAddr                 string                 `json:"syslog_network_addr"`
+	StatsdConnectionString            string                 `json:"statsd_connection_string"`
+	StatsdPrefix                      string                 `json:"statsd_prefix"`
 	EnforceOrgDataAge                 bool                   `json:"enforce_org_data_age"`
 	EnforceOrgDataDeailLogging        bool                   `json:"enforce_org_data_detail_logging"`
 	EnforceOrgQuotas                  bool                   `json:"enforce_org_quotas"`
