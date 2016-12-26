@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
-	"github.com/TykTechnologies/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -49,6 +49,10 @@ func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	fmt.Fprintf(w, string(responseMessage))
+	if code != 200 {
+		job := instrument.NewJob("SystemAPIError")
+		job.Event(strconv.Itoa(code))
+	}
 }
 
 func GetSpecForApi(APIID string) *APISpec {
