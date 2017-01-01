@@ -87,7 +87,7 @@ func HandleSendMiniConfig(payload string) {
 	if (thisConfigPayload.FromHostname != HostDetails.Hostname) && (thisConfigPayload.FromNodeID != NodeID) {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Info("Configuration request received, no NodeID/Hostname match found, ignoring")
+		}).Debug("Configuration request received, no NodeID/Hostname match found, ignoring")
 		return
 	}
 
@@ -122,6 +122,6 @@ func HandleSendMiniConfig(payload string) {
 	MainNotifier.Notify(asNotification)
 	log.WithFields(logrus.Fields{
 		"prefix": "pub-sub",
-	}).Info("Configuration request responded.")
+	}).Debug("Configuration request responded.")
 
 }
