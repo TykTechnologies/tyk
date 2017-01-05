@@ -1290,12 +1290,6 @@ func expandKey(orgID, key string) string {
 	return fmt.Sprintf("%s%s", orgID, key)
 }
 
-func extractKey(orgID, key string) string {
-	replacementStr := fmt.Sprintf("%s", orgID)
-	replaced := strings.Replace(key, replacementStr, "", 1)
-	return replaced
-}
-
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	code := 200

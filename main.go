@@ -637,10 +637,6 @@ func IsRPCMode() bool {
 	return false
 }
 
-func doCopy(from *APISpec, to *APISpec) {
-	*to = *from
-}
-
 type SortableAPISpecListByListen []*APISpec
 
 func (s SortableAPISpecListByListen) Len() int {
