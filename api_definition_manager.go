@@ -1235,9 +1235,6 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		thisVersion := thisURL[:firstParamEndsAt]
 
 		return thisVersion
-
-	} else {
-		return ""
 	}
 
 	return ""

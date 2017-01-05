@@ -536,11 +536,8 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 		}
 
 		return ok.(bool)
-	} else {
-		log.Debug("RPCStorageHandler called DEL - Nothing to delete")
-		return true
 	}
-
+	log.Debug("RPCStorageHandler called DEL - Nothing to delete")
 	return true
 }
 
