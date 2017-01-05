@@ -243,10 +243,10 @@
 			"revisionTime": "2016-04-23T09:52:02Z"
 		},
 		{
-			"checksumSHA1": "waE6Z3VT1RUBZ7RkkMajlVeOHjM=",
+			"checksumSHA1": "x87zR0VzytTmPXbrON3cG8XkKcQ=",
 			"path": "github.com/lonelycode/redigocluster/rediscluster",
-			"revision": "1284ae4700d04c162cd1fc7966f1a5aff43887f0",
-			"revisionTime": "2016-12-09T09:21:43Z"
+			"revision": "488cecc7456ee5d7665d352ae1f91c4229522bc3",
+			"revisionTime": "2017-01-05T07:49:30Z"
 		},
 		{
 			"checksumSHA1": "Jok28OroSdzQaC1bdTp+yEIVy30=",
@@ -397,6 +397,13 @@
 			"path": "github.com/streamrail/concurrent-map",
 			"revision": "8bf1e9bacbf65b10c81d0f4314cf2b1ebef728b5",
 			"revisionTime": "2016-08-23T15:06:47Z"
+		},
+		{
+			"checksumSHA1": "dVgJf/okSqM79Y79+RH0fglgerA=",
+			"origin": "rsc.io/letsencrypt/vendor/github.com/xenolf/lego/acme",
+			"path": "github.com/xenolf/lego/acme",
+			"revision": "e580d2ca856f31692001eb84a9298b11dbfd7c4b",
+			"revisionTime": "2017-01-01T21:34:21Z"
 		},
 		{
 			"checksumSHA1": "vE43s37+4CJ2CDU6TlOUOYE0K9c=",

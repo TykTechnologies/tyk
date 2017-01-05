@@ -6,7 +6,6 @@ import "errors"
 import "math/rand"
 import "os"
 import "github.com/TykTechnologies/logrus"
-import "github.com/streamrail/concurrent-map"
 import iMap "github.com/TykTechnologies/concurrent-map"
 
 const RedisClusterHashSlots = 16384
@@ -16,8 +15,8 @@ const RedisClusterDefaultTimeout = 1
 var log = logrus.New()
 
 type RedisCluster struct {
-	SeedHosts        cmap.ConcurrentMap //map[string]bool
-	Handles          cmap.ConcurrentMap // map[string]*RedisHandle
+	SeedHosts        ConcurrentMap //map[string]bool
+	Handles          ConcurrentMap // map[string]*RedisHandle
 	Slots            iMap.ConcurrentMap //map[uint16]string
 	RefreshTableASAP bool
 	SingleRedisMode  bool
@@ -34,8 +33,8 @@ func NewRedisCluster(seed_redii []map[string]string, poolConfig PoolConfig, debu
 	cluster := RedisCluster{
 		RefreshTableASAP: false,
 		SingleRedisMode:  !poolConfig.IsCluster,
-		SeedHosts:        cmap.New(), //make(map[string]bool),
-		Handles:          cmap.New(), //make(map[string]*RedisHandle),
+		SeedHosts:        NewCmap(), //make(map[string]bool),
+		Handles:          NewCmap(), //make(map[string]*RedisHandle),
 		Slots:            iMap.New(), // make(map[uint16]string),
 		poolConfig:       poolConfig,
 		Debug:            debug,
