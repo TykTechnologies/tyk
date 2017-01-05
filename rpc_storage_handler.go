@@ -649,10 +649,7 @@ func (r RPCStorageHandler) RemoveFromSet(keyName string, value string) {
 
 func (r RPCStorageHandler) IsAccessError(err error) bool {
 	if err != nil {
-		if err.Error() == "Access Denied" {
-			return true
-		}
-		return false
+		return err.Error() == "Access Denied"
 	}
 	return false
 }

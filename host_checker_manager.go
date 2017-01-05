@@ -283,12 +283,8 @@ func (hc *HostCheckerManager) IsHostDown(thisUrl string) bool {
 	}).Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
 	_, fErr := hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
 
-	if fErr != nil {
-		// Found a key, the host is down
-		return true
-	}
-
-	return false
+	// Found a key, the host is down
+	return fErr != nil
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostCheckObject, APIID string) (HostData, error) {
