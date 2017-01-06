@@ -241,14 +241,14 @@ func getAPISpecs() *[]*APISpec {
 	}).Printf("Detected %v APIs", len(*APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].AuthProvider = config.AuthOverride.AuthProvider
 
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
@@ -854,7 +854,7 @@ func setupLogger() {
 func initialiseSystem(arguments map[string]interface{}) {
 
 	// Enable command mode
-	for k, _ := range CommandModeOptions {
+	for k := range CommandModeOptions {
 
 		v := arguments[k]
 

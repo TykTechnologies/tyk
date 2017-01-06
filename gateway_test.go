@@ -87,7 +87,7 @@ func createVersionedSession() SessionState {
 	thisSession.QuotaRenews = time.Now().Unix()
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = -1
-	thisSession.AccessRights = map[string]AccessDefinition{"9991": AccessDefinition{APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
 
 	return thisSession
 }
@@ -103,7 +103,7 @@ func createParamAuthSession() SessionState {
 	thisSession.QuotaRenews = time.Now().Unix()
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = -1
-	thisSession.AccessRights = map[string]AccessDefinition{"9992": AccessDefinition{APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"9992": {APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
 
 	return thisSession
 }
@@ -635,7 +635,7 @@ func TestVersioningRequestFail(t *testing.T) {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	thisSession := createVersionedSession()
-	thisSession.AccessRights = map[string]AccessDefinition{"9991": AccessDefinition{APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
 
 	// no version allowed
 	spec.SessionManager.UpdateSession("zz1234", thisSession, 60)

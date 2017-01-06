@@ -767,7 +767,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 		Per:              1.0,
 		QuotaMax:         -1,
 		QuotaRenewalRate: -1,
-		AccessRights: map[string]AccessDefinition{"76": AccessDefinition{
+		AccessRights: map[string]AccessDefinition{"76": {
 			APIName:  "Test",
 			APIID:    "76",
 			Versions: []string{"default"},

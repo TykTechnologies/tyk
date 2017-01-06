@@ -65,7 +65,7 @@ func createMultiAuthKeyAuthSession() SessionState {
 	thisSession.QuotaRenews = time.Now().Unix()
 	thisSession.QuotaRemaining = 900
 	thisSession.QuotaMax = 10
-	thisSession.AccessRights = map[string]AccessDefinition{"55": AccessDefinition{APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 
 	return thisSession
 }
@@ -82,7 +82,7 @@ func createMultiBasicAuthSession() SessionState {
 	thisSession.QuotaRemaining = 1
 	thisSession.QuotaMax = -1
 	thisSession.BasicAuthData.Password = "TEST"
-	thisSession.AccessRights = map[string]AccessDefinition{"55": AccessDefinition{APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 
 	return thisSession
 }
