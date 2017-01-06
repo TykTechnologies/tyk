@@ -145,8 +145,7 @@ func (b BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, re
 		}
 
 		for i := 0; i < len(batchRequest.Requests); i++ {
-			val := BatchReplyUnit{}
-			val = <-replies
+			val := <-replies
 
 			ReplySet = append(ReplySet, val)
 		}

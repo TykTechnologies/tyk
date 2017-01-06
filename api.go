@@ -1020,7 +1020,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
-	success := true
+	success := false
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
 	var newSession SessionState
@@ -1030,7 +1030,6 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	if err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		code = 400
-		success = false
 		responseMessage = createError("Request malformed")
 	} else {
 		// Update our session object (create it)
@@ -2029,7 +2028,6 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 			"path":        "--",
 			"server_name": "system",
 		}).Info("Cache invalidated successfully")
-		code = 200
 	} else {
 		// Return Not supported message (and code)
 		code = 405

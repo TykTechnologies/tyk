@@ -204,7 +204,6 @@ func processSpec(referenceSpec *APISpec,
 	referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
 	//Set up all the JSVM middleware
-	mwPaths := []string{}
 	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
@@ -223,6 +222,7 @@ func processSpec(referenceSpec *APISpec,
 			"api_name": referenceSpec.APIDefinition.Name,
 		}).Debug("Loading Middleware")
 
+		var mwPaths []string
 		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
 		if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
