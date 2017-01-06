@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 	"io"
@@ -21,20 +22,18 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"github.com/TykTechnologies/tykcommon"
-
 )
 
 var ServiceCache *cache.Cache
 
 func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 
-	doCacheRefresh := func () (*tykcommon.HostList, error) {
+	doCacheRefresh := func() (*tykcommon.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
 		sd := ServiceDiscovery{}
 		sd.New(&spec.Proxy.ServiceDiscovery)
-		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)	
+		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err == nil {
 			// Set the cached value
 			if data.Len() == 0 {
@@ -73,7 +72,7 @@ func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 			log.Debug("Cache expired! Refreshing...")
 			return doCacheRefresh()
 		}
-		
+
 	}
 
 	log.Debug("Returning from cache.")
@@ -304,7 +303,7 @@ func getMaxIdleConns() int {
 }
 
 var TykDefaultTransport *TykTransporter = &TykTransporter{http.Transport{
-	Proxy: http.ProxyFromEnvironment,
+	Proxy:               http.ProxyFromEnvironment,
 	MaxIdleConnsPerHost: getMaxIdleConns(),
 	Dial: (&net.Dialer{
 		Timeout:   30 * time.Second,

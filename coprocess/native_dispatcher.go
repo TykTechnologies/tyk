@@ -14,11 +14,11 @@ package coprocess
 import "C"
 import "unsafe"
 
-import(
+import (
 	"github.com/TykTechnologies/tykcommon"
 )
 
-const(
+const (
 	_ = iota
 	JsonMessage
 	ProtobufMessage

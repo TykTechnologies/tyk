@@ -11,10 +11,9 @@ type RoundRobin struct {
 }
 
 func (r *RoundRobin) SetMax(rp *tykcommon.HostList) {
-	
+
 	// r.max = len(*rp.(*[]string)) - 1
 	r.max = rp.Len() - 1
-	
 
 	if r.max < 0 {
 		r.max = 0

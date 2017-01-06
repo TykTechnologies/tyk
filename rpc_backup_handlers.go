@@ -126,8 +126,8 @@ func doLoadWithBackup(specs *[]*APISpec) {
 
 	l, goAgainErr := goagain.Listener()
 	var listenerErr error
-	
-	l, listenerErr = generateListener(l) 
+
+	l, listenerErr = generateListener(l)
 	if listenerErr != nil {
 		log.Info("Failed to generate listener!")
 	}

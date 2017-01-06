@@ -88,7 +88,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 			bucketKey := key + ":" + currentSession.LastUpdated
 
 			// DRL will always overflow with more servers on low rates
-			thisRate := uint(currentSession.Rate*float64(DRLManager.RequestTokenValue))
+			thisRate := uint(currentSession.Rate * float64(DRLManager.RequestTokenValue))
 			if thisRate < uint(DRLManager.CurrentTokenValue) {
 				thisRate = uint(DRLManager.CurrentTokenValue)
 			}
@@ -113,9 +113,9 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 
 	if enableQ {
 		if config.LegacyEnableAllowanceCountdown {
-			currentSession.Allowance--	
+			currentSession.Allowance--
 		}
-		
+
 		if l.IsRedisQuotaExceeded(currentSession, key, store) {
 			return false, 2
 		}

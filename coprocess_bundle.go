@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 
 	"archive/zip"

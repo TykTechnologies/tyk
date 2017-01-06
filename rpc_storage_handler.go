@@ -53,7 +53,6 @@ var ErrorDenied error = errors.New("Access Denied")
 var GlobalRPCCallTimeout time.Duration
 var GlobalRPCPingTimeout time.Duration
 
-
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
 var RPCCLientRWMutex sync.RWMutex = sync.RWMutex{}

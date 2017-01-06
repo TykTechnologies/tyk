@@ -3,11 +3,11 @@
 
 package coprocess
 
-import(
+import (
 	"github.com/TykTechnologies/tykcommon"
 )
 
-const(
+const (
 	_ = iota
 	JsonMessage
 	ProtobufMessage

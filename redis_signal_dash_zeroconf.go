@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"github.com/TykTechnologies/logrus"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type DashboardConfigPayload struct {

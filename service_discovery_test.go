@@ -295,7 +295,7 @@ func TestServiceDiscovery_CONSUL(t *testing.T) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All()  {
+	for i, v := range thisList.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)
@@ -321,7 +321,7 @@ func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All()  {
+	for i, v := range thisList.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)
@@ -347,7 +347,7 @@ func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All()  {
+	for i, v := range thisList.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)
@@ -365,7 +365,7 @@ func TestServiceDiscovery_ETCD_NESTED_NOLIST(t *testing.T) {
 		t.Error(err)
 	}
 
-	host,_ := data.GetIndex(0)
+	host, _ := data.GetIndex(0)
 
 	tVal := "httpbin.org:80"
 
@@ -385,7 +385,7 @@ func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
 		t.Error(err)
 	}
 
-	host,_ := data.GetIndex(0)
+	host, _ := data.GetIndex(0)
 
 	tVal := "httpbin.org:6000"
 
@@ -413,7 +413,7 @@ func TestServiceDiscovery_MESOSPHERE(t *testing.T) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All()  {
+	for i, v := range thisList.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)

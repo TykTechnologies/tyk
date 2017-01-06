@@ -4,10 +4,10 @@
 package main
 
 import (
+	"errors"
 	"net"
 	"net/url"
 	"time"
-	"errors"
 
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -86,7 +86,7 @@ func (d *GRPCDispatcher) Reload() {
 }
 
 // HandleMiddlewareCache isn't used by gRPC.
-func (d* GRPCDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+func (d *GRPCDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
 	return
 }
 

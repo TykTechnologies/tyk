@@ -3,8 +3,8 @@ package main
 import (
 	b64 "encoding/base64"
 	"encoding/json"
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
 	"time"
 )
@@ -130,7 +130,7 @@ func IsPayloadSignatureValid(notification Notification) bool {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Error("Could not verify notification: ", err, ": ", notification)
-			
+
 			return false
 		}
 

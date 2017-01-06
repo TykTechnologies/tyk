@@ -1,16 +1,16 @@
 package main
 
 import (
-	"rsc.io/letsencrypt"
 	"encoding/json"
 	"github.com/TykTechnologies/logrus"
+	"rsc.io/letsencrypt"
 )
 
 const LEKeyPrefix string = "le_ssl:"
 
 func StoreLEState(m *letsencrypt.Manager) {
 	log.Debug("Storing SSL backup")
-	
+
 	log.Debug("[SSL] --> Connecting to DB")
 
 	thisStore := &RedisClusterStorageManager{KeyPrefix: LEKeyPrefix, HashKeys: false}
@@ -59,16 +59,15 @@ func GetLEState(m *letsencrypt.Manager) {
 	m.Unmarshal(sslState)
 }
 
-
 type LE_ServerInfo struct {
 	HostName string
-	ID string
+	ID       string
 }
 
 func NotifyLEStateChange() {
 	thisServer := LE_ServerInfo{
-		HostName:   HostDetails.Hostname,
-		ID:         NodeID,
+		HostName: HostDetails.Hostname,
+		ID:       NodeID,
 	}
 
 	asJson, jsErr := json.Marshal(thisServer)
@@ -104,7 +103,7 @@ func OnLESSLStatusReceivedHandler(payload string) {
 	}
 
 	log.Info("Received Redis LE change notification from myself, ignoring")
-	
+
 }
 
 func StartPeriodicStateBackup(m *letsencrypt.Manager) {
