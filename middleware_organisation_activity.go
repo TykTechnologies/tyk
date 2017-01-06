@@ -43,13 +43,9 @@ func (k *OrganizationMonitor) New() {
 }
 
 func (a *OrganizationMonitor) IsEnabledForSpec() bool {
-
-	if !config.EnforceOrgQuotas {
-		// We aren't enforcing quotas, so skip this mw altogether
-		return false
-	}
-
-	return true
+	// If false, we aren't enforcing quotas so skip this mw
+	// altogether
+	return config.EnforceOrgQuotas
 }
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity

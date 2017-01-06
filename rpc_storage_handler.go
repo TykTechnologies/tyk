@@ -136,12 +136,10 @@ func (r *RPCStorageHandler) Register() {
 }
 
 func (r *RPCStorageHandler) checkDisconnect() {
-	select {
-	case res := <-r.killChan:
-		log.Info("RPC Client disconnecting: ", res)
-		r.Killed = true
-		r.Disconnect()
-	}
+	res := <-r.killChan
+	log.Info("RPC Client disconnecting: ", res)
+	r.Killed = true
+	r.Disconnect()
 }
 
 func (r *RPCStorageHandler) ReConnect() {

@@ -109,7 +109,7 @@ func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 		}
 	}
 
-	if thisHandler.conf.TemplatePath == "" && templateLoaded == false {
+	if thisHandler.conf.TemplatePath == "" && templateLoaded {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 			"target": thisHandler.conf.TargetPath,

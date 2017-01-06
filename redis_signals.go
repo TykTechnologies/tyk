@@ -95,13 +95,12 @@ func IsPayloadSignatureValid(notification Notification) bool {
 	}
 
 	if notification.Signature == "" && config.AllowInsecureConfigs {
-		if warnedOnce == false {
+		if !warnedOnce {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Warning("Insecure configuration detected (allowing)!")
 			warnedOnce = true
 		}
-
 		return true
 	}
 
