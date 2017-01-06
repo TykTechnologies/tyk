@@ -92,7 +92,7 @@ func (b *Bundle) Verify() (err error) {
 		if err != nil {
 			return err
 		}
-		err = bundleVerifier.Verify([]byte(bundleData.Bytes()), signed)
+		err = bundleVerifier.Verify(bundleData.Bytes(), signed)
 		if err != nil {
 			return err
 		}
