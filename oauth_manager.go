@@ -104,11 +104,11 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 		osinResponse.Output["redirect_to"] = redirect
 	}
 
-	if respData, marshalErr := json.Marshal(&osinResponse.Output); marshalErr != nil {
+	respData, marshalErr := json.Marshal(&osinResponse.Output)
+	if marshalErr != nil {
 		return []byte{}, false
-	} else {
-		return respData, true
 	}
+	return respData, true
 
 }
 
@@ -628,15 +628,14 @@ func (r RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) er
 
 // SaveAuthorize saves authorisation data to REdis
 func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error {
-	if authDataJSON, marshalErr := json.Marshal(&authData); marshalErr != nil {
+	authDataJSON, marshalErr := json.Marshal(&authData)
+	if marshalErr != nil {
 		return marshalErr
-	} else {
-		key := AUTH_PREFIX + authData.Code
-		log.Debug("Saving auth code: ", key)
-		r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
-		return nil
-
 	}
+	key := AUTH_PREFIX + authData.Code
+	log.Debug("Saving auth code: ", key)
+	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
+	return nil
 
 }
 
@@ -724,21 +723,19 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
-		if accessDataJSON, marshalErr := json.Marshal(accessData); marshalErr != nil {
+		accessDataJSON, marshalErr := json.Marshal(accessData)
+		if marshalErr != nil {
 			return marshalErr
-		} else {
-			key := REFRESH_PREFIX + accessData.RefreshToken
-			log.Debug("Saving REFRESH key: ", key)
-			refreshExpire := int64(1209600) // 14 days
-			if config.OauthRefreshExpire != 0 {
-				refreshExpire = config.OauthRefreshExpire
-			}
-			r.store.SetKey(key, string(accessDataJSON), refreshExpire)
-			log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
-
-			return nil
 		}
-
+		key := REFRESH_PREFIX + accessData.RefreshToken
+		log.Debug("Saving REFRESH key: ", key)
+		refreshExpire := int64(1209600) // 14 days
+		if config.OauthRefreshExpire != 0 {
+			refreshExpire = config.OauthRefreshExpire
+		}
+		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
+		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
+		return nil
 	}
 
 	return nil

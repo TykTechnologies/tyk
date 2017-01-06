@@ -202,17 +202,15 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 					hostList = append(hostList, hostname)
 				}
 				return &hostList
-
-			} else {
-				log.Debug("Not a list")
-				switch parentData.(type) {
-				default:
-					log.Debug("parentData is not a string")
-				case string:
-					s.ParseObject(parentData.(string), &subContainer)
-					thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-					log.Debug("thisSet (object list): ", objList)
-				}
+			}
+			log.Debug("Not a list")
+			switch parentData.(type) {
+			default:
+				log.Debug("parentData is not a string")
+			case string:
+				s.ParseObject(parentData.(string), &subContainer)
+				thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
+				log.Debug("thisSet (object list): ", objList)
 			}
 		} else if s.parentPath != "" {
 			thisSet = s.decodeToNameSpaceAsArray(s.parentPath, objList)

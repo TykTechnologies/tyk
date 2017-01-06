@@ -415,23 +415,21 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		// No, let's try one-to-one mapping
 		return k.processOneToOneTokenMap(w, r, token)
+	}
+	log.WithFields(logrus.Fields{
+		"path":   r.URL.Path,
+		"origin": GetIPFromRequest(r),
+	}).Info("Attempted JWT access with non-existent key.")
 
-	} else {
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": GetIPFromRequest(r),
-		}).Info("Attempted JWT access with non-existent key.")
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-			}).Error("JWT validation error: ", err)
-		}
-
-		k.reportLoginFailure(tykId, r)
-		return errors.New("Key not authorized"), 403
+		}).Error("JWT validation error: ", err)
 	}
+
+	k.reportLoginFailure(tykId, r)
+	return errors.New("Key not authorized"), 403
 }
 
 func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {

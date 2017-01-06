@@ -1043,9 +1043,8 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			if config.SupressDefaultOrgStore {
 				responseMessage = createError("No such organisation found in Active API list")
 				return responseMessage, 400
-			} else {
-				thisSessionManager = &DefaultOrgStore
 			}
+			thisSessionManager = &DefaultOrgStore
 		} else {
 			thisSessionManager = spec.OrgSessionManager
 		}

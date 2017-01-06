@@ -77,13 +77,10 @@ func GetIP(ip string) (string, error) {
 	} else {
 		if len(IPWithoutPort) == 1 {
 			return ip, nil
-		} else {
-			log.Warning(IPWithoutPort)
-			return ip, errors.New("IP Address malformed")
 		}
-
+		log.Warning(IPWithoutPort)
+		return ip, errors.New("IP Address malformed")
 	}
-
 	return ip, nil
 }
 

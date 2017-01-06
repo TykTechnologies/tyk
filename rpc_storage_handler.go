@@ -271,7 +271,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		return
 	}
 	log.Debug("[RPC Store] Group Login complete")
-	RPC_LoadCount += 1
+	RPC_LoadCount++
 }
 
 func (r *RPCStorageHandler) Login() {
@@ -300,7 +300,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 	log.Debug("[RPC Store] Login complete")
-	RPC_LoadCount += 1
+	RPC_LoadCount++
 }
 
 // GetKey will retrieve a key from the database

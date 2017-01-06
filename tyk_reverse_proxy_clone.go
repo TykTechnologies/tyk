@@ -68,12 +68,10 @@ func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 			// Are we already refreshing the cache? skip and return last good conf
 			log.Debug("Cache expired! But service refresh in progress")
 			return spec.LastGoodHostList, nil
-		} else {
-			// Refresh the spec
-			log.Debug("Cache expired! Refreshing...")
-			return doCacheRefresh()
 		}
-
+		// Refresh the spec
+		log.Debug("Cache expired! Refreshing...")
+		return doCacheRefresh()
 	}
 
 	log.Debug("Returning from cache.")
@@ -343,11 +341,9 @@ func singleJoiningSlash(a, b string) string {
 		if len(b) > 0 {
 			log.Debug(a + b)
 			return a + "/" + b
-		} else {
-			log.Debug(a + b)
-			return a
 		}
-
+		log.Debug(a + b)
+		return a
 	}
 	log.Debug(a + b)
 	return a + b

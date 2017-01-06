@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -147,7 +146,7 @@ func TestBatchSuccess(t *testing.T) {
 
 	requestSet, createReqErr := batchHandler.ConstructRequests(batchRequest, false)
 	if createReqErr != nil {
-		t.Error(fmt.Sprintf("Batch request creation failed , request structure malformed"))
+		t.Error("Batch request creation failed , request structure malformed")
 	}
 
 	if len(requestSet) != 3 {

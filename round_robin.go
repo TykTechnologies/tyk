@@ -31,7 +31,7 @@ func (r *RoundRobin) SetMax(rp *tykcommon.HostList) {
 
 func (r *RoundRobin) GetPos() int {
 	r.cur = r.pos
-	r.pos += 1
+	r.pos++
 	if r.pos > (r.max) {
 		r.pos = 0
 	}
