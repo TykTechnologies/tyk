@@ -1,4 +1,10 @@
-# Develop
+# v2.3.1
+
+- Added patch for redis cluster driver - in some docker distributions caused deadlocks by setting REDIGOCLUSTER_SHARDCOUNT to a higher value (default 32)
+- Removed config notification info messages (to debug) so Tyk is less chatty
+- Added instrumentation for statsd for more in-depth debugging (If TYK_INSTRUMENTATION is set to any value and TYK_GW_STATSDCONNECTIONSTRING is set), optionally set TYK_GW_STATSDPREFIX to a value to enable a prefix.
+
+# v2.3
 
 - It is now possible to separate out the cache data store from the main redis store
 - Context Data now includes JWT Claims, claims are added as individual keys as $tyk_context.jwt_claims_CLAIMNAME.

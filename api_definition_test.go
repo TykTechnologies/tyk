@@ -162,7 +162,7 @@ func TestExpiredRequest(t *testing.T) {
 	thisSpec := createDefinitionFromString(sampleDefiniton)
 
 	ok, status, _ := thisSpec.IsRequestValid(req)
-	if ok == true {
+	if ok {
 		t.Error("Request should fail as expiry date is in the past!")
 	}
 

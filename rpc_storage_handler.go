@@ -536,11 +536,8 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 		}
 
 		return ok.(bool)
-	} else {
-		log.Debug("RPCStorageHandler called DEL - Nothing to delete")
-		return true
 	}
-
+	log.Debug("RPCStorageHandler called DEL - Nothing to delete")
 	return true
 }
 
@@ -652,10 +649,7 @@ func (r RPCStorageHandler) RemoveFromSet(keyName string, value string) {
 
 func (r RPCStorageHandler) IsAccessError(err error) bool {
 	if err != nil {
-		if err.Error() == "Access Denied" {
-			return true
-		}
-		return false
+		return err.Error() == "Access Denied"
 	}
 	return false
 }

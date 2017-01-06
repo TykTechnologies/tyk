@@ -113,8 +113,5 @@ func IsWebsocket(req *http.Request) bool {
 	}
 
 	upgrade := strings.ToLower(strings.TrimSpace(req.Header.Get("Upgrade")))
-	if upgrade != "websocket" {
-		return false
-	}
-	return true
+	return upgrade == "websocket"
 }

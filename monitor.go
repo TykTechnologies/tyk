@@ -5,11 +5,7 @@ import "time"
 type Monitor struct{}
 
 func (m Monitor) IsMonitorEnabled() bool {
-	if config.Monitor.EnableTriggerMonitors {
-		return true
-	}
-
-	return false
+	return config.Monitor.EnableTriggerMonitors
 }
 
 func (m Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
