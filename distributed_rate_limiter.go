@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"time"
+
 	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/logrus"
-	"time"
 )
 
 var DRLManager drl.DRL

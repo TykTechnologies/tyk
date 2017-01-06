@@ -3,12 +3,13 @@
 package main
 
 import (
+	"regexp"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/xmlpath.v2"
-	"regexp"
 
 	"bytes"
 	"crypto/md5"

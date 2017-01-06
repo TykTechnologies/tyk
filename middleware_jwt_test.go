@@ -3,10 +3,11 @@ package main
 import (
 	//"encoding/base64"
 	//"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+
+	"github.com/dgrijalva/jwt-go"
 	//"strings"
 	"testing"
 	"time"

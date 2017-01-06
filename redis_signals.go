@@ -3,10 +3,11 @@ package main
 import (
 	b64 "encoding/base64"
 	"encoding/json"
+	"time"
+
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
-	"time"
 )
 
 const (

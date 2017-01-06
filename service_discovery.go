@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/lonelycode/gabs"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/lonelycode/gabs"
 )
 
 const ARRAY_NAME string = "tyk_array"

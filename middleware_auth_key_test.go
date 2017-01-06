@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/justinas/alice"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
 )
 
 func createAuthKeyAuthSession() SessionState {

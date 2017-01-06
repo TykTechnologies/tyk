@@ -1,9 +1,10 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/mitchellh/mapstructure"
-	"net/http"
 )
 
 type HeaderInjectorOptions struct {

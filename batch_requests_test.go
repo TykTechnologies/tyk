@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/justinas/alice"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
 )
 
 func createBatchTestSession() SessionState {

@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2/bson"
-	"net/http"
-	"time"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format

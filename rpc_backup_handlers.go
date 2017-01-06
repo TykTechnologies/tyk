@@ -6,12 +6,13 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"github.com/TykTechnologies/logrus"
-	"github.com/gorilla/mux"
-	"github.com/rcrowley/goagain"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/gorilla/mux"
+	"github.com/rcrowley/goagain"
 )
 
 const RPCKeyPrefix string = "rpc:"

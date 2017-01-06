@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
-	"github.com/TykTechnologies/logrus"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 type MultiTargetProxy struct {

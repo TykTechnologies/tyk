@@ -4,9 +4,10 @@ package main
 
 import (
 	"fmt"
+	"hash"
+
 	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
-	"hash"
 )
 
 type HashType string

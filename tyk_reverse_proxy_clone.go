@@ -9,10 +9,6 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
-	"github.com/pmylund/go-cache"
 	"io"
 	"io/ioutil"
 	"net"
@@ -22,6 +18,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
+	"github.com/pmylund/go-cache"
 )
 
 var ServiceCache *cache.Cache

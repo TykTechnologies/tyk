@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/hex"
-	"github.com/garyburd/redigo/redis"
-	"github.com/spaolacci/murmur3"
 	"hash"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/spaolacci/murmur3"
 )
 
 // KeyError is a standard error for when a key is not found in the storage engine

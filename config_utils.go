@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/kelseyhightower/envconfig"
-	"github.com/nu7hatch/gouuid"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
+	"github.com/nu7hatch/gouuid"
 )
 
 const ENV_PREVIX string = "TYK_GW"

@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tykcommon"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"testing"
+
+	"github.com/TykTechnologies/tykcommon"
 )
 
 var sampleDefiniton string = `

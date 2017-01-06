@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/mitchellh/mapstructure"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 type RevProxyTransform struct {

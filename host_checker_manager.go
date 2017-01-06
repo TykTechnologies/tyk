@@ -4,12 +4,13 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/url"
+	"time"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/lonelycode/go-uuid/uuid"
 	"gopkg.in/vmihailenco/msgpack.v2"
-	"net/url"
-	"time"
 )
 
 var GlobalHostChecker HostCheckerManager
