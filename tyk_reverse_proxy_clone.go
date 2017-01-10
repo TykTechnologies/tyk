@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"errors"
 	"time"
 	"github.com/TykTechnologies/tykcommon"
 
@@ -41,6 +42,12 @@ func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 				spec.HasRun = true
 				spec.ServiceRefreshInProgress = false
 				log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
+
+				if spec.LastGoodHostList == nil {
+					log.Warning("[PROXY][SD] Last good host list is nil, returning empty set.")
+					spec.LastGoodHostList = tykcommon.NewHostList()
+				}
+
 				return spec.LastGoodHostList, nil
 			}
 
