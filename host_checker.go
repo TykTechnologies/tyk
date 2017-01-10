@@ -129,7 +129,7 @@ func (h *HostUptimeChecker) HostReporter() {
 
 		case <-h.stopPollingChan:
 			log.Debug("[HOST CHECKER] Received kill signal")
-			break
+			return
 		}
 	}
 }

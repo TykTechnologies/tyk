@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/hex"
-	"errors"
 	"github.com/garyburd/redigo/redis"
 	"github.com/spaolacci/murmur3"
 	"hash"
@@ -657,11 +656,9 @@ func (r *RedisStorageManager) StartPubSubHandler(channel string, callback func(r
 
 		case error:
 			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
-
 			return v
 		}
 	}
-	return errors.New("Connection closed.")
 }
 
 func (r *RedisStorageManager) Publish(channel string, message string) error {

@@ -79,10 +79,7 @@ func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSta
 func (b DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
 	if newSession.Expires >= 1 {
 		//diff := newSession.Expires - time.Now().Unix()
-		if time.Now().After(time.Unix(newSession.Expires, 0)) {
-			return true
-		}
-		return false
+		return time.Now().After(time.Unix(newSession.Expires, 0))
 	}
 	return false
 }

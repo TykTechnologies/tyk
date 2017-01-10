@@ -1235,9 +1235,6 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		thisVersion := thisURL[:firstParamEndsAt]
 
 		return thisVersion
-
-	} else {
-		return ""
 	}
 
 	return ""
@@ -1262,15 +1259,9 @@ func (a *APISpec) IsThisAPIVersionExpired(versionDef *tykcommon.VersionInfo) boo
 		return true
 	}
 
-	remaining := time.Since(t)
-	if remaining < 0 {
-		// It's in the future, keep going
-		return false
-	}
-
 	// It's in the past, expire
-	return true
-
+	// It's in the future, keep going
+	return time.Since(t) >= 0
 }
 
 // IsRequestValid will check if an incoming request has valid version data and return a RequestStatus that
@@ -1284,7 +1275,7 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 	}
 
 	// Is the API version expired?
-	if a.IsThisAPIVersionExpired(versionMetaData) == true {
+	if a.IsThisAPIVersionExpired(versionMetaData) {
 		// Expired - fail
 		return false, VersionExpired, nil
 	}

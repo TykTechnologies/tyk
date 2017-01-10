@@ -539,8 +539,6 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 			return v
 		}
 	}
-	return errors.New("Connection closed.")
-	return nil
 }
 
 func (r *RedisClusterStorageManager) Publish(channel string, message string) error {
@@ -751,7 +749,6 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 
 		return intVal, redVal[1].([]interface{})
 	}
-	return 0, []interface{}{}
 }
 
 func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, per int64, value_override string) (int, []interface{}) {
@@ -817,5 +814,4 @@ func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, pe
 
 		return intVal, redVal[1].([]interface{})
 	}
-	return 0, []interface{}{}
 }
