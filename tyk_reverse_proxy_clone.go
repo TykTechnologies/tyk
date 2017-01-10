@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"errors"
 	"time"
 	"github.com/TykTechnologies/tykcommon"
 
