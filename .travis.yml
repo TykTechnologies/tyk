@@ -1,7 +1,8 @@
-language: go
 sudo: false
+language: go
 
 go:
+  - 1.6.x
   - 1.7.x
 
 services:
