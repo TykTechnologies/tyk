@@ -1324,6 +1324,8 @@ func listen(l net.Listener, err error) {
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
+			defaultRouter.SkipClean(config.HttpServerOptions.SkipURLCleaning)
+
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("Custom gateway started")
@@ -1344,10 +1346,11 @@ func listen(l net.Listener, err error) {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Printf("Gateway started (%v)", VERSION)
-			if !RPC_EmergencyMode {
-				http.Handle("/", mainRouter)
+			if RPC_EmergencyMode {
+				go http.Serve(l, nil)
+			} else {
+				go http.Serve(l, mainRouter)
 			}
-			go http.Serve(l, nil)
 			displayConfig()
 		}
 
