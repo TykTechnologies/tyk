@@ -76,7 +76,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
 			"origin": GetIPFromRequest(req),
-		}).Error("Hijack error: %v", err)
+		}).Errorf("Hijack error: %v", err)
 		return nil, err
 	}
 	defer nc.Close()
@@ -86,7 +86,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
 			"origin": GetIPFromRequest(req),
-		}).Error("Error copying request to target: %v", err)
+		}).Errorf("Error copying request to target: %v", err)
 		return nil, err
 	}
 

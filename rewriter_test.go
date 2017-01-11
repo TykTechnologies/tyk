@@ -26,7 +26,7 @@ func TestRewriter(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
 
@@ -50,7 +50,7 @@ func TestRewriterWithOneVal(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
 
@@ -74,7 +74,7 @@ func TestRewriterWithThreeVals(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
 
@@ -98,7 +98,7 @@ func TestRewriterWithReverse(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
 
@@ -122,7 +122,7 @@ func TestRewriterWithMissing(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
 
@@ -146,7 +146,7 @@ func TestRewriterWithMissingAgain(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
 
@@ -170,7 +170,7 @@ func TestRewriterWithQS(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }
 
@@ -194,6 +194,6 @@ func TestRewriterWithQS2(t *testing.T) {
 	}
 
 	if val != expected {
-		t.Error("Transform failed, expected: %v, got: %v ", expected, val)
+		t.Errorf("Transform failed, expected: %v, got: %v ", expected, val)
 	}
 }

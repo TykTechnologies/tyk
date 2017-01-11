@@ -84,7 +84,7 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 		for _, host := range h.HostList {
 			_, err := h.pool.SendWork(host)
 			if err != nil {
-				log.Error("[HOST CHECKER] could not send work, error: %v", err)
+				log.Errorf("[HOST CHECKER] could not send work, error: %v", err)
 			}
 		}
 
@@ -227,7 +227,7 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	log.Debug("[HOST CHECKER] Init complete")
 
 	if pErr != nil {
-		log.Error("[HOST CHECKER POOL] Error: %v\n", pErr)
+		log.Errorf("[HOST CHECKER POOL] Error: %v\n", pErr)
 	}
 }
 
