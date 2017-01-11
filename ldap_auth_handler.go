@@ -2,8 +2,9 @@ package main
 
 import (
 	"errors"
-	ldap "github.com/mavricknz/ldap"
 	"strings"
+
+	ldap "github.com/mavricknz/ldap"
 )
 
 // LDAPStorageHandler implements StorageHandler, this is a read-only implementation to access keys from an LDAP service

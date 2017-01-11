@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/lonelycode/gabs"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/lonelycode/gabs"
 )
 
 const ARRAY_NAME string = "tyk_array"
@@ -201,17 +202,15 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 					hostList = append(hostList, hostname)
 				}
 				return &hostList
-
-			} else {
-				log.Debug("Not a list")
-				switch parentData.(type) {
-				default:
-					log.Debug("parentData is not a string")
-				case string:
-					s.ParseObject(parentData.(string), &subContainer)
-					thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-					log.Debug("thisSet (object list): ", objList)
-				}
+			}
+			log.Debug("Not a list")
+			switch parentData.(type) {
+			default:
+				log.Debug("parentData is not a string")
+			case string:
+				s.ParseObject(parentData.(string), &subContainer)
+				thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
+				log.Debug("thisSet (object list): ", objList)
 			}
 		} else if s.parentPath != "" {
 			thisSet = s.decodeToNameSpaceAsArray(s.parentPath, objList)

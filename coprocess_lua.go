@@ -146,7 +146,7 @@ func (d *LuaDispatcher) Reload() {
 	}
 }
 
-func (d* LuaDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+func (d *LuaDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
 	for _, f := range b.FileList {
 		fullPath := filepath.Join(basePath, f)
 		contents, err := ioutil.ReadFile(fullPath)

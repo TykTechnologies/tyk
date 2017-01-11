@@ -77,13 +77,10 @@ func GetIP(ip string) (string, error) {
 	} else {
 		if len(IPWithoutPort) == 1 {
 			return ip, nil
-		} else {
-			log.Warning(IPWithoutPort)
-			return ip, errors.New("IP Address malformed")
 		}
-
+		log.Warning(IPWithoutPort)
+		return ip, errors.New("IP Address malformed")
 	}
-
 	return ip, nil
 }
 
@@ -263,7 +260,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			}
 
-			cachedData, timestamp, decErr := m.decodePayload(string(retBlob))
+			cachedData, timestamp, decErr := m.decodePayload(retBlob)
 			if decErr != nil {
 				// Tere was an issue with this cache entry - lets remove it:
 				m.CacheStore.DeleteKey(thisKey)

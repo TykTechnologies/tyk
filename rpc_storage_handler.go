@@ -53,7 +53,6 @@ var ErrorDenied error = errors.New("Access Denied")
 var GlobalRPCCallTimeout time.Duration
 var GlobalRPCPingTimeout time.Duration
 
-
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
 var RPCCLientRWMutex sync.RWMutex = sync.RWMutex{}
@@ -137,12 +136,10 @@ func (r *RPCStorageHandler) Register() {
 }
 
 func (r *RPCStorageHandler) checkDisconnect() {
-	select {
-	case res := <-r.killChan:
-		log.Info("RPC Client disconnecting: ", res)
-		r.Killed = true
-		r.Disconnect()
-	}
+	res := <-r.killChan
+	log.Info("RPC Client disconnecting: ", res)
+	r.Killed = true
+	r.Disconnect()
 }
 
 func (r *RPCStorageHandler) ReConnect() {
@@ -274,7 +271,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		return
 	}
 	log.Debug("[RPC Store] Group Login complete")
-	RPC_LoadCount += 1
+	RPC_LoadCount++
 }
 
 func (r *RPCStorageHandler) Login() {
@@ -303,7 +300,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 	log.Debug("[RPC Store] Login complete")
-	RPC_LoadCount += 1
+	RPC_LoadCount++
 }
 
 // GetKey will retrieve a key from the database

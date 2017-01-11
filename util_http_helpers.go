@@ -2,11 +2,12 @@ package main
 
 import (
 	"bytes"
-	"github.com/gorilla/context"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/context"
 )
 
 func GetIPFromRequest(r *http.Request) string {
@@ -99,4 +100,3 @@ func RecordDetail(r *http.Request) bool {
 	thisSessionState = ses.(SessionState)
 	return thisSessionState.EnableDetailedRecording
 }
-

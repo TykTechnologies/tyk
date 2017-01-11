@@ -6,12 +6,13 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"github.com/TykTechnologies/logrus"
-	"github.com/gorilla/mux"
-	"github.com/rcrowley/goagain"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/gorilla/mux"
+	"github.com/rcrowley/goagain"
 )
 
 const RPCKeyPrefix string = "rpc:"
@@ -126,8 +127,8 @@ func doLoadWithBackup(specs *[]*APISpec) {
 
 	l, goAgainErr := goagain.Listener()
 	var listenerErr error
-	
-	l, listenerErr = generateListener(l) 
+
+	l, listenerErr = generateListener(l)
 	if listenerErr != nil {
 		log.Info("Failed to generate listener!")
 	}

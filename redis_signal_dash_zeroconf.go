@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/logrus"
-	"strings"
 	"strconv"
+	"strings"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 type DashboardConfigPayload struct {

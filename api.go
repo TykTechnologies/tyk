@@ -106,7 +106,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
-		for apiId, _ := range newSession.AccessRights {
+		for apiId := range newSession.AccessRights {
 			thisAPISpec := GetSpecForApi(apiId)
 			if thisAPISpec != nil {
 
@@ -246,7 +246,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 				// Ge the session
 				var originalKey SessionState
 				var found bool
-				for api_id, _ := range newSession.AccessRights {
+				for api_id := range newSession.AccessRights {
 					originalKey, found = GetKeyDetail(keyName, api_id)
 					if found {
 						break
@@ -1020,7 +1020,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
-	success := true
+	success := false
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
 	var newSession SessionState
@@ -1030,7 +1030,6 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	if err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		code = 400
-		success = false
 		responseMessage = createError("Request malformed")
 	} else {
 		// Update our session object (create it)
@@ -1043,9 +1042,8 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			if config.SupressDefaultOrgStore {
 				responseMessage = createError("No such organisation found in Active API list")
 				return responseMessage, 400
-			} else {
-				thisSessionManager = &DefaultOrgStore
 			}
+			thisSessionManager = &DefaultOrgStore
 		} else {
 			thisSessionManager = spec.OrgSessionManager
 		}
@@ -1320,7 +1318,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 			if len(newSession.AccessRights) > 0 {
-				for apiId, _ := range newSession.AccessRights {
+				for apiId := range newSession.AccessRights {
 					thisAPISpec := GetSpecForApi(apiId)
 					if thisAPISpec != nil {
 						checkAndApplyTrialPeriod(newKey, apiId, &newSession)
@@ -2030,7 +2028,6 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 			"path":        "--",
 			"server_name": "system",
 		}).Info("Cache invalidated successfully")
-		code = 200
 	} else {
 		// Return Not supported message (and code)
 		code = 405

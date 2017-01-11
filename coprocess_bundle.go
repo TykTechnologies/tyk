@@ -1,15 +1,14 @@
 package main
 
 import (
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
 	b64 "encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,10 +61,6 @@ func (b *Bundle) Verify() (err error) {
 		useSignature = true
 	}
 
-	h := md5.New()
-	h.Write(b.Data)
-	checksum := hex.EncodeToString(h.Sum(nil))
-
 	var bundleData bytes.Buffer
 
 	for _, f := range b.Manifest.FileList {
@@ -80,7 +75,7 @@ func (b *Bundle) Verify() (err error) {
 		bundleData.Write(data)
 	}
 
-	checksum = fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
+	checksum := fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
 
 	if checksum != b.Manifest.Checksum {
 		err = errors.New("Invalid checksum")
@@ -92,7 +87,7 @@ func (b *Bundle) Verify() (err error) {
 		if err != nil {
 			return err
 		}
-		err = bundleVerifier.Verify([]byte(bundleData.Bytes()), signed)
+		err = bundleVerifier.Verify(bundleData.Bytes(), signed)
 		if err != nil {
 			return err
 		}

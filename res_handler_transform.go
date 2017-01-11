@@ -3,13 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/TykTechnologies/logrus"
-	"github.com/clbanning/mxj"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
 	"net/http"
 	"strconv"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/clbanning/mxj"
+	"github.com/mitchellh/mapstructure"
 )
 
 type ResponsetransformOptions struct {

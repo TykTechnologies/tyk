@@ -43,13 +43,9 @@ func (k *OrganizationMonitor) New() {
 }
 
 func (a *OrganizationMonitor) IsEnabledForSpec() bool {
-
-	if !config.EnforceOrgQuotas {
-		// We aren't enforcing quotas, so skip this mw altogether
-		return false
-	}
-
-	return true
+	// If false, we aren't enforcing quotas so skip this mw
+	// altogether
+	return config.EnforceOrgQuotas
 }
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
@@ -60,9 +56,8 @@ func (k *OrganizationMonitor) GetConfig() (interface{}, error) {
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	if config.ExperimentalProcessOrgOffThread {
 		return k.ProcessRequestOffThread(w, r, configuration)
-	} else {
-		return k.ProcessRequestLive(w, r, configuration)
 	}
+	return k.ProcessRequestLive(w, r, configuration)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

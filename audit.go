@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/facebookgo/pidfile"
 	"os"
+
+	"github.com/facebookgo/pidfile"
 )
 
 type AuditHostDetails struct {

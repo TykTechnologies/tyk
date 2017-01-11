@@ -4,8 +4,6 @@ import (
 	"bytes"
 	b64 "encoding/base64"
 	"fmt"
-	"github.com/TykTechnologies/logrus"
-	"github.com/gorilla/context"
 	"html/template"
 	"net"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/gorilla/context"
 )
 
 const (

@@ -4,12 +4,13 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/logrus"
-	"github.com/lonelycode/go-uuid/uuid"
-	"github.com/TykTechnologies/tykcommon"
-	"gopkg.in/vmihailenco/msgpack.v2"
 	"net/url"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/lonelycode/go-uuid/uuid"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 var GlobalHostChecker HostCheckerManager
@@ -206,7 +207,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", hc.getHostKey(report))
-	hc.store.SetKey(hc.getHostKey(report), "1", int64(config.UptimeTests.Config.TimeWait + 1))
+	hc.store.SetKey(hc.getHostKey(report), "1", int64(config.UptimeTests.Config.TimeWait+1))
 
 	thisSpec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	if !found {

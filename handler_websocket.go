@@ -3,12 +3,13 @@ package main
 import (
 	"crypto/tls"
 	"errors"
-	"github.com/TykTechnologies/logrus"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 func canonicalAddr(url *url.URL) string {

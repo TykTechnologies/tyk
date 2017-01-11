@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"github.com/justinas/alice"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
 )
 
 func createBatchTestSession() SessionState {
@@ -146,7 +146,7 @@ func TestBatchSuccess(t *testing.T) {
 
 	requestSet, createReqErr := batchHandler.ConstructRequests(batchRequest, false)
 	if createReqErr != nil {
-		t.Error(fmt.Sprintf("Batch request creation failed , request structure malformed"))
+		t.Error("Batch request creation failed , request structure malformed")
 	}
 
 	if len(requestSet) != 3 {

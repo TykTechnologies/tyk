@@ -3,10 +3,11 @@
 package main
 
 import (
-	"github.com/spaolacci/murmur3"
-	"gopkg.in/vmihailenco/msgpack.v2"
 	"fmt"
 	"hash"
+
+	"github.com/spaolacci/murmur3"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type HashType string
@@ -65,7 +66,7 @@ type SessionState struct {
 	Tags                    []string    `json:"tags" msg:"tags"`
 	Alias                   string      `json:"alias" msg:"alias"`
 	LastUpdated             string      `json:"last_updated" msg:"last_updated"`
-	IdExtractorDeadline		int64	`json:"id_extractor_deadline" msg:"id_extractor_deadline"`
+	IdExtractorDeadline     int64       `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64       `bson:"session_lifetime" json:"session_lifetime"`
 
 	firstSeenHash string
@@ -80,7 +81,7 @@ func (s *SessionState) SetFirstSeenHash() {
 		return
 	}
 
-    s.firstSeenHash = fmt.Sprintf("%x", murmurHasher.Sum(encoded))
+	s.firstSeenHash = fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
 func (s *SessionState) GetHash() string {
@@ -90,7 +91,7 @@ func (s *SessionState) GetHash() string {
 		return ""
 	}
 
-    return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
+	return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
 func (s *SessionState) HasChanged() bool {

@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lonelycode/go-uuid/uuid"
-	"github.com/TykTechnologies/tykcommon"
 	"io/ioutil"
 	"strings"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/lonelycode/go-uuid/uuid"
 )
 
 var CommandModeOptions = map[string]bool{

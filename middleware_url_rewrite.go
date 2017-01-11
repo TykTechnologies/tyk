@@ -44,7 +44,7 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 
 		for _, v := range replace_slice {
 			log.Debug("Replacing: ", v[0])
-			newpath = strings.Replace(newpath, string(v[0]), string(mapped_replace[v[0]]), -1)
+			newpath = strings.Replace(newpath, v[0], mapped_replace[v[0]], -1)
 		}
 
 		log.Debug("URL Re-written from: ", path)
@@ -94,7 +94,7 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 					default:
 						log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
 					}
-					newpath = strings.Replace(newpath, string(v[0]), url.QueryEscape(nVal), -1)
+					newpath = strings.Replace(newpath, v[0], url.QueryEscape(nVal), -1)
 				}
 
 			}
@@ -138,7 +138,7 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 					default:
 						log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
 					}
-					newpath = strings.Replace(newpath, string(v[0]), url.QueryEscape(nVal), -1)
+					newpath = strings.Replace(newpath, v[0], url.QueryEscape(nVal), -1)
 				}
 
 			}

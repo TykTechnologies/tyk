@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/gorilla/mux"
 )
 
 var ipMiddlewareTestDefinitionEnabledFail string = `

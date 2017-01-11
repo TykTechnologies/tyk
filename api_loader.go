@@ -204,7 +204,6 @@ func processSpec(referenceSpec *APISpec,
 	referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
 	//Set up all the JSVM middleware
-	mwPaths := []string{}
 	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
 	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
 	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
@@ -223,6 +222,7 @@ func processSpec(referenceSpec *APISpec,
 			"api_name": referenceSpec.APIDefinition.Name,
 		}).Debug("Loading Middleware")
 
+		var mwPaths []string
 		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
 		if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
@@ -331,9 +331,7 @@ func processSpec(referenceSpec *APISpec,
 			}
 		}
 
-		for _, baseMw := range baseChainArray {
-			chainArray = append(chainArray, baseMw)
-		}
+		chainArray = append(chainArray, baseChainArray...)
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != tykcommon.OttoDriver {
@@ -378,9 +376,7 @@ func processSpec(referenceSpec *APISpec,
 			}
 		}
 
-		for _, baseMw := range baseChainArray_PreAuth {
-			chainArray = append(chainArray, baseMw)
-		}
+		chainArray = append(chainArray, baseChainArray_PreAuth...)
 
 		// Select the keying method to use for setting session states
 		var authArray = []alice.Constructor{}
@@ -474,9 +470,7 @@ func processSpec(referenceSpec *APISpec,
 			authArray = append(authArray, CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware))
 		}
 
-		for _, authMw := range authArray {
-			chainArray = append(chainArray, authMw)
-		}
+		chainArray = append(chainArray, authArray...)
 
 		for _, obj := range mwPostAuthCheckFuncs {
 			log.WithFields(logrus.Fields{
@@ -498,9 +492,7 @@ func processSpec(referenceSpec *APISpec,
 		AppendMiddleware(&baseChainArray_PostAuth, &TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PostAuth, &VirtualEndpoint{TykMiddleware: tykMiddleware}, tykMiddleware)
 
-		for _, baseMw := range baseChainArray_PostAuth {
-			chainArray = append(chainArray, baseMw)
-		}
+		chainArray = append(chainArray, baseChainArray_PostAuth...)
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != tykcommon.OttoDriver {
@@ -535,17 +527,9 @@ func processSpec(referenceSpec *APISpec,
 			CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)}
 
 		var fullSimpleChain = []alice.Constructor{}
-		for _, mw := range simpleChain_PreAuth {
-			fullSimpleChain = append(fullSimpleChain, mw)
-		}
-
-		for _, authMw := range authArray {
-			fullSimpleChain = append(fullSimpleChain, authMw)
-		}
-
-		for _, mw := range simpleChain_PostAuth {
-			fullSimpleChain = append(fullSimpleChain, mw)
-		}
+		fullSimpleChain = append(fullSimpleChain, simpleChain_PreAuth...)
+		fullSimpleChain = append(fullSimpleChain, authArray...)
+		fullSimpleChain = append(fullSimpleChain, simpleChain_PostAuth...)
 
 		simpleChain := alice.New(fullSimpleChain...).Then(userCheckHandler)
 

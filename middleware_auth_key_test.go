@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/justinas/alice"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
 )
 
 func createAuthKeyAuthSession() SessionState {
@@ -25,7 +26,7 @@ func createAuthKeyAuthSession() SessionState {
 	thisSession.QuotaRemaining = 10
 	thisSession.QuotaMax = 10
 
-	thisSession.AccessRights = map[string]AccessDefinition{"31": AccessDefinition{APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
+	thisSession.AccessRights = map[string]AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
 
 	return thisSession
 }

@@ -191,21 +191,19 @@ func (r *RedisClusterStorageManager) SetKey(keyName string, sessionState string,
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.SetKey(keyName, sessionState, timeout)
-	} else {
-		_, err := GetRelevantClusterReference(r.IsCache).Do("SET", r.fixKey(keyName), sessionState)
-		if timeout > 0 {
-			_, expErr := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", r.fixKey(keyName), timeout)
-			if expErr != nil {
-				log.Error("Could not EXPIRE key: ", expErr)
-				return expErr
-			}
-		}
-		if err != nil {
-			log.Error("Error trying to set value: ", err)
-			return err
+	}
+	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", r.fixKey(keyName), sessionState)
+	if timeout > 0 {
+		_, expErr := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", r.fixKey(keyName), timeout)
+		if expErr != nil {
+			log.Error("Could not EXPIRE key: ", expErr)
+			return expErr
 		}
 	}
-
+	if err != nil {
+		log.Error("Error trying to set value: ", err)
+		return err
+	}
 	return nil
 }
 
@@ -215,21 +213,19 @@ func (r *RedisClusterStorageManager) SetRawKey(keyName string, sessionState stri
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.SetRawKey(keyName, sessionState, timeout)
-	} else {
-		_, err := GetRelevantClusterReference(r.IsCache).Do("SET", keyName, sessionState)
-		if timeout > 0 {
-			_, expErr := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", keyName, timeout)
-			if expErr != nil {
-				log.Error("Could not EXPIRE key: ", expErr)
-				return expErr
-			}
-		}
-		if err != nil {
-			log.Error("Error trying to set value: ", err)
-			return err
+	}
+	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", keyName, sessionState)
+	if timeout > 0 {
+		_, expErr := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", keyName, timeout)
+		if expErr != nil {
+			log.Error("Could not EXPIRE key: ", expErr)
+			return expErr
 		}
 	}
-
+	if err != nil {
+		log.Error("Error trying to set value: ", err)
+		return err
+	}
 	return nil
 }
 
@@ -420,18 +416,16 @@ func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
 	// this will store the keys of each iteration
 	var keys []string
 	for {
-
 		// we scan with our iter offset, starting at 0
-		if arr, err := redis.MultiBulk(GetRelevantClusterReference(r.IsCache).Do("SCAN", iter, "MATCH", pattern)); err != nil {
+		arr, err := redis.MultiBulk(GetRelevantClusterReference(r.IsCache).Do("SCAN", iter, "MATCH", pattern))
+		if err != nil {
 			log.Error("SCAN Token Get Failure: ", err)
 			return false
-		} else {
-
-			// now we get the iter and the keys from the multi-bulk reply
-			iter, _ = redis.String(arr[0], nil)
-			theseKeys, _ := redis.Strings(arr[1], nil)
-			keys = append(keys, theseKeys...)
 		}
+		// now we get the iter and the keys from the multi-bulk reply
+		iter, _ = redis.String(arr[0], nil)
+		theseKeys, _ := redis.Strings(arr[1], nil)
+		keys = append(keys, theseKeys...)
 
 		// check if we need to stop...
 		if iter == "0" {
@@ -688,67 +682,66 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.SetRollingWindow(keyName, per, value_override)
-	} else {
-		log.Debug("keyName is: ", keyName)
-		now := time.Now()
-		log.Debug("Now is:", now)
-		onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
-		log.Debug("Then is: ", onePeriodAgo)
-
-		ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
-		ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
-		ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
-
-		ZRANGE := rediscluster.ClusterTransaction{}
-		ZRANGE.Cmd = "ZRANGE"
-		ZRANGE.Args = []interface{}{keyName, 0, -1}
-
-		ZADD := rediscluster.ClusterTransaction{}
-		ZADD.Cmd = "ZADD"
-
-		if value_override != "-1" {
-			ZADD.Args = []interface{}{keyName, now.UnixNano(), value_override}
-		} else {
-			ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
-		}
-
-		EXPIRE := rediscluster.ClusterTransaction{}
-		EXPIRE.Cmd = "EXPIRE"
-		EXPIRE.Args = []interface{}{keyName, per}
-
-		redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
-
-		if len(redVal) < 2 {
-			log.Error("Multi command failed: return index is out of range")
-			return 0, []interface{}{}
-		}
-
-		if err != nil {
-			log.Error("Multi command failed: ", err)
-			return 0, make([]interface{}, 0)
-		}
-
-		// Check for nil array
-		if redVal == nil {
-			return 0, make([]interface{}, 0)
-		}
-
-		// Check for nil length
-		if len(redVal) == 0 {
-			return 0, make([]interface{}, 0)
-		}
-
-		// Check actual value
-		if redVal[1] == nil {
-			return 0, make([]interface{}, 0)
-		}
-
-		intVal := len(redVal[1].([]interface{}))
-
-		log.Debug("Returned: ", intVal)
-
-		return intVal, redVal[1].([]interface{})
 	}
+	log.Debug("keyName is: ", keyName)
+	now := time.Now()
+	log.Debug("Now is:", now)
+	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
+	log.Debug("Then is: ", onePeriodAgo)
+
+	ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
+	ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
+	ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
+
+	ZRANGE := rediscluster.ClusterTransaction{}
+	ZRANGE.Cmd = "ZRANGE"
+	ZRANGE.Args = []interface{}{keyName, 0, -1}
+
+	ZADD := rediscluster.ClusterTransaction{}
+	ZADD.Cmd = "ZADD"
+
+	if value_override != "-1" {
+		ZADD.Args = []interface{}{keyName, now.UnixNano(), value_override}
+	} else {
+		ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
+	}
+
+	EXPIRE := rediscluster.ClusterTransaction{}
+	EXPIRE.Cmd = "EXPIRE"
+	EXPIRE.Args = []interface{}{keyName, per}
+
+	redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
+
+	if len(redVal) < 2 {
+		log.Error("Multi command failed: return index is out of range")
+		return 0, []interface{}{}
+	}
+
+	if err != nil {
+		log.Error("Multi command failed: ", err)
+		return 0, make([]interface{}, 0)
+	}
+
+	// Check for nil array
+	if redVal == nil {
+		return 0, make([]interface{}, 0)
+	}
+
+	// Check for nil length
+	if len(redVal) == 0 {
+		return 0, make([]interface{}, 0)
+	}
+
+	// Check actual value
+	if redVal[1] == nil {
+		return 0, make([]interface{}, 0)
+	}
+
+	intVal := len(redVal[1].([]interface{}))
+
+	log.Debug("Returned: ", intVal)
+
+	return intVal, redVal[1].([]interface{})
 }
 
 func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, per int64, value_override string) (int, []interface{}) {
@@ -758,60 +751,59 @@ func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, pe
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.SetRollingWindow(keyName, per, value_override)
-	} else {
-		log.Debug("keyName is: ", keyName)
-		now := time.Now()
-		log.Debug("Now is:", now)
-		onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
-		log.Debug("Then is: ", onePeriodAgo)
-
-		ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
-		ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
-		ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
-
-		ZRANGE := rediscluster.ClusterTransaction{}
-		ZRANGE.Cmd = "ZRANGE"
-		ZRANGE.Args = []interface{}{keyName, 0, -1}
-
-		ZADD := rediscluster.ClusterTransaction{}
-		ZADD.Cmd = "ZADD"
-
-		if value_override != "-1" {
-			ZADD.Args = []interface{}{keyName, now.UnixNano(), value_override}
-		} else {
-			ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
-		}
-
-		EXPIRE := rediscluster.ClusterTransaction{}
-		EXPIRE.Cmd = "EXPIRE"
-		EXPIRE.Args = []interface{}{keyName, per}
-
-		redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoPipeline([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
-
-		if err != nil {
-			log.Error("Multi command failed: ", err)
-			return 0, make([]interface{}, 0)
-		}
-
-		// Check for nil array
-		if redVal == nil {
-			return 0, make([]interface{}, 0)
-		}
-
-		// Check for nil length
-		if len(redVal) == 0 {
-			return 0, make([]interface{}, 0)
-		}
-
-		// Check actual value
-		if redVal[1] == nil {
-			return 0, make([]interface{}, 0)
-		}
-
-		// All clear
-		intVal := len(redVal[1].([]interface{}))
-		log.Debug("Returned: ", intVal)
-
-		return intVal, redVal[1].([]interface{})
 	}
+	log.Debug("keyName is: ", keyName)
+	now := time.Now()
+	log.Debug("Now is:", now)
+	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
+	log.Debug("Then is: ", onePeriodAgo)
+
+	ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
+	ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
+	ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
+
+	ZRANGE := rediscluster.ClusterTransaction{}
+	ZRANGE.Cmd = "ZRANGE"
+	ZRANGE.Args = []interface{}{keyName, 0, -1}
+
+	ZADD := rediscluster.ClusterTransaction{}
+	ZADD.Cmd = "ZADD"
+
+	if value_override != "-1" {
+		ZADD.Args = []interface{}{keyName, now.UnixNano(), value_override}
+	} else {
+		ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
+	}
+
+	EXPIRE := rediscluster.ClusterTransaction{}
+	EXPIRE.Cmd = "EXPIRE"
+	EXPIRE.Args = []interface{}{keyName, per}
+
+	redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoPipeline([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
+
+	if err != nil {
+		log.Error("Multi command failed: ", err)
+		return 0, make([]interface{}, 0)
+	}
+
+	// Check for nil array
+	if redVal == nil {
+		return 0, make([]interface{}, 0)
+	}
+
+	// Check for nil length
+	if len(redVal) == 0 {
+		return 0, make([]interface{}, 0)
+	}
+
+	// Check actual value
+	if redVal[1] == nil {
+		return 0, make([]interface{}, 0)
+	}
+
+	// All clear
+	intVal := len(redVal[1].([]interface{}))
+	log.Debug("Returned: ", intVal)
+
+	return intVal, redVal[1].([]interface{})
 }

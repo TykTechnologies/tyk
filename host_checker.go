@@ -2,11 +2,12 @@ package main
 
 import (
 	"bytes"
-	"github.com/jeffail/tunny"
-	"github.com/pmylund/go-cache"
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/jeffail/tunny"
+	"github.com/pmylund/go-cache"
 )
 
 const (
@@ -112,7 +113,7 @@ func (h *HostUptimeChecker) HostReporter() {
 
 			} else {
 				newVal := cachedHostCount.(int)
-				newVal += 1
+				newVal++
 				go h.sampleCache.Set(failedHost.ID, newVal, cache.DefaultExpiration)
 
 				if newVal > h.sampleTriggerLimit {

@@ -88,7 +88,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 			bucketKey := key + ":" + currentSession.LastUpdated
 
 			// DRL will always overflow with more servers on low rates
-			thisRate := uint(currentSession.Rate*float64(DRLManager.RequestTokenValue))
+			thisRate := uint(currentSession.Rate * float64(DRLManager.RequestTokenValue))
 			if thisRate < uint(DRLManager.CurrentTokenValue) {
 				thisRate = uint(DRLManager.CurrentTokenValue)
 			}
@@ -113,9 +113,9 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 
 	if enableQ {
 		if config.LegacyEnableAllowanceCountdown {
-			currentSession.Allowance--	
+			currentSession.Allowance--
 		}
-		
+
 		if l.IsRedisQuotaExceeded(currentSession, key, store) {
 			return false, 2
 		}
@@ -192,7 +192,7 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 	qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
 
 	// if the returned val is >= quota: block
-	if (int64(qInt) - 1) >= currentSession.QuotaMax {
+	if (qInt - 1) >= currentSession.QuotaMax {
 		RenewalDate := time.Unix(currentSession.QuotaRenews, 0)
 		log.Debug("Renewal Date is: ", RenewalDate)
 		log.Debug("As epoch: ", currentSession.QuotaRenews)
@@ -212,13 +212,13 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 	}
 
 	// If this is a new Quota period, ensure we let the end user know
-	if int64(qInt) == 1 {
+	if qInt == 1 {
 		current := time.Now().Unix()
 		currentSession.QuotaRenews = current + currentSession.QuotaRenewalRate
 	}
 
 	// If not, pass and set the values of the session to quotamax - counter
-	remaining := currentSession.QuotaMax - int64(qInt)
+	remaining := currentSession.QuotaMax - qInt
 
 	if remaining < 0 {
 		currentSession.QuotaRemaining = 0

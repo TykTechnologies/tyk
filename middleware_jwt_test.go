@@ -3,10 +3,11 @@ package main
 import (
 	//"encoding/base64"
 	//"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+
+	"github.com/dgrijalva/jwt-go"
 	//"strings"
 	"testing"
 	"time"
@@ -767,7 +768,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 		Per:              1.0,
 		QuotaMax:         -1,
 		QuotaRenewalRate: -1,
-		AccessRights: map[string]AccessDefinition{"76": AccessDefinition{
+		AccessRights: map[string]AccessDefinition{"76": {
 			APIName:  "Test",
 			APIID:    "76",
 			Versions: []string{"default"},

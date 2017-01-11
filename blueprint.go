@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tykcommon"
 	"strconv"
+
+	"github.com/TykTechnologies/tykcommon"
 )
 
 type APIImporterSource string

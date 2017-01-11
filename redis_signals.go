@@ -3,10 +3,11 @@ package main
 import (
 	b64 "encoding/base64"
 	"encoding/json"
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/goverify"
-	"github.com/garyburd/redigo/redis"
 	"time"
+
+	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/logrus"
+	"github.com/garyburd/redigo/redis"
 )
 
 const (
@@ -94,13 +95,12 @@ func IsPayloadSignatureValid(notification Notification) bool {
 	}
 
 	if notification.Signature == "" && config.AllowInsecureConfigs {
-		if warnedOnce == false {
+		if !warnedOnce {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Warning("Insecure configuration detected (allowing)!")
 			warnedOnce = true
 		}
-
 		return true
 	}
 
@@ -130,7 +130,7 @@ func IsPayloadSignatureValid(notification Notification) bool {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Error("Could not verify notification: ", err, ": ", notification)
-			
+
 			return false
 		}
 

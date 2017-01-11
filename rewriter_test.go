@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tykcommon"
 	"testing"
+
+	"github.com/TykTechnologies/tykcommon"
 )
 
 func TestRewriter(t *testing.T) {

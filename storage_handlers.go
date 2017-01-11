@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/hex"
-	"github.com/garyburd/redigo/redis"
-	"github.com/spaolacci/murmur3"
 	"hash"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/spaolacci/murmur3"
 )
 
 // KeyError is a standard error for when a key is not found in the storage engine
@@ -360,21 +361,19 @@ func (r *RedisStorageManager) SetKey(keyName string, sessionState string, timeou
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.SetKey(keyName, sessionState, timeout)
-	} else {
-		_, err := db.Do("SET", r.fixKey(keyName), sessionState)
-		if timeout > 0 {
-			_, expErr := db.Do("EXPIRE", r.fixKey(keyName), timeout)
-			if expErr != nil {
-				log.Error("Could not EXPIRE key: ", expErr)
-				return expErr
-			}
-		}
-		if err != nil {
-			log.Error("Error trying to set value: ", err)
-			return err
+	}
+	_, err := db.Do("SET", r.fixKey(keyName), sessionState)
+	if timeout > 0 {
+		_, expErr := db.Do("EXPIRE", r.fixKey(keyName), timeout)
+		if expErr != nil {
+			log.Error("Could not EXPIRE key: ", expErr)
+			return expErr
 		}
 	}
-
+	if err != nil {
+		log.Error("Error trying to set value: ", err)
+		return err
+	}
 	return nil
 }
 
@@ -386,21 +385,19 @@ func (r *RedisStorageManager) SetRawKey(keyName string, sessionState string, tim
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		return r.SetRawKey(keyName, sessionState, timeout)
-	} else {
-		_, err := db.Do("SET", keyName, sessionState)
-		if timeout > 0 {
-			_, expErr := db.Do("EXPIRE", keyName, timeout)
-			if expErr != nil {
-				log.Error("Could not EXPIRE key: ", expErr)
-				return expErr
-			}
-		}
-		if err != nil {
-			log.Error("Error trying to set value: ", err)
-			return err
+	}
+	_, err := db.Do("SET", keyName, sessionState)
+	if timeout > 0 {
+		_, expErr := db.Do("EXPIRE", keyName, timeout)
+		if expErr != nil {
+			log.Error("Could not EXPIRE key: ", expErr)
+			return expErr
 		}
 	}
-
+	if err != nil {
+		log.Error("Error trying to set value: ", err)
+		return err
+	}
 	return nil
 }
 

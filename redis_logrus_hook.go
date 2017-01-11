@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/logrus"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 type redisChannelHook struct {

@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"time"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
-	"time"
 )
 
 type InterfaceNotification struct {

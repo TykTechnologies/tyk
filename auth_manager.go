@@ -121,10 +121,10 @@ func (b DefaultSessionManager) UpdateSession(keyName string, session SessionStat
 
 	// Keep the TTL
 	if config.UseAsyncSessionWrite {
-		go b.Store.SetKey(keyName, string(v), int64(resetTTLTo))
+		go b.Store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
 	}
-	err := b.Store.SetKey(keyName, string(v), int64(resetTTLTo))
+	err := b.Store.SetKey(keyName, string(v), resetTTLTo)
 	return err
 
 }

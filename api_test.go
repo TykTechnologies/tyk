@@ -2,14 +2,15 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
-	"github.com/TykTechnologies/tykcommon"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/mux"
 )
 
 var apiTestDef string = `

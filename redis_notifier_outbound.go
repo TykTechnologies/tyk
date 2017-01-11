@@ -45,14 +45,13 @@ func (r *RedisNotifier) Notify(notification Notification) bool {
 		log.Error("Problem marshalling notification!")
 		log.Error(err)
 		return false
-	} else {
-		log.Debug("Sending notification", notification)
-		sentErr := r.store.Publish(r.channel, string(toSend))
-		if sentErr != nil {
-			log.Error("Could not send notification")
-			log.Error(err)
-			return false
-		}
+	}
+	log.Debug("Sending notification", notification)
+	sentErr := r.store.Publish(r.channel, string(toSend))
+	if sentErr != nil {
+		log.Error("Could not send notification")
+		log.Error(err)
+		return false
 	}
 	return true
 }

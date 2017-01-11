@@ -8,22 +8,23 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
 )
 
 const (
-	T_REDIRECT_URI     string = "http://client.oauth.com"
-	T_REDIRECT_URI2    string = "http://client2.oauth.com"
-	T_CLIENT_ID        string = "1234"
-	T_CLIENT_SECRET    string = "aabbccdd"
-	P_CLIENT_ID        string = "4321"
+	T_REDIRECT_URI  string = "http://client.oauth.com"
+	T_REDIRECT_URI2 string = "http://client2.oauth.com"
+	T_CLIENT_ID     string = "1234"
+	T_CLIENT_SECRET string = "aabbccdd"
+	P_CLIENT_ID     string = "4321"
 )
 
 var keyRules = `
@@ -434,7 +435,7 @@ func GetToken() tokenData {
 	return thisResponse
 }
 
-func TestOAuthClientCredsGrant (t *testing.T) {
+func TestOAuthClientCredsGrant(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -450,7 +451,7 @@ func TestOAuthClientCredsGrant (t *testing.T) {
 	param.Set("grant_type", "client_credentials")
 	param.Set("client_id", T_CLIENT_ID)
 	param.Set("client_secret", T_CLIENT_SECRET)
-	
+
 	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -467,7 +468,7 @@ func TestOAuthClientCredsGrant (t *testing.T) {
 	}
 	log.Debug("TOKEN DATA: ", string(body))
 	log.Info("Access token: ", thisResponse.AccessToken)
-	
+
 	if recorder.Code != 200 {
 		t.Error("Response code should have 200 error but is: ", recorder.Code)
 		t.Error(recorder.Body)

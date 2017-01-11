@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/drl"
 	"time"
+
+	"github.com/TykTechnologies/drl"
+	"github.com/TykTechnologies/logrus"
 )
 
 var DRLManager drl.DRL
@@ -39,7 +40,7 @@ func StartRateLimitNotifications() {
 
 func getTagHash() string {
 	th := ""
-	for _, tag := range(config.DBAppConfOptions.Tags) {
+	for _, tag := range config.DBAppConfOptions.Tags {
 		th += tag
 	}
 	return th

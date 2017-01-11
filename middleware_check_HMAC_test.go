@@ -5,14 +5,15 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"github.com/justinas/alice"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
 )
 
 var HMACAuthDef string = `
@@ -424,7 +425,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 }
 
 func getUpperCaseEscaped(signature string) (bool, []string) {
-	r, _:= regexp.Compile("%[A-F0-9][A-F0-9]")
+	r, _ := regexp.Compile("%[A-F0-9][A-F0-9]")
 	foundList := r.FindAllString(signature, -1)
 	if len(foundList) > 0 {
 		return true, foundList
@@ -436,7 +437,7 @@ func getUpperCaseEscaped(signature string) (bool, []string) {
 func replaceUpperCase(originalSignature string, lowercaseList []string) string {
 	log.Warning("ORIGINAL: ", originalSignature)
 	newSignature := originalSignature
-	for _, lStr := range(lowercaseList) {
+	for _, lStr := range lowercaseList {
 		asUpper := strings.ToLower(lStr)
 		newSignature = strings.Replace(newSignature, lStr, asUpper, -1)
 	}

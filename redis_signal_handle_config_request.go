@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/logrus"
 	"io/ioutil"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 type GetConfigPayload struct {
