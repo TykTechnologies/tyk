@@ -70,7 +70,7 @@ func ClearRPCClients() {
 			log.Debug("Disconnect chan failed")
 		}
 
-		go func() { c <- 1 }()
+		go func(c chan int) { c <- 1 }(c)
 	}
 }
 
