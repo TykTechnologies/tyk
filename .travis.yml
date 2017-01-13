@@ -1,7 +1,8 @@
-language: go
 sudo: false
+language: go
 
 go:
+  - 1.6.x
   - 1.7.x
 
 services:
@@ -9,8 +10,6 @@ services:
   - mongodb
 
 install:
-  - go get -d -v ./...
-  - go get -d -v -tags coprocess ./...
   - go install -v ./...
 
 secure: "F3GrvKUQkuIJyzamGM3fw5tTZfYtSCmR+02t5KpqsqkBt1iBM2w4wlZjm+kMzisz8NDVZYfXYDYIqLhfBa4kwSPGgUqxqXAsMhI7hEco3P2FZ6nre0HC0QYhvKks07644KsVq1J2Xn7JMT+61rXKeEk4Ncu1spZCfWbhiJk+MKA="
