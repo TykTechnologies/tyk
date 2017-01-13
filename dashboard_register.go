@@ -137,10 +137,7 @@ func (h *HTTPDashboardHandler) Register() error {
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
-	for {
-		if h.heartBeatStopSentinel == true {
-			break
-		}
+	for !h.heartBeatStopSentinel {
 		failure := h.SendHeartBeat(h.HeartBeatEndpoint, h.Secret)
 		if failure != nil {
 			log.Warning(failure)

@@ -49,7 +49,7 @@ func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Check versioning, blacklist, whitelist and ignored status
 	requestValid, stat, meta := v.TykMiddleware.Spec.IsRequestValid(r)
-	if requestValid == false {
+	if !requestValid {
 		// Fire a versioning failure event
 		go v.TykMiddleware.FireEvent(EVENT_VersionFailure,
 			EVENT_VersionFailureMeta{

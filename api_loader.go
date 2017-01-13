@@ -642,7 +642,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	log.Debug("Checker host list")
 
 	// Kick off our host checkers
-	if config.UptimeTests.Disable == false {
+	if !config.UptimeTests.Disable {
 		SetCheckerHostList()
 	}
 
