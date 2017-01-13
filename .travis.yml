@@ -15,5 +15,4 @@ install:
 secure: "F3GrvKUQkuIJyzamGM3fw5tTZfYtSCmR+02t5KpqsqkBt1iBM2w4wlZjm+kMzisz8NDVZYfXYDYIqLhfBa4kwSPGgUqxqXAsMhI7hEco3P2FZ6nre0HC0QYhvKks07644KsVq1J2Xn7JMT+61rXKeEk4Ncu1spZCfWbhiJk+MKA="
 
 script:
-  - go test -v
-  - go test -tags coprocess -v
+  - ./utils/ci-test.sh
