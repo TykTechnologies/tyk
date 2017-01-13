@@ -307,7 +307,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			m.Proxy.CopyResponse(w, newRes.Body)
 
 			// Record analytics
-			if m.Spec.DoNotTrack == false {
+			if !m.Spec.DoNotTrack {
 				go m.sh.RecordHit(w, r, 0, newRes.StatusCode, copiedRequest, nil)
 			}
 

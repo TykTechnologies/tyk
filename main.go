@@ -199,7 +199,7 @@ func buildConnStr(resource string) string {
 		return ""
 	}
 
-	if config.DisableDashboardZeroConf == false && config.DBAppConfOptions.ConnectionString == "" {
+	if !config.DisableDashboardZeroConf && config.DBAppConfOptions.ConnectionString == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Waiting for zeroconf signal...")
@@ -1005,7 +1005,7 @@ func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 				KeepaliveRunning = false
 				break
 			}
-			if engine.Killed == true {
+			if engine.Killed {
 				log.WithFields(logrus.Fields{
 					"prefix": "RPC Conn Mgr",
 				}).Debug("[RPC Conn Mgr] this connection killed")

@@ -111,7 +111,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	if matchPass == false {
+	if !matchPass {
 		log.WithFields(logrus.Fields{
 			"prefix":   "hmac",
 			"expected": encodedSignature,
@@ -233,7 +233,7 @@ func (hm *HMACMiddleware) getSecretAndSessionForKeyID(keyId string) (string, Ses
 		return "", thisSessionState, errors.New("Key ID does not exist")
 	}
 
-	if thisSessionState.HmacSecret == "" || thisSessionState.HMACEnabled == false {
+	if thisSessionState.HmacSecret == "" || !thisSessionState.HMACEnabled {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 		}).Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")

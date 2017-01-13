@@ -37,8 +37,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 
 	sessionVersionData, foundAPI := thisSessionState.AccessRights[m.Spec.APIID]
-
-	if foundAPI == false {
+	if !foundAPI {
 		log.Debug("Version not found")
 		return nil, 200
 	}

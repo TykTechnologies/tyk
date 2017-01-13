@@ -47,7 +47,7 @@ func getTagHash() string {
 }
 
 func NotifyCurrentServerStatus() {
-	if DRLManager.Ready == false {
+	if !DRLManager.Ready {
 		return
 	}
 

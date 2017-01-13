@@ -94,7 +94,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		!k.Spec.DisableQuota)
 
 	// If either are disabled, save the write roundtrip
-	if k.Spec.DisableRateLimit == false || k.Spec.DisableQuota == false {
+	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
 		// Ensure quota and rate data for this session are recorded
 		if !config.UseAsyncSessionWrite {
 			k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
