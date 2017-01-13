@@ -506,25 +506,29 @@ func TestParambasedAuth(t *testing.T) {
 	// Ensure the post data is still sent
 	contents, _ := ioutil.ReadAll(recorder.Body)
 	dat := make(map[string]interface{})
-	jErr := json.Unmarshal(contents, &dat)
 
-	if jErr != nil {
-		log.Error("JSON decoding failed")
+	if err := json.Unmarshal(contents, &dat); err != nil {
+		t.Fatal("JSON decoding failed:", err)
 	}
 
-	if dat["args"].(map[string]interface{})["authorization"].(string) != "54321" {
+	args, ok := dat["args"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Invalid response")
+	}
+	if args["authorization"].(string) != "54321" {
 		t.Error("Request params did not arrive")
 	}
-
-	if dat["form"].(map[string]interface{})["foo"].(string) != "swiggetty" {
+	fmap, ok := dat["form"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Invalid response")
+	}
+	if fmap["foo"].(string) != "swiggetty" {
 		t.Error("Form param 1 did not arrive")
 	}
-
-	if dat["form"].(map[string]interface{})["bar"].(string) != "swoggetty" {
+	if fmap["bar"].(string) != "swoggetty" {
 		t.Error("Form param 2 did not arrive")
 	}
-
-	if dat["form"].(map[string]interface{})["baz"].(string) != "swoogetty" {
+	if fmap["baz"].(string) != "swoogetty" {
 		t.Error("Form param 3 did not arrive")
 	}
 

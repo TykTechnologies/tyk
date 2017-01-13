@@ -338,12 +338,13 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 
 	asData := make(map[string]interface{})
 	decoder := json.NewDecoder(recorder.Body)
-	marshalErr := decoder.Decode(&asData)
-	if marshalErr != nil {
-		t.Error("Decode failed: ", marshalErr)
+	if err := decoder.Decode(&asData); err != nil {
+		t.Fatal("Decode failed:", err)
 	}
-
-	token := asData["access_token"].(string)
+	token, ok := asData["access_token"].(string)
+	if !ok {
+		t.Fatal("No access token found")
+	}
 
 	// Verify the token is correct
 	key, fnd := redisStore.GetKey(token)
@@ -356,7 +357,6 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		t.Error("Policy not added to token!")
 		fmt.Println(key)
 	}
-
 }
 
 func GetAuthCode() map[string]string {
@@ -678,18 +678,20 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	responseData := make(map[string]interface{})
 
 	body, _ := ioutil.ReadAll(recorder.Body)
-	dErr := json.Unmarshal(body, &responseData)
-	if err != nil {
-		t.Error("Decode failed: ", dErr)
+	if err := json.Unmarshal(body, &responseData); err != nil {
+		t.Fatal("Decode failed:", err)
 	}
 	log.Debug("Refresh token body", string(body))
+	token, ok := responseData["refresh_token"].(string)
+	if !ok {
+		t.Fatal("No refresh token found")
+	}
 
 	param2 := make(url.Values)
 	param2.Set("grant_type", "refresh_token")
 	param2.Set("redirect_uri", T_REDIRECT_URI)
 	param2.Set("client_id", T_CLIENT_ID)
-
-	param2.Set("refresh_token", responseData["refresh_token"].(string))
+	param2.Set("refresh_token", token)
 	req2, err2 := http.NewRequest(method, uri, bytes.NewBufferString(param2.Encode()))
 	req2.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
