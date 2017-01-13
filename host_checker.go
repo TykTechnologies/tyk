@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	defaultTimeout             int = 10
-	defaultWorkerPoolSize      int = 50
-	defaultSampletTriggerLimit int = 3
+	defaultTimeout             = 10
+	defaultWorkerPoolSize      = 50
+	defaultSampletTriggerLimit = 3
 )
 
 var HostCheckerClient = &http.Client{Timeout: 500 * time.Millisecond}

@@ -20,16 +20,16 @@ type ContextKey int
 // Enums for keys to be stored in a session context - this is how gorilla expects
 // these to be implemented and is lifted pretty much from docs
 const (
-	SessionData            = 0
-	AuthHeaderValue        = 1
-	VersionData            = 2
-	VersionKeyContext      = 3
-	OrgSessionContext      = 4
-	ContextData            = 5
-	RetainHost             = 6
-	SkipCoProcessAuth      = 7
-	TrackThisEndpoint      = 8
-	DoNotTrackThisEndpoint = 9
+	SessionData = iota
+	AuthHeaderValue
+	VersionData
+	VersionKeyContext
+	OrgSessionContext
+	ContextData
+	RetainHost
+	SkipCoProcessAuth
+	TrackThisEndpoint
+	DoNotTrackThisEndpoint
 )
 
 var SessionCache = cache.New(10*time.Second, 5*time.Second)
