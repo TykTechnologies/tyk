@@ -35,22 +35,23 @@ type URLStatus int
 // Enums representing the various statuses for a VersionInfo Path match during a
 // proxy request
 const (
-	Ignored                URLStatus = 1
-	WhiteList              URLStatus = 2
-	BlackList              URLStatus = 3
-	Cached                 URLStatus = 4
-	Transformed            URLStatus = 5
-	HeaderInjected         URLStatus = 6
-	HeaderInjectedResponse URLStatus = 7
-	TransformedResponse    URLStatus = 8
-	HardTimeout            URLStatus = 9
-	CircuitBreaker         URLStatus = 10
-	URLRewrite             URLStatus = 11
-	VirtualPath            URLStatus = 12
-	RequestSizeLimit       URLStatus = 13
-	MethodTransformed      URLStatus = 14
-	RequestTracked         URLStatus = 15
-	RequestNotTracked      URLStatus = 16
+	_ URLStatus = iota
+	Ignored
+	WhiteList
+	BlackList
+	Cached
+	Transformed
+	HeaderInjected
+	HeaderInjectedResponse
+	TransformedResponse
+	HardTimeout
+	CircuitBreaker
+	URLRewrite
+	VirtualPath
+	RequestSizeLimit
+	MethodTransformed
+	RequestTracked
+	RequestNotTracked
 )
 
 // RequestStatus is a custom type to avoid collisions

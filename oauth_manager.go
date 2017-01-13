@@ -391,11 +391,11 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 // These enums fix the prefix to use when storing various OAuth keys and data, since we
 // delegate everything to the osin framework
 const (
-	AUTH_PREFIX            string = "oauth-authorize."
-	CLIENT_PREFIX          string = "oauth-clientid."
-	ACCESS_PREFIX          string = "oauth-access."
-	REFRESH_PREFIX         string = "oauth-refresh."
-	OAUTH_CLIENTSET_PREFIX string = "oauth-clientset."
+	AUTH_PREFIX            = "oauth-authorize."
+	CLIENT_PREFIX          = "oauth-clientid."
+	ACCESS_PREFIX          = "oauth-access."
+	REFRESH_PREFIX         = "oauth-refresh."
+	OAUTH_CLIENTSET_PREFIX = "oauth-clientset."
 )
 
 type ExtendedOsinStorageInterface interface {
