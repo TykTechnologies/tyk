@@ -86,7 +86,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 	uri := "/"
 	method := "POST"
 
-	var authValue string = "abc"
+	var authValue = "abc"
 
 	form := url.Values{}
 	form.Add("auth", authValue)
@@ -212,7 +212,7 @@ func computeSessionID(input []byte, tykMiddleware *TykMiddleware) (sessionID str
 	return sessionID
 }
 
-var IdExtractorCoProcessDef string = `
+var IdExtractorCoProcessDef = `
 
 	{
 		"name": "Tyk Test API",
@@ -276,7 +276,7 @@ var IdExtractorCoProcessDef string = `
 	}
 `
 
-var ValueExtractorFormSource string = `
+var ValueExtractorFormSource = `
 
 	{
 		"name": "Tyk Test API",
@@ -340,7 +340,7 @@ var ValueExtractorFormSource string = `
 	}
 `
 
-var RegexExtractorDef string = `
+var RegexExtractorDef = `
 
 	{
 		"name": "Tyk Test API - ValueExtractor/XPath",

@@ -17,7 +17,7 @@ import (
 )
 
 // CoProcessName specifies the driver name.
-const CoProcessName string = "grpc"
+const CoProcessName = "grpc"
 
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage

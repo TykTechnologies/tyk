@@ -20,10 +20,10 @@ import (
 )
 
 const (
-	T_REDIRECT_URI  string = "http://client.oauth.com"
-	T_REDIRECT_URI2 string = "http://client2.oauth.com"
-	T_CLIENT_ID     string = "1234"
-	T_CLIENT_SECRET string = "aabbccdd"
+	T_REDIRECT_URI  = "http://client.oauth.com"
+	T_REDIRECT_URI2 = "http://client2.oauth.com"
+	T_CLIENT_ID     = "1234"
+	T_CLIENT_SECRET = "aabbccdd"
 )
 
 var keyRules = `

@@ -310,7 +310,7 @@ func TestCoProcessAuth(t *testing.T) {
 	}
 }
 
-var basicCoProcessDef string = `
+var basicCoProcessDef = `
 
 	{
 		"name": "Tyk Test API - IPCONF Fail",
@@ -367,7 +367,7 @@ var basicCoProcessDef string = `
 	}
 `
 
-var protectedCoProcessDef string = `
+var protectedCoProcessDef = `
 
 	{
 		"name": "Tyk Test API",

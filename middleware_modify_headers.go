@@ -15,8 +15,8 @@ type TransformHeaders struct {
 	*TykMiddleware
 }
 
-const TYK_META_LABEL string = "$tyk_meta."
-const TYK_CONTEXT_LABEL string = "$tyk_context."
+const TYK_META_LABEL = "$tyk_meta."
+const TYK_CONTEXT_LABEL = "$tyk_context."
 
 type TransformHeadersConfig struct{}
 

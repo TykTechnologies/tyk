@@ -180,7 +180,7 @@ import (
 )
 
 // CoProcessName declares the driver name.
-const CoProcessName string = "python"
+const CoProcessName = "python"
 
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage

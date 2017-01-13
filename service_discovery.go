@@ -11,7 +11,7 @@ import (
 	"github.com/lonelycode/gabs"
 )
 
-const ARRAY_NAME string = "tyk_array"
+const ARRAY_NAME = "tyk_array"
 
 type ServiceDiscovery struct {
 	spec                *tykcommon.ServiceDiscoveryConfiguration

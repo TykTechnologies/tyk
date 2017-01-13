@@ -20,8 +20,8 @@ type PublicSessionState struct {
 }
 
 const (
-	QuotaKeyPrefix     string = "quota-"
-	RateLimitKeyPrefix string = "rate-limit-"
+	QuotaKeyPrefix     = "quota-"
+	RateLimitKeyPrefix = "rate-limit-"
 )
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to

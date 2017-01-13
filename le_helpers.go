@@ -7,7 +7,7 @@ import (
 	"rsc.io/letsencrypt"
 )
 
-const LEKeyPrefix string = "le_ssl:"
+const LEKeyPrefix = "le_ssl:"
 
 func StoreLEState(m *letsencrypt.Manager) {
 	log.Debug("Storing SSL backup")
