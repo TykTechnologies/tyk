@@ -1,7 +1,6 @@
-Master: [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/lonelycode/tyk) 
+Master: [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk)
 
-Develop: [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=develop)](https://travis-ci.org/lonelycode/tyk) 
-
+Stable: [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=stable)](https://travis-ci.org/TykTechnologies/tyk)
 
 # Tyk API Gateway ##
 
