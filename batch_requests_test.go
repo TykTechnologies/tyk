@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var BatchTestDef string = `
+var BatchTestDef = `
 
 	{
 		"name": "Tyk Test API",
@@ -47,7 +47,7 @@ var BatchTestDef string = `
 
 `
 
-var testBatchRequest string = `
+var testBatchRequest = `
 
 {
     "requests": [

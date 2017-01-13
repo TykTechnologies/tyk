@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var sampleDefiniton string = `
+var sampleDefiniton = `
 
 	{
 		"name": "Tyk Test API",
@@ -43,7 +43,7 @@ var sampleDefiniton string = `
 
 `
 
-var nonExpiringDef string = `
+var nonExpiringDef = `
 
 	{
 		"name": "Tyk Test API",
@@ -79,7 +79,7 @@ var nonExpiringDef string = `
 
 `
 
-var nonExpiringMultiDef string = `
+var nonExpiringMultiDef = `
 
 	{
 		"name": "Tyk Test API",

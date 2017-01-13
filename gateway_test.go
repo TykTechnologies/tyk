@@ -130,7 +130,7 @@ func getChain(spec APISpec) http.Handler {
 	return chain
 }
 
-var nonExpiringDefNoWhiteList string = `
+var nonExpiringDefNoWhiteList = `
 
 	{
 		"name": "Tyk Test API",
@@ -188,7 +188,7 @@ var nonExpiringDefNoWhiteList string = `
 
 `
 
-var VersionedDefinition string = `
+var VersionedDefinition = `
 
 	{
 		"name": "Tyk Test API",
@@ -247,7 +247,7 @@ var VersionedDefinition string = `
 
 `
 
-var PathBasedDefinition string = `
+var PathBasedDefinition = `
 
 	{
 		"name": "Tyk Test API",
@@ -286,7 +286,7 @@ var PathBasedDefinition string = `
 
 `
 
-var ExtendedPathGatewaySetup string = `
+var ExtendedPathGatewaySetup = `
 
 	{
 		"name": "Tyk Test API",

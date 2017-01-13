@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-var consul string = `
+var consul = `
 [
   {
     "Node": "foobar",
@@ -116,7 +116,7 @@ var eureka_real = `
 }
 `
 
-var nested_consul string = `
+var nested_consul = `
 [
   {
     "Name": "beep",
@@ -129,7 +129,7 @@ var nested_consul string = `
 ]
 `
 
-var etcd string = `
+var etcd = `
 {
     "action": "get",
     "node": {
@@ -141,7 +141,7 @@ var etcd string = `
 }
 `
 
-var nested string = `
+var nested = `
 {
     "action": "get",
     "node": {
@@ -153,7 +153,7 @@ var nested string = `
 }
 `
 
-var nested_list string = `
+var nested_list = `
 {
     "action": "get",
     "node": {
@@ -165,7 +165,7 @@ var nested_list string = `
 }
 `
 
-var mesosphere string = `
+var mesosphere = `
 {
  "tasks": [{
   "id": "myservice.7fc21d4c-eabb-11e5-b381-066c48d09c8f",

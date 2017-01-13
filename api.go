@@ -176,7 +176,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 }
 
 func ObfuscateKeyString(keyName string) string {
-	var obfuscated string = "--"
+	obfuscated := "--"
 
 	if len(keyName) > 4 {
 		obfuscated = "****" + keyName[len(keyName)-4:]
@@ -267,7 +267,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 
 		}
 		dont_reset := r.FormValue("suppress_reset")
-		var suppress_reset bool = false
+		suppress_reset := false
 
 		if dont_reset == "1" {
 			suppress_reset = true
@@ -1291,7 +1291,7 @@ func expandKey(orgID, key string) string {
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	code := 200
-	var responseObj = APIModifyKeySuccess{}
+	responseObj := APIModifyKeySuccess{}
 
 	if r.Method == "POST" {
 		decoder := json.NewDecoder(r.Body)
@@ -1896,7 +1896,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
-	var code int = 200
+	code := 200
 
 	if r.Method == "GET" {
 		if config.HealthCheck.EnableHealthChecks {
@@ -1985,7 +1985,7 @@ func getIPHelper(r *http.Request) string {
 
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
-	var code int = 200
+	code := 200
 
 	if r.Method == "DELETE" {
 		APIID := r.URL.Path[len("/tyk/cache/"):]

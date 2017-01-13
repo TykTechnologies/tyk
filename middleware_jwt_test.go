@@ -15,7 +15,7 @@ import (
 	"github.com/justinas/alice"
 )
 
-var jwtDef string = `
+var jwtDef = `
 
 	{
 		"name": "Tyk JWT API",
@@ -53,7 +53,7 @@ var jwtDef string = `
 
 `
 
-var jwtWithJWKDef string = `
+var jwtWithJWKDef = `
 
 	{
 		"name": "Tyk JWT With JWK API",
@@ -95,7 +95,7 @@ var jwtWithJWKDef string = `
 
 `
 
-var jwtWithCentralDef string = `
+var jwtWithCentralDef = `
 
 	{
 		"name": "Tyk JWT With JWK API",
@@ -137,7 +137,7 @@ var jwtWithCentralDef string = `
 
 `
 
-var jwtWithCentralDefNoPolicyBaseField string = `
+var jwtWithCentralDefNoPolicyBaseField = `
 
 	{
 		"name": "Tyk JWT With JWK API",
@@ -179,10 +179,10 @@ var jwtWithCentralDefNoPolicyBaseField string = `
 
 `
 
-const JWTSECRET string = "9879879878787878"
+const JWTSECRET = "9879879878787878"
 
 // openssl genrsa -out app.rsa
-const JWTRSA_PRIVKEY string = `
+const JWTRSA_PRIVKEY = `
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T
 4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1
@@ -213,7 +213,7 @@ YGivtXBGXk1hlVYlje1RB+W6RQuDAegI5h8vl8pYJS9JQH0wjatsDaE=
 `
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub
-const JWTRSA_PUBKEY string = `
+const JWTRSA_PUBKEY = `
 -----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyqZ4rwKF8qCExS7kpY4c
 nJa/37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb
@@ -294,7 +294,7 @@ func getJWTChain(spec APISpec) http.Handler {
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "hmac"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -338,7 +338,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 }
 
 func TestJWTSessionRSA(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -386,7 +386,7 @@ func TestJWTSessionRSA(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -436,7 +436,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -483,7 +483,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -533,7 +533,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.DoNotTrack = true
 	spec.JWTSigningMethod = "rsa"
@@ -584,7 +584,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -634,7 +634,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -683,7 +683,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 }
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
-	var thisTokenKID string = randSeq(10)
+	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}

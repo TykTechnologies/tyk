@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-var RESPONSE_PROCESSORS map[string]TykResponseHandler = map[string]TykResponseHandler{
+var RESPONSE_PROCESSORS = map[string]TykResponseHandler{
 	"header_injector":         HeaderInjector{},
 	"response_body_transform": ResponseTransformMiddleware{},
 	"header_transform":        HeaderTransform{},

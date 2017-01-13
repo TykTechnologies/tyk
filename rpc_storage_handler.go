@@ -48,14 +48,14 @@ var RPC_LoadCount int
 var RPC_EmergencyMode bool
 var RPC_EmergencyModeLoaded bool
 
-var ErrorDenied error = errors.New("Access Denied")
+var ErrorDenied = errors.New("Access Denied")
 
 var GlobalRPCCallTimeout time.Duration
 var GlobalRPCPingTimeout time.Duration
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
-var RPCCLientRWMutex sync.RWMutex = sync.RWMutex{}
+var RPCCLientRWMutex = sync.RWMutex{}
 var RPCClients = map[string]chan int{}
 
 func ClearRPCClients() {
@@ -791,7 +791,7 @@ func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
 }
 
 func GetDispatcher() *gorpc.Dispatcher {
-	var Dispatch *gorpc.Dispatcher = gorpc.NewDispatcher()
+	Dispatch := gorpc.NewDispatcher()
 
 	Dispatch.AddFunc("Login", func(clientAddr string, userKey string) bool {
 		return false

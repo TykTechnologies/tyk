@@ -10,7 +10,7 @@ import (
 	"github.com/paulbellamy/ratecounter"
 )
 
-var GlobalRate *ratecounter.RateCounter = ratecounter.NewRateCounter(1 * time.Second)
+var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddlewareImplementation interface {
 	New()

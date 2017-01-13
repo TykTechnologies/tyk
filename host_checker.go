@@ -16,7 +16,7 @@ const (
 	defaultSampletTriggerLimit int = 3
 )
 
-var HostCheckerClient *http.Client = &http.Client{Timeout: 500 * time.Millisecond}
+var HostCheckerClient = &http.Client{Timeout: 500 * time.Millisecond}
 
 type HostData struct {
 	CheckURL string

@@ -16,7 +16,7 @@ import (
 	"github.com/justinas/alice"
 )
 
-var HMACAuthDef string = `
+var HMACAuthDef = `
 
 	{
 		"name": "Tyk Test API",

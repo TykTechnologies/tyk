@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var nonExpiringExtendedDef string = `
+var nonExpiringExtendedDef = `
 
 	{
 		"name": "Tyk Test API",
@@ -149,7 +149,7 @@ var nonExpiringExtendedDef string = `
 
 `
 
-var nonExpiringExtendedDefNoWhitelist string = `
+var nonExpiringExtendedDefNoWhitelist = `
 
 	{
 		"name": "Tyk Test API",

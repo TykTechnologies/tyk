@@ -81,7 +81,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 	}
 }
 
-var authKeyDef string = `
+var authKeyDef = `
   {
 		"name": "Tyk Auth Key Test",
 		"api_id": "31",
@@ -139,7 +139,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	}
 }
 
-var multiAuthBackwardsCompatible string = `
+var multiAuthBackwardsCompatible = `
   {
 		"name": "Tyk Auth Key Test",
 		"api_id": "31",
@@ -242,7 +242,7 @@ func TestMultiAuthSession(t *testing.T) {
 	}
 }
 
-var multiAuthDef string = `
+var multiAuthDef = `
   {
 		"name": "Tyk Auth Key Test",
 		"api_id": "31",

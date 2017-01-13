@@ -31,8 +31,8 @@ type RedisClusterStorageManager struct {
 }
 
 func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisCluster {
-	var redisPtr *rediscluster.RedisCluster = redisClusterSingleton
-	var cfg StorageOptionsConf = config.Storage
+	redisPtr := redisClusterSingleton
+	cfg := config.Storage
 	if isCache {
 		if config.EnableSeperateCacheStore {
 			redisPtr = redisCacheClusterSingleton

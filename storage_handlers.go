@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"hash"
 	"strconv"
 	"strings"
 	"time"
@@ -256,7 +255,7 @@ func (r *RedisStorageManager) Connect() bool {
 }
 
 func doHash(in string) string {
-	var h hash.Hash32 = murmur3.New32()
+	h := murmur3.New32()
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }
