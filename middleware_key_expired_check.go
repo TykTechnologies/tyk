@@ -35,7 +35,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 	sess, ok := context.GetOk(r, SessionData)
 
 	if !ok {
-		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied."), 403
+		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 403
 	}
 
 	thisSessionState := sess.(SessionState)

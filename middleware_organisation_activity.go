@@ -83,7 +83,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation access is disabled.")
 
-		return errors.New("This organisation access has been disabled, please contact your API administrator."), 403
+		return errors.New("this organisation access has been disabled, please contact your API administrator"), 403
 	}
 
 	// We found a session, apply the quota limiter
@@ -165,7 +165,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *
 	if found {
 		log.Debug("Is not active")
 		if !active {
-			return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator."), 403
+			return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
 		}
 	}
 

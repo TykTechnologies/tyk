@@ -381,7 +381,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
 	spec, found := (*ApiSpecRegister)[APIID]
 	if !found {
-		return []HostData{}, errors.New("API ID not found in register!")
+		return []HostData{}, errors.New("API ID not found in register")
 	}
 	sd := ServiceDiscovery{}
 	sd.New(&spec.UptimeTests.Config.ServiceDiscovery)

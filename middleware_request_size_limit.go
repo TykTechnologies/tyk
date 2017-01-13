@@ -49,7 +49,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 	asInt, convErr := strconv.Atoi(statedCL)
 	if convErr != nil {
 		log.Error("String conversion for content length failed:", convErr)
-		return errors.New("Content length is not a valid Integer!"), 400
+		return errors.New("content length is not a valid Integer"), 400
 	}
 
 	// Check stated size

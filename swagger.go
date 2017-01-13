@@ -97,7 +97,7 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, 
 	thisVersionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
 
 	if len(s.Paths) == 0 {
-		return thisVersionInfo, errors.New("No paths defined in swagger file!")
+		return thisVersionInfo, errors.New("no paths defined in swagger file")
 	}
 	for pathName, pathSpec := range s.Paths {
 		log.Debug("path: %s", pathName)
