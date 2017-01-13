@@ -31,21 +31,6 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func createThrottledSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 3
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 60
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = 10
-
-	return thisSession
-}
-
 func createNonThrottledSession() SessionState {
 	var thisSession SessionState
 	thisSession.Rate = 100.0

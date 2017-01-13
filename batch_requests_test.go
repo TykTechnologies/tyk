@@ -2,48 +2,9 @@ package main
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/justinas/alice"
 )
-
-func createBatchTestSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 1.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 100000
-	thisSession.Expires = -1
-	thisSession.QuotaRenewalRate = 30000000
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = 10
-
-	return thisSession
-}
-
-func getBatchTestChain(spec APISpec) http.Handler {
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	remote, _ := url.Parse("http://httpbin.org/")
-	proxy := TykNewSingleHostReverseProxy(remote, &spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
-	tykMiddleware := &TykMiddleware{&spec, proxy}
-	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
-
-	return chain
-}
 
 var BatchTestDef string = `
 
