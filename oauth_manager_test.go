@@ -24,7 +24,6 @@ const (
 	T_REDIRECT_URI2 string = "http://client2.oauth.com"
 	T_CLIENT_ID     string = "1234"
 	T_CLIENT_SECRET string = "aabbccdd"
-	P_CLIENT_ID     string = "4321"
 )
 
 var keyRules = `

@@ -1,13 +1,9 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"testing"
-
-	"github.com/TykTechnologies/tykcommon"
 )
 
 var sampleDefiniton string = `
@@ -137,16 +133,6 @@ func createDefinitionFromString(defStr string) APISpec {
 	thisSpec.APIDefinition = thisDef
 
 	return thisSpec
-}
-
-func writeDefToFile(configStruct tykcommon.APIDefinition) {
-	newConfig, err := json.Marshal(configStruct)
-	if err != nil {
-		log.Error("Problem marshalling configuration!")
-		log.Error(err)
-	} else {
-		ioutil.WriteFile("app_sample.json", newConfig, 0644)
-	}
 }
 
 func TestExpiredRequest(t *testing.T) {
