@@ -12,7 +12,7 @@ import (
 	"github.com/nu7hatch/gouuid"
 )
 
-const ENV_PREVIX string = "TYK_GW"
+const ENV_PREVIX = "TYK_GW"
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
 func WriteDefaultConf(configStruct *Config) {

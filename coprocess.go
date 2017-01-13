@@ -185,7 +185,7 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 // IsEnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
-	var enableCoProcess bool = config.CoProcessOptions.EnableCoProcess && EnableCoProcess
+	enableCoProcess := config.CoProcessOptions.EnableCoProcess && EnableCoProcess
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 

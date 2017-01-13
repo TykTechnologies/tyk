@@ -17,8 +17,8 @@ import (
 	"github.com/gorilla/context"
 )
 
-const DateHeaderSpec string = "Date"
-const AltHeaderSpec string = "x-aux-date"
+const DateHeaderSpec = "Date"
+const AltHeaderSpec = "x-aux-date"
 const HMACClockSkewLimitInMs float64 = 1000
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through

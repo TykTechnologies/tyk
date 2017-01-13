@@ -58,7 +58,7 @@ type GeoData struct {
 }
 
 const (
-	ANALYTICS_KEYNAME string = "tyk-system-analytics"
+	ANALYTICS_KEYNAME = "tyk-system-analytics"
 )
 
 func (a *AnalyticsRecord) GetGeo(ipStr string) {

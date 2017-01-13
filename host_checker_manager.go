@@ -59,13 +59,13 @@ func (u *UptimeReportData) SetExpiry(expiresInSeconds int64) {
 }
 
 const (
-	UnHealthyHostMetaDataTargetKey string = "target_url"
-	UnHealthyHostMetaDataAPIKey    string = "api_id"
-	UnHealthyHostMetaDataHostKey   string = "host_name"
-	PollerCacheKey                 string = "PollerActiveInstanceID"
-	PoolerHostSentinelKeyPrefix    string = "PollerCheckerInstance:"
+	UnHealthyHostMetaDataTargetKey = "target_url"
+	UnHealthyHostMetaDataAPIKey    = "api_id"
+	UnHealthyHostMetaDataHostKey   = "host_name"
+	PollerCacheKey                 = "PollerActiveInstanceID"
+	PoolerHostSentinelKeyPrefix    = "PollerCheckerInstance:"
 
-	UptimeAnalytics_KEYNAME string = "tyk-uptime-analytics"
+	UptimeAnalytics_KEYNAME = "tyk-uptime-analytics"
 )
 
 func (hc *HostCheckerManager) Init(store *RedisClusterStorageManager) {

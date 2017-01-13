@@ -21,7 +21,7 @@ type RedisNotificationHandler struct {
 }
 
 const (
-	UIChanName string = "dashboard.ui.messages"
+	UIChanName = "dashboard.ui.messages"
 )
 
 func (u *RedisNotificationHandler) Start() {

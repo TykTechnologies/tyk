@@ -15,7 +15,7 @@ const (
 	RequestLog        HealthPrefix = "Request"
 	BlockedRequestLog HealthPrefix = "BlockedRequest"
 
-	HealthCheckRedisPrefix string = "apihealth"
+	HealthCheckRedisPrefix = "apihealth"
 )
 
 type HealthChecker interface {

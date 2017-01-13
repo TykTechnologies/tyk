@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	RedisPubSubChannel string = "tyk.cluster.notifications"
+	RedisPubSubChannel = "tyk.cluster.notifications"
 )
 
 func StartPubSubLoop() {

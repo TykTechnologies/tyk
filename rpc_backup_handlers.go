@@ -15,8 +15,8 @@ import (
 	"github.com/rcrowley/goagain"
 )
 
-const RPCKeyPrefix string = "rpc:"
-const BackupKeyBase string = "node-definition-backup:"
+const RPCKeyPrefix = "rpc:"
+const BackupKeyBase = "node-definition-backup:"
 
 func getTagListAsString() string {
 	tagList := ""

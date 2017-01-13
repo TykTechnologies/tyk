@@ -23,7 +23,7 @@ import (
 )
 
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
-const CoProcessDefaultKeyPrefix string = "coprocess-data:"
+const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
 // TODO: implement INCR, DECR?
 
