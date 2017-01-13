@@ -30,7 +30,7 @@ var keyRules = `
 {     "last_check": 1402492859,     "org_id": "53ac07777cbb8c2d53000002",     "allowance": 0,     "rate": 1,     "per": 1,     "expires": 0,     "quota_max": -1,     "quota_renews": 1399567002,     "quota_remaining": 10,     "quota_renewal_rate": 300 }
 `
 
-var oauthDefinition string = `
+var oauthDefinition = `
 	{
 		"name": "OAUTH Test API",
 		"api_id": "999999",

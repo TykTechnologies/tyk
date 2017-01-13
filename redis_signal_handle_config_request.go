@@ -46,7 +46,7 @@ func GetExistingConfig() (MicroConfig, error) {
 	value, _ := argumentsBackup["--conf"]
 	thisMicroConfig := MicroConfig{}
 
-	var filename string = "./tyk.conf"
+	filename := "./tyk.conf"
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",

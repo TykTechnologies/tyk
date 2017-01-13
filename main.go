@@ -212,7 +212,7 @@ func buildConnStr(resource string) string {
 }
 
 // Pull API Specs from configuration
-var APILoader APIDefinitionLoader = APIDefinitionLoader{}
+var APILoader = APIDefinitionLoader{}
 
 func getAPISpecs() *[]*APISpec {
 	var APISpecs *[]*APISpec

@@ -13,7 +13,7 @@ import (
 	"github.com/justinas/alice"
 )
 
-var basicAuthDef string = `
+var basicAuthDef = `
 
 	{
 		"name": "Tyk Test API",

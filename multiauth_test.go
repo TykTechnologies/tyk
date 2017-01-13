@@ -13,7 +13,7 @@ import (
 	"github.com/justinas/alice"
 )
 
-var multiAuthDev string = `
+var multiAuthDev = `
 
 	{
 		"name": "Tyk Test API",

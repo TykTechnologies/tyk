@@ -237,7 +237,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 
 		// No override, and no load balancing? Use the existing target
-		var targetToUse *url.URL = target
+		targetToUse := target
 		if switchTargets {
 			targetToUse = newTarget
 		}
@@ -307,7 +307,7 @@ func getMaxIdleConns() int {
 	return config.MaxIdleConnsPerHost
 }
 
-var TykDefaultTransport *TykTransporter = &TykTransporter{http.Transport{
+var TykDefaultTransport = &TykTransporter{http.Transport{
 	Proxy:               http.ProxyFromEnvironment,
 	MaxIdleConnsPerHost: getMaxIdleConns(),
 	Dial: (&net.Dialer{
@@ -447,7 +447,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 }
 
 func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
-	var thisTransport *TykTransporter = TykDefaultTransport
+	thisTransport := TykDefaultTransport
 
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {

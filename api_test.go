@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var apiTestDef string = `
+var apiTestDef = `
 
 	{
 		"id": "507f1f77bcf86cd799439011",

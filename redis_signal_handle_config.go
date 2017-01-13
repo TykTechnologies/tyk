@@ -37,7 +37,7 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 	}
 
 	value, _ := argumentsBackup["--conf"]
-	var filename string = "./tyk.conf"
+	filename := "./tyk.conf"
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -55,7 +55,7 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 
 func GetExistingRawConfig() Config {
 	value, _ := argumentsBackup["--conf"]
-	var filename string = "./tyk.conf"
+	filename := "./tyk.conf"
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",

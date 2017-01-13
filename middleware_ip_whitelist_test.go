@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var ipMiddlewareTestDefinitionEnabledFail string = `
+var ipMiddlewareTestDefinitionEnabledFail = `
 
 	{
 		"name": "Tyk Test API - IPCONF Fail",
@@ -47,7 +47,7 @@ var ipMiddlewareTestDefinitionEnabledFail string = `
 	}
 `
 
-var ipMiddlewareTestDefinitionEnabledPass string = `
+var ipMiddlewareTestDefinitionEnabledPass = `
 
 	{
 		"name": "Tyk Test API",
@@ -85,7 +85,7 @@ var ipMiddlewareTestDefinitionEnabledPass string = `
 	}
 `
 
-var ipMiddlewareTestDefinitionDisabled string = `
+var ipMiddlewareTestDefinitionDisabled = `
 
 	{
 		"name": "Tyk Test API",
@@ -123,7 +123,7 @@ var ipMiddlewareTestDefinitionDisabled string = `
 	}
 `
 
-var ipMiddlewareTestDefinitionMissing string = `
+var ipMiddlewareTestDefinitionMissing = `
 
 	{
 		"name": "Tyk Test API",

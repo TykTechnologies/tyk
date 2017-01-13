@@ -269,7 +269,7 @@ func getDateHeader(r *http.Request) (string, string) {
 	return "", ""
 }
 
-var validKeyHeaders map[string]bool = map[string]bool{
+var validKeyHeaders = map[string]bool{
 	"keyid":     true,
 	"algorithm": true,
 	"headers":   true,

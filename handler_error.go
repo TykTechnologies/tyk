@@ -51,7 +51,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		w.Header().Set("Content-Type", thisContentType)
 
 		var thisTemplate *template.Template
-		var templateName string = fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
+		templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
 
 		// templateError := templates.ExecuteTemplate(w, templateName, &thisError)
 

@@ -32,8 +32,8 @@ const (
 	DoNotTrackThisEndpoint = 9
 )
 
-var SessionCache *cache.Cache = cache.New(10*time.Second, 5*time.Second)
-var ExpiryCache *cache.Cache = cache.New(600*time.Second, 10*time.Minute)
+var SessionCache = cache.New(10*time.Second, 5*time.Second)
+var ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
 
 type ReturningHttpHandler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response

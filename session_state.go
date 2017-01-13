@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-	"hash"
 
 	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -72,7 +71,7 @@ type SessionState struct {
 	firstSeenHash string
 }
 
-var murmurHasher hash.Hash32 = murmur3.New32()
+var murmurHasher = murmur3.New32()
 
 func (s *SessionState) SetFirstSeenHash() {
 	encoded, err := msgpack.Marshal(s)

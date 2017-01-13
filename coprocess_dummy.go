@@ -24,7 +24,7 @@ type Dispatcher interface {
 
 var GlobalDispatcher Dispatcher
 
-var EnableCoProcess bool = false
+var EnableCoProcess = false
 
 type CoProcessMiddleware struct {
 	*TykMiddleware

@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/context"
 )
 
-var OIDPREFIX string = "openid"
+var OIDPREFIX = "openid"
 
 type OpenIDMW struct {
 	*TykMiddleware

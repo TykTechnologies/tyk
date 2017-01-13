@@ -422,11 +422,11 @@ func (j *JSVM) LoadTykJSApi() {
 			return otto.Value{}
 		}
 
-		var dont_reset bool = false
+		dontReset := false
 		if suppress_reset == "1" {
-			dont_reset = true
+			dontReset = true
 		}
-		doAddOrUpdate(apiKey, newSession, dont_reset)
+		doAddOrUpdate(apiKey, newSession, dontReset)
 
 		return otto.Value{}
 	})

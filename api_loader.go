@@ -392,7 +392,7 @@ func processSpec(referenceSpec *APISpec,
 
 		useCoProcessAuth := EnableCoProcess && mwDriver != tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth
 
-		var useOttoAuth bool = false
+		useOttoAuth := false
 		if !useCoProcessAuth {
 			useOttoAuth = mwDriver == tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth
 		}
