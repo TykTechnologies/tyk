@@ -20,7 +20,7 @@ func (m *MultiTargetProxy) getProxyForRequest(r *http.Request) (*ReverseProxy, e
 	proxy, found := m.VersionProxyMap[thisVersion.Name]
 
 	if !found {
-		return nil, errors.New("Proxy not found!")
+		return nil, errors.New("proxy not found")
 	}
 
 	return proxy, nil

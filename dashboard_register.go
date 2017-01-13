@@ -175,12 +175,8 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 	}
 	response, reqErr := c.Do(newRequest)
 
-	if reqErr != nil {
-		return errors.New("Dashboard is down? Heartbeat is failing.")
-	}
-
-	if response.StatusCode != 200 {
-		return errors.New("Dashboard is down? Heartbeat is failing.")
+	if reqErr != nil || response.StatusCode != 200 {
+		return errors.New("dashboard is down? Heartbeat is failing")
 	}
 
 	defer response.Body.Close()

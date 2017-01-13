@@ -171,7 +171,7 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 			var thisCoProcessEventHandler TykEventHandler
 			var err error
 			if GlobalDispatcher == nil {
-				err = errors.New("No CP available!")
+				err = errors.New("no CP available")
 			} else {
 				thisCoProcessEventHandler, err = CoProcessEventHandler{Spec: Spec}.New(thisConf)
 			}

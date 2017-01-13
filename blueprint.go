@@ -30,7 +30,7 @@ func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
 		thisSwaggerSource := &SwaggerAST{}
 		return thisSwaggerSource, nil
 	default:
-		return nil, errors.New("Source not matched, failing.")
+		return nil, errors.New("source not matched, failing")
 	}
 }
 
@@ -135,7 +135,7 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 
 	for _, resourceGroup := range b.ResourceGroups {
 		if len(resourceGroup.Resources) < 1 {
-			return thisVersionInfo, errors.New("No resourcs defined in the resource group.")
+			return thisVersionInfo, errors.New("no resourcs defined in the resource group")
 		}
 
 		for _, resource := range resourceGroup.Resources {

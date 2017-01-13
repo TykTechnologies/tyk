@@ -115,7 +115,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 					log.Debug("Cert was: ", string(decodedCert))
 					return decodedCert, nil
 				}
-				return nil, errors.New("No certificates in JWK!")
+				return nil, errors.New("no certificates in JWK")
 			}
 		}
 	}
@@ -181,7 +181,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	thisSessionState, rawKeyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !rawKeyExists {
 		log.Info("Not found!")
-		return nil, errors.New("Token invalid, key not found.")
+		return nil, errors.New("token invalid, key not found")
 	}
 	return []byte(thisSessionState.JWTData.Secret), nil
 }

@@ -188,7 +188,7 @@ func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("Bundle downloader is disabled.")
-		err = errors.New("Bundle downloader is disabled.")
+		err = errors.New("Bundle downloader is disabled")
 		return thisBundle, err
 	}
 
@@ -207,7 +207,7 @@ func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
 			Url: bundleUrl,
 		}
 	default:
-		err = errors.New("Unknown URL scheme!")
+		err = errors.New("unknown URL scheme")
 	}
 
 	bundleData, err := thisGetter.Get()
