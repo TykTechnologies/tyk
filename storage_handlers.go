@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"fmt"
 	"hash"
 	"strconv"
 	"strings"
@@ -762,15 +763,16 @@ func (r *RedisStorageManager) SetRollingWindow(keyName string, per int64, expire
 		// REset the TTL so the key lives as long as the requests pile in
 		db.Send("EXPIRE", keyName, per)
 		r, err := redis.Values(db.Do("EXEC"))
-
-		intVal := len(r[1].([]interface{}))
-
-		log.Debug("Returned: ", intVal)
-
+		if err == nil && len(r) < 1 {
+			err = fmt.Errorf("expected 1 values, got %d", len(r))
+		}
 		if err != nil {
 			log.Error("Multi command failed: ", err)
+			return 0, []interface{}{}
 		}
 
+		intVal := len(r[1].([]interface{}))
+		log.Debug("Returned: ", intVal)
 		return intVal, r[1].([]interface{})
 	}
 	return 0, []interface{}{}
