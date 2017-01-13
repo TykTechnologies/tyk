@@ -1,10 +1,6 @@
-Master: [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk)
+# Tyk API Gateway #
 
-Stable: [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=stable)](https://travis-ci.org/TykTechnologies/tyk)
-
-# Tyk API Gateway ##
-
-[![Join the chat at https://gitter.im/TykTechnologies/tyk](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/TykTechnologies/tyk?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk)
 
 Tyk is a lightweight, open source API Gateway and Management Platform enables you to control who accesses your API, when they access it and how they access it. Tyk will
 also record detailed analytics on how your users are interacting with your API and when things go wrong.
