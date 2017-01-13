@@ -18,19 +18,19 @@ type DashboardConfigPayload struct {
 }
 
 func createConnectionStringFromDashboardObject(thisConfig DashboardConfigPayload) string {
-	thisHostname := "http://"
+	hostname := "http://"
 	if thisConfig.DashboardConfig.UseTLS {
-		thisHostname = "https://"
+		hostname = "https://"
 	}
 
-	thisHostname = thisHostname + thisConfig.DashboardConfig.Hostname
+	hostname = hostname + thisConfig.DashboardConfig.Hostname
 
 	if thisConfig.DashboardConfig.Port != 0 {
-		strings.TrimRight(thisHostname, "/")
-		thisHostname = thisHostname + ":" + strconv.Itoa(thisConfig.DashboardConfig.Port)
+		hostname = strings.TrimRight(hostname, "/")
+		hostname = hostname + ":" + strconv.Itoa(thisConfig.DashboardConfig.Port)
 	}
 
-	return thisHostname
+	return hostname
 }
 
 func HandleDashboardZeroConfMessage(payload string) {
