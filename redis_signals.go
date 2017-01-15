@@ -85,6 +85,13 @@ func HandleRedisMsg(message redis.Message) {
 
 }
 
+func HandleReloadMsg() {
+	log.WithFields(logrus.Fields{
+		"prefix": "pub-sub",
+	}).Info("Reloading endpoints")
+	ReloadURLStructure()
+}
+
 var warnedOnce bool
 var notificationVerifier goverify.Verifier
 
