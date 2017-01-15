@@ -2,6 +2,9 @@ package main
 
 import (
 	"time"
+
+	"github.com/TykTechnologies/leakybucket"
+	"github.com/TykTechnologies/leakybucket/memorycache"
 )
 
 type PublicSessionState struct {
@@ -123,6 +126,12 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 
 	return true, 0
 
+}
+
+var BucketStore leakybucket.Storage
+
+func InitBucketStore() {
+	BucketStore = memorycache.New()
 }
 
 // ForwardMessageNaiveKey is the old redis-key ttl-based Rate limit, it could be gamed.
