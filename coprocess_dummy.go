@@ -3,12 +3,11 @@
 package main
 
 import (
-	"github.com/TykTechnologies/logrus"
+	"net/http"
 
+	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
-
-	"net/http"
 )
 
 const (
@@ -22,9 +21,10 @@ type Dispatcher interface {
 	Reload()
 }
 
-var GlobalDispatcher Dispatcher
-
-var EnableCoProcess = false
+var (
+	GlobalDispatcher Dispatcher
+	EnableCoProcess  = false
+)
 
 type CoProcessMiddleware struct {
 	*TykMiddleware
@@ -33,20 +33,15 @@ type CoProcessMiddleware struct {
 	MiddlewareDriver tykcommon.MiddlewareDriver
 }
 
-func (mw *CoProcessMiddleware) GetName() string {
+func (m *CoProcessMiddleware) GetName() string {
 	return "CoProcessMiddlewareDummy"
 }
 
-func (m *CoProcessMiddleware) New() {}
-
-func (a *CoProcessMiddleware) IsEnabledForSpec() bool {
-	return false
-}
-
+func (m *CoProcessMiddleware) New()                   {}
+func (m *CoProcessMiddleware) IsEnabledForSpec() bool { return false }
 func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
-
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	return nil, 200
 }
@@ -64,9 +59,6 @@ func CoProcessInit() {
 	return
 }
 
-func doCoprocessReload() {
-	return
-}
+func doCoprocessReload() { return }
 
-func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
-}
+func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {}

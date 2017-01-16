@@ -19,13 +19,13 @@ import (
 	"github.com/justinas/alice"
 )
 
-const (
-	baseMiddlewarePath = "middleware/python"
-)
+const baseMiddlewarePath = "middleware/python"
 
-var CoProcessName = "test"
-var MessageType = coprocess.ProtobufMessage
-var thisTestDispatcher, _ = NewCoProcessDispatcher()
+var (
+	CoProcessName = "test"
+	MessageType = coprocess.ProtobufMessage
+	thisTestDispatcher, _ = NewCoProcessDispatcher()
+)
 
 /* Dispatcher functions */
 
