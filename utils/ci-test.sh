@@ -20,3 +20,9 @@ if [[ -n $FMT_FILES ]]; then
 	echo "Run 'gofmt -s -w' on these files:\n$FMT_FILES"
 	exit 1
 fi
+
+IMP_FILES="$(goimports -l $GOFILES)"
+if [[ -n $IMP_FILES ]]; then
+	echo "Run 'goimports -w' on these files:\n$IMP_FILES"
+	exit 1
+fi
