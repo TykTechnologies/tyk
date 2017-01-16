@@ -73,15 +73,15 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		switch thisMeta.TemplateMeta.TemplateData.Input {
 		case tykcommon.RequestXML:
 			mxj.XmlCharsetReader = WrappedCharsetReader
-			var xErr error
-			bodyData, xErr = mxj.NewMapXml(body) // unmarshal
-			if xErr != nil {
+			var err error
+			bodyData, err = mxj.NewMapXml(body) // unmarshal
+			if err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix":      "inbound-transform",
 					"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
 					"api_id":      t.Spec.APIDefinition.APIID,
 					"path":        r.URL.Path,
-				}).Error("Error unmarshalling XML: ", xErr)
+				}).Error("Error unmarshalling XML: ", err)
 			}
 		case tykcommon.RequestJSON:
 			json.Unmarshal(body, &bodyData)

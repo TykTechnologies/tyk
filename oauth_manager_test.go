@@ -384,8 +384,7 @@ func GetAuthCode() map[string]string {
 
 	var thisResponse = map[string]string{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-	err := json.Unmarshal(body, &thisResponse)
-	if err != nil {
+	if err := json.Unmarshal(body, &thisResponse); err != nil {
 		fmt.Println(err)
 	}
 
@@ -426,8 +425,7 @@ func GetToken() tokenData {
 	var thisResponse = tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
 	//	fmt.Println(string(body))
-	err := json.Unmarshal(body, &thisResponse)
-	if err != nil {
+	if err := json.Unmarshal(body, &thisResponse); err != nil {
 		fmt.Println(err)
 	}
 	log.Debug("TOKEN DATA: ", string(body))

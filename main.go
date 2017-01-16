@@ -1073,14 +1073,12 @@ func main() {
 		initialiseSystem(arguments)
 		start()
 
-		var listenerErr error
-		l, listenerErr = generateListener(l)
-
-		// Check if listener was started successfully.
-		if listenerErr != nil {
+		var err error
+		l, err = generateListener(l)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Fatalf("Error starting listener: %s", listenerErr)
+			}).Fatalf("Error starting listener: %s", err)
 		}
 
 		listen(l, goAgainErr)
@@ -1247,8 +1245,7 @@ func handleDashboardRegistration() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Registering node.")
-		err := DashService.Register()
-		if err != nil {
+		if err := DashService.Register(); err != nil {
 			log.Fatal("Registration failed: ", err)
 		}
 

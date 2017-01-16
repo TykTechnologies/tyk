@@ -276,12 +276,8 @@ func (r *RedisStorageManager) Decrement(keyName string) {
 		log.Info("Connection dropped, connecting..")
 		r.Connect()
 		r.Decrement(keyName)
-	} else {
-		err := db.Send("DECR", keyName)
-
-		if err != nil {
-			log.Error("Error trying to decrement value:", err)
-		}
+	} else if err := db.Send("DECR", keyName); err != nil {
+		log.Error("Error trying to decrement value:", err)
 	}
 }
 

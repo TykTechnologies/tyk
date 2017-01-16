@@ -169,8 +169,10 @@ import "C"
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"unsafe"
 

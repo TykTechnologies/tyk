@@ -571,8 +571,7 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*AP
 
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
 	thisAppConfig := tykcommon.APIDefinition{}
-	err := json.Unmarshal(apiDef, &thisAppConfig)
-	if err != nil {
+	if err := json.Unmarshal(apiDef, &thisAppConfig); err != nil {
 		log.Error("[RPC] --> Couldn't unmarshal api configuration")
 		log.Error(err)
 	}

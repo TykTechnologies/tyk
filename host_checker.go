@@ -217,8 +217,8 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimout)
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
-	var pErr error
-	h.pool, pErr = tunny.CreatePool(h.workerPoolSize, func(hostData interface{}) interface{} {
+	var err error
+	h.pool, err = tunny.CreatePool(h.workerPoolSize, func(hostData interface{}) interface{} {
 		input, _ := hostData.(HostData)
 		h.CheckHost(input)
 		return nil
@@ -226,8 +226,8 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 
 	log.Debug("[HOST CHECKER] Init complete")
 
-	if pErr != nil {
-		log.Errorf("[HOST CHECKER POOL] Error: %v\n", pErr)
+	if err != nil {
+		log.Errorf("[HOST CHECKER POOL] Error: %v\n", err)
 	}
 }
 

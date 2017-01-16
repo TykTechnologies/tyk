@@ -301,14 +301,13 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostChec
 
 	var bodyData string
 	var bodyByteArr []byte
-	var loadErr error
 	if len(checkObject.Body) > 0 {
-		bodyByteArr, loadErr = b64.StdEncoding.DecodeString(checkObject.Body)
-		if loadErr != nil {
+		bodyByteArr, err = b64.StdEncoding.DecodeString(checkObject.Body)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
-			}).Error("Failed to load blob data: ", loadErr)
-			return thisHostData, loadErr
+			}).Error("Failed to load blob data: ", err)
+			return thisHostData, err
 		}
 		bodyData = string(bodyByteArr)
 	}

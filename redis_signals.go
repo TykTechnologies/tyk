@@ -40,8 +40,7 @@ func StartPubSubLoop() {
 
 func HandleRedisMsg(message redis.Message) {
 	thisMessage := Notification{}
-	err := json.Unmarshal(message.Data, &thisMessage)
-	if err != nil {
+	if err := json.Unmarshal(message.Data, &thisMessage); err != nil {
 		log.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
@@ -113,12 +112,12 @@ func IsPayloadSignatureValid(notification Notification) bool {
 
 	if config.PublicKeyPath != "" {
 		if notificationVerifier == nil {
-			var loadErr error
-			notificationVerifier, loadErr = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
-			if loadErr != nil {
+			var err error
+			notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
+			if err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "pub-sub",
-				}).Error("Notification signer: Failed loading private key from path: ", loadErr)
+				}).Error("Notification signer: Failed loading private key from path: ", err)
 				return false
 			}
 		}

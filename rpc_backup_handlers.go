@@ -126,10 +126,8 @@ func doLoadWithBackup(specs *[]*APISpec) {
 	RPC_EmergencyModeLoaded = true
 
 	l, goAgainErr := goagain.Listener()
-	var listenerErr error
-
-	l, listenerErr = generateListener(l)
-	if listenerErr != nil {
+	var err error
+	if l, err = generateListener(l); err != nil {
 		log.Info("Failed to generate listener!")
 	}
 

@@ -42,14 +42,11 @@ func ReLogin() {
 
 	time.Sleep(30 * time.Second)
 
-	err := DashService.Register()
-	if err != nil {
+	if err := DashService.Register(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Error(err)
-	}
-
-	if err == nil {
+	} else {
 		go DashService.StartBeating()
 	}
 
