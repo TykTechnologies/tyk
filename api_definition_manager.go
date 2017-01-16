@@ -4,7 +4,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -14,7 +13,6 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/rubyist/circuitbreaker"
@@ -148,18 +146,6 @@ type APIDefinitionLoader struct {
 // Nonce to use when interacting with the dashboard service
 var ServiceNonce string
 
-// Connect connects to the storage engine - can be null
-func (a *APIDefinitionLoader) Connect() {
-	log.Warning("MongoDB Driver no longer implemented")
-}
-
-// Connect connects to the storage engine - can be null
-func (a *APIDefinitionLoader) Disconnect() {
-	if a.dbSession != nil {
-		a.dbSession.Close()
-	}
-}
-
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) APISpec {
@@ -253,141 +239,6 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 
 	return contents, nil
 
-}
-
-func RegisterNodeWithDashboard(endpoint string, secret string) error {
-	// Get the definitions
-	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
-	}
-
-	newRequest.Header.Add("authorization", secret)
-
-	c := &http.Client{
-		Timeout: 20 * time.Second,
-	}
-	response, reqErr := c.Do(newRequest)
-
-	if reqErr != nil {
-		log.Error("Request failed: ", reqErr)
-		time.Sleep(time.Second * 5)
-		return RegisterNodeWithDashboard(endpoint, secret)
-	}
-
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
-
-	if response.StatusCode != 200 {
-		log.Error("Failed to register node, retrying in 5s")
-		log.Debug("Response was: ", string(retBody))
-		time.Sleep(time.Second * 5)
-		return RegisterNodeWithDashboard(endpoint, secret)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Extract tagged APIs#
-	type NodeResponseOK struct {
-		Status  string
-		Message map[string]string
-		Nonce   string
-	}
-
-	thisVal := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &thisVal)
-	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
-		return decErr
-	}
-
-	// Set the NodeID
-	var found bool
-	NodeID, found = thisVal.Message["NodeID"]
-	if !found {
-		log.Error("Failed to register node, retrying in 5s")
-		time.Sleep(time.Second * 5)
-		return RegisterNodeWithDashboard(endpoint, secret)
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "dashboard",
-		"id":     NodeID,
-	}).Info("Node registered")
-
-	// Set the nonce
-	ServiceNonce = thisVal.Nonce
-	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
-
-	return nil
-}
-
-func StartBeating(endpoint, secret string) {
-	for {
-		failure := SendHeartBeat(endpoint, secret)
-		if failure != nil {
-			log.Warning(failure)
-		}
-		time.Sleep(time.Second * 5)
-	}
-}
-
-func SendHeartBeat(endpoint string, secret string) error {
-	// Get the definitions
-	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
-	}
-
-	newRequest.Header.Add("authorization", secret)
-	newRequest.Header.Add("x-tyk-nodeid", NodeID)
-	log.Debug("Sending Heartbeat as: ", NodeID)
-
-	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
-
-	c := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	response, reqErr := c.Do(newRequest)
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
-
-	if reqErr != nil {
-		return fmt.Errorf("Dashboard is down? Heartbeat is failing. (err: %v), response was: %s", reqErr, string(retBody))
-	}
-
-	if response.StatusCode != 200 {
-		return fmt.Errorf("Dashboard is down? Heartbeat is failing. (code invalid: %v), response was: %s", response.StatusCode, string(retBody))
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Extract tagged APIs#
-	type NodeResponseOK struct {
-		Status  string
-		Message map[string]string
-		Nonce   string
-	}
-
-	thisVal := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &thisVal)
-	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
-		return decErr
-	}
-
-	// Set the nonce
-
-	ServiceNonce = thisVal.Nonce
-	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
-
-	return nil
 }
 
 // LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
