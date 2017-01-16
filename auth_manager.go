@@ -32,11 +32,6 @@ type SessionHandler interface {
 	ResetQuota(string, SessionState)
 }
 
-type KeyGenerator interface {
-	GenerateAuthKey(OrgID string) string
-	GenerateHMACSecret() string
-}
-
 // DefaultAuthorisationManager implements AuthorisationHandler,
 // requires a StorageHandler to interact with key store
 type DefaultAuthorisationManager struct {

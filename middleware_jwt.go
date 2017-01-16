@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -56,10 +55,6 @@ func (k *JWTMiddleware) GetConfig() (interface{}, error) {
 
 func (a *JWTMiddleware) IsEnabledForSpec() bool {
 	return true
-}
-
-func (k *JWTMiddleware) copyResponse(dst io.Writer, src io.Reader) {
-	io.Copy(dst, src)
 }
 
 func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string) ([]byte, error) {

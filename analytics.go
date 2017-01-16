@@ -162,13 +162,6 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 	a.ExpireAt = t2
 }
 
-// AnalyticsError is an error for when writing to the storage engine fails
-type AnalyticsError struct{}
-
-func (e AnalyticsError) Error() string {
-	return "Recording request failed!"
-}
-
 // AnalyticsHandler is an interface to record analytics data to a writer.
 type AnalyticsHandler interface {
 	Init() error

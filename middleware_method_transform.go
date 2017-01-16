@@ -13,8 +13,6 @@ type TransformMethod struct {
 	*TykMiddleware
 }
 
-type TransformMethodConfig struct{}
-
 func (mw *TransformMethod) GetName() string {
 	return "TransformMethod"
 }

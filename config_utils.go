@@ -95,10 +95,6 @@ func (c *Config) loadIgnoredIPs() {
 	}
 }
 
-func (c *Config) TestShowIPs() {
-	log.Warning(c.AnalyticsConfig.ignoredIPsCompiled)
-}
-
 func (c Config) StoreAnalytics(r *http.Request) bool {
 	if !c.EnableAnalytics {
 		return false

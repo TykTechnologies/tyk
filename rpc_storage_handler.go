@@ -48,8 +48,6 @@ var RPC_LoadCount int
 var RPC_EmergencyMode bool
 var RPC_EmergencyModeLoaded bool
 
-var ErrorDenied = errors.New("Access Denied")
-
 var GlobalRPCCallTimeout time.Duration
 var GlobalRPCPingTimeout time.Duration
 
@@ -118,11 +116,6 @@ type RPCStorageHandler struct {
 	Connected        bool
 	ID               string
 	SuppressRegister bool
-}
-
-func handleReconnect(r *RPCStorageHandler) {
-	ClearRPCClients()
-
 }
 
 func (r *RPCStorageHandler) Register() {

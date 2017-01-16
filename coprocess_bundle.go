@@ -383,16 +383,3 @@ func bundleError(spec *APISpec, err error, message string) {
 		"path":        "-",
 	}).Error(message, ": ", err)
 }
-
-// getBundlePaths will return an array of the available bundle directories:
-func getBundlePaths() []string {
-	directories := make([]string, 0)
-	bundles, _ := ioutil.ReadDir(tykBundlePath)
-	for _, f := range bundles {
-		if f.IsDir() {
-			fullPath := filepath.Join(tykBundlePath, f.Name())
-			directories = append(directories, fullPath)
-		}
-	}
-	return directories
-}

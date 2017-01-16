@@ -14,9 +14,6 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
-// ContextKey is a key type to avoid collisions
-type ContextKey int
-
 // Enums for keys to be stored in a session context - this is how gorilla expects
 // these to be implemented and is lifted pretty much from docs
 const (
@@ -27,7 +24,6 @@ const (
 	OrgSessionContext
 	ContextData
 	RetainHost
-	SkipCoProcessAuth
 	TrackThisEndpoint
 	DoNotTrackThisEndpoint
 )
@@ -47,19 +43,6 @@ type ReturningHttpHandler interface {
 type TykMiddleware struct {
 	Spec  *APISpec
 	Proxy ReturningHttpHandler
-}
-
-func SetUpSessionCache() *cache.Cache {
-	sessionLength := 10
-	evictionTime := 5
-	if config.LocalSessionCache.CachedSessionTimeout > 0 {
-		sessionLength = config.LocalSessionCache.CachedSessionTimeout
-	}
-	if config.LocalSessionCache.CacheSessionEviction > 0 {
-		evictionTime = config.LocalSessionCache.CacheSessionEviction
-	}
-
-	return cache.New(time.Duration(sessionLength)*time.Second, time.Duration(evictionTime)*time.Second)
 }
 
 func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {

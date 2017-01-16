@@ -10,8 +10,6 @@ type RateCheckMW struct {
 	*TykMiddleware
 }
 
-type RateCheckMWConfig struct{}
-
 func (mw *RateCheckMW) GetName() string {
 	return "RateCheckMW"
 }

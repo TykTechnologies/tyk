@@ -14,8 +14,6 @@ const (
 	KeyFailure        HealthPrefix = "KeyFailure"
 	RequestLog        HealthPrefix = "Request"
 	BlockedRequestLog HealthPrefix = "BlockedRequest"
-
-	HealthCheckRedisPrefix = "apihealth"
 )
 
 type HealthChecker interface {

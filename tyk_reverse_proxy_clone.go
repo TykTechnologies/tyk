@@ -376,14 +376,6 @@ var hopHeaders = []string{
 	"Upgrade",
 }
 
-func (p *ReverseProxy) ReturnRequestServeHttp(rw http.ResponseWriter, req *http.Request) *http.Request {
-	outreq := new(http.Request)
-
-	p.ServeHTTP(rw, req)
-
-	return outreq
-}
-
 func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
 	p.ErrorHandler = ErrorHandler{TykMiddleware: &TykMiddleware{spec, p}}
 	return nil, nil
