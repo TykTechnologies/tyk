@@ -162,7 +162,7 @@ func (w WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 	case "DELETE":
 		return WH_DELETE
 	case "PATCH":
-		return WH_DELETE
+		return WH_PATCH
 	default:
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
