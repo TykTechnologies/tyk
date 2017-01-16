@@ -19,11 +19,13 @@ import (
 	"net/http"
 )
 
-// EnableCoProcess will be overridden by config.EnableCoProcess.
-var EnableCoProcess = false
+var (
+	// EnableCoProcess will be overridden by config.EnableCoProcess.
+	EnableCoProcess = false
 
-// GlobalDispatcher will be implemented by the current CoProcess driver.
-var GlobalDispatcher coprocess.Dispatcher
+	// GlobalDispatcher will be implemented by the current CoProcess driver.
+	GlobalDispatcher coprocess.Dispatcher
+)
 
 // CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {

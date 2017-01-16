@@ -97,11 +97,9 @@ func (s *SessionState) HasChanged() bool {
 	if s.firstSeenHash == "" {
 		return true
 	}
-
 	if s.firstSeenHash == s.GetHash() {
 		return false
 	}
-
 	// log.Debug("s.firstSeenHash: ", s.firstSeenHash, " current hash: ", s.GetHash())
 	return true
 }
@@ -110,12 +108,11 @@ func GetLifetime(spec *APISpec, session *SessionState) int64 {
 	if config.ForceGlobalSessionLifetime {
 		return config.GlobalSessionLifetime
 	}
-
 	if session.SessionLifetime > 0 {
 		return session.SessionLifetime
-	} else if spec.SessionLifetime > 0 {
+	}
+	if spec.SessionLifetime > 0 {
 		return spec.SessionLifetime
 	}
-
 	return 0
 }
