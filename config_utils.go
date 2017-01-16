@@ -65,8 +65,7 @@ func loadConfig(filePath string, configStruct *Config) {
 		log.Info("Loading default configuration...")
 		loadConfig("tyk.conf", configStruct)
 	} else {
-		err := json.Unmarshal(configuration, &configStruct)
-		if err != nil {
+		if err := json.Unmarshal(configuration, &configStruct); err != nil {
 			log.Error("Couldn't unmarshal configuration")
 			log.Error(err)
 		}

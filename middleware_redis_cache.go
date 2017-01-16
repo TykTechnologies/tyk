@@ -163,14 +163,13 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		// Cached route matched, let go
 		if stat == StatusCached {
 			var authHeaderValue string
-			var ipErr error
 			authVal := context.Get(r, AuthHeaderValue)
 
 			// No authentication data? use the IP.
 			if authVal == nil {
-				authHeaderValue, ipErr = GetIP(GetIPFromRequest(r))
-				if ipErr != nil {
-					log.Error(ipErr)
+				var err error
+				if authHeaderValue, err = GetIP(GetIPFromRequest(r)); err != nil {
+					log.Error(err)
 					return nil, 200
 				}
 			} else {

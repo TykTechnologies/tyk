@@ -222,10 +222,9 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
 	var newSession SessionState
-	err := decoder.Decode(&newSession)
 	code := 200
 
-	if err != nil {
+	if err := decoder.Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		code = 400
 		success = false
@@ -293,8 +292,10 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		response := APIModifyKeySuccess{
 			keyName,
 			"ok",
-			action}
+			action,
+		}
 
+		var err error
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
@@ -675,10 +676,9 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
 	var newDef tykcommon.APIDefinition
-	err := decoder.Decode(&newDef)
 	code := 200
 
-	if err != nil {
+	if err := decoder.Decode(&newDef); err != nil {
 		log.Error("Couldn't decode new API Definition object: ", err)
 		success = false
 		return createError("Request malformed"), 400
@@ -728,6 +728,7 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 			"ok",
 			action}
 
+		var err error
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
@@ -866,9 +867,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		decoder := json.NewDecoder(r.Body)
 		var policRecord PolicyUpdateObj
-		err := decoder.Decode(&policRecord)
-
-		if err != nil {
+		if err := decoder.Decode(&policRecord); err != nil {
 			decodeFail := APIStatusMessage{"error", "Couldn't decode instruction"}
 			responseMessage, _ = json.Marshal(&decodeFail)
 			DoJSONWrite(w, 400, responseMessage)
@@ -1024,10 +1023,9 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
 	var newSession SessionState
-	err := decoder.Decode(&newSession)
 	code := 200
 
-	if err != nil {
+	if err := decoder.Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		code = 400
 		responseMessage = createError("Request malformed")
@@ -1083,8 +1081,10 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		response := APIModifyKeySuccess{
 			keyName,
 			"ok",
-			action}
+			action,
+		}
 
+		var err error
 		responseMessage, err = json.Marshal(&response)
 
 		if err != nil {
@@ -1296,9 +1296,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		decoder := json.NewDecoder(r.Body)
 		var newSession SessionState
-		err := decoder.Decode(&newSession)
-
-		if err != nil {
+		if err := decoder.Decode(&newSession); err != nil {
 			responseMessage = []byte(E_SYSTEM_ERROR)
 			code = 500
 
@@ -1477,9 +1475,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		decoder := json.NewDecoder(r.Body)
 		var newOauthClient NewClientRequest
-		err := decoder.Decode(&newOauthClient)
-
-		if err != nil {
+		if err := decoder.Decode(&newOauthClient); err != nil {
 			responseMessage = []byte(E_SYSTEM_ERROR)
 			code = 500
 
@@ -1547,6 +1543,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			PolicyID:          newClient.GetPolicyID(),
 		}
 
+		var err error
 		responseMessage, err = json.Marshal(&reportableClientData)
 
 		if err != nil {
@@ -1908,9 +1905,9 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 				thisAPISpec := GetSpecForApi(APIID)
 				if thisAPISpec != nil {
 					health, _ := thisAPISpec.Health.GetApiHealthValues()
-					var jsonErr error
-					responseMessage, jsonErr = json.Marshal(health)
-					if jsonErr != nil {
+					var err error
+					responseMessage, err = json.Marshal(health)
+					if err != nil {
 						code = 405
 						responseMessage = createError("Failed to encode data")
 					}
@@ -1996,8 +1993,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 			orgid = spec.OrgID
 		}
 
-		err := HandleInvalidateAPICache(APIID)
-		if err != nil {
+		if err := HandleInvalidateAPICache(APIID); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
 				"api_id":      APIID,

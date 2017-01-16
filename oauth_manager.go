@@ -300,9 +300,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			searchKey := "apikey-" + keyName
 			log.Debug("Getting: ", searchKey)
 
-			var keyErr error
-			thisSessionState, keyErr = o.OsinServer.Storage.GetUser(searchKey)
-			if keyErr != nil {
+			var err error
+			thisSessionState, err = o.OsinServer.Storage.GetUser(searchKey)
+			if err != nil {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
 				var passMatch bool
@@ -556,11 +556,10 @@ func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) 
 	if !config.Storage.EnableCluster {
 		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
 	} else {
-		var getErr error
 		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
-		clientJSON, getErr = r.store.GetSet(KeyForSet)
-		if getErr != nil {
-			return []osin.Client{}, getErr
+		var err error
+		if clientJSON, err = r.store.GetSet(KeyForSet); err != nil {
+			return []osin.Client{}, err
 		}
 	}
 
@@ -808,9 +807,7 @@ func (r RedisOsinStorageInterface) RemoveRefresh(token string) error {
 }
 
 // AccessTokenGenTyk is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
-type AccessTokenGenTyk struct {
-	sessionManager SessionHandler
-}
+type AccessTokenGenTyk struct{}
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
 func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken string, refreshtoken string, err error) {

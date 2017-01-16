@@ -79,8 +79,7 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	ip := net.ParseIP(ipStr)
 
 	var record GeoData // Or any appropriate struct
-	err := analytics.GeoIPDB.Lookup(ip, &record)
-	if err != nil {
+	if err := analytics.GeoIPDB.Lookup(ip, &record); err != nil {
 		log.Error("GeoIP Failure (not recorded): ", err)
 		return
 	}

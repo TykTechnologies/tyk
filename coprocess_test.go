@@ -22,8 +22,8 @@ import (
 const baseMiddlewarePath = "middleware/python"
 
 var (
-	CoProcessName = "test"
-	MessageType = coprocess.ProtobufMessage
+	CoProcessName         = "test"
+	MessageType           = coprocess.ProtobufMessage
 	thisTestDispatcher, _ = NewCoProcessDispatcher()
 )
 

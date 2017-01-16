@@ -14,15 +14,12 @@ type AuditHostDetails struct {
 var HostDetails AuditHostDetails
 
 func GetHostDetails() {
-	var pfErr error
-	HostDetails.PID, pfErr = pidfile.Read()
-	if pfErr != nil {
-		log.Error("Failed ot get host pid: ", pfErr)
+	var err error
+	if HostDetails.PID, err = pidfile.Read(); err != nil {
+		log.Error("Failed ot get host pid: ", err)
 	}
 
-	var hErr error
-	HostDetails.Hostname, hErr = os.Hostname()
-	if hErr != nil {
-		log.Error("Failed ot get hostname: ", hErr)
+	if HostDetails.Hostname, err = os.Hostname(); err != nil {
+		log.Error("Failed ot get hostname: ", err)
 	}
 }

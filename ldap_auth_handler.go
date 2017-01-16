@@ -39,8 +39,7 @@ func (l *LDAPStorageHandler) LoadConfFromMeta(confMeta interface{}) {
 
 func (l *LDAPStorageHandler) Connect() bool {
 	conn := ldap.NewLDAPConnection(l.LDAPServer, l.LDAPPort)
-	err := conn.Connect()
-	if err != nil {
+	if err := conn.Connect(); err != nil {
 		log.Error("LDAP server connection failed: ", err)
 		return false
 	}

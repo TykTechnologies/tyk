@@ -32,16 +32,16 @@ func (mw *OpenIDMW) GetName() string {
 func (k *OpenIDMW) New() {
 	k.provider_client_policymap = make(map[string]map[string]string)
 	// Create an OpenID Configuration and store
-	var configErr error
-	k.providerConfiguration, configErr = openid.NewConfiguration(openid.ProvidersGetter(k.getProviders),
+	var err error
+	k.providerConfiguration, err = openid.NewConfiguration(openid.ProvidersGetter(k.getProviders),
 		openid.ErrorHandler(k.dummyErrorHandler))
 
 	k.lock = sync.RWMutex{}
 
-	if configErr != nil {
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,
-		}).Error("OpenID configuration error: ", configErr)
+		}).Error("OpenID configuration error: ", err)
 	}
 }
 

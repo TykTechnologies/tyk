@@ -380,12 +380,9 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			}
 		}
 
-		var val []byte
-		var secretErr error
-
-		val, secretErr = k.getSecret(token)
-		if secretErr != nil {
-			log.Error("Couldn't get token: ", secretErr)
+		val, err := k.getSecret(token)
+		if err != nil {
+			log.Error("Couldn't get token: ", err)
 		}
 
 		if k.TykMiddleware.Spec.JWTSigningMethod == "rsa" {
@@ -394,10 +391,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 				log.Error("Failed to deccode JWT to RSA type")
 				return nil, err
 			}
-			return asRSA, secretErr
+			return asRSA, err
 		}
 
-		return val, secretErr
+		return val, err
 	})
 
 	if err == nil && token.Valid {

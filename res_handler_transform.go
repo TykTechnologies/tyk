@@ -64,9 +64,8 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		switch thisMeta.TemplateMeta.TemplateData.Input {
 		case tykcommon.RequestXML:
 			mxj.XmlCharsetReader = WrappedCharsetReader
-			var xErr error
-			bodyData, xErr = mxj.NewMapXml(body) // unmarshal
-			if xErr != nil {
+			bodyData, err = mxj.NewMapXml(body) // unmarshal
+			if err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix":      "outbound-transform",
 					"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,

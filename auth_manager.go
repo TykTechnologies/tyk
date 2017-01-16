@@ -119,9 +119,7 @@ func (b DefaultSessionManager) UpdateSession(keyName string, session SessionStat
 		go b.Store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
 	}
-	err := b.Store.SetKey(keyName, string(v), resetTTLTo)
-	return err
-
+	return b.Store.SetKey(keyName, string(v), resetTTLTo)
 }
 
 func (b DefaultSessionManager) RemoveSession(keyName string) {

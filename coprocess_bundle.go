@@ -140,7 +140,7 @@ type BundleSaver interface {
 }
 
 // ZipBundleSaver is a BundleSaver for ZIP files.
-type ZipBundleSaver struct {}
+type ZipBundleSaver struct{}
 
 // Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
 func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) (err error) {

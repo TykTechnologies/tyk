@@ -256,8 +256,7 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (*tykcommon.HostList, 
 	if s.endpointReturnsList {
 		// Convert to an object
 		s.ConvertRawListToObj(&rawData)
-		err := s.ParseObject(rawData, &jsonParsed)
-		if err != nil {
+		if err := s.ParseObject(rawData, &jsonParsed); err != nil {
 			log.Error("Parse object failed: ", err)
 			return nil, err
 		}
