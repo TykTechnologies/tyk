@@ -13,8 +13,10 @@ PKGS="$(go list ./... | grep -v /vendor/)"
 show go test -v $PKGS
 show go test -v -tags coprocess $PKGS
 
-FMT_FILES="$(go fmt $PKGS)"
+GOFILES=$(find * -name '*.go' -not -path 'vendor/*')
+
+FMT_FILES="$(gofmt -s -l $GOFILES)"
 if [[ -n $FMT_FILES ]]; then
-	echo "Run 'gofmt -w' on these files:\n$FMT_FILES"
+	echo "Run 'gofmt -s -w' on these files:\n$FMT_FILES"
 	exit 1
 fi
