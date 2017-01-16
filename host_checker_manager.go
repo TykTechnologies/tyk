@@ -547,20 +547,20 @@ func SetCheckerHostList() {
 ## TEST CONFIGURATION
 
 uptime_tests: {
-    check_list: [
-      {
-        "url": "http://google.com:3000/"
-      },
-      {
-        "url": "http://posttestserver.com/post.php?dir=tyk-checker-target-test&beep=boop",
-        "method": "POST",
-        "headers": {
-          "this": "that",
-          "more": "beans"
-        },
-        "body": "VEhJUyBJUyBBIEJPRFkgT0JKRUNUIFRFWFQNCg0KTW9yZSBzdHVmZiBoZXJl"
-      }
-    ]
-  },
+	check_list: [
+	{
+		"url": "http://google.com:3000/"
+	},
+	{
+		"url": "http://posttestserver.com/post.php?dir=tyk-checker-target-test&beep=boop",
+		"method": "POST",
+		"headers": {
+			"this": "that",
+			"more": "beans"
+		},
+		"body": "VEhJUyBJUyBBIEJPRFkgT0JKRUNUIFRFWFQNCg0KTW9yZSBzdHVmZiBoZXJl"
+	}
+	]
+},
 
 */

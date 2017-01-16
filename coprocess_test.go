@@ -350,15 +350,15 @@ var basicCoProcessDef = `
 						]
 			}
 		},
-    "custom_middleware": {
-      "pre": [
-        {
-          "name": "MyPreMiddleware",
-          "require_session": false
-        }
-      ],
-      "driver": "python"
-    },
+		"custom_middleware": {
+			"pre": [
+			{
+				"name": "MyPreMiddleware",
+				"require_session": false
+			}
+			],
+			"driver": "python"
+		},
 		"proxy": {
 			"listen_path": "/v1",
 			"target_url": "http://httpbin.org",
@@ -409,12 +409,12 @@ var protectedCoProcessDef = `
 						]
 			}
 		},
-    "custom_middleware": {
-      "auth_check": {
-        "name": "TestAuthCheck"
-      },
-      "driver": "python"
-    },
+		"custom_middleware": {
+			"auth_check": {
+				"name": "TestAuthCheck"
+			},
+			"driver": "python"
+		},
 		"proxy": {
 			"listen_path": "/v1",
 			"target_url": "http://httpbin.org",

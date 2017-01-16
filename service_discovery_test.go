@@ -5,26 +5,24 @@ import (
 )
 
 var consul = `
-[
-  {
-    "Node": "foobar",
-    "Address": "10.1.10.12",
-    "ServiceID": "redis",
-    "ServiceName": "redis",
-    "ServiceTags": null,
-    "ServiceAddress": "",
-    "ServicePort": 8000
-  },
-  {
-    "Node": "foobar2",
-    "Address": "10.1.10.13",
-    "ServiceID": "redis",
-    "ServiceName": "redis",
-    "ServiceTags": null,
-    "ServiceAddress": "",
-    "ServicePort": 8000
-  }
-]
+[{
+	"Node": "foobar",
+	"Address": "10.1.10.12",
+	"ServiceID": "redis",
+	"ServiceName": "redis",
+	"ServiceTags": null,
+	"ServiceAddress": "",
+	"ServicePort": 8000
+},
+{
+	"Node": "foobar2",
+	"Address": "10.1.10.13",
+	"ServiceID": "redis",
+	"ServiceName": "redis",
+	"ServiceTags": null,
+	"ServiceAddress": "",
+	"ServicePort": 8000
+}]
 `
 
 var eureka_real = `
@@ -117,67 +115,65 @@ var eureka_real = `
 `
 
 var nested_consul = `
-[
-  {
-    "Name": "beep",
-    "Data": "{\"hostname\": \"httpbin1.org\", \"port\": \"80\"}"
-  },
-  {
-    "Name": "boop",
-    "Data": "{\"hostname\": \"httpbin2.org\", \"port\": \"80\"}"
-  }
-]
+[{
+	"Name": "beep",
+	"Data": "{\"hostname\": \"httpbin1.org\", \"port\": \"80\"}"
+},
+{
+	"Name": "boop",
+	"Data": "{\"hostname\": \"httpbin2.org\", \"port\": \"80\"}"
+}]
 `
 
 var etcd = `
 {
-    "action": "get",
-    "node": {
-        "key": "/services/single",
-        "value": "httpbin.org:6000",
-        "modifiedIndex": 6,
-        "createdIndex": 6
-    }
+	"action": "get",
+	"node": {
+		"key": "/services/single",
+		"value": "httpbin.org:6000",
+		"modifiedIndex": 6,
+		"createdIndex": 6
+	}
 }
 `
 
 var nested = `
 {
-    "action": "get",
-    "node": {
-        "key": "/services/single",
-        "value": "{\"hostname\": \"httpbin.org\", \"port\": \"80\"}",
-        "modifiedIndex": 6,
-        "createdIndex": 6
-    }
+	"action": "get",
+	"node": {
+		"key": "/services/single",
+		"value": "{\"hostname\": \"httpbin.org\", \"port\": \"80\"}",
+		"modifiedIndex": 6,
+		"createdIndex": 6
+	}
 }
 `
 
 var nested_list = `
 {
-    "action": "get",
-    "node": {
-        "key": "/services/single",
-        "value": "[{\"hostname\": \"httpbin.org\", \"port\": \"80\"}, {\"hostname\": \"httpbin2.org\", \"port\": \"80\"}]",
-        "modifiedIndex": 6,
-        "createdIndex": 6
-    }
+	"action": "get",
+	"node": {
+		"key": "/services/single",
+		"value": "[{\"hostname\": \"httpbin.org\", \"port\": \"80\"}, {\"hostname\": \"httpbin2.org\", \"port\": \"80\"}]",
+		"modifiedIndex": 6,
+		"createdIndex": 6
+	}
 }
 `
 
 var mesosphere = `
 {
- "tasks": [{
-  "id": "myservice.7fc21d4c-eabb-11e5-b381-066c48d09c8f",
-  "host": "httpbin.org",
-  "ipAddresses": [],
-  "ports": [80],
-  "startedAt": "2016-03-15T14:37:55.941Z",
-  "stagedAt": "2016-03-15T14:37:52.792Z",
-  "version": "2016-03-15T14:37:52.726Z",
-  "slaveId": "d70867df-fdb2-4889-abeb-0829c742fded-S2",
-  "appId": "/httpbin"
- }]
+	"tasks": [{
+		"id": "myservice.7fc21d4c-eabb-11e5-b381-066c48d09c8f",
+		"host": "httpbin.org",
+		"ipAddresses": [],
+		"ports": [80],
+		"startedAt": "2016-03-15T14:37:55.941Z",
+		"stagedAt": "2016-03-15T14:37:52.792Z",
+		"version": "2016-03-15T14:37:52.726Z",
+		"slaveId": "d70867df-fdb2-4889-abeb-0829c742fded-S2",
+		"appId": "/httpbin"
+	}]
 }
 `
 
