@@ -253,21 +253,21 @@ var IdExtractorCoProcessDef = `
 			}
 		},
 		"custom_middleware": {
-      "pre": [
-        {
-          "name": "MyPreMiddleware",
-          "require_session": false
-        }
-      ],
-      "id_extractor": {
-        "extract_from": "header",
-        "extract_with": "value",
-        "extractor_config": {
-          "header_name": "Authorization"
-        }
-      },
-      "driver": "grpc"
-    },
+			"pre": [
+			{
+				"name": "MyPreMiddleware",
+				"require_session": false
+			}
+			],
+			"id_extractor": {
+				"extract_from": "header",
+				"extract_with": "value",
+				"extractor_config": {
+					"header_name": "Authorization"
+				}
+			},
+			"driver": "grpc"
+		},
 		"proxy": {
 			"listen_path": "/v1",
 			"target_url": "http://httpbin.org",
@@ -317,28 +317,28 @@ var ValueExtractorFormSource = `
 			}
 		},
 		"custom_middleware": {
-      "pre": [
-        {
-          "name": "MyPreMiddleware",
-          "require_session": false
-        }
-      ],
-      "id_extractor": {
-        "extract_from": "form",
-        "extract_with": "value",
-        "extractor_config": {
+			"pre": [
+			{
+				"name": "MyPreMiddleware",
+				"require_session": false
+			}
+			],
+			"id_extractor": {
+				"extract_from": "form",
+				"extract_with": "value",
+				"extractor_config": {
 					"param_name": "auth"
-        }
-      },
-      "driver": "grpc"
-    },
+				}
+			},
+			"driver": "grpc"
+		},
 		"proxy": {
 			"listen_path": "/v1",
 			"target_url": "http://httpbin.org",
 			"strip_listen_path": false
 		}
 	}
-`
+	`
 
 var RegexExtractorDef = `
 
@@ -382,16 +382,16 @@ var RegexExtractorDef = `
 		},
 		"custom_middleware": {
 			"id_extractor": {
-        "extract_from": "header",
-        "extract_with": "regex",
-        "extractor_config": {
-          "header_name": "Authorization",
-          "regex_expression": "[^\\\\-]+",
+				"extract_from": "header",
+				"extract_with": "regex",
+				"extractor_config": {
+					"header_name": "Authorization",
+					"regex_expression": "[^\\\\-]+",
 					"regex_match_index": 1
-        }
-      },
-      "driver": "grpc"
-    },
+				}
+			},
+			"driver": "grpc"
+		},
 		"proxy": {
 			"listen_path": "/v1",
 			"target_url": "http://httpbin.org",

@@ -27,7 +27,7 @@ var HMACAuthDef = `
 			"key": "version"
 		},
 		"enable_signature_checking": true,
-        "hmac_allowed_clock_skew": 1000,
+		"hmac_allowed_clock_skew": 1000,
 		"auth": {
 			"auth_header_name": "authorization"
 		},

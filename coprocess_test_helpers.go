@@ -29,7 +29,7 @@ static struct CoProcessMessage* TestDispatchHook(struct CoProcessMessage* object
 
 	applyTestHooks(outputObject);
 
-  return outputObject;
+	return outputObject;
 };
 
 */

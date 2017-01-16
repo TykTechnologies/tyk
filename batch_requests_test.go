@@ -50,30 +50,30 @@ var BatchTestDef = `
 var testBatchRequest = `
 
 {
-    "requests": [
-        {
-            "method": "GET",
-            "headers": {
-                "test-header-1": "test-1",
-                "test-header-2": "test-2"
-            },
-            "body": "",
-            "relative_url": "get/?param1=this"
-        },
-        {
-            "method": "POST",
-            "headers": {},
-            "body": "TEST BODY",
-            "relative_url": "post/"
-        },
-        {
-            "method": "PUT",
-            "headers": {},
-            "body": "",
-            "relative_url": "put/"
-        }
-    ],
-    "suppress_parallel_execution": true
+	"requests": [
+	{
+		"method": "GET",
+		"headers": {
+			"test-header-1": "test-1",
+			"test-header-2": "test-2"
+		},
+		"body": "",
+		"relative_url": "get/?param1=this"
+	},
+	{
+		"method": "POST",
+		"headers": {},
+		"body": "TEST BODY",
+		"relative_url": "post/"
+	},
+	{
+		"method": "PUT",
+		"headers": {},
+		"body": "",
+		"relative_url": "put/"
+	}
+	],
+	"suppress_parallel_execution": true
 }
 
 `

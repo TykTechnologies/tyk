@@ -25,42 +25,42 @@ package main
 PyGILState_STATE gilState;
 
 static int Python_Init() {
-  CoProcessLog( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
-  Py_Initialize();
+	CoProcessLog( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
+	Py_Initialize();
 	gilState = PyGILState_Ensure();
 	PyEval_InitThreads();
 	// This exposes the Cython interface as "gateway"
 	PyInit_gateway();
-  return Py_IsInitialized();
+	return Py_IsInitialized();
 }
 
 
 static int Python_LoadDispatcher() {
-  PyObject *module_name = PyUnicode_FromString( dispatcher_module_name );
-  dispatcher_module = PyImport_Import( module_name );
+	PyObject *module_name = PyUnicode_FromString( dispatcher_module_name );
+	dispatcher_module = PyImport_Import( module_name );
 
 	Py_DECREF(module_name);
 
-  if( dispatcher_module == NULL ) {
-    PyErr_Print();
-    return -1;
-  }
+	if( dispatcher_module == NULL ) {
+		PyErr_Print();
+		return -1;
+	}
 
-  dispatcher_module_dict = PyModule_GetDict(dispatcher_module);
+	dispatcher_module_dict = PyModule_GetDict(dispatcher_module);
 
-  if( dispatcher_module_dict == NULL ) {
-    PyErr_Print();
-    return -1;
-  }
+	if( dispatcher_module_dict == NULL ) {
+		PyErr_Print();
+		return -1;
+	}
 
-  dispatcher_class = PyDict_GetItemString(dispatcher_module_dict, dispatcher_class_name);
+	dispatcher_class = PyDict_GetItemString(dispatcher_module_dict, dispatcher_class_name);
 
-  if( dispatcher_class == NULL ) {
-    PyErr_Print();
-    return -1;
-  }
+	if( dispatcher_class == NULL ) {
+		PyErr_Print();
+		return -1;
+	}
 
-  return 0;
+	return 0;
 }
 
 static void Python_ReloadDispatcher() {
@@ -77,7 +77,7 @@ static void Python_ReloadDispatcher() {
 }
 
 static void Python_HandleMiddlewareCache(char* bundle_path) {
-  gilState = PyGILState_Ensure();
+	gilState = PyGILState_Ensure();
 	if( PyCallable_Check(dispatcher_load_bundle) ) {
 		PyObject* load_bundle_args = PyTuple_Pack( 1, PyUnicode_FromString(bundle_path) );
 		PyObject_CallObject( dispatcher_load_bundle, load_bundle_args );
@@ -86,23 +86,23 @@ static void Python_HandleMiddlewareCache(char* bundle_path) {
 }
 
 static int Python_NewDispatcher(char* middleware_path, char* event_handler_path, char* bundle_paths) {
-  if( PyCallable_Check(dispatcher_class) ) {
-    dispatcher_args = PyTuple_Pack( 3, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path), PyUnicode_FromString(bundle_paths) );
-    dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
+	if( PyCallable_Check(dispatcher_class) ) {
+		dispatcher_args = PyTuple_Pack( 3, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path), PyUnicode_FromString(bundle_paths) );
+		dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
 
 		Py_DECREF(dispatcher_args);
 
-    if( dispatcher == NULL) {
-      PyErr_Print();
-      return -1;
-    }
-  } else {
-    PyErr_Print();
-    return -1;
-  }
+		if( dispatcher == NULL) {
+			PyErr_Print();
+			return -1;
+		}
+	} else {
+		PyErr_Print();
+		return -1;
+	}
 
-  dispatcher_hook_name = PyUnicode_FromString( hook_name );
-  dispatcher_hook = PyObject_GetAttr(dispatcher, dispatcher_hook_name);
+	dispatcher_hook_name = PyUnicode_FromString( hook_name );
+	dispatcher_hook = PyObject_GetAttr(dispatcher, dispatcher_hook_name);
 
 	dispatch_event_name = PyUnicode_FromString( dispatch_event_name_s );
 	dispatch_event = PyObject_GetAttr(dispatcher, dispatch_event_name );
@@ -113,17 +113,17 @@ static int Python_NewDispatcher(char* middleware_path, char* event_handler_path,
 	Py_DECREF(dispatcher_hook_name);
 	Py_DECREF(dispatch_event_name);
 
-  if( dispatcher_hook == NULL ) {
-    PyErr_Print();
-    return -1;
-  }
+	if( dispatcher_hook == NULL ) {
+		PyErr_Print();
+		return -1;
+	}
 
-  return 0;
+	return 0;
 }
 
 static void Python_SetEnv(char* python_path) {
-  CoProcessLog( sdscatprintf(sdsempty(), "Setting PYTHONPATH to '%s'", python_path), "info");
-  setenv("PYTHONPATH", python_path, 1 );
+	CoProcessLog( sdscatprintf(sdsempty(), "Setting PYTHONPATH to '%s'", python_path), "info");
+	setenv("PYTHONPATH", python_path, 1 );
 }
 
 static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* object) {

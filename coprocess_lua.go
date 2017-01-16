@@ -24,24 +24,24 @@ static void LoadMiddleware(char* middleware_file, char* middleware_contents) {
 }
 
 static void LoadMiddlewareIntoState(lua_State* L, char* middleware_name, char* middleware_contents) {
-  luaL_dostring(L, middleware_contents);
+	luaL_dostring(L, middleware_contents);
 }
 
 static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object) {
 
-  struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
+	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
 
-  lua_State *L = luaL_newstate();
+	lua_State *L = luaL_newstate();
 
-  luaL_openlibs(L);
-  // luaL_dofile(L, "coprocess/lua/tyk/core.lua");
-  LoadCachedModules(L);
+	luaL_openlibs(L);
+	// luaL_dofile(L, "coprocess/lua/tyk/core.lua");
+	LoadCachedModules(L);
 
-  LoadCachedMiddleware(L);
-  lua_getglobal(L, "dispatch");
+	LoadCachedMiddleware(L);
+	lua_getglobal(L, "dispatch");
 
-  lua_pushlstring(L, object->p_data, object->length);
-  int call_result = lua_pcall(L, 1, 2, 0);
+	lua_pushlstring(L, object->p_data, object->length);
+	int call_result = lua_pcall(L, 1, 2, 0);
 
 	size_t lua_output_length = lua_tointeger(L, -1);
 	const char* lua_output_data = lua_tolstring(L, 0, &lua_output_length);
@@ -49,12 +49,12 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
 	char* output = malloc(lua_output_length);
 	memmove(output, lua_output_data, lua_output_length);
 
-  lua_close(L);
+	lua_close(L);
 
-  outputObject->p_data = (void*)output;
-  outputObject->length = lua_output_length;
+	outputObject->p_data = (void*)output;
+	outputObject->length = lua_output_length;
 
-  return outputObject;
+	return outputObject;
 }
 
 static void LuaDispatchEvent(char* event_json) {
