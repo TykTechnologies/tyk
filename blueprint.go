@@ -186,7 +186,3 @@ func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(thisVersion tykcommon.Ve
 	thisDefinition.VersionData.Versions[versionName] = thisVersion
 	return nil
 }
-
-func HandleImportMode() {
-
-}

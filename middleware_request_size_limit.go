@@ -14,8 +14,6 @@ type RequestSizeLimitMiddleware struct {
 	*TykMiddleware
 }
 
-type RequestSizeLimitConfig struct{}
-
 // New lets you do any initialisations for the object can be done here
 func (t *RequestSizeLimitMiddleware) New() {}
 

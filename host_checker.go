@@ -248,11 +248,6 @@ func (h *HostUptimeChecker) Stop() {
 	h.pool.Close()
 }
 
-func (h *HostUptimeChecker) AddHost(hd HostData) {
-	h.HostList[hd.ID] = hd
-	log.Info("[HOST CHECKER] Tracking: ", hd.ID)
-}
-
 func (h *HostUptimeChecker) RemoveHost(name string) {
 	delete(h.HostList, name)
 	log.Info("[HOST CHECKER] Stopped tracking: ", name)
@@ -262,36 +257,4 @@ func (h *HostUptimeChecker) ResetList(hostList *map[string]HostData) {
 	h.doResetList = true
 	h.newList = hostList
 	log.Debug("[HOST CHECKER] Checker reset queued!")
-}
-
-func hostcheck_example() {
-	// Create the poller
-	poller := &HostUptimeChecker{}
-	poller.Init(defaultWorkerPoolSize,
-		defaultSampletTriggerLimit,
-		defaultTimeout,
-		map[string]HostData{},
-		// On failure
-		func(fr HostHealthReport) {
-			log.Error("This host is failing: ", fr.CheckURL)
-			log.Info("---> Latency: \t", fr.Latency)
-			if fr.IsTCPError {
-				log.Info("---> TCP Error: \t", fr.IsTCPError)
-			} else {
-				log.Info("---> Response Code: \t", fr.ResponseCode)
-			}
-
-		},
-		// On success
-		func(fr HostHealthReport) {
-			log.Info("Host is back up! URL: ", fr.CheckURL)
-		},
-		func(fr HostHealthReport) {
-			log.Info("Host report, URL: ", fr.CheckURL)
-		})
-
-	// Start the check loop
-	poller.Start()
-	defer poller.Stop()
-
 }

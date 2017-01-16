@@ -19,7 +19,6 @@ import (
 
 const DateHeaderSpec = "Date"
 const AltHeaderSpec = "x-aux-date"
-const HMACClockSkewLimitInMs float64 = 1000
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
@@ -362,17 +361,4 @@ func generateEncodedSignature(signatureString string, secret string) string {
 	encodedString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString = url.QueryEscape(encodedString)
 	return encodedString
-}
-
-func generateAuthHeaderValue(fieldValues *HMACFieldValues) string {
-	authHeaderString := "Signature "
-	authHeaderString += "keyId=" + fieldValues.KeyID + ","
-	authHeaderString += "algorithm=" + fieldValues.Algorthm + ","
-	if len(fieldValues.Headers) > 0 {
-		headers := strings.Join(fieldValues.Headers, " ")
-		authHeaderString += "headers=" + headers
-	}
-	authHeaderString += ", signature=" + fieldValues.Signature
-
-	return authHeaderString
 }

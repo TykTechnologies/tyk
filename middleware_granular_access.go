@@ -14,8 +14,6 @@ type GranularAccessMiddleware struct {
 	*TykMiddleware
 }
 
-type GranularAccessMiddlewareConfig struct{}
-
 func (m *GranularAccessMiddleware) New() {}
 
 func (mw *GranularAccessMiddleware) GetName() string {

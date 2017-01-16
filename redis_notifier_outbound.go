@@ -7,11 +7,7 @@ import (
 type NotificationCommand string
 
 const (
-	NoticeApiUpdated             NotificationCommand = "ApiUpdated"
-	NoticeApiRemoved             NotificationCommand = "ApiRemoved"
-	NoticeApiAdded               NotificationCommand = "ApiAdded"
 	NoticeGroupReload            NotificationCommand = "GroupReload"
-	NoticePolicyChanged          NotificationCommand = "PolicyChanged"
 	NoticeConfigUpdate           NotificationCommand = "NoticeConfigUpdated"
 	NoticeDashboardZeroConf      NotificationCommand = "NoticeDashboardZeroConf"
 	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"

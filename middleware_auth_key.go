@@ -34,10 +34,6 @@ func (a *AuthKey) IsEnabledForSpec() bool {
 	return true
 }
 
-func (k *AuthKey) copyResponse(dst io.Writer, src io.Reader) {
-	io.Copy(dst, src)
-}
-
 func CopyRequest(r *http.Request) *http.Request {
 	tempRes := new(http.Request)
 	*tempRes = *r

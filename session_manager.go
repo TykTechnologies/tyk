@@ -134,56 +134,6 @@ func InitBucketStore() {
 	BucketStore = memorycache.New()
 }
 
-// ForwardMessageNaiveKey is the old redis-key ttl-based Rate limit, it could be gamed.
-func (l SessionLimiter) ForwardMessageNaiveKey(currentSession *SessionState, key string, store StorageHandler) (bool, int) {
-
-	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
-	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
-	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
-	ratePerPeriodNow := store.IncrememntWithExpire(rateLimiterKey, int64(currentSession.Per))
-
-	if ratePerPeriodNow > (int64(currentSession.Rate)) {
-		return false, 1
-	}
-
-	currentSession.Allowance--
-	if !l.IsRedisQuotaExceeded(currentSession, key, store) {
-		return true, 0
-	}
-
-	return false, 2
-
-}
-
-// IsQuotaExceeded will confirm if a session key has exceeded it's quota, if a quota has been exceeded,
-// but the quata renewal time has passed, it will be refreshed.
-func (l SessionLimiter) IsQuotaExceeded(currentSession *SessionState) bool {
-	if currentSession.QuotaMax == -1 {
-		// No quota set
-		return false
-	}
-
-	if currentSession.QuotaRemaining == 0 {
-		current := time.Now().Unix()
-		if currentSession.QuotaRenews-current < 0 {
-			// quota used up, but we're passed renewal time
-			currentSession.QuotaRenews = current + currentSession.QuotaRenewalRate
-			currentSession.QuotaRemaining = currentSession.QuotaMax
-			return false
-		}
-		// quota used up
-		return true
-	}
-
-	if currentSession.QuotaRemaining > 0 {
-		currentSession.QuotaRemaining--
-		return false
-	}
-
-	return true
-
-}
-
 func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
 
 	// Are they unlimited?

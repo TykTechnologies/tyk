@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -58,12 +57,6 @@ func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	}
 
 	return string(contents), nil
-}
-
-func (s *ServiceDiscovery) decodeRawJsonString(value string) interface{} {
-	var thisObj interface{}
-	json.Unmarshal([]byte(value), &thisObj)
-	return &thisObj
 }
 
 func (s *ServiceDiscovery) decodeToNameSpace(namespace string, jsonParsed *gabs.Container) interface{} {

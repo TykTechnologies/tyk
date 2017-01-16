@@ -63,9 +63,8 @@ var NodeID string
 
 // Generic system error
 const (
-	E_SYSTEM_ERROR          = "{\"status\": \"system error, please contact administrator\"}"
-	OAUTH_AUTH_CODE_TIMEOUT = 60 * 60
-	OAUTH_PREFIX            = "oauth-data."
+	E_SYSTEM_ERROR = "{\"status\": \"system error, please contact administrator\"}"
+	OAUTH_PREFIX   = "oauth-data."
 )
 
 // Display configuration options

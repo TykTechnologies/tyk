@@ -65,26 +65,6 @@ type LE_ServerInfo struct {
 	ID       string
 }
 
-func NotifyLEStateChange() {
-	thisServer := LE_ServerInfo{
-		HostName: HostDetails.Hostname,
-		ID:       NodeID,
-	}
-
-	asJson, jsErr := json.Marshal(thisServer)
-	if jsErr != nil {
-		log.Error("Failed to encode payload: ", jsErr)
-		return
-	}
-
-	n := Notification{
-		Command: NoticeGatewayLENotification,
-		Payload: string(asJson),
-	}
-
-	MainNotifier.Notify(n)
-}
-
 func OnLESSLStatusReceivedHandler(payload string) {
 	thisServerData := LE_ServerInfo{}
 	jsErr := json.Unmarshal([]byte(payload), &thisServerData)
