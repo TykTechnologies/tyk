@@ -30,11 +30,11 @@ func createAuthKeyAuthSession() SessionState {
 	return thisSession
 }
 
-func getAuthKeyChain(spec APISpec) http.Handler {
+func getAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	proxy := TykNewSingleHostReverseProxy(remote, &spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
-	tykMiddleware := &TykMiddleware{&spec, proxy}
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	tykMiddleware := &TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
@@ -46,7 +46,7 @@ func getAuthKeyChain(spec APISpec) http.Handler {
 	return chain
 }
 
-func setUp(def string) APISpec {
+func setUp(def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}

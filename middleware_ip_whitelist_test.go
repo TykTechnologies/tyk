@@ -166,7 +166,7 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := &[]*APISpec{&thisSpec}
+	specs := &[]*APISpec{thisSpec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
@@ -176,7 +176,7 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 	http.DefaultServeMux = newHttpMuxer
 	log.Debug("IP TEST Reload complete")
 
-	return &thisSpec
+	return thisSpec
 }
 
 func TestIpMiddlewareIPFail(t *testing.T) {
@@ -200,7 +200,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getChain(*spec)
+	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 403 {
@@ -229,7 +229,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getChain(*spec)
+	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -258,7 +258,7 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getChain(*spec)
+	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -287,7 +287,7 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getChain(*spec)
+	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 403 {
@@ -317,7 +317,7 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getChain(*spec)
+	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -345,7 +345,7 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getChain(*spec)
+	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
@@ -373,7 +373,7 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getChain(*spec)
+	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {

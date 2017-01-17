@@ -48,7 +48,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getBasicAuthChain(*spec)
+	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	var returnOverrides ReturnOverrides
@@ -101,7 +101,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getBasicAuthChain(*spec)
+	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	var returnOverrides ReturnOverrides
@@ -146,7 +146,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getBasicAuthChain(*spec)
+	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	var returnOverrides ReturnOverrides
@@ -190,7 +190,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain := getBasicAuthChain(*spec)
+	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	// var returnOverrides ReturnOverrides
