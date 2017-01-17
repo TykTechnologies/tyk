@@ -113,12 +113,12 @@ type TykErrorResponse struct {
 	Error string
 }
 
-func getChain(spec APISpec) http.Handler {
+func getChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	//remote, _ := url.Parse("http://example.com/")
-	proxy := TykNewSingleHostReverseProxy(remote, &spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
-	tykMiddleware := &TykMiddleware{&spec, proxy}
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	tykMiddleware := &TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
@@ -426,31 +426,22 @@ var ExtendedPathGatewaySetup = `
 			"strip_listen_path": false
 		}
 	}
-
 `
 
-func createExtendedDefinitionWithPaths() APISpec {
-
+func createExtendedDefinitionWithPaths() *APISpec {
 	return createDefinitionFromString(ExtendedPathGatewaySetup)
-
 }
 
-func createNonVersionedDefinition() APISpec {
-
+func createNonVersionedDefinition() *APISpec {
 	return createDefinitionFromString(nonExpiringDefNoWhiteList)
-
 }
 
-func createVersionedDefinition() APISpec {
-
+func createVersionedDefinition() *APISpec {
 	return createDefinitionFromString(VersionedDefinition)
-
 }
 
-func createPathBasedDefinition() APISpec {
-
+func createPathBasedDefinition() *APISpec {
 	return createDefinitionFromString(PathBasedDefinition)
-
 }
 
 func TestParambasedAuth(t *testing.T) {

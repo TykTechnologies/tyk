@@ -85,7 +85,7 @@ func TestBatchSuccess(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	batchHandler := BatchRequestHandler{API: &spec}
+	batchHandler := BatchRequestHandler{API: spec}
 
 	r, _ := http.NewRequest("POST", "/vi/tyk/batch/", strings.NewReader(testBatchRequest))
 
@@ -131,7 +131,7 @@ func TestMakeSyncRequest(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	batchHandler := BatchRequestHandler{API: &spec}
+	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
 	thisRequest, _ := http.NewRequest("GET", "http://example.com/", nil)
@@ -159,7 +159,7 @@ func TestMakeASyncRequest(t *testing.T) {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	batchHandler := BatchRequestHandler{API: &spec}
+	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
 	thisRequest, _ := http.NewRequest("GET", "http://example.com/", nil)
