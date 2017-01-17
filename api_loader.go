@@ -152,7 +152,7 @@ func processSpec(referenceSpec *APISpec,
 	// Set up LB targets:
 	if referenceSpec.Proxy.EnableLoadBalancing {
 		thisSL := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
-		referenceSpec.Proxy.StructuredTargetList = *thisSL
+		referenceSpec.Proxy.StructuredTargetList = thisSL
 	}
 
 	// Initialise the auth and session managers (use Redis for now)

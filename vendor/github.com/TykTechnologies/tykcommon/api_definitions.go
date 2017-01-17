@@ -315,7 +315,7 @@ type APIDefinition struct {
 		StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
 		EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
 		Targets                     []string                      `bson:"target_list" json:"target_list"`
-		StructuredTargetList        HostList                      `bson:"-" json:"-"`
+		StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
 	} `bson:"proxy" json:"proxy"`

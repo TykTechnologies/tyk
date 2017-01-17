@@ -22,7 +22,7 @@ func canonicalAddr(url *url.URL) string {
 }
 
 type WSDialer struct {
-	TykTransporter
+	*TykTransporter
 	RW        http.ResponseWriter
 	TLSConfig *tls.Config
 }
