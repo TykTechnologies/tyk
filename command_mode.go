@@ -91,13 +91,13 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 			log.Error("onversion into API Def failed: ", err)
 		}
 
-		insertErr := bp.InsertIntoAPIDefinitionAsVersion(versionData, &thisDefFromFile, versionName.(string))
+		insertErr := bp.InsertIntoAPIDefinitionAsVersion(versionData, thisDefFromFile, versionName.(string))
 		if insertErr != nil {
 			log.Error("Insertion failed: ", insertErr)
 			return
 		}
 
-		printDef(&thisDefFromFile)
+		printDef(thisDefFromFile)
 
 	}
 }
@@ -162,8 +162,8 @@ func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
 	return thisBlueprint.(*BluePrintAST), nil
 }
 
-func apiDefLoadFile(filePath string) (tykcommon.APIDefinition, error) {
-	thisDef := tykcommon.APIDefinition{}
+func apiDefLoadFile(filePath string) (*tykcommon.APIDefinition, error) {
+	thisDef := &tykcommon.APIDefinition{}
 
 	defFileData, err := ioutil.ReadFile(filePath)
 

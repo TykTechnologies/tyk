@@ -196,13 +196,13 @@ func handleSwaggerMode(arguments map[string]interface{}) {
 			log.Error("Conversion into API Def failed: ", err)
 		}
 
-		insertErr := s.InsertIntoAPIDefinitionAsVersion(versionData, &thisDefFromFile, versionName.(string))
+		insertErr := s.InsertIntoAPIDefinitionAsVersion(versionData, thisDefFromFile, versionName.(string))
 		if insertErr != nil {
 			log.Error("Insertion failed: ", insertErr)
 			return
 		}
 
-		printDef(&thisDefFromFile)
+		printDef(thisDefFromFile)
 
 	}
 }

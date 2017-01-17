@@ -618,8 +618,7 @@ func HandleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	var thisAPIIDList []tykcommon.APIDefinition
-	thisAPIIDList = make([]tykcommon.APIDefinition, len(*ApiSpecRegister))
+	thisAPIIDList := make([]*tykcommon.APIDefinition, len(*ApiSpecRegister))
 
 	c := 0
 	for _, apiSpec := range *ApiSpecRegister {
@@ -675,10 +674,10 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 	success := true
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
-	var newDef tykcommon.APIDefinition
+	newDef := &tykcommon.APIDefinition{}
 	code := 200
 
-	if err := decoder.Decode(&newDef); err != nil {
+	if err := decoder.Decode(newDef); err != nil {
 		log.Error("Couldn't decode new API Definition object: ", err)
 		success = false
 		return createError("Request malformed"), 400
