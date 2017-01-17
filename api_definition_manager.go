@@ -114,7 +114,7 @@ type ExtendedCircuitBreakerMeta struct {
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
-	tykcommon.APIDefinition
+	*tykcommon.APIDefinition
 
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
@@ -148,7 +148,7 @@ var ServiceNonce string
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) *APISpec {
+func (a *APIDefinitionLoader) MakeSpec(thisAppConfig *tykcommon.APIDefinition) *APISpec {
 	newAppSpec := &APISpec{}
 	newAppSpec.APIDefinition = thisAppConfig
 
@@ -284,7 +284,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	// Extract tagged APIs#
 
 	type ResponseStruct struct {
-		ApiDefinition tykcommon.APIDefinition `bson:"api_definition" json:"api_definition"`
+		ApiDefinition *tykcommon.APIDefinition `bson:"api_definition" json:"api_definition"`
 	}
 	type NodeResponseOK struct {
 		Status  string
@@ -310,12 +310,11 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	}
 
 	// Extract tagged entries only
-	APIDefinitions := make([]tykcommon.APIDefinition, 0)
+	APIDefinitions := make([]*tykcommon.APIDefinition, 0)
 
 	if config.DBAppConfOptions.NodeIsSegmented {
-		APIDefinitions = make([]tykcommon.APIDefinition, 0)
 		tagList := make(map[string]bool)
-		toLoad := make(map[string]tykcommon.APIDefinition)
+		toLoad := make(map[string]*tykcommon.APIDefinition)
 
 		for _, mt := range config.DBAppConfOptions.Tags {
 			tagList[mt] = true
@@ -383,7 +382,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*APISpec {
 	var APISpecs = []*APISpec{}
 
-	var APIDefinitions = []tykcommon.APIDefinition{}
+	var APIDefinitions = []*tykcommon.APIDefinition{}
 	var StringDefs = make([]map[string]interface{}, 0)
 
 	jErr1 := json.Unmarshal([]byte(apiCollection), &APIDefinitions)
@@ -420,9 +419,9 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*AP
 	return &APISpecs
 }
 
-func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (tykcommon.APIDefinition, map[string]interface{}) {
-	thisAppConfig := tykcommon.APIDefinition{}
-	if err := json.Unmarshal(apiDef, &thisAppConfig); err != nil {
+func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*tykcommon.APIDefinition, map[string]interface{}) {
+	thisAppConfig := &tykcommon.APIDefinition{}
+	if err := json.Unmarshal(apiDef, thisAppConfig); err != nil {
 		log.Error("[RPC] --> Couldn't unmarshal api configuration")
 		log.Error(err)
 	}
