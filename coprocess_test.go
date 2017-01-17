@@ -166,7 +166,7 @@ func MakeCoProcessSampleAPI(apiTestDef string) *APISpec {
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	return &thisSpec
+	return thisSpec
 }
 
 func BuildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver tykcommon.MiddlewareDriver) http.Handler {

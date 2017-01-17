@@ -203,7 +203,7 @@ func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData int
 	}
 }
 
-func (s APISpec) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
+func (s *APISpec) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
 
 	log.Debug("EVENT FIRED: ", eventName)
 	handlers, handlerExists := s.EventPaths[eventName]

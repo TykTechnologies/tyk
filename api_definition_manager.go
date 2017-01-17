@@ -148,8 +148,8 @@ var ServiceNonce string
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) APISpec {
-	newAppSpec := APISpec{}
+func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) *APISpec {
+	newAppSpec := &APISpec{}
 	newAppSpec.APIDefinition = thisAppConfig
 
 	// We'll push the default HealthChecker:
@@ -196,7 +196,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
-			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf, &newAppSpec)
+			thisEventHandlerInstance, getHandlerErr := GetEventHandlerByName(handlerConf, newAppSpec)
 
 			if getHandlerErr != nil {
 				log.Error("Failed to init event handler: ", getHandlerErr)
@@ -216,7 +216,7 @@ func (a *APIDefinitionLoader) MakeSpec(thisAppConfig tykcommon.APIDefinition) AP
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, &newAppSpec)
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, newAppSpec)
 
 		} else {
 			log.Warning("Legacy path detected! Upgrade to extended.")
@@ -345,7 +345,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	// Process
 	for _, thisAppConfig := range APIDefinitions {
 		newAppSpec := a.MakeSpec(thisAppConfig)
-		APISpecs = append(APISpecs, &newAppSpec)
+		APISpecs = append(APISpecs, newAppSpec)
 	}
 
 	// Set the nonce
@@ -414,7 +414,7 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*AP
 		}
 
 		newAppSpec := a.MakeSpec(thisAppConfig)
-		APISpecs = append(APISpecs, &newAppSpec)
+		APISpecs = append(APISpecs, newAppSpec)
 	}
 
 	return &APISpecs
@@ -453,7 +453,7 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) *[]*APISpec {
 
 			thisAppConfig.RawData = thisRawConfig // Lets keep a copy for plugable modules
 			newAppSpec := a.MakeSpec(thisAppConfig)
-			APISpecs = append(APISpecs, &newAppSpec)
+			APISpecs = append(APISpecs, newAppSpec)
 
 		}
 	}

@@ -77,22 +77,22 @@ var oauthDefinition = `
 	}
 `
 
-func createOauthAppDefinition() APISpec {
+func createOauthAppDefinition() *APISpec {
 	return createDefinitionFromString(oauthDefinition)
 }
 
-func getOAuthChain(spec APISpec, Muxer *mux.Router) {
+func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(Muxer)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	addOAuthHandlers(&spec, Muxer, true)
+	addOAuthHandlers(spec, Muxer, true)
 	remote, _ := url.Parse("http://example.com/")
-	proxy := TykNewSingleHostReverseProxy(remote, &spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, &spec))
-	tykMiddleware := &TykMiddleware{&spec, proxy}
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	tykMiddleware := &TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware),
@@ -100,7 +100,7 @@ func getOAuthChain(spec APISpec, Muxer *mux.Router) {
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
-	//ApiSpecRegister[spec.APIID] = &spec
+	//ApiSpecRegister[spec.APIID] = spec
 	Muxer.Handle(spec.Proxy.ListenPath, chain)
 }
 
@@ -112,7 +112,7 @@ func MakeOAuthAPI() *APISpec {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := &[]*APISpec{&thisSpec}
+	specs := &[]*APISpec{thisSpec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
@@ -123,7 +123,7 @@ func MakeOAuthAPI() *APISpec {
 
 	log.Debug("OAUTH Test Reload complete")
 
-	return &thisSpec
+	return thisSpec
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
@@ -526,8 +526,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 
 	// thisSpec := createOauthAppDefinition()
 
-	sp := MakeOAuthAPI()
-	thisSpec := *sp
+	thisSpec := MakeOAuthAPI()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}

@@ -59,7 +59,7 @@ func MakeSampleAPI() *APISpec {
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := &[]*APISpec{&thisSpec}
+	specs := &[]*APISpec{thisSpec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
@@ -71,7 +71,7 @@ func MakeSampleAPI() *APISpec {
 	http.DefaultServeMux = newHttmMuxer
 	log.Debug("TEST Reload complete")
 
-	return &thisSpec
+	return thisSpec
 }
 
 type Success struct {
