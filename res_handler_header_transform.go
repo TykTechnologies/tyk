@@ -14,9 +14,7 @@ type RevProxyTransform struct {
 }
 
 type HeaderTransformOptions struct {
-	RevProxyTransform RevProxyTransform `mapstructure:"rev_proxy_header_cleanup" \
-	bson:"rev_proxy_header_cleanup" \
-	json:"rev_proxy_header_cleanup"`
+	RevProxyTransform RevProxyTransform `mapstructure:"rev_proxy_header_cleanup" bson:"rev_proxy_header_cleanup" json:"rev_proxy_header_cleanup"`
 }
 
 type HeaderTransform struct {

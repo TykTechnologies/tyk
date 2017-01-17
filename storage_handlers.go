@@ -501,7 +501,7 @@ func (r *RedisStorageManager) DeleteRawKeys(keys []string, prefix string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
 func (r *RedisStorageManager) StartPubSubHandler(channel string, callback func(redis.Message)) error {
-	psc := redis.PubSubConn{r.pool.Get()}
+	psc := redis.PubSubConn{Conn: r.pool.Get()}
 	psc.Subscribe(channel)
 	for {
 		switch v := psc.Receive().(type) {

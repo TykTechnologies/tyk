@@ -518,7 +518,9 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 		return errors.New("Redis connection failed")
 	}
 
-	psc := redis.PubSubConn{GetRelevantClusterReference(r.IsCache).RandomRedisHandle().Pool.Get()}
+	psc := redis.PubSubConn{
+		Conn: GetRelevantClusterReference(r.IsCache).RandomRedisHandle().Pool.Get(),
+	}
 	psc.Subscribe(channel)
 	for {
 		switch v := psc.Receive().(type) {
