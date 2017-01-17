@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-var DRLManager drl.DRL
+var DRLManager = &drl.DRL{}
 
 func SetupDRL() {
-	thisDRLManager := drl.DRL{}
+	thisDRLManager := &drl.DRL{}
 	thisDRLManager.Init()
 	thisDRLManager.ThisServerID = NodeID + "|" + HostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", thisDRLManager.ThisServerID)
