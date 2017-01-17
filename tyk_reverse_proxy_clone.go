@@ -204,7 +204,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.StructuredTargetList, spec, 0))
+				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0))
 				if lbErr != nil {
 					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
@@ -453,7 +453,7 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 	}
 
 	if IsWebsocket(req) {
-		wsTransport := &WSDialer{*thisTransport, rw, p.TLSClientConfig}
+		wsTransport := &WSDialer{thisTransport, rw, p.TLSClientConfig}
 		return wsTransport
 	}
 
