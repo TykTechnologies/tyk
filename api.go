@@ -617,8 +617,7 @@ func HandleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	var thisAPIIDList []tykcommon.APIDefinition
-	thisAPIIDList = make([]tykcommon.APIDefinition, len(*ApiSpecRegister))
+	thisAPIIDList := make([]*tykcommon.APIDefinition, len(*ApiSpecRegister))
 
 	c := 0
 	for _, apiSpec := range *ApiSpecRegister {
@@ -674,8 +673,8 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 	success := true
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
-	var newDef tykcommon.APIDefinition
-	err := decoder.Decode(&newDef)
+	newDef := &tykcommon.APIDefinition{}
+	err := decoder.Decode(newDef)
 	code := 200
 
 	if err != nil {
