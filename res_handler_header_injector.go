@@ -36,19 +36,10 @@ func (h HeaderInjector) New(c interface{}, spec *APISpec) (TykResponseHandler, e
 func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	// TODO: This should only target specific paths
 
-	// Uee the request status validator to see if it's in our response list
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := h.Spec.GetVersionData(req)
-	found, meta = h.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HeaderInjectedResponse)
+	found, meta := h.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HeaderInjectedResponse)
 
 	if found {
-		stat = StatusHeaderInjected
-	}
-
-	if stat == StatusHeaderInjected {
 		thisMeta := meta.(*tykcommon.HeaderInjectionMeta)
 
 		for _, dKey := range thisMeta.DeleteHeaders {

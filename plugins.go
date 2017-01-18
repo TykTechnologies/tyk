@@ -130,8 +130,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
-	var thisSessionState = SessionState{}
-	var authHeaderValue = ""
+	thisSessionState := SessionState{}
+	authHeaderValue := ""
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre {
@@ -332,23 +332,17 @@ func (j *JSVM) LoadTykJSApi() {
 
 			client := &http.Client{}
 
-			var d *string
+			var d string
 			if HRO.Body != "" {
-				d = &HRO.Body
-			} else {
-				if len(HRO.FormData) > 0 {
-					thisD := data.Encode()
-					d = &thisD
-				} else {
-					d = nil
-				}
-
+				d = HRO.Body
+			} else if len(HRO.FormData) > 0 {
+				d = data.Encode()
 			}
 
 			r, _ := http.NewRequest(HRO.Method, urlStr, nil)
 
-			if d != nil {
-				r, _ = http.NewRequest(HRO.Method, urlStr, bytes.NewBufferString(*d))
+			if d != "" {
+				r, _ = http.NewRequest(HRO.Method, urlStr, bytes.NewBufferString(d))
 			}
 
 			for k, v := range HRO.Headers {

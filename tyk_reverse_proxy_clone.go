@@ -395,17 +395,9 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 		return false, 0
 	}
 
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := spec.GetVersionData(req)
-	found, meta = spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HardTimeout)
+	found, meta := spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HardTimeout)
 	if found {
-		stat = StatusHardTimeout
-	}
-
-	if stat == StatusHardTimeout {
 		thisMeta := meta.(*int)
 		log.Debug("HARD TIMEOUT ENFORCED: ", *thisMeta)
 		return true, *thisMeta
@@ -419,17 +411,9 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 		return false, nil
 	}
 
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := spec.GetVersionData(req)
-	found, meta = spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, CircuitBreaker)
+	found, meta := spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, CircuitBreaker)
 	if found {
-		stat = StatusCircuitBreaker
-	}
-
-	if stat == StatusCircuitBreaker {
 		thisMeta := meta.(*ExtendedCircuitBreakerMeta)
 		log.Debug("CB Enforced for path: ", *thisMeta)
 		return true, thisMeta

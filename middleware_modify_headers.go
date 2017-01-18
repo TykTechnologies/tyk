@@ -134,12 +134,6 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-
-	// Uee the request status validator to see if it's in our cache list
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	vInfo, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
 
 	// Manage global headers first - remove
@@ -155,12 +149,8 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		t.iterateAddHeaders(vInfo.GlobalHeaders, r)
 	}
 
-	found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, HeaderInjected)
+	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, HeaderInjected)
 	if found {
-		stat = StatusHeaderInjected
-	}
-
-	if stat == StatusHeaderInjected {
 		thisMeta := meta.(*tykcommon.HeaderInjectionMeta)
 
 		for _, dKey := range thisMeta.DeleteHeaders {
