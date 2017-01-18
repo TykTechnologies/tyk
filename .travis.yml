@@ -1,9 +1,11 @@
 sudo: false
 language: go
 
-go:
-  - 1.6.x
-  - 1.7.x
+matrix:
+  include:
+    - go: 1.6.x
+      env: SKIP_LINT=true
+    - go: 1.7.x
 
 services:
   - redis-server
