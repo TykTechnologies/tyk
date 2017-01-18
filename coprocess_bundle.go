@@ -208,6 +208,9 @@ func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
 	default:
 		err = errors.New("unknown URL scheme")
 	}
+	if err != nil {
+		return Bundle{}, err
+	}
 
 	bundleData, err := thisGetter.Get()
 
@@ -246,6 +249,9 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) (e
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
 	var manifestData []byte
 	manifestData, err = ioutil.ReadFile(manifestPath)
+	if err != nil {
+		return err
+	}
 
 	err = json.Unmarshal(manifestData, &bundle.Manifest)
 
