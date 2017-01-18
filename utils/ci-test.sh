@@ -18,8 +18,12 @@ PKGS="$(go list ./... | grep -v /vendor/)"
 show go test -v $PKGS
 show go test -v -tags coprocess $PKGS
 
-show go vet -v $PKGS
-show go vet -v -tags coprocess $PKGS
+if [[ $SKIP_LINT ]]; then
+	echo "Skipping linting"
+else
+	show go vet -v $PKGS
+	show go vet -v -tags coprocess $PKGS
+fi
 
 GOFILES=$(find * -name '*.go' -not -path 'vendor/*')
 
