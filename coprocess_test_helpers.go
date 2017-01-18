@@ -170,7 +170,10 @@ func applyTestHooks(objectPtr unsafe.Pointer) {
 		}
 		object.Request.DeleteParams = []string{"remove"}
 	case "hook_test_bad_auth":
-		object.Request.ReturnOverrides = &coprocess.ReturnOverrides{403, "Key not authorised"}
+		object.Request.ReturnOverrides = &coprocess.ReturnOverrides{
+			ResponseCode:  403,
+			ResponseError: "Key not authorised",
+		}
 	case "hook_test_bad_auth_using_id_extractor":
 		break
 	case "hook_test_bad_auth_cp_error":

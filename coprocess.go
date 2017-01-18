@@ -77,16 +77,19 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 	var miniRequestObject *coprocess.MiniRequestObject
 
 	miniRequestObject = &coprocess.MiniRequestObject{
-		Headers:         ProtoMap(r.Header),
-		SetHeaders:      make(map[string]string, 0),
-		DeleteHeaders:   make([]string, 0),
-		Body:            string(originalBody),
-		Url:             r.URL.Path,
-		Params:          ProtoMap(r.URL.Query()),
-		AddParams:       make(map[string]string),
-		ExtendedParams:  ProtoMap(nil),
-		DeleteParams:    make([]string, 0),
-		ReturnOverrides: &coprocess.ReturnOverrides{-1, ""},
+		Headers:        ProtoMap(r.Header),
+		SetHeaders:     make(map[string]string, 0),
+		DeleteHeaders:  make([]string, 0),
+		Body:           string(originalBody),
+		Url:            r.URL.Path,
+		Params:         ProtoMap(r.URL.Query()),
+		AddParams:      make(map[string]string),
+		ExtendedParams: ProtoMap(nil),
+		DeleteParams:   make([]string, 0),
+		ReturnOverrides: &coprocess.ReturnOverrides{
+			ResponseCode:  -1,
+			ResponseError: "",
+		},
 	}
 
 	object = &coprocess.Object{
