@@ -187,8 +187,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				log.Debug("Cache enabled, but record not found")
 				// Pass through to proxy AND CACHE RESULT
 
-				reqVal := new(http.Response)
-
+				var reqVal *http.Response
 				if isVirtual {
 					log.Debug("This is a virtual function")
 					thisVP := VirtualEndpoint{TykMiddleware: m.TykMiddleware}

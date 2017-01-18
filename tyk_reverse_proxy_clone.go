@@ -445,10 +445,9 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
-	transport := p.Transport
 	// 1. Check if timeouts are set for this endpoint
 	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-	transport = GetTransport(timeout, rw, req, p)
+	transport := GetTransport(timeout, rw, req, p)
 
 	// Do this before we make a shallow copy
 	sessVal := context.Get(req, SessionData)

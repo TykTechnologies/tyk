@@ -1785,7 +1785,7 @@ func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
 	if osinErr != nil {
 		code = 500
 		errObj := APIErrorMessage{"error", "Delete failed"}
-		responseMessage, err = json.Marshal(&errObj)
+		responseMessage, _ = json.Marshal(&errObj)
 		return responseMessage, code
 	}
 

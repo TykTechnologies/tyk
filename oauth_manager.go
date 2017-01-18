@@ -162,7 +162,6 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 	if r.Method == "GET" || r.Method == "POST" {
 		// Extract client data and check
 		resp := o.Manager.HandleAuthorisation(r, false, "")
-		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
 		if resp.IsError {
 			log.Error("There was an error with the request")
 			log.Error(resp)
