@@ -49,19 +49,9 @@ func (t *TransformMiddleware) IsEnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-
-	// New request checker, more targetted, less likely to fail
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
-	found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Transformed)
+	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Transformed)
 	if found {
-		stat = StatusTransform
-	}
-
-	if stat == StatusTransform {
 		thisMeta := meta.(*TransformSpec)
 
 		// Read the body:

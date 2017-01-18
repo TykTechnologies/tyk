@@ -189,8 +189,7 @@ func decrypt(key []byte, cryptoText string) string {
 }
 
 func rightPad2Len(s string, padStr string, overallLen int) string {
-	var padCountInt int
-	padCountInt = 1 + ((overallLen - len(padStr)) / len(padStr))
-	var retStr = s + strings.Repeat(padStr, padCountInt)
+	padCountInt := 1 + ((overallLen - len(padStr)) / len(padStr))
+	retStr := s + strings.Repeat(padStr, padCountInt)
 	return retStr[:overallLen]
 }

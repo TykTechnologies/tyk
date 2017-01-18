@@ -193,20 +193,9 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	// Uee the request status validator to see if it's in our cache list
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
-	found, meta = m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
+	found, meta := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
 	if found {
-		stat = StatusURLRewrite
-	}
-
-	log.Debug("Rewriter started, stat was: ", stat)
-
-	if stat == StatusURLRewrite {
 		log.Debug("Rewriter active")
 		thisMeta := meta.(*tykcommon.URLRewriteMeta)
 		log.Debug(r.URL)

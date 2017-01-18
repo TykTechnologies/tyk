@@ -116,22 +116,10 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 }
 
 func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
-
-	// Check if we are even using this MW
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := d.TykMiddleware.Spec.GetVersionData(r)
-	found, meta = d.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+	found, meta := d.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
 
-	if found {
-		stat = StatusVirtualPath
-	} else {
-		return nil
-	}
-
-	if stat != StatusVirtualPath {
+	if !found {
 		return nil
 	}
 

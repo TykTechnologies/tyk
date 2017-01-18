@@ -81,10 +81,6 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 // RequestSizeLimit will check a request for maximum request size, this can be a global limit or a matched limit.
 func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	log.Debug("Request size limiter active")
-	// Uee the request status validator to see if it's in our cache list
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
 
 	vInfo, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
 
@@ -105,12 +101,8 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	}
 
 	// If there's a potential match, try to match
-	found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestSizeLimit)
+	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestSizeLimit)
 	if found {
-		stat = StatusRequestSizeControlled
-	}
-
-	if stat == StatusRequestSizeControlled {
 		log.Debug("Request size limit matched for this URL, checking...")
 		thisMeta := meta.(*tykcommon.RequestSizeMeta)
 

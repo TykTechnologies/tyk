@@ -41,18 +41,9 @@ func (rt ResponseTransformMiddleware) New(c interface{}, spec *APISpec) (TykResp
 }
 
 func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
-	// New request checker, more targetted, less likely to fail
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := rt.Spec.GetVersionData(req)
-	found, meta = rt.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, TransformedResponse)
+	found, meta := rt.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, TransformedResponse)
 	if found {
-		stat = StatusTransformResponse
-	}
-
-	if stat == StatusTransformResponse {
 		thisMeta := meta.(*TransformSpec)
 
 		// Read the body:

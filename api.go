@@ -278,14 +278,11 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		}
 	}
 
-	var action string
-	var event tykcommon.TykEvent
+	action := "modified"
+	event := EVENT_TokenUpdated
 	if r.Method == "POST" {
 		action = "added"
 		event = EVENT_TokenCreated
-	} else {
-		action = "modified"
-		event = EVENT_TokenUpdated
 	}
 
 	if success {

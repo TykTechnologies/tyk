@@ -358,12 +358,11 @@ func (r *RedisStorageManager) GetKeysAndValuesWithFilter(filter string) map[stri
 		valueObj, err := db.Do("MGET", sessionsInterface.([]interface{})...)
 		values, err := redis.Strings(valueObj, err)
 
-		returnValues := make(map[string]string)
+		m := make(map[string]string)
 		for i, v := range keys {
-			returnValues[r.cleanKey(v)] = values[i]
+			m[r.cleanKey(v)] = values[i]
 		}
-
-		return returnValues
+		return m
 	}
 
 	return map[string]string{}
@@ -390,12 +389,11 @@ func (r *RedisStorageManager) GetKeysAndValues() map[string]string {
 		valueObj, err := db.Do("MGET", sessionsInterface.([]interface{})...)
 		values, err := redis.Strings(valueObj, err)
 
-		returnValues := make(map[string]string)
+		m := make(map[string]string)
 		for i, v := range keys {
-			returnValues[r.cleanKey(v)] = values[i]
+			m[r.cleanKey(v)] = values[i]
 		}
-
-		return returnValues
+		return m
 	}
 
 	return map[string]string{}

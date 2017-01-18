@@ -39,18 +39,9 @@ func (t *TransformMethod) IsEnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	// Uee the request status validator to see if it's in our cache list
-	var stat RequestStatus
-	var meta interface{}
-	var found bool
-
 	_, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
-	found, meta = t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, MethodTransformed)
+	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, MethodTransformed)
 	if found {
-		stat = StatusMethodTransformed
-	}
-
-	if stat == StatusMethodTransformed {
 		thisMeta := meta.(*tykcommon.MethodTransformMeta)
 
 		switch strings.ToUpper(thisMeta.ToMethod) {

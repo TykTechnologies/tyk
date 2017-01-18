@@ -189,24 +189,22 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 
 // createSampleSession is a debug function to create a mock session value
 func createSampleSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 5.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 8.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = 10
-
-	simpleDef := AccessDefinition{
-		APIName:  "Test",
-		APIID:    "1",
-		Versions: []string{"Default"},
+	return SessionState{
+		Rate:             5.0,
+		Allowance:        5.0,
+		LastCheck:        time.Now().Unix(),
+		Per:              8.0,
+		Expires:          0,
+		QuotaRenewalRate: 300, // 5 minutes
+		QuotaRenews:      time.Now().Unix(),
+		QuotaRemaining:   10,
+		QuotaMax:         10,
+		AccessRights: map[string]AccessDefinition{
+			"1": {
+				APIName:  "Test",
+				APIID:    "1",
+				Versions: []string{"Default"},
+			},
+		},
 	}
-	thisSession.AccessRights = map[string]AccessDefinition{}
-	thisSession.AccessRights["1"] = simpleDef
-
-	return thisSession
 }

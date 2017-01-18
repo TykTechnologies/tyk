@@ -319,12 +319,11 @@ func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) m
 		valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
 		values, err := redis.Strings(valueObj, err)
 
-		returnValues := make(map[string]string)
+		m := make(map[string]string)
 		for i, v := range keys {
-			returnValues[r.cleanKey(v)] = values[i]
+			m[r.cleanKey(v)] = values[i]
 		}
-
-		return returnValues
+		return m
 	}
 
 	return map[string]string{}
@@ -350,12 +349,11 @@ func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
 		valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
 		values, err := redis.Strings(valueObj, err)
 
-		returnValues := make(map[string]string)
+		m := make(map[string]string)
 		for i, v := range keys {
-			returnValues[r.cleanKey(v)] = values[i]
+			m[r.cleanKey(v)] = values[i]
 		}
-
-		return returnValues
+		return m
 	}
 
 	return map[string]string{}
