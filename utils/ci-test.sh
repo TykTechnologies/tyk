@@ -1,31 +1,42 @@
 #!/bin/bash
 
+# SKIP_LINT=true - only run the tests
+
 set -e
+
+MATRIX=(
+	""
+	"-tags coprocess"
+)
 
 # print a command and execute it
 show() {
-	echo "$@"
+	echo "$@" >&2
 	eval "$@"
 }
 
 fatal() {
-	echo "$@"
+	echo "$@" >&2
 	exit 1
 }
 
 PKGS="$(go list ./... | grep -v /vendor/)"
 
-show go test -v $PKGS
-show go test -v -tags coprocess $PKGS
+for opts in "${MATRIX[@]}"; do
+	show go test -v $opts $PKGS
+done
 
 if [[ $SKIP_LINT ]]; then
 	echo "Skipping linting"
 	exit 0
 fi
 
-show go vet -v $PKGS
-show go vet -v -tags coprocess $PKGS
+for opts in "${MATRIX[@]}"; do
+	show go vet -v $opts $PKGS
+done
 
+# Includes all top-level files and dirs that don't start with a dot
+# (hidden). Also excludes all of vendor/.
 GOFILES=$(find * -name '*.go' -not -path 'vendor/*')
 
 FMT_FILES="$(gofmt -s -l $GOFILES)"
