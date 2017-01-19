@@ -9,7 +9,6 @@ matrix:
 
 services:
   - redis-server
-  - mongodb
 
 install:
   - go install -v ./...
