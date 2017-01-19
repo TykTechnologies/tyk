@@ -16,7 +16,7 @@ func (d DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // DEFUNCT
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
-func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) func(http.ResponseWriter, *http.Request) {
+func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		tm := TykMiddleware{apiSpec, p}

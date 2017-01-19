@@ -47,7 +47,7 @@ func SetupInstrumentation(enabled bool) {
 }
 
 // InstrumentationMW will set basic instrumentation events, variables and timers on API jobs
-func InstrumentationMW(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+func InstrumentationMW(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		job := instrument.NewJob("SystemAPICall")
 
