@@ -774,7 +774,12 @@ func HandleDeleteAPI(APIID string) ([]byte, int) {
 }
 
 func apiHandler(w http.ResponseWriter, r *http.Request) {
-	APIID := r.URL.Path[len("/tyk/apis/"):]
+	var APIID string
+
+	if r.URL.Path != "/tyk/apis" {
+		APIID = r.URL.Path[len("/tyk/apis/"):]
+	}
+
 	var responseMessage []byte
 	var code int
 
