@@ -345,7 +345,7 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 // correct security credentials - this is a shared secret between the
 // client and the owner and is set in the tyk.conf file. This should
 // never be made public!
-func CheckIsAPIOwner(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+func CheckIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
 		if tykAuthKey != config.Secret {

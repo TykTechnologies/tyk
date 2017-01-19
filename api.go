@@ -1945,7 +1945,7 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	DoJSONWrite(w, code, responseMessage)
 }
 
-func UserRatesCheck() func(http.ResponseWriter, *http.Request) {
+func UserRatesCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := 200
 
