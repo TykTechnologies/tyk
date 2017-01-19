@@ -123,36 +123,39 @@ func TestHealthCheckEndpoint(t *testing.T) {
 }
 
 func TestApiHandler(t *testing.T) {
-	uri := "/tyk/apis/"
-	method := "GET"
-	sampleKey := createSampleSession()
-	body, _ := json.Marshal(&sampleKey)
+	uris := []string{"/tyk/apis/", "/tyk/apis"}
 
-	recorder := httptest.NewRecorder()
-	param := make(url.Values)
+	for _, uri := range uris {
+		method := "GET"
+		sampleKey := createSampleSession()
+		body, _ := json.Marshal(&sampleKey)
 
-	MakeSampleAPI()
+		recorder := httptest.NewRecorder()
+		param := make(url.Values)
 
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+		MakeSampleAPI()
 
-	if err != nil {
-		t.Fatal(err)
-	}
+		req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
-	apiHandler(recorder, req)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// We can't deserialize BSON ObjectID's if they are not in th test base!
-	var ApiList []testAPIDefinition
-	err = json.Unmarshal([]byte(recorder.Body.String()), &ApiList)
+		apiHandler(recorder, req)
 
-	if err != nil {
-		t.Error("Could not unmarshal API List:\n", err, recorder.Body.String())
-	} else {
-		if len(ApiList) != 1 {
-			t.Error("API's not returned, len was: \n", len(ApiList), recorder.Body.String())
+		// We can't deserialize BSON ObjectID's if they are not in th test base!
+		var ApiList []testAPIDefinition
+		err = json.Unmarshal([]byte(recorder.Body.String()), &ApiList)
+
+		if err != nil {
+			t.Error("Could not unmarshal API List:\n", err, recorder.Body.String(), uri)
 		} else {
-			if ApiList[0].APIID != "1" {
-				t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
+			if len(ApiList) != 1 {
+				t.Error("API's not returned, len was: \n", len(ApiList), recorder.Body.String(), uri)
+			} else {
+				if ApiList[0].APIID != "1" {
+					t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String(), uri)
+				}
 			}
 		}
 	}
