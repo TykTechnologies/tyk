@@ -146,7 +146,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var stat RequestStatus
 	var isVirtual bool
 	// Only allow idempotent (safe) methods
-	if r.Method == "GET" || r.Method == "OPTIONS" || r.Method == "HEAD" {
+	if r.Method == "GET" || r.Method == "HEAD" {
 		// Lets see if we can throw a sledgehammer at this
 		if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
 			stat = StatusCached
