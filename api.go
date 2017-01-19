@@ -784,7 +784,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	var code int
 
 	log.Debug(r.Method)
-	if r.Method == "GET" {
+	switch r.Method {
+	case "GET":
 		if APIID != "" {
 			log.Debug("Requesting API definition for", APIID)
 			responseMessage, code = HandleGetAPI(APIID)
@@ -792,14 +793,13 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debug("Requesting API list")
 			responseMessage, code = HandleGetAPIList()
 		}
-
-	} else if r.Method == "POST" {
+	case "POST":
 		log.Debug("Creating new definition file")
 		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
-	} else if r.Method == "PUT" {
+	case "PUT":
 		log.Debug("Updating existing API: ", APIID)
 		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
-	} else if r.Method == "DELETE" {
+	case "DELETE":
 		log.Debug("Deleting existing API: ", APIID)
 		if APIID != "" {
 			log.Debug("Deleting API definition for: ", APIID)
@@ -808,7 +808,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 			code = 400
 			responseMessage = createError("Must specify an APIID to delete")
 		}
-	} else {
+	default:
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
@@ -824,10 +824,11 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
 
-	if r.Method == "POST" || r.Method == "PUT" {
+	switch r.Method {
+	case "POST", "PUT":
 		responseMessage, code = handleAddOrUpdate(keyName, r)
 
-	} else if r.Method == "GET" {
+	case "GET":
 		if keyName != "" {
 			// Return single key detail
 			responseMessage, code = handleGetDetail(keyName, APIID)
@@ -836,7 +837,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, code = handleGetAllKeys(filter, APIID)
 		}
 
-	} else if r.Method == "DELETE" {
+	case "DELETE":
 		hashed := r.FormValue("hashed")
 		// Remove a key
 		if hashed == "" {
@@ -845,7 +846,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, code = handleDeleteHashedKey(keyName, APIID)
 		}
 
-	} else {
+	default:
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
@@ -993,10 +994,11 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
 
-	if r.Method == "POST" || r.Method == "PUT" {
+	switch r.Method {
+	case "POST", "PUT":
 		responseMessage, code = handleOrgAddOrUpdate(keyName, r)
 
-	} else if r.Method == "GET" {
+	case "GET":
 
 		if keyName != "" {
 			// Return single org detail
@@ -1006,11 +1008,11 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 			responseMessage, code = handleGetAllOrgKeys(filter, "")
 		}
 
-	} else if r.Method == "DELETE" {
+	case "DELETE":
 		// Remove a key
 		responseMessage, code = handleDeleteOrgKey(keyName)
 
-	} else {
+	default:
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
@@ -1675,7 +1677,8 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method == "GET" {
+	switch r.Method {
+	case "GET":
 		if keyName != "" {
 			// Return single client detail
 			responseMessage, code = getOauthClientDetails(keyName, apiID)
@@ -1683,12 +1686,10 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 			// Return list of keys
 			responseMessage, code = getOauthClients(apiID)
 		}
-
-	} else if r.Method == "DELETE" {
+	case "DELETE":
 		// Remove a key
 		responseMessage, code = handleDeleteOAuthClient(keyName, apiID)
-
-	} else {
+	default:
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")

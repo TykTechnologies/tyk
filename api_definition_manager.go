@@ -1033,14 +1033,15 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
-	if a.APIDefinition.VersionDefinition.Location == "header" {
+	switch a.APIDefinition.VersionDefinition.Location {
+	case "header":
 		versionHeaderVal := r.Header.Get(a.APIDefinition.VersionDefinition.Key)
 		if versionHeaderVal != "" {
 			return versionHeaderVal
 		}
 		return ""
 
-	} else if a.APIDefinition.VersionDefinition.Location == "url-param" {
+	case "url-param":
 		tempRes := CopyRequest(r)
 		fromParam := tempRes.FormValue(a.APIDefinition.VersionDefinition.Key)
 		if fromParam != "" {
@@ -1048,7 +1049,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		}
 		return ""
 
-	} else if a.APIDefinition.VersionDefinition.Location == "url" {
+	case "url":
 		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
 		if len(url) == 0 {
 			return ""
