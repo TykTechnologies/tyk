@@ -141,12 +141,8 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 }
 
 func stripSignature(token string) string {
-	if strings.HasPrefix(token, "Signature") {
-		token = strings.Replace(token, "Signature", "", 1)
-	}
-	if strings.HasPrefix(token, "signature") {
-		token = strings.Replace(token, "signature", "", 1)
-	}
+	token = strings.TrimPrefix(token, "Signature")
+	token = strings.TrimPrefix(token, "signature")
 	return strings.TrimSpace(token)
 }
 
