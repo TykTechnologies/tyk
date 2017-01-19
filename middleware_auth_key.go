@@ -1,12 +1,12 @@
 package main
 
-import "net/http"
-
 import (
 	"bytes"
 	"errors"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"strings"
 
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"
@@ -150,6 +150,12 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	return nil, 200
+}
+
+func stripBearer(token string) string {
+	token = strings.Replace(token, "Bearer", "", 1)
+	token = strings.Replace(token, "bearer", "", 1)
+	return strings.TrimSpace(token)
 }
 
 func AuthFailed(m *TykMiddleware, r *http.Request, authHeaderValue string) {

@@ -140,6 +140,16 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 }
 
+func stripSignature(token string) string {
+	if strings.HasPrefix(token, "Signature") {
+		token = strings.Replace(token, "Signature", "", 1)
+	}
+	if strings.HasPrefix(token, "signature") {
+		token = strings.Replace(token, "signature", "", 1)
+	}
+	return strings.TrimSpace(token)
+}
+
 func (hm *HMACMiddleware) hasLowerCaseEscaped(signature string) (bool, []string) {
 	foundList := hm.lowercasePattern.FindAllString(signature, -1)
 	if len(foundList) > 0 {
