@@ -356,19 +356,20 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 	// Verify the token
 	token, err := jwt.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
-		if k.TykMiddleware.Spec.JWTSigningMethod == "hmac" {
+		switch k.TykMiddleware.Spec.JWTSigningMethod {
+		case "hmac":
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-		} else if k.TykMiddleware.Spec.JWTSigningMethod == "rsa" {
+		case "rsa":
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-		} else if k.TykMiddleware.Spec.JWTSigningMethod == "ecdsa" {
+		case "ecdsa":
 			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-		} else {
+		default:
 			log.Warning("No signing method found in API Definition, defaulting to HMAC")
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
