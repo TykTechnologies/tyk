@@ -38,9 +38,9 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 403
 	}
 
-	thisSessionState := sess.(SessionState)
+	sessionState := sess.(SessionState)
 
-	if thisSessionState.IsInactive {
+	if sessionState.IsInactive {
 		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -63,7 +63,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		return errors.New("Key is inactive, please renew"), 403
 	}
 
-	keyExpired := k.Spec.AuthManager.IsKeyExpired(&thisSessionState)
+	keyExpired := k.Spec.AuthManager.IsKeyExpired(&sessionState)
 
 	if keyExpired {
 		authHeaderValue := context.Get(r, AuthHeaderValue).(string)

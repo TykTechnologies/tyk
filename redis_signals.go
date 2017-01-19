@@ -39,8 +39,8 @@ func StartPubSubLoop() {
 }
 
 func HandleRedisMsg(message redis.Message) {
-	thisMessage := Notification{}
-	if err := json.Unmarshal(message.Data, &thisMessage); err != nil {
+	notif := Notification{}
+	if err := json.Unmarshal(message.Data, &notif); err != nil {
 		log.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
@@ -51,32 +51,32 @@ func HandleRedisMsg(message redis.Message) {
 	}
 
 	// Don't react to all messages
-	_, ignore := ignoreMessageList[thisMessage.Command]
+	_, ignore := ignoreMessageList[notif.Command]
 	if ignore {
 		return
 	}
 
 	// Check for a signature, if not signature found, handle
-	if !IsPayloadSignatureValid(thisMessage) {
+	if !IsPayloadSignatureValid(notif) {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Error("Payload signature is invalid!")
 		return
 	}
 
-	switch thisMessage.Command {
+	switch notif.Command {
 	case NoticeDashboardZeroConf:
-		HandleDashboardZeroConfMessage(thisMessage.Payload)
+		HandleDashboardZeroConfMessage(notif.Payload)
 		break
 	case NoticeConfigUpdate:
-		HandleNewConfiguration(thisMessage.Payload)
+		HandleNewConfiguration(notif.Payload)
 		break
 	case NoticeDashboardConfigRequest:
-		HandleSendMiniConfig(thisMessage.Payload)
+		HandleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		OnServerStatusReceivedHandler(thisMessage.Payload)
+		OnServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
-		OnLESSLStatusReceivedHandler(thisMessage.Payload)
+		OnLESSLStatusReceivedHandler(notif.Payload)
 	default:
 		HandleReloadMsg()
 		break

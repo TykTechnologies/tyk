@@ -105,8 +105,8 @@ func (h *HTTPDashboardHandler) Register() error {
 		return err
 	}
 
-	thisVal := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &thisVal)
+	val := NodeResponseOK{}
+	decErr := json.Unmarshal(retBody, &val)
 	if decErr != nil {
 		log.Error("Failed to decode body: ", decErr)
 		return decErr
@@ -114,7 +114,7 @@ func (h *HTTPDashboardHandler) Register() error {
 
 	// Set the NodeID
 	var found bool
-	NodeID, found = thisVal.Message["NodeID"]
+	NodeID, found = val.Message["NodeID"]
 	if !found {
 		log.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
@@ -127,7 +127,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	}).Info("Node registered")
 
 	// Set the nonce
-	ServiceNonce = thisVal.Nonce
+	ServiceNonce = val.Nonce
 	log.Debug("Registration Finished: Nonce Set: ", ServiceNonce)
 
 	return nil
@@ -183,15 +183,15 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 		return err
 	}
 
-	thisVal := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &thisVal)
+	val := NodeResponseOK{}
+	decErr := json.Unmarshal(retBody, &val)
 	if decErr != nil {
 		log.Error("Failed to decode body: ", decErr)
 		return decErr
 	}
 
 	// Set the nonce
-	ServiceNonce = thisVal.Nonce
+	ServiceNonce = val.Nonce
 	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
 
 	return nil
@@ -239,15 +239,15 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 		return err
 	}
 
-	thisVal := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &thisVal)
+	val := NodeResponseOK{}
+	decErr := json.Unmarshal(retBody, &val)
 	if decErr != nil {
 		log.Error("Failed to decode body: ", decErr)
 		return decErr
 	}
 
 	// Set the nonce
-	ServiceNonce = thisVal.Nonce
+	ServiceNonce = val.Nonce
 	log.Info("De-registered.")
 
 	return nil

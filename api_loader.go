@@ -103,9 +103,9 @@ func generateListenPathMap(APISpecs *[]*APISpec) {
 		domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
 		val, ok := ListenPathMap.Get(domainHash)
 		if ok {
-			thisVal := val.(int)
-			thisVal++
-			ListenPathMap.Set(domainHash, thisVal)
+			intVal := val.(int)
+			intVal++
+			ListenPathMap.Set(domainHash, intVal)
 		} else {
 			ListenPathMap.Set(domainHash, 1)
 			dN := referenceSpec.Domain
@@ -132,8 +132,8 @@ func processSpec(referenceSpec *APISpec,
 	rpcOrgStore *RPCStorageHandler,
 	subrouter *mux.Router) *ChainObject {
 
-	var thisChainDefinition = ChainObject{}
-	thisChainDefinition.Subrouter = subrouter
+	var chainDef = ChainObject{}
+	chainDef.Subrouter = subrouter
 
 	log.WithFields(logrus.Fields{
 		"prefix":   "main",
@@ -145,14 +145,14 @@ func processSpec(referenceSpec *APISpec,
 			"prefix":   "main",
 			"api_name": referenceSpec.APIDefinition.Name,
 		}).Warning("Skipped!")
-		thisChainDefinition.Skip = true
-		return &thisChainDefinition
+		chainDef.Skip = true
+		return &chainDef
 	}
 
 	// Set up LB targets:
 	if referenceSpec.Proxy.EnableLoadBalancing {
-		thisSL := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
-		referenceSpec.Proxy.StructuredTargetList = thisSL
+		sl := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
+		referenceSpec.Proxy.StructuredTargetList = sl
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
@@ -170,13 +170,13 @@ func processSpec(referenceSpec *APISpec,
 		authStore = redisStore
 		orgStore = redisOrgStore
 	case LDAPStorageEngine:
-		thisStorageEngine := LDAPStorageHandler{}
-		thisStorageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
-		authStore = &thisStorageEngine
+		storageEngine := LDAPStorageHandler{}
+		storageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
+		authStore = &storageEngine
 		orgStore = redisOrgStore
 	case RPCStorageEngine:
-		thisStorageEngine := rpcAuthStore // &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-		authStore = thisStorageEngine
+		storageEngine := rpcAuthStore // &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		authStore = storageEngine
 		orgStore = rpcOrgStore // &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 		config.EnforceOrgDataAge = true
 
@@ -241,10 +241,10 @@ func processSpec(referenceSpec *APISpec,
 	if referenceSpec.UseOauth2 {
 		log.Debug("Loading OAuth Manager")
 		if !RPC_EmergencyMode {
-			thisOauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
+			oauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
 			log.Debug("-- Added OAuth Handlers")
 
-			referenceSpec.OAuthManager = thisOauthManager
+			referenceSpec.OAuthManager = oauthManager
 			log.Debug("Done loading OAuth Manager")
 		} else {
 			log.Warning("RPC Emergency mode detected! OAuth APIs will not function!")
@@ -292,7 +292,7 @@ func processSpec(referenceSpec *APISpec,
 	var chain http.Handler
 
 	if referenceSpec.APIDefinition.UseKeylessAccess {
-		thisChainDefinition.Open = true
+		chainDef.Open = true
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": referenceSpec.APIDefinition.Name,
@@ -539,8 +539,8 @@ func processSpec(referenceSpec *APISpec,
 			"api_name": referenceSpec.APIDefinition.Name,
 		}).Debug("Rate limit endpoint is: ", rateLimitPath)
 		//subrouter.Handle(rateLimitPath, simpleChain)
-		thisChainDefinition.RateLimitPath = rateLimitPath
-		thisChainDefinition.RateLimitChain = simpleChain
+		chainDef.RateLimitPath = rateLimitPath
+		chainDef.RateLimitChain = simpleChain
 	}
 
 	log.WithFields(logrus.Fields{
@@ -549,12 +549,12 @@ func processSpec(referenceSpec *APISpec,
 	}).Debug("Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 	//subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 
-	thisChainDefinition.ThisHandler = chain
-	thisChainDefinition.ListenOn = referenceSpec.Proxy.ListenPath + "{rest:.*}"
+	chainDef.ThisHandler = chain
+	chainDef.ListenOn = referenceSpec.Proxy.ListenPath + "{rest:.*}"
 
 	notifyAPILoaded(referenceSpec)
 
-	return &thisChainDefinition
+	return &chainDef
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -600,9 +600,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 				subrouter = Muxer
 			}
 
-			thisChainObject := processSpec(referenceSpec, Muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
-			thisChainObject.Index = i
-			chChan <- thisChainObject
+			chainObj := processSpec(referenceSpec, Muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
+			chainObj.Index = i
+			chChan <- chainObj
 		}(chainChannel, referenceSpec, i, subrouter)
 
 		// TODO: This will not deal with skipped APis well
@@ -610,8 +610,8 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	}
 
 	go func() {
-		for thisCHObj := range chainChannel {
-			loadList[thisCHObj.Index] = thisCHObj
+		for chObj := range chainChannel {
+			loadList[chObj.Index] = chObj
 		}
 	}()
 
@@ -619,16 +619,16 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 	time.Sleep(1 * time.Second)
 
-	for _, thisChainObject := range loadList {
-		if !thisChainObject.Skip {
-			if !thisChainObject.Open {
-				thisChainObject.Subrouter.Handle(thisChainObject.RateLimitPath, thisChainObject.RateLimitChain)
+	for _, chainObj := range loadList {
+		if !chainObj.Skip {
+			if !chainObj.Open {
+				chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
 			}
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Info("Processed and listening on: ", thisChainObject.ListenOn)
-			thisChainObject.Subrouter.Handle(thisChainObject.ListenOn, thisChainObject.ThisHandler)
+			}).Info("Processed and listening on: ", chainObj.ListenOn)
+			chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 		}
 	}
 

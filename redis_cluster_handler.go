@@ -68,7 +68,7 @@ func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisC
 		log.Info("--> Using clustered mode")
 	}
 
-	thisPoolConf := rediscluster.PoolConfig{
+	poolConf := rediscluster.PoolConfig{
 		MaxIdle:     maxIdle,
 		MaxActive:   maxActive,
 		IdleTimeout: 240 * time.Second,
@@ -87,11 +87,8 @@ func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisC
 		seed_redii = append(seed_redii, map[string]string{cfg.Host: strconv.Itoa(cfg.Port)})
 	}
 
-	thisInstance := rediscluster.NewRedisCluster(seed_redii, thisPoolConf, false)
-
-	redisPtr = &thisInstance
-
-	return &thisInstance
+	cluster := rediscluster.NewRedisCluster(seed_redii, poolConf, false)
+	return &cluster
 }
 
 // Connect will establish a connection to the GetRelevantClusterReference(r.IsCache)

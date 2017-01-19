@@ -60,18 +60,18 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 		i := 0
 		for clientID, policyID := range provider.ClientIDs {
 			clID, _ := b64.StdEncoding.DecodeString(clientID)
-			thisClientID := string(clID)
+			clientID := string(clID)
 
 			k.lock.Lock()
 			if k.provider_client_policymap[iss] == nil {
-				k.provider_client_policymap[iss] = map[string]string{thisClientID: policyID}
+				k.provider_client_policymap[iss] = map[string]string{clientID: policyID}
 			} else {
-				k.provider_client_policymap[iss][thisClientID] = policyID
+				k.provider_client_policymap[iss][clientID] = policyID
 			}
 			k.lock.Unlock()
 
-			log.Debug("--> Setting up client: ", thisClientID, " with policy: ", policyID)
-			providerClientArray[i] = thisClientID
+			log.Debug("--> Setting up client: ", clientID, " with policy: ", policyID)
+			providerClientArray[i] = clientID
 			i++
 		}
 
@@ -138,20 +138,20 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	}
 
 	policyID := ""
-	thisClientID := ""
+	clientID := ""
 	switch v := clients.(type) {
 	case string:
 		k.lock.RLock()
 		policyID = clientSet[v]
 		k.lock.RUnlock()
-		thisClientID = v
+		clientID = v
 	case []interface{}:
 		for _, audVal := range v {
 			k.lock.RLock()
 			policy, foundPolicy := clientSet[audVal.(string)]
 			k.lock.RUnlock()
 			if foundPolicy {
-				thisClientID = audVal.(string)
+				clientID = audVal.(string)
 				policyID = policy
 				break
 			}
@@ -171,17 +171,17 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	SessionID := k.TykMiddleware.Spec.OrgID + tokenID
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
-		log.Debug("Client ID:", thisClientID)
-		SessionID = k.TykMiddleware.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(thisClientID))) + tokenID
+		log.Debug("Client ID:", clientID)
+		SessionID = k.TykMiddleware.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(clientID))) + tokenID
 	}
 
 	log.Debug("Generated Session ID: ", SessionID)
 
-	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
-	if !keyExists {
+	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
-		thisSessionState = SessionState{}
+		sessionState = SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		newSessionState, err := generateSessionFromPolicy(policyID,
@@ -196,19 +196,19 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 			return errors.New("Key not authorized: no matching policy"), 403
 		}
 
-		thisSessionState = newSessionState
-		thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID, "ClientID": thisClientID}
-		thisSessionState.Alias = thisClientID + ":" + user.ID
+		sessionState = newSessionState
+		sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID, "ClientID": clientID}
+		sessionState.Alias = clientID + ":" + user.ID
 
 		// Update the session in the session manager in case it gets called again
-		k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
+		k.Spec.SessionManager.UpdateSession(SessionID, sessionState, GetLifetime(k.Spec, &sessionState))
 		log.Debug("Policy applied to key")
 
 	}
 
 	// 4. Set session state on context, we will need it later
 	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.OIDCUser) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
-		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, SessionID)
 	}
 	k.setContextVars(r, token)
@@ -239,8 +239,8 @@ func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
 			claimPrefix := "jwt_claims_"
 
 			for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
-				thisClaim := claimPrefix + claimName
-				contextDataObject[thisClaim] = claimValue
+				claim := claimPrefix + claimName
+				contextDataObject[claim] = claimValue
 			}
 
 			// Key data

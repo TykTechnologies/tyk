@@ -48,14 +48,14 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 	mw.New()
 
 	// Pull the configuration
-	thisMwConfiguration, confErr := mw.GetConfig()
+	mwConf, confErr := mw.GetConfig()
 
 	if confErr != nil {
 		log.Fatal("[Middleware] Configuration load failed")
 	}
 
 	aliceHandler := func(h http.Handler) http.Handler {
-		thisHandler := func(w http.ResponseWriter, r *http.Request) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
 				"from_ip":  fmt.Sprint(r.RemoteAddr),
@@ -73,7 +73,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 			if (tykMwSuper.Spec.CORS.OptionsPassthrough) && (r.Method == "OPTIONS") {
 				h.ServeHTTP(w, r)
 			} else {
-				reqErr, errCode := mw.ProcessRequest(w, r, thisMwConfiguration)
+				reqErr, errCode := mw.ProcessRequest(w, r, mwConf)
 				if reqErr != nil {
 					handler := ErrorHandler{tykMwSuper}
 					handler.HandleError(w, r, reqErr.Error(), errCode)
@@ -106,7 +106,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 
 		}
 
-		return http.HandlerFunc(thisHandler)
+		return http.HandlerFunc(handler)
 	}
 
 	return aliceHandler

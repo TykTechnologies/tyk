@@ -22,8 +22,8 @@ func (mw *MiddlewareContextVars) GetName() string {
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *MiddlewareContextVars) GetConfig() (interface{}, error) {
-	var thisModuleConfig MiddlewareContextVarsConfig
-	return thisModuleConfig, nil
+	var moduleConfig MiddlewareContextVarsConfig
+	return moduleConfig, nil
 }
 
 func (a *MiddlewareContextVars) IsEnabledForSpec() bool {

@@ -24,11 +24,9 @@ func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
 	// Extend to add new importers
 	switch source {
 	case ApiaryBluePrint:
-		thisBluePrint := &BluePrintAST{}
-		return thisBluePrint, nil
+		return &BluePrintAST{}, nil
 	case SwaggerSource:
-		thisSwaggerSource := &SwaggerAST{}
-		return thisSwaggerSource, nil
+		return &SwaggerAST{}, nil
 	default:
 		return nil, errors.New("source not matched, failing")
 	}
@@ -125,17 +123,17 @@ func (b *BluePrintAST) ReadString(asJson string) error {
 }
 
 func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, error) {
-	thisVersionInfo := tykcommon.VersionInfo{}
-	thisVersionInfo.UseExtendedPaths = true
-	thisVersionInfo.Name = b.Name
+	versionInfo := tykcommon.VersionInfo{}
+	versionInfo.UseExtendedPaths = true
+	versionInfo.Name = b.Name
 
 	if len(b.ResourceGroups) < 1 {
-		return thisVersionInfo, errors.New("There are no resource groups defined in this blueprint, are you sure it is correctly formatted?")
+		return versionInfo, errors.New("There are no resource groups defined in this blueprint, are you sure it is correctly formatted?")
 	}
 
 	for _, resourceGroup := range b.ResourceGroups {
 		if len(resourceGroup.Resources) < 1 {
-			return thisVersionInfo, errors.New("no resourcs defined in the resource group")
+			return versionInfo, errors.New("no resourcs defined in the resource group")
 		}
 
 		for _, resource := range resourceGroup.Resources {
@@ -146,43 +144,42 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 			for _, action := range resource.Actions {
 				if len(action.Examples) > 0 {
 					if len(action.Examples[0].Responses) > 0 {
-						thisEndPointMethodMeta := tykcommon.EndpointMethodMeta{}
+						endPointMethodMeta := tykcommon.EndpointMethodMeta{}
 						code, err := strconv.Atoi(action.Examples[0].Responses[0].Name)
 						if err != nil {
 							log.Warning("Could not genrate response code form Name field, using 200")
 							code = 200
 						}
-						thisEndPointMethodMeta.Code = code
+						endPointMethodMeta.Code = code
 
 						if asMock {
-							thisEndPointMethodMeta.Action = tykcommon.Reply
+							endPointMethodMeta.Action = tykcommon.Reply
 						} else {
-							thisEndPointMethodMeta.Action = tykcommon.NoAction
+							endPointMethodMeta.Action = tykcommon.NoAction
 						}
 
 						for _, h := range action.Examples[0].Responses[0].Headers {
-							thisEndPointMethodMeta.Headers = make(map[string]string)
-							thisEndPointMethodMeta.Headers[h.Name] = h.Value
+							endPointMethodMeta.Headers = make(map[string]string)
+							endPointMethodMeta.Headers[h.Name] = h.Value
 						}
-						thisEndPointMethodMeta.Data = action.Examples[0].Responses[0].Body
-						newMetaData.MethodActions[action.Method] = thisEndPointMethodMeta
+						endPointMethodMeta.Data = action.Examples[0].Responses[0].Body
+						newMetaData.MethodActions[action.Method] = endPointMethodMeta
 					}
 				}
 			}
 
 			// Add it to the version
-			thisVersionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
-			thisVersionInfo.ExtendedPaths.WhiteList = append(thisVersionInfo.ExtendedPaths.WhiteList, newMetaData)
+			versionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
+			versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, newMetaData)
 		}
 
 	}
 
-	return thisVersionInfo, nil
+	return versionInfo, nil
 }
 
-func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(thisVersion tykcommon.VersionInfo, thisDefinition *tykcommon.APIDefinition, versionName string) error {
-
-	thisDefinition.VersionData.NotVersioned = false
-	thisDefinition.VersionData.Versions[versionName] = thisVersion
+func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(version tykcommon.VersionInfo, def *tykcommon.APIDefinition, versionName string) error {
+	def.VersionData.NotVersioned = false
+	def.VersionData.Versions[versionName] = version
 	return nil
 }

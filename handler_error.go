@@ -37,45 +37,45 @@ type ErrorHandler struct {
 func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
 	if e.Spec.DoNotTrack {
 		var templateExtension string
-		var thisContentType string
+		var contentType string
 
 		switch r.Header.Get("Content-Type") {
 		case "application/xml":
 			templateExtension = "xml"
-			thisContentType = "application/xml"
+			contentType = "application/xml"
 		default:
 			templateExtension = "json"
-			thisContentType = "application/json"
+			contentType = "application/json"
 		}
 
-		w.Header().Set("Content-Type", thisContentType)
+		w.Header().Set("Content-Type", contentType)
 
-		var thisTemplate *template.Template
+		var tmpl *template.Template
 		templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
 
-		// templateError := templates.ExecuteTemplate(w, templateName, &thisError)
+		// templateError := templates.ExecuteTemplate(w, templateName, &apiErr)
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		thisTemplate = templates.Lookup(templateName)
+		tmpl = templates.Lookup(templateName)
 
 		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
-		if thisTemplate == nil {
+		if tmpl == nil {
 			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
-			thisTemplate = templates.Lookup(templateName)
+			tmpl = templates.Lookup(templateName)
 		}
 
 		// If no template is available for this content type, fallback to "error.json".
-		if thisTemplate == nil {
+		if tmpl == nil {
 			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
-			thisTemplate = templates.Lookup(templateName)
+			tmpl = templates.Lookup(templateName)
 			w.Header().Set("Content-Type", defaultContentType)
 		}
 
 		// Need to return the correct error code!
 		w.WriteHeader(errCode)
 
-		thisError := APIError{fmt.Sprintf("%s", err)}
-		thisTemplate.Execute(w, &thisError)
+		apiErr := APIError{fmt.Sprintf("%s", err)}
+		tmpl.Execute(w, &apiErr)
 
 		if doMemoryProfile {
 			pprof.WriteHeapProfile(profileFile)
@@ -116,12 +116,12 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 
 		OauthClientID := ""
 		tags := make([]string, 0)
-		thisSessionState := context.Get(r, SessionData)
+		sessionState := context.Get(r, SessionData)
 
-		if thisSessionState != nil {
-			OauthClientID = thisSessionState.(SessionState).OauthClientID
-			alias = thisSessionState.(SessionState).Alias
-			tags = thisSessionState.(SessionState).Tags
+		if sessionState != nil {
+			OauthClientID = sessionState.(SessionState).OauthClientID
+			alias = sessionState.(SessionState).Alias
+			tags = sessionState.(SessionState).Tags
 		}
 
 		var requestCopy *http.Request
@@ -154,7 +154,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			trackedPath = r.URL.Path
 		}
 
-		thisRecord := AnalyticsRecord{
+		record := AnalyticsRecord{
 			r.Method,
 			trackedPath,
 			r.URL.Path,
@@ -183,12 +183,11 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 			time.Now(),
 		}
 
-		thisRecord.GetGeo(GetIPFromRequest(r))
+		record.GetGeo(GetIPFromRequest(r))
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if config.EnforceOrgDataAge {
-			thisOrg := e.Spec.OrgID
-			orgExpireDataTime := e.GetOrgSessionExpiry(thisOrg)
+			orgExpireDataTime := e.GetOrgSessionExpiry(e.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
@@ -196,12 +195,12 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 
 		}
 
-		thisRecord.SetExpiry(expiresAfter)
+		record.SetExpiry(expiresAfter)
 		if config.AnalyticsConfig.NormaliseUrls.Enabled {
-			thisRecord.NormalisePath()
+			record.NormalisePath()
 		}
 
-		go analytics.RecordHit(thisRecord)
+		go analytics.RecordHit(record)
 	}
 
 	// Report in health check
@@ -225,7 +224,7 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		obfuscated = "****" + keyName[len(keyName)-4:]
 	}
 
-	var thisIP string
+	var ip string
 	if clientIP, _, derr := net.SplitHostPort(r.RemoteAddr); derr == nil {
 		// If we aren't the first proxy retain prior
 		// X-Forwarded-For information as a comma+space
@@ -233,11 +232,11 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 		if prior, ok := r.Header["X-Forwarded-For"]; ok {
 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
 		}
-		thisIP = clientIP
+		ip = clientIP
 	}
 	log.WithFields(logrus.Fields{
 		"prefix":      "gateway",
-		"user_ip":     thisIP,
+		"user_ip":     ip,
 		"server_name": e.Spec.APIDefinition.Proxy.TargetURL,
 		"user_id":     obfuscated,
 		"org_id":      e.Spec.APIDefinition.OrgID,
@@ -247,8 +246,8 @@ func (e ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err st
 
 	log.Debug("Returning error header")
 	w.WriteHeader(errCode)
-	thisError := APIError{fmt.Sprintf("%s", err)}
-	templates.ExecuteTemplate(w, "error.json", &thisError)
+	apiErr := APIError{fmt.Sprintf("%s", err)}
+	templates.ExecuteTemplate(w, "error.json", &apiErr)
 	if doMemoryProfile {
 		pprof.WriteHeapProfile(profileFile)
 	}

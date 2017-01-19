@@ -27,8 +27,8 @@ func (t *TransformMethod) GetConfig() (interface{}, error) {
 
 func (t *TransformMethod) IsEnabledForSpec() bool {
 	var used bool
-	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
-		if len(thisVersion.ExtendedPaths.MethodTransforms) > 0 {
+	for _, version := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(version.ExtendedPaths.MethodTransforms) > 0 {
 			used = true
 			break
 		}
@@ -42,9 +42,9 @@ func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	_, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
 	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, MethodTransformed)
 	if found {
-		thisMeta := meta.(*tykcommon.MethodTransformMeta)
+		mmeta := meta.(*tykcommon.MethodTransformMeta)
 
-		switch strings.ToUpper(thisMeta.ToMethod) {
+		switch strings.ToUpper(mmeta.ToMethod) {
 		case "GET":
 			r.Method = "GET"
 			return nil, 200

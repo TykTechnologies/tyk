@@ -47,21 +47,21 @@ type TykMiddleware struct {
 
 func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
-	var thisSession SessionState
+	var session SessionState
 	var found bool
 
-	thisSession, found = t.Spec.OrgSessionManager.GetSessionDetail(key)
+	session, found = t.Spec.OrgSessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		if config.EnforceOrgDataAge {
 			// We cache org expiry data
-			log.Debug("Setting data expiry: ", thisSession.OrgID)
-			go t.SetOrgExpiry(thisSession.OrgID, thisSession.DataExpires)
+			log.Debug("Setting data expiry: ", session.OrgID)
+			go t.SetOrgExpiry(session.OrgID, session.DataExpires)
 		}
-		return thisSession, true
+		return session, true
 	}
 
-	return thisSession, found
+	return session, found
 }
 
 func (t TykMiddleware) SetOrgExpiry(orgid string, expiry int64) {
@@ -81,10 +81,10 @@ func (t TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 }
 
 // ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
-func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState) {
-	if thisSession.ApplyPolicyID != "" {
+func (t TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
+	if session.ApplyPolicyID != "" {
 		log.Debug("Session has policy, checking")
-		policy, ok := Policies[thisSession.ApplyPolicyID]
+		policy, ok := Policies[session.ApplyPolicyID]
 		if ok {
 			// Check ownership, policy org owner must be the same as API,
 			// otherwise youcould overwrite a session key with a policy from a different org!
@@ -102,57 +102,57 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 				if policy.Partitions.Quota {
 					// Quotas
 					log.Debug("Applying partition: Quota")
-					thisSession.QuotaMax = policy.QuotaMax
-					thisSession.QuotaRenewalRate = policy.QuotaRenewalRate
+					session.QuotaMax = policy.QuotaMax
+					session.QuotaRenewalRate = policy.QuotaRenewalRate
 				}
 
 				if policy.Partitions.RateLimit {
 					// Rate limting
 					log.Debug("Applying partition: Rate Limit")
-					thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-					thisSession.Rate = policy.Rate
-					thisSession.Per = policy.Per
+					session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+					session.Rate = policy.Rate
+					session.Per = policy.Per
 					if policy.LastUpdated != "" {
-						thisSession.LastUpdated = policy.LastUpdated
+						session.LastUpdated = policy.LastUpdated
 					}
 				}
 
 				if policy.Partitions.Acl {
 					// ACL
 					log.Debug("Applying partition: ACL")
-					thisSession.AccessRights = policy.AccessRights
-					thisSession.HMACEnabled = policy.HMACEnabled
+					session.AccessRights = policy.AccessRights
+					session.HMACEnabled = policy.HMACEnabled
 				}
 
 			} else {
 				// This is not a partitioned policy, apply everything
 				log.Debug("Applying regular policy")
 				// Quotas
-				thisSession.QuotaMax = policy.QuotaMax
-				thisSession.QuotaRenewalRate = policy.QuotaRenewalRate
+				session.QuotaMax = policy.QuotaMax
+				session.QuotaRenewalRate = policy.QuotaRenewalRate
 
 				// Rate limting
-				thisSession.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-				thisSession.Rate = policy.Rate
-				thisSession.Per = policy.Per
+				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+				session.Rate = policy.Rate
+				session.Per = policy.Per
 				if policy.LastUpdated != "" {
-					thisSession.LastUpdated = policy.LastUpdated
+					session.LastUpdated = policy.LastUpdated
 				}
 
 				// ACL
-				thisSession.AccessRights = policy.AccessRights
-				thisSession.HMACEnabled = policy.HMACEnabled
+				session.AccessRights = policy.AccessRights
+				session.HMACEnabled = policy.HMACEnabled
 			}
 
 			// Required for all
-			thisSession.IsInactive = policy.IsInactive
-			thisSession.Tags = policy.Tags
+			session.IsInactive = policy.IsInactive
+			session.Tags = policy.Tags
 
-			log.Debug("Policy Applied, Access rights are: ", thisSession.AccessRights)
+			log.Debug("Policy Applied, Access rights are: ", session.AccessRights)
 			log.Debug("Policy Applied, Access rights were: ", policy.AccessRights)
 
 			// Update the session in the session manager in case it gets called again
-			t.Spec.SessionManager.UpdateSession(key, *thisSession, GetLifetime(t.Spec, thisSession))
+			t.Spec.SessionManager.UpdateSession(key, *session, GetLifetime(t.Spec, session))
 			log.Debug("Policy applied to key")
 		}
 	}
@@ -162,7 +162,7 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState
 // the Auth Handler, if not found it will fail
 func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
 	// Try and get the session from the session store
-	var thisSession SessionState
+	var session SessionState
 	var found bool
 
 	log.Debug("Querying local cache")
@@ -171,46 +171,46 @@ func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionSt
 		cachedVal, found := SessionCache.Get(key)
 		if found {
 			log.Debug("--> Key found in local cache")
-			thisSession = cachedVal.(SessionState)
-			t.ApplyPolicyIfExists(key, &thisSession)
-			return thisSession, true
+			session = cachedVal.(SessionState)
+			t.ApplyPolicyIfExists(key, &session)
+			return session, true
 		}
 	}
 
 	// Check session store
 	log.Debug("Querying keystore")
-	thisSession, found = t.Spec.SessionManager.GetSessionDetail(key)
+	session, found = t.Spec.SessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it
-		go SessionCache.Set(key, thisSession, cache.DefaultExpiration)
+		go SessionCache.Set(key, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		t.ApplyPolicyIfExists(key, &thisSession)
+		t.ApplyPolicyIfExists(key, &session)
 		log.Debug("--> Got key")
-		return thisSession, true
+		return session, true
 	}
 
 	log.Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
-	thisSession, found = t.Spec.AuthManager.IsKeyAuthorised(key)
+	session, found = t.Spec.AuthManager.IsKeyAuthorised(key)
 	if found {
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		log.Info("Recreating session for key: ", key)
 
 		// cache it
-		go SessionCache.Set(key, thisSession, cache.DefaultExpiration)
+		go SessionCache.Set(key, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		t.ApplyPolicyIfExists(key, &thisSession)
+		t.ApplyPolicyIfExists(key, &session)
 
-		log.Debug("Lifetime is: ", GetLifetime(t.Spec, &thisSession))
+		log.Debug("Lifetime is: ", GetLifetime(t.Spec, &session))
 		// Need to set this in order for the write to work!
-		thisSession.LastUpdated = time.Now().String()
-		t.Spec.SessionManager.UpdateSession(key, thisSession, GetLifetime(t.Spec, &thisSession))
+		session.LastUpdated = time.Now().String()
+		t.Spec.SessionManager.UpdateSession(key, session, GetLifetime(t.Spec, &session))
 	}
 
-	return thisSession, found
+	return session, found
 }
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
@@ -245,12 +245,12 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 		OauthClientID := ""
 		tags := make([]string, 0)
 		var alias string
-		thisSessionState := context.Get(r, SessionData)
+		sessionState := context.Get(r, SessionData)
 
-		if thisSessionState != nil {
-			OauthClientID = thisSessionState.(SessionState).OauthClientID
-			tags = thisSessionState.(SessionState).Tags
-			alias = thisSessionState.(SessionState).Alias
+		if sessionState != nil {
+			OauthClientID = sessionState.(SessionState).OauthClientID
+			tags = sessionState.(SessionState).Tags
+			alias = sessionState.(SessionState).Alias
 		}
 
 		rawRequest := ""
@@ -284,7 +284,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			trackedPath = r.URL.Path
 		}
 
-		thisRecord := AnalyticsRecord{
+		record := AnalyticsRecord{
 			r.Method,
 			trackedPath,
 			r.URL.Path,
@@ -313,25 +313,24 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 			time.Now(),
 		}
 
-		thisRecord.GetGeo(GetIPFromRequest(r))
+		record.GetGeo(GetIPFromRequest(r))
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if config.EnforceOrgDataAge {
-			thisOrg := s.Spec.OrgID
-			orgExpireDataTime := s.GetOrgSessionExpiry(thisOrg)
+			orgExpireDataTime := s.GetOrgSessionExpiry(s.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
 			}
 		}
 
-		thisRecord.SetExpiry(expiresAfter)
+		record.SetExpiry(expiresAfter)
 
 		if config.AnalyticsConfig.NormaliseUrls.Enabled {
-			thisRecord.NormalisePath()
+			record.NormalisePath()
 		}
 
-		go analytics.RecordHit(thisRecord)
+		go analytics.RecordHit(record)
 	}
 
 	// Report in health check

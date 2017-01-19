@@ -134,9 +134,9 @@ func setupGlobals() {
 
 		if config.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
-			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
-			thisPurger.Connect()
-			analytics.Clean = &thisPurger
+			purger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
+			purger.Connect()
+			analytics.Clean = &purger
 			go analytics.Clean.StartPurgeLoop(10)
 		}
 
@@ -439,8 +439,8 @@ func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
 		"prefix": "main",
 	}).Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
-	thisBatchHandler := BatchRequestHandler{API: spec}
-	Muxer.HandleFunc(apiBatchPath, thisBatchHandler.HandleBatchRequest)
+	batchHandler := BatchRequestHandler{API: spec}
+	Muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
 func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, tykcommon.MiddlewareDriver) {
@@ -496,13 +496,13 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("-- Middleware requires session: ", requiresSession)
-			thisMWDef := tykcommon.MiddlewareDefinition{}
-			thisMWDef.Name = middlewareObjectName
-			thisMWDef.Path = filePath
-			thisMWDef.RequireSession = requiresSession
+			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef.Name = middlewareObjectName
+			mwDef.Path = filePath
+			mwDef.RequireSession = requiresSession
 
 			mwPaths = append(mwPaths, filePath)
-			mwPreFuncs = append(mwPreFuncs, thisMWDef)
+			mwPreFuncs = append(mwPreFuncs, mwDef)
 		}
 	}
 
@@ -520,13 +520,13 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 				"prefix": "main",
 			}).Debug("-- Middleware name ", middlewareObjectName)
 
-			thisMWDef := tykcommon.MiddlewareDefinition{}
-			thisMWDef.Name = middlewareObjectName
-			thisMWDef.Path = filePath
-			thisMWDef.RequireSession = false
+			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef.Name = middlewareObjectName
+			mwDef.Path = filePath
+			mwDef.RequireSession = false
 
 			mwPaths = append(mwPaths, filePath)
-			mwAuthCheckFunc = thisMWDef
+			mwAuthCheckFunc = mwDef
 			// only one allowed!
 			break
 		}
@@ -550,13 +550,13 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("-- Middleware requires session: ", requiresSession)
-			thisMWDef := tykcommon.MiddlewareDefinition{}
-			thisMWDef.Name = middlewareObjectName
-			thisMWDef.Path = filePath
-			thisMWDef.RequireSession = requiresSession
+			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef.Name = middlewareObjectName
+			mwDef.Path = filePath
+			mwDef.RequireSession = requiresSession
 
 			mwPaths = append(mwPaths, filePath)
-			mwPostKeyAuthFuncs = append(mwPostFuncs, thisMWDef)
+			mwPostKeyAuthFuncs = append(mwPostFuncs, mwDef)
 		}
 	}
 
@@ -578,13 +578,13 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("-- Middleware requires session: ", requiresSession)
-			thisMWDef := tykcommon.MiddlewareDefinition{}
-			thisMWDef.Name = middlewareObjectName
-			thisMWDef.Path = filePath
-			thisMWDef.RequireSession = requiresSession
+			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef.Name = middlewareObjectName
+			mwDef.Path = filePath
+			mwDef.RequireSession = requiresSession
 
 			mwPaths = append(mwPaths, filePath)
-			mwPostFuncs = append(mwPostFuncs, thisMWDef)
+			mwPostFuncs = append(mwPostFuncs, mwDef)
 		}
 	}
 
@@ -617,11 +617,11 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 			}).Error("Failed to load processor! ", err)
 			return
 		}
-		thisProcessor, _ := processorType.New(processorDetail.Options, referenceSpec)
+		processor, _ := processorType.New(processorDetail.Options, referenceSpec)
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Loading Response processor: ", processorDetail.Name)
-		responseChain[i] = thisProcessor
+		responseChain[i] = processor
 	}
 	referenceSpec.ResponseChain = &responseChain
 	if len(responseChain) > 0 {
@@ -1372,17 +1372,17 @@ func listen(l net.Listener, err error) {
 	} else {
 
 		// handle dashboard registration and nonces if available
-		thisNonce := os.Getenv("TYK_SERVICE_NONCE")
-		thisID := os.Getenv("TYK_SERVICE_NODEID")
-		if thisNonce == "" || thisID == "" {
+		nonce := os.Getenv("TYK_SERVICE_NONCE")
+		nodeID := os.Getenv("TYK_SERVICE_NODEID")
+		if nonce == "" || nodeID == "" {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
 
 		} else {
-			NodeID = thisID
-			ServiceNonce = thisNonce
+			NodeID = nodeID
+			ServiceNonce = nonce
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("State recovered")

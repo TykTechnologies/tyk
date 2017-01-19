@@ -40,14 +40,12 @@ type DBAccessDefinition struct {
 }
 
 func (d *DBAccessDefinition) ToRegularAD() AccessDefinition {
-	thisAD := AccessDefinition{
+	return AccessDefinition{
 		APIName:     d.APIName,
 		APIID:       d.APIID,
 		Versions:    d.Versions,
 		AllowedURLs: d.AllowedURLs,
 	}
-
-	return thisAD
 }
 
 type DBPolicy struct {
@@ -56,14 +54,13 @@ type DBPolicy struct {
 }
 
 func (d *DBPolicy) ToRegularPolicy() Policy {
-	thisPolicy := d.Policy
-	thisPolicy.AccessRights = make(map[string]AccessDefinition)
+	policy := d.Policy
+	policy.AccessRights = make(map[string]AccessDefinition)
 
 	for k, v := range d.AccessRights {
-		thisPolicy.AccessRights[k] = v.ToRegularAD()
+		policy.AccessRights[k] = v.ToRegularAD()
 	}
-
-	return thisPolicy
+	return policy
 }
 
 func LoadPoliciesFromFile(filePath string) map[string]Policy {
@@ -145,32 +142,32 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 		return policies
 	}
 
-	thisList := NodeResponseOK{}
+	list := NodeResponseOK{}
 
-	decErr := json.Unmarshal(retBody, &thisList)
+	decErr := json.Unmarshal(retBody, &list)
 	if decErr != nil {
 		log.Error("Failed to decode policy body: ", decErr, "Returned: ", string(retBody))
 
 		return policies
 	}
 
-	ServiceNonce = thisList.Nonce
+	ServiceNonce = list.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Processing policy list")
-	for _, p := range thisList.Message {
-		thisID := p.MID.Hex()
+	for _, p := range list.Message {
+		id := p.MID.Hex()
 		if allowExplicit {
 			if p.ID != "" {
-				thisID = p.ID
+				id = p.ID
 			}
 		}
-		p.ID = thisID
-		_, foundP := policies[thisID]
+		p.ID = id
+		_, foundP := policies[id]
 		if !foundP {
-			policies[thisID] = p.ToRegularPolicy()
+			policies[id] = p.ToRegularPolicy()
 			log.WithFields(logrus.Fields{
 				"prefix": "policy",
 			}).Info("--> Processing policy ID: ", p.ID)

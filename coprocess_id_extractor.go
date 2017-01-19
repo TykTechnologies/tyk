@@ -44,11 +44,11 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (SessionID string, retu
 }
 
 // PostProcess sets context variables and updates the storage.
-func (e *BaseExtractor) PostProcess(r *http.Request, thisSessionState SessionState, SessionID string) {
-	var sessionLifetime = GetLifetime(e.Spec, &thisSessionState)
-	e.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, sessionLifetime)
+func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, SessionID string) {
+	var sessionLifetime = GetLifetime(e.Spec, &sessionState)
+	e.Spec.SessionManager.UpdateSession(SessionID, sessionState, sessionLifetime)
 
-	context.Set(r, SessionData, thisSessionState)
+	context.Set(r, SessionData, sessionState)
 	context.Set(r, AuthHeaderValue, SessionID)
 
 	return
@@ -334,19 +334,19 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 // newExtractor is called from the CP middleware for every API that specifies extractor settings.
 func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
-	var thisExtractor IdExtractor
+	var extractor IdExtractor
 
 	baseExtractor := BaseExtractor{&referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}
 
 	// Initialize a extractor based on the API spec.
 	switch referenceSpec.CustomMiddleware.IdExtractor.ExtractWith {
 	case tykcommon.ValueExtractor:
-		thisExtractor = &ValueExtractor{baseExtractor}
+		extractor = &ValueExtractor{baseExtractor}
 	case tykcommon.RegexExtractor:
-		thisExtractor = &RegexExtractor{baseExtractor}
+		extractor = &RegexExtractor{baseExtractor}
 	case tykcommon.XPathExtractor:
-		thisExtractor = &XPathExtractor{baseExtractor}
+		extractor = &XPathExtractor{baseExtractor}
 	}
 
-	referenceSpec.CustomMiddleware.IdExtractor.Extractor = thisExtractor
+	referenceSpec.CustomMiddleware.IdExtractor.Extractor = extractor
 }

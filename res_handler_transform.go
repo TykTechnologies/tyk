@@ -23,28 +23,28 @@ type ResponseTransformMiddleware struct {
 }
 
 func (rt ResponseTransformMiddleware) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	thisHandler := ResponseTransformMiddleware{}
-	thisModuleConfig := ResponsetransformOptions{}
+	handler := ResponseTransformMiddleware{}
+	moduleConfig := ResponsetransformOptions{}
 
-	err := mapstructure.Decode(c, &thisModuleConfig)
+	err := mapstructure.Decode(c, &moduleConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 
-	thisHandler.config = thisModuleConfig
-	thisHandler.Spec = spec
+	handler.config = moduleConfig
+	handler.Spec = spec
 
 	log.Debug("Response body transform processor initialised")
 
-	return thisHandler, nil
+	return handler, nil
 }
 
 func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	_, versionPaths, _, _ := rt.Spec.GetVersionData(req)
 	found, meta := rt.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, TransformedResponse)
 	if found {
-		thisMeta := meta.(*TransformSpec)
+		tmeta := meta.(*TransformSpec)
 
 		// Read the body:
 		defer res.Body.Close()
@@ -52,7 +52,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 		// Put into an interface:
 		var bodyData interface{}
-		switch thisMeta.TemplateMeta.TemplateData.Input {
+		switch tmeta.TemplateMeta.TemplateData.Input {
 		case tykcommon.RequestXML:
 			mxj.XmlCharsetReader = WrappedCharsetReader
 			bodyData, err = mxj.NewMapXml(body) // unmarshal
@@ -72,9 +72,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 		// Apply to template
 		var bodyBuffer bytes.Buffer
-		err = thisMeta.Template.Execute(&bodyBuffer, bodyData)
-
-		if err != nil {
+		if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "outbound-transform",
 				"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,

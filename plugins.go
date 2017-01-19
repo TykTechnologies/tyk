@@ -81,9 +81,9 @@ func (a *DynamicMiddleware) IsEnabledForSpec() bool {
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
-	var thisModuleConfig DynamicMiddlewareConfig
+	var moduleConfig DynamicMiddlewareConfig
 
-	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
+	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &moduleConfig)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -91,7 +91,7 @@ func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
 		return nil, err
 	}
 
-	return thisModuleConfig, nil
+	return moduleConfig, nil
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -109,7 +109,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
-	thisRequestData := MiniRequestObject{
+	requestData := MiniRequestObject{
 		Headers:        r.Header,
 		SetHeaders:     make(map[string]string),
 		DeleteHeaders:  make([]string, 0),
@@ -122,26 +122,26 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		IgnoreBody:     false,
 	}
 
-	asJsonRequestObj, encErr := json.Marshal(thisRequestData)
-	if encErr != nil {
+	asJsonRequestObj, err := json.Marshal(requestData)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
-		}).Error("Failed to encode request object for dynamic middleware: ", encErr)
+		}).Error("Failed to encode request object for dynamic middleware: ", err)
 		return nil, 200
 	}
 
-	thisSessionState := SessionState{}
+	sessionState := SessionState{}
 	authHeaderValue := ""
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre {
 		if d.UseSession {
-			thisSessionState = context.Get(r, SessionData).(SessionState)
+			sessionState = context.Get(r, SessionData).(SessionState)
 			authHeaderValue = context.Get(r, AuthHeaderValue).(string)
 		}
 	}
 
-	sessionAsJsonObj, sessEncErr := json.Marshal(thisSessionState)
+	sessionAsJsonObj, sessEncErr := json.Marshal(sessionState)
 
 	if sessEncErr != nil {
 		log.WithFields(logrus.Fields{
@@ -152,11 +152,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
-	thisVM := d.Spec.JSVM.VM.Copy()
+	vm := d.Spec.JSVM.VM.Copy()
 	log.WithFields(logrus.Fields{
 		"prefix": "jsvm",
 	}).Debug("Running: ", middlewareClassname)
-	returnRaw, _ := thisVM.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+	returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
@@ -216,8 +216,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if !d.Pre {
 		if d.UseSession {
 			if len(newRequestData.SessionMeta) > 0 {
-				thisSessionState.MetaData = newRequestData.SessionMeta
-				d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(d.Spec, &thisSessionState))
+				sessionState.MetaData = newRequestData.SessionMeta
+				d.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, GetLifetime(d.Spec, &sessionState))
 			}
 
 		}

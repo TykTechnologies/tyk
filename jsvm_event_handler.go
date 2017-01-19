@@ -24,9 +24,9 @@ type JSVMEventHandler struct {
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
 func (l JSVMEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	thisHandler := JSVMEventHandler{}
-	thisHandler.Spec = l.Spec
-	thisHandler.conf = handlerConf.(map[string]interface{})
+	handler := JSVMEventHandler{}
+	handler.Spec = l.Spec
+	handler.conf = handlerConf.(map[string]interface{})
 
 	// Set the VM globals
 	globalVals := JSVMContextGlobal{
@@ -39,9 +39,9 @@ func (l JSVMEventHandler) New(handlerConf interface{}) (TykEventHandler, error) 
 		log.Error("Failed to marshal globals! ", gErr)
 	}
 
-	thisHandler.SpecJSON = string(gValAsJSON)
+	handler.SpecJSON = string(gValAsJSON)
 
-	return thisHandler, nil
+	return handler, nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain

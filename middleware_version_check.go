@@ -34,13 +34,13 @@ func (a *VersionCheck) IsEnabledForSpec() bool {
 
 func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 	// Reply with some alternate data
-	thisMeta := meta.(*tykcommon.EndpointMethodMeta)
-	responseMessage := []byte(thisMeta.Data)
-	for header, value := range thisMeta.Headers {
+	emeta := meta.(*tykcommon.EndpointMethodMeta)
+	responseMessage := []byte(emeta.Data)
+	for header, value := range emeta.Headers {
 		w.Header().Add(header, value)
 	}
 
-	w.WriteHeader(thisMeta.Code)
+	w.WriteHeader(emeta.Code)
 	fmt.Fprintf(w, string(responseMessage))
 	return
 }
