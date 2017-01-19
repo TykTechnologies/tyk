@@ -20,10 +20,11 @@ show go test -v -tags coprocess $PKGS
 
 if [[ $SKIP_LINT ]]; then
 	echo "Skipping linting"
-else
-	show go vet -v $PKGS
-	show go vet -v -tags coprocess $PKGS
+	exit 0
 fi
+
+show go vet -v $PKGS
+show go vet -v -tags coprocess $PKGS
 
 GOFILES=$(find * -name '*.go' -not -path 'vendor/*')
 
