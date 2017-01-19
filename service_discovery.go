@@ -150,13 +150,9 @@ func (s *ServiceDiscovery) GetHostname(item *gabs.Container) string {
 }
 
 func (s *ServiceDiscovery) isList(val string) bool {
-	if len(val) > 0 {
-		if strings.HasPrefix(val, "[") {
-			return true
-		}
-	}
-	return false
+	return strings.HasPrefix(val, "[")
 }
+
 func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]string {
 	hostList := []string{}
 	var hostname string
