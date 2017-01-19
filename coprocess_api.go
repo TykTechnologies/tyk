@@ -34,8 +34,8 @@ func TykStoreData(CKey *C.char, CValue *C.char, CTTL C.int) {
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
 
-	thisStorageHandler := GetGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
-	thisStorageHandler.SetKey(key, value, ttl)
+	storageHandler := GetGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
+	storageHandler.SetKey(key, value, ttl)
 }
 
 // TykGetData is a CoProcess API function for fetching data.
@@ -43,9 +43,9 @@ func TykStoreData(CKey *C.char, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
-	thisStorageHandler := GetGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
+	storageHandler := GetGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
 	// TODO: return error
-	val, _ := thisStorageHandler.GetKey(key)
+	val, _ := storageHandler.GetKey(key)
 	return C.CString(val)
 }
 

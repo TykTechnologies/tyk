@@ -90,15 +90,15 @@ func (d *VirtualEndpoint) New() {
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
-	var thisModuleConfig VirtualEndpointConfig
+	var moduleConfig VirtualEndpointConfig
 
-	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
+	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &moduleConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 
-	return thisModuleConfig, nil
+	return moduleConfig, nil
 }
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {
@@ -106,8 +106,8 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 		return false
 	}
 	used := false
-	for _, thisVersion := range d.TykMiddleware.Spec.VersionData.Versions {
-		if len(thisVersion.ExtendedPaths.Virtual) > 0 {
+	for _, version := range d.TykMiddleware.Spec.VersionData.Versions {
+		if len(version.ExtendedPaths.Virtual) > 0 {
 			used = true
 			break
 		}
@@ -129,7 +129,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	t1 := time.Now().UnixNano()
-	thisMeta := meta.(*tykcommon.VirtualMeta)
+	vmeta := meta.(*tykcommon.VirtualMeta)
 
 	// Create the proxy object
 	defer r.Body.Close()
@@ -139,7 +139,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	thisRequestData := RequestObject{
+	requestData := RequestObject{
 		Headers: r.Header,
 		Body:    string(originalBody),
 		URL:     r.URL.Path,
@@ -148,9 +148,9 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// We need to copy the body _back_ for the decode
 	r.Body = nopCloser{bytes.NewBuffer(originalBody)}
 	r.ParseForm()
-	thisRequestData.Params = r.Form
+	requestData.Params = r.Form
 
-	asJsonRequestObj, encErr := json.Marshal(thisRequestData)
+	asJsonRequestObj, encErr := json.Marshal(requestData)
 	if encErr != nil {
 		log.Error("Failed to encode request object for virtual endpoint: ", encErr)
 		return nil
@@ -169,16 +169,16 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	var thisSessionState = SessionState{}
+	var sessionState = SessionState{}
 	var authHeaderValue = ""
 
 	// Encode the session object (if not a pre-process)
-	if thisMeta.UseSession {
-		thisSessionState = context.Get(r, SessionData).(SessionState)
+	if vmeta.UseSession {
+		sessionState = context.Get(r, SessionData).(SessionState)
 		authHeaderValue = context.Get(r, AuthHeaderValue).(string)
 	}
 
-	sessionAsJsonObj, sessEncErr := json.Marshal(thisSessionState)
+	sessionAsJsonObj, sessEncErr := json.Marshal(sessionState)
 
 	if sessEncErr != nil {
 		log.Error("Failed to encode session for VM: ", sessEncErr)
@@ -186,8 +186,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run the middleware
-	thisVM := d.Spec.JSVM.VM.Copy()
-	returnRaw, _ := thisVM.Run(thisMeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + string(asJsonConfigData) + `);`)
+	vm := d.Spec.JSVM.VM.Copy()
+	returnRaw, _ := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + string(asJsonConfigData) + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
@@ -201,9 +201,9 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Save the sesison data (if modified)
-	if thisMeta.UseSession {
-		thisSessionState.MetaData = newResponseData.SessionMeta
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(d.Spec, &thisSessionState))
+	if vmeta.UseSession {
+		sessionState.MetaData = newResponseData.SessionMeta
+		d.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, GetLifetime(d.Spec, &sessionState))
 	}
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
@@ -232,7 +232,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Handle response middleware
 	ResponseHandler := ResponseChain{}
 
-	chainErr := ResponseHandler.Go(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &thisSessionState)
+	chainErr := ResponseHandler.Go(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &sessionState)
 	if chainErr != nil {
 		log.Error("Response chain failed! ", chainErr)
 	}
@@ -260,7 +260,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Body = ioutil.NopCloser(&bodyBuffer)
 	copiedRes.Body = ioutil.NopCloser(bodyBuffer2)
 
-	d.HandleResponse(w, newResponse, &thisSessionState)
+	d.HandleResponse(w, newResponse, &sessionState)
 
 	// Record analytics
 	go d.sh.RecordHit(w, r, 0, newResponse.StatusCode, copiedRequest, copiedResponse)

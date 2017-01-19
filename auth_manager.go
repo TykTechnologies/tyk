@@ -129,24 +129,24 @@ func (b DefaultSessionManager) RemoveSession(keyName string) {
 // GetSessionDetail returns the session detail using the storage engine (either in memory or Redis)
 func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, bool) {
 	jsonKeyVal, err := b.Store.GetKey(keyName)
-	var thisSession SessionState
+	var session SessionState
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",
 			"inbound-key": ObfuscateKeyString(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
-		return thisSession, false
+		return session, false
 	}
 
-	if marshalErr := json.Unmarshal([]byte(jsonKeyVal), &thisSession); marshalErr != nil {
+	if marshalErr := json.Unmarshal([]byte(jsonKeyVal), &session); marshalErr != nil {
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", marshalErr)
-		return thisSession, false
+		return session, false
 	}
 
-	thisSession.SetFirstSeenHash()
+	session.SetFirstSeenHash()
 
-	return thisSession, true
+	return session, true
 }
 
 // GetSessions returns all sessions in the key store that match a filter key (a prefix)

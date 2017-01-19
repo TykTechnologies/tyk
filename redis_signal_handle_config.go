@@ -75,13 +75,13 @@ func GetExistingRawConfig() Config {
 
 func HandleNewConfiguration(payload string) {
 	// Decode the configuration from the payload
-	thisConfigPayload := ConfigPayload{}
+	configPayload := ConfigPayload{}
 
 	// We actually want to merge into the existing configuration
 	// so as not to lose data through automatic defaults
-	thisConfigPayload.Configuration = GetExistingRawConfig()
+	configPayload.Configuration = GetExistingRawConfig()
 
-	err := json.Unmarshal([]byte(payload), &thisConfigPayload)
+	err := json.Unmarshal([]byte(payload), &configPayload)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -90,7 +90,7 @@ func HandleNewConfiguration(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if (thisConfigPayload.ForHostname != HostDetails.Hostname) && (thisConfigPayload.ForNodeID != NodeID) {
+	if (configPayload.ForHostname != HostDetails.Hostname) && (configPayload.ForNodeID != NodeID) {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Info("Configuration update received, no NodeID/Hostname match found")
@@ -112,7 +112,7 @@ func HandleNewConfiguration(payload string) {
 		return
 	}
 
-	writeErr := WriteNewConfiguration(thisConfigPayload)
+	writeErr := WriteNewConfiguration(configPayload)
 	if writeErr != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",

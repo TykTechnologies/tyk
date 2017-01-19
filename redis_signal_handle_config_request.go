@@ -42,9 +42,8 @@ func SanitizeConfig(mc MicroConfig) MicroConfig {
 }
 
 func GetExistingConfig() (MicroConfig, error) {
-
 	value, _ := argumentsBackup["--conf"]
-	thisMicroConfig := MicroConfig{}
+	microConfig := MicroConfig{}
 
 	filename := "./tyk.conf"
 	if value != nil {
@@ -60,50 +59,45 @@ func GetExistingConfig() (MicroConfig, error) {
 
 	dat, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return thisMicroConfig, err
+		return microConfig, err
 	}
-
-	jsErr := json.Unmarshal(dat, &thisMicroConfig)
-	if jsErr != nil {
-		return thisMicroConfig, jsErr
+	if err := json.Unmarshal(dat, &microConfig); err != nil {
+		return microConfig, err
 	}
-
-	thisMicroConfig = SanitizeConfig(thisMicroConfig)
-
-	return thisMicroConfig, nil
+	return SanitizeConfig(microConfig), nil
 }
 
 func HandleSendMiniConfig(payload string) {
 	// Decode the configuration from the payload
-	thisConfigPayload := GetConfigPayload{}
-	jsErr := json.Unmarshal([]byte(payload), &thisConfigPayload)
-	if jsErr != nil {
+	configPayload := GetConfigPayload{}
+	err := json.Unmarshal([]byte(payload), &configPayload)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed unmarshal request: ", jsErr)
+		}).Error("Failed unmarshal request: ", err)
 		return
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if (thisConfigPayload.FromHostname != HostDetails.Hostname) && (thisConfigPayload.FromNodeID != NodeID) {
+	if (configPayload.FromHostname != HostDetails.Hostname) && (configPayload.FromNodeID != NodeID) {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Debug("Configuration request received, no NodeID/Hostname match found, ignoring")
 		return
 	}
 
-	thisConfig, getConfErr := GetExistingConfig()
-	if getConfErr != nil {
+	config, err := GetExistingConfig()
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed to get existing configuration: ", getConfErr)
+		}).Error("Failed to get existing configuration: ", err)
 		return
 	}
 
 	returnPayload := ReturnConfigPayload{
 		FromHostname:  HostDetails.Hostname,
 		FromNodeID:    NodeID,
-		Configuration: thisConfig,
+		Configuration: config,
 		TimeStamp:     time.Now().Unix(),
 	}
 

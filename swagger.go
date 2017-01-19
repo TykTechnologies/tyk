@@ -86,18 +86,18 @@ func (s *SwaggerAST) ReadString(asJson string) error {
 }
 
 func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, error) {
-	thisVersionInfo := tykcommon.VersionInfo{}
+	versionInfo := tykcommon.VersionInfo{}
 
 	if asMock {
-		return thisVersionInfo, errors.New("Swagger mocks not supported")
+		return versionInfo, errors.New("Swagger mocks not supported")
 	}
 
-	thisVersionInfo.UseExtendedPaths = true
-	thisVersionInfo.Name = s.Info.Version
-	thisVersionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
+	versionInfo.UseExtendedPaths = true
+	versionInfo.Name = s.Info.Version
+	versionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
 
 	if len(s.Paths) == 0 {
-		return thisVersionInfo, errors.New("no paths defined in swagger file")
+		return versionInfo, errors.New("no paths defined in swagger file")
 	}
 	for pathName, pathSpec := range s.Paths {
 		log.Debug("path: %s", pathName)
@@ -120,20 +120,20 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, 
 			if len(m.Responses) == 0 && m.Description == "" && m.OperationID == "" {
 				continue
 			}
-			thisMethodAction := tykcommon.EndpointMethodMeta{}
-			thisMethodAction.Action = tykcommon.NoAction
-			newEndpointMeta.MethodActions[methodName] = thisMethodAction
+			methodAction := tykcommon.EndpointMethodMeta{}
+			methodAction.Action = tykcommon.NoAction
+			newEndpointMeta.MethodActions[methodName] = methodAction
 		}
 
-		thisVersionInfo.ExtendedPaths.WhiteList = append(thisVersionInfo.ExtendedPaths.WhiteList, newEndpointMeta)
+		versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, newEndpointMeta)
 	}
 
-	return thisVersionInfo, nil
+	return versionInfo, nil
 }
 
-func (s *SwaggerAST) InsertIntoAPIDefinitionAsVersion(thisVersion tykcommon.VersionInfo, thisDefinition *tykcommon.APIDefinition, versionName string) error {
-	thisDefinition.VersionData.NotVersioned = false
-	thisDefinition.VersionData.Versions[versionName] = thisVersion
+func (s *SwaggerAST) InsertIntoAPIDefinitionAsVersion(version tykcommon.VersionInfo, def *tykcommon.APIDefinition, versionName string) error {
+	def.VersionData.NotVersioned = false
+	def.VersionData.Versions[versionName] = version
 	return nil
 }
 
@@ -179,9 +179,9 @@ func handleSwaggerMode(arguments map[string]interface{}) {
 			return
 		}
 
-		thisDefFromFile, fileErr := apiDefLoadFile(forApiPath.(string))
-		if fileErr != nil {
-			log.Error("failed to load and decode file data for API Definition: ", fileErr)
+		defFromFile, err := apiDefLoadFile(forApiPath.(string))
+		if err != nil {
+			log.Error("failed to load and decode file data for API Definition: ", err)
 			return
 		}
 
@@ -196,31 +196,31 @@ func handleSwaggerMode(arguments map[string]interface{}) {
 			log.Error("Conversion into API Def failed: ", err)
 		}
 
-		insertErr := s.InsertIntoAPIDefinitionAsVersion(versionData, thisDefFromFile, versionName.(string))
+		insertErr := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string))
 		if insertErr != nil {
 			log.Error("Insertion failed: ", insertErr)
 			return
 		}
 
-		printDef(thisDefFromFile)
+		printDef(defFromFile)
 
 	}
 }
 
 func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool) (*tykcommon.APIDefinition, error) {
-	thisAD := tykcommon.APIDefinition{}
-	thisAD.Name = s.Info.Title
-	thisAD.Active = true
-	thisAD.UseKeylessAccess = true
-	thisAD.APIID = uuid.NewUUID().String()
-	thisAD.OrgID = orgId
-	thisAD.VersionDefinition.Key = "version"
-	thisAD.VersionDefinition.Location = "header"
-	thisAD.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
-	thisAD.VersionData.NotVersioned = false
-	thisAD.Proxy.ListenPath = "/" + thisAD.APIID + "/"
-	thisAD.Proxy.StripListenPath = true
-	thisAD.Proxy.TargetURL = upstreamURL
+	ad := tykcommon.APIDefinition{}
+	ad.Name = s.Info.Title
+	ad.Active = true
+	ad.UseKeylessAccess = true
+	ad.APIID = uuid.NewUUID().String()
+	ad.OrgID = orgId
+	ad.VersionDefinition.Key = "version"
+	ad.VersionDefinition.Location = "header"
+	ad.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
+	ad.VersionData.NotVersioned = false
+	ad.Proxy.ListenPath = "/" + ad.APIID + "/"
+	ad.Proxy.StripListenPath = true
+	ad.Proxy.TargetURL = upstreamURL
 
 	if as_mock {
 		log.Warning("Mocks not supported for Swagger definitions, ignoring option")
@@ -230,31 +230,31 @@ func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool
 		log.Error("Conversion into API Def failed: ", err)
 	}
 
-	s.InsertIntoAPIDefinitionAsVersion(versionData, &thisAD, strings.Trim(s.Info.Version, " "))
+	s.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(s.Info.Version, " "))
 
-	return &thisAD, nil
+	return &ad, nil
 }
 
 func swaggerLoadFile(filePath string) (*SwaggerAST, error) {
-	thisSwagger, astErr := GetImporterForSource(SwaggerSource)
+	swagger, astErr := GetImporterForSource(SwaggerSource)
 
 	if astErr != nil {
 		log.Error("Couldn't get swagger importer: ", astErr)
-		return thisSwagger.(*SwaggerAST), astErr
+		return swagger.(*SwaggerAST), astErr
 	}
 
 	swaggerFileData, err := ioutil.ReadFile(filePath)
 
 	if err != nil {
 		log.Error("Couldn't load swagger file: ", err)
-		return thisSwagger.(*SwaggerAST), err
+		return swagger.(*SwaggerAST), err
 	}
 
-	readErr := thisSwagger.ReadString(string(swaggerFileData))
+	readErr := swagger.ReadString(string(swaggerFileData))
 	if readErr != nil {
 		log.Error("Failed to decode object")
-		return thisSwagger.(*SwaggerAST), readErr
+		return swagger.(*SwaggerAST), readErr
 	}
 
-	return thisSwagger.(*SwaggerAST), nil
+	return swagger.(*SwaggerAST), nil
 }

@@ -35,13 +35,13 @@ func (a *AccessRightsCheck) IsEnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	accessingVersion := a.Spec.getVersionFromRequest(r)
-	thisSessionState := context.Get(r, SessionData).(SessionState)
+	sessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue)
 
 	// If there's nothing in our profile, we let them through to the next phase
-	if len(thisSessionState.AccessRights) > 0 {
+	if len(sessionState.AccessRights) > 0 {
 		// Otherwise, run auth checks
-		versionList, apiExists := thisSessionState.AccessRights[a.Spec.APIID]
+		versionList, apiExists := sessionState.AccessRights[a.Spec.APIID]
 		if !apiExists {
 			log.WithFields(logrus.Fields{
 				"path":      r.URL.Path,

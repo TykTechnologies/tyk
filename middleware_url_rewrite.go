@@ -14,9 +14,9 @@ import (
 
 type URLRewriter struct{}
 
-func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
+func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
 	// Find all the matching groups:
-	mp, mpErr := regexp.Compile(thisMeta.MatchPattern)
+	mp, mpErr := regexp.Compile(meta.MatchPattern)
 	if mpErr != nil {
 		log.Debug("Compilation error: ", mpErr)
 		return "", mpErr
@@ -28,10 +28,10 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 	// Make sure it matches the string
 	log.Debug("Rewriter checking matches, len is: ", len(result_slice))
 	if len(result_slice) > 0 {
-		newpath = thisMeta.RewriteTo
+		newpath = meta.RewriteTo
 		// get the indices for the replacements:
 		dollarMatch, _ := regexp.Compile(`\$\d+`) // Prepare our regex
-		replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
+		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
 
 		log.Debug(result_slice)
 		log.Debug(replace_slice)
@@ -64,7 +64,7 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 		}
 
 		dollarMatch, _ := regexp.Compile(`\$tyk_context.(\w+)`)
-		replace_slice := dollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
+		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
 		for _, v := range replace_slice {
 			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
 			log.Debug("Replacing: ", v[0])
@@ -105,15 +105,15 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 	// Meta data from the token
 	sess, sessFound := context.GetOk(r, SessionData)
 	if sessFound {
-		thisSessionState := sess.(SessionState)
+		sessionState := sess.(SessionState)
 
 		metaDollarMatch, _ := regexp.Compile(`\$tyk_meta.(\w+)`)
-		metaReplace_slice := metaDollarMatch.FindAllStringSubmatch(thisMeta.RewriteTo, -1)
+		metaReplace_slice := metaDollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
 		for _, v := range metaReplace_slice {
 			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
 			log.Debug("Replacing: ", v[0])
 
-			tempVal, ok := thisSessionState.MetaData.(map[string]interface{})[contextKey]
+			tempVal, ok := sessionState.MetaData.(map[string]interface{})[contextKey]
 			if ok {
 				var nVal string
 				if ok {
@@ -164,8 +164,8 @@ func (m *URLRewriteMiddleware) New() {}
 
 func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
 	var used bool
-	for _, thisVersion := range m.TykMiddleware.Spec.VersionData.Versions {
-		if len(thisVersion.ExtendedPaths.URLRewrite) > 0 {
+	for _, version := range m.TykMiddleware.Spec.VersionData.Versions {
+		if len(version.ExtendedPaths.URLRewrite) > 0 {
 			used = true
 			m.TykMiddleware.Spec.URLRewriteEnabled = true
 			break
@@ -197,10 +197,10 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	found, meta := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
 	if found {
 		log.Debug("Rewriter active")
-		thisMeta := meta.(*tykcommon.URLRewriteMeta)
+		umeta := meta.(*tykcommon.URLRewriteMeta)
 		log.Debug(r.URL)
 		oldPath := r.URL.String()
-		p, pErr := m.Rewriter.Rewrite(thisMeta, r.URL.String(), true, r)
+		p, pErr := m.Rewriter.Rewrite(umeta, r.URL.String(), true, r)
 		if pErr != nil {
 			return pErr, 500
 		}

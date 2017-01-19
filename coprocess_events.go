@@ -26,9 +26,9 @@ type CoProcessEventWrapper struct {
 }
 
 func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	thisHandler := CoProcessEventHandler{}
-	thisHandler.Spec = l.Spec
-	thisHandler.conf = handlerConf.(map[string]interface{})
+	handler := CoProcessEventHandler{}
+	handler.Spec = l.Spec
+	handler.conf = handlerConf.(map[string]interface{})
 
 	// Set the VM globals
 	globalVals := JSVMContextGlobal{
@@ -41,10 +41,10 @@ func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, er
 		log.Error("Failed to marshal globals! ", gErr)
 	}
 
-	// thisHandler.SpecJSON = string(gValAsJSON)
-	thisHandler.SpecJSON = json.RawMessage(gValAsJSON)
+	// handler.SpecJSON = string(gValAsJSON)
+	handler.SpecJSON = json.RawMessage(gValAsJSON)
 
-	return thisHandler, nil
+	return handler, nil
 }
 
 func (l CoProcessEventHandler) HandleEvent(em EventMessage) {

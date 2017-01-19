@@ -174,9 +174,9 @@ func (m *CoProcessMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
-	var thisModuleConfig CoProcessMiddlewareConfig
+	var moduleConfig CoProcessMiddlewareConfig
 
-	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
+	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &moduleConfig)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -184,7 +184,7 @@ func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 		return nil, err
 	}
 
-	return thisModuleConfig, nil
+	return moduleConfig, nil
 }
 
 // IsEnabledForSpec checks if this middleware should be enabled for a given API.
@@ -235,16 +235,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, 200
 	}
 
-	var thisExtractor IdExtractor
+	var extractor IdExtractor
 	if m.TykMiddleware.Spec.EnableCoProcessAuth && m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
-		thisExtractor = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+		extractor = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 	}
 
 	var returnOverrides ReturnOverrides
 	var SessionID string
 
-	if m.HookType == coprocess.HookType_CustomKeyCheck && thisExtractor != nil {
-		SessionID, returnOverrides = thisExtractor.ExtractAndCheck(r)
+	if m.HookType == coprocess.HookType_CustomKeyCheck && extractor != nil {
+		SessionID, returnOverrides = extractor.ExtractAndCheck(r)
 
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
@@ -257,14 +257,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// It's also possible to override the HookType:
-	thisCoProcessor := CoProcessor{
+	coProcessor := CoProcessor{
 		Middleware: m,
 		// HookType: coprocess.PreHook,
 	}
 
-	object := thisCoProcessor.GetObjectFromRequest(r)
+	object := coProcessor.GetObjectFromRequest(r)
 
-	returnObject, dispatchErr := thisCoProcessor.Dispatch(object)
+	returnObject, dispatchErr := coProcessor.Dispatch(object)
 
 	if dispatchErr != nil {
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
@@ -274,7 +274,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	thisCoProcessor.ObjectPostProcess(returnObject, r)
+	coProcessor.ObjectPostProcess(returnObject, r)
 
 	authHeaderValue := returnObject.Metadata["token"]
 
@@ -305,7 +305,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		returnedSessionState := TykSessionState(returnObject.Session)
 
-		if thisExtractor == nil {
+		if extractor == nil {
 			var sessionLifetime = GetLifetime(m.Spec, &returnedSessionState)
 			// This API is not using the ID extractor, but we've got a session:
 			m.Spec.SessionManager.UpdateSession(authHeaderValue, returnedSessionState, sessionLifetime)
@@ -313,7 +313,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			context.Set(r, AuthHeaderValue, authHeaderValue)
 		} else {
 			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
-			thisExtractor.PostProcess(r, returnedSessionState, SessionID)
+			extractor.PostProcess(r, returnedSessionState, SessionID)
 		}
 	}
 

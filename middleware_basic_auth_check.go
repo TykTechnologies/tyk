@@ -90,7 +90,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Check if API key valid
 	keyName := k.TykMiddleware.Spec.OrgID + authValues[0]
-	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(keyName)
+	sessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(keyName)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -109,16 +109,16 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Ensure that the username and password match up
 	var passMatch bool
-	if thisSessionState.BasicAuthData.Hash == HASH_BCrypt {
-		err := bcrypt.CompareHashAndPassword([]byte(thisSessionState.BasicAuthData.Password), []byte(authValues[1]))
+	if sessionState.BasicAuthData.Hash == HASH_BCrypt {
+		err := bcrypt.CompareHashAndPassword([]byte(sessionState.BasicAuthData.Password), []byte(authValues[1]))
 
 		if err == nil {
 			passMatch = true
 		}
 	}
 
-	if thisSessionState.BasicAuthData.Hash == HASH_PlainText {
-		if thisSessionState.BasicAuthData.Password == authValues[1] {
+	if sessionState.BasicAuthData.Hash == HASH_PlainText {
+		if sessionState.BasicAuthData.Password == authValues[1] {
 			passMatch = true
 		}
 	}
@@ -141,7 +141,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Set session state on context, we will need it later
 	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.BasicAuthUser) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
-		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, keyName)
 	}
 

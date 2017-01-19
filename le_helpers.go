@@ -14,8 +14,8 @@ func StoreLEState(m *letsencrypt.Manager) {
 
 	log.Debug("[SSL] --> Connecting to DB")
 
-	thisStore := &RedisClusterStorageManager{KeyPrefix: LEKeyPrefix, HashKeys: false}
-	connected := thisStore.Connect()
+	store := &RedisClusterStorageManager{KeyPrefix: LEKeyPrefix, HashKeys: false}
+	connected := store.Connect()
 
 	log.Debug("--> Connected to DB")
 
@@ -28,9 +28,9 @@ func StoreLEState(m *letsencrypt.Manager) {
 	secret := rightPad2Len(config.Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), state)
 
-	rErr := thisStore.SetKey("cache", cryptoText, -1)
-	if rErr != nil {
-		log.Error("[SSL] --> Failed to store SSL backup: ", rErr)
+	err := store.SetKey("cache", cryptoText, -1)
+	if err != nil {
+		log.Error("[SSL] --> Failed to store SSL backup: ", err)
 		return
 	}
 }
@@ -38,9 +38,9 @@ func StoreLEState(m *letsencrypt.Manager) {
 func GetLEState(m *letsencrypt.Manager) {
 	checkKey := "cache"
 
-	thisStore := &RedisClusterStorageManager{KeyPrefix: LEKeyPrefix, HashKeys: false}
+	store := &RedisClusterStorageManager{KeyPrefix: LEKeyPrefix, HashKeys: false}
 
-	connected := thisStore.Connect()
+	connected := store.Connect()
 	log.Debug("[SSL] --> Connected to DB")
 
 	if !connected {
@@ -48,9 +48,9 @@ func GetLEState(m *letsencrypt.Manager) {
 		return
 	}
 
-	cryptoText, rErr := thisStore.GetKey(checkKey)
-	if rErr != nil {
-		log.Warning("[SSL] --> No SSL backup: ", rErr)
+	cryptoText, err := store.GetKey(checkKey)
+	if err != nil {
+		log.Warning("[SSL] --> No SSL backup: ", err)
 		return
 	}
 
@@ -66,8 +66,8 @@ type LE_ServerInfo struct {
 }
 
 func OnLESSLStatusReceivedHandler(payload string) {
-	thisServerData := LE_ServerInfo{}
-	jsErr := json.Unmarshal([]byte(payload), &thisServerData)
+	serverData := LE_ServerInfo{}
+	jsErr := json.Unmarshal([]byte(payload), &serverData)
 	if jsErr != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -75,10 +75,10 @@ func OnLESSLStatusReceivedHandler(payload string) {
 		return
 	}
 
-	log.Debug("Received LE data: ", thisServerData)
+	log.Debug("Received LE data: ", serverData)
 
 	// not great
-	if thisServerData.ID != NodeID {
+	if serverData.ID != NodeID {
 		log.Info("Received Redis LE change notification!")
 		GetLEState(&LE_MANAGER)
 	}

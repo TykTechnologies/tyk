@@ -91,13 +91,13 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 			bucketKey := key + ":" + currentSession.LastUpdated
 
 			// DRL will always overflow with more servers on low rates
-			thisRate := uint(currentSession.Rate * float64(DRLManager.RequestTokenValue))
-			if thisRate < uint(DRLManager.CurrentTokenValue) {
-				thisRate = uint(DRLManager.CurrentTokenValue)
+			rate := uint(currentSession.Rate * float64(DRLManager.RequestTokenValue))
+			if rate < uint(DRLManager.CurrentTokenValue) {
+				rate = uint(DRLManager.CurrentTokenValue)
 			}
 
-			thisUserBucket, cErr := BucketStore.Create(bucketKey,
-				thisRate,
+			userBucket, cErr := BucketStore.Create(bucketKey,
+				rate,
 				time.Duration(currentSession.Per)*time.Second)
 
 			if cErr != nil {
@@ -106,7 +106,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 			}
 
 			//log.Info("Add is: ", DRLManager.CurrentTokenValue)
-			_, errF := thisUserBucket.Add(uint(DRLManager.CurrentTokenValue))
+			_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
 
 			if errF != nil {
 				return false, 1

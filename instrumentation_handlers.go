@@ -16,9 +16,7 @@ var instrument = health.NewStream()
 
 // SetupInstrumentation handles all the intialisation of the instrumentation handler
 func SetupInstrumentation(enabled bool) {
-	thisInstr := os.Getenv("TYK_INSTRUMENTATION")
-
-	if thisInstr == "1" {
+	if os.Getenv("TYK_INSTRUMENTATION") == "1" {
 		enabled = true
 	}
 

@@ -28,8 +28,8 @@ func (t *RequestSizeLimitMiddleware) GetConfig() (interface{}, error) {
 
 func (t *RequestSizeLimitMiddleware) IsEnabledForSpec() bool {
 	var used bool
-	for _, thisVersion := range t.TykMiddleware.Spec.VersionData.Versions {
-		if len(thisVersion.ExtendedPaths.SizeLimit) > 0 {
+	for _, version := range t.TykMiddleware.Spec.VersionData.Versions {
+		if len(version.ExtendedPaths.SizeLimit) > 0 {
 			used = true
 			break
 		}
@@ -104,10 +104,8 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestSizeLimit)
 	if found {
 		log.Debug("Request size limit matched for this URL, checking...")
-		thisMeta := meta.(*tykcommon.RequestSizeMeta)
-
-		return t.checkRequestLimit(r, thisMeta.SizeLimit)
-
+		rmeta := meta.(*tykcommon.RequestSizeMeta)
+		return t.checkRequestLimit(r, rmeta.SizeLimit)
 	}
 
 	return nil, 200

@@ -19,8 +19,6 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
-// KeyExists will check if the key being used to access the API is in the request data,
-// and then if the key is in the storage engine
 type JWTMiddleware struct {
 	*TykMiddleware
 }
@@ -64,7 +62,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 		JWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
-	var thisJWKSet JWKs
+	var jwkSet JWKs
 	cachedJWK, found := JWKCache.Get(k.TykMiddleware.Spec.APIID)
 	if !found {
 		// Get the JWK
@@ -83,7 +81,7 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 			return nil, err
 		}
 
-		decErr := json.Unmarshal(contents, &thisJWKSet)
+		decErr := json.Unmarshal(contents, &jwkSet)
 		if decErr != nil {
 			log.Error("Failed to decode body JWK: ", decErr)
 			return nil, err
@@ -91,13 +89,13 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 
 		// Cache it
 		log.Debug("Caching JWK")
-		JWKCache.Set(k.TykMiddleware.Spec.APIID, thisJWKSet, cache.DefaultExpiration)
+		JWKCache.Set(k.TykMiddleware.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
-		thisJWKSet = cachedJWK.(JWKs)
+		jwkSet = cachedJWK.(JWKs)
 	}
 
 	log.Debug("Checking JWKs...")
-	for _, val := range thisJWKSet.Keys {
+	for _, val := range jwkSet.Keys {
 		if val.KID == kid {
 			if strings.ToLower(val.Kty) == strings.ToLower(keyType) {
 				if len(val.X5c) > 0 {
@@ -139,13 +137,13 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 }
 
 func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
-	thisConfig := k.TykMiddleware.Spec.APIDefinition
+	config := k.TykMiddleware.Spec.APIDefinition
 	// Check for central JWT source
-	if thisConfig.JWTSource != "" {
+	if config.JWTSource != "" {
 
 		// Is it a URL?
-		if strings.HasPrefix(strings.ToLower(thisConfig.JWTSource), "http://") || strings.HasPrefix(strings.ToLower(thisConfig.JWTSource), "https://") {
-			secret, urlErr := k.getSecretFromURL(thisConfig.JWTSource, token.Header["kid"].(string), k.TykMiddleware.Spec.JWTSigningMethod)
+		if strings.HasPrefix(strings.ToLower(config.JWTSource), "http://") || strings.HasPrefix(strings.ToLower(config.JWTSource), "https://") {
+			secret, urlErr := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.TykMiddleware.Spec.JWTSigningMethod)
 			if urlErr != nil {
 				return nil, urlErr
 			}
@@ -154,7 +152,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 		}
 
 		// If not, return the actual value
-		decodedCert, decErr := b64.StdEncoding.DecodeString(thisConfig.JWTSource)
+		decodedCert, decErr := b64.StdEncoding.DecodeString(config.JWTSource)
 		if decErr != nil {
 			return nil, decErr
 		}
@@ -168,17 +166,14 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 		return nil, errors.New("Key ID not found")
 	}
 
-	var thisSessionState SessionState
-	var rawKeyExists bool
-
 	// Couldn't b64 decode the kid, so lets try it raw
 	log.Debug("Getting key: ", tykId)
-	thisSessionState, rawKeyExists = k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	sessionState, rawKeyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !rawKeyExists {
 		log.Info("Not found!")
 		return nil, errors.New("token invalid, key not found")
 	}
-	return []byte(thisSessionState.JWTData.Secret), nil
+	return []byte(sessionState.JWTData.Secret), nil
 }
 
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
@@ -199,8 +194,8 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 		}
 
 		// Check for a regular token that matches this client ID
-		clientsessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
-		if !keyExists {
+		clientsessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
+		if !exists {
 			return "", false
 		}
 
@@ -241,11 +236,11 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 
 	log.Debug("JWT Temporary session ID is: ", SessionID)
 
-	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
-	if !keyExists {
+	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
-		thisSessionState = SessionState{}
+		sessionState = SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy := k.getBasePolicyID(token)
@@ -258,16 +253,16 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 			true)
 
 		if err == nil {
-			thisSessionState = newSessionState
-			thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
-			thisSessionState.Alias = baseFieldData
+			sessionState = newSessionState
+			sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
+			sessionState.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again
-			k.Spec.SessionManager.UpdateSession(SessionID, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
+			k.Spec.SessionManager.UpdateSession(SessionID, sessionState, GetLifetime(k.Spec, &sessionState))
 			log.Debug("Policy applied to key")
 
 			if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
-				context.Set(r, SessionData, thisSessionState)
+				context.Set(r, SessionData, sessionState)
 				context.Set(r, AuthHeaderValue, SessionID)
 			}
 			k.setContextVars(r, token)
@@ -281,7 +276,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 
 	log.Debug("Key found")
 	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
-		context.Set(r, SessionData, thisSessionState)
+		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, SessionID)
 	}
 	return nil, 200
@@ -304,35 +299,35 @@ func (k *JWTMiddleware) processOneToOneTokenMap(w http.ResponseWriter, r *http.R
 	}
 
 	log.Debug("Using raw key ID: ", tykId)
-	thisSessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
-	if !keyExists {
+	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), 403
 	}
 
 	log.Debug("Raw key ID found.")
-	context.Set(r, SessionData, thisSessionState)
+	context.Set(r, SessionData, sessionState)
 	context.Set(r, AuthHeaderValue, tykId)
 	k.setContextVars(r, token)
 	return nil, 200
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	thisConfig := k.TykMiddleware.Spec.APIDefinition.Auth
+	config := k.TykMiddleware.Spec.APIDefinition.Auth
 	var tykId string
 
 	// Get the token
-	rawJWT := r.Header.Get(thisConfig.AuthHeaderName)
-	if thisConfig.UseParam {
+	rawJWT := r.Header.Get(config.AuthHeaderName)
+	if config.UseParam {
 		tempRes := CopyRequest(r)
 
 		// Set hte header name
-		rawJWT = tempRes.FormValue(thisConfig.AuthHeaderName)
+		rawJWT = tempRes.FormValue(config.AuthHeaderName)
 	}
 
-	if thisConfig.UseCookie {
+	if config.UseCookie {
 		tempRes := CopyRequest(r)
-		authCookie, notFoundErr := tempRes.Cookie(thisConfig.AuthHeaderName)
+		authCookie, notFoundErr := tempRes.Cookie(config.AuthHeaderName)
 		if notFoundErr != nil {
 			rawJWT = ""
 		} else {
@@ -347,7 +342,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			"origin": GetIPFromRequest(r),
 		}).Info("Attempted access with malformed header, no JWT auth header found.")
 
-		log.Debug("Looked in: ", thisConfig.AuthHeaderName)
+		log.Debug("Looked in: ", config.AuthHeaderName)
 		log.Debug("Raw data was: ", rawJWT)
 		log.Debug("Headers are: ", r.Header)
 
@@ -434,8 +429,8 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 			claimPrefix := "jwt_claims_"
 
 			for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
-				thisClaim := claimPrefix + claimName
-				contextDataObject[thisClaim] = claimValue
+				claim := claimPrefix + claimName
+				contextDataObject[claim] = claimValue
 			}
 
 			// Key data
@@ -452,7 +447,7 @@ func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (
 	log.Debug("Generating from policyID: ", policyID)
 	log.Debug(Policies)
 	policy, ok := Policies[policyID]
-	thisSessionState := SessionState{}
+	sessionState := SessionState{}
 	log.Debug(ok)
 	if ok {
 		log.Debug("Policy found")
@@ -462,7 +457,7 @@ func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (
 		if enforceOrg {
 			if policy.OrgID != OrgID {
 				log.Error("Attempting to apply policy from different organisation to key, skipping")
-				return thisSessionState, errors.New("Key not authorized: no matching policy")
+				return sessionState, errors.New("Key not authorized: no matching policy")
 			}
 		} else {
 			// Org isn;t enforced, so lets use the policy baseline
@@ -470,24 +465,24 @@ func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (
 		}
 
 		log.Debug("Found policy, applying")
-		thisSessionState.ApplyPolicyID = policyID
-		thisSessionState.OrgID = OrgID
-		thisSessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-		thisSessionState.Rate = policy.Rate
-		thisSessionState.Per = policy.Per
-		thisSessionState.QuotaMax = policy.QuotaMax
-		thisSessionState.QuotaRenewalRate = policy.QuotaRenewalRate
-		thisSessionState.AccessRights = policy.AccessRights
-		thisSessionState.HMACEnabled = policy.HMACEnabled
-		thisSessionState.IsInactive = policy.IsInactive
-		thisSessionState.Tags = policy.Tags
+		sessionState.ApplyPolicyID = policyID
+		sessionState.OrgID = OrgID
+		sessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+		sessionState.Rate = policy.Rate
+		sessionState.Per = policy.Per
+		sessionState.QuotaMax = policy.QuotaMax
+		sessionState.QuotaRenewalRate = policy.QuotaRenewalRate
+		sessionState.AccessRights = policy.AccessRights
+		sessionState.HMACEnabled = policy.HMACEnabled
+		sessionState.IsInactive = policy.IsInactive
+		sessionState.Tags = policy.Tags
 
 		if policy.KeyExpiresIn > 0 {
-			thisSessionState.Expires = time.Now().Unix() + policy.KeyExpiresIn
+			sessionState.Expires = time.Now().Unix() + policy.KeyExpiresIn
 		}
 
-		return thisSessionState, nil
+		return sessionState, nil
 	}
 
-	return thisSessionState, errors.New("Policy not found")
+	return sessionState, errors.New("Policy not found")
 }

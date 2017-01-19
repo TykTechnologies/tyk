@@ -83,11 +83,11 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(w http.ResponseWriter, r *ht
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	thisSessionState := context.Get(r, SessionData).(SessionState)
+	sessionState := context.Get(r, SessionData).(SessionState)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 
 	storeRef := k.Spec.SessionManager.GetStore()
-	forwardMessage, reason := sessionLimiter.ForwardMessage(&thisSessionState,
+	forwardMessage, reason := sessionLimiter.ForwardMessage(&sessionState,
 		authHeaderValue,
 		storeRef,
 		!k.Spec.DisableRateLimit,
@@ -97,15 +97,15 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
 		// Ensure quota and rate data for this session are recorded
 		if !config.UseAsyncSessionWrite {
-			k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
-			context.Set(r, SessionData, thisSessionState)
+			k.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, GetLifetime(k.Spec, &sessionState))
+			context.Set(r, SessionData, sessionState)
 		} else {
-			go k.Spec.SessionManager.UpdateSession(authHeaderValue, thisSessionState, GetLifetime(k.Spec, &thisSessionState))
-			go context.Set(r, SessionData, thisSessionState)
+			go k.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, GetLifetime(k.Spec, &sessionState))
+			go context.Set(r, SessionData, sessionState)
 		}
 	}
 
-	log.Debug("SessionState: ", thisSessionState)
+	log.Debug("SessionState: ", sessionState)
 
 	if !forwardMessage {
 		// TODO Use an Enum!
@@ -120,7 +120,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if config.Monitor.MonitorUserKeys {
-		sessionMonitor.Check(&thisSessionState, authHeaderValue)
+		sessionMonitor.Check(&sessionState, authHeaderValue)
 	}
 
 	// Request is valid, carry on

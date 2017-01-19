@@ -74,9 +74,9 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 			return
 		}
 
-		thisDefFromFile, fileErr := apiDefLoadFile(forApiPath.(string))
-		if fileErr != nil {
-			log.Error("failed to load and decode file data for API Definition: ", fileErr)
+		defFromFile, err := apiDefLoadFile(forApiPath.(string))
+		if err != nil {
+			log.Error("failed to load and decode file data for API Definition: ", err)
 			return
 		}
 
@@ -91,13 +91,13 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 			log.Error("onversion into API Def failed: ", err)
 		}
 
-		insertErr := bp.InsertIntoAPIDefinitionAsVersion(versionData, thisDefFromFile, versionName.(string))
+		insertErr := bp.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string))
 		if insertErr != nil {
 			log.Error("Insertion failed: ", insertErr)
 			return
 		}
 
-		printDef(thisDefFromFile)
+		printDef(defFromFile)
 
 	}
 }
@@ -114,69 +114,69 @@ func printDef(def *tykcommon.APIDefinition) {
 }
 
 func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock bool) (*tykcommon.APIDefinition, error) {
-	thisAD := tykcommon.APIDefinition{}
-	thisAD.Name = bp.Name
-	thisAD.Active = true
-	thisAD.UseKeylessAccess = true
-	thisAD.APIID = uuid.NewUUID().String()
-	thisAD.OrgID = orgId
-	thisAD.VersionDefinition.Key = "version"
-	thisAD.VersionDefinition.Location = "header"
-	thisAD.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
-	thisAD.VersionData.NotVersioned = false
-	thisAD.Proxy.ListenPath = "/" + thisAD.APIID + "/"
-	thisAD.Proxy.StripListenPath = true
-	thisAD.Proxy.TargetURL = upstreamURL
+	ad := tykcommon.APIDefinition{}
+	ad.Name = bp.Name
+	ad.Active = true
+	ad.UseKeylessAccess = true
+	ad.APIID = uuid.NewUUID().String()
+	ad.OrgID = orgId
+	ad.VersionDefinition.Key = "version"
+	ad.VersionDefinition.Location = "header"
+	ad.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
+	ad.VersionData.NotVersioned = false
+	ad.Proxy.ListenPath = "/" + ad.APIID + "/"
+	ad.Proxy.StripListenPath = true
+	ad.Proxy.TargetURL = upstreamURL
 
 	versionData, err := bp.ConvertIntoApiVersion(as_mock)
 	if err != nil {
 		log.Error("onversion into API Def failed: ", err)
 	}
 
-	bp.InsertIntoAPIDefinitionAsVersion(versionData, &thisAD, strings.Trim(bp.Name, " "))
+	bp.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(bp.Name, " "))
 
-	return &thisAD, nil
+	return &ad, nil
 }
 
 func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
-	thisBlueprint, astErr := GetImporterForSource(ApiaryBluePrint)
+	blueprint, astErr := GetImporterForSource(ApiaryBluePrint)
 
 	if astErr != nil {
 		log.Error("Couldn't get blueprint importer: ", astErr)
-		return thisBlueprint.(*BluePrintAST), astErr
+		return blueprint.(*BluePrintAST), astErr
 	}
 
 	bluePrintFileData, err := ioutil.ReadFile(filePath)
 
 	if err != nil {
 		log.Error("Couldn't load blueprint file: ", err)
-		return thisBlueprint.(*BluePrintAST), err
+		return blueprint.(*BluePrintAST), err
 	}
 
-	readErr := thisBlueprint.ReadString(string(bluePrintFileData))
+	readErr := blueprint.ReadString(string(bluePrintFileData))
 	if readErr != nil {
 		log.Error("Failed to decode object")
-		return thisBlueprint.(*BluePrintAST), readErr
+		return blueprint.(*BluePrintAST), readErr
 	}
 
-	return thisBlueprint.(*BluePrintAST), nil
+	return blueprint.(*BluePrintAST), nil
 }
 
 func apiDefLoadFile(filePath string) (*tykcommon.APIDefinition, error) {
-	thisDef := &tykcommon.APIDefinition{}
+	def := &tykcommon.APIDefinition{}
 
 	defFileData, err := ioutil.ReadFile(filePath)
 
 	if err != nil {
 		log.Error("Couldn't load API Definition file: ", err)
-		return thisDef, err
+		return def, err
 	}
 
-	jsonErr := json.Unmarshal(defFileData, &thisDef)
+	jsonErr := json.Unmarshal(defFileData, &def)
 	if jsonErr != nil {
 		log.Error("Failed to unmarshal the JSON definition: ", jsonErr)
-		return thisDef, jsonErr
+		return def, jsonErr
 	}
 
-	return thisDef, nil
+	return def, nil
 }

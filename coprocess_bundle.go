@@ -181,28 +181,26 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 }
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
-func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
+func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 
 	if !config.EnableBundleDownloader {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("Bundle downloader is disabled.")
 		err = errors.New("Bundle downloader is disabled")
-		return thisBundle, err
+		return bundle, err
 	}
 
 	var bundleUrl string
 
 	bundleUrl = strings.Join([]string{config.BundleBaseURL, spec.CustomMiddlewareBundle}, "")
 
-	var thisGetter BundleGetter
+	var getter BundleGetter
 
-	var u *url.URL
-	u, err = url.Parse(bundleUrl)
-
+	u, err := url.Parse(bundleUrl)
 	switch u.Scheme {
 	case "http":
-		thisGetter = &HttpBundleGetter{
+		getter = &HttpBundleGetter{
 			Url: bundleUrl,
 		}
 	default:
@@ -212,15 +210,15 @@ func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
 		return Bundle{}, err
 	}
 
-	bundleData, err := thisGetter.Get()
+	bundleData, err := getter.Get()
 
-	thisBundle = Bundle{
+	bundle = Bundle{
 		Name: spec.CustomMiddlewareBundle,
 		Data: bundleData,
 		Spec: spec,
 	}
 
-	return thisBundle, err
+	return bundle, err
 }
 
 // saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.

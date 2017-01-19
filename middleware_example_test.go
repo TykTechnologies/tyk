@@ -29,15 +29,15 @@ func (m *ModifiedMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *ModifiedMiddleware) GetConfig() (interface{}, error) {
-	var thisModuleConfig ModifiedMiddlewareConfig
+	var moduleConfig ModifiedMiddlewareConfig
 
-	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
+	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &moduleConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 
-	return thisModuleConfig, nil
+	return moduleConfig, nil
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

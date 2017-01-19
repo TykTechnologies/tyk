@@ -114,18 +114,18 @@ func (b BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructur
 			absURL = requestDef.RelativeURL
 		}
 
-		thisRequest, createReqErr := http.NewRequest(requestDef.Method, absURL, bytes.NewBuffer([]byte(requestDef.Body)))
-		if createReqErr != nil {
+		request, err := http.NewRequest(requestDef.Method, absURL, bytes.NewBuffer([]byte(requestDef.Body)))
+		if err != nil {
 			log.Error("Failure generating batch request for request spec index: ", i)
-			return nil, createReqErr
+			return nil, err
 		}
 
 		// Add headers
 		for k, v := range requestDef.Headers {
-			thisRequest.Header.Add(k, v)
+			request.Header.Add(k, v)
 		}
 
-		requestSet = append(requestSet, thisRequest)
+		requestSet = append(requestSet, request)
 	}
 
 	return requestSet, nil
@@ -173,8 +173,8 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 		}
 
 		// Construct the requests
-		requestSet, createReqErr := b.ConstructRequests(batchRequest, false)
-		if createReqErr != nil {
+		requestSet, err := b.ConstructRequests(batchRequest, false)
+		if err != nil {
 			ReturnError(fmt.Sprintf("Batch request creation failed , request structure malformed"), w)
 			return
 		}
@@ -208,9 +208,9 @@ func (b BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 	}
 
 	// Construct the unsafe requests
-	requestSet, createReqErr := b.ConstructRequests(batchRequest, true)
-	if createReqErr != nil {
-		log.Error("Batch request creation failed , request structure malformed: ", createReqErr)
+	requestSet, err := b.ConstructRequests(batchRequest, true)
+	if err != nil {
+		log.Error("Batch request creation failed , request structure malformed: ", err)
 		return []byte{}
 	}
 

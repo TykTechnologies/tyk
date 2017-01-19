@@ -16,8 +16,8 @@ type MultiTargetProxy struct {
 }
 
 func (m *MultiTargetProxy) getProxyForRequest(r *http.Request) (*ReverseProxy, error) {
-	thisVersion, _, _, _ := m.specReference.GetVersionData(r)
-	proxy, found := m.VersionProxyMap[thisVersion.Name]
+	version, _, _, _ := m.specReference.GetVersionData(r)
+	proxy, found := m.VersionProxyMap[version.Name]
 
 	if !found {
 		return nil, errors.New("proxy not found")
@@ -30,7 +30,7 @@ func (m *MultiTargetProxy) ServeHTTP(rw http.ResponseWriter, r *http.Request) *h
 	log.WithFields(logrus.Fields{
 		"prefix": "multi-target",
 	}).Debug("Serving Multi-target...")
-	thisProxy, err := m.getProxyForRequest(r)
+	proxy, err := m.getProxyForRequest(r)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "multi-target",
@@ -38,15 +38,15 @@ func (m *MultiTargetProxy) ServeHTTP(rw http.ResponseWriter, r *http.Request) *h
 		return m.defaultProxy.ServeHTTP(rw, r)
 	}
 
-	return thisProxy.ServeHTTP(rw, r)
+	return proxy.ServeHTTP(rw, r)
 }
 func (m *MultiTargetProxy) ServeHTTPForCache(rw http.ResponseWriter, r *http.Request) *http.Response {
-	thisProxy, err := m.getProxyForRequest(r)
+	proxy, err := m.getProxyForRequest(r)
 	if err != nil {
 		return m.defaultProxy.ServeHTTPForCache(rw, r)
 	}
 
-	return thisProxy.ServeHTTPForCache(rw, r)
+	return proxy.ServeHTTPForCache(rw, r)
 }
 
 func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {

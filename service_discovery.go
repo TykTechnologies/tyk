@@ -156,11 +156,11 @@ func (s *ServiceDiscovery) isList(val string) bool {
 func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]string {
 	hostList := []string{}
 	var hostname string
-	var thisSet *[]*gabs.Container
+	var set *[]*gabs.Container
 	if s.endpointReturnsList {
 		// pre-process the object since we've nested it
-		thisSet = s.decodeToNameSpaceAsArray(ARRAY_NAME, objList)
-		log.Debug("thisSet: ", thisSet)
+		set = s.decodeToNameSpaceAsArray(ARRAY_NAME, objList)
+		log.Debug("set: ", set)
 	} else {
 		// It's an object, but the value may be nested
 		if s.isNested {
@@ -181,10 +181,10 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 				log.Debug("Yup, it's a list")
 				s.ConvertRawListToObj(&nestedString)
 				s.ParseObject(nestedString, &subContainer)
-				thisSet = s.decodeToNameSpaceAsArray(ARRAY_NAME, &subContainer)
+				set = s.decodeToNameSpaceAsArray(ARRAY_NAME, &subContainer)
 
 				// Hijack this here because we need to use a non-nested get
-				for _, item := range *thisSet {
+				for _, item := range *set {
 					log.Debug("Child in list: ", item)
 					hostname = s.GetObject(item) + s.targetPath
 					// Add to list
@@ -198,17 +198,17 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) *[]stri
 				log.Debug("parentData is not a string")
 			case string:
 				s.ParseObject(parentData.(string), &subContainer)
-				thisSet = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-				log.Debug("thisSet (object list): ", objList)
+				set = s.decodeToNameSpaceAsArray(s.dataPath, objList)
+				log.Debug("set (object list): ", objList)
 			}
 		} else if s.parentPath != "" {
-			thisSet = s.decodeToNameSpaceAsArray(s.parentPath, objList)
+			set = s.decodeToNameSpaceAsArray(s.parentPath, objList)
 		}
 
 	}
 
-	if thisSet != nil {
-		for _, item := range *thisSet {
+	if set != nil {
+		for _, item := range *set {
 			log.Debug("Child in list: ", item)
 			hostname = s.GetHostname(item) + s.targetPath
 			// Add to list

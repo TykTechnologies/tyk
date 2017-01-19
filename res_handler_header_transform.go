@@ -23,19 +23,18 @@ type HeaderTransform struct {
 }
 
 func (h HeaderTransform) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	thisHandler := HeaderTransform{}
-	thisModuleConfig := HeaderTransformOptions{}
+	handler := HeaderTransform{}
+	moduleConfig := HeaderTransformOptions{}
 
-	err := mapstructure.Decode(c, &thisModuleConfig)
+	err := mapstructure.Decode(c, &moduleConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 
-	thisHandler.config = thisModuleConfig
-	thisHandler.Spec = spec
-
-	return thisHandler, nil
+	handler.config = moduleConfig
+	handler.Spec = spec
+	return handler, nil
 }
 
 func (h HeaderTransform) HandleResponse(rw http.ResponseWriter,

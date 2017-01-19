@@ -114,11 +114,10 @@ func InitNormalisationPatterns() NormaliseURLPatterns {
 
 	custPats := []*regexp.Regexp{}
 	for _, pattern := range config.AnalyticsConfig.NormaliseUrls.Custom {
-		thisPat, patErr := regexp.Compile(pattern)
-		if patErr != nil {
-			log.Error("failed to compile custom pattern: ", patErr)
+		if patRe, err := regexp.Compile(pattern); err != nil {
+			log.Error("failed to compile custom pattern: ", err)
 		} else {
-			custPats = append(custPats, thisPat)
+			custPats = append(custPats, patRe)
 		}
 	}
 
@@ -194,12 +193,12 @@ func (r *RedisAnalyticsHandler) Init() {
 }
 
 func (r *RedisAnalyticsHandler) reloadDB() {
-	thisDb, err := maxminddb.Open(config.AnalyticsConfig.GeoIPDBLocation)
+	db, err := maxminddb.Open(config.AnalyticsConfig.GeoIPDBLocation)
 	if err != nil {
 		log.Error("Failed to init GeoIP Database: ", err)
 	} else {
 		oldDB := r.GeoIPDB
-		r.GeoIPDB = thisDb
+		r.GeoIPDB = db
 		if oldDB != nil {
 			oldDB.Close()
 		}
@@ -209,34 +208,34 @@ func (r *RedisAnalyticsHandler) reloadDB() {
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
-func (r RedisAnalyticsHandler) RecordHit(thisRecord AnalyticsRecord) error {
+func (r RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 
 	AnalyticsPool.SendWork(func() {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-		thisRecord.APIKey = publicHash(thisRecord.APIKey)
+		record.APIKey = publicHash(record.APIKey)
 
 		if config.SlaveOptions.UseRPC {
 			// Extend tag list to include this data so wecan segment by node if necessary
-			thisRecord.Tags = append(thisRecord.Tags, "tyk-hybrid-rpc")
+			record.Tags = append(record.Tags, "tyk-hybrid-rpc")
 		}
 
 		if config.DBAppConfOptions.NodeIsSegmented {
 			// Extend tag list to include this data so wecan segment by node if necessary
-			thisRecord.Tags = append(thisRecord.Tags, config.DBAppConfOptions.Tags...)
+			record.Tags = append(record.Tags, config.DBAppConfOptions.Tags...)
 		}
 
 		// Lets add some metadata
-		if thisRecord.APIKey != "" {
-			thisRecord.Tags = append(thisRecord.Tags, "key-"+thisRecord.APIKey)
+		if record.APIKey != "" {
+			record.Tags = append(record.Tags, "key-"+record.APIKey)
 		}
 
-		if thisRecord.OrgID != "" {
-			thisRecord.Tags = append(thisRecord.Tags, "org-"+thisRecord.OrgID)
+		if record.OrgID != "" {
+			record.Tags = append(record.Tags, "org-"+record.OrgID)
 		}
 
-		thisRecord.Tags = append(thisRecord.Tags, "api-"+thisRecord.APIID)
+		record.Tags = append(record.Tags, "api-"+record.APIID)
 
-		encoded, err := msgpack.Marshal(thisRecord)
+		encoded, err := msgpack.Marshal(record)
 
 		if err != nil {
 			log.Error("Error encoding analytics data: ", err)

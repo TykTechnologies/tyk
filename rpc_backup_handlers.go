@@ -27,14 +27,14 @@ func getTagListAsString() string {
 	return tagList
 }
 
-func SaveRPCDefinitionsBackup(thisList string) {
+func SaveRPCDefinitionsBackup(list string) {
 	log.Info("Storing RPC backup")
 	tagList := getTagListAsString()
 
 	log.Info("--> Connecting to DB")
 
-	thisStore := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
-	connected := thisStore.Connect()
+	store := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
+	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
 
@@ -44,8 +44,8 @@ func SaveRPCDefinitionsBackup(thisList string) {
 	}
 
 	secret := rightPad2Len(config.Secret, "=", 32)
-	cryptoText := encrypt([]byte(secret), thisList)
-	rErr := thisStore.SetKey(BackupKeyBase+tagList, cryptoText, -1)
+	cryptoText := encrypt([]byte(secret), list)
+	rErr := store.SetKey(BackupKeyBase+tagList, cryptoText, -1)
 	if rErr != nil {
 		log.Error("Failed to store node backup: ", rErr)
 	}
@@ -55,9 +55,9 @@ func LoadDefinitionsFromRPCBackup() *[]*APISpec {
 	tagList := getTagListAsString()
 	checkKey := BackupKeyBase + tagList
 
-	thisStore := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
+	store := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix, HashKeys: false}
 
-	connected := thisStore.Connect()
+	connected := store.Connect()
 	log.Info("[RPC] --> Connected to DB")
 
 	if !connected {
@@ -66,7 +66,7 @@ func LoadDefinitionsFromRPCBackup() *[]*APISpec {
 	}
 
 	secret := rightPad2Len(config.Secret, "=", 32)
-	cryptoText, rErr := thisStore.GetKey(checkKey)
+	cryptoText, rErr := store.GetKey(checkKey)
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
 	if rErr != nil {
