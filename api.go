@@ -1842,6 +1842,20 @@ func getOauthClients(APIID string) ([]byte, int) {
 		return responseMessage, 400
 	}
 
+	if thisAPISpec.OAuthManager == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  APIID,
+			"status": "fail",
+			"err":    "API not found",
+		}).Error("Failed to retrieve OAuth client list.")
+
+		notAvailable := APIStatusMessage{"error", "OAuth client list isn't available or hasn't been propagated yet."}
+		responseMessage, _ = json.Marshal(&notAvailable)
+
+		return responseMessage, 400
+	}
+
 	thisClientData, getClientsErr := thisAPISpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
 	if getClientsErr != nil {
 		log.WithFields(logrus.Fields{
