@@ -50,23 +50,11 @@ All the documentation can be found on our main site at http://tyk.io/
 
 Tyk is released under the MPL v2.0 please see the LICENSE.md file for a full version of the license.
 
-## Contribute / Build ##
+## Contributing ##
 
-To get started contributing, clone the repo to your local go workspace, change into the new tyk directory and run `go get`, this should retrieve all the dependencies.
+For more information about contributing PRs and issues, see our [Contribution Guidelines](CONTRIBUTING.md).
 
-We are working to increase test coverage of features, currently the majority of auth methods and middleware are tested, however it could always be better.
-
-Any changes that are submitted with a pull request should come with a test and be in a separate branch. Basically, use this checklist:
-
-- Do your changes have tests?
-- Have you run the tests?
-- Did they pass?
-- Have you written a test for your feature?
-- Does it pass after merge?
-
-If you can answer yes to all of the above, feel free to submit a pull request :-)
-
-## Roadmap
+## Roadmap ##
 
 To coordinate development and be completely transparent as to where the project is going, the version roadmap for the next version, as well as proposed features
 and adopted proposals can be viewed on our public Trello board:
@@ -74,20 +62,3 @@ and adopted proposals can be viewed on our public Trello board:
 [https://trello.com/b/59d5kAZ5/tyk-api-gateway-roadmap](https://trello.com/b/59d5kAZ5/tyk-api-gateway-roadmap)
 
 Any proposals can be made in the Github issue tracker, proposals that are adopted will be placed into the trello and then moved according to their status.
-
-### A note on the tests
-
-Currently in order for tests to pass, a redis host is required. We know, this is terrible and should be handled with an interface, and it is, however
-in the current version there is a hard requirement for the application to have its default memory setup to use redis as part of a deployment, this is
-to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement.
-
-The simplest way to get the tests to run is to install local redis, or (what I do) have a vagrant instance that is running redis, then you can just `vagrant up`
-when you need redis and kill it later. Just make sure you are forwarding the default ports 1:1.
-
-### Dev versus stable
-
-The master branch is NOT the stable releases, check the tags for stable releases that can be patched, please see the CHANGELOG for breaking changes or to see how things stand.
-
-### Geo IP features
-
-This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).
