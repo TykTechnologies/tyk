@@ -95,9 +95,9 @@ const (
 // MessageType sets the default message type.
 var MessageType = coprocess.JsonMessage
 
-// gMiddlewareCache will hold a pointer to LuaDispatcher.gMiddlewareCache.
-var gMiddlewareCache *map[string]string
-var gModuleCache *map[string]string
+// gMiddlewareCache will hold LuaDispatcher.gMiddlewareCache.
+var gMiddlewareCache map[string]string
+var gModuleCache map[string]string
 
 // LuaDispatcher implements a coprocess.Dispatcher
 type LuaDispatcher struct {
@@ -126,7 +126,7 @@ func (d *LuaDispatcher) Reload() {
 
 	if d.MiddlewareCache == nil {
 		d.MiddlewareCache = make(map[string]string, len(files))
-		gMiddlewareCache = &d.MiddlewareCache
+		gMiddlewareCache = d.MiddlewareCache
 	} else {
 		for k := range d.MiddlewareCache {
 			delete(d.MiddlewareCache, k)
@@ -167,7 +167,7 @@ func (d *LuaDispatcher) LoadModules() {
 
 	if d.ModuleCache == nil {
 		d.ModuleCache = make(map[string]string, 0)
-		gModuleCache = &d.ModuleCache
+		gModuleCache = d.ModuleCache
 	}
 
 	middlewarePath := path.Join(ModuleBasePath, "bundle.lua")
@@ -184,7 +184,7 @@ func (d *LuaDispatcher) LoadModules() {
 
 //export LoadCachedModules
 func LoadCachedModules(luaState unsafe.Pointer) {
-	for moduleName, moduleContents := range *gModuleCache {
+	for moduleName, moduleContents := range gModuleCache {
 		var cModuleName, cModuleContents *C.char
 		cModuleName = C.CString(moduleName)
 		cModuleContents = C.CString(moduleContents)
@@ -197,7 +197,7 @@ func LoadCachedModules(luaState unsafe.Pointer) {
 
 //export LoadCachedMiddleware
 func LoadCachedMiddleware(luaState unsafe.Pointer) {
-	for middlewareName, middlewareContents := range *gMiddlewareCache {
+	for middlewareName, middlewareContents := range gMiddlewareCache {
 		var cMiddlewareName, cMiddlewareContents *C.char
 		cMiddlewareName = C.CString(middlewareName)
 		cMiddlewareContents = C.CString(middlewareContents)

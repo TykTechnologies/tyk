@@ -51,7 +51,7 @@ type HostUptimeChecker struct {
 	sampleCache     *cache.Cache
 	stopLoop        bool
 	doResetList     bool
-	newList         *map[string]HostData
+	newList         map[string]HostData
 }
 
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
@@ -75,7 +75,7 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 		}
 		if h.doResetList {
 			if h.newList != nil {
-				h.HostList = *h.newList
+				h.HostList = h.newList
 				h.newList = nil
 				h.doResetList = false
 				log.Debug("[HOST CHECKER] Host list reset")
@@ -253,7 +253,7 @@ func (h *HostUptimeChecker) RemoveHost(name string) {
 	log.Info("[HOST CHECKER] Stopped tracking: ", name)
 }
 
-func (h *HostUptimeChecker) ResetList(hostList *map[string]HostData) {
+func (h *HostUptimeChecker) ResetList(hostList map[string]HostData) {
 	h.doResetList = true
 	h.newList = hostList
 	log.Debug("[HOST CHECKER] Checker reset queued!")
