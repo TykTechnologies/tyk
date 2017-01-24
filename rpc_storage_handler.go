@@ -43,13 +43,15 @@ type GroupKeySpaceRequest struct {
 	GroupID string
 }
 
-// RPC_LoadCount is a counter to check if this is a cold boot
-var RPC_LoadCount int
-var RPC_EmergencyMode bool
-var RPC_EmergencyModeLoaded bool
+var (
+	// RPC_LoadCount is a counter to check if this is a cold boot
+	RPC_LoadCount           int
+	RPC_EmergencyMode       bool
+	RPC_EmergencyModeLoaded bool
 
-var GlobalRPCCallTimeout time.Duration
-var GlobalRPCPingTimeout time.Duration
+	GlobalRPCCallTimeout time.Duration
+	GlobalRPCPingTimeout time.Duration
+)
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
