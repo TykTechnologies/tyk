@@ -143,7 +143,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	// Set session state on context, we will need it later
-	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.AuthToken) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+	if k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.AuthToken || k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth {
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, key)
 		k.setContextVars(r, key)

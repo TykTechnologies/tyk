@@ -116,7 +116,7 @@ func setupGlobals() {
 		defaultRouter = mainRouter
 	}
 
-	if (config.EnableAnalytics) && (config.Storage.Type != "redis") {
+	if config.EnableAnalytics && config.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")

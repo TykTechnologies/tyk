@@ -70,7 +70,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 			job.EventKv(eventName, meta)
 			startTime := time.Now()
 
-			if (tykMwSuper.Spec.CORS.OptionsPassthrough) && (r.Method == "OPTIONS") {
+			if tykMwSuper.Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
 			} else {
 				reqErr, errCode := mw.ProcessRequest(w, r, mwConf)

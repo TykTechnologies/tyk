@@ -129,7 +129,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Set session state on context, we will need it later
-	if (hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.HMACKey) || (hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+	if hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.HMACKey || hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth {
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, fieldValues.KeyID)
 		hm.setContextVars(r, fieldValues.KeyID)
@@ -351,7 +351,7 @@ func generateHMACSignatureStringFromRequest(r *http.Request, fieldValues *HMACFi
 			signatureString += headerField
 		}
 
-		if i != (len(fieldValues.Headers) - 1) {
+		if i != len(fieldValues.Headers)-1 {
 			signatureString += "\n"
 		}
 	}

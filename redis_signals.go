@@ -95,7 +95,7 @@ var warnedOnce bool
 var notificationVerifier goverify.Verifier
 
 func IsPayloadSignatureValid(notification Notification) bool {
-	if (notification.Command == NoticeGatewayDRLNotification) || (notification.Command == NoticeGatewayLENotification) {
+	if notification.Command == NoticeGatewayDRLNotification || notification.Command == NoticeGatewayLENotification {
 		// Gateway to gateway
 		return true
 	}

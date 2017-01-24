@@ -207,7 +207,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	}
 
 	// 4. Set session state on context, we will need it later
-	if (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.OIDCUser) || (k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth) {
+	if k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.OIDCUser || k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth {
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, SessionID)
 	}

@@ -256,7 +256,7 @@ func (s *StatsDSink) processTiming(job string, event string, nanos int64) {
 func (s *StatsDSink) processGauge(job string, event string, value float64) {
 	s.timingBuf = s.timingBuf[0:0]
 	prec := 2
-	if (value < 0.1) && (value > -0.1) {
+	if value < 0.1 && value > -0.1 {
 		prec = -1
 	}
 	s.timingBuf = strconv.AppendFloat(s.timingBuf, value, 'f', prec, 64)
@@ -308,7 +308,7 @@ func (s *StatsDSink) writeStatsDMetric(b []byte) {
 
 	lenUdpBuf := s.udpBuf.Len()
 
-	if (lenb + lenUdpBuf) > maxUdpBytes {
+	if lenb+lenUdpBuf > maxUdpBytes {
 		s.udpConn.WriteToUDP(s.udpBuf.Bytes(), s.udpAddr)
 		s.udpBuf.Truncate(0)
 	}
