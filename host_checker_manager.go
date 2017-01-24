@@ -209,7 +209,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	}).Debug("Update key: ", hc.getHostKey(report))
 	hc.store.SetKey(hc.getHostKey(report), "1", int64(config.UptimeTests.Config.TimeWait+1))
 
-	spec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	spec, found := ApiSpecRegister[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	if !found {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -253,7 +253,7 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 	}).Debug("Delete key: ", hc.getHostKey(report))
 	hc.store.DeleteKey(hc.getHostKey(report))
 
-	spec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	spec, found := ApiSpecRegister[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	if !found {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -378,7 +378,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 }
 
 func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
-	spec, found := (*ApiSpecRegister)[APIID]
+	spec, found := ApiSpecRegister[APIID]
 	if !found {
 		return []HostData{}, errors.New("API ID not found in register")
 	}
@@ -441,7 +441,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(APIID string) {
 func (hc HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	spec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	spec, found := ApiSpecRegister[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	orgID := ""
 	if found {
 		orgID = spec.OrgID
@@ -504,7 +504,7 @@ func SetCheckerHostList() {
 		"prefix": "host-check-mgr",
 	}).Info("Loading uptime tests...")
 	hostList := []HostData{}
-	for _, spec := range *ApiSpecRegister {
+	for _, spec := range ApiSpecRegister {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
 			hostList, sdErr := GlobalHostChecker.GetListFromService(spec.APIID)
 			if sdErr == nil {

@@ -541,19 +541,18 @@ func TestAPIAuthOk(t *testing.T) {
 		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
 	}
 }
+
 func TestGetOAuthClients(t *testing.T) {
 	var testAPIID = "1"
 	var responseCode int
-
-	var tempSpecRegister = make(map[string]*APISpec)
-	ApiSpecRegister = &tempSpecRegister
 
 	_, responseCode = getOauthClients(testAPIID)
 	if responseCode != 400 {
 		t.Fatal("Retrieving OAuth clients from nonexistent APIs must return error.")
 	}
 
-	(*ApiSpecRegister)[testAPIID] = &APISpec{}
+	ApiSpecRegister = make(map[string]*APISpec)
+	ApiSpecRegister[testAPIID] = &APISpec{}
 
 	_, responseCode = getOauthClients(testAPIID)
 	if responseCode != 400 {

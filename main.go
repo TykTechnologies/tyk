@@ -52,7 +52,7 @@ var (
 	argumentsBackup          map[string]interface{}
 	DashService              DashboardServiceSender
 
-	ApiSpecRegister *map[string]*APISpec
+	ApiSpecRegister map[string]*APISpec
 	keyGen          = DefaultKeyGenerator{}
 
 	mainRouter    *mux.Router
