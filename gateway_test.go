@@ -2,23 +2,34 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis"
 	"github.com/justinas/alice"
 )
 
 func init() {
-	fmt.Println("THIS IS THE TEST SETUP INIT")
 	runningTests = true
+}
+
+func TestMain(m *testing.M) {
+	s, err := miniredis.Run()
+	if err != nil {
+		panic(err)
+	}
+	defer s.Close()
+	config.Storage.Port, _ = strconv.Atoi(s.Port())
 	initialiseSystem(map[string]interface{}{})
+	os.Exit(m.Run())
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

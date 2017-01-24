@@ -11,10 +11,8 @@ matrix:
       env: SKIP_LINT=true
     - go: 1.7.x
 
-services:
-  - redis-server
-
 install:
+  - go get -t ./... # test deps
   - go install -v ./...
   - go get -u golang.org/x/tools/cmd/goimports
 

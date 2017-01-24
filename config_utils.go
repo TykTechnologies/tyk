@@ -15,30 +15,32 @@ import (
 const ENV_PREVIX = "TYK_GW"
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
-func WriteDefaultConf(configStruct *Config) {
-	configStruct.ListenAddress = ""
-	configStruct.ListenPort = 8080
-	configStruct.Secret = "352d20ee67be67f6340b4c0605b044b7"
-	configStruct.TemplatePath = "./templates"
-	configStruct.TykJSPath = "./js/tyk.js"
-	configStruct.MiddlewarePath = "./middleware"
-	configStruct.Storage.Type = "redis"
-	configStruct.AppPath = "./apps/"
-	configStruct.Storage.Host = "localhost"
-	configStruct.Storage.Username = ""
-	configStruct.Storage.Password = ""
-	configStruct.Storage.Database = 0
-	configStruct.Storage.MaxIdle = 100
-	configStruct.Storage.Port = 6379
-	configStruct.EnableAnalytics = false
-	configStruct.HealthCheck.EnableHealthChecks = true
-	configStruct.HealthCheck.HealthCheckValueTimeout = 60
-	configStruct.AnalyticsConfig.IgnoredIPs = make([]string, 0)
-	configStruct.UseAsyncSessionWrite = false
-	configStruct.HideGeneratorHeader = false
-	configStruct.OauthRedirectUriSeparator = ""
-	newConfig, err := json.MarshalIndent(configStruct, "", "    ")
-	overrideErr := envconfig.Process(ENV_PREVIX, &configStruct)
+func WriteDefaultConf(conf *Config) {
+	conf.ListenAddress = ""
+	conf.ListenPort = 8080
+	conf.Secret = "352d20ee67be67f6340b4c0605b044b7"
+	conf.TemplatePath = "./templates"
+	conf.TykJSPath = "./js/tyk.js"
+	conf.MiddlewarePath = "./middleware"
+	conf.Storage.Type = "redis"
+	conf.AppPath = "./apps/"
+	conf.Storage.Host = "localhost"
+	conf.Storage.Username = ""
+	conf.Storage.Password = ""
+	conf.Storage.Database = 0
+	conf.Storage.MaxIdle = 100
+	if !runningTests {
+		conf.Storage.Port = 6379
+	}
+	conf.EnableAnalytics = false
+	conf.HealthCheck.EnableHealthChecks = true
+	conf.HealthCheck.HealthCheckValueTimeout = 60
+	conf.AnalyticsConfig.IgnoredIPs = make([]string, 0)
+	conf.UseAsyncSessionWrite = false
+	conf.HideGeneratorHeader = false
+	conf.OauthRedirectUriSeparator = ""
+	newConfig, err := json.MarshalIndent(conf, "", "    ")
+	overrideErr := envconfig.Process(ENV_PREVIX, &conf)
 	if overrideErr != nil {
 		log.Error("Failed to process environment variables: ", overrideErr)
 	}
@@ -53,38 +55,38 @@ func WriteDefaultConf(configStruct *Config) {
 // LoadConfig will load the configuration file from filePath, if it can't open
 // the file for reading, it assumes there is no configuration file and will try to create
 // one on the default path (tyk.conf in the local directory)
-func loadConfig(filePath string, configStruct *Config) {
+func loadConfig(filePath string, conf *Config) {
 	configuration, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		log.Error("Couldn't load configuration file")
 		log.Error(err)
 		log.Info("Writing a default file to ./tyk.conf")
 
-		WriteDefaultConf(configStruct)
+		WriteDefaultConf(conf)
 
 		log.Info("Loading default configuration...")
-		loadConfig("tyk.conf", configStruct)
+		loadConfig("tyk.conf", conf)
 	} else {
-		if err := json.Unmarshal(configuration, &configStruct); err != nil {
+		if err := json.Unmarshal(configuration, &conf); err != nil {
 			log.Error("Couldn't unmarshal configuration")
 			log.Error(err)
 		}
 
-		overrideErr := envconfig.Process(ENV_PREVIX, configStruct)
+		overrideErr := envconfig.Process(ENV_PREVIX, conf)
 		if overrideErr != nil {
 			log.Error("Failed to process environment variables after file load: ", overrideErr)
 		}
 	}
 
-	if configStruct.SlaveOptions.CallTimeout == 0 {
-		configStruct.SlaveOptions.CallTimeout = 30
+	if conf.SlaveOptions.CallTimeout == 0 {
+		conf.SlaveOptions.CallTimeout = 30
 	}
-	if configStruct.SlaveOptions.PingTimeout == 0 {
-		configStruct.SlaveOptions.PingTimeout = 60
+	if conf.SlaveOptions.PingTimeout == 0 {
+		conf.SlaveOptions.PingTimeout = 60
 	}
-	GlobalRPCPingTimeout = time.Second * time.Duration(configStruct.SlaveOptions.PingTimeout)
-	GlobalRPCCallTimeout = time.Second * time.Duration(configStruct.SlaveOptions.CallTimeout)
-	configStruct.EventTriggers = InitGenericEventHandlers(configStruct.EventHandlers)
+	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
+	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
+	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
 }
 
 func (c *Config) loadIgnoredIPs() {
