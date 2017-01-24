@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -573,16 +571,13 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	prepareSortOrder(APISpecs)
 
 	chainChannel := make(chan *ChainObject)
-	var wg sync.WaitGroup
 
-	wg.Add(len(*APISpecs))
 	// Create a new handler for each API spec
 	loadList := make([]*ChainObject, len(*APISpecs))
 	generateListenPathMap(APISpecs)
 	for i, referenceSpec := range *APISpecs {
 		go func(referenceSpec *APISpec, i int) {
 			subrouter := Muxer
-			defer wg.Done()
 			// Handle custom domains
 			if config.EnableCustomDomains && referenceSpec.Domain != "" {
 				log.WithFields(logrus.Fields{
@@ -601,15 +596,10 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		tmpSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 	}
 
-	go func() {
-		for chObj := range chainChannel {
-			loadList[chObj.Index] = chObj
-		}
-	}()
-
-	wg.Wait()
-
-	time.Sleep(1 * time.Second)
+	for range *APISpecs {
+		chObj := <-chainChannel
+		loadList[chObj.Index] = chObj
+	}
 
 	for _, chainObj := range loadList {
 		if !chainObj.Skip {
