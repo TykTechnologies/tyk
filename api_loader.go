@@ -565,7 +565,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		"prefix": "main",
 	}).Info("Loading API configurations.")
 
-	var tempSpecRegister = make(map[string]*APISpec)
+	tmpSpecRegister := make(map[string]*APISpec)
 
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
@@ -606,7 +606,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		}(chainChannel, referenceSpec, i, subrouter)
 
 		// TODO: This will not deal with skipped APis well
-		tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
+		tmpSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 	}
 
 	go func() {
@@ -637,7 +637,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	Muxer.HandleFunc("/hello", pingTest)
 
 	// Swap in the new register
-	ApiSpecRegister = &tempSpecRegister
+	ApiSpecRegister = tmpSpecRegister
 
 	log.Debug("Checker host list")
 
