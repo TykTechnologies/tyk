@@ -49,7 +49,7 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
 
-	if ratePerPeriodNow > (int(currentSession.Rate) - subtractor) {
+	if ratePerPeriodNow > int(currentSession.Rate)-subtractor {
 		// Set a sentinel value with expire
 		if config.EnableSentinelRateLImiter {
 			store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
@@ -151,7 +151,7 @@ func (l SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key s
 	qInt := store.IncrememntWithExpire(rawKey, currentSession.QuotaRenewalRate)
 
 	// if the returned val is >= quota: block
-	if (qInt - 1) >= currentSession.QuotaMax {
+	if qInt-1 >= currentSession.QuotaMax {
 		RenewalDate := time.Unix(currentSession.QuotaRenews, 0)
 		log.Debug("Renewal Date is: ", RenewalDate)
 		log.Debug("As epoch: ", currentSession.QuotaRenews)

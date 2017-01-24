@@ -79,7 +79,7 @@ func HandleSendMiniConfig(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if (configPayload.FromHostname != HostDetails.Hostname) && (configPayload.FromNodeID != NodeID) {
+	if configPayload.FromHostname != HostDetails.Hostname && configPayload.FromNodeID != NodeID {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Debug("Configuration request received, no NodeID/Hostname match found, ignoring")

@@ -105,7 +105,7 @@ func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec, tryCount int) 
 		spec.RoundRobin.SetMax(targetData)
 
 		pos := spec.RoundRobin.GetPos()
-		if pos > (targetData.Len() - 1) {
+		if pos > targetData.Len()-1 {
 			// problem
 			spec.RoundRobin.SetMax(targetData)
 			pos = 0
