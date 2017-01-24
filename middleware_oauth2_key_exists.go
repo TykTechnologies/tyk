@@ -76,7 +76,8 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Set session state on context, we will need it later
-	if k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.OAuthKey || k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth {
+	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	case tykcommon.OAuthKey, tykcommon.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, accessToken)
 	}

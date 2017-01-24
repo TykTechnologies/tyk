@@ -129,7 +129,8 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Set session state on context, we will need it later
-	if hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.HMACKey || hm.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth {
+	switch hm.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	case tykcommon.HMACKey, tykcommon.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, fieldValues.KeyID)
 		hm.setContextVars(r, fieldValues.KeyID)

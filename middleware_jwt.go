@@ -261,7 +261,8 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 			k.Spec.SessionManager.UpdateSession(SessionID, sessionState, GetLifetime(k.Spec, &sessionState))
 			log.Debug("Policy applied to key")
 
-			if k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim || k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth {
+			switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+			case tykcommon.JWTClaim, tykcommon.UnsetAuth:
 				context.Set(r, SessionData, sessionState)
 				context.Set(r, AuthHeaderValue, SessionID)
 			}
@@ -275,7 +276,8 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	}
 
 	log.Debug("Key found")
-	if k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.JWTClaim || k.TykMiddleware.Spec.BaseIdentityProvidedBy == tykcommon.UnsetAuth {
+	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	case tykcommon.JWTClaim, tykcommon.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, SessionID)
 	}
