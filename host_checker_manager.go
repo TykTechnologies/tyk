@@ -343,7 +343,7 @@ func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Reset initiated")
-		hc.checker.ResetList(&newHostList)
+		hc.checker.ResetList(newHostList)
 	}
 }
 
@@ -370,7 +370,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Reset initiated")
-		hc.checker.ResetList(&newHostList)
+		hc.checker.ResetList(newHostList)
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
