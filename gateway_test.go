@@ -17,6 +17,7 @@ import (
 
 func init() {
 	fmt.Println("THIS IS THE TEST SETUP INIT")
+	runningTests = true
 	initialiseSystem(map[string]interface{}{})
 }
 

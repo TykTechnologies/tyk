@@ -1,6 +1,10 @@
 sudo: false
 language: go
 
+env:
+  global:
+    - TYK_LOGLEVEL=info
+
 matrix:
   include:
     - go: 1.6.x

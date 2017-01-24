@@ -63,8 +63,10 @@ var (
 	NodeID string
 )
 
-// Generic system error
+var runningTests = false
+
 const (
+	// Generic system error
 	E_SYSTEM_ERROR = "{\"status\": \"system error, please contact administrator\"}"
 	OAUTH_PREFIX   = "oauth-data."
 )
@@ -894,6 +896,19 @@ func initialiseSystem(arguments map[string]interface{}) {
 
 	}
 
+	if runningTests && os.Getenv("TYK_LOGLEVEL") == "" {
+		// `go test` without TYK_LOGLEVEL override
+		log.Level = logrus.ErrorLevel
+	} else if dbg, _ := arguments["--debug"]; dbg == true {
+		log.Level = logrus.DebugLevel
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Enabling debug-level output")
+	} else {
+		// default is info
+		log.Level = logrus.InfoLevel
+	}
+
 	filename := "/etc/tyk/tyk.conf"
 	value, _ := arguments["--conf"]
 	if value != nil {
@@ -934,15 +949,6 @@ func initialiseSystem(arguments map[string]interface{}) {
 
 	doMemoryProfile, _ = arguments["--memprofile"].(bool)
 	doCpuProfile, _ = arguments["--cpuprofile"].(bool)
-
-	doDebug, _ := arguments["--debug"]
-	log.Level = logrus.InfoLevel
-	if doDebug == true {
-		log.Level = logrus.DebugLevel
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Enabling debug-level output")
-	}
 
 	// Enable all the loggers
 	setupLogger()
