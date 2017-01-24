@@ -580,30 +580,22 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	loadList := make([]*ChainObject, len(*APISpecs))
 	generateListenPathMap(APISpecs)
 	for i, referenceSpec := range *APISpecs {
-		var subrouter *mux.Router
-
-		go func(chChan chan *ChainObject, referenceSpec *APISpec, i int, subrouter *mux.Router) {
+		go func(referenceSpec *APISpec, i int) {
+			subrouter := Muxer
 			defer wg.Done()
 			// Handle custom domains
-			if config.EnableCustomDomains {
-				if referenceSpec.Domain != "" {
-					log.WithFields(logrus.Fields{
-						"prefix":   "main",
-						"api_name": referenceSpec.APIDefinition.Name,
-						"domain":   referenceSpec.Domain,
-					}).Info("Custom Domain set.")
-					subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
-				} else {
-					subrouter = Muxer
-				}
-			} else {
-				subrouter = Muxer
+			if config.EnableCustomDomains && referenceSpec.Domain != "" {
+				log.WithFields(logrus.Fields{
+					"prefix":   "main",
+					"api_name": referenceSpec.APIDefinition.Name,
+					"domain":   referenceSpec.Domain,
+				}).Info("Custom Domain set.")
+				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
 			}
-
 			chainObj := processSpec(referenceSpec, Muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
-			chChan <- chainObj
-		}(chainChannel, referenceSpec, i, subrouter)
+			chainChannel <- chainObj
+		}(referenceSpec, i)
 
 		// TODO: This will not deal with skipped APis well
 		tmpSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
