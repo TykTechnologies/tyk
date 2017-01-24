@@ -42,7 +42,8 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	// We do not get this WSS scheme, need another way to identify it
-	if req.URL.Scheme == "wss" || req.URL.Scheme == "https" {
+	switch req.URL.Scheme {
+	case "wss", "https":
 		var tlsConfig *tls.Config
 		if ws.TLSClientConfig == nil {
 			tlsConfig = &tls.Config{}
