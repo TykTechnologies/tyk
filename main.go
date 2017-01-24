@@ -33,33 +33,35 @@ import (
 	"rsc.io/letsencrypt"
 )
 
-var log = logger.GetLogger()
-var config = Config{}
-var templates = &template.Template{}
-var analytics = RedisAnalyticsHandler{}
-var profileFile = &os.File{}
-var GlobalEventsJSVM = &JSVM{}
-var doMemoryProfile bool
-var doCpuProfile bool
-var Policies = make(map[string]Policy)
-var MainNotifier = RedisNotifier{}
-var DefaultOrgStore = DefaultSessionManager{}
-var DefaultQuotaStore = DefaultSessionManager{}
-var FallbackKeySesionManager SessionHandler = &DefaultSessionManager{}
-var MonitoringHandler TykEventHandler
-var RPCListener = RPCStorageHandler{}
-var argumentsBackup map[string]interface{}
-var DashService DashboardServiceSender
+var (
+	log                      = logger.GetLogger()
+	config                   = Config{}
+	templates                = &template.Template{}
+	analytics                = RedisAnalyticsHandler{}
+	profileFile              = &os.File{}
+	GlobalEventsJSVM         = &JSVM{}
+	doMemoryProfile          bool
+	doCpuProfile             bool
+	Policies                 = map[string]Policy{}
+	MainNotifier             = RedisNotifier{}
+	DefaultOrgStore          = DefaultSessionManager{}
+	DefaultQuotaStore        = DefaultSessionManager{}
+	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
+	MonitoringHandler        TykEventHandler
+	RPCListener              = RPCStorageHandler{}
+	argumentsBackup          map[string]interface{}
+	DashService              DashboardServiceSender
 
-var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
-var keyGen = DefaultKeyGenerator{}
+	ApiSpecRegister *map[string]*APISpec
+	keyGen          = DefaultKeyGenerator{}
 
-var mainRouter *mux.Router
-var defaultRouter *mux.Router
-var LE_MANAGER letsencrypt.Manager
-var LE_FIRSTRUN bool
+	mainRouter    *mux.Router
+	defaultRouter *mux.Router
+	LE_MANAGER    letsencrypt.Manager
+	LE_FIRSTRUN   bool
 
-var NodeID string
+	NodeID string
+)
 
 // Generic system error
 const (
