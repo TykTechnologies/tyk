@@ -438,7 +438,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(APIID string) {
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
-func (hc HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
+func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
 	spec, found := ApiSpecRegister[report.MetaData[UnHealthyHostMetaDataAPIKey]]

@@ -492,14 +492,14 @@ type RedisOsinStorageInterface struct {
 	sessionManager SessionHandler
 }
 
-func (r RedisOsinStorageInterface) Clone() osin.Storage {
+func (r *RedisOsinStorageInterface) Clone() osin.Storage {
 	return r
 }
 
-func (r RedisOsinStorageInterface) Close() {}
+func (r *RedisOsinStorageInterface) Close() {}
 
 // GetClient will retrieve client data
-func (r RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
+func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	key := CLIENT_PREFIX + id
 
 	log.Info("Getting client ID:", id)
@@ -523,7 +523,7 @@ func (r RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 
 // GetClientNoPrefix will retrieve client data, but not asign a prefix - this is an unfortunate hack,
 // but we don't want to change the signature in Osin for GetClient to support the odd Redis prefixing
-func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, error) {
+func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, error) {
 
 	key := id
 
@@ -545,7 +545,7 @@ func (r RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, er
 }
 
 // GetClients will retreive a list of clients for a prefix
-func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]osin.Client, error) {
+func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]osin.Client, error) {
 	key := CLIENT_PREFIX + filter
 	if ignorePrefix {
 		key = filter
@@ -578,7 +578,7 @@ func (r RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) 
 }
 
 // SetClient creates client data
-func (r RedisOsinStorageInterface) SetClient(id string, client osin.Client, ignorePrefix bool) error {
+func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ignorePrefix bool) error {
 	clientDataJSON, err := json.Marshal(client)
 
 	if err != nil {
@@ -605,7 +605,7 @@ func (r RedisOsinStorageInterface) SetClient(id string, client osin.Client, igno
 }
 
 // DeleteClient Removes a client from the system
-func (r RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) error {
+func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) error {
 	key := CLIENT_PREFIX + id
 	if ignorePrefix {
 		key = id
@@ -625,7 +625,7 @@ func (r RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) er
 }
 
 // SaveAuthorize saves authorisation data to REdis
-func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error {
+func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error {
 	authDataJSON, marshalErr := json.Marshal(&authData)
 	if marshalErr != nil {
 		return marshalErr
@@ -638,7 +638,7 @@ func (r RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) e
 }
 
 // LoadAuthorize loads auth data from redis
-func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
+func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	key := AUTH_PREFIX + code
 	log.Debug("Loading auth code: ", key)
 	authJSON, storeErr := r.store.GetKey(key)
@@ -661,14 +661,14 @@ func (r RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeDa
 }
 
 // RemoveAuthorize removes authorisation keys from redis
-func (r RedisOsinStorageInterface) RemoveAuthorize(code string) error {
+func (r *RedisOsinStorageInterface) RemoveAuthorize(code string) error {
 	key := AUTH_PREFIX + code
 	r.store.DeleteKey(key)
 	return nil
 }
 
 // SaveAccess will save a token and it's access data to redis
-func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error {
+func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error {
 	authDataJSON, marshalErr := json.Marshal(accessData)
 	if marshalErr != nil {
 		return marshalErr
@@ -740,7 +740,7 @@ func (r RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error
 }
 
 // LoadAccess will load access data from redis
-func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
+func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
 	key := ACCESS_PREFIX + token
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, storeErr := r.store.GetKey(key)
@@ -763,7 +763,7 @@ func (r RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, e
 }
 
 // RemoveAccess will remove access data from Redis
-func (r RedisOsinStorageInterface) RemoveAccess(token string) error {
+func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 	key := ACCESS_PREFIX + token
 	r.store.DeleteKey(key)
 
@@ -774,7 +774,7 @@ func (r RedisOsinStorageInterface) RemoveAccess(token string) error {
 }
 
 // LoadRefresh will load access data from Redis
-func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error) {
+func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error) {
 	key := REFRESH_PREFIX + token
 	log.Debug("Loading REFRESH key: ", key)
 	accessJSON, storeErr := r.store.GetKey(key)
@@ -799,7 +799,7 @@ func (r RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, 
 }
 
 // RemoveRefresh will remove a refresh token from redis
-func (r RedisOsinStorageInterface) RemoveRefresh(token string) error {
+func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 	key := REFRESH_PREFIX + token
 	r.store.DeleteKey(key)
 	return nil
@@ -843,7 +843,7 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 }
 
 // LoadRefresh will load access data from Redis
-func (r RedisOsinStorageInterface) GetUser(username string) (*SessionState, error) {
+func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, error) {
 	key := username
 	log.Debug("Loading User key: ", key)
 	accessJSON, storeErr := r.store.GetRawKey(key)
@@ -865,7 +865,7 @@ func (r RedisOsinStorageInterface) GetUser(username string) (*SessionState, erro
 	return &session, nil
 }
 
-func (r RedisOsinStorageInterface) SetUser(username string, sessionState *SessionState, timeout int64) error {
+func (r *RedisOsinStorageInterface) SetUser(username string, sessionState *SessionState, timeout int64) error {
 	key := username
 	authDataJSON, marshalErr := json.Marshal(sessionState)
 	if marshalErr != nil {

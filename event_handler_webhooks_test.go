@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func CreateHookObj() WebHookHandler {
+func CreateHookObj() *WebHookHandler {
 	eventHandlerConf := WebHookHandlerConf{}
 	eventHandlerConf.TargetPath = "http://httpbin.org/get"
 	eventHandlerConf.Method = "GET"
@@ -14,9 +14,9 @@ func CreateHookObj() WebHookHandler {
 	eventHandlerConf.HeaderList = make(map[string]string)
 	eventHandlerConf.HeaderList["x-tyk-test"] = "TEST"
 
-	ev, _ := WebHookHandler{}.New(eventHandlerConf)
+	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
 
-	myEventHandler := ev.(WebHookHandler)
+	myEventHandler := ev.(*WebHookHandler)
 
 	eventMessage := EventMessage{}
 	eventMessage.EventType = EVENT_KeyExpired
@@ -154,9 +154,9 @@ func TestGet(t *testing.T) {
 	eventHandlerConf.HeaderList = make(map[string]string)
 	eventHandlerConf.HeaderList["x-tyk-test"] = "TEST"
 
-	ev, _ := WebHookHandler{}.New(eventHandlerConf)
+	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
 
-	myEventHandler := ev.(WebHookHandler)
+	myEventHandler := ev.(*WebHookHandler)
 
 	eventMessage := EventMessage{}
 	eventMessage.EventType = EVENT_KeyExpired
@@ -191,8 +191,8 @@ func TestPost(t *testing.T) {
 	eventHandlerConf.HeaderList = make(map[string]string)
 	eventHandlerConf.HeaderList["x-tyk-test"] = "TEST POST"
 
-	ev, _ := WebHookHandler{}.New(eventHandlerConf)
-	myEventHandler := ev.(WebHookHandler)
+	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
+	myEventHandler := ev.(*WebHookHandler)
 
 	eventMessage := EventMessage{}
 	eventMessage.EventType = EVENT_KeyExpired

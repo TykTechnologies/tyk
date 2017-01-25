@@ -19,11 +19,11 @@ type AuthKey struct {
 	*TykMiddleware
 }
 
-func (mw *AuthKey) GetName() string {
+func (k *AuthKey) GetName() string {
 	return "AuthKey"
 }
 
-func (k AuthKey) New() {}
+func (k *AuthKey) New() {}
 
 // GetConfig retrieves the configuration from the API config
 func (k *AuthKey) GetConfig() (interface{}, error) {

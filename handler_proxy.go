@@ -9,7 +9,7 @@ type DummyProxyHandler struct {
 	SH SuccessHandler
 }
 
-func (d DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 	return
 }
