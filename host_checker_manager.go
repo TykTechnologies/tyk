@@ -106,14 +106,14 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 					"prefix": "host-check-mgr",
 				}).Info("Starting Poller")
 				hc.pollerStarted = true
-				go hc.StartPoller()
+				hc.StartPoller()
 			}
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
 			}).Debug("New master found, no tests running")
 			if hc.pollerStarted {
-				go hc.StopPoller()
+				hc.StopPoller()
 				hc.pollerStarted = false
 			}
 		}
