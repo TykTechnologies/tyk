@@ -58,19 +58,6 @@ var (
 var RPCCLientRWMutex = sync.RWMutex{}
 var RPCClients = map[string]chan int{}
 
-func ClearRPCClients() {
-	// log.Info("Found: ", len(RPCClients), " RPC connections, terminating")
-	// for _, c := range RPCClients {
-	// 	select {
-	// 	case c <- 1:
-	// 		log.Debug("Disconnect sent")
-	// 	default:
-	// 		log.Debug("Disconnect chan failed")
-	// 	}
-	// 	go func(c chan int) { c <- 1 }(c)
-	// }
-}
-
 func RPCKeepAliveCheck(r *RPCStorageHandler) {
 	// Only run when connected
 	if RPCClientIsConnected {

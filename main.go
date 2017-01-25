@@ -729,11 +729,6 @@ func doReload() {
 
 	// We have updated specs, lets load those...
 
-	// Kill RPC if available
-	if config.SlaveOptions.UseRPC {
-		ClearRPCClients()
-	}
-
 	// Reset the JSVM
 	if config.EnableJSVM {
 		GlobalEventsJSVM.Init(config.TykJSPath)
