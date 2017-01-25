@@ -4,11 +4,11 @@ import "time"
 
 type Monitor struct{}
 
-func (m Monitor) IsMonitorEnabled() bool {
+func (m *Monitor) IsMonitorEnabled() bool {
 	return config.Monitor.EnableTriggerMonitors
 }
 
-func (m Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
+func (m *Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
 	em := EventMessage{
 		EventType: EVENT_TriggerExceeded,
 		EventMetaData: EVENT_TriggerExceededMeta{
@@ -23,7 +23,7 @@ func (m Monitor) Fire(sessionData *SessionState, key string, triggerLimit float6
 	go MonitoringHandler.HandleEvent(em)
 }
 
-func (m Monitor) Check(sessionData *SessionState, key string) {
+func (m *Monitor) Check(sessionData *SessionState, key string) {
 	if !m.IsMonitorEnabled() {
 		return
 	}

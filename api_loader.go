@@ -344,7 +344,7 @@ func processSpec(referenceSpec *APISpec,
 		}
 
 		// for KeyLessAccess we can't support rate limiting, versioning or access rules
-		chain = alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
+		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 
 	} else {
 
@@ -510,7 +510,7 @@ func processSpec(referenceSpec *APISpec,
 		}).Debug("Custom middleware completed processing")
 
 		// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
-		chain = alice.New(chainArray...).Then(DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
+		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{tykMiddleware}})
 
 		log.Debug("Chain completed")
 

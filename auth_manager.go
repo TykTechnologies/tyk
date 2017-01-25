@@ -48,7 +48,7 @@ func (b *DefaultAuthorisationManager) Init(store StorageHandler) {
 }
 
 // IsKeyAuthorised checks if key exists and can be read into a SessionState object
-func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionState, bool) {
+func (b *DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionState, bool) {
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var newSession SessionState
 	if err != nil {
@@ -71,7 +71,7 @@ func (b DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSta
 }
 
 // IsKeyExpired checks if a key has expired, if the value of SessionState.Expires is 0, it will be ignored
-func (b DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
+func (b *DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
 	if newSession.Expires >= 1 {
 		//diff := newSession.Expires - time.Now().Unix()
 		return time.Now().After(time.Unix(newSession.Expires, 0))
@@ -106,7 +106,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b DefaultSessionManager) UpdateSession(keyName string, session SessionState, resetTTLTo int64) error {
+func (b *DefaultSessionManager) UpdateSession(keyName string, session SessionState, resetTTLTo int64) error {
 	if !session.HasChanged() {
 		log.Debug("Session has not changed, not updating")
 		return nil
@@ -122,12 +122,12 @@ func (b DefaultSessionManager) UpdateSession(keyName string, session SessionStat
 	return b.Store.SetKey(keyName, string(v), resetTTLTo)
 }
 
-func (b DefaultSessionManager) RemoveSession(keyName string) {
+func (b *DefaultSessionManager) RemoveSession(keyName string) {
 	b.Store.DeleteKey(keyName)
 }
 
 // GetSessionDetail returns the session detail using the storage engine (either in memory or Redis)
-func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, bool) {
+func (b *DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, bool) {
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var session SessionState
 	if err != nil {
@@ -150,7 +150,7 @@ func (b DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, b
 }
 
 // GetSessions returns all sessions in the key store that match a filter key (a prefix)
-func (b DefaultSessionManager) GetSessions(filter string) []string {
+func (b *DefaultSessionManager) GetSessions(filter string) []string {
 	return b.Store.GetKeys(filter)
 }
 
@@ -158,7 +158,7 @@ type DefaultKeyGenerator struct {
 }
 
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
-func (b DefaultKeyGenerator) GenerateAuthKey(OrgID string) string {
+func (b *DefaultKeyGenerator) GenerateAuthKey(OrgID string) string {
 	u5, _ := uuid.NewV4()
 	cleanSting := strings.Replace(u5.String(), "-", "", -1)
 	newAuthKey := expandKey(OrgID, cleanSting)
@@ -167,7 +167,7 @@ func (b DefaultKeyGenerator) GenerateAuthKey(OrgID string) string {
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
-func (b DefaultKeyGenerator) GenerateHMACSecret() string {
+func (b *DefaultKeyGenerator) GenerateHMACSecret() string {
 	u5, _ := uuid.NewV4()
 	cleanSting := strings.Replace(u5.String(), "-", "", -1)
 	newSecret := base64.StdEncoding.EncodeToString([]byte(cleanSting))

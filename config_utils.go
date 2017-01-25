@@ -96,7 +96,7 @@ func (c *Config) loadIgnoredIPs() {
 	}
 }
 
-func (c Config) StoreAnalytics(r *http.Request) bool {
+func (c *Config) StoreAnalytics(r *http.Request) bool {
 	if !c.EnableAnalytics {
 		return false
 	}

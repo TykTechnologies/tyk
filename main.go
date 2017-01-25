@@ -174,7 +174,7 @@ func setupGlobals() {
 
 	if config.Monitor.EnableTriggerMonitors {
 		var monitorErr error
-		MonitoringHandler, monitorErr = WebHookHandler{}.New(config.Monitor.Config)
+		MonitoringHandler, monitorErr = (&WebHookHandler{}).New(config.Monitor.Config)
 		if monitorErr != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -391,7 +391,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	//storageManager := RedisClusterStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager := GetGlobalStorageHandler(OAuthPrefix, false)
 	storageManager.Connect()
-	osinStorage := RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
+	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
 	if test {
 		log.WithFields(logrus.Fields{

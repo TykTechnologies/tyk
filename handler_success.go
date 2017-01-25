@@ -45,7 +45,7 @@ type TykMiddleware struct {
 	Proxy ReturningHttpHandler
 }
 
-func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
+func (t *TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	var session SessionState
 	var found bool
@@ -64,11 +64,11 @@ func (t TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	return session, found
 }
 
-func (t TykMiddleware) SetOrgExpiry(orgid string, expiry int64) {
+func (t *TykMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 	ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
-func (t TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
+func (t *TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 	log.Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
@@ -81,7 +81,7 @@ func (t TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 }
 
 // ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
-func (t TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
+func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 	if session.ApplyPolicyID != "" {
 		log.Debug("Session has policy, checking")
 		policy, ok := Policies[session.ApplyPolicyID]
@@ -160,7 +160,7 @@ func (t TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
+func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	var session SessionState
 	var found bool
@@ -218,7 +218,7 @@ type SuccessHandler struct {
 	*TykMiddleware
 }
 
-func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
+func (s *SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack {
 		return
@@ -346,7 +346,7 @@ func (s SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored
-func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
+func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
@@ -381,7 +381,7 @@ func (s SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.
 // ServeHTTPWithCache will store the request details in the analytics store if necessary and proxy the request to it's
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored Itwill also return a response object for the cache
-func (s SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
+func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
 	// Make sure we get the correct target URL
 	if s.Spec.APIDefinition.Proxy.StripListenPath {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)

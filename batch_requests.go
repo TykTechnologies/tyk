@@ -38,7 +38,7 @@ type BatchRequestHandler struct {
 }
 
 // doAsyncRequest runs an async request and replies to a channel
-func (b BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, out chan BatchReplyUnit) {
+func (b *BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, out chan BatchReplyUnit) {
 	client := &http.Client{}
 	resp, doReqErr := client.Do(req)
 
@@ -66,7 +66,7 @@ func (b BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, ou
 }
 
 // doSyncRequest will make the same request but return a BatchReplyUnit
-func (b BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) BatchReplyUnit {
+func (b *BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) BatchReplyUnit {
 	client := &http.Client{}
 	resp, doReqErr := client.Do(req)
 
@@ -92,7 +92,7 @@ func (b BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) Bat
 	return reply
 }
 
-func (b BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestStructure, error) {
+func (b *BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestStructure, error) {
 	decoder := json.NewDecoder(r.Body)
 	var batchRequest BatchRequestStructure
 	decodeErr := decoder.Decode(&batchRequest)
@@ -100,7 +100,7 @@ func (b BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestSt
 	return batchRequest, decodeErr
 }
 
-func (b BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure, unsafe bool) ([]*http.Request, error) {
+func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure, unsafe bool) ([]*http.Request, error) {
 	requestSet := []*http.Request{}
 
 	for i, requestDef := range batchRequest.Requests {
@@ -131,7 +131,7 @@ func (b BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructur
 	return requestSet, nil
 }
 
-func (b BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, requestSet []*http.Request) []BatchReplyUnit {
+func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, requestSet []*http.Request) []BatchReplyUnit {
 	ReplySet := []BatchReplyUnit{}
 
 	if len(batchRequest.Requests) != len(requestSet) {
@@ -160,7 +160,7 @@ func (b BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, re
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
-func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.Request) {
+func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "POST" {
 
@@ -196,7 +196,7 @@ func (b BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.R
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
-func (b BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
+func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 
 	// Decode request
 	var batchRequest BatchRequestStructure

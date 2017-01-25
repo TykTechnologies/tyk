@@ -154,13 +154,13 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 
 	switch handlerConf.Handler {
 	case EH_LogHandler:
-		return LogMessageEventHandler{}.New(conf)
+		return (&LogMessageEventHandler{}).New(conf)
 	case EH_WebHook:
-		return WebHookHandler{}.New(conf)
+		return (&WebHookHandler{}).New(conf)
 	case EH_JSVMHandler:
 		// Load the globals and file here
 		if Spec != nil {
-			jsVmEventHandler, err := JSVMEventHandler{Spec: Spec}.New(conf)
+			jsVmEventHandler, err := (&JSVMEventHandler{Spec: Spec}).New(conf)
 			if err == nil {
 				GlobalEventsJSVM.LoadJSPaths([]string{conf.(map[string]interface{})["path"].(string)}, "")
 			}
@@ -184,7 +184,7 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 }
 
 // FireEvent is added to the tykMiddleware object so it is available across the entire stack
-func (t TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
+func (t *TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
 
 	log.Debug("EVENT FIRED")
 	handlers, handlerExists := t.Spec.EventPaths[eventName]
@@ -228,14 +228,14 @@ type LogMessageEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	handler := LogMessageEventHandler{}
+func (l *LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+	handler := &LogMessageEventHandler{}
 	handler.conf = handlerConf.(map[string]interface{})
 	return handler, nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (l LogMessageEventHandler) HandleEvent(em EventMessage) {
+func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
 	var formattedMsgString string
 	formattedMsgString = fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.EventType)
 

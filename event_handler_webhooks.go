@@ -60,7 +60,7 @@ func GetRedisInterfacePointer() *RedisClusterStorageManager {
 
 // createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
 // specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
-func (w WebHookHandler) createConfigObject(handlerConf interface{}) (WebHookHandlerConf, error) {
+func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (WebHookHandlerConf, error) {
 	newConf := WebHookHandlerConf{}
 
 	asJSON, _ := json.Marshal(handlerConf)
@@ -75,8 +75,8 @@ func (w WebHookHandler) createConfigObject(handlerConf interface{}) (WebHookHand
 }
 
 // New enables the init of event handler instances when they are created on ApiSpec creation
-func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	handler := WebHookHandler{}
+func (w *WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+	handler := &WebHookHandler{}
 	var err error
 	handler.conf, err = w.createConfigObject(handlerConf)
 	if err != nil {
@@ -131,7 +131,7 @@ func (w WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 }
 
 // hookFired checks if an event has been fired within the EventTimeout setting
-func (w WebHookHandler) WasHookFired(checksum string) bool {
+func (w *WebHookHandler) WasHookFired(checksum string) bool {
 	if _, err := w.store.GetKey(checksum); err != nil {
 		// Key not found, so hook is in limit
 		log.WithFields(logrus.Fields{
@@ -144,14 +144,14 @@ func (w WebHookHandler) WasHookFired(checksum string) bool {
 }
 
 // setHookFired will create an expiring key for the checksum of the event
-func (w WebHookHandler) setHookFired(checksum string) {
+func (w *WebHookHandler) setHookFired(checksum string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Setting Webhook Checksum: ", checksum)
 	w.store.SetKey(checksum, "1", w.conf.EventTimeout)
 }
 
-func (w WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
+func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 	switch strings.ToUpper(m) {
 	case "GET":
 		return WH_GET
@@ -171,7 +171,7 @@ func (w WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 	}
 }
 
-func (w WebHookHandler) checkURL(r string) bool {
+func (w *WebHookHandler) checkURL(r string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Checking URL: ", r)
@@ -185,7 +185,7 @@ func (w WebHookHandler) checkURL(r string) bool {
 	return true
 }
 
-func (w WebHookHandler) GetChecksum(reqBody string) (string, error) {
+func (w *WebHookHandler) GetChecksum(reqBody string) (string, error) {
 	var rawRequest bytes.Buffer
 	// We do this twice because fuck it.
 	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
@@ -204,7 +204,7 @@ func (w WebHookHandler) GetChecksum(reqBody string) (string, error) {
 	return reqChecksum, nil
 }
 
-func (w WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
+func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	req, reqErr := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
 	if reqErr != nil {
 		log.WithFields(logrus.Fields{
@@ -222,7 +222,7 @@ func (w WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	return req, nil
 }
 
-func (w WebHookHandler) CreateBody(em EventMessage) (string, error) {
+func (w *WebHookHandler) CreateBody(em EventMessage) (string, error) {
 	var reqBody bytes.Buffer
 	w.template.Execute(&reqBody, em)
 
@@ -230,7 +230,7 @@ func (w WebHookHandler) CreateBody(em EventMessage) (string, error) {
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (w WebHookHandler) HandleEvent(em EventMessage) {
+func (w *WebHookHandler) HandleEvent(em EventMessage) {
 
 	// Inject event message into template, render to string
 	reqBody, _ := w.CreateBody(em)
