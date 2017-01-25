@@ -857,9 +857,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 		t.Error("Request failed with 200 code: \n", recorder.Code)
 	}
 
-	time.Sleep(1)
 	results := analytics.Store.GetKeysAndValues()
-
 	if len(results) < 1 {
 		t.Error("Not enough results! Should be 1, is: ", len(results))
 	}

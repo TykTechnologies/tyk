@@ -247,7 +247,6 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	}
 
 	chain := getHMACAuthChain(spec)
-	time.Sleep(time.Second * 2)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 400 {
@@ -302,7 +301,6 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	}
 
 	chain := getHMACAuthChain(spec)
-	time.Sleep(time.Second * 2)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 400 {
@@ -357,7 +355,6 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	}
 
 	chain := getHMACAuthChain(spec)
-	time.Sleep(time.Second * 2)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 400 {
