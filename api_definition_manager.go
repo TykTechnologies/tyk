@@ -16,7 +16,6 @@ import (
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/rubyist/circuitbreaker"
-	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -139,9 +138,7 @@ type APISpec struct {
 
 // APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
 // and LoadDefinitions(), each will pull api specifications from different locations.
-type APIDefinitionLoader struct {
-	dbSession *mgo.Session
-}
+type APIDefinitionLoader struct{}
 
 // Nonce to use when interacting with the dashboard service
 var ServiceNonce string
