@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	pprof_http "net/http/pprof"
+
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/logrus-logstash-hook"
@@ -40,6 +42,7 @@ var (
 	analytics                = RedisAnalyticsHandler{}
 	profileFile              = &os.File{}
 	GlobalEventsJSVM         = &JSVM{}
+	doHTTPProfile            bool
 	doMemoryProfile          bool
 	doCpuProfile             bool
 	Policies                 = map[string]Policy{}
@@ -949,6 +952,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 
 	doMemoryProfile, _ = arguments["--memprofile"].(bool)
 	doCpuProfile, _ = arguments["--cpuprofile"].(bool)
+	doHTTPProfile, _ = arguments["--httpprofile"].(bool)
 
 	// Enable all the loggers
 	setupLogger()
@@ -991,6 +995,7 @@ func getCmdArguments() map[string]interface{} {
 		--port=PORT                  Listen on PORT (overrides confg file)
 		--memprofile                 Generate a memory profile
 		--cpuprofile                 Generate a cpu profile
+		--httpprofile                Expose runtime profiling data via HTTP
 		--debug                      Enable Debug output
 		--import-blueprint=<file>    Import an API Blueprint file
 		--import-swagger=<file>      Import a Swagger file
@@ -1177,6 +1182,18 @@ func start() {
 		profileFile, _ = os.Create("tyk.prof")
 		pprof.StartCPUProfile(profileFile)
 		defer pprof.StopCPUProfile()
+	}
+
+	if doHTTPProfile {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Adding pprof endpoints")
+
+		defaultRouter.HandleFunc("/debug/pprof/"+"{rest:.*}", http.HandlerFunc(pprof_http.Index))
+		defaultRouter.HandleFunc("/debug/pprof/cmdline", http.HandlerFunc(pprof_http.Cmdline))
+		defaultRouter.HandleFunc("/debug/pprof/profile", http.HandlerFunc(pprof_http.Profile))
+		defaultRouter.HandleFunc("/debug/pprof/symbol", http.HandlerFunc(pprof_http.Symbol))
+		defaultRouter.HandleFunc("/debug/pprof/trace", http.HandlerFunc(pprof_http.Trace))
 	}
 
 	// Set up a default org manager so we can traverse non-live paths
