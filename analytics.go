@@ -157,16 +157,10 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 	a.ExpireAt = t2
 }
 
-// AnalyticsHandler is an interface to record analytics data to a writer.
-type AnalyticsHandler interface {
-	Init() error
-	RecordHit(AnalyticsRecord) error
-}
-
 var AnalyticsPool *tunny.WorkPool
 
-// RedisAnalyticsHandler implements AnalyticsHandler and will record analytics
-// data to a redis back end as defined in the Config object
+// RedisAnalyticsHandler will record analytics data to a redis back end
+// as defined in the Config object
 type RedisAnalyticsHandler struct {
 	Store   *RedisClusterStorageManager
 	Clean   Purger
@@ -208,7 +202,7 @@ func (r *RedisAnalyticsHandler) reloadDB() {
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
-func (r RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
+func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 
 	AnalyticsPool.SendWork(func() {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
