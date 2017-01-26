@@ -71,7 +71,7 @@ To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. I
 
 ### Adding dependencies
 
-If your patch depends on new packages, ensure that they will be put in `/vendor` folder. `git` is very handy when it comes to vendoring, because it automatically creates needed directories, example: `git clone https://github.com/Shopify/sarama.git vendor/github.com/Shopify/sarama`.
+If your patch depends on new packages, ensure that they will be put in `/vendor` folder. Here at Tyk we use `govendor` for managing our dependencies. Adding new dependencie can be done using following command: `govendor fetch github.com/alicebob/miniredis`.
 
 ### Geo IP features
 This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).
