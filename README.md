@@ -1,4 +1,4 @@
-# Tyk API Gateway #
+# Tyk API Gateway
 
 [![Build Status](https://travis-ci.org/TykTechnologies/tyk.svg?branch=master)](https://travis-ci.org/TykTechnologies/tyk)
 
@@ -7,16 +7,14 @@ also record detailed analytics on how your users are interacting with your API a
 
 Go versions 1.6 or later are supported.
 
-***
-
-## What is an API Gateway? ##
+## What is an API Gateway?
 
 An API Gateway sits in front of your application(s) and manages the heavy lifting of authorisation, access control and throughput limiting to your services. Ideally, 
 it should mean that you can focus on creating services instead of implementing management infrastructure. For example if you have written a really awesome web service
 that provides geolocation data for all the cats in NYC, and you want to make it public, integrating an API gateway is a faster, more secure route that writing your own 
 authorisation middleware.
 
-## Key Features of Tyk ##
+## Key Features of Tyk
 
 Tyk offers powerful, yet lightweight features that allow fine grained control over your API ecosystem.
 
@@ -37,24 +35,24 @@ Tyk offers powerful, yet lightweight features that allow fine grained control ov
 Tyk is written in Go, which makes it fast and easy to set up. Its only dependencies are a Mongo database (for analytics) and Redis, 
 though it can be deployed without either (not recommended).
 
-## Why? ##
+## Why?
 
 Tyk was built because other open source API Gateways in the market come with dependencies and bloat, attempting to be too many things to too many people. tyk is focused,
 simple and does one thing well - protecting your API from unauthorised access.
 
-## Documentation ##
+### Documentation
 
 All the documentation can be found on our main site at http://tyk.io/
 
-## License ##
+### License
 
 Tyk is released under the MPL v2.0 please see the LICENSE.md file for a full version of the license.
 
-## Contributing ##
+### Contributing
 
 For more information about contributing PRs and issues, see our [Contribution Guidelines](CONTRIBUTING.md).
 
-## Roadmap ##
+### Roadmap
 
 To coordinate development and be completely transparent as to where the project is going, the version roadmap for the next version, as well as proposed features
 and adopted proposals can be viewed on our public Trello board:
