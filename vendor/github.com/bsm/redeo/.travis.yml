@@ -1,0 +1,9 @@
+language: go
+sudo: false
+script: make
+install:
+  - go get -u -t ./...
+go:
+  - 1.7
+  - 1.6
+  - 1.5
