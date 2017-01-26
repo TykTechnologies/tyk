@@ -70,31 +70,8 @@ func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useCon
 			log.Debug("Replacing: ", v[0])
 
 			if contextFound {
-				tempVal, ok := contextData[contextKey]
-				var nVal string
-				if ok {
-					switch tempVal.(type) {
-					case string:
-						nVal = tempVal.(string)
-					case []string:
-						nVal = strings.Join(tempVal.([]string), ",")
-						// Remove empty start
-						nVal = strings.TrimPrefix(nVal, ",")
-					case url.Values:
-						end := len(tempVal.(url.Values))
-						i := 0
-						nVal = ""
-						for key, val := range tempVal.(url.Values) {
-							nVal += key + ":" + strings.Join(val, ",")
-							if i < end-1 {
-								nVal += ";"
-							}
-							i++
-						}
-					default:
-						log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
-					}
-					newpath = strings.Replace(newpath, v[0], url.QueryEscape(nVal), -1)
+				if val, ok := contextData[contextKey]; ok {
+					newpath = strings.Replace(newpath, v[0], valToStr(val), -1)
 				}
 
 			}
@@ -113,40 +90,40 @@ func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useCon
 			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
 			log.Debug("Replacing: ", v[0])
 
-			tempVal, ok := sessionState.MetaData.(map[string]interface{})[contextKey]
+			val, ok := sessionState.MetaData.(map[string]interface{})[contextKey]
 			if ok {
-				var nVal string
-				if ok {
-					switch tempVal.(type) {
-					case string:
-						nVal = tempVal.(string)
-					case []string:
-						nVal = strings.Join(tempVal.([]string), ",")
-						// Remove empty start
-						nVal = strings.TrimPrefix(nVal, ",")
-					case url.Values:
-						end := len(tempVal.(url.Values))
-						i := 0
-						nVal = ""
-						for key, val := range tempVal.(url.Values) {
-							nVal += key + ":" + strings.Join(val, ",")
-							if i < end-1 {
-								nVal += ";"
-							}
-							i++
-						}
-					default:
-						log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
-					}
-					newpath = strings.Replace(newpath, v[0], url.QueryEscape(nVal), -1)
-				}
-
+				newpath = strings.Replace(newpath, v[0], valToStr(val), -1)
 			}
 
 		}
 	}
 
 	return newpath, nil
+}
+
+func valToStr(v interface{}) string {
+	s := ""
+	switch v.(type) {
+	case string:
+		s = v.(string)
+	case []string:
+		s = strings.Join(v.([]string), ",")
+		// Remove empty start
+		s = strings.TrimPrefix(s, ",")
+	case url.Values:
+		end := len(v.(url.Values))
+		i := 0
+		for key, v := range v.(url.Values) {
+			s += key + ":" + strings.Join(v, ",")
+			if i < end-1 {
+				s += ";"
+			}
+			i++
+		}
+	default:
+		log.Error("Context variable type is not supported: ", reflect.TypeOf(v))
+	}
+	return url.QueryEscape(s)
 }
 
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
