@@ -5,6 +5,12 @@ env:
   global:
     - TYK_LOGLEVEL=info
 
+addons:
+  apt:
+    packages:
+    - python3-dev
+    - libluajit-5.1-dev
+
 matrix:
   include:
     - go: 1.6.x
@@ -12,8 +18,11 @@ matrix:
     - go: 1.7.x
 
 install:
-  - go install -v ./...
+  - go install ./...
   - go get -u golang.org/x/tools/cmd/goimports
 
 script:
+  - go build -tags 'coprocess python'
+  - go build -tags 'coprocess lua'
+  - go build -tags 'coprocess grpc'
   - ./utils/ci-test.sh

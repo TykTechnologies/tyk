@@ -6,7 +6,7 @@ set -e
 
 MATRIX=(
 	""
-	"-tags coprocess"
+	"-tags 'coprocess'"
 )
 
 # print a command and execute it
