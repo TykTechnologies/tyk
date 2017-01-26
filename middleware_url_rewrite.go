@@ -103,19 +103,18 @@ func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useCon
 
 func valToStr(v interface{}) string {
 	s := ""
-	switch v.(type) {
+	switch x := v.(type) {
 	case string:
-		s = v.(string)
+		s = x
 	case []string:
-		s = strings.Join(v.([]string), ",")
+		s = strings.Join(x, ",")
 		// Remove empty start
 		s = strings.TrimPrefix(s, ",")
 	case url.Values:
-		end := len(v.(url.Values))
 		i := 0
-		for key, v := range v.(url.Values) {
+		for key, v := range x {
 			s += key + ":" + strings.Join(v, ",")
-			if i < end-1 {
+			if i < len(x)-1 {
 				s += ";"
 			}
 			i++
