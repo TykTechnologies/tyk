@@ -4,6 +4,7 @@ import "testing"
 import "github.com/TykTechnologies/tykcommon"
 
 func TestRR(t *testing.T) {
+	t.Parallel()
 	thisArr1 := []string{"1", "2", "3"}
 
 	thisRR := RoundRobin{}

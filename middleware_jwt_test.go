@@ -294,6 +294,7 @@ func getJWTChain(spec *APISpec) http.Handler {
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "hmac"
@@ -338,6 +339,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 }
 
 func TestJWTSessionRSA(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
@@ -386,6 +388,7 @@ func TestJWTSessionRSA(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
@@ -436,6 +439,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
@@ -483,6 +487,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
@@ -533,6 +538,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.DoNotTrack = true
@@ -584,6 +590,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
@@ -634,6 +641,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
@@ -683,6 +691,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 }
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
+	t.Parallel()
 	thisTokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
@@ -732,6 +741,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(jwtWithCentralDefNoPolicyBaseField)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -799,6 +809,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithRawSource(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -859,6 +870,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -919,6 +931,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithJWK(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(jwtWithJWKDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}

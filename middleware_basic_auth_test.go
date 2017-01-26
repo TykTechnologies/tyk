@@ -88,6 +88,7 @@ func getBasicAuthChain(spec *APISpec) http.Handler {
 }
 
 func TestBasicAuthSession(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(basicAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -122,6 +123,7 @@ func TestBasicAuthSession(t *testing.T) {
 }
 
 func TestBasicAuthBadFormatting(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(basicAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -160,6 +162,7 @@ func TestBasicAuthBadFormatting(t *testing.T) {
 }
 
 func TestBasicAuthBadData(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(basicAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -196,6 +199,7 @@ func TestBasicAuthBadData(t *testing.T) {
 }
 
 func TestBasicAuthBadOverFormatting(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(basicAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -234,6 +238,7 @@ func TestBasicAuthBadOverFormatting(t *testing.T) {
 }
 
 func TestBasicAuthWrongUser(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(basicAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -275,6 +280,7 @@ func TestBasicAuthWrongUser(t *testing.T) {
 }
 
 func TestBasicMissingHeader(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(basicAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -309,6 +315,7 @@ func TestBasicMissingHeader(t *testing.T) {
 }
 
 func TestBasicAuthWrongPassword(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(basicAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
