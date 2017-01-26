@@ -87,6 +87,18 @@
 			"revisionTime": "2016-12-01T17:11:51Z"
 		},
 		{
+			"checksumSHA1": "fCQppNcKbizZxVrO/AquOQKHcbk=",
+			"path": "github.com/alicebob/miniredis",
+			"revision": "10ddf01f45bee3c40d1af5dbaad9aa71e6f20835",
+			"revisionTime": "2016-10-16T21:16:47Z"
+		},
+		{
+			"checksumSHA1": "1NIow3q647gMn0soD4kkd5jJRgA=",
+			"path": "github.com/bsm/redeo",
+			"revision": "1ce09fc76693fb3c1ca9b529c66f38920beb6fb8",
+			"revisionTime": "2016-08-17T16:11:42Z"
+		},
+		{
 			"checksumSHA1": "m6QMy+u/IX6knzP28DqMn4sdLSw=",
 			"path": "github.com/cenk/backoff",
 			"revision": "b02f2bbce11d7ea6b97f282ef1771b0fe2f65ef3",
