@@ -32,7 +32,7 @@ func (h *HostList) Set(newList []string) {
 	h.hosts = newList
 }
 
-func (h *HostList) All() []string{
+func (h *HostList) All() []string {
 	return h.hosts
 }
 

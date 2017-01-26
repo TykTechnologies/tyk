@@ -1,8 +1,9 @@
 package tykcommon
 
 import (
-	"github.com/franela/goreq"
 	"time"
+
+	"github.com/franela/goreq"
 )
 
 // NotificationsManager handles sending notifications to OAuth endpoints to notify the provider of key changes.
