@@ -16,7 +16,7 @@ import (
 	"github.com/justinas/alice"
 )
 
-var HMACAuthDef = `
+var hmacAuthDef = `
 
 	{
 		"name": "Tyk Test API",
@@ -93,7 +93,7 @@ func getHMACAuthChain(spec *APISpec) http.Handler {
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
-	spec := createDefinitionFromString(HMACAuthDef)
+	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -147,7 +147,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 }
 
 func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
-	spec := createDefinitionFromString(HMACAuthDef)
+	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -201,7 +201,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
-	spec := createDefinitionFromString(HMACAuthDef)
+	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -255,7 +255,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
-	spec := createDefinitionFromString(HMACAuthDef)
+	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -309,7 +309,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 }
 
 func TestHMACAuthSessionMalformedHeader(t *testing.T) {
-	spec := createDefinitionFromString(HMACAuthDef)
+	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -363,7 +363,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
-	spec := createDefinitionFromString(HMACAuthDef)
+	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -444,7 +444,7 @@ func replaceUpperCase(originalSignature string, lowercaseList []string) string {
 }
 
 func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
-	spec := createDefinitionFromString(HMACAuthDef)
+	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}

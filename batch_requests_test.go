@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var BatchTestDef = `
+var batchTestDef = `
 
 	{
 		"name": "Tyk Test API",
@@ -79,7 +79,7 @@ var testBatchRequest = `
 `
 
 func TestBatchSuccess(t *testing.T) {
-	spec := createDefinitionFromString(BatchTestDef)
+	spec := createDefinitionFromString(batchTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -125,7 +125,7 @@ func TestBatchSuccess(t *testing.T) {
 }
 
 func TestMakeSyncRequest(t *testing.T) {
-	spec := createDefinitionFromString(BatchTestDef)
+	spec := createDefinitionFromString(batchTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -153,7 +153,7 @@ func TestMakeSyncRequest(t *testing.T) {
 }
 
 func TestMakeASyncRequest(t *testing.T) {
-	spec := createDefinitionFromString(BatchTestDef)
+	spec := createDefinitionFromString(batchTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}

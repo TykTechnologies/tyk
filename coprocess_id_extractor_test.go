@@ -17,7 +17,7 @@ import (
 /* Value Extractor tests, using "header" source */
 
 func TestValueExtractorHeaderSource(t *testing.T) {
-	spec := makeCoProcessSampleAPI(IdExtractorCoProcessDef)
+	spec := makeCoProcessSampleAPI(idExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -64,7 +64,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 /* Value Extractor tests, using "form" source */
 
 func TestValueExtractorFormSource(t *testing.T) {
-	spec := makeCoProcessSampleAPI(ValueExtractorFormSource)
+	spec := makeCoProcessSampleAPI(valueExtractorFormSource)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -120,7 +120,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 }
 
 func TestValueExtractorHeaderSourceValidation(t *testing.T) {
-	spec := makeCoProcessSampleAPI(IdExtractorCoProcessDef)
+	spec := makeCoProcessSampleAPI(idExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -160,7 +160,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 /* Regex Extractor tests, using "header" source */
 
 func TestRegexExtractorHeaderSource(t *testing.T) {
-	spec := makeCoProcessSampleAPI(RegexExtractorDef)
+	spec := makeCoProcessSampleAPI(regexExtractorDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -212,8 +212,7 @@ func computeSessionID(input []byte, tykMiddleware *TykMiddleware) (sessionID str
 	return sessionID
 }
 
-var IdExtractorCoProcessDef = `
-
+var idExtractorCoProcessDef = `
 	{
 		"name": "Tyk Test API",
 		"api_id": "1",
@@ -276,8 +275,7 @@ var IdExtractorCoProcessDef = `
 	}
 `
 
-var ValueExtractorFormSource = `
-
+var valueExtractorFormSource = `
 	{
 		"name": "Tyk Test API",
 		"api_id": "1",
@@ -340,7 +338,7 @@ var ValueExtractorFormSource = `
 	}
 	`
 
-var RegexExtractorDef = `
+var regexExtractorDef = `
 
 	{
 		"name": "Tyk Test API - ValueExtractor/XPath",
