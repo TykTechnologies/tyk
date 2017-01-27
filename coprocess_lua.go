@@ -188,7 +188,7 @@ func LoadCachedModules(luaState unsafe.Pointer) {
 		var cModuleName, cModuleContents *C.char
 		cModuleName = C.CString(moduleName)
 		cModuleContents = C.CString(moduleContents)
-		C.LoadMiddlewareIntoState(luaState, cModuleName, cModuleContents)
+		C.LoadMiddlewareIntoState((*C.struct_lua_State)(luaState), cModuleName, cModuleContents)
 		C.free(unsafe.Pointer(cModuleName))
 		C.free(unsafe.Pointer(cModuleContents))
 	}
@@ -201,7 +201,7 @@ func LoadCachedMiddleware(luaState unsafe.Pointer) {
 		var cMiddlewareName, cMiddlewareContents *C.char
 		cMiddlewareName = C.CString(middlewareName)
 		cMiddlewareContents = C.CString(middlewareContents)
-		C.LoadMiddlewareIntoState(luaState, cMiddlewareName, cMiddlewareContents)
+		C.LoadMiddlewareIntoState((*C.struct_lua_State)(luaState), cMiddlewareName, cMiddlewareContents)
 		C.free(unsafe.Pointer(cMiddlewareName))
 		C.free(unsafe.Pointer(cMiddlewareContents))
 	}
