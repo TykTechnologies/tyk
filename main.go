@@ -144,7 +144,7 @@ func setupGlobals() {
 			purger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
 			purger.Connect()
 			analytics.Clean = &purger
-			go analytics.Clean.StartPurgeLoop(10)
+			go analytics.Clean.PurgeLoop(10 * time.Second)
 		}
 
 	}
