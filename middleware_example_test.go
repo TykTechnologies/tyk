@@ -10,26 +10,26 @@ import (
 // It's very easy to create custom middleware
 // TODO: Write the docs around this
 
-// ModifiedMiddleware is a sample custom middleware component, must inherit TykMiddleware
+// modifiedMiddleware is a sample custom middleware component, must inherit TykMiddleware
 // so you have access to spec and definition data
-type ModifiedMiddleware struct {
+type modifiedMiddleware struct {
 	*TykMiddleware
 }
 
-type ModifiedMiddlewareConfig struct {
+type modifiedMiddlewareConfig struct {
 	CustomConfigVar string `mapstructure:"custom_config_var" bson:"custom_config_var" json:"custom_config_var"`
 }
 
-func (mw *ModifiedMiddleware) GetName() string {
-	return "ModifiedMiddleware"
+func (mw *modifiedMiddleware) GetName() string {
+	return "modifiedMiddleware"
 }
 
 // New lets you do any initialisations for the object can be done here
-func (m *ModifiedMiddleware) New() {}
+func (m *modifiedMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *ModifiedMiddleware) GetConfig() (interface{}, error) {
-	var moduleConfig ModifiedMiddlewareConfig
+func (m *modifiedMiddleware) GetConfig() (interface{}, error) {
+	var moduleConfig modifiedMiddlewareConfig
 
 	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &moduleConfig)
 	if err != nil {
@@ -41,9 +41,9 @@ func (m *ModifiedMiddleware) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (m *ModifiedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	var thisConfig ModifiedMiddlewareConfig
-	thisConfig = configuration.(ModifiedMiddlewareConfig)
+func (m *modifiedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+	var thisConfig modifiedMiddlewareConfig
+	thisConfig = configuration.(modifiedMiddlewareConfig)
 	log.Info("Custom configuration: ", thisConfig.CustomConfigVar)
 
 	if thisConfig.CustomConfigVar == "error" {

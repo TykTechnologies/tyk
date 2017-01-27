@@ -74,7 +74,7 @@ func makeSampleAPI() *APISpec {
 	return thisSpec
 }
 
-type Success struct {
+type apiSuccess struct {
 	Key    string `json:"key"`
 	Status string `json:"status"`
 	Action string `json:"action"`
@@ -210,7 +210,7 @@ func TestApiHandlerPost(t *testing.T) {
 
 	apiHandler(recorder, req)
 
-	var success Success
+	var success apiSuccess
 	err = json.Unmarshal([]byte(recorder.Body.String()), &success)
 
 	if err != nil {
@@ -241,7 +241,7 @@ func TestApiHandlerPostDbConfig(t *testing.T) {
 
 	apiHandler(recorder, req)
 
-	var success Success
+	var success apiSuccess
 	err = json.Unmarshal([]byte(recorder.Body.String()), &success)
 
 	if err != nil {
@@ -272,7 +272,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 
 	keyHandler(recorder, req)
 
-	newSuccess := Success{}
+	newSuccess := apiSuccess{}
 	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
 
 	if err != nil {
@@ -305,7 +305,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 
 	keyHandler(recorder, req)
 
-	newSuccess := Success{}
+	newSuccess := apiSuccess{}
 	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
 
 	if err != nil {
@@ -412,7 +412,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 
 	keyHandler(recorder, req)
 
-	newSuccess := Success{}
+	newSuccess := apiSuccess{}
 	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
 
 	if err != nil {
@@ -448,7 +448,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 
 	createKeyHandler(recorder, req)
 
-	newSuccess := Success{}
+	newSuccess := apiSuccess{}
 	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
 
 	if err != nil {
@@ -483,7 +483,7 @@ func TestCreateKeyHandlerCreateNewKeyNoAPIID(t *testing.T) {
 
 	createKeyHandler(recorder, req)
 
-	newSuccess := Success{}
+	newSuccess := apiSuccess{}
 	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
 
 	if err != nil {
