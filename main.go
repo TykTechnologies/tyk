@@ -138,10 +138,10 @@ func setupGlobals() {
 
 		if config.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
-			thisPurger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
-			thisPurger.Connect()
-			analytics.Clean = &thisPurger
-			go analytics.Clean.StartPurgeLoop(10)
+			purger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
+			purger.Connect()
+			analytics.Clean = &purger
+			go analytics.Clean.PurgeLoop(10 * time.Second)
 		}
 
 	}
