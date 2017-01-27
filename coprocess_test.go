@@ -48,7 +48,7 @@ func TestCoProcessDispatch(t *testing.T) {
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
-	spec := MakeCoProcessSampleAPI(basicCoProcessDef)
+	spec := makeCoProcessSampleAPI(basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -159,7 +159,7 @@ type HttpbinHeadersResponse struct {
 	Headers map[string]string `json:"headers"`
 }
 
-func MakeCoProcessSampleAPI(apiTestDef string) *APISpec {
+func makeCoProcessSampleAPI(apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR COPROCESS TEST")
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -169,7 +169,7 @@ func MakeCoProcessSampleAPI(apiTestDef string) *APISpec {
 	return thisSpec
 }
 
-func BuildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver tykcommon.MiddlewareDriver) http.Handler {
+func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver tykcommon.MiddlewareDriver) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -180,9 +180,9 @@ func BuildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.Hook
 }
 
 func TestCoProcessMiddleware(t *testing.T) {
-	spec := MakeCoProcessSampleAPI(basicCoProcessDef)
+	spec := makeCoProcessSampleAPI(basicCoProcessDef)
 
-	chain := BuildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
+	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
 
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", thisSession, 60)
@@ -206,9 +206,9 @@ func TestCoProcessMiddleware(t *testing.T) {
 }
 
 func TestCoProcessObjectPostProcess(t *testing.T) {
-	spec := MakeCoProcessSampleAPI(basicCoProcessDef)
+	spec := makeCoProcessSampleAPI(basicCoProcessDef)
 
-	chain := BuildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
+	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
 
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", thisSession, 60)
@@ -282,9 +282,9 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 func TestCoProcessAuth(t *testing.T) {
 	t.Log("CP AUTH")
-	spec := MakeCoProcessSampleAPI(protectedCoProcessDef)
+	spec := makeCoProcessSampleAPI(protectedCoProcessDef)
 
-	chain := BuildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, tykcommon.MiddlewareDriver("python"))
+	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, tykcommon.MiddlewareDriver("python"))
 
 	thisSession := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", thisSession, 60)

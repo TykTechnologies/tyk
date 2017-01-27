@@ -159,7 +159,7 @@ var ipMiddlewareTestDefinitionMissing = `
 	}
 `
 
-func MakeIPSampleAPI(apiTestDef string) *APISpec {
+func makeIPSampleAPI(apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR IP WHITELIST")
 	thisSpec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -181,7 +181,7 @@ func MakeIPSampleAPI(apiTestDef string) *APISpec {
 }
 
 func TestIpMiddlewareIPFail(t *testing.T) {
-	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledFail)
+	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledFail)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -210,7 +210,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 }
 
 func TestIpMiddlewareIPPass(t *testing.T) {
-	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
+	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -239,7 +239,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 }
 
 func TestIpMiddlewareIPPassCIDR(t *testing.T) {
-	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
+	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -268,7 +268,7 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 }
 
 func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
-	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
+	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -297,7 +297,7 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 }
 
 func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
-	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
+	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -327,7 +327,7 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 }
 
 func TestIpMiddlewareIPMissing(t *testing.T) {
-	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionMissing)
+	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionMissing)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -355,7 +355,7 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 }
 
 func TestIpMiddlewareIPDisabled(t *testing.T) {
-	spec := MakeIPSampleAPI(ipMiddlewareTestDefinitionDisabled)
+	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionDisabled)
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}

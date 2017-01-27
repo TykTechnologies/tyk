@@ -104,7 +104,7 @@ func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 	Muxer.Handle(spec.Proxy.ListenPath, chain)
 }
 
-func MakeOAuthAPI() *APISpec {
+func makeOAuthAPI() *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR OAUTH")
 	thisSpec := createOauthAppDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -358,7 +358,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	}
 }
 
-func GetAuthCode() map[string]string {
+func getAuthCode() map[string]string {
 	thisSpec := createOauthAppDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
@@ -396,8 +396,8 @@ type tokenData struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func GetToken() tokenData {
-	authData := GetAuthCode()
+func getToken() tokenData {
+	authData := getAuthCode()
 
 	thisSpec := createOauthAppDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -482,7 +482,7 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 
 func TestClientAccessRequest(t *testing.T) {
 
-	authData := GetAuthCode()
+	authData := getAuthCode()
 
 	thisSpec := createOauthAppDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -522,11 +522,11 @@ func TestClientAccessRequest(t *testing.T) {
 func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 
 	// Step 1 create token
-	tokenData := GetToken()
+	tokenData := getToken()
 
 	// thisSpec := createOauthAppDefinition()
 
-	thisSpec := MakeOAuthAPI()
+	thisSpec := makeOAuthAPI()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
@@ -602,7 +602,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 
 func TestClientRefreshRequest(t *testing.T) {
 
-	tokenData := GetToken()
+	tokenData := getToken()
 
 	thisSpec := createOauthAppDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
@@ -641,7 +641,7 @@ func TestClientRefreshRequest(t *testing.T) {
 
 func TestClientRefreshRequestDouble(t *testing.T) {
 
-	tokenData := GetToken()
+	tokenData := getToken()
 
 	thisSpec := createOauthAppDefinition()
 	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
