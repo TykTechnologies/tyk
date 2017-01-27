@@ -148,14 +148,14 @@ func TestCoProcessTykTriggerEvent(t *testing.T) {
 
 /* Middleware */
 
-type HttpbinGetResponse struct {
+type httpbinGetResponse struct {
 	Params  map[string]string `json:"args"`
 	Headers map[string]string `json:"headers"`
 	Origin  string            `json:"origin"`
 	Url     string            `json:"url"`
 }
 
-type HttpbinHeadersResponse struct {
+type httpbinHeadersResponse struct {
 	Headers map[string]string `json:"headers"`
 }
 
@@ -230,7 +230,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	chain.ServeHTTP(recorder, req)
 
-	headersResponse := HttpbinHeadersResponse{}
+	headersResponse := httpbinHeadersResponse{}
 	err = json.Unmarshal(recorder.Body.Bytes(), &headersResponse)
 
 	if err != nil {
@@ -257,7 +257,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	chain.ServeHTTP(recorder, getReq)
 
-	getResponse := HttpbinGetResponse{}
+	getResponse := httpbinGetResponse{}
 	err = json.Unmarshal(recorder.Body.Bytes(), &getResponse)
 
 	if err != nil {

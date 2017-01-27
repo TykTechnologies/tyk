@@ -121,7 +121,7 @@ func createStandardSession() SessionState {
 	return thisSession
 }
 
-type TykErrorResponse struct {
+type tykErrorResponse struct {
 	Error string
 }
 
@@ -584,7 +584,7 @@ func TestParambasedAuth(t *testing.T) {
 // 		t.Error("5th request returned invalid code, should 403, got: \n", fifthRecorder.Code)
 // 	}
 
-// 	newAPIError := TykErrorResponse{}
+// 	newAPIError := tykErrorResponse{}
 // 	json.Unmarshal([]byte(fifthRecorder.Body.String()), &newAPIError)
 
 // 	if newAPIError.Error != "Rate limit exceeded" {
@@ -759,7 +759,7 @@ func TestQuota(t *testing.T) {
 		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
 	}
 
-	newAPIError := TykErrorResponse{}
+	newAPIError := tykErrorResponse{}
 	json.Unmarshal([]byte(thirdRecorder.Body.String()), &newAPIError)
 
 	if newAPIError.Error != "Quota exceeded" {
