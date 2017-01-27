@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func CreateHookObj() *WebHookHandler {
+func createHookObj() *WebHookHandler {
 	eventHandlerConf := WebHookHandlerConf{}
 	eventHandlerConf.TargetPath = "http://httpbin.org/get"
 	eventHandlerConf.Method = "GET"
@@ -78,7 +78,7 @@ func TestGetChecksum(t *testing.T) {
 	}
 	`
 
-	hook := CreateHookObj()
+	hook := createHookObj()
 	checksum, err := hook.GetChecksum(rBody)
 
 	if err != nil {
@@ -92,7 +92,7 @@ func TestGetChecksum(t *testing.T) {
 }
 
 func TestBuildRequest(t *testing.T) {
-	hook := CreateHookObj()
+	hook := createHookObj()
 
 	rBody := `
 	{
@@ -130,7 +130,7 @@ func TestCreateBody(t *testing.T) {
 	em.EventType = EVENT_QuotaExceeded
 	em.TimeStamp = "0"
 
-	thisHook := CreateHookObj()
+	thisHook := createHookObj()
 
 	body, err := thisHook.CreateBody(em)
 

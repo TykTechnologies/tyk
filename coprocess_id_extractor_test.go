@@ -17,7 +17,7 @@ import (
 /* Value Extractor tests, using "header" source */
 
 func TestValueExtractorHeaderSource(t *testing.T) {
-	spec := MakeCoProcessSampleAPI(IdExtractorCoProcessDef)
+	spec := makeCoProcessSampleAPI(IdExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -64,7 +64,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 /* Value Extractor tests, using "form" source */
 
 func TestValueExtractorFormSource(t *testing.T) {
-	spec := MakeCoProcessSampleAPI(ValueExtractorFormSource)
+	spec := makeCoProcessSampleAPI(ValueExtractorFormSource)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -120,7 +120,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 }
 
 func TestValueExtractorHeaderSourceValidation(t *testing.T) {
-	spec := MakeCoProcessSampleAPI(IdExtractorCoProcessDef)
+	spec := makeCoProcessSampleAPI(IdExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -160,7 +160,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 /* Regex Extractor tests, using "header" source */
 
 func TestRegexExtractorHeaderSource(t *testing.T) {
-	spec := MakeCoProcessSampleAPI(RegexExtractorDef)
+	spec := makeCoProcessSampleAPI(RegexExtractorDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
