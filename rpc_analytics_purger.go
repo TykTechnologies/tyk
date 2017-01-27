@@ -13,7 +13,7 @@ import (
 // of analytics data to prevent it growing too large
 type Purger interface {
 	PurgeCache()
-	StartPurgeLoop(int)
+	PurgeLoop(time.Duration)
 }
 
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
@@ -57,12 +57,13 @@ func (r *RPCPurger) Connect() {
 	return
 }
 
-// StartPurgeLoop starts the loop that will be started as a goroutine and pull data out of the in-memory
-// store and into RPC
-func (r RPCPurger) StartPurgeLoop(nextCount int) {
-	time.Sleep(time.Duration(nextCount) * time.Second)
-	r.PurgeCache()
-	r.StartPurgeLoop(nextCount)
+// PurgeLoop starts the loop that will pull data out of the in-memory
+// store and into RPC.
+func (r RPCPurger) PurgeLoop(sleep time.Duration) {
+	for {
+		time.Sleep(sleep)
+		r.PurgeCache()
+	}
 }
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
