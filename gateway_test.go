@@ -197,11 +197,9 @@ var nonExpiringDefNoWhiteList = `
 			"strip_listen_path": false
 		}
 	}
-
 `
 
-var VersionedDefinition = `
-
+var versionedDefinition = `
 	{
 		"name": "Tyk Test API",
 		"api_id": "9991",
@@ -256,11 +254,9 @@ var VersionedDefinition = `
 			"strip_listen_path": false
 		}
 	}
-
 `
 
-var PathBasedDefinition = `
-
+var pathBasedDefinition = `
 	{
 		"name": "Tyk Test API",
 		"api_id": "9992",
@@ -295,11 +291,9 @@ var PathBasedDefinition = `
 			"strip_listen_path": true
 		}
 	}
-
 `
 
-var ExtendedPathGatewaySetup = `
-
+var extendedPathGatewaySetup = `
 	{
 		"name": "Tyk Test API",
 		"api_id": "1",
@@ -441,7 +435,7 @@ var ExtendedPathGatewaySetup = `
 `
 
 func createExtendedDefinitionWithPaths() *APISpec {
-	return createDefinitionFromString(ExtendedPathGatewaySetup)
+	return createDefinitionFromString(extendedPathGatewaySetup)
 }
 
 func createNonVersionedDefinition() *APISpec {
@@ -449,11 +443,11 @@ func createNonVersionedDefinition() *APISpec {
 }
 
 func createVersionedDefinition() *APISpec {
-	return createDefinitionFromString(VersionedDefinition)
+	return createDefinitionFromString(versionedDefinition)
 }
 
 func createPathBasedDefinition() *APISpec {
-	return createDefinitionFromString(PathBasedDefinition)
+	return createDefinitionFromString(pathBasedDefinition)
 }
 
 func TestParambasedAuth(t *testing.T) {

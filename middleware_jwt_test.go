@@ -179,10 +179,10 @@ var jwtWithCentralDefNoPolicyBaseField = `
 
 `
 
-const JWTSECRET = "9879879878787878"
+const jwtSecret = "9879879878787878"
 
 // openssl genrsa -out app.rsa
-const JWTRSA_PRIVKEY = `
+const jwtRSAPrivKey = `
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEAyqZ4rwKF8qCExS7kpY4cnJa/37FMkJNkalZ3OuslLB0oRL8T
 4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb+t06L0Q94k+/P37x7+/RJZiff4y1
@@ -213,7 +213,7 @@ YGivtXBGXk1hlVYlje1RB+W6RQuDAegI5h8vl8pYJS9JQH0wjatsDaE=
 `
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub
-const JWTRSA_PUBKEY = `
+const jwtRSAPubKey = `
 -----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyqZ4rwKF8qCExS7kpY4c
 nJa/37FMkJNkalZ3OuslLB0oRL8T4c94kdF4aeNzSFkSe2n99IBI6Ssl79vbfMZb
@@ -236,7 +236,7 @@ func createJWTSession() SessionState {
 	thisSession.QuotaRenews = time.Now().Unix() + 20
 	thisSession.QuotaRemaining = 1
 	thisSession.QuotaMax = -1
-	thisSession.JWTData.Secret = JWTSECRET
+	thisSession.JWTData.Secret = jwtSecret
 
 	return thisSession
 }
@@ -252,7 +252,7 @@ func createJWTSessionWithRSA() SessionState {
 	thisSession.QuotaRenews = time.Now().Unix() + 20
 	thisSession.QuotaRemaining = 1
 	thisSession.QuotaMax = -1
-	thisSession.JWTData.Secret = JWTRSA_PUBKEY
+	thisSession.JWTData.Secret = jwtRSAPubKey
 
 	return thisSession
 }
@@ -313,7 +313,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	tokenString, err := token.SignedString([]byte(JWTSECRET))
+	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		log.Error("Couldn't create JWT token: ")
 		t.Fatal(err)
@@ -356,7 +356,7 @@ func TestJWTSessionRSA(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -404,7 +404,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -454,7 +454,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -501,7 +501,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -552,7 +552,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -602,7 +602,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -653,7 +653,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -701,7 +701,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -768,7 +768,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["azp"] = thisTokenID
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -828,7 +828,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -888,7 +888,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["policy_id"] = "1234567898978788"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
@@ -948,7 +948,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
-	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(JWTRSA_PRIVKEY))
+	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if getSignErr != nil {
 		log.Error("Couldn't extract private key: ")
 		t.Fatal(getSignErr)
