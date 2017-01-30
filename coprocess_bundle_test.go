@@ -1,9 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestBundleGetter(t *testing.T) {
 }
@@ -13,8 +10,6 @@ func TestHttpBundleGetter(t *testing.T) {
 	thisGetter = &HttpBundleGetter{}
 
 	thisGetter.Get()
-
-	fmt.Println(thisGetter)
 }
 
 func TestBundleSaver(t *testing.T) {
