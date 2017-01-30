@@ -16,6 +16,7 @@ matrix:
     - go: 1.6.x
       env: SKIP_LINT=true
     - go: 1.7.x
+    - go: 1.8rc3
 
 install:
   - go install ./...
