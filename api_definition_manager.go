@@ -470,12 +470,11 @@ func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef tykcommon.VersionInfo) 
 }
 
 func (a *APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
-	apiLangIDsRegex, _ := regexp.Compile("{(.*?)}")
-	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, "(.*?)")
-	asRegex, _ := regexp.Compile(asRegexStr)
+	apiLangIDsRegex := regexp.MustCompile(`{(.*?)}`)
+	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `(.*?)`)
+	asRegex := regexp.MustCompile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
-
 }
 
 func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {

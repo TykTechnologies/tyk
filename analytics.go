@@ -102,15 +102,8 @@ type NormaliseURLPatterns struct {
 func InitNormalisationPatterns() NormaliseURLPatterns {
 	thesePatterns := NormaliseURLPatterns{}
 
-	uuidPat, pat1Err := regexp.Compile("[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}")
-	if pat1Err != nil {
-		log.Error("failed to compile custom pattern: ", pat1Err)
-	}
-
-	numPat, pat2Err := regexp.Compile(`\/(\d+)`)
-	if pat2Err != nil {
-		log.Error("failed to compile custom pattern: ", pat2Err)
-	}
+	uuidPat := regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
+	numPat := regexp.MustCompile(`\/(\d+)`)
 
 	custPats := []*regexp.Regexp{}
 	for _, pattern := range config.AnalyticsConfig.NormaliseUrls.Custom {

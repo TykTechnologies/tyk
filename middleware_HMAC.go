@@ -32,7 +32,7 @@ func (mw *HMACMiddleware) GetName() string {
 
 // New lets you do any initializations for the object can be done here
 func (hm *HMACMiddleware) New() {
-	hm.lowercasePattern, _ = regexp.Compile("%[a-f0-9][a-f0-9]")
+	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 
 func (a *HMACMiddleware) IsEnabledForSpec() bool {
