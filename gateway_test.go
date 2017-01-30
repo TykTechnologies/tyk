@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -26,10 +27,14 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	defer s.Close()
 	config.Storage.Port, _ = strconv.Atoi(s.Port())
 	initialiseSystem(map[string]interface{}{})
-	os.Exit(m.Run())
+	exitCode := m.Run()
+
+	s.Close()
+	os.Remove("tyk.conf")
+	os.Remove(filepath.Join("apps", "1.json"))
+	os.Exit(exitCode)
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
