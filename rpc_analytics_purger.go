@@ -73,7 +73,7 @@ func (r *RPCPurger) PurgeCache() {
 	AnalyticsValues := r.Store.GetAndDeleteSet(ANALYTICS_KEYNAME)
 
 	if len(AnalyticsValues) > 0 {
-		keys := make([]AnalyticsRecord, len(AnalyticsValues), len(AnalyticsValues))
+		keys := make([]AnalyticsRecord, len(AnalyticsValues))
 
 		for i, v := range AnalyticsValues {
 			decoded := AnalyticsRecord{}
