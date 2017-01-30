@@ -30,7 +30,7 @@ func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useCon
 	if len(result_slice) > 0 {
 		newpath = meta.RewriteTo
 		// get the indices for the replacements:
-		dollarMatch, _ := regexp.Compile(`\$\d+`) // Prepare our regex
+		dollarMatch := regexp.MustCompile(`\$\d+`) // Prepare our regex
 		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
 
 		log.Debug(result_slice)
@@ -63,7 +63,7 @@ func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useCon
 			contextData = cnt.(map[string]interface{})
 		}
 
-		dollarMatch, _ := regexp.Compile(`\$tyk_context.(\w+)`)
+		dollarMatch := regexp.MustCompile(`\$tyk_context.(\w+)`)
 		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
 		for _, v := range replace_slice {
 			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
@@ -84,7 +84,7 @@ func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useCon
 	if sessFound {
 		sessionState := sess.(SessionState)
 
-		metaDollarMatch, _ := regexp.Compile(`\$tyk_meta.(\w+)`)
+		metaDollarMatch := regexp.MustCompile(`\$tyk_meta.(\w+)`)
 		metaReplace_slice := metaDollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
 		for _, v := range metaReplace_slice {
 			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
