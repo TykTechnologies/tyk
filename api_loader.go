@@ -514,7 +514,7 @@ func processSpec(referenceSpec *APISpec,
 
 		log.Debug("Chain completed")
 
-		userCheckHandler := http.HandlerFunc(UserRatesCheck())
+		userCheckHandler := UserRatesCheck()
 		simpleChain_PreAuth := []alice.Constructor{
 			CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
 			CreateMiddleware(&OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware),
