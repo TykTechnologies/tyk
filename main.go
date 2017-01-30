@@ -1381,11 +1381,10 @@ func listen(l net.Listener, err error) {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Printf("Gateway started (%v)", VERSION)
-			if RPC_EmergencyMode {
-				go http.Serve(l, nil)
-			} else {
-				go http.Serve(l, mainRouter)
+			if !RPC_EmergencyMode {
+				http.Handle("/", mainRouter)
 			}
+			go http.Serve(l, nil)
 			displayConfig()
 		}
 
