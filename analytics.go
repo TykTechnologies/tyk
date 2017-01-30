@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"regexp"
 	"time"
@@ -65,22 +66,17 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	if !config.AnalyticsConfig.EnableGeoIP {
 		return
 	}
-
 	// Not great, tightly coupled
 	if analytics.GeoIPDB == nil {
 		return
 	}
 
-	// Sometimes it is empty, we can't look up mpty IP addresses
-	if ipStr == "" {
+	record, err := geoIPLookup(ipStr)
+	if err != nil {
+		log.Error("GeoIP Failure (not recorded): ", err)
 		return
 	}
-
-	ip := net.ParseIP(ipStr)
-
-	var record GeoData // Or any appropriate struct
-	if err := analytics.GeoIPDB.Lookup(ip, &record); err != nil {
-		log.Error("GeoIP Failure (not recorded): ", err)
+	if record == nil {
 		return
 	}
 
@@ -90,7 +86,22 @@ func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	log.Debug("Lon: ", record.Location.Longitude)
 	log.Debug("TZ: ", record.Location.TimeZone)
 
-	a.Geo = record
+	a.Geo = *record
+}
+
+func geoIPLookup(ipStr string) (*GeoData, error) {
+	if ipStr == "" {
+		return nil, nil
+	}
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address %q", ipStr)
+	}
+	record := new(GeoData)
+	if err := analytics.GeoIPDB.Lookup(ip, record); err != nil {
+		return nil, fmt.Errorf("geoIPDB lookup of %q failed: %v", ipStr, err)
+	}
+	return record, nil
 }
 
 type NormaliseURLPatterns struct {
