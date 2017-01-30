@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/mux"
@@ -119,6 +120,27 @@ func TestHealthCheckEndpoint(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Recorder should return 200 for health check")
+	}
+}
+
+func createSampleSession() SessionState {
+	return SessionState{
+		Rate:             5.0,
+		Allowance:        5.0,
+		LastCheck:        time.Now().Unix(),
+		Per:              8.0,
+		Expires:          0,
+		QuotaRenewalRate: 300, // 5 minutes
+		QuotaRenews:      time.Now().Unix(),
+		QuotaRemaining:   10,
+		QuotaMax:         10,
+		AccessRights: map[string]AccessDefinition{
+			"1": {
+				APIName:  "Test",
+				APIID:    "1",
+				Versions: []string{"Default"},
+			},
+		},
 	}
 }
 
