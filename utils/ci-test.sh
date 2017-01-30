@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# SKIP_LINT=true - only run the tests
-
 set -e
 
 MATRIX=(
@@ -22,17 +20,24 @@ fatal() {
 
 PKGS="$(go list ./... | grep -v /vendor/)"
 
-for opts in "${MATRIX[@]}"; do
-	show go test -v $opts $PKGS
+i=0
+# need to do per-pkg because go test doesn't support a single coverage
+# profile for multiple pkgs
+for pkg in $PKGS; do
+	for opts in "${MATRIX[@]}"; do
+		show go test -v -coverprofile=test-$i.cov $opts $pkg \
+			|| fatal "go test errored"
+		let i++ || true
+	done
 done
 
-if [[ $SKIP_LINT ]]; then
-	echo "Skipping linting"
+if [[ ! $LATEST_GO ]]; then
+	echo "Skipping linting and coverage report"
 	exit 0
 fi
 
 for opts in "${MATRIX[@]}"; do
-	show go vet -v $opts $PKGS
+	show go vet -v $opts $PKGS || fatal "go vet errored"
 done
 
 # Includes all top-level files and dirs that don't start with a dot

@@ -18,16 +18,17 @@ addons:
 matrix:
   include:
     - go: 1.6.x
-      env: SKIP_LINT=true
     - go: 1.7.x
+      env: LATEST_GO=true # run linters and report coverage
     - go: 1.8rc3
 
 install:
   - go install ./...
-  - go get -u golang.org/x/tools/cmd/goimports
+  - go get -u golang.org/x/tools/cmd/goimports github.com/{wadey/gocovmerge,mattn/goveralls}
 
 script:
   - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
   - go build -tags 'coprocess grpc'
   - ./utils/ci-test.sh
+  - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
