@@ -22,8 +22,6 @@ static int TestMessageLength(struct CoProcessMessage* object) {
 static struct CoProcessMessage* TestDispatchHook(struct CoProcessMessage* object) {
 	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
 
-	printf("TestDispatchHook: %p\n", object);
-
 	outputObject->p_data = object->p_data;
 	outputObject->length = object->length;
 

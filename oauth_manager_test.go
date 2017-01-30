@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -349,12 +348,10 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	key, fnd := redisStore.GetKey(token)
 	if fnd != nil {
 		t.Error("Key was not created (Can't find it)!")
-		fmt.Println(fnd)
 	}
 
 	if !strings.Contains(key, `"apply_policy_id":"TEST-4321"`) {
 		t.Error("Policy not added to token!")
-		fmt.Println(key)
 	}
 }
 
@@ -385,7 +382,6 @@ func getAuthCode() map[string]string {
 	var thisResponse = map[string]string{}
 	body, _ := ioutil.ReadAll(recorder.Body)
 	if err := json.Unmarshal(body, &thisResponse); err != nil {
-		fmt.Println(err)
 	}
 
 	return thisResponse
@@ -424,9 +420,7 @@ func getToken() tokenData {
 
 	var thisResponse = tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-	//	fmt.Println(string(body))
 	if err := json.Unmarshal(body, &thisResponse); err != nil {
-		fmt.Println(err)
 	}
 	log.Debug("TOKEN DATA: ", string(body))
 	return thisResponse
@@ -458,10 +452,8 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 
 	var thisResponse = tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-	//	fmt.Println(string(body))
 	err := json.Unmarshal(body, &thisResponse)
 	if err != nil {
-		fmt.Println(err)
 	}
 	log.Debug("TOKEN DATA: ", string(body))
 	log.Info("Access token: ", thisResponse.AccessToken)

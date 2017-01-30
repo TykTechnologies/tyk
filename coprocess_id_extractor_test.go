@@ -24,8 +24,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	var thisExtractor IdExtractor
-	thisExtractor = tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	thisSession := createBasicAuthSession()
 	username := "4321"
@@ -51,14 +50,8 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	var returnOverrides ReturnOverrides
-	var SessionID string
-
-	SessionID, returnOverrides = thisExtractor.ExtractAndCheck(req)
-
-	fmt.Println("SessionID=", SessionID)
-	fmt.Println("returnOverrides", returnOverrides)
-
+	SessionID, returnOverrides := thisExtractor.ExtractAndCheck(req)
+	_, _ = SessionID, returnOverrides
 }
 
 /* Value Extractor tests, using "form" source */
@@ -71,8 +64,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	var thisExtractor IdExtractor
-	thisExtractor = tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	thisSession := createBasicAuthSession()
 	username := "4321"
@@ -86,7 +78,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 	uri := "/"
 	method := "POST"
 
-	var authValue = "abc"
+	authValue := "abc"
 
 	form := url.Values{}
 	form.Add("auth", authValue)
@@ -104,19 +96,12 @@ func TestValueExtractorFormSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	var returnOverrides ReturnOverrides
-	var SessionID string
-
-	SessionID, _ = thisExtractor.ExtractAndCheck(req)
+	SessionID, _ := thisExtractor.ExtractAndCheck(req)
 	expectedSessionID := computeSessionID([]byte(authValue), tykMiddleware)
 
 	if SessionID != expectedSessionID {
 		t.Fatal("Value Extractor output (using form source) doesn't match the computed session ID.")
 	}
-
-	fmt.Println("SessionID=", SessionID)
-	fmt.Println("returnOverrides", returnOverrides)
-
 }
 
 func TestValueExtractorHeaderSourceValidation(t *testing.T) {
@@ -127,8 +112,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	var thisExtractor IdExtractor
-	thisExtractor = tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	thisSession := createBasicAuthSession()
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
@@ -149,8 +133,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	var returnOverrides ReturnOverrides
-	_, returnOverrides = thisExtractor.ExtractAndCheck(req)
+	_, returnOverrides := thisExtractor.ExtractAndCheck(req)
 
 	if returnOverrides.ResponseCode != 400 && returnOverrides.ResponseError != "Authorization field missing" {
 		t.Fatal("ValueExtractor should return an error when the header is missing.")
@@ -167,8 +150,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	var thisExtractor IdExtractor
-	thisExtractor = tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	thisSession := createBasicAuthSession()
 
@@ -193,10 +175,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	// var returnOverrides ReturnOverrides
-	var SessionID string
-
-	SessionID, _ = thisExtractor.ExtractAndCheck(req)
+	SessionID, _ := thisExtractor.ExtractAndCheck(req)
 	expectedSessionID := computeSessionID(matchedHeaderValue, tykMiddleware)
 
 	if SessionID != expectedSessionID {
@@ -207,9 +186,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 
 func computeSessionID(input []byte, tykMiddleware *TykMiddleware) (sessionID string) {
 	tokenID := fmt.Sprintf("%x", md5.Sum(input))
-	sessionID = tykMiddleware.Spec.OrgID + tokenID
-
-	return sessionID
+	return tykMiddleware.Spec.OrgID + tokenID
 }
 
 var idExtractorCoProcessDef = `
