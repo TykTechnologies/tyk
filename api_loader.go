@@ -555,6 +555,15 @@ func processSpec(referenceSpec *APISpec,
 	return &chainDef
 }
 
+type DummyProxyHandler struct {
+	SH SuccessHandler
+}
+
+func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	d.SH.ServeHTTP(w, r)
+	return
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	ListenPathMap = cmap.New()
