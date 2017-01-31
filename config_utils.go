@@ -29,9 +29,7 @@ func WriteDefaultConf(conf *Config) {
 	conf.Storage.Password = ""
 	conf.Storage.Database = 0
 	conf.Storage.MaxIdle = 100
-	if !runningTests {
-		conf.Storage.Port = 6379
-	}
+	conf.Storage.Port = 6379
 	conf.EnableAnalytics = false
 	conf.HealthCheck.EnableHealthChecks = true
 	conf.HealthCheck.HealthCheckValueTimeout = 60
@@ -47,7 +45,7 @@ func WriteDefaultConf(conf *Config) {
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
 		log.Error(err)
-	} else {
+	} else if !runningTests {
 		ioutil.WriteFile("tyk.conf", newConfig, 0644)
 	}
 }
@@ -58,14 +56,14 @@ func WriteDefaultConf(conf *Config) {
 func loadConfig(filePath string, conf *Config) {
 	configuration, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		log.Error("Couldn't load configuration file")
-		log.Error(err)
-		log.Info("Writing a default file to ./tyk.conf")
-
-		WriteDefaultConf(conf)
-
-		log.Info("Loading default configuration...")
-		loadConfig("tyk.conf", conf)
+		if !runningTests {
+			log.Error("Couldn't load configuration file")
+			log.Error(err)
+			log.Info("Writing a default file to ./tyk.conf")
+			WriteDefaultConf(conf)
+			log.Info("Loading default configuration...")
+			loadConfig("tyk.conf", conf)
+		}
 	} else {
 		if err := json.Unmarshal(configuration, &conf); err != nil {
 			log.Error("Couldn't unmarshal configuration")

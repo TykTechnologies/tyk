@@ -27,12 +27,13 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	WriteDefaultConf(&config)
 	config.Storage.Port, _ = strconv.Atoi(s.Port())
+	config.EnableAnalytics = true
 	initialiseSystem(map[string]interface{}{})
 	exitCode := m.Run()
 
 	s.Close()
-	os.Remove("tyk.conf")
 	os.Remove(filepath.Join("apps", "1.json"))
 	os.Exit(exitCode)
 }
@@ -778,8 +779,6 @@ func TestQuota(t *testing.T) {
 }
 
 func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
-	config.EnableAnalytics = true
-
 	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
 
@@ -827,8 +826,6 @@ func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
 }
 
 func TestWithAnalyticsErrorResponse(t *testing.T) {
-	config.EnableAnalytics = true
-
 	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
 
