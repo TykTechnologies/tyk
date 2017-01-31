@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/TykTechnologies/logrus"
@@ -30,7 +29,7 @@ func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
 
 	newEntry, fmtErr := hook.formatter.Format(entry)
 	if fmtErr != nil {
-		fmt.Println(fmtErr)
+		log.Error(fmtErr)
 		return nil
 	}
 
