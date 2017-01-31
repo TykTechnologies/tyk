@@ -209,6 +209,7 @@ type Config struct {
 	HostName                          string                                `json:"hostname"`
 	EnableAPISegregation              bool                                  `json:"enable_api_segregation"`
 	ControlAPIHostname                string                                `json:"control_api_hostname"`
+	ControlAPIPort                    int                                   `json:"control_api_port"`
 	EnableCustomDomains               bool                                  `json:"enable_custom_domains"`
 	EnableJSVM                        bool                                  `json:"enable_jsvm"`
 	CoProcessOptions                  CoProcessConfig                       `json:"coprocess_options"`

@@ -61,6 +61,7 @@ var (
 
 	mainRouter    *mux.Router
 	defaultRouter *mux.Router
+	controlRouter *mux.Router
 	LE_MANAGER    letsencrypt.Manager
 	LE_FIRSTRUN   bool
 
@@ -116,6 +117,8 @@ func setupGlobals() {
 	} else {
 		defaultRouter = mainRouter
 	}
+
+	controlRouter = mux.NewRouter()
 
 	if config.EnableAnalytics && config.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
@@ -745,7 +748,9 @@ func doReload() {
 		newMuxes = newRouter
 	}
 
-	loadAPIEndpoints(newMuxes)
+	if config.ControlAPIPort == 0 {
+		loadAPIEndpoints(newMuxes)
+	}
 	loadApps(specs, newMuxes)
 
 	newServeMux := http.NewServeMux()
@@ -1092,21 +1097,30 @@ func main() {
 	arguments := getCmdArguments()
 	NodeID = generateRandomNodeID()
 	l, goAgainErr := goagain.Listener(onFork)
+	controlListener, goAgainErr := goagain.Listener(onFork)
 
 	initialiseSystem(arguments)
 	start()
 
 	if goAgainErr != nil {
 		var err error
-		if l, err = generateListener(l); err != nil {
+		if l, err = generateListener(l, "", 0); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Fatalf("Error starting listener: %s", err)
 		}
 
-		listen(l, goAgainErr)
+		if config.ControlAPIPort > 0 {
+			if controlListener, err = generateListener(controlListener, "", config.ControlAPIPort); err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Fatalf("Error starting control API listener: %s", err)
+			}
+		}
+
+		listen(l, controlListener, goAgainErr)
 	} else {
-		listen(l, goAgainErr)
+		listen(l, controlListener, goAgainErr)
 
 		// Kill the parent, now that the child has started successfully.
 		log.Debug("KILLING PARENT PROCESS")
@@ -1190,7 +1204,9 @@ func start() {
 		DefaultQuotaStore.Init(GetGlobalStorageHandler("orgkey.", false))
 	}
 
-	loadAPIEndpoints(defaultRouter)
+	if config.ControlAPIPort == 0 {
+		loadAPIEndpoints(defaultRouter)
+	}
 
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
@@ -1214,8 +1230,15 @@ func start() {
 
 }
 
-func generateListener(l net.Listener) (net.Listener, error) {
-	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
+func generateListener(l net.Listener, listenAddress string, listenPort int) (net.Listener, error) {
+	if listenAddress == "" {
+		listenAddress = config.ListenAddress
+	}
+	if listenPort == 0 {
+		listenPort = config.ListenPort
+	}
+
+	targetPort := fmt.Sprintf("%s:%d", listenAddress, listenPort)
 
 	if config.HttpServerOptions.UseSSL {
 		log.WithFields(logrus.Fields{
@@ -1304,7 +1327,7 @@ func StartDRL() {
 	}
 }
 
-func listen(l net.Listener, err error) {
+func listen(l net.Listener, controlListener net.Listener, err error) {
 	ReadTimeout := 120
 	WriteTimeout := 120
 	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
@@ -1333,6 +1356,10 @@ func listen(l net.Listener, err error) {
 			if specs != nil {
 				loadApps(specs, defaultRouter)
 				getPolicies()
+
+				if config.ControlAPIPort > 0 {
+					loadAPIEndpoints(controlRouter)
+				}
 			}
 		}
 
@@ -1364,6 +1391,10 @@ func listen(l net.Listener, err error) {
 				http.Handle("/", mainRouter)
 			}
 			go http.Serve(l, nil)
+
+			if controlListener != nil {
+				go http.Serve(controlListener, controlRouter)
+			}
 			displayConfig()
 		}
 
