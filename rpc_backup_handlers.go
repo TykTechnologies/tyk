@@ -127,11 +127,11 @@ func doLoadWithBackup(specs []*APISpec) {
 
 	l, goAgainErr := goagain.Listener()
 	var err error
-	if l, err = generateListener(l); err != nil {
+	if l, err = generateListener(l, "", 0); err != nil {
 		log.Info("Failed to generate listener!")
 	}
 
-	listen(l, goAgainErr)
+	listen(l, nil, goAgainErr)
 }
 
 // encrypt string to base64 crypto using AES
