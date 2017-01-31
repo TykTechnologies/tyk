@@ -162,9 +162,9 @@ type httpbinHeadersResponse struct {
 func makeCoProcessSampleAPI(apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR COPROCESS TEST")
 	thisSpec := createDefinitionFromString(apiTestDef)
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	return thisSpec
 }

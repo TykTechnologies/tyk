@@ -80,9 +80,9 @@ var testBatchRequest = `
 
 func TestBatchSuccess(t *testing.T) {
 	spec := createDefinitionFromString(batchTestDef)
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	batchHandler := BatchRequestHandler{API: spec}
@@ -126,9 +126,9 @@ func TestBatchSuccess(t *testing.T) {
 
 func TestMakeSyncRequest(t *testing.T) {
 	spec := createDefinitionFromString(batchTestDef)
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	batchHandler := BatchRequestHandler{API: spec}
@@ -154,9 +154,9 @@ func TestMakeSyncRequest(t *testing.T) {
 
 func TestMakeASyncRequest(t *testing.T) {
 	spec := createDefinitionFromString(batchTestDef)
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	batchHandler := BatchRequestHandler{API: spec}
