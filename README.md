@@ -5,7 +5,8 @@
 Tyk is a lightweight, open source API Gateway and Management Platform enables you to control who accesses your API, when they access it and how they access it. Tyk will
 also record detailed analytics on how your users are interacting with your API and when things go wrong.
 
-Go versions 1.6 or later are supported.
+Go version 1.6 or later is required to build. Tyk is officially
+supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
 
 ## What is an API Gateway?
 
