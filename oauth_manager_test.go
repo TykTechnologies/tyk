@@ -83,9 +83,9 @@ func createOauthAppDefinition() *APISpec {
 func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(Muxer)
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	addOAuthHandlers(spec, Muxer, true)
 	remote, _ := url.Parse("http://example.com/")
@@ -106,9 +106,9 @@ func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 func makeOAuthAPI() *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR OAUTH")
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	specs := &[]*APISpec{thisSpec}
@@ -127,9 +127,9 @@ func makeOAuthAPI() *APISpec {
 
 func TestAuthCodeRedirect(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -163,9 +163,9 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	config.OauthRedirectUriSeparator = ","
 
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -199,9 +199,9 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	config.OauthRedirectUriSeparator = ""
 
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -232,9 +232,9 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 
 func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -267,9 +267,9 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 
 func TestAPIClientAuthorizeToken(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -302,9 +302,9 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -357,9 +357,9 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 
 func getAuthCode() map[string]string {
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -396,9 +396,9 @@ func getToken() tokenData {
 	authData := getAuthCode()
 
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -428,9 +428,9 @@ func getToken() tokenData {
 
 func TestOAuthClientCredsGrant(t *testing.T) {
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -477,9 +477,9 @@ func TestClientAccessRequest(t *testing.T) {
 	authData := getAuthCode()
 
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -519,9 +519,9 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	// thisSpec := createOauthAppDefinition()
 
 	thisSpec := makeOAuthAPI()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -597,9 +597,9 @@ func TestClientRefreshRequest(t *testing.T) {
 	tokenData := getToken()
 
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
@@ -636,9 +636,9 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	tokenData := getToken()
 
 	thisSpec := createOauthAppDefinition()
-	redisStore := RedisStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisStorageManager{KeyPrefix: "orgKey."}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(thisSpec, testMuxer)
