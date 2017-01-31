@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,13 +27,14 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	WriteDefaultConf(&config)
+	config.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	config.Storage.Port, _ = strconv.Atoi(s.Port())
 	config.EnableAnalytics = true
 	initialiseSystem(map[string]interface{}{})
 	exitCode := m.Run()
 
 	s.Close()
-	os.Remove(filepath.Join("apps", "1.json"))
+	os.RemoveAll(config.AppPath)
 	os.Exit(exitCode)
 }
 

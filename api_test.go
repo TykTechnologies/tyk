@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -87,13 +86,6 @@ type apiSuccess struct {
 type testAPIDefinition struct {
 	tykcommon.APIDefinition
 	ID string `json:"id"`
-}
-
-func init() {
-	// Clean up our API list
-	log.Debug("Setting up Empty API path")
-	config.AppPath = os.TempDir() + "/tyk_test/"
-	os.Mkdir(config.AppPath, 0755)
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
