@@ -161,13 +161,13 @@ var ipMiddlewareTestDefinitionMissing = `
 
 func makeIPSampleAPI(apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR IP WHITELIST")
-	thisSpec := createDefinitionFromString(apiTestDef)
+	spec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := &[]*APISpec{thisSpec}
+	specs := &[]*APISpec{spec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
@@ -177,7 +177,7 @@ func makeIPSampleAPI(apiTestDef string) *APISpec {
 	http.DefaultServeMux = newHttpMuxer
 	log.Debug("IP TEST Reload complete")
 
-	return thisSpec
+	return spec
 }
 
 func TestIpMiddlewareIPFail(t *testing.T) {
@@ -186,8 +186,8 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234wer", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("1234wer", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -215,8 +215,8 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -244,8 +244,8 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -273,8 +273,8 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -302,8 +302,8 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("gfgg1234", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -332,8 +332,8 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234rtyrty", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("1234rtyrty", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -360,8 +360,8 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234iuouio", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("1234iuouio", session, 60)
 	uri := "/"
 	method := "GET"
 

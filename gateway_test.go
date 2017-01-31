@@ -50,81 +50,81 @@ func randSeq(n int) string {
 }
 
 func createNonThrottledSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 100.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = 10
-	thisSession.Alias = "TEST-ALIAS"
+	var session SessionState
+	session.Rate = 100.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
+	session.QuotaRemaining = 10
+	session.QuotaMax = 10
+	session.Alias = "TEST-ALIAS"
 
-	return thisSession
+	return session
 }
 
 func createQuotaSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 8.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 2
-	thisSession.QuotaMax = 2
+	var session SessionState
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 2
+	session.QuotaMax = 2
 
-	return thisSession
+	return session
 }
 
 func createVersionedSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 10000
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 60
-	thisSession.Expires = -1
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = -1
-	thisSession.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
+	var session SessionState
+	session.Rate = 10000
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 60
+	session.Expires = -1
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
+	session.QuotaRemaining = 10
+	session.QuotaMax = -1
+	session.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
 
-	return thisSession
+	return session
 }
 
 func createParamAuthSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 10000
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 60
-	thisSession.Expires = -1
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = -1
-	thisSession.AccessRights = map[string]AccessDefinition{"9992": {APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
+	var session SessionState
+	session.Rate = 10000
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 60
+	session.Expires = -1
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
+	session.QuotaRemaining = 10
+	session.QuotaMax = -1
+	session.AccessRights = map[string]AccessDefinition{"9992": {APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
 
-	return thisSession
+	return session
 }
 
 func createStandardSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 10000
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 60
-	thisSession.Expires = -1
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = -1
+	var session SessionState
+	session.Rate = 10000
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 60
+	session.Expires = -1
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
+	session.QuotaRemaining = 10
+	session.QuotaMax = -1
 
-	return thisSession
+	return session
 }
 
 type tykErrorResponse struct {
@@ -473,8 +473,8 @@ func TestParambasedAuth(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createParamAuthSession()
-	spec.SessionManager.UpdateSession("54321", thisSession, 60)
+	session := createParamAuthSession()
+	spec.SessionManager.UpdateSession("54321", session, 60)
 	uri := "/pathBased/post?authorization=54321"
 	method := "POST"
 
@@ -539,9 +539,9 @@ func TestParambasedAuth(t *testing.T) {
 // 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 // 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 // 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-// 	thisSession := createThrottledSession()
+// 	session := createThrottledSession()
 // 	keyId := randSeq(10)
-// 	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
+// 	spec.SessionManager.UpdateSession(keyId, session, 60)
 // 	uri := "/"
 // 	method := "GET"
 
@@ -609,8 +609,8 @@ func TestVersioningRequestOK(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createVersionedSession()
-	spec.SessionManager.UpdateSession("96869686969", thisSession, 60)
+	session := createVersionedSession()
+	spec.SessionManager.UpdateSession("96869686969", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -638,11 +638,11 @@ func TestVersioningRequestFail(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createVersionedSession()
-	thisSession.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
+	session := createVersionedSession()
+	session.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
 
 	// no version allowed
-	spec.SessionManager.UpdateSession("zz1234", thisSession, 60)
+	spec.SessionManager.UpdateSession("zz1234", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -670,9 +670,9 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createStandardSession()
+	session := createStandardSession()
 
-	spec.SessionManager.UpdateSession("tyutyu345345dgh", thisSession, 60)
+	spec.SessionManager.UpdateSession("tyutyu345345dgh", session, 60)
 	uri := "/v1/ignored/noregex"
 	method := "GET"
 
@@ -701,11 +701,11 @@ func TestWhitelistRequestReply(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createStandardSession()
+	session := createStandardSession()
 
 	keyId := randSeq(10)
 
-	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
+	spec.SessionManager.UpdateSession(keyId, session, 60)
 	uri := "v1/allowed/whitelist/reply/"
 	method := "GET"
 
@@ -735,9 +735,9 @@ func TestQuota(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createQuotaSession()
+	session := createQuotaSession()
 	keyId := randSeq(10)
-	spec.SessionManager.UpdateSession(keyId, thisSession, 60)
+	spec.SessionManager.UpdateSession(keyId, session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -793,8 +793,8 @@ func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("ert1234ert", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("ert1234ert", session, 60)
 	uri := "/"
 	method := "GET"
 
@@ -840,8 +840,8 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("fgh561234", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("fgh561234", session, 60)
 	uri := "/"
 	method := "GET"
 

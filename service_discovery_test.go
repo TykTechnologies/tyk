@@ -257,15 +257,13 @@ func TestServiceDiscovery_EUREKA(t *testing.T) {
 		t.Error(err)
 	}
 
-	thisList := data
-
 	arr := []string{"ip-172-31-57-136:60565", "ip-172-31-13-37:50045"}
 
-	if thisList.Len() != len(arr) {
+	if data.Len() != len(arr) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All() {
+	for i, v := range data.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)
@@ -283,15 +281,13 @@ func TestServiceDiscovery_CONSUL(t *testing.T) {
 		t.Error(err)
 	}
 
-	thisList := data
-
 	arr := []string{"10.1.10.12:8000", "10.1.10.13:8000"}
 
-	if thisList.Len() != len(arr) {
+	if data.Len() != len(arr) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All() {
+	for i, v := range data.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)
@@ -309,15 +305,13 @@ func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
 		t.Error(err)
 	}
 
-	thisList := data
-
 	arr := []string{"httpbin1.org:80", "httpbin2.org:80"}
 
-	if thisList.Len() != len(arr) {
+	if data.Len() != len(arr) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All() {
+	for i, v := range data.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)
@@ -335,15 +329,13 @@ func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
 		t.Error(err)
 	}
 
-	thisList := data
-
 	arr := []string{"httpbin.org:80", "httpbin2.org:80"}
 
-	if thisList.Len() != len(arr) {
+	if data.Len() != len(arr) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All() {
+	for i, v := range data.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)
@@ -401,15 +393,13 @@ func TestServiceDiscovery_MESOSPHERE(t *testing.T) {
 		t.Error(err)
 	}
 
-	thisList := data
-
 	arr := []string{"httpbin.org:80"}
 
-	if thisList.Len() != len(arr) {
+	if data.Len() != len(arr) {
 		t.Error("Result lists length do not match expected value")
 	}
 
-	for i, v := range thisList.All() {
+	for i, v := range data.All() {
 		if v != arr[i] {
 			err := "Value is wrong, should be: " + arr[i] + " have: " + v
 			t.Error(err)

@@ -22,9 +22,9 @@ import (
 const baseMiddlewarePath = "middleware/python"
 
 var (
-	CoProcessName         = "test"
-	MessageType           = coprocess.ProtobufMessage
-	thisTestDispatcher, _ = NewCoProcessDispatcher()
+	CoProcessName     = "test"
+	MessageType       = coprocess.ProtobufMessage
+	testDispatcher, _ = NewCoProcessDispatcher()
 )
 
 /* Dispatcher functions */
@@ -38,10 +38,10 @@ func TestCoProcessDispatch(t *testing.T) {
 		HookName: "test",
 	}
 
-	messagePtr = thisTestDispatcher.ToCoProcessMessage(object)
-	newMessagePtr = thisTestDispatcher.Dispatch(messagePtr)
+	messagePtr = testDispatcher.ToCoProcessMessage(object)
+	newMessagePtr = testDispatcher.Dispatch(messagePtr)
 
-	newObject = thisTestDispatcher.ToCoProcessObject(newMessagePtr)
+	newObject = testDispatcher.ToCoProcessObject(newMessagePtr)
 
 	t.Log(newObject)
 
@@ -89,8 +89,8 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 
 // Makes sense when testing with -timeout
 func TestCoProcessReload(t *testing.T) {
-	if thisTestDispatcher == nil {
-		thisTestDispatcher, _ = NewCoProcessDispatcher()
+	if testDispatcher == nil {
+		testDispatcher, _ = NewCoProcessDispatcher()
 	}
 	ReloadURLStructure()
 	<-CoProcessReload
@@ -113,10 +113,10 @@ func TestCoProcessSerialization(t *testing.T) {
 	}
 
 	var messagePtr unsafe.Pointer
-	messagePtr = thisTestDispatcher.ToCoProcessMessage(object)
+	messagePtr = testDispatcher.ToCoProcessMessage(object)
 
 	var length int
-	length = thisTestDispatcher.TestMessageLength(messagePtr)
+	length = testDispatcher.TestMessageLength(messagePtr)
 
 	if len(data) != length {
 		err := "The length of the serialized object doesn't match."
@@ -161,12 +161,12 @@ type httpbinHeadersResponse struct {
 
 func makeCoProcessSampleAPI(apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR COPROCESS TEST")
-	thisSpec := createDefinitionFromString(apiTestDef)
+	spec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	return thisSpec
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	return spec
 }
 
 func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver tykcommon.MiddlewareDriver) http.Handler {
@@ -184,8 +184,8 @@ func TestCoProcessMiddleware(t *testing.T) {
 
 	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
 
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("abc", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("abc", session, 60)
 
 	uri := "/headers"
 	method := "GET"
@@ -210,8 +210,8 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
 
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("abc", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("abc", session, 60)
 
 	uri := "/headers"
 	method := "GET"
@@ -286,8 +286,8 @@ func TestCoProcessAuth(t *testing.T) {
 
 	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, tykcommon.MiddlewareDriver("python"))
 
-	thisSession := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("abc", thisSession, 60)
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("abc", session, 60)
 
 	uri := "/headers"
 	method := "GET"

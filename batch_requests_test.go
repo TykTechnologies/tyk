@@ -134,9 +134,9 @@ func TestMakeSyncRequest(t *testing.T) {
 	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
-	thisRequest, _ := http.NewRequest("GET", "http://example.com/", nil)
+	request, _ := http.NewRequest("GET", "http://example.com/", nil)
 
-	replyUnit := batchHandler.doSyncRequest(thisRequest, relURL)
+	replyUnit := batchHandler.doSyncRequest(request, relURL)
 
 	if replyUnit.RelativeURL != relURL {
 		t.Error("Relativce URL in reply is wrong")
@@ -162,10 +162,10 @@ func TestMakeASyncRequest(t *testing.T) {
 	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
-	thisRequest, _ := http.NewRequest("GET", "http://example.com/", nil)
+	request, _ := http.NewRequest("GET", "http://example.com/", nil)
 
 	replies := make(chan BatchReplyUnit)
-	go batchHandler.doAsyncRequest(thisRequest, relURL, replies)
+	go batchHandler.doAsyncRequest(request, relURL, replies)
 	replyUnit := BatchReplyUnit{}
 	replyUnit = <-replies
 

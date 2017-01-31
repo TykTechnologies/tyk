@@ -56,20 +56,20 @@ var hmacAuthDef = `
 `
 
 func createHMACAuthSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 8.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 1
-	thisSession.QuotaMax = -1
-	thisSession.HMACEnabled = true
-	thisSession.HmacSecret = "9879879878787878"
+	var session SessionState
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.HMACEnabled = true
+	session.HmacSecret = "9879879878787878"
 
-	return thisSession
+	return session
 }
 
 func getHMACAuthChain(spec *APISpec) http.Handler {
@@ -98,10 +98,10 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createHMACAuthSession()
+	session := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -121,7 +121,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	log.Info("[TEST] Signature string before encoding: ", signatureString)
 
 	// Encode it
-	key := []byte(thisSession.HmacSecret)
+	key := []byte(session.HmacSecret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))
 
@@ -152,10 +152,10 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createHMACAuthSession()
+	session := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -175,7 +175,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
-	key := []byte(thisSession.HmacSecret)
+	key := []byte(session.HmacSecret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))
 
@@ -206,10 +206,10 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createHMACAuthSession()
+	session := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -229,7 +229,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
-	key := []byte(thisSession.HmacSecret)
+	key := []byte(session.HmacSecret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))
 
@@ -260,10 +260,10 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createHMACAuthSession()
+	session := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -283,7 +283,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
-	key := []byte(thisSession.HmacSecret)
+	key := []byte(session.HmacSecret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))
 
@@ -314,10 +314,10 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createHMACAuthSession()
+	session := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -337,7 +337,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
-	key := []byte(thisSession.HmacSecret)
+	key := []byte(session.HmacSecret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))
 
@@ -368,10 +368,10 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createHMACAuthSession()
+	session := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -396,7 +396,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	log.Info("[TEST] Signature string before encoding: ", signatureString)
 
 	// Encode it
-	key := []byte(thisSession.HmacSecret)
+	key := []byte(session.HmacSecret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))
 
@@ -449,10 +449,10 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createHMACAuthSession()
+	session := createHMACAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", thisSession, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -477,7 +477,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	log.Info("[TEST] Signature string before encoding: ", signatureString)
 
 	// Encode it
-	key := []byte(thisSession.HmacSecret)
+	key := []byte(session.HmacSecret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))
 

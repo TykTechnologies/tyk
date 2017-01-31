@@ -24,14 +24,14 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -50,7 +50,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	SessionID, returnOverrides := thisExtractor.ExtractAndCheck(req)
+	SessionID, returnOverrides := extractor.ExtractAndCheck(req)
 	_, _ = SessionID, returnOverrides
 }
 
@@ -64,14 +64,14 @@ func TestValueExtractorFormSource(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -96,7 +96,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	SessionID, _ := thisExtractor.ExtractAndCheck(req)
+	SessionID, _ := extractor.ExtractAndCheck(req)
 	expectedSessionID := computeSessionID([]byte(authValue), tykMiddleware)
 
 	if SessionID != expectedSessionID {
@@ -112,11 +112,11 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -133,7 +133,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	_, returnOverrides := thisExtractor.ExtractAndCheck(req)
+	_, returnOverrides := extractor.ExtractAndCheck(req)
 
 	if returnOverrides.ResponseCode != 400 && returnOverrides.ResponseError != "Authorization field missing" {
 		t.Fatal("ValueExtractor should return an error when the header is missing.")
@@ -150,12 +150,12 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 
 	newExtractor(spec, tykMiddleware)
 
-	thisExtractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	fullHeaderValue := "token-12345"
 	matchedHeaderValue := []byte("12345")
@@ -175,7 +175,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	SessionID, _ := thisExtractor.ExtractAndCheck(req)
+	SessionID, _ := extractor.ExtractAndCheck(req)
 	expectedSessionID := computeSessionID(matchedHeaderValue, tykMiddleware)
 
 	if SessionID != expectedSessionID {

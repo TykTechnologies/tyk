@@ -259,9 +259,9 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createDefinitionFromString(nonExpiringExtendedDefNoWhitelist)
+	spec := createDefinitionFromString(nonExpiringExtendedDefNoWhitelist)
 
-	ok, status, _ := thisSpec.IsRequestValid(req)
+	ok, status, _ := spec.IsRequestValid(req)
 	if ok {
 		t.Error("Request should fail as URL is blacklisted!")
 	}
@@ -280,7 +280,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	ok, status, _ = thisSpec.IsRequestValid(req)
+	ok, status, _ = spec.IsRequestValid(req)
 	if ok {
 		t.Error("Request should fail as URL (with dynamic ID) is blacklisted!")
 	}
@@ -300,7 +300,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	ok, status, _ = thisSpec.IsRequestValid(req)
+	ok, status, _ = spec.IsRequestValid(req)
 	if !ok {
 		t.Error("Request should fail as URL (with dynamic ID) is blacklisted!")
 	}
@@ -321,9 +321,9 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createDefinitionFromString(nonExpiringExtendedDef)
+	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := thisSpec.IsRequestValid(req)
+	ok, status, _ := spec.IsRequestValid(req)
 	if !ok {
 		t.Error("Request should be OK as URL is whitelisted!")
 	}
@@ -342,7 +342,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	ok, status, _ = thisSpec.IsRequestValid(req)
+	ok, status, _ = spec.IsRequestValid(req)
 	if !ok {
 		t.Error("Request should be OK as URL is whitelisted (regex)!")
 	}
@@ -363,9 +363,9 @@ func TestExtendedWhiteListBlock(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createDefinitionFromString(nonExpiringExtendedDef)
+	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := thisSpec.IsRequestValid(req)
+	ok, status, _ := spec.IsRequestValid(req)
 	if ok {
 		t.Error("Request should fail as things not in whitelist should be rejected!")
 	}
@@ -386,9 +386,9 @@ func TestExtendedIgnored(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createDefinitionFromString(nonExpiringExtendedDef)
+	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := thisSpec.IsRequestValid(req)
+	ok, status, _ := spec.IsRequestValid(req)
 	if !ok {
 		t.Error("Request should pass, URL is ignored")
 	}
@@ -409,9 +409,9 @@ func TestExtendedWhiteListWithRedirectedReply(t *testing.T) {
 	}
 	req.Header.Add("version", "v1")
 
-	thisSpec := createDefinitionFromString(nonExpiringExtendedDef)
+	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := thisSpec.IsRequestValid(req)
+	ok, status, _ := spec.IsRequestValid(req)
 	if !ok {
 		t.Error("Request should be OK as URL is whitelisted! Status was: ", status)
 	}

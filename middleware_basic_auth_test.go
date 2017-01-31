@@ -52,19 +52,19 @@ var basicAuthDef = `
 `
 
 func createBasicAuthSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 8.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 1
-	thisSession.QuotaMax = -1
-	thisSession.BasicAuthData.Password = "TEST"
+	var session SessionState
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.BasicAuthData.Password = "TEST"
 
-	return thisSession
+	return session
 }
 
 func getBasicAuthChain(spec *APISpec) http.Handler {
@@ -93,11 +93,11 @@ func TestBasicAuthSession(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -127,11 +127,11 @@ func TestBasicAuthBadFormatting(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := strings.Join([]string{username, password}, "-")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -165,9 +165,9 @@ func TestBasicAuthBadData(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := "ldhflsdflksjfdlksjflksdjlskdjflkjsfd:::jhdsgfkjahsgdkhasdgjhgasdjhads:::aksdakjsdh:adskasdkjhasdkjhad-asdads"
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -201,11 +201,11 @@ func TestBasicAuthBadOverFormatting(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := strings.Join([]string{username, password, "banana"}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -239,10 +239,10 @@ func TestBasicAuthWrongUser(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := strings.Join([]string{"1234", password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -280,10 +280,10 @@ func TestBasicMissingHeader(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	uri := "/"
 	method := "GET"
@@ -314,11 +314,11 @@ func TestBasicAuthWrongPassword(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createBasicAuthSession()
+	session := createBasicAuthSession()
 	username := "4321"
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default4321", thisSession, 60)
+	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	to_encode := strings.Join([]string{username, "WRONGPASSTEST"}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))

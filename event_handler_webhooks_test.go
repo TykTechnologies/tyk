@@ -130,9 +130,9 @@ func TestCreateBody(t *testing.T) {
 	em.EventType = EVENT_QuotaExceeded
 	em.TimeStamp = "0"
 
-	thisHook := createHookObj()
+	hook := createHookObj()
 
-	body, err := thisHook.CreateBody(em)
+	body, err := hook.CreateBody(em)
 
 	if err != nil {
 		t.Error("Create body failed with error! ", err)
@@ -167,14 +167,14 @@ func TestGet(t *testing.T) {
 		Key:              "123456789",
 	}
 
-	thisBody, _ := myEventHandler.CreateBody(eventMessage)
+	body, _ := myEventHandler.CreateBody(eventMessage)
 
-	thisChecksum, _ := myEventHandler.GetChecksum(thisBody)
+	checksum, _ := myEventHandler.GetChecksum(body)
 	myEventHandler.HandleEvent(eventMessage)
 
-	wasFired := myEventHandler.WasHookFired(thisChecksum)
+	wasFired := myEventHandler.WasHookFired(checksum)
 
-	log.Warning("Test Checksum: ", thisChecksum)
+	log.Warning("Test Checksum: ", checksum)
 
 	if !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
@@ -203,14 +203,14 @@ func TestPost(t *testing.T) {
 		Key:              "123456789",
 	}
 
-	thisBody, _ := myEventHandler.CreateBody(eventMessage)
+	body, _ := myEventHandler.CreateBody(eventMessage)
 
-	thisChecksum, _ := myEventHandler.GetChecksum(thisBody)
+	checksum, _ := myEventHandler.GetChecksum(body)
 	myEventHandler.HandleEvent(eventMessage)
 
-	wasFired := myEventHandler.WasHookFired(thisChecksum)
+	wasFired := myEventHandler.WasHookFired(checksum)
 
-	log.Warning("Test Checksum: ", thisChecksum)
+	log.Warning("Test Checksum: ", checksum)
 
 	if !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
