@@ -14,21 +14,21 @@ import (
 )
 
 func createAuthKeyAuthSession() SessionState {
-	var thisSession SessionState
+	var session SessionState
 	// essentially non-throttled
-	thisSession.Rate = 100.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 10
-	thisSession.QuotaMax = 10
+	session.Rate = 100.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
+	session.QuotaRemaining = 10
+	session.QuotaMax = 10
 
-	thisSession.AccessRights = map[string]AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
+	session.AccessRights = map[string]AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
 
-	return thisSession
+	return session
 }
 
 func getAuthKeyChain(spec *APISpec) http.Handler {
@@ -58,10 +58,10 @@ func setUp(def string) *APISpec {
 
 func TestBearerTokenAuthKeySession(t *testing.T) {
 	spec := setUp(authKeyDef)
-	thisSession := createAuthKeyAuthSession()
+	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60)
 
 	recorder := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/auth_key_test/", nil)
@@ -118,10 +118,10 @@ var authKeyDef = `
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	spec := setUp(multiAuthBackwardsCompatible)
-	thisSession := createAuthKeyAuthSession()
+	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60)
 
 	recorder := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), strings.NewReader(""))
@@ -177,10 +177,10 @@ var multiAuthBackwardsCompatible = `
 
 func TestMultiAuthSession(t *testing.T) {
 	spec := setUp(multiAuthDef)
-	thisSession := createAuthKeyAuthSession()
+	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60)
 
 	var req *http.Request
 	var err error

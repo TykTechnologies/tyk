@@ -53,13 +53,13 @@ var apiTestDef = `
 
 func makeSampleAPI() *APISpec {
 	log.Debug("CREATING TEMPORARY API")
-	thisSpec := createDefinitionFromString(apiTestDef)
+	spec := createDefinitionFromString(apiTestDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	thisSpec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	specs := &[]*APISpec{thisSpec}
+	specs := &[]*APISpec{spec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
@@ -71,7 +71,7 @@ func makeSampleAPI() *APISpec {
 	http.DefaultServeMux = newHttmMuxer
 	log.Debug("TEST Reload complete")
 
-	return thisSpec
+	return spec
 }
 
 type apiSuccess struct {

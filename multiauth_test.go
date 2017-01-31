@@ -54,37 +54,37 @@ var multiAuthDev = `
 `
 
 func createMultiAuthKeyAuthSession() SessionState {
-	var thisSession SessionState
+	var session SessionState
 	// essentially non-throttled
-	thisSession.Rate = 100.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix()
-	thisSession.QuotaRemaining = 900
-	thisSession.QuotaMax = 10
-	thisSession.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	session.Rate = 100.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix()
+	session.QuotaRemaining = 900
+	session.QuotaMax = 10
+	session.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 
-	return thisSession
+	return session
 }
 
 func createMultiBasicAuthSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 8.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix()
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 1
-	thisSession.QuotaMax = -1
-	thisSession.BasicAuthData.Password = "TEST"
-	thisSession.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	var session SessionState
+	session.Rate = 8.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix()
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.BasicAuthData.Password = "TEST"
+	session.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 
-	return thisSession
+	return session
 }
 
 func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
@@ -123,10 +123,10 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
 
 	// Create key
-	thisSession := createMultiAuthKeyAuthSession()
+	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -166,10 +166,10 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
 
 	// Create key
-	thisSession := createMultiAuthKeyAuthSession()
+	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -214,10 +214,10 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
 
 	// Create key
-	thisSession := createMultiAuthKeyAuthSession()
+	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -257,10 +257,10 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
 
 	// Create key
-	thisSession := createMultiAuthKeyAuthSession()
+	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, thisSession, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))

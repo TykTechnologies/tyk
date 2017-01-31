@@ -226,51 +226,51 @@ jQIDAQAB
 `
 
 func createJWTSession() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 1000000.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix() - 10
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 1
-	thisSession.QuotaMax = -1
-	thisSession.JWTData.Secret = jwtSecret
+	var session SessionState
+	session.Rate = 1000000.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix() - 10
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.JWTData.Secret = jwtSecret
 
-	return thisSession
+	return session
 }
 
 func createJWTSessionWithRSA() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 1000000.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix() - 10
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 1
-	thisSession.QuotaMax = -1
-	thisSession.JWTData.Secret = jwtRSAPubKey
+	var session SessionState
+	session.Rate = 1000000.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix() - 10
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.JWTData.Secret = jwtRSAPubKey
 
-	return thisSession
+	return session
 }
 
 func createJWTSessionWithRSAWithPolicy() SessionState {
-	var thisSession SessionState
-	thisSession.Rate = 1000000.0
-	thisSession.Allowance = thisSession.Rate
-	thisSession.LastCheck = time.Now().Unix() - 10
-	thisSession.Per = 1.0
-	thisSession.Expires = 0
-	thisSession.QuotaRenewalRate = 300 // 5 minutes
-	thisSession.QuotaRenews = time.Now().Unix() + 20
-	thisSession.QuotaRemaining = 1
-	thisSession.QuotaMax = -1
-	thisSession.ApplyPolicyID = "987654321"
+	var session SessionState
+	session.Rate = 1000000.0
+	session.Allowance = session.Rate
+	session.LastCheck = time.Now().Unix() - 10
+	session.Per = 1.0
+	session.Expires = 0
+	session.QuotaRenewalRate = 300 // 5 minutes
+	session.QuotaRenews = time.Now().Unix() + 20
+	session.QuotaRemaining = 1
+	session.QuotaMax = -1
+	session.ApplyPolicyID = "987654321"
 
-	return thisSession
+	return session
 }
 
 func getJWTChain(spec *APISpec) http.Handler {
@@ -294,21 +294,21 @@ func getJWTChain(spec *APISpec) http.Handler {
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "hmac"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSession()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSession()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.SigningMethodHS256)
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
-	log.Info("Kid is: ", thisTokenKID)
+	token.Header["kid"] = tokenKID
+	log.Info("Kid is: ", tokenKID)
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -338,20 +338,20 @@ func TestJWTSessionHMAC(t *testing.T) {
 }
 
 func TestJWTSessionRSA(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -386,20 +386,20 @@ func TestJWTSessionRSA(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -436,20 +436,20 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -483,20 +483,20 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -533,7 +533,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.DoNotTrack = true
 	spec.JWTSigningMethod = "rsa"
@@ -541,13 +541,13 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -584,20 +584,20 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -634,21 +634,21 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.ResetQuota(thisTokenKID, thisSession)
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.ResetQuota(tokenKID, session)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -683,20 +683,20 @@ func TestJWTSessionRSABearer(t *testing.T) {
 }
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
-	thisTokenKID := randSeq(10)
+	tokenKID := randSeq(10)
 	spec := createDefinitionFromString(jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	thisSession := createJWTSessionWithRSA()
-	spec.SessionManager.UpdateSession(thisTokenKID, thisSession, 60)
+	session := createJWTSessionWithRSA()
+	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set the token ID
-	token.Header["kid"] = thisTokenKID
+	token.Header["kid"] = tokenKID
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
@@ -739,10 +739,10 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
-	thisTokenID := "1234567891010101"
-	thisSession := createJWTSessionWithRSAWithPolicy()
-	spec.SessionManager.ResetQuota(thisTokenID, thisSession)
-	spec.SessionManager.UpdateSession(thisTokenID, thisSession, 60)
+	tokenID := "1234567891010101"
+	session := createJWTSessionWithRSAWithPolicy()
+	spec.SessionManager.ResetQuota(tokenID, session)
+	spec.SessionManager.UpdateSession(tokenID, session, 60)
 
 	Policies["987654321"] = Policy{
 		ID:               "987654321",
@@ -765,7 +765,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
-	token.Claims.(jwt.MapClaims)["azp"] = thisTokenID
+	token.Claims.(jwt.MapClaims)["azp"] = tokenID
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	signKey, getSignErr := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
