@@ -776,16 +776,7 @@ func TestQuota(t *testing.T) {
 	}
 }
 
-func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
-	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
-	log.Info("Setting up analytics DB connection")
-
-	analytics = RedisAnalyticsHandler{
-		Store: &AnalyticsStore,
-	}
-	analytics.Store.Connect()
-	analytics.Init()
-
+func TestWithAnalytics(t *testing.T) {
 	spec := createNonVersionedDefinition()
 	specInitTest(t, spec)
 	session := createNonThrottledSession()
@@ -821,15 +812,6 @@ func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
 }
 
 func TestWithAnalyticsErrorResponse(t *testing.T) {
-	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
-	log.Info("Setting up analytics DB connection")
-
-	analytics = RedisAnalyticsHandler{
-		Store: &AnalyticsStore,
-	}
-	analytics.Store.Connect()
-	analytics.Init()
-
 	spec := createNonVersionedDefinition()
 	specInitTest(t, spec)
 	session := createNonThrottledSession()
