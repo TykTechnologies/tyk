@@ -68,10 +68,6 @@ func createBasicAuthSession() SessionState {
 }
 
 func getBasicAuthChain(spec *APISpec) http.Handler {
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -88,11 +84,7 @@ func getBasicAuthChain(spec *APISpec) http.Handler {
 }
 
 func TestBasicAuthSession(t *testing.T) {
-	spec := createDefinitionFromString(basicAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, basicAuthDef)
 	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
@@ -122,11 +114,7 @@ func TestBasicAuthSession(t *testing.T) {
 }
 
 func TestBasicAuthBadFormatting(t *testing.T) {
-	spec := createDefinitionFromString(basicAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, basicAuthDef)
 	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
@@ -160,11 +148,7 @@ func TestBasicAuthBadFormatting(t *testing.T) {
 }
 
 func TestBasicAuthBadData(t *testing.T) {
-	spec := createDefinitionFromString(basicAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, basicAuthDef)
 	session := createBasicAuthSession()
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("default4321", session, 60)
@@ -196,11 +180,7 @@ func TestBasicAuthBadData(t *testing.T) {
 }
 
 func TestBasicAuthBadOverFormatting(t *testing.T) {
-	spec := createDefinitionFromString(basicAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, basicAuthDef)
 	session := createBasicAuthSession()
 	username := "4321"
 	password := "TEST"
@@ -234,11 +214,7 @@ func TestBasicAuthBadOverFormatting(t *testing.T) {
 }
 
 func TestBasicAuthWrongUser(t *testing.T) {
-	spec := createDefinitionFromString(basicAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, basicAuthDef)
 	session := createBasicAuthSession()
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
@@ -275,11 +251,7 @@ func TestBasicAuthWrongUser(t *testing.T) {
 }
 
 func TestBasicMissingHeader(t *testing.T) {
-	spec := createDefinitionFromString(basicAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, basicAuthDef)
 	session := createBasicAuthSession()
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
@@ -309,11 +281,7 @@ func TestBasicMissingHeader(t *testing.T) {
 }
 
 func TestBasicAuthWrongPassword(t *testing.T) {
-	spec := createDefinitionFromString(basicAuthDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, basicAuthDef)
 	session := createBasicAuthSession()
 	username := "4321"
 

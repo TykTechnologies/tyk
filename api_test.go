@@ -51,13 +51,10 @@ var apiTestDef = `
 
 `
 
-func makeSampleAPI() *APISpec {
+func makeSampleAPI(t *testing.T) *APISpec {
 	log.Debug("CREATING TEMPORARY API")
 	spec := createDefinitionFromString(apiTestDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	specInitTest(t, spec)
 
 	specs := &[]*APISpec{spec}
 	newMuxes := mux.NewRouter()
@@ -93,7 +90,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 
-	makeSampleAPI()
+	makeSampleAPI(t)
 
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
@@ -147,7 +144,7 @@ func TestApiHandler(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
 
-		makeSampleAPI()
+		makeSampleAPI(t)
 
 		req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
@@ -185,7 +182,7 @@ func TestApiHandlerGetSingle(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 
-	makeSampleAPI()
+	makeSampleAPI(t)
 
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
@@ -276,7 +273,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 
-	makeSampleAPI()
+	makeSampleAPI(t)
 	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
@@ -309,7 +306,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	makeSampleAPI()
+	makeSampleAPI(t)
 	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
@@ -335,7 +332,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 }
 
 func TestKeyHandlerGetKey(t *testing.T) {
-	makeSampleAPI()
+	makeSampleAPI(t)
 	createKey()
 
 	uri := "/tyk/keys/1234"
@@ -366,7 +363,7 @@ func TestKeyHandlerGetKey(t *testing.T) {
 }
 
 func TestKeyHandlerGetKeyNoAPIID(t *testing.T) {
-	makeSampleAPI()
+	makeSampleAPI(t)
 	createKey()
 
 	uri := "/tyk/keys/1234"
@@ -416,7 +413,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	makeSampleAPI()
+	makeSampleAPI(t)
 	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
 
@@ -452,7 +449,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	makeSampleAPI()
+	makeSampleAPI(t)
 	param.Set("api_id", "1")
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
@@ -488,7 +485,7 @@ func TestCreateKeyHandlerCreateNewKeyNoAPIID(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	makeSampleAPI()
+	makeSampleAPI(t)
 	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
 
 	if err != nil {
@@ -526,7 +523,7 @@ func TestAPIAuthFail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	makeSampleAPI()
+	makeSampleAPI(t)
 	CheckIsAPIOwner(healthCheckhandler)(recorder, req)
 
 	if recorder.Code == 200 {
@@ -548,7 +545,7 @@ func TestAPIAuthOk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	makeSampleAPI()
+	makeSampleAPI(t)
 	CheckIsAPIOwner(healthCheckhandler)(recorder, req)
 
 	if recorder.Code != 200 {
