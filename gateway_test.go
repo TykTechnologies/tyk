@@ -475,6 +475,7 @@ func createPathBasedDefinition() *APISpec {
 }
 
 func TestParambasedAuth(t *testing.T) {
+	t.Fail()
 	spec := createPathBasedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
