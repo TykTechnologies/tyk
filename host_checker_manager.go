@@ -262,7 +262,7 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 	}
 	go spec.FireEvent(EVENT_HOSTUP,
 		EVENT_HostStatusMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Uptime test suceeded"},
+			EventMetaDefault: EventMetaDefault{Message: "Uptime test succeeded"},
 			HostInfo:         report,
 		})
 

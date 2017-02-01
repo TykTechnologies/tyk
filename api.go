@@ -1055,7 +1055,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 			newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			rawKey := QuotaKeyPrefix + publicHash(keyName)
 
-			// manage quotas seperately
+			// manage quotas separately
 			DefaultQuotaStore.RemoveSession(rawKey)
 		}
 

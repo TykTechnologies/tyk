@@ -290,7 +290,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	// Test wiht POST (it's a GET, should pass through)
+	// Test with POST (it's a GET, should pass through)
 	uri = "v1/disallowed/blacklist/abacab12345"
 	method = "POST"
 	param = make(url.Values)

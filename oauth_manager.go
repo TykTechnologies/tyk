@@ -521,7 +521,7 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 	return client, nil
 }
 
-// GetClientNoPrefix will retrieve client data, but not asign a prefix - this is an unfortunate hack,
+// GetClientNoPrefix will retrieve client data, but not assign a prefix - this is an unfortunate hack,
 // but we don't want to change the signature in Osin for GetClient to support the odd Redis prefixing
 func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, error) {
 
@@ -544,7 +544,7 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 	return client, nil
 }
 
-// GetClients will retreive a list of clients for a prefix
+// GetClients will retrieve a list of clients for a prefix
 func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]osin.Client, error) {
 	key := CLIENT_PREFIX + filter
 	if ignorePrefix {
