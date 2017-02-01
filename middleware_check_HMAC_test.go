@@ -93,6 +93,7 @@ func getHMACAuthChain(spec *APISpec) http.Handler {
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -147,6 +148,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 }
 
 func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -201,6 +203,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -255,6 +258,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -309,6 +313,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 }
 
 func TestHMACAuthSessionMalformedHeader(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -363,6 +368,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -444,6 +450,7 @@ func replaceUpperCase(originalSignature string, lowercaseList []string) string {
 }
 
 func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(hmacAuthDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}

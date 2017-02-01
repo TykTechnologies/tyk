@@ -134,6 +134,7 @@ func createDefinitionFromString(defStr string) *APISpec {
 }
 
 func TestExpiredRequest(t *testing.T) {
+	t.Parallel()
 	uri := "/v1/bananaphone"
 	method := "GET"
 
@@ -158,6 +159,7 @@ func TestExpiredRequest(t *testing.T) {
 }
 
 func TestNotVersioned(t *testing.T) {
+	t.Parallel()
 	uri := "v1/allowed/whitelist/literal"
 	method := "GET"
 
@@ -185,6 +187,7 @@ func TestNotVersioned(t *testing.T) {
 }
 
 func TestMissingVersion(t *testing.T) {
+	t.Parallel()
 	uri := "/v1/bananaphone"
 	method := "GET"
 
@@ -208,6 +211,7 @@ func TestMissingVersion(t *testing.T) {
 }
 
 func TestWrongVersion(t *testing.T) {
+	t.Parallel()
 	uri := "/v1/bananaphone"
 	method := "GET"
 
@@ -232,6 +236,7 @@ func TestWrongVersion(t *testing.T) {
 }
 
 func TestBlacklistLinks(t *testing.T) {
+	t.Parallel()
 	uri := "v1/disallowed/blacklist/literal"
 	method := "GET"
 	param := make(url.Values)
@@ -274,6 +279,7 @@ func TestBlacklistLinks(t *testing.T) {
 }
 
 func TestWhiteLIstLinks(t *testing.T) {
+	t.Parallel()
 	uri := "v1/allowed/whitelist/literal"
 	method := "GET"
 	param := make(url.Values)
@@ -316,6 +322,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 }
 
 func TestWhiteListBlock(t *testing.T) {
+	t.Parallel()
 	uri := "v1/allowed/bananaphone"
 	method := "GET"
 	param := make(url.Values)
@@ -339,6 +346,7 @@ func TestWhiteListBlock(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
+	t.Parallel()
 	uri := "/v1/ignored/noregex"
 	method := "GET"
 	param := make(url.Values)
@@ -362,6 +370,7 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestBlacklistLinksMulti(t *testing.T) {
+	t.Parallel()
 	uri := "v1/disallowed/blacklist/literal"
 	method := "GET"
 	param := make(url.Values)

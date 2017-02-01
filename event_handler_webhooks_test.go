@@ -31,6 +31,7 @@ func createHookObj() *WebHookHandler {
 }
 
 func TestNewValid(t *testing.T) {
+	t.Parallel()
 
 	o := WebHookHandler{}
 	var conf = make(map[string]interface{})
@@ -49,6 +50,7 @@ func TestNewValid(t *testing.T) {
 }
 
 func TestNewInvlalid(t *testing.T) {
+	t.Parallel()
 
 	o := WebHookHandler{}
 	var conf = make(map[string]interface{})
@@ -67,6 +69,7 @@ func TestNewInvlalid(t *testing.T) {
 }
 
 func TestGetChecksum(t *testing.T) {
+	t.Parallel()
 	rBody := `
 	{
 		"event": "QuotaExceeded",
@@ -92,6 +95,7 @@ func TestGetChecksum(t *testing.T) {
 }
 
 func TestBuildRequest(t *testing.T) {
+	t.Parallel()
 	hook := createHookObj()
 
 	rBody := `
@@ -126,6 +130,7 @@ func TestBuildRequest(t *testing.T) {
 }
 
 func TestCreateBody(t *testing.T) {
+	t.Parallel()
 	em := EventMessage{}
 	em.EventType = EVENT_QuotaExceeded
 	em.TimeStamp = "0"
@@ -146,6 +151,7 @@ func TestCreateBody(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	t.Parallel()
 	eventHandlerConf := WebHookHandlerConf{}
 	eventHandlerConf.TargetPath = "http://httpbin.org/get"
 	eventHandlerConf.Method = "GET"
@@ -183,6 +189,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestPost(t *testing.T) {
+	t.Parallel()
 	eventHandlerConf := WebHookHandlerConf{}
 	eventHandlerConf.TargetPath = "http://posttestserver.com/post.php?dir=tyk"
 	eventHandlerConf.Method = "POST"

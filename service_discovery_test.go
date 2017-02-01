@@ -249,6 +249,7 @@ func configureService(name string, sd *ServiceDiscovery) string {
 }
 
 func TestServiceDiscovery_EUREKA(t *testing.T) {
+	t.Parallel()
 	sd := ServiceDiscovery{}
 	rawData := configureService("eureka", &sd)
 	data, err := sd.ProcessRawData(rawData)
@@ -275,6 +276,7 @@ func TestServiceDiscovery_EUREKA(t *testing.T) {
 }
 
 func TestServiceDiscovery_CONSUL(t *testing.T) {
+	t.Parallel()
 	sd := ServiceDiscovery{}
 	rawData := configureService("consul", &sd)
 	data, err := sd.ProcessRawData(rawData)
@@ -301,6 +303,7 @@ func TestServiceDiscovery_CONSUL(t *testing.T) {
 }
 
 func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
+	t.Parallel()
 	sd := ServiceDiscovery{}
 	rawData := configureService("nested_consul", &sd)
 	data, err := sd.ProcessRawData(rawData)
@@ -327,6 +330,7 @@ func TestServiceDiscovery_NESTED_CONSUL(t *testing.T) {
 }
 
 func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
+	t.Parallel()
 	sd := ServiceDiscovery{}
 	rawData := configureService("nested_list", &sd)
 	data, err := sd.ProcessRawData(rawData)
@@ -353,6 +357,7 @@ func TestServiceDiscovery_ETCD_NESTED_LIST(t *testing.T) {
 }
 
 func TestServiceDiscovery_ETCD_NESTED_NOLIST(t *testing.T) {
+	t.Parallel()
 	sd := ServiceDiscovery{}
 	rawData := configureService("nested", &sd)
 	data, err := sd.ProcessRawData(rawData)
@@ -373,6 +378,7 @@ func TestServiceDiscovery_ETCD_NESTED_NOLIST(t *testing.T) {
 }
 
 func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
+	t.Parallel()
 	sd := ServiceDiscovery{}
 	rawData := configureService("etcd", &sd)
 	data, err := sd.ProcessRawData(rawData)
@@ -393,6 +399,7 @@ func TestServiceDiscovery_ETCD_NOLIST(t *testing.T) {
 }
 
 func TestServiceDiscovery_MESOSPHERE(t *testing.T) {
+	t.Parallel()
 	sd := ServiceDiscovery{}
 	rawData := configureService("mesosphere", &sd)
 	data, err := sd.ProcessRawData(rawData)

@@ -79,6 +79,7 @@ var testBatchRequest = `
 `
 
 func TestBatchSuccess(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(batchTestDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -125,6 +126,7 @@ func TestBatchSuccess(t *testing.T) {
 }
 
 func TestMakeSyncRequest(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(batchTestDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -153,6 +155,7 @@ func TestMakeSyncRequest(t *testing.T) {
 }
 
 func TestMakeASyncRequest(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(batchTestDef)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}

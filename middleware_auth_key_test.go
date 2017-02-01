@@ -57,6 +57,7 @@ func setUp(def string) *APISpec {
 }
 
 func TestBearerTokenAuthKeySession(t *testing.T) {
+	t.Parallel()
 	spec := setUp(authKeyDef)
 	thisSession := createAuthKeyAuthSession()
 	customToken := "54321111"
@@ -117,6 +118,7 @@ var authKeyDef = `
 }`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
+	t.Parallel()
 	spec := setUp(multiAuthBackwardsCompatible)
 	thisSession := createAuthKeyAuthSession()
 	customToken := "54321111"
@@ -176,6 +178,7 @@ var multiAuthBackwardsCompatible = `
 }`
 
 func TestMultiAuthSession(t *testing.T) {
+	t.Parallel()
 	spec := setUp(multiAuthDef)
 	thisSession := createAuthKeyAuthSession()
 	customToken := "54321111"

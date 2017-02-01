@@ -109,6 +109,7 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 }
 
 func TestMultiSession_BA_Standard_OK(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(multiAuthDev)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -152,6 +153,7 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_Identity(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(multiAuthDev)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -200,6 +202,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(multiAuthDev)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -243,6 +246,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
+	t.Parallel()
 	spec := createDefinitionFromString(multiAuthDev)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}

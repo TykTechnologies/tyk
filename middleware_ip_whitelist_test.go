@@ -181,6 +181,7 @@ func makeIPSampleAPI(apiTestDef string) *APISpec {
 }
 
 func TestIpMiddlewareIPFail(t *testing.T) {
+	t.Parallel()
 	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledFail)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -210,6 +211,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 }
 
 func TestIpMiddlewareIPPass(t *testing.T) {
+	t.Parallel()
 	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -239,6 +241,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 }
 
 func TestIpMiddlewareIPPassCIDR(t *testing.T) {
+	t.Parallel()
 	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -268,6 +271,7 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 }
 
 func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
+	t.Parallel()
 	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -297,6 +301,7 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 }
 
 func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
+	t.Parallel()
 	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -327,6 +332,7 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 }
 
 func TestIpMiddlewareIPMissing(t *testing.T) {
+	t.Parallel()
 	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionMissing)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -355,6 +361,7 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 }
 
 func TestIpMiddlewareIPDisabled(t *testing.T) {
+	t.Parallel()
 	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionDisabled)
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}

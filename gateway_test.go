@@ -468,6 +468,7 @@ func createPathBasedDefinition() *APISpec {
 }
 
 func TestParambasedAuth(t *testing.T) {
+	t.Parallel()
 	spec := createPathBasedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -604,6 +605,7 @@ func TestParambasedAuth(t *testing.T) {
 // }
 
 func TestVersioningRequestOK(t *testing.T) {
+	t.Parallel()
 	spec := createVersionedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -633,6 +635,7 @@ func TestVersioningRequestOK(t *testing.T) {
 }
 
 func TestVersioningRequestFail(t *testing.T) {
+	t.Parallel()
 	spec := createVersionedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -665,6 +668,7 @@ func TestVersioningRequestFail(t *testing.T) {
 }
 
 func TestIgnoredPathRequestOK(t *testing.T) {
+	t.Parallel()
 	spec := createExtendedDefinitionWithPaths()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -696,6 +700,7 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 }
 
 func TestWhitelistRequestReply(t *testing.T) {
+	t.Parallel()
 	spec := createExtendedDefinitionWithPaths()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -730,6 +735,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 }
 
 func TestQuota(t *testing.T) {
+	t.Parallel()
 	spec := createNonVersionedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
@@ -779,6 +785,7 @@ func TestQuota(t *testing.T) {
 }
 
 func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
+	t.Parallel()
 	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
 
@@ -826,6 +833,7 @@ func TestWithAnalyticsTestWithAnalytics(t *testing.T) {
 }
 
 func TestWithAnalyticsErrorResponse(t *testing.T) {
+	t.Parallel()
 	AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 	log.Info("Setting up analytics DB connection")
 
