@@ -77,15 +77,13 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 
 	domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
 	val, listenPathExists := ListenPathMap.Get(domainHash)
-	if listenPathExists {
-		if val.(int) > 1 {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-				"org_id": referenceSpec.APIDefinition.OrgID,
-				"api_id": referenceSpec.APIDefinition.APIID,
-			}).Error("Listen path is a duplicate: ", domainHash)
-			return true
-		}
+	if listenPathExists && val.(int) > 1 {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+			"org_id": referenceSpec.APIDefinition.OrgID,
+			"api_id": referenceSpec.APIDefinition.APIID,
+		}).Error("Listen path is a duplicate: ", domainHash)
+		return true
 	}
 
 	return false

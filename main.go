@@ -658,12 +658,8 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 }
 
 func IsRPCMode() bool {
-	if config.AuthOverride.ForceAuthProvider {
-		if config.AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine {
-			return true
-		}
-	}
-	return false
+	return config.AuthOverride.ForceAuthProvider &&
+		config.AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
 }
 
 type SortableAPISpecListByListen []*APISpec

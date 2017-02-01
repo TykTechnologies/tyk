@@ -396,11 +396,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 func getUpperCaseEscaped(signature string) (bool, []string) {
 	r := regexp.MustCompile(`%[A-F0-9][A-F0-9]`)
 	foundList := r.FindAllString(signature, -1)
-	if len(foundList) > 0 {
-		return true, foundList
-	}
-
-	return false, foundList
+	return len(foundList) > 0, foundList
 }
 
 func replaceUpperCase(originalSignature string, lowercaseList []string) string {

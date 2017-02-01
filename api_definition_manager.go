@@ -959,69 +959,61 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 	// Check if ignored
 	for _, v := range *RxPaths {
 		match := v.Spec.MatchString(url)
-		if match {
-			// only return it it's what we are looking for
-			if mode == v.Status {
-				switch v.Status {
-				case Ignored:
-					return true, nil
-				case BlackList:
-					return true, nil
-				case WhiteList:
-					return true, nil
-				case Cached:
-					return true, nil
-				case Transformed:
-					if method != nil && method.(string) == v.TransformAction.TemplateMeta.Method {
-						return true, &v.TransformAction
-					}
-				case HeaderInjected:
-					if method != nil && method.(string) == v.InjectHeaders.Method {
-						return true, &v.InjectHeaders
-					}
-				case HeaderInjectedResponse:
-					if method != nil && method.(string) == v.InjectHeadersResponse.Method {
-						return true, &v.InjectHeadersResponse
-					}
-				case TransformedResponse:
-					if method != nil && method.(string) == v.TransformResponseAction.TemplateMeta.Method {
-						return true, &v.TransformResponseAction
-					}
-				case HardTimeout:
-					if method != nil && method.(string) == v.HardTimeout.Method {
-						return true, &v.HardTimeout.TimeOut
-					}
-				case CircuitBreaker:
-					if method != nil && method.(string) == v.CircuitBreaker.Method {
-						return true, &v.CircuitBreaker
-					}
-				case URLRewrite:
-					if method != nil && method.(string) == v.URLRewrite.Method {
-						return true, &v.URLRewrite
-					}
-				case VirtualPath:
-					if method != nil && method.(string) == v.VirtualPathSpec.Method {
-						return true, &v.VirtualPathSpec
-					}
-				case RequestSizeLimit:
-					if method != nil && method.(string) == v.RequestSize.Method {
-						return true, &v.RequestSize
-					}
-				case MethodTransformed:
-					if method != nil && method.(string) == v.MethodTransform.Method {
-						return true, &v.MethodTransform
-					}
+		// only return it it's what we are looking for
+		if !match || mode != v.Status {
+			continue
+		}
+		switch v.Status {
+		case Ignored, BlackList, WhiteList, Cached:
+			return true, nil
+		case Transformed:
+			if method != nil && method.(string) == v.TransformAction.TemplateMeta.Method {
+				return true, &v.TransformAction
+			}
+		case HeaderInjected:
+			if method != nil && method.(string) == v.InjectHeaders.Method {
+				return true, &v.InjectHeaders
+			}
+		case HeaderInjectedResponse:
+			if method != nil && method.(string) == v.InjectHeadersResponse.Method {
+				return true, &v.InjectHeadersResponse
+			}
+		case TransformedResponse:
+			if method != nil && method.(string) == v.TransformResponseAction.TemplateMeta.Method {
+				return true, &v.TransformResponseAction
+			}
+		case HardTimeout:
+			if method != nil && method.(string) == v.HardTimeout.Method {
+				return true, &v.HardTimeout.TimeOut
+			}
+		case CircuitBreaker:
+			if method != nil && method.(string) == v.CircuitBreaker.Method {
+				return true, &v.CircuitBreaker
+			}
+		case URLRewrite:
+			if method != nil && method.(string) == v.URLRewrite.Method {
+				return true, &v.URLRewrite
+			}
+		case VirtualPath:
+			if method != nil && method.(string) == v.VirtualPathSpec.Method {
+				return true, &v.VirtualPathSpec
+			}
+		case RequestSizeLimit:
+			if method != nil && method.(string) == v.RequestSize.Method {
+				return true, &v.RequestSize
+			}
+		case MethodTransformed:
+			if method != nil && method.(string) == v.MethodTransform.Method {
+				return true, &v.MethodTransform
+			}
 
-				case RequestTracked:
-					if method != nil && method.(string) == v.TrackEndpoint.Method {
-						return true, &v.TrackEndpoint
-					}
-				case RequestNotTracked:
-					if method != nil && method.(string) == v.DoNotTrackEndpoint.Method {
-						return true, &v.DoNotTrackEndpoint
-					}
-				}
-
+		case RequestTracked:
+			if method != nil && method.(string) == v.TrackEndpoint.Method {
+				return true, &v.TrackEndpoint
+			}
+		case RequestNotTracked:
+			if method != nil && method.(string) == v.DoNotTrackEndpoint.Method {
+				return true, &v.DoNotTrackEndpoint
 			}
 		}
 	}
