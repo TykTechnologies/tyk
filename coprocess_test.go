@@ -48,7 +48,7 @@ func TestCoProcessDispatch(t *testing.T) {
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
-	spec := makeCoProcessSampleAPI(basicCoProcessDef)
+	spec := createSpecTest(t, basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
@@ -159,16 +159,6 @@ type httpbinHeadersResponse struct {
 	Headers map[string]string `json:"headers"`
 }
 
-func makeCoProcessSampleAPI(apiTestDef string) *APISpec {
-	log.Debug("CREATING TEMPORARY API FOR COPROCESS TEST")
-	spec := createDefinitionFromString(apiTestDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	return spec
-}
-
 func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver tykcommon.MiddlewareDriver) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
@@ -180,7 +170,7 @@ func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.Hook
 }
 
 func TestCoProcessMiddleware(t *testing.T) {
-	spec := makeCoProcessSampleAPI(basicCoProcessDef)
+	spec := createSpecTest(t, basicCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
 
@@ -206,7 +196,7 @@ func TestCoProcessMiddleware(t *testing.T) {
 }
 
 func TestCoProcessObjectPostProcess(t *testing.T) {
-	spec := makeCoProcessSampleAPI(basicCoProcessDef)
+	spec := createSpecTest(t, basicCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
 
@@ -282,7 +272,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 func TestCoProcessAuth(t *testing.T) {
 	t.Log("CP AUTH")
-	spec := makeCoProcessSampleAPI(protectedCoProcessDef)
+	spec := createSpecTest(t, protectedCoProcessDef)
 
 	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, tykcommon.MiddlewareDriver("python"))
 

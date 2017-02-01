@@ -88,10 +88,6 @@ func createMultiBasicAuthSession() SessionState {
 }
 
 func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -109,11 +105,7 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 }
 
 func TestMultiSession_BA_Standard_OK(t *testing.T) {
-	spec := createDefinitionFromString(multiAuthDev)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession()
@@ -152,11 +144,7 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_Identity(t *testing.T) {
-	spec := createDefinitionFromString(multiAuthDev)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession()
@@ -200,11 +188,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
-	spec := createDefinitionFromString(multiAuthDev)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession()
@@ -243,11 +227,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 }
 
 func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
-	spec := createDefinitionFromString(multiAuthDev)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
 	baSession := createMultiBasicAuthSession()

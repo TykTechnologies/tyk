@@ -274,10 +274,6 @@ func createJWTSessionWithRSAWithPolicy() SessionState {
 }
 
 func getJWTChain(spec *APISpec) http.Handler {
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -295,12 +291,8 @@ func getJWTChain(spec *APISpec) http.Handler {
 
 func TestJWTSessionHMAC(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "hmac"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSession()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -339,12 +331,8 @@ func TestJWTSessionHMAC(t *testing.T) {
 
 func TestJWTSessionRSA(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -387,12 +375,8 @@ func TestJWTSessionRSA(t *testing.T) {
 
 func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -437,12 +421,8 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 
 func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -484,12 +464,8 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 
 func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -534,13 +510,9 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 
 func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.DoNotTrack = true
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -585,12 +557,8 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -635,12 +603,8 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 
 func TestJWTSessionRSABearer(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.ResetQuota(tokenKID, session)
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
@@ -684,12 +648,8 @@ func TestJWTSessionRSABearer(t *testing.T) {
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	tokenKID := randSeq(10)
-	spec := createDefinitionFromString(jwtDef)
+	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 	session := createJWTSessionWithRSA()
 	spec.SessionManager.UpdateSession(tokenKID, session, 60)
 
@@ -732,12 +692,8 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
-	spec := createDefinitionFromString(jwtWithCentralDefNoPolicyBaseField)
+	spec := createSpecTest(t, jwtWithCentralDefNoPolicyBaseField)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	tokenID := "1234567891010101"
 	session := createJWTSessionWithRSAWithPolicy()
@@ -799,12 +755,8 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithRawSource(t *testing.T) {
-	spec := createDefinitionFromString(jwtWithCentralDef)
+	spec := createSpecTest(t, jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	Policies["987654321"] = Policy{
 		ID:               "987654321",
@@ -859,12 +811,8 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
-	spec := createDefinitionFromString(jwtWithCentralDef)
+	spec := createSpecTest(t, jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	Policies["987654321"] = Policy{
 		ID:               "987654321",
@@ -919,12 +867,8 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 }
 
 func TestJWTSessionRSAWithJWK(t *testing.T) {
-	spec := createDefinitionFromString(jwtWithJWKDef)
+	spec := createSpecTest(t, jwtWithJWKDef)
 	spec.JWTSigningMethod = "rsa"
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
 
 	Policies["987654321"] = Policy{
 		ID:               "987654321",

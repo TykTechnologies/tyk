@@ -159,13 +159,9 @@ var ipMiddlewareTestDefinitionMissing = `
 	}
 `
 
-func makeIPSampleAPI(apiTestDef string) *APISpec {
+func createIPSampleAPI(t *testing.T, apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR IP WHITELIST")
-	spec := createDefinitionFromString(apiTestDef)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createSpecTest(t, apiTestDef)
 
 	specs := &[]*APISpec{spec}
 	newMuxes := mux.NewRouter()
@@ -181,11 +177,7 @@ func makeIPSampleAPI(apiTestDef string) *APISpec {
 }
 
 func TestIpMiddlewareIPFail(t *testing.T) {
-	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledFail)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledFail)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234wer", session, 60)
 	uri := "/"
@@ -210,11 +202,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 }
 
 func TestIpMiddlewareIPPass(t *testing.T) {
-	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
@@ -239,11 +227,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 }
 
 func TestIpMiddlewareIPPassCIDR(t *testing.T) {
-	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
@@ -268,11 +252,7 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 }
 
 func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
-	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
@@ -297,11 +277,7 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 }
 
 func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
-	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionEnabledPass)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	uri := "/"
@@ -327,11 +303,7 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 }
 
 func TestIpMiddlewareIPMissing(t *testing.T) {
-	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionMissing)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionMissing)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234rtyrty", session, 60)
 	uri := "/"
@@ -355,11 +327,7 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 }
 
 func TestIpMiddlewareIPDisabled(t *testing.T) {
-	spec := makeIPSampleAPI(ipMiddlewareTestDefinitionDisabled)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
+	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionDisabled)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234iuouio", session, 60)
 	uri := "/"

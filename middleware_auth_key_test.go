@@ -47,17 +47,8 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func setUp(def string) *APISpec {
-	spec := createDefinitionFromString(def)
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(&redisStore, &redisStore, healthStore, orgStore)
-	return spec
-}
-
 func TestBearerTokenAuthKeySession(t *testing.T) {
-	spec := setUp(authKeyDef)
+	spec := createSpecTest(t, authKeyDef)
 	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
@@ -117,7 +108,7 @@ var authKeyDef = `
 }`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
-	spec := setUp(multiAuthBackwardsCompatible)
+	spec := createSpecTest(t, multiAuthBackwardsCompatible)
 	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
@@ -176,7 +167,7 @@ var multiAuthBackwardsCompatible = `
 }`
 
 func TestMultiAuthSession(t *testing.T) {
-	spec := setUp(multiAuthDef)
+	spec := createSpecTest(t, multiAuthDef)
 	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
