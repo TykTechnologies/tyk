@@ -208,16 +208,16 @@ func handleSwaggerMode(arguments map[string]interface{}) {
 }
 
 func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool) (*tykcommon.APIDefinition, error) {
-	ad := tykcommon.APIDefinition{}
-	ad.Name = s.Info.Title
-	ad.Active = true
-	ad.UseKeylessAccess = true
-	ad.APIID = uuid.NewUUID().String()
-	ad.OrgID = orgId
+	ad := tykcommon.APIDefinition{
+		Name:             s.Info.Title,
+		Active:           true,
+		UseKeylessAccess: true,
+		APIID:            uuid.NewUUID().String(),
+		OrgID:            orgId,
+	}
 	ad.VersionDefinition.Key = "version"
 	ad.VersionDefinition.Location = "header"
 	ad.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
-	ad.VersionData.NotVersioned = false
 	ad.Proxy.ListenPath = "/" + ad.APIID + "/"
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL
