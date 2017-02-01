@@ -191,7 +191,6 @@ func (r *RedisAnalyticsHandler) reloadDB() {
 		}
 
 	}
-	time.Sleep(time.Hour * 1)
 }
 
 // RecordHit will store an AnalyticsRecord in Redis
