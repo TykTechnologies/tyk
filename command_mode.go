@@ -114,16 +114,16 @@ func printDef(def *tykcommon.APIDefinition) {
 }
 
 func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock bool) (*tykcommon.APIDefinition, error) {
-	ad := tykcommon.APIDefinition{}
-	ad.Name = bp.Name
-	ad.Active = true
-	ad.UseKeylessAccess = true
-	ad.APIID = uuid.NewUUID().String()
-	ad.OrgID = orgId
+	ad := tykcommon.APIDefinition{
+		Name:             bp.Name,
+		Active:           true,
+		UseKeylessAccess: true,
+		APIID:            uuid.NewUUID().String(),
+		OrgID:            orgId,
+	}
 	ad.VersionDefinition.Key = "version"
 	ad.VersionDefinition.Location = "header"
 	ad.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
-	ad.VersionData.NotVersioned = false
 	ad.Proxy.ListenPath = "/" + ad.APIID + "/"
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL
