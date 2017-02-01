@@ -51,7 +51,7 @@ func SaveRPCDefinitionsBackup(list string) {
 	}
 }
 
-func LoadDefinitionsFromRPCBackup() *[]*APISpec {
+func LoadDefinitionsFromRPCBackup() []*APISpec {
 	tagList := getTagListAsString()
 	checkKey := BackupKeyBase + tagList
 
@@ -78,11 +78,11 @@ func LoadDefinitionsFromRPCBackup() *[]*APISpec {
 	return a.processRPCDefinitions(apiListAsString)
 }
 
-func doLoadWithBackup(specs *[]*APISpec) {
+func doLoadWithBackup(specs []*APISpec) {
 
 	log.Warning("[RPC Backup] --> Load Policies too!")
 
-	if len(*specs) == 0 {
+	if len(specs) == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not loading backup")
