@@ -149,11 +149,7 @@ func stripSignature(token string) string {
 
 func (hm *HMACMiddleware) hasLowerCaseEscaped(signature string) (bool, []string) {
 	foundList := hm.lowercasePattern.FindAllString(signature, -1)
-	if len(foundList) > 0 {
-		return true, foundList
-	}
-
-	return false, foundList
+	return len(foundList) > 0, foundList
 }
 
 func (hm *HMACMiddleware) replaceWithUpperCase(originalSignature string, lowercaseList []string) string {
