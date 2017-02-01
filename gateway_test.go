@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -22,6 +24,8 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	logBuf := new(bytes.Buffer)
+	log.Out = logBuf
 	s, err := miniredis.Run()
 	if err != nil {
 		panic(err)
@@ -35,6 +39,9 @@ func TestMain(m *testing.M) {
 
 	s.Close()
 	os.RemoveAll(config.AppPath)
+	if exitCode > 0 {
+		io.Copy(os.Stderr, logBuf)
+	}
 	os.Exit(exitCode)
 }
 
@@ -468,6 +475,7 @@ func createPathBasedDefinition() *APISpec {
 }
 
 func TestParambasedAuth(t *testing.T) {
+	t.Fail()
 	spec := createPathBasedDefinition()
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
