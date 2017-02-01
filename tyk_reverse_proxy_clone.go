@@ -151,7 +151,7 @@ func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec, tryCount int) 
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
-	// initalise round robin
+	// initialise round robin
 	spec.RoundRobin = &RoundRobin{}
 	spec.RoundRobin.SetMax(tykcommon.NewHostList())
 
@@ -196,7 +196,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 					}
 				}
 			}
-			// We've overriden remote now, don;t need to do it again
+			// We've overridden remote now, don;t need to do it again
 			targetSet = true
 		}
 

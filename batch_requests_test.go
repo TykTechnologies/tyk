@@ -143,7 +143,7 @@ func TestMakeSyncRequest(t *testing.T) {
 	}
 
 	if replyUnit.Code != 200 {
-		t.Error("Repsonse reported a non-200 reponse (could be because lonelycode.com is down)")
+		t.Error("Response reported a non-200 response (could be because lonelycode.com is down)")
 	}
 
 	if len(replyUnit.Body) < 1 {
@@ -174,7 +174,7 @@ func TestMakeASyncRequest(t *testing.T) {
 	}
 
 	if replyUnit.Code != 200 {
-		t.Error("Repsonse reported a non-200 reponse (could be because http://example.com/ is down)")
+		t.Error("Response reported a non-200 response (could be because http://example.com/ is down)")
 	}
 
 	if len(replyUnit.Body) < 1 {

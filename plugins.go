@@ -25,7 +25,7 @@ type ReturnOverrides struct {
 	ResponseError string
 }
 
-// MiniRequestObject is marshalled to JSON string and pased into JSON middleware
+// MiniRequestObject is marshalled to JSON string and passed into JSON middleware
 type MiniRequestObject struct {
 	Headers         map[string][]string
 	SetHeaders      map[string]string

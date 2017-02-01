@@ -128,7 +128,7 @@ func (r *RedisClusterStorageManager) cleanKey(keyName string) string {
 	return setKeyName
 }
 
-// GetKey will retreive a key from the database
+// GetKey will retrieve a key from the database
 func (r *RedisClusterStorageManager) GetKey(keyName string) (string, error) {
 	if GetRelevantClusterReference(r.IsCache) == nil {
 		log.Info("Connection dropped, connecting..")

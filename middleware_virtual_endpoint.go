@@ -15,7 +15,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-// RequestObject is marshalled to JSON string and pased into JSON middleware
+// RequestObject is marshalled to JSON string and passed into JSON middleware
 type RequestObject struct {
 	Headers map[string][]string
 	Body    string

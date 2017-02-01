@@ -1,5 +1,5 @@
 function thisTest(request, session, config) {
-	// Set up a reponse object
+	// Set up a response object
 	var response = {
 		Body: ""
 		Headers: {

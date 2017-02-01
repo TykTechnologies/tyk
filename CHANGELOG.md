@@ -51,11 +51,11 @@ If the transport or address are empty, syslog will log to file
 - Tyk Gateway now uses "lazy loading" of middleware, so only the absolute minimum required processing is done for each request, this includes CB and other features
 - Introduced a new in-memory distributed rate limiter, this removes the dependency on redis and makes performance much smoother, the DRL will measure load on each node and modify rate limits accordingly (so for example, on two nodes, the rate limit must be split between them), depending on the way the load is being distributed, one node may be getting less traffic than the others, the trate limiter will attempt to compensate for this. Load information is broadcast via redis pub/sub every 5s, this can be changed in tyk.conf. it is possible to use the old rate limiter too, simply ensure that `enable_redis_rolling_limiter` is set to true.
 - Analytics writer now uses a managed pool, this mean a smoother performance curve under very high load (2k req p/s)
-- All config settings can now be overriden with an environmnt variable, env variables must start with TYK_GW and must use the configuration object names specified in the `config.go`, NOT in the JSON file
+- All config settings can now be overridden with an environmnt variable, env variables must start with TYK_GW and must use the configuration object names specified in the `config.go`, NOT in the JSON file
 - Implemented a cache mechanism for APIs that use the CP (CoProcess) feature, see "ID extractor".
 - Session lifetime can be set globally (and forced, with a flag), add `"global_session_lifetime": 10` to your `tyk.conf`, where `10` is the session lifetime value you want to use. To force this value across all the APIs and override the per-API session lifetime, add `"force_global_session_lifetime": true` to your `tyk.conf`.
 - Added (experimental, beta) LetsEncrypt support, the gateway will cache domain data as it sees it and synchronise / cache ssl certificates in Redis, to enable simply set `"http_server_options.use_ssl_le": true`
-- Fixed a bug in which HMAC signatures generated in some libraries where URL-encoded cahracters result in a lower-cased octet pair instead of upper-cased (Golang / Java Default) caused valid HMAC strings to fail. We now check for this after an intiial failure just in case.
+- Fixed a bug in which HMAC signatures generated in some libraries where URL-encoded characters result in a lower-cased octet pair instead of upper-cased (Golang / Java Default) caused valid HMAC strings to fail. We now check for this after an intiial failure just in case.
 - Adding an `auth` or `post_auth` folder to a middleware api-id folder will let you add custom auth middleware and post-auth middleware that uses the JSVM
 - Adding JSVM middleware for post key auth and auth can now also be done in the api definition itself
 - Generate a key using:
@@ -184,7 +184,7 @@ Path: {{._tyk_context.path}}
 
 - Added OpenID Connect Token validation (OIDC ID Tokens) - this is similar to the JWT support but specific to OpenID Connect standard.
 
-- OpenID Connect tokens can be rate-limited per client (so the same user comming via different clients can have different rate limits): in the open ID options, set `"segregate_by_client": true`
+- OpenID Connect tokens can be rate-limited per client (so the same user coming via different clients can have different rate limits): in the open ID options, set `"segregate_by_client": true`
 
 ### Enabling OpenID Connect
 
@@ -220,7 +220,7 @@ A map of `base64(clientID):PolicyID`
 
 This map will assign a policy already stored in Tyk to a client ID, this will cause Tyk to apply this policy to the underlying ientity of the uer (i.e. generate an internal token that represents the User that holds the token).
 
-Why Base64? We require base64 encoded client IDs to ensure cross-compatability with document stores
+Why Base64? We require base64 encoded client IDs to ensure cross-compatibility with document stores
 
 What happens:
 
@@ -347,9 +347,9 @@ What happens:
 - Added new feature: Detailed logging, enable by setting `analytics_config.enable_detailed_recording` to true, two new fields will be added to analytics data: rawRequest and rawResponse, these will be in wire format and are *NOT* anonymised. This adds additional processing complexity to request throughput so could degrade performance.
 - Added a check for connection failures
 - Updating a key with a quota reset set to true will also remove any rate limit sentinels
-- URL Rewrites and cache interactions now work properly, although you need to define the cached entry as the rewritten pattern in a seperate entry.
+- URL Rewrites and cache interactions now work properly, although you need to define the cached entry as the rewritten pattern in a separate entry.
 - Org quotas monitors now only fire when the renewal is in the future, not the past.
-- Fixed bug where quotas would not reset (regression introduced by switch to Redis Cluster), Tyk will automaticall correct quota entries taht are incorrect.
+- Fixed bug where quotas would not reset (regression introduced by switch to Redis Cluster), Tyk will automaticall correct quota entries that are incorrect.
 - Using golang builtins for time checking
 
 # 1.9
@@ -485,7 +485,7 @@ What happens:
 	- Set the `allowed_access_types` array to include `password`
 	- Generate a valid access request with the client_id:client_secret as a Basic auth header and the u/p in the form of the body.
 	- POST to: `/oauth/token/` endpoint on your OAuth-enabled API
-	- If successfull, the user will get:
+	- If successful, the user will get:
 
 	```
 	{"access_token":"4i0VmSYMQ2iN7ivX0LaYBw","expires_in":3600,"refresh_token":"B_99PjEmQquufNWs8QYbow","token_type":"bearer"}
@@ -553,7 +553,7 @@ What happens:
 	._tyk_meta.KEYNAME
 	```
 
-	You must enable sesison parsing in the TemplateData of the body tranform entry though by adding:
+	You must enable sesison parsing in the TemplateData of the body transform entry though by adding:
 
 	```
 	"enable_session": true
@@ -589,7 +589,7 @@ What happens:
 	```
 
 - Fixed cache bug
-- When using node segments, tags will be transferred into analytics data as well as any token-level tags, so for example, you could tag each node independently, and then view the trafic that went through those nodes by ID or group them in aggregate
+- When using node segments, tags will be transferred into analytics data as well as any token-level tags, so for example, you could tag each node independently, and then view the traffic that went through those nodes by ID or group them in aggregate
 - You can now segment gateways that use a DB-backed configurations for example if you vae APIs in different regions, or only wish to service a segment of your APIs (e.g. "Health APIs", "Finance APIs"). So you can have a centralised API registry using the dashboard, and then Tag APIs according to their segment(s), then configure your Tyk nodes to only load those API endpoints, so node 1 may only serve health APIs, while node 2 might serve a mixture and node 3 will serve only finance APIs. To enable, simply configure your node and add to `tyk.conf` and `host_manager.conf` (if using):
 
 	"db_app_conf_options": {
@@ -679,7 +679,7 @@ What happens:
         }
       ]
 
-Circuit breakers are individual on a singlie host, they do not centralise or pool back-end data, this is for speed. This means that in a load balanced environment where multiple Tyk nodes are used, some traffic can spill through as other nodes reach the sampling rate limit. This is for pure speed, adding a redis counter layer or data-store on every request to a servcie would jsut add latency.
+Circuit breakers are individual on a singlie host, they do not centralise or pool back-end data, this is for speed. This means that in a load balanced environment where multiple Tyk nodes are used, some traffic can spill through as other nodes reach the sampling rate limit. This is for pure speed, adding a redis counter layer or data-store on every request to a servcie would just add latency.
 
 Circuit breakers use a thresh-old-breaker pattern, so of sample size x if y% requests fail, trip the breaker.
 
@@ -837,7 +837,7 @@ Status codes are:
 - Added `oauth_refresh_token_expire` setting in configuration, allows for customisation of refresh token expiry
 - Changed refresh token expiry to be 14 days by default
 - Basic swagger file supoprt in command line, use `--import-swagger=petstore.json` to import a swagger definition, will create a Whitelisted API.
-- Created quota monitoring for orgs and user keys, uses a webhook. To configure update tyk.conf to include the gloabl check rate and target data:
+- Created quota monitoring for orgs and user keys, uses a webhook. To configure update tyk.conf to include the global check rate and target data:
 
 	"monitor": {
         "enable_trigger_monitors": false,
@@ -869,7 +869,7 @@ Status codes are:
 	    "trigger_limit": "80",
 	}
 
-- Added response body transforms (JSON only), uses the same syntax as regular transforms, must be placed into `transform_response" list and the trasnformer must be registered under `response_transforms`.
+- Added response body transforms (JSON only), uses the same syntax as regular transforms, must be placed into `transform_response" list and the transformer must be registered under `response_transforms`.
 	{
       name: "response_body_transform",
       options: {}
@@ -885,10 +885,10 @@ Status codes are:
   	  }
     }
 
-- Added repsonse header injection (uses the same code as the regular injector), add your path definitions to the `extended_paths.transform_response_headers` filed, uses the same syntx as header injection
+- Added response header injection (uses the same code as the regular injector), add your path definitions to the `extended_paths.transform_response_headers` filed, uses the same syntx as header injection
 - Added SupressDefaultOrgStore - uses a default redis connection to handle unfound Org lookups
 - Added support for Sentry DSN
-- Modification: Analyitcs purger (redis) now uses redis lists, much cleaner, and purge is a transaction which means multiple gateways can purge at the same time safely without risk of duplication
+- Modification: Analytics purger (redis) now uses redis lists, much cleaner, and purge is a transaction which means multiple gateways can purge at the same time safely without risk of duplication
 - Added `enforce_org_data_age` config parameter that allows for setting the expireAt in seconds for analytics data on an organisation level. (Requires the addition of a `data_expires` filed in the Session object that is larger than 0)
 
 # v1.6
@@ -971,7 +971,7 @@ Status codes are:
     - If an upstream application replies with the header `x-tyk-cache-action-set` set to `1` (or anything non empty), and upstream control is enabled. Tyk will cache the response.
     - If the upstream application sets `x-tyk-cache-action-set-ttl` to a numeric value, and upstream control is enabled, the cached object will be created for whatever number of seconds this value is set to.
 - Added `auth.use_param` option to API Definitions, set to tru if you want Tyk to check for the API Token in the request parameters instead of the header, it will look for the value set in `auth.auth_header_name` and is *case sensitive*
-- Host manager now supports Portal NginX tempalte maangement, will generate portal configuration files for NginX on load for each organisation in DB
+- Host manager now supports Portal NginX template maangement, will generate portal configuration files for NginX on load for each organisation in DB
 - Host manager will now gracefully attempt reconnect if Redis goes down
 - *Tyk will now reload on notifications from Redis* (dashboard signal) for cluster reloads (see below), new option in config `SuppressRedisSignalReload` will suppress this behaviour (for example, if you are still using old host manager)
 - Added new group reload endpoint (for management via LB), sending a GET to /tyk/reload/group will now send a pub/sub notification via Redis which will cause all listening nodes to reload gracefully.
@@ -1007,7 +1007,7 @@ Status codes are:
 
 # v1.4
 
-- Added expiry TTL to `tykcommon`, data expiry headers will be added to all analytics records, set `expire_analytics_after` to `0` to have data live indefinetely (currently 100 years), set to anything above zero for data in MongoDB to be removed after x seconds. **requirement**: You must create an expiry TTL index on the tyk_analytics collection manually (http://docs.mongodb.org/manual/tutorial/expire-data/). If you do not wish mongo to manage data warehousing at all, simply do not create the index.
+- Added expiry TTL to `tykcommon`, data expiry headers will be added to all analytics records, set `expire_analytics_after` to `0` to have data live indefinitely (currently 100 years), set to anything above zero for data in MongoDB to be removed after x seconds. **requirement**: You must create an expiry TTL index on the tyk_analytics collection manually (http://docs.mongodb.org/manual/tutorial/expire-data/). If you do not wish mongo to manage data warehousing at all, simply do not create the index.
 - Added a JS Virtual Machine so dynamic JS middleware can be run PRE and POST middleware chain
 - Added a global JS VM
 - Added an `eh_dynamic_handler` event handler type that runs JS event handlers

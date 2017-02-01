@@ -565,7 +565,7 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []tykcommon.Templat
 			log.Debug("-- Blob mode")
 			newTransformSpec.Template, templErr = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
 		default:
-			log.Warning("[Transform Templates] No tempalte mode defined! Found: ", stringSpec.TemplateData.Mode)
+			log.Warning("[Transform Templates] No template mode defined! Found: ", stringSpec.TemplateData.Mode)
 			templErr = errors.New("No valid template mode defined, must be either 'file' or 'blob'")
 		}
 

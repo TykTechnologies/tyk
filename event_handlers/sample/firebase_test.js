@@ -9,7 +9,7 @@ fbHandler.NewHandler(function(event, context) {
             {
                 "EventType": "Event Typ Code",
                 "EventMetaData": {
-                    "Message": "MEvent descirption",
+                    "Message": "MEvent descriptions",
                     "Path": "/{{api_id}}/{{path}}",
                     "Origin": "1.1.1.1:PORT",
                     "Key": "{{Auth Key}}"
