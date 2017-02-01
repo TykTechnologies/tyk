@@ -239,7 +239,7 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 }
 
 // LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint string, secret string) *[]*APISpec {
+func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint string, secret string) []*APISpec {
 	var APISpecs = []*APISpec{}
 
 	// Get the definitions
@@ -261,20 +261,20 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	response, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Request failed: ", err)
-		return &APISpecs
+		return APISpecs
 	}
 
 	retBody, err := a.readBody(response)
 	if err != nil {
 		log.Error("Failed to read body: ", err)
-		return &APISpecs
+		return APISpecs
 	}
 
 	if response.StatusCode == 403 {
 		log.Error("Login failure, Response was: ", string(retBody))
 		reloadScheduled = false
 		ReLogin()
-		return &APISpecs
+		return APISpecs
 	}
 
 	// Extract tagged APIs#
@@ -293,14 +293,13 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	if err := json.Unmarshal(retBody, &list); err != nil {
 		log.Error("Failed to decode body: ", err, "Response was: ", string(retBody))
 		log.Info("--> Retrying in 5s")
-		return &APISpecs
-		// return &APISpecs
+		return APISpecs
 	}
 
 	rawList := make(map[string]interface{})
 	if err := json.Unmarshal(retBody, &rawList); err != nil {
 		log.Error("Failed to decode body (raw): ", err)
-		return &APISpecs
+		return APISpecs
 	}
 
 	// Extract tagged entries only
@@ -345,11 +344,11 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	ServiceNonce = list.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
-	return &APISpecs
+	return APISpecs
 }
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
+func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
 	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	store.Connect()
 
@@ -373,7 +372,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) *[]*APISpec {
 	return a.processRPCDefinitions(apiCollection)
 }
 
-func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*APISpec {
+func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APISpec {
 	var APISpecs = []*APISpec{}
 
 	var APIDefinitions = []*apidef.APIDefinition{}
@@ -406,7 +405,7 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*AP
 		APISpecs = append(APISpecs, newAppSpec)
 	}
 
-	return &APISpecs
+	return APISpecs
 }
 
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*apidef.APIDefinition, map[string]interface{}) {
@@ -425,7 +424,7 @@ func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*apidef.APIDefinit
 
 // LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
-func (a *APIDefinitionLoader) LoadDefinitions(dir string) *[]*APISpec {
+func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
 	var APISpecs = []*APISpec{}
 	// Grab json files from directory
 	files, _ := ioutil.ReadDir(dir)
@@ -447,7 +446,7 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) *[]*APISpec {
 		}
 	}
 
-	return &APISpecs
+	return APISpecs
 }
 
 func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {

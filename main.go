@@ -218,8 +218,8 @@ func buildConnStr(resource string) string {
 // Pull API Specs from configuration
 var APILoader = APIDefinitionLoader{}
 
-func getAPISpecs() *[]*APISpec {
-	var APISpecs *[]*APISpec
+func getAPISpecs() []*APISpec {
+	var APISpecs []*APISpec
 
 	if config.UseDBAppConfigs {
 
@@ -242,18 +242,18 @@ func getAPISpecs() *[]*APISpec {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Printf("Detected %v APIs", len(*APISpecs))
+	}).Printf("Detected %v APIs", len(APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i := range *APISpecs {
-			(*APISpecs)[i].AuthProvider = config.AuthOverride.AuthProvider
+		for i := range APISpecs {
+			APISpecs[i].AuthProvider = config.AuthOverride.AuthProvider
 
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i := range *APISpecs {
-			(*APISpecs)[i].SessionProvider = config.AuthOverride.SessionProvider
+		for i := range APISpecs {
+			APISpecs[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
 
@@ -709,7 +709,7 @@ func doReload() {
 	// load the specs
 	specs := getAPISpecs()
 
-	if len(*specs) == 0 {
+	if len(specs) == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")

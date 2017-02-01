@@ -40,9 +40,9 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
-func prepareSortOrder(APISpecs *[]*APISpec) {
-	sort.Sort(SortableAPISpecListByHost(*APISpecs))
-	sort.Sort(SortableAPISpecListByListen(*APISpecs))
+func prepareSortOrder(APISpecs []*APISpec) {
+	sort.Sort(SortableAPISpecListByHost(APISpecs))
+	sort.Sort(SortableAPISpecListByListen(APISpecs))
 }
 
 func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
@@ -93,9 +93,9 @@ func generateDomainPath(hostname string, listenPath string) string {
 	return hostname + listenPath
 }
 
-func generateListenPathMap(APISpecs *[]*APISpec) {
+func generateListenPathMap(APISpecs []*APISpec) {
 	// We must track the hostname no matter what
-	for _, referenceSpec := range *APISpecs {
+	for _, referenceSpec := range APISpecs {
 		domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
 		val, ok := ListenPathMap.Get(domainHash)
 		if ok {
@@ -554,7 +554,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
+func loadApps(APISpecs []*APISpec, Muxer *mux.Router) {
 	ListenPathMap = cmap.New()
 	// load the APi defs
 	log.WithFields(logrus.Fields{
@@ -571,9 +571,9 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	chainChannel := make(chan *ChainObject)
 
 	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(*APISpecs))
+	loadList := make([]*ChainObject, len(APISpecs))
 	generateListenPathMap(APISpecs)
-	for i, referenceSpec := range *APISpecs {
+	for i, referenceSpec := range APISpecs {
 		go func(referenceSpec *APISpec, i int) {
 			subrouter := Muxer
 			// Handle custom domains
@@ -594,7 +594,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		tmpSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 	}
 
-	for range *APISpecs {
+	for range APISpecs {
 		chObj := <-chainChannel
 		loadList[chObj.Index] = chObj
 	}

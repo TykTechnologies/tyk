@@ -151,7 +151,7 @@ func createIPSampleAPI(t *testing.T, apiTestDef string) *APISpec {
 	log.Debug("CREATING TEMPORARY API FOR IP WHITELIST")
 	spec := createSpecTest(t, apiTestDef)
 
-	specs := &[]*APISpec{spec}
+	specs := []*APISpec{spec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)

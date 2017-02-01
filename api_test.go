@@ -51,7 +51,7 @@ const apiTestDef = `{
 func makeSampleAPI(t *testing.T) *APISpec {
 	spec := createSpecTest(t, apiTestDef)
 
-	specs := &[]*APISpec{spec}
+	specs := []*APISpec{spec}
 	newMuxes := mux.NewRouter()
 	loadAPIEndpoints(newMuxes)
 	loadApps(specs, newMuxes)
@@ -606,6 +606,6 @@ func BenchmarkApiInsertReload(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newMuxes := mux.NewRouter()
 		loadAPIEndpoints(newMuxes)
-		loadApps(&specs, newMuxes)
+		loadApps(specs, newMuxes)
 	}
 }
