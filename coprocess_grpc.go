@@ -94,7 +94,7 @@ func (d *GRPCDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, base
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
-	dispatcher, err := &GRPCDispatcher{}, error(nil)
+	var err error
 	grpcConnection, err = grpc.Dial("", grpc.WithInsecure(), grpc.WithDialer(dialer))
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
@@ -103,7 +103,7 @@ func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 			"prefix": "coprocess-grpc",
 		}).Error(err)
 	}
-	return dispatcher, err
+	return &GRPCDispatcher{}, err
 }
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.

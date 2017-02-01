@@ -28,6 +28,9 @@ func TestMain(m *testing.M) {
 	}
 	WriteDefaultConf(&config)
 	config.AppPath, err = ioutil.TempDir("", "tyk-test-")
+	if err != nil {
+		panic(err)
+	}
 	config.Storage.Port, _ = strconv.Atoi(s.Port())
 	config.EnableAnalytics = true
 	initialiseSystem(map[string]interface{}{})
