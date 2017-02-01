@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -270,11 +269,6 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
-	// TODO: rewrite test to not use redisStore directly
-	redisStore := &RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(spec, testMuxer)
 
@@ -314,12 +308,12 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	}
 
 	// Verify the token is correct
-	key, fnd := redisStore.GetKey(token)
-	if fnd != nil {
+	session, ok := spec.AuthManager.IsKeyAuthorised(token)
+	if !ok {
 		t.Error("Key was not created (Can't find it)!")
 	}
 
-	if !strings.Contains(key, `"apply_policy_id":"TEST-4321"`) {
+	if session.ApplyPolicyID != "TEST-4321" {
 		t.Error("Policy not added to token!")
 	}
 }
