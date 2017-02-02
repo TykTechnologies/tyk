@@ -891,8 +891,10 @@ func initialiseSystem(arguments map[string]interface{}) {
 	}
 
 	if runningTests && os.Getenv("TYK_LOGLEVEL") == "" {
-		// `go test` without TYK_LOGLEVEL override
+		// `go test` without TYK_LOGLEVEL set defaults to no log
+		// output
 		log.Level = logrus.ErrorLevel
+		log.Out = ioutil.Discard
 	} else if dbg, _ := arguments["--debug"]; dbg == true {
 		log.Level = logrus.DebugLevel
 		log.WithFields(logrus.Fields{
