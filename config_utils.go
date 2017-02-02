@@ -38,7 +38,7 @@ func WriteDefaultConf(conf *Config) {
 	conf.HideGeneratorHeader = false
 	conf.OauthRedirectUriSeparator = ""
 	newConfig, err := json.MarshalIndent(conf, "", "    ")
-	overrideErr := envconfig.Process(ENV_PREVIX, &conf)
+	overrideErr := envconfig.Process(ENV_PREVIX, conf)
 	if overrideErr != nil {
 		log.Error("Failed to process environment variables: ", overrideErr)
 	}
