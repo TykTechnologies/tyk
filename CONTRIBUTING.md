@@ -67,7 +67,7 @@ You need to clone Tyk from GitHub to your GOPATH folder, or alternatively you ca
 ### Building the project
 You need to have working Go enironment: see [golang.org](https://golang.org/doc/code.html) for more info on how Go works with code.
 
-To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. If you want to just test a subset of the project, you can pass the `-run` argument with name of the test.
+To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. If you want to just test a subset of the project, you can pass the `-run` argument with name of the test. Note that logs are hidden by default when running the tests, which you can override by setting `TYK_LOGLEVEL=info`.
 
 ### Adding dependencies
 
