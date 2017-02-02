@@ -1,6 +1,6 @@
 #!/bin/bash
 echo Set version number
-export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3\.$4"' version.go)
+export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)
 
 echo Generating key
 [[ $(gpg --list-keys | grep -w 729EA673) ]] && echo "Key exists" || gpg --import build_key.key
