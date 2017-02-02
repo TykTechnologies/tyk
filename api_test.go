@@ -52,8 +52,7 @@ var apiTestDef = `
 `
 
 func makeSampleAPI(t *testing.T) *APISpec {
-	spec := createDefinitionFromString(apiTestDef)
-	specInitTest(t, spec)
+	spec := createSpecTest(t, apiTestDef)
 
 	specs := &[]*APISpec{spec}
 	newMuxes := mux.NewRouter()

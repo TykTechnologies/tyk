@@ -454,38 +454,17 @@ var extendedPathGatewaySetup = `
 	}
 `
 
-func createExtendedDefinitionWithPaths() *APISpec {
-	return createDefinitionFromString(extendedPathGatewaySetup)
-}
-
-func createNonVersionedDefinition() *APISpec {
-	return createDefinitionFromString(nonExpiringDefNoWhiteList)
-}
-
-func createVersionedDefinition() *APISpec {
-	return createDefinitionFromString(versionedDefinition)
-}
-
-func createPathBasedDefinition() *APISpec {
-	return createDefinitionFromString(pathBasedDefinition)
-}
-
-func specInitTest(t *testing.T, spec *APISpec) {
+func createSpecTest(t *testing.T, def string) *APISpec {
+	spec := createDefinitionFromString(def)
 	redisStore := &RedisClusterStorageManager{KeyPrefix: "apikey-"}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
-}
-
-func createSpecTest(t *testing.T, def string) *APISpec {
-	spec := createDefinitionFromString(def)
-	specInitTest(t, spec)
 	return spec
 }
 
 func TestParambasedAuth(t *testing.T) {
-	spec := createPathBasedDefinition()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, pathBasedDefinition)
 	session := createParamAuthSession()
 	spec.SessionManager.UpdateSession("54321", session, 60)
 	uri := "/pathBased/post?authorization=54321"
@@ -547,8 +526,7 @@ func TestParambasedAuth(t *testing.T) {
 }
 
 func TestVersioningRequestOK(t *testing.T) {
-	spec := createVersionedDefinition()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, versionedDefinition)
 	session := createVersionedSession()
 	spec.SessionManager.UpdateSession("96869686969", session, 60)
 	uri := "/"
@@ -573,8 +551,7 @@ func TestVersioningRequestOK(t *testing.T) {
 }
 
 func TestVersioningRequestFail(t *testing.T) {
-	spec := createVersionedDefinition()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, versionedDefinition)
 	session := createVersionedSession()
 	session.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
 
@@ -602,8 +579,7 @@ func TestVersioningRequestFail(t *testing.T) {
 }
 
 func TestIgnoredPathRequestOK(t *testing.T) {
-	spec := createExtendedDefinitionWithPaths()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, extendedPathGatewaySetup)
 	session := createStandardSession()
 
 	spec.SessionManager.UpdateSession("tyutyu345345dgh", session, 60)
@@ -630,8 +606,7 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 }
 
 func TestWhitelistRequestReply(t *testing.T) {
-	spec := createExtendedDefinitionWithPaths()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, extendedPathGatewaySetup)
 	session := createStandardSession()
 
 	keyId := randSeq(10)
@@ -661,8 +636,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 }
 
 func TestQuota(t *testing.T) {
-	spec := createNonVersionedDefinition()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createQuotaSession()
 	keyId := randSeq(10)
 	spec.SessionManager.UpdateSession(keyId, session, 60)
@@ -707,8 +681,7 @@ func TestQuota(t *testing.T) {
 }
 
 func TestWithAnalytics(t *testing.T) {
-	spec := createNonVersionedDefinition()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("ert1234ert", session, 60)
 	uri := "/"
@@ -742,8 +715,7 @@ func TestWithAnalytics(t *testing.T) {
 }
 
 func TestWithAnalyticsErrorResponse(t *testing.T) {
-	spec := createNonVersionedDefinition()
-	specInitTest(t, spec)
+	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("fgh561234", session, 60)
 	uri := "/"
