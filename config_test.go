@@ -7,6 +7,7 @@ import (
 
 func TestWriteDefaultConf(t *testing.T) {
 	conf := &Config{}
+	os.Unsetenv("TYK_GW_LISTENPORT")
 	WriteDefaultConf(conf)
 	if conf.ListenPort != 8080 {
 		t.Error("Expected ListenPort to be set to its default")
