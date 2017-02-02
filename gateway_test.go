@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -454,11 +455,19 @@ var extendedPathGatewaySetup = `
 	}
 `
 
+func testName(t *testing.T) string {
+	// TODO(mvdan): replace with t.Name() once 1.9 is out and we
+	// drop support for 1.7.x (approx July 2017)
+	v := reflect.Indirect(reflect.ValueOf(t))
+	return v.FieldByName("name").String()
+}
+
 func createSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
-	redisStore := &RedisClusterStorageManager{KeyPrefix: "apikey-"}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
+	tname := testName(t)
+	redisStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apikey."}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: tname + "-orgKey."}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }
