@@ -95,7 +95,6 @@ func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 }
 
 func makeOAuthAPI(t *testing.T) *APISpec {
-	log.Debug("CREATING TEMPORARY API FOR OAUTH")
 	spec := createSpecTest(t, oauthDefinition)
 
 	specs := &[]*APISpec{spec}
@@ -106,8 +105,6 @@ func makeOAuthAPI(t *testing.T) *APISpec {
 	newHttpMux := http.NewServeMux()
 	newHttpMux.Handle("/", newMuxes)
 	http.DefaultServeMux = newHttpMux
-
-	log.Debug("OAUTH Test Reload complete")
 
 	return spec
 }
@@ -377,7 +374,6 @@ func getToken(t *testing.T) tokenData {
 	body, _ := ioutil.ReadAll(recorder.Body)
 	if err := json.Unmarshal(body, &response); err != nil {
 	}
-	log.Debug("TOKEN DATA: ", string(body))
 	return response
 }
 
@@ -406,7 +402,6 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 	err := json.Unmarshal(body, &response)
 	if err != nil {
 	}
-	log.Debug("TOKEN DATA: ", string(body))
 	log.Info("Access token: ", response.AccessToken)
 
 	if recorder.Code != 200 {
@@ -602,7 +597,6 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	if err := json.Unmarshal(body, &responseData); err != nil {
 		t.Fatal("Decode failed:", err)
 	}
-	log.Debug("Refresh token body", string(body))
 	token, ok := responseData["refresh_token"].(string)
 	if !ok {
 		t.Fatal("No refresh token found")
