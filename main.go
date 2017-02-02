@@ -326,22 +326,22 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 	ApiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(InstrumentationMW(resetHandler)))
 
 	if !IsRPCMode() {
-		ApiMuxer.HandleFunc("/tyk/org/keys/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(orgHandler)))
-		ApiMuxer.HandleFunc("/tyk/keys/policy/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
+		ApiMuxer.HandleFunc("/tyk/org/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(orgHandler)))
+		ApiMuxer.HandleFunc("/tyk/keys/policy/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
 		ApiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(InstrumentationMW(createKeyHandler)))
-		ApiMuxer.HandleFunc("/tyk/apis/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
+		ApiMuxer.HandleFunc("/tyk/apis/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
 		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(InstrumentationMW(healthCheckhandler)))
 		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(InstrumentationMW(createOauthClient)))
-		ApiMuxer.HandleFunc("/tyk/oauth/refresh/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
-		ApiMuxer.HandleFunc("/tyk/cache/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
+		ApiMuxer.HandleFunc("/tyk/oauth/refresh/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
+		ApiMuxer.HandleFunc("/tyk/cache/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	ApiMuxer.HandleFunc("/tyk/keys/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(keyHandler)))
-	ApiMuxer.HandleFunc("/tyk/oauth/clients/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
+	ApiMuxer.HandleFunc("/tyk/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(keyHandler)))
+	ApiMuxer.HandleFunc("/tyk/oauth/clients/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -1182,7 +1182,7 @@ func start() {
 			"prefix": "main",
 		}).Debug("Adding pprof endpoints")
 
-		defaultRouter.HandleFunc("/debug/pprof/"+"{rest:.*}", http.HandlerFunc(pprof_http.Index))
+		defaultRouter.HandleFunc("/debug/pprof/{rest:.*}", http.HandlerFunc(pprof_http.Index))
 		defaultRouter.HandleFunc("/debug/pprof/cmdline", http.HandlerFunc(pprof_http.Cmdline))
 		defaultRouter.HandleFunc("/debug/pprof/profile", http.HandlerFunc(pprof_http.Profile))
 		defaultRouter.HandleFunc("/debug/pprof/symbol", http.HandlerFunc(pprof_http.Symbol))
