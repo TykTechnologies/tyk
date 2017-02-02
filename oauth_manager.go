@@ -275,7 +275,7 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 		}
 	}
 	if resp.IsError && resp.InternalError != nil {
-		fmt.Printf("ERROR: %s\n", resp.InternalError)
+		log.Error(resp.InternalError)
 	}
 
 	return resp
