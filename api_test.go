@@ -52,7 +52,6 @@ var apiTestDef = `
 `
 
 func makeSampleAPI(t *testing.T) *APISpec {
-	log.Debug("CREATING TEMPORARY API")
 	spec := createDefinitionFromString(apiTestDef)
 	specInitTest(t, spec)
 
@@ -66,8 +65,6 @@ func makeSampleAPI(t *testing.T) *APISpec {
 	newHttmMuxer.Handle("/", newMuxes)
 
 	http.DefaultServeMux = newHttmMuxer
-	log.Debug("TEST Reload complete")
-
 	return spec
 }
 
@@ -83,7 +80,6 @@ type testAPIDefinition struct {
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
-	log.Debug("TEST GET HEALTHCHECK")
 	uri := "/tyk/health/?api_id=1"
 	method := "GET"
 
@@ -173,7 +169,6 @@ func TestApiHandler(t *testing.T) {
 }
 
 func TestApiHandlerGetSingle(t *testing.T) {
-	log.Debug("TEST GET SINGLE API DEFINITION")
 	uri := "/tyk/apis/1"
 	method := "GET"
 	sampleKey := createSampleSession()
@@ -206,7 +201,6 @@ func TestApiHandlerGetSingle(t *testing.T) {
 }
 
 func TestApiHandlerPost(t *testing.T) {
-	log.Debug("TEST POST SINGLE API DEFINITION")
 	uri := "/tyk/apis/1"
 	method := "POST"
 
@@ -234,7 +228,6 @@ func TestApiHandlerPost(t *testing.T) {
 }
 
 func TestApiHandlerPostDbConfig(t *testing.T) {
-	log.Debug("TEST POST SINGLE API DEFINITION ON USE_DB_CONFIG")
 	uri := "/tyk/apis/1"
 	method := "POST"
 
