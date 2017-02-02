@@ -900,9 +900,6 @@ func initialiseSystem(arguments map[string]interface{}) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling debug-level output")
-	} else {
-		// default is info
-		log.Level = logrus.InfoLevel
 	}
 
 	filename := "/etc/tyk/tyk.conf"
