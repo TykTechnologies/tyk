@@ -3,7 +3,7 @@
 # Super hacky release script
 
 # ----- SET THE VERSION NUMBER -----
-CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3\.$4"' version.go)
+CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' version.go)
 
 echo "Current version is: " $CURRENTVERS
 

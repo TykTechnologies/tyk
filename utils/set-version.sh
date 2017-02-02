@@ -1,5 +1,5 @@
 #!/bin/sh
-CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3\.$4"' version.go)
+CURRENTVERS=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' version.go)
 
 echo "Current version is: " $CURRENTVERS
 
@@ -9,10 +9,8 @@ echo -n "Minor version [ENTER]: "
 read min 
 echo -n "Patch version [ENTER]: "
 read patch 
-echo -n "Release version [ENTER]: "
-read rel 
 
-NEWVERSION="v$maj.$min.$patch.$rel"
+NEWVERSION="v$maj.$min.$patch"
 echo "Setting new version in source: " $NEWVERSION
 
-perl -pi -e 's/var VERSION string = \"(.*)\"/var VERSION string = \"'$NEWVERSION'\"/g' version.go
+perl -pi -e 's/var VERSION = \"(.*)\"/var VERSION = \"'$NEWVERSION'\"/g' version.go
