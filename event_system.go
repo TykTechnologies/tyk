@@ -236,8 +236,7 @@ func (l *LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, 
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
-	var formattedMsgString string
-	formattedMsgString = fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.EventType)
+	formattedMsgString := fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.EventType)
 
 	// We can handle specific event types easily
 	if em.EventType == EVENT_QuotaExceeded {

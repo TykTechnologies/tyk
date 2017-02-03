@@ -125,10 +125,9 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 
 func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
-	var err error
 	var config ValueExtractorConfig
 
-	err = mapstructure.Decode(e.Config.ExtractorConfig, &config)
+	err := mapstructure.Decode(e.Config.ExtractorConfig, &config)
 	if err != nil {
 		returnOverrides = e.Error(r, err, "Couldn't decode ValueExtractor configuration")
 		return SessionID, returnOverrides
@@ -148,16 +147,12 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	SessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
 
-	var keyExists bool
-	var previousSessionState SessionState
-	previousSessionState, keyExists = e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSessionState, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
-
 		lastUpdated, _ := strconv.Atoi(previousSessionState.LastUpdated)
 
 		deadlineTs := int64(lastUpdated) + previousSessionState.IdExtractorDeadline
-
 		if deadlineTs > time.Now().Unix() {
 			e.PostProcess(r, previousSessionState, SessionID)
 			returnOverrides = ReturnOverrides{
@@ -182,12 +177,9 @@ type RegexExtractorConfig struct {
 
 func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
-	var err error
-
 	var config RegexExtractorConfig
 
-	err = mapstructure.Decode(e.Config.ExtractorConfig, &config)
-
+	err := mapstructure.Decode(e.Config.ExtractorConfig, &config)
 	if err != nil {
 		returnOverrides = e.Error(r, err, "Can't decode RegexExtractor configuration")
 		return SessionID, returnOverrides
@@ -198,8 +190,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	var expression *regexp.Regexp
-	expression, err = regexp.Compile(config.RegexExpression)
+	expression, err := regexp.Compile(config.RegexExpression)
 
 	if err != nil {
 		returnOverrides = e.Error(r, nil, "RegexExtractor found an invalid expression")
@@ -220,14 +211,11 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	var regexOutput []string
-	regexOutput = expression.FindAllString(extractorOutput, -1)
+	regexOutput := expression.FindAllString(extractorOutput, -1)
 
 	SessionID = e.GenerateSessionID(regexOutput[config.RegexMatchIndex], e.TykMiddleware)
 
-	var keyExists bool
-	var previousSessionState SessionState
-	previousSessionState, keyExists = e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSessionState, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
 
@@ -259,21 +247,18 @@ type XPathExtractorConfig struct {
 
 func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
-	var err error
 
 	var config XPathExtractorConfig
-	err = mapstructure.Decode(e.Config.ExtractorConfig, &config)
+	err := mapstructure.Decode(e.Config.ExtractorConfig, &config)
 
 	if e.Config.ExtractorConfig["xpath_expression"] == nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: no expression set")
 		return SessionID, returnOverrides
 	}
 
-	var expressionString string
-	expressionString = e.Config.ExtractorConfig["xpath_expression"].(string)
+	expressionString := e.Config.ExtractorConfig["xpath_expression"].(string)
 
-	var expression *xmlpath.Path
-	expression, err = xmlpath.Compile(expressionString)
+	expression, err := xmlpath.Compile(expressionString)
 
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
@@ -294,8 +279,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	var extractedXml *xmlpath.Node
-	extractedXml, err = xmlpath.Parse(bytes.NewBufferString(extractorOutput))
+	extractedXml, err := xmlpath.Parse(bytes.NewBufferString(extractorOutput))
 
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: couldn't parse input")

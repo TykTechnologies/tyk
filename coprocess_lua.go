@@ -217,19 +217,9 @@ func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
 }
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
-
-	dispatcher, err = &LuaDispatcher{}, nil
-
+func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
+	dispatcher := &LuaDispatcher{}
 	dispatcher.LoadModules()
-
 	dispatcher.Reload()
-
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Error(err)
-	}
-
-	return dispatcher, err
+	return dispatcher, nil
 }
