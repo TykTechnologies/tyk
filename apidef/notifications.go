@@ -1,9 +1,14 @@
-package tykcommon
+package apidef
 
 import (
-	"github.com/franela/goreq"
 	"time"
+
+	logger "github.com/TykTechnologies/tyk/log"
+
+	"github.com/franela/goreq"
 )
+
+var log = logger.Get()
 
 // NotificationsManager handles sending notifications to OAuth endpoints to notify the provider of key changes.
 // TODO: Make this more generic
