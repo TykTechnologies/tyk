@@ -53,6 +53,7 @@ petstore.json
 *.prof
 *.pdf
 *.mmdb
+!testdata/*.mmdb
 *.pid
 coprocess_gen_test.go
 session_state_gen_test.go
