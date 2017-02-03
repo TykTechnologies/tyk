@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type APIImporterSource string
@@ -16,8 +16,8 @@ const (
 
 type APIImporter interface {
 	ReadString(string) error
-	ConvertIntoApiVersion(bool) (tykcommon.VersionInfo, error)
-	InsertIntoAPIDefinitionAsVersion(tykcommon.VersionInfo, *tykcommon.APIDefinition, string) error
+	ConvertIntoApiVersion(bool) (apidef.VersionInfo, error)
+	InsertIntoAPIDefinitionAsVersion(apidef.VersionInfo, *apidef.APIDefinition, string) error
 }
 
 func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
@@ -122,8 +122,8 @@ func (b *BluePrintAST) ReadString(asJson string) error {
 	return nil
 }
 
-func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, error) {
-	versionInfo := tykcommon.VersionInfo{}
+func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
+	versionInfo := apidef.VersionInfo{}
 	versionInfo.UseExtendedPaths = true
 	versionInfo.Name = b.Name
 
@@ -137,14 +137,14 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 		}
 
 		for _, resource := range resourceGroup.Resources {
-			newMetaData := tykcommon.EndPointMeta{}
+			newMetaData := apidef.EndPointMeta{}
 			newMetaData.Path = resource.UriTemplate
-			newMetaData.MethodActions = make(map[string]tykcommon.EndpointMethodMeta)
+			newMetaData.MethodActions = make(map[string]apidef.EndpointMethodMeta)
 
 			for _, action := range resource.Actions {
 				if len(action.Examples) > 0 {
 					if len(action.Examples[0].Responses) > 0 {
-						endPointMethodMeta := tykcommon.EndpointMethodMeta{}
+						endPointMethodMeta := apidef.EndpointMethodMeta{}
 						code, err := strconv.Atoi(action.Examples[0].Responses[0].Name)
 						if err != nil {
 							log.Warning("Could not genrate response code form Name field, using 200")
@@ -153,9 +153,9 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 						endPointMethodMeta.Code = code
 
 						if asMock {
-							endPointMethodMeta.Action = tykcommon.Reply
+							endPointMethodMeta.Action = apidef.Reply
 						} else {
-							endPointMethodMeta.Action = tykcommon.NoAction
+							endPointMethodMeta.Action = apidef.NoAction
 						}
 
 						for _, h := range action.Examples[0].Responses[0].Headers {
@@ -169,7 +169,7 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 			}
 
 			// Add it to the version
-			versionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
+			versionInfo.ExtendedPaths.WhiteList = make([]apidef.EndPointMeta, 0)
 			versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, newMetaData)
 		}
 
@@ -178,7 +178,7 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo
 	return versionInfo, nil
 }
 
-func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(version tykcommon.VersionInfo, def *tykcommon.APIDefinition, versionName string) error {
+func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, def *apidef.APIDefinition, versionName string) error {
 	def.VersionData.NotVersioned = false
 	def.VersionData.Versions[versionName] = version
 	return nil

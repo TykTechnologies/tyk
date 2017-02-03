@@ -6,14 +6,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/lonelycode/gabs"
 )
 
 const ARRAY_NAME = "tyk_array"
 
 type ServiceDiscovery struct {
-	spec                *tykcommon.ServiceDiscoveryConfiguration
+	spec                *apidef.ServiceDiscoveryConfiguration
 	isNested            bool
 	isTargetList        bool
 	endpointReturnsList bool
@@ -24,7 +24,7 @@ type ServiceDiscovery struct {
 	targetPath          string
 }
 
-func (s *ServiceDiscovery) New(spec *tykcommon.ServiceDiscoveryConfiguration) {
+func (s *ServiceDiscovery) New(spec *apidef.ServiceDiscoveryConfiguration) {
 	s.spec = spec
 	s.isNested = spec.UseNestedQuery
 	s.isTargetList = spec.UseTargetList
@@ -244,10 +244,10 @@ func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Contain
 	return pErr
 }
 
-func (s *ServiceDiscovery) ProcessRawData(rawData string) (*tykcommon.HostList, error) {
+func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, error) {
 	var jsonParsed gabs.Container
 
-	hostlist := tykcommon.NewHostList()
+	hostlist := apidef.NewHostList()
 
 	if s.endpointReturnsList {
 		// Convert to an object
@@ -299,7 +299,7 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (*tykcommon.HostList, 
 	return hostlist, nil
 }
 
-func (s *ServiceDiscovery) GetTarget(serviceURL string) (*tykcommon.HostList, error) {
+func (s *ServiceDiscovery) GetTarget(serviceURL string) (*apidef.HostList, error) {
 	// Get the data
 	rawData, err := s.getServiceData(serviceURL)
 	if err != nil {

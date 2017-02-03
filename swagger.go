@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/lonelycode/go-uuid/uuid"
 )
 
@@ -85,8 +85,8 @@ func (s *SwaggerAST) ReadString(asJson string) error {
 	return nil
 }
 
-func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, error) {
-	versionInfo := tykcommon.VersionInfo{}
+func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
+	versionInfo := apidef.VersionInfo{}
 
 	if asMock {
 		return versionInfo, errors.New("Swagger mocks not supported")
@@ -94,15 +94,15 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, 
 
 	versionInfo.UseExtendedPaths = true
 	versionInfo.Name = s.Info.Version
-	versionInfo.ExtendedPaths.WhiteList = make([]tykcommon.EndPointMeta, 0)
+	versionInfo.ExtendedPaths.WhiteList = make([]apidef.EndPointMeta, 0)
 
 	if len(s.Paths) == 0 {
 		return versionInfo, errors.New("no paths defined in swagger file")
 	}
 	for pathName, pathSpec := range s.Paths {
 		log.Debug("path: %s", pathName)
-		newEndpointMeta := tykcommon.EndPointMeta{}
-		newEndpointMeta.MethodActions = make(map[string]tykcommon.EndpointMethodMeta)
+		newEndpointMeta := apidef.EndPointMeta{}
+		newEndpointMeta.MethodActions = make(map[string]apidef.EndpointMethodMeta)
 		newEndpointMeta.Path = pathName
 
 		// We just want the paths here, no mocks
@@ -120,8 +120,8 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, 
 			if len(m.Responses) == 0 && m.Description == "" && m.OperationID == "" {
 				continue
 			}
-			methodAction := tykcommon.EndpointMethodMeta{}
-			methodAction.Action = tykcommon.NoAction
+			methodAction := apidef.EndpointMethodMeta{}
+			methodAction.Action = apidef.NoAction
 			newEndpointMeta.MethodActions[methodName] = methodAction
 		}
 
@@ -131,7 +131,7 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (tykcommon.VersionInfo, 
 	return versionInfo, nil
 }
 
-func (s *SwaggerAST) InsertIntoAPIDefinitionAsVersion(version tykcommon.VersionInfo, def *tykcommon.APIDefinition, versionName string) error {
+func (s *SwaggerAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo, def *apidef.APIDefinition, versionName string) error {
 	def.VersionData.NotVersioned = false
 	def.VersionData.Versions[versionName] = version
 	return nil
@@ -207,8 +207,8 @@ func handleSwaggerMode(arguments map[string]interface{}) {
 	}
 }
 
-func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool) (*tykcommon.APIDefinition, error) {
-	ad := tykcommon.APIDefinition{
+func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
+	ad := apidef.APIDefinition{
 		Name:             s.Info.Title,
 		Active:           true,
 		UseKeylessAccess: true,
@@ -217,7 +217,7 @@ func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool
 	}
 	ad.VersionDefinition.Key = "version"
 	ad.VersionDefinition.Location = "header"
-	ad.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
+	ad.VersionData.Versions = make(map[string]apidef.VersionInfo)
 	ad.Proxy.ListenPath = "/" + ad.APIID + "/"
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL

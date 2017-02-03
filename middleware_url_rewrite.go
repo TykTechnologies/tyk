@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 )
 
 type URLRewriter struct{}
 
-func (u URLRewriter) Rewrite(meta *tykcommon.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
+func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
 	// Find all the matching groups:
 	mp, mpErr := regexp.Compile(meta.MatchPattern)
 	if mpErr != nil {
@@ -173,7 +173,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	found, meta := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
 	if found {
 		log.Debug("Rewriter active")
-		umeta := meta.(*tykcommon.URLRewriteMeta)
+		umeta := meta.(*apidef.URLRewriteMeta)
 		log.Debug(r.URL)
 		oldPath := r.URL.String()
 		p, pErr := m.Rewriter.Rewrite(umeta, r.URL.String(), true, r)

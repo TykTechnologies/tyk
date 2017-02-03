@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/streamrail/concurrent-map"
@@ -147,7 +147,7 @@ func processSpec(referenceSpec *APISpec,
 
 	// Set up LB targets:
 	if referenceSpec.Proxy.EnableLoadBalancing {
-		sl := tykcommon.NewHostListFromList(referenceSpec.Proxy.Targets)
+		sl := apidef.NewHostListFromList(referenceSpec.Proxy.Targets)
 		referenceSpec.Proxy.StructuredTargetList = sl
 	}
 
@@ -200,12 +200,12 @@ func processSpec(referenceSpec *APISpec,
 	referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
 
 	//Set up all the JSVM middleware
-	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
-	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
-	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-	mwPostAuthCheckFuncs := []tykcommon.MiddlewareDefinition{}
+	var mwAuthCheckFunc apidef.MiddlewareDefinition
+	mwPreFuncs := []apidef.MiddlewareDefinition{}
+	mwPostFuncs := []apidef.MiddlewareDefinition{}
+	mwPostAuthCheckFuncs := []apidef.MiddlewareDefinition{}
 
-	var mwDriver tykcommon.MiddlewareDriver
+	var mwDriver apidef.MiddlewareDriver
 
 	if EnableCoProcess {
 		loadBundle(referenceSpec)
@@ -221,7 +221,7 @@ func processSpec(referenceSpec *APISpec,
 		var mwPaths []string
 		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
-		if config.EnableJSVM && mwDriver == tykcommon.OttoDriver {
+		if config.EnableJSVM && mwDriver == apidef.OttoDriver {
 			var pathPrefix string
 			if referenceSpec.CustomMiddlewareBundle != "" {
 				pathPrefix = strings.Join([]string{referenceSpec.APIID, referenceSpec.CustomMiddlewareBundle}, "-")
@@ -316,7 +316,7 @@ func processSpec(referenceSpec *APISpec,
 		log.Debug(referenceSpec.APIDefinition.Name, " - CHAIN SIZE: ", len(baseChainArray))
 
 		for _, obj := range mwPreFuncs {
-			if mwDriver != tykcommon.OttoDriver {
+			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.APIDefinition.Name,
@@ -330,7 +330,7 @@ func processSpec(referenceSpec *APISpec,
 		chainArray = append(chainArray, baseChainArray...)
 
 		for _, obj := range mwPostFuncs {
-			if mwDriver != tykcommon.OttoDriver {
+			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.APIDefinition.Name,
@@ -361,7 +361,7 @@ func processSpec(referenceSpec *APISpec,
 
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
-			if mwDriver != tykcommon.OttoDriver {
+			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.APIDefinition.Name,
@@ -386,11 +386,11 @@ func processSpec(referenceSpec *APISpec,
 
 		}
 
-		useCoProcessAuth := EnableCoProcess && mwDriver != tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth
+		useCoProcessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && referenceSpec.EnableCoProcessAuth
 
 		useOttoAuth := false
 		if !useCoProcessAuth {
-			useOttoAuth = mwDriver == tykcommon.OttoDriver && referenceSpec.EnableCoProcessAuth
+			useOttoAuth = mwDriver == apidef.OttoDriver && referenceSpec.EnableCoProcessAuth
 		}
 
 		if referenceSpec.APIDefinition.UseBasicAuth {
@@ -491,7 +491,7 @@ func processSpec(referenceSpec *APISpec,
 		chainArray = append(chainArray, baseChainArray_PostAuth...)
 
 		for _, obj := range mwPostFuncs {
-			if mwDriver != tykcommon.OttoDriver {
+			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.APIDefinition.Name,

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 )
 
@@ -144,7 +144,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 
 	// Set session state on context, we will need it later
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
-	case tykcommon.AuthToken, tykcommon.UnsetAuth:
+	case apidef.AuthToken, apidef.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, key)
 		k.setContextVars(r, key)

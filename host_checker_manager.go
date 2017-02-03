@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/lonelycode/go-uuid/uuid"
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -288,7 +288,7 @@ func (hc *HostCheckerManager) IsHostDown(urlStr string) bool {
 	return fErr != nil
 }
 
-func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostCheckObject, APIID string) (HostData, error) {
+func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, APIID string) (HostData, error) {
 	// Build the check URL:
 	var hostData HostData
 	u, err := url.Parse(checkObject.CheckURL)
@@ -394,7 +394,7 @@ func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, erro
 	}
 
 	// The returned data is a string, so lets unmarshal it:
-	checkTargets := make([]tykcommon.HostCheckObject, 0)
+	checkTargets := make([]apidef.HostCheckObject, 0)
 	data0, _ := data.GetIndex(0)
 	decodeErr := json.Unmarshal([]byte(data0), &checkTargets)
 

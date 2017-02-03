@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/mitchellh/mapstructure"
 )
 
@@ -37,7 +37,7 @@ func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respons
 	found, meta := h.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HeaderInjectedResponse)
 
 	if found {
-		hmeta := meta.(*tykcommon.HeaderInjectionMeta)
+		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
 			res.Header.Del(dKey)
 		}

@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const (
-	EH_JSVMHandler tykcommon.TykEventHandlerName = "eh_dynamic_handler"
+	EH_JSVMHandler apidef.TykEventHandlerName = "eh_dynamic_handler"
 )
 
 type JSVMContextGlobal struct {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -42,7 +42,7 @@ func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	_, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
 	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, MethodTransformed)
 	if found {
-		mmeta := meta.(*tykcommon.MethodTransformMeta)
+		mmeta := meta.(*apidef.MethodTransformMeta)
 
 		switch strings.ToUpper(mmeta.ToMethod) {
 		case "GET":

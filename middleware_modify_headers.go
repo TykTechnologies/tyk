@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 )
 
@@ -151,7 +151,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 
 	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, HeaderInjected)
 	if found {
-		hmeta := meta.(*tykcommon.HeaderInjectionMeta)
+		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
 			r.Header.Del(dKey)
 		}

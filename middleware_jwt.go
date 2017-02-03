@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
@@ -262,7 +262,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 			log.Debug("Policy applied to key")
 
 			switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
-			case tykcommon.JWTClaim, tykcommon.UnsetAuth:
+			case apidef.JWTClaim, apidef.UnsetAuth:
 				context.Set(r, SessionData, sessionState)
 				context.Set(r, AuthHeaderValue, SessionID)
 			}
@@ -277,7 +277,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 
 	log.Debug("Key found")
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
-	case tykcommon.JWTClaim, tykcommon.UnsetAuth:
+	case apidef.JWTClaim, apidef.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, SessionID)
 	}

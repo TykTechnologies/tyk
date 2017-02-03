@@ -3,14 +3,14 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	// "fmt"
 	"encoding/json"
 )
 
 // Constant for event system.
 const (
-	EH_CoProcessHandler tykcommon.TykEventHandlerName = "cp_dynamic_handler"
+	EH_CoProcessHandler apidef.TykEventHandlerName = "cp_dynamic_handler"
 )
 
 type CoProcessEventHandler struct {

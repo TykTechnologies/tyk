@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
@@ -615,7 +615,7 @@ func HandleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	apiIDList := make([]*tykcommon.APIDefinition, len(ApiSpecRegister))
+	apiIDList := make([]*apidef.APIDefinition, len(ApiSpecRegister))
 
 	c := 0
 	for _, apiSpec := range ApiSpecRegister {
@@ -671,7 +671,7 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 	success := true
 	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
-	newDef := &tykcommon.APIDefinition{}
+	newDef := &apidef.APIDefinition{}
 	code := 200
 
 	if err := decoder.Decode(newDef); err != nil {

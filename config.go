@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/kelseyhightower/envconfig"
 	uuid "github.com/nu7hatch/gouuid"
 )
@@ -122,10 +122,10 @@ type HttpServerOptionsConfig struct {
 }
 
 type AuthOverrideConf struct {
-	ForceAuthProvider    bool                          `json:"force_auth_provider"`
-	AuthProvider         tykcommon.AuthProviderMeta    `json:"auth_provider"`
-	ForceSessionProvider bool                          `json:"force_session_provider"`
-	SessionProvider      tykcommon.SessionProviderMeta `json:"session_provider"`
+	ForceAuthProvider    bool                       `json:"force_auth_provider"`
+	AuthProvider         apidef.AuthProviderMeta    `json:"auth_provider"`
+	ForceSessionProvider bool                       `json:"force_session_provider"`
+	SessionProvider      apidef.SessionProviderMeta `json:"session_provider"`
 }
 
 type UptimeTestsConfigDetail struct {
@@ -195,39 +195,39 @@ type Config struct {
 	EnableSentinelRateLImiter         bool                   `json:"enable_sentinel_rate_limiter"`
 	EnableRedisRollingLimiter         bool                   `json:"enable_redis_rolling_limiter"`
 	Monitor                           MonitorConfig
-	OauthRefreshExpire                int64                                    `json:"oauth_refresh_token_expire"`
-	OauthTokenExpire                  int32                                    `json:"oauth_token_expire"`
-	OauthRedirectUriSeparator         string                                   `json:"oauth_redirect_uri_separator"`
-	SlaveOptions                      SlaveOptionsConfig                       `json:"slave_options"`
-	DisableVirtualPathBlobs           bool                                     `json:"disable_virtual_path_blobs"`
-	LocalSessionCache                 LocalSessionCacheConf                    `json:"local_session_cache"`
-	HttpServerOptions                 HttpServerOptionsConfig                  `json:"http_server_options"`
-	ServiceDiscovery                  ServiceDiscoveryConf                     `json:"service_discovery"`
-	CloseConnections                  bool                                     `json:"close_connections"`
-	AuthOverride                      AuthOverrideConf                         `json:"auth_override"`
-	UptimeTests                       UptimeTestsConfig                        `json:"uptime_tests"`
-	HostName                          string                                   `json:"hostname"`
-	EnableAPISegregation              bool                                     `json:"enable_api_segregation"`
-	ControlAPIHostname                string                                   `json:"control_api_hostname"`
-	EnableCustomDomains               bool                                     `json:"enable_custom_domains"`
-	EnableJSVM                        bool                                     `json:"enable_jsvm"`
-	CoProcessOptions                  CoProcessConfig                          `json:"coprocess_options"`
-	HideGeneratorHeader               bool                                     `json:"hide_generator_header"`
-	EventHandlers                     tykcommon.EventHandlerMetaConfig         `json:"event_handlers"`
-	EventTriggers                     map[tykcommon.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
-	PIDFileLocation                   string                                   `json:"pid_file_location"`
-	AllowInsecureConfigs              bool                                     `json:"allow_insecure_configs"`
-	PublicKeyPath                     string                                   `json:"public_key_path"`
-	CloseIdleConnections              bool                                     `json:"close_idle_connections"`
-	DRLNotificationFrequency          int                                      `json:"drl_notification_frequency"`
-	GlobalSessionLifetime             int64                                    `bson:"global_session_lifetime" json:"global_session_lifetime"`
-	ForceGlobalSessionLifetime        bool                                     `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
-	BundleBaseURL                     string                                   `bson:"bundle_base_url" json:"bundle_base_url"`
-	EnableBundleDownloader            bool                                     `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
-	AllowRemoteConfig                 bool                                     `bson:"allow_remote_config" json:"allow_remote_config"`
-	LegacyEnableAllowanceCountdown    bool                                     `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
-	MaxIdleConnsPerHost               int                                      `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
-	ReloadWaitTime                    int                                      `bson:"reload_wait_time" json:"reload_wait_time"`
+	OauthRefreshExpire                int64                                 `json:"oauth_refresh_token_expire"`
+	OauthTokenExpire                  int32                                 `json:"oauth_token_expire"`
+	OauthRedirectUriSeparator         string                                `json:"oauth_redirect_uri_separator"`
+	SlaveOptions                      SlaveOptionsConfig                    `json:"slave_options"`
+	DisableVirtualPathBlobs           bool                                  `json:"disable_virtual_path_blobs"`
+	LocalSessionCache                 LocalSessionCacheConf                 `json:"local_session_cache"`
+	HttpServerOptions                 HttpServerOptionsConfig               `json:"http_server_options"`
+	ServiceDiscovery                  ServiceDiscoveryConf                  `json:"service_discovery"`
+	CloseConnections                  bool                                  `json:"close_connections"`
+	AuthOverride                      AuthOverrideConf                      `json:"auth_override"`
+	UptimeTests                       UptimeTestsConfig                     `json:"uptime_tests"`
+	HostName                          string                                `json:"hostname"`
+	EnableAPISegregation              bool                                  `json:"enable_api_segregation"`
+	ControlAPIHostname                string                                `json:"control_api_hostname"`
+	EnableCustomDomains               bool                                  `json:"enable_custom_domains"`
+	EnableJSVM                        bool                                  `json:"enable_jsvm"`
+	CoProcessOptions                  CoProcessConfig                       `json:"coprocess_options"`
+	HideGeneratorHeader               bool                                  `json:"hide_generator_header"`
+	EventHandlers                     apidef.EventHandlerMetaConfig         `json:"event_handlers"`
+	EventTriggers                     map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`
+	PIDFileLocation                   string                                `json:"pid_file_location"`
+	AllowInsecureConfigs              bool                                  `json:"allow_insecure_configs"`
+	PublicKeyPath                     string                                `json:"public_key_path"`
+	CloseIdleConnections              bool                                  `json:"close_idle_connections"`
+	DRLNotificationFrequency          int                                   `json:"drl_notification_frequency"`
+	GlobalSessionLifetime             int64                                 `bson:"global_session_lifetime" json:"global_session_lifetime"`
+	ForceGlobalSessionLifetime        bool                                  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
+	BundleBaseURL                     string                                `bson:"bundle_base_url" json:"bundle_base_url"`
+	EnableBundleDownloader            bool                                  `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
+	AllowRemoteConfig                 bool                                  `bson:"allow_remote_config" json:"allow_remote_config"`
+	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
+	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 }
 
 type CertData struct {

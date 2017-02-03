@@ -6,7 +6,7 @@ import (
 	"regexp"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/xmlpath.v2"
@@ -30,7 +30,7 @@ type IdExtractor interface {
 
 // BaseExtractor is the base structure for an ID extractor, it implements the IdExtractor interface. Other extractors may override some of its methods.
 type BaseExtractor struct {
-	Config        *tykcommon.MiddlewareIdExtractor
+	Config        *apidef.MiddlewareIdExtractor
 	TykMiddleware *TykMiddleware
 	Spec          *APISpec
 }
@@ -135,9 +135,9 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	switch e.Config.ExtractFrom {
-	case tykcommon.HeaderSource:
+	case apidef.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
-	case tykcommon.FormSource:
+	case apidef.FormSource:
 		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
 	}
 
@@ -207,11 +207,11 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	switch e.Config.ExtractFrom {
-	case tykcommon.HeaderSource:
+	case apidef.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
-	case tykcommon.BodySource:
+	case apidef.BodySource:
 		extractorOutput, err = e.ExtractBody(r)
-	case tykcommon.FormSource:
+	case apidef.FormSource:
 		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
 	}
 
@@ -281,11 +281,11 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	switch e.Config.ExtractFrom {
-	case tykcommon.HeaderSource:
+	case apidef.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
-	case tykcommon.BodySource:
+	case apidef.BodySource:
 		extractorOutput, err = e.ExtractBody(r)
-	case tykcommon.FormSource:
+	case apidef.FormSource:
 		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
 	}
 
@@ -340,11 +340,11 @@ func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
 
 	// Initialize a extractor based on the API spec.
 	switch referenceSpec.CustomMiddleware.IdExtractor.ExtractWith {
-	case tykcommon.ValueExtractor:
+	case apidef.ValueExtractor:
 		extractor = &ValueExtractor{baseExtractor}
-	case tykcommon.RegexExtractor:
+	case apidef.RegexExtractor:
 		extractor = &RegexExtractor{baseExtractor}
-	case tykcommon.XPathExtractor:
+	case apidef.XPathExtractor:
 		extractor = &XPathExtractor{baseExtractor}
 	}
 

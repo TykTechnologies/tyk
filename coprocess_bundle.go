@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"archive/zip"
 	"bytes"
@@ -33,7 +33,7 @@ type Bundle struct {
 	Data     []byte
 	Path     string
 	Spec     *APISpec
-	Manifest tykcommon.BundleManifest
+	Manifest apidef.BundleManifest
 }
 
 func (b *Bundle) Verify() (err error) {

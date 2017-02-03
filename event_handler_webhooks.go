@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type WebHookRequestMethod string
@@ -27,7 +27,7 @@ const (
 	WH_PATCH  WebHookRequestMethod = "PATCH"
 
 	// Define the Event Handler name so we can register it
-	EH_WebHook tykcommon.TykEventHandlerName = "eh_web_hook_handler"
+	EH_WebHook apidef.TykEventHandlerName = "eh_web_hook_handler"
 )
 
 type WebHookHandlerConf struct {

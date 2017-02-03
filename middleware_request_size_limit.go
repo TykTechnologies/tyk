@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
@@ -104,7 +104,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestSizeLimit)
 	if found {
 		log.Debug("Request size limit matched for this URL, checking...")
-		rmeta := meta.(*tykcommon.RequestSizeMeta)
+		rmeta := meta.(*apidef.RequestSizeMeta)
 		return t.checkRequestLimit(r, rmeta.SizeLimit)
 	}
 

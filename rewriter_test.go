@@ -3,13 +3,13 @@ package main
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestRewriter(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "test/straight/rewrite",
@@ -33,7 +33,7 @@ func TestRewriter(t *testing.T) {
 func TestRewriterWithOneVal(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "test/val/(.*)",
@@ -57,7 +57,7 @@ func TestRewriterWithOneVal(t *testing.T) {
 func TestRewriterWithThreeVals(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "test/val/(.*)/space/(.*)/and/then/(.*)",
@@ -81,7 +81,7 @@ func TestRewriterWithThreeVals(t *testing.T) {
 func TestRewriterWithReverse(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "test/val/(.*)/space/(.*)/and/then/(.*)",
@@ -105,7 +105,7 @@ func TestRewriterWithReverse(t *testing.T) {
 func TestRewriterWithMissing(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "test/val/(.*)/space/(.*)/and/then/(.*)",
@@ -129,7 +129,7 @@ func TestRewriterWithMissing(t *testing.T) {
 func TestRewriterWithMissingAgain(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "test/val/(.*)/space/(.*)/and/then/(.*)",
@@ -153,7 +153,7 @@ func TestRewriterWithMissingAgain(t *testing.T) {
 func TestRewriterWithQS(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "(.*)",
@@ -177,7 +177,7 @@ func TestRewriterWithQS(t *testing.T) {
 func TestRewriterWithQS2(t *testing.T) {
 	rw := URLRewriter{}
 
-	testConf := tykcommon.URLRewriteMeta{
+	testConf := apidef.URLRewriteMeta{
 		Path:         "",
 		Method:       "",
 		MatchPattern: "test/val/(.*)/space/(.*)/and/then(.*)",

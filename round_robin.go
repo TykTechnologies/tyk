@@ -1,14 +1,14 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type RoundRobin struct {
 	pos, max, cur int
 }
 
-func (r *RoundRobin) SetMax(rp *tykcommon.HostList) {
+func (r *RoundRobin) SetMax(rp *apidef.HostList) {
 	if r.max = rp.Len() - 1; r.max < 0 {
 		r.max = 0
 	}

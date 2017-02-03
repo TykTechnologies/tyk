@@ -3,7 +3,7 @@ package main
 import "net/http"
 
 import (
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 )
 
@@ -33,12 +33,12 @@ func (a *TrackEndpointMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 	_, versionPaths, _, _ := a.TykMiddleware.Spec.GetVersionData(r)
 	foundTracked, metaTrack := a.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestTracked)
 	if foundTracked {
-		context.Set(r, TrackThisEndpoint, metaTrack.(*tykcommon.TrackEndpointMeta).Path)
+		context.Set(r, TrackThisEndpoint, metaTrack.(*apidef.TrackEndpointMeta).Path)
 	}
 
 	foundDnTrack, meta_dnTrack := a.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestNotTracked)
 	if foundDnTrack {
-		context.Set(r, DoNotTrackThisEndpoint, meta_dnTrack.(*tykcommon.TrackEndpointMeta).Path)
+		context.Set(r, DoNotTrackThisEndpoint, meta_dnTrack.(*apidef.TrackEndpointMeta).Path)
 	}
 
 	return nil, 200

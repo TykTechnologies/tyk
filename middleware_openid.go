@@ -11,7 +11,7 @@ import (
 
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/openid2go/openid"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 )
@@ -208,7 +208,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 
 	// 4. Set session state on context, we will need it later
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
-	case tykcommon.OIDCUser, tykcommon.UnsetAuth:
+	case apidef.OIDCUser, apidef.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, SessionID)
 	}

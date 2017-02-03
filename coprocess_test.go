@@ -13,8 +13,8 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
 )
@@ -159,7 +159,7 @@ type httpbinHeadersResponse struct {
 	Headers map[string]string `json:"headers"`
 }
 
-func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver tykcommon.MiddlewareDriver) http.Handler {
+func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver apidef.MiddlewareDriver) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -172,7 +172,7 @@ func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.Hook
 func TestCoProcessMiddleware(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 
-	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
+	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", session, 60)
@@ -198,7 +198,7 @@ func TestCoProcessMiddleware(t *testing.T) {
 func TestCoProcessObjectPostProcess(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 
-	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, tykcommon.MiddlewareDriver("python"))
+	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", session, 60)
@@ -274,7 +274,7 @@ func TestCoProcessAuth(t *testing.T) {
 	t.Log("CP AUTH")
 	spec := createSpecTest(t, protectedCoProcessDef)
 
-	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, tykcommon.MiddlewareDriver("python"))
+	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, apidef.MiddlewareDriver("python"))
 
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", session, 60)
