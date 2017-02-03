@@ -81,12 +81,6 @@
 			"revisionTime": "2016-12-01T17:12:18Z"
 		},
 		{
-			"checksumSHA1": "GvjUf4roQySScpjXIPpg7RsqE4k=",
-			"path": "github.com/TykTechnologies/tykcommon-logger",
-			"revision": "7bae07354ebad4c0feff3617b9f530af9b0c3aa9",
-			"revisionTime": "2016-12-01T17:11:51Z"
-		},
-		{
 			"checksumSHA1": "fCQppNcKbizZxVrO/AquOQKHcbk=",
 			"path": "github.com/alicebob/miniredis",
 			"revision": "10ddf01f45bee3c40d1af5dbaad9aa71e6f20835",
