@@ -9,12 +9,10 @@ import (
 	"net/url"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis"
 	"github.com/justinas/alice"
 )
 
@@ -23,21 +21,16 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-	s, err := miniredis.Run()
-	if err != nil {
-		panic(err)
-	}
 	WriteDefaultConf(&config)
+	var err error
 	config.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	if err != nil {
 		panic(err)
 	}
-	config.Storage.Port, _ = strconv.Atoi(s.Port())
 	config.EnableAnalytics = true
 	initialiseSystem(map[string]interface{}{})
 	exitCode := m.Run()
 
-	s.Close()
 	os.RemoveAll(config.AppPath)
 	os.Exit(exitCode)
 }
