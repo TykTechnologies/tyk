@@ -75,12 +75,6 @@
 			"revisionTime": "2016-08-17T21:35:54Z"
 		},
 		{
-			"checksumSHA1": "hOr2Xd3wlrIMZyQxwAcy2saINAA=",
-			"path": "github.com/TykTechnologies/tykcommon",
-			"revision": "94bf3370ac7827e0bb16e0fafbe8fa37bdc1c2b4",
-			"revisionTime": "2016-12-01T17:12:18Z"
-		},
-		{
 			"checksumSHA1": "fCQppNcKbizZxVrO/AquOQKHcbk=",
 			"path": "github.com/alicebob/miniredis",
 			"revision": "10ddf01f45bee3c40d1af5dbaad9aa71e6f20835",

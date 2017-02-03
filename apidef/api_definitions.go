@@ -1,7 +1,8 @@
-package tykcommon
+package apidef
 
 import (
 	"encoding/base64"
+
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -32,13 +33,13 @@ const (
 
 	OttoDriver   MiddlewareDriver = "otto"
 	PythonDriver MiddlewareDriver = "python"
-	LuaDriver MiddlewareDriver = "lua"
-	GrpcDriver MiddlewareDriver = "grpc"
+	LuaDriver    MiddlewareDriver = "lua"
+	GrpcDriver   MiddlewareDriver = "grpc"
 
-	BodySource IdExtractorSource = "body"
-	HeaderSource IdExtractorSource = "header"
+	BodySource        IdExtractorSource = "body"
+	HeaderSource      IdExtractorSource = "header"
 	QuerystringSource IdExtractorSource = "querystring"
-	FormSource IdExtractorSource = "form"
+	FormSource        IdExtractorSource = "form"
 
 	ValueExtractor IdExtractorType = "value"
 	XPathExtractor IdExtractorType = "xpath"
@@ -94,8 +95,8 @@ type HardTimeoutMeta struct {
 }
 
 type TrackEndpointMeta struct {
-	Path    string `bson:"path" json:"path"`
-	Method  string `bson:"method" json:"method"`
+	Path   string `bson:"path" json:"path"`
+	Method string `bson:"method" json:"method"`
 }
 
 type RequestSizeMeta struct {
@@ -149,8 +150,8 @@ type ExtendedPathsSet struct {
 	Virtual                 []VirtualMeta         `bson:"virtual" json:"virtual,omitempty"`
 	SizeLimit               []RequestSizeMeta     `bson:"size_limits" json:"size_limits,omitempty"`
 	MethodTransforms        []MethodTransformMeta `bson:"method_transforms" json:"method_transforms,omitempty"`
-	TrackEndpoints          []TrackEndpointMeta `bson:"track_endpoints" json:"track_endpoints,omitempty"`
-	DoNotTrackEndpoints 	[]TrackEndpointMeta `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
+	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
+	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 }
 
 type VersionInfo struct {
@@ -197,10 +198,10 @@ type MiddlewareDefinition struct {
 }
 
 type MiddlewareIdExtractor struct {
-	ExtractFrom	IdExtractorSource	`bson:"extract_from" json:"extract_from"`
-	ExtractWith IdExtractorType	`bson:"extract_with" json:"extract_with"`
-	ExtractorConfig map[string]interface{}	`bson:"extractor_config" json:"extractor_config"`
-	Extractor interface{}	`bson:"-" json:"-"`
+	ExtractFrom     IdExtractorSource      `bson:"extract_from" json:"extract_from"`
+	ExtractWith     IdExtractorType        `bson:"extract_with" json:"extract_with"`
+	ExtractorConfig map[string]interface{} `bson:"extractor_config" json:"extractor_config"`
+	Extractor       interface{}            `bson:"-" json:"-"`
 }
 
 type MiddlewareSection struct {
@@ -210,7 +211,7 @@ type MiddlewareSection struct {
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
-	IdExtractor MiddlewareIdExtractor	 `bson:"id_extractor" json:"id_extractor"`
+	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
 }
 
 type CacheOptions struct {
@@ -322,7 +323,7 @@ type APIDefinition struct {
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota              bool                   `bson:"disable_quota" json:"disable_quota"`
 	CustomMiddleware          MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
-	CustomMiddlewareBundle 	string							 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
+	CustomMiddlewareBundle    string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
 	CacheOptions              CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetime           int64                  `bson:"session_lifetime" json:"session_lifetime"`
 	Active                    bool                   `bson:"active" json:"active"`
@@ -354,10 +355,10 @@ type APIDefinition struct {
 }
 
 type BundleManifest struct {
-	FileList	[]string	`bson:"file_list" json:"file_list"`
-	CustomMiddleware MiddlewareSection	`bson:"custom_middleware" json:"custom_middleware"`
-	Checksum	string	`bson:"checksum" json:"checksum"`
-	Signature string	`bson:"signature" json:"signature"`
+	FileList         []string          `bson:"file_list" json:"file_list"`
+	CustomMiddleware MiddlewareSection `bson:"custom_middleware" json:"custom_middleware"`
+	Checksum         string            `bson:"checksum" json:"checksum"`
+	Signature        string            `bson:"signature" json:"signature"`
 }
 
 // Clean will URL encode map[string]struct variables for saving
