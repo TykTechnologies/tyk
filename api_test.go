@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/mux"
 )
 
@@ -74,7 +74,7 @@ type apiSuccess struct {
 }
 
 type testAPIDefinition struct {
-	tykcommon.APIDefinition
+	apidef.APIDefinition
 	ID string `json:"id"`
 }
 

@@ -177,8 +177,8 @@ import (
 	"unsafe"
 
 	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tykcommon"
 )
 
 // CoProcessName declares the driver name.
@@ -219,7 +219,7 @@ func (d *PythonDispatcher) Reload() {
 }
 
 // HandleMiddlewareCache isn't used by Python.
-func (d *PythonDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
 	var CBundlePath *C.char
 	CBundlePath = C.CString(basePath)
 	C.Python_HandleMiddlewareCache(CBundlePath)

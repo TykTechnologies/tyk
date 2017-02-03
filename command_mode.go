@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/lonelycode/go-uuid/uuid"
 )
 
@@ -102,7 +102,7 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 	}
 }
 
-func printDef(def *tykcommon.APIDefinition) {
+func printDef(def *apidef.APIDefinition) {
 	asJson, err := json.MarshalIndent(def, "", "    ")
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
@@ -113,8 +113,8 @@ func printDef(def *tykcommon.APIDefinition) {
 	fmt.Printf(fixed)
 }
 
-func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock bool) (*tykcommon.APIDefinition, error) {
-	ad := tykcommon.APIDefinition{
+func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
+	ad := apidef.APIDefinition{
 		Name:             bp.Name,
 		Active:           true,
 		UseKeylessAccess: true,
@@ -123,7 +123,7 @@ func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock
 	}
 	ad.VersionDefinition.Key = "version"
 	ad.VersionDefinition.Location = "header"
-	ad.VersionData.Versions = make(map[string]tykcommon.VersionInfo)
+	ad.VersionData.Versions = make(map[string]apidef.VersionInfo)
 	ad.Proxy.ListenPath = "/" + ad.APIID + "/"
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL
@@ -162,8 +162,8 @@ func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
 	return blueprint.(*BluePrintAST), nil
 }
 
-func apiDefLoadFile(filePath string) (*tykcommon.APIDefinition, error) {
-	def := &tykcommon.APIDefinition{}
+func apiDefLoadFile(filePath string) (*apidef.APIDefinition, error) {
+	def := &apidef.APIDefinition{}
 
 	defFileData, err := ioutil.ReadFile(filePath)
 

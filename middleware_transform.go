@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/context"
 	"golang.org/x/net/html/charset"
@@ -61,7 +61,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Put into an interface:
 		var bodyData interface{}
 		switch tmeta.TemplateMeta.TemplateData.Input {
-		case tykcommon.RequestXML:
+		case apidef.RequestXML:
 			mxj.XmlCharsetReader = WrappedCharsetReader
 			var err error
 			bodyData, err = mxj.NewMapXml(body) // unmarshal
@@ -73,7 +73,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 					"path":        r.URL.Path,
 				}).Error("Error unmarshalling XML: ", err)
 			}
-		case tykcommon.RequestJSON:
+		case apidef.RequestJSON:
 			json.Unmarshal(body, &bodyData)
 		default:
 			// unset, assume an open field

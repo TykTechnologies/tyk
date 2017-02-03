@@ -9,31 +9,31 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/rubyist/circuitbreaker"
 	"gopkg.in/mgo.v2/bson"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
 const (
-	EH_LogHandler tykcommon.TykEventHandlerName = "eh_log_handler"
+	EH_LogHandler apidef.TykEventHandlerName = "eh_log_handler"
 )
 
 // Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
-	EVENT_QuotaExceeded     tykcommon.TykEvent = "QuotaExceeded"
-	EVENT_RateLimitExceeded tykcommon.TykEvent = "RatelimitExceeded"
-	EVENT_AuthFailure       tykcommon.TykEvent = "AuthFailure"
-	EVENT_KeyExpired        tykcommon.TykEvent = "KeyExpired"
-	EVENT_VersionFailure    tykcommon.TykEvent = "VersionFailure"
-	EVENT_OrgQuotaExceeded  tykcommon.TykEvent = "OrgQuotaExceeded"
-	EVENT_TriggerExceeded   tykcommon.TykEvent = "TriggerExceeded"
-	EVENT_BreakerTriggered  tykcommon.TykEvent = "BreakerTriggered"
-	EVENT_HOSTDOWN          tykcommon.TykEvent = "HostDown"
-	EVENT_HOSTUP            tykcommon.TykEvent = "HostUp"
-	EVENT_TokenCreated      tykcommon.TykEvent = "TokenCreated"
-	EVENT_TokenUpdated      tykcommon.TykEvent = "TokenUpdated"
-	EVENT_TokenDeleted      tykcommon.TykEvent = "TokenDeleted"
+	EVENT_QuotaExceeded     apidef.TykEvent = "QuotaExceeded"
+	EVENT_RateLimitExceeded apidef.TykEvent = "RatelimitExceeded"
+	EVENT_AuthFailure       apidef.TykEvent = "AuthFailure"
+	EVENT_KeyExpired        apidef.TykEvent = "KeyExpired"
+	EVENT_VersionFailure    apidef.TykEvent = "VersionFailure"
+	EVENT_OrgQuotaExceeded  apidef.TykEvent = "OrgQuotaExceeded"
+	EVENT_TriggerExceeded   apidef.TykEvent = "TriggerExceeded"
+	EVENT_BreakerTriggered  apidef.TykEvent = "BreakerTriggered"
+	EVENT_HOSTDOWN          apidef.TykEvent = "HostDown"
+	EVENT_HOSTUP            apidef.TykEvent = "HostUp"
+	EVENT_TokenCreated      apidef.TykEvent = "TokenCreated"
+	EVENT_TokenUpdated      apidef.TykEvent = "TokenUpdated"
+	EVENT_TokenDeleted      apidef.TykEvent = "TokenDeleted"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -114,7 +114,7 @@ type EVENT_TokenMeta struct {
 
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
-	EventType     tykcommon.TykEvent
+	EventType     apidef.TykEvent
 	EventMetaData interface{}
 	TimeStamp     string
 }
@@ -135,7 +135,7 @@ func EncodeRequestToEvent(r *http.Request) string {
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
-func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec *APISpec) (TykEventHandler, error) {
+func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, Spec *APISpec) (TykEventHandler, error) {
 
 	var conf interface{}
 	switch handlerConf.HandlerMeta.(type) {
@@ -184,7 +184,7 @@ func GetEventHandlerByName(handlerConf tykcommon.EventHandlerTriggerConfig, Spec
 }
 
 // FireEvent is added to the tykMiddleware object so it is available across the entire stack
-func (t *TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
+func (t *TykMiddleware) FireEvent(eventName apidef.TykEvent, eventMetaData interface{}) {
 
 	log.Debug("EVENT FIRED")
 	handlers, handlerExists := t.Spec.EventPaths[eventName]
@@ -203,7 +203,7 @@ func (t *TykMiddleware) FireEvent(eventName tykcommon.TykEvent, eventMetaData in
 	}
 }
 
-func (s *APISpec) FireEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
+func (s *APISpec) FireEvent(eventName apidef.TykEvent, eventMetaData interface{}) {
 
 	log.Debug("EVENT FIRED: ", eventName)
 	handlers, handlerExists := s.EventPaths[eventName]
@@ -252,8 +252,8 @@ func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
 	log.Warning(formattedMsgString)
 }
 
-func InitGenericEventHandlers(theseEvents tykcommon.EventHandlerMetaConfig) map[tykcommon.TykEvent][]TykEventHandler {
-	actualEventHandlers := make(map[tykcommon.TykEvent][]TykEventHandler)
+func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]TykEventHandler {
+	actualEventHandlers := make(map[apidef.TykEvent][]TykEventHandler)
 	for eventName, eventHandlerConfs := range theseEvents.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
@@ -272,7 +272,7 @@ func InitGenericEventHandlers(theseEvents tykcommon.EventHandlerMetaConfig) map[
 	return actualEventHandlers
 }
 
-func FireSystemEvent(eventName tykcommon.TykEvent, eventMetaData interface{}) {
+func FireSystemEvent(eventName apidef.TykEvent, eventMetaData interface{}) {
 
 	log.Debug("EVENT FIRED: ", eventName)
 	handlers, handlerExists := config.EventTriggers[eventName]

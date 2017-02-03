@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 )
@@ -44,7 +44,7 @@ func (mw *VirtualEndpoint) GetName() string {
 	return "VirtualEndpoint"
 }
 
-func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
+func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	if j == nil {
 		log.Error("No JSVM loaded, cannot init methods")
 		return
@@ -129,7 +129,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	t1 := time.Now().UnixNano()
-	vmeta := meta.(*tykcommon.VirtualMeta)
+	vmeta := meta.(*apidef.VirtualMeta)
 
 	// Create the proxy object
 	defer r.Body.Close()

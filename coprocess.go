@@ -10,8 +10,8 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tykcommon"
 
 	"bytes"
 	"errors"
@@ -32,7 +32,7 @@ type CoProcessMiddleware struct {
 	*TykMiddleware
 	HookType         coprocess.HookType
 	HookName         string
-	MiddlewareDriver tykcommon.MiddlewareDriver
+	MiddlewareDriver apidef.MiddlewareDriver
 }
 
 func (mw *CoProcessMiddleware) GetName() string {
@@ -40,7 +40,7 @@ func (mw *CoProcessMiddleware) GetName() string {
 }
 
 // CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
-func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver tykcommon.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		TykMiddleware:    tykMwSuper,
 		HookType:         hookType,
@@ -195,7 +195,7 @@ func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 
-	var supportedDrivers = []tykcommon.MiddlewareDriver{tykcommon.PythonDriver, tykcommon.LuaDriver, tykcommon.GrpcDriver}
+	var supportedDrivers = []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
 
 	for _, driver := range supportedDrivers {
 		if m.TykMiddleware.Spec.CustomMiddleware.Driver == driver && CoProcessName == string(driver) {

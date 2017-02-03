@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/clbanning/mxj"
 	"github.com/mitchellh/mapstructure"
 )
@@ -53,7 +53,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		// Put into an interface:
 		var bodyData interface{}
 		switch tmeta.TemplateMeta.TemplateData.Input {
-		case tykcommon.RequestXML:
+		case apidef.RequestXML:
 			mxj.XmlCharsetReader = WrappedCharsetReader
 			bodyData, err = mxj.NewMapXml(body) // unmarshal
 			if err != nil {
@@ -64,7 +64,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 					"path":        req.URL.Path,
 				}).Error("Error unmarshalling XML: ", err)
 			}
-		case tykcommon.RequestJSON:
+		case apidef.RequestJSON:
 			json.Unmarshal(body, &bodyData)
 		default:
 			json.Unmarshal(body, &bodyData)

@@ -78,8 +78,8 @@ import (
 	"unsafe"
 
 	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tykcommon"
 )
 
 // CoProcessName specifies the driver name.
@@ -146,7 +146,7 @@ func (d *LuaDispatcher) Reload() {
 	}
 }
 
-func (d *LuaDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+func (d *LuaDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
 	for _, f := range b.FileList {
 		fullPath := filepath.Join(basePath, f)
 		contents, err := ioutil.ReadFile(fullPath)

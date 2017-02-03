@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -141,7 +141,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Set session state on context, we will need it later
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
-	case tykcommon.BasicAuthUser, tykcommon.UnsetAuth:
+	case apidef.BasicAuthUser, apidef.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, keyName)
 	}

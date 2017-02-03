@@ -25,7 +25,7 @@ import (
 	"github.com/TykTechnologies/logrus-logstash-hook"
 	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
 	"github.com/TykTechnologies/logrus_sentry"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/docopt/docopt.go"
 	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
@@ -451,13 +451,13 @@ func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
 	Muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, []tykcommon.MiddlewareDefinition, tykcommon.MiddlewareDriver) {
+func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
 	mwPaths := []string{}
-	var mwAuthCheckFunc tykcommon.MiddlewareDefinition
-	mwPreFuncs := []tykcommon.MiddlewareDefinition{}
-	mwPostFuncs := []tykcommon.MiddlewareDefinition{}
-	mwPostKeyAuthFuncs := []tykcommon.MiddlewareDefinition{}
-	mwDriver := tykcommon.OttoDriver
+	var mwAuthCheckFunc apidef.MiddlewareDefinition
+	mwPreFuncs := []apidef.MiddlewareDefinition{}
+	mwPostFuncs := []apidef.MiddlewareDefinition{}
+	mwPostKeyAuthFuncs := []apidef.MiddlewareDefinition{}
+	mwDriver := apidef.OttoDriver
 
 	// Set AuthCheck hook
 	if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" {
@@ -504,7 +504,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("-- Middleware requires session: ", requiresSession)
-			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef := apidef.MiddlewareDefinition{}
 			mwDef.Name = middlewareObjectName
 			mwDef.Path = filePath
 			mwDef.RequireSession = requiresSession
@@ -528,7 +528,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 				"prefix": "main",
 			}).Debug("-- Middleware name ", middlewareObjectName)
 
-			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef := apidef.MiddlewareDefinition{}
 			mwDef.Name = middlewareObjectName
 			mwDef.Path = filePath
 			mwDef.RequireSession = false
@@ -558,7 +558,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("-- Middleware requires session: ", requiresSession)
-			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef := apidef.MiddlewareDefinition{}
 			mwDef.Name = middlewareObjectName
 			mwDef.Path = filePath
 			mwDef.RequireSession = requiresSession
@@ -586,7 +586,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, tykcommon.Middlewar
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("-- Middleware requires session: ", requiresSession)
-			mwDef := tykcommon.MiddlewareDefinition{}
+			mwDef := apidef.MiddlewareDefinition{}
 			mwDef.Name = middlewareObjectName
 			mwDef.Path = filePath
 			mwDef.RequireSession = requiresSession
@@ -1051,7 +1051,7 @@ func GetGlobalLocalCacheStorageHandler(KeyPrefix string, hashKeys bool) StorageH
 }
 
 func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
-	var Name tykcommon.StorageEngineCode
+	var Name apidef.StorageEngineCode
 	// Select configuration options
 	if config.SlaveOptions.UseRPC {
 		Name = RPCStorageEngine

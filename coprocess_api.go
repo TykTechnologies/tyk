@@ -19,7 +19,7 @@ import "C"
 
 import (
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
@@ -55,7 +55,7 @@ func TykTriggerEvent(CEventName *C.char, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
 	payload := C.GoString(CPayload)
 
-	FireSystemEvent(tykcommon.TykEvent(eventName), EventMetaDefault{
+	FireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
 		Message: payload,
 	})
 }

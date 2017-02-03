@@ -1,13 +1,13 @@
 package main
 
 import "testing"
-import "github.com/TykTechnologies/tykcommon"
+import "github.com/TykTechnologies/tyk/apidef"
 
 func TestRR(t *testing.T) {
 	arr1 := []string{"1", "2", "3"}
 
 	rr := RoundRobin{}
-	asHL := tykcommon.NewHostListFromList(arr1)
+	asHL := apidef.NewHostListFromList(arr1)
 	rr.SetMax(asHL)
 
 	val := rr.GetPos()

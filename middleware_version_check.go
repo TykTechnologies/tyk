@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
@@ -34,7 +34,7 @@ func (a *VersionCheck) IsEnabledForSpec() bool {
 
 func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 	// Reply with some alternate data
-	emeta := meta.(*tykcommon.EndpointMethodMeta)
+	emeta := meta.(*apidef.EndpointMethodMeta)
 	responseMessage := []byte(emeta.Data)
 	for header, value := range emeta.Headers {
 		w.Header().Add(header, value)

@@ -20,16 +20,16 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 )
 
 var ServiceCache *cache.Cache
 
-func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
+func GetURLFromService(spec *APISpec) (*apidef.HostList, error) {
 
-	doCacheRefresh := func() (*tykcommon.HostList, error) {
+	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
 		sd := ServiceDiscovery{}
@@ -44,7 +44,7 @@ func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 
 				if spec.LastGoodHostList == nil {
 					log.Warning("[PROXY][SD] Last good host list is nil, returning empty set.")
-					spec.LastGoodHostList = tykcommon.NewHostList()
+					spec.LastGoodHostList = apidef.NewHostList()
 				}
 
 				return spec.LastGoodHostList, nil
@@ -81,7 +81,7 @@ func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 	}
 
 	log.Debug("Returning from cache.")
-	return cachedServiceData.(*tykcommon.HostList), nil
+	return cachedServiceData.(*apidef.HostList), nil
 }
 
 func EnsureTransport(host string) string {
@@ -98,7 +98,7 @@ func EnsureTransport(host string) string {
 	return host
 }
 
-func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec, tryCount int) string {
+func GetNextTarget(targetData *apidef.HostList, spec *APISpec, tryCount int) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
@@ -153,7 +153,7 @@ func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec, tryCount int) 
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
 	// initialise round robin
 	spec.RoundRobin = &RoundRobin{}
-	spec.RoundRobin.SetMax(tykcommon.NewHostList())
+	spec.RoundRobin.SetMax(apidef.NewHostList())
 
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")

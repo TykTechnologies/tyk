@@ -6,18 +6,18 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tykcommon"
 )
 
 const (
-	EH_CoProcessHandler tykcommon.TykEventHandlerName = "cp_dynamic_handler"
+	EH_CoProcessHandler apidef.TykEventHandlerName = "cp_dynamic_handler"
 )
 
 type Dispatcher interface {
 	DispatchEvent([]byte)
 	LoadModules()
-	HandleMiddlewareCache(*tykcommon.BundleManifest, string)
+	HandleMiddlewareCache(*apidef.BundleManifest, string)
 	Reload()
 }
 
@@ -30,7 +30,7 @@ type CoProcessMiddleware struct {
 	*TykMiddleware
 	HookType         coprocess.HookType
 	HookName         string
-	MiddlewareDriver tykcommon.MiddlewareDriver
+	MiddlewareDriver apidef.MiddlewareDriver
 }
 
 func (m *CoProcessMiddleware) GetName() string {

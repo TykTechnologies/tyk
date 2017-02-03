@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 )
 
@@ -130,7 +130,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	// Set session state on context, we will need it later
 	switch hm.TykMiddleware.Spec.BaseIdentityProvidedBy {
-	case tykcommon.HMACKey, tykcommon.UnsetAuth:
+	case apidef.HMACKey, apidef.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
 		context.Set(r, AuthHeaderValue, fieldValues.KeyID)
 		hm.setContextVars(r, fieldValues.KeyID)
