@@ -82,8 +82,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	defer nc.Close()
 
-	err = req.Write(d)
-	if err != nil {
+	if err := req.Write(d); err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
 			"origin": GetIPFromRequest(req),

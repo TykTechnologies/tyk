@@ -1098,13 +1098,12 @@ func main() {
 	NodeID = generateRandomNodeID()
 	l, goAgainErr := goagain.Listener(onFork)
 
-	if nil != goAgainErr {
-		initialiseSystem(arguments)
-		start()
+	initialiseSystem(arguments)
+	start()
 
+	if goAgainErr != nil {
 		var err error
-		l, err = generateListener(l)
-		if err != nil {
+		if l, err = generateListener(l); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Fatalf("Error starting listener: %s", err)
@@ -1112,9 +1111,6 @@ func main() {
 
 		listen(l, goAgainErr)
 	} else {
-		initialiseSystem(arguments)
-		start()
-
 		listen(l, goAgainErr)
 
 		// Kill the parent, now that the child has started successfully.
@@ -1157,7 +1153,6 @@ func main() {
 	}
 
 	time.Sleep(3 * time.Second)
-
 }
 
 func start() {

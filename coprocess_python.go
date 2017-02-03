@@ -292,7 +292,7 @@ func getBundlePaths() []string {
 }
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
+func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 
 	workDir, _ := os.Getwd()
 
@@ -314,7 +314,7 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	PythonInit()
 	PythonLoadDispatcher()
 
-	dispatcher, err = PythonNewDispatcher(middlewarePath, eventHandlerPath, bundlePaths)
+	dispatcher, err := PythonNewDispatcher(middlewarePath, eventHandlerPath, bundlePaths)
 
 	C.PyEval_ReleaseLock()
 

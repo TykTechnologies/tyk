@@ -63,10 +63,8 @@ func TykTriggerEvent(CEventName *C.char, CPayload *C.char) {
 // CoProcessLog is a bridge for using Tyk log from CP.
 //export CoProcessLog
 func CoProcessLog(CMessage *C.char, CLogLevel *C.char) {
-	var message, logLevel string
-	message = C.GoString(CMessage)
-	logLevel = C.GoString(CLogLevel)
-
+	message := C.GoString(CMessage)
+	logLevel := C.GoString(CLogLevel)
 	switch logLevel {
 	case "debug":
 		log.WithFields(logrus.Fields{

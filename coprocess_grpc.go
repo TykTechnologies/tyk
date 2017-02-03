@@ -30,10 +30,8 @@ type GRPCDispatcher struct {
 	coprocess.Dispatcher
 }
 
-func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
-	var grpcUrl *url.URL
-	grpcUrl, err = url.Parse(config.CoProcessOptions.CoProcessGRPCServer)
-
+func dialer(addr string, timeout time.Duration) (net.Conn, error) {
+	grpcUrl, err := url.Parse(config.CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
@@ -50,7 +48,6 @@ func dialer(addr string, timeout time.Duration) (conn net.Conn, err error) {
 	}
 
 	grpcUrlString := config.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:]
-
 	return net.DialTimeout(grpcUrl.Scheme, grpcUrlString, timeout)
 }
 
@@ -107,7 +104,6 @@ func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 }
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
-func (c *CoProcessor) Dispatch(object *coprocess.Object) (newObject *coprocess.Object, err error) {
-	newObject, err = GlobalDispatcher.DispatchObject(object)
-	return newObject, err
+func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	return GlobalDispatcher.DispatchObject(object)
 }

@@ -116,11 +116,8 @@ type HttpBundleGetter struct {
 }
 
 // Get performs an HTTP GET request.
-func (g *HttpBundleGetter) Get() (bundleData []byte, err error) {
-	var resp *http.Response
-
-	resp, err = http.Get(g.Url)
-
+func (g *HttpBundleGetter) Get() ([]byte, error) {
+	resp, err := http.Get(g.Url)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +127,7 @@ func (g *HttpBundleGetter) Get() (bundleData []byte, err error) {
 	}
 
 	defer resp.Body.Close()
-	bundleData, err = ioutil.ReadAll(resp.Body)
-	return bundleData, err
+	return ioutil.ReadAll(resp.Body)
 }
 
 // BundleSaver is an interface used by bundle saver structures.
@@ -148,33 +144,24 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 	reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
 
 	for _, f := range reader.File {
-		var rc io.ReadCloser
-		rc, err = f.Open()
-
+		rc, err := f.Open()
 		if err != nil {
 			return err
 		}
+		destPath := filepath.Join(bundlePath, f.Name)
 
-		var destPath string
-		destPath = filepath.Join(bundlePath, f.Name)
-
-		isDir := f.FileHeader.Mode().IsDir()
-
-		if isDir {
-			err = os.Mkdir(destPath, 0755)
-			if err != nil {
+		if f.FileHeader.Mode().IsDir() {
+			if err = os.Mkdir(destPath, 0755); err != nil {
 				return err
 			}
-		} else {
-			var newFile *os.File
-			newFile, err = os.Create(destPath)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(newFile, rc)
-			if err != nil {
-				return err
-			}
+			continue
+		}
+		newFile, err := os.Create(destPath)
+		if err != nil {
+			return err
+		}
+		if _, err = io.Copy(newFile, rc); err != nil {
+			return err
 		}
 	}
 	return err
@@ -191,9 +178,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		return bundle, err
 	}
 
-	var bundleUrl string
-
-	bundleUrl = strings.Join([]string{config.BundleBaseURL, spec.CustomMiddlewareBundle}, "")
+	bundleUrl := strings.Join([]string{config.BundleBaseURL, spec.CustomMiddlewareBundle}, "")
 
 	var getter BundleGetter
 
@@ -223,7 +208,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 
 // saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.
 func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
-	var bundleFormat = "zip"
+	bundleFormat := "zip"
 
 	var bundleSaver BundleSaver
 
@@ -239,20 +224,18 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 }
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
-func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) (err error) {
+func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
 
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
-	var manifestData []byte
-	manifestData, err = ioutil.ReadFile(manifestPath)
+	manifestData, err := ioutil.ReadFile(manifestPath)
 	if err != nil {
 		return err
 	}
 
 	err = json.Unmarshal(manifestData, &bundle.Manifest)
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -264,20 +247,16 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) (e
 		return err
 	}
 
-	err = bundle.Verify()
-	if err != nil {
+	if err = bundle.Verify(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
 	}
-
 	return err
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
 func loadBundle(spec *APISpec) {
-	var err error
-
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundle == "" {
 		return
@@ -285,7 +264,7 @@ func loadBundle(spec *APISpec) {
 
 	// Skip if no bundle base URL is set.
 	if config.BundleBaseURL == "" {
-		bundleError(spec, err, "No bundle base URL set, skipping bundle")
+		bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 		return
 	}
 
@@ -325,24 +304,18 @@ func loadBundle(spec *APISpec) {
 		"prefix": "main",
 	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
-	var bundle Bundle
-	bundle, err = fetchBundle(spec)
-
+	bundle, err := fetchBundle(spec)
 	if err != nil {
 		bundleError(spec, err, "Couldn't fetch bundle")
 		return
 	}
 
-	err = os.Mkdir(destPath, 0755)
-
-	if err != nil {
+	if err := os.Mkdir(destPath, 0755); err != nil {
 		bundleError(spec, err, "Couldn't create bundle directory")
 		return
 	}
 
-	err = saveBundle(&bundle, destPath, spec)
-
-	if err != nil {
+	if err := saveBundle(&bundle, destPath, spec); err != nil {
 		bundleError(spec, err, "Couldn't save bundle")
 		return
 	}
@@ -354,9 +327,7 @@ func loadBundle(spec *APISpec) {
 	// Set the destination path:
 	bundle.Path = destPath
 
-	err = loadBundleManifest(&bundle, spec, false)
-
-	if err != nil {
+	if err := loadBundleManifest(&bundle, spec, false); err != nil {
 		bundleError(spec, err, "Couldn't load bundle")
 
 		removeErr := os.RemoveAll(bundle.Path)
