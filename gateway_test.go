@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,7 +29,12 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	config.EnableAnalytics = true
-	initialiseSystem(map[string]interface{}{})
+	config.AnalyticsConfig.EnableGeoIP = true
+	config.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	initialiseSystem(nil)
+	if analytics.GeoIPDB == nil {
+		panic("GeoIPDB was not initialized")
+	}
 	exitCode := m.Run()
 
 	os.RemoveAll(config.AppPath)
