@@ -69,6 +69,8 @@ You need to have working Go enironment: see [golang.org](https://golang.org/doc/
 
 To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. If you want to just test a subset of the project, you can pass the `-run` argument with name of the test. Note that logs are hidden by default when running the tests, which you can override by setting `TYK_LOGLEVEL=info`.
 
+Currently in order for tests to pass, a **Redis host is required**. We know, this is terrible and should be handled with an interface, and it is, however in the current version there is a hard requirement for the application to have its default memory setup to use redis as part of a deployment, this is to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement. Simplest way to run Redis is to use official Docker image [https://hub.docker.com/_/redis/](https://hub.docker.com/_/redis/)
+
 ### Adding dependencies
 
 If your patch depends on new packages, ensure that they will be put in `/vendor` folder. Here at Tyk we use `govendor` for managing our dependencies. Adding new dependencies can be done using following command: `govendor fetch github.com/alicebob/miniredis`.

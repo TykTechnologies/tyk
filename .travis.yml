@@ -22,6 +22,9 @@ matrix:
       env: LATEST_GO=true # run linters and report coverage
     - go: 1.8rc3
 
+services:
+  - redis-server
+
 install:
   - go install ./...
   - go get -u golang.org/x/tools/cmd/goimports github.com/{wadey/gocovmerge,mattn/goveralls}
