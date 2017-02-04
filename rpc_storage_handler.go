@@ -148,9 +148,12 @@ func (r *RPCStorageHandler) checkDisconnect() {
 func (r *RPCStorageHandler) ReConnect() {
 	// Should only be used by reload checker
 	// r.Disconnect()
-	RPCClientIsConnected = false
-	r.Connect()
-	log.Info("Reconnected.")
+
+	return
+
+	// RPCClientIsConnected = false
+	// r.Connect()
+	// log.Info("Reconnected.")
 }
 
 var RPCCLientSingleton *gorpc.Client
