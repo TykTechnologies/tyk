@@ -16,7 +16,9 @@ type Purger interface {
 
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
-type RPCPurger struct {}
+type RPCPurger struct {
+	Store     *RedisClusterStorageManager
+}
 
 // Connect Connects to RPC
 func (r *RPCPurger) Connect() {
@@ -44,7 +46,7 @@ func (r RPCPurger) StartPurgeLoop(nextCount int) {
 func (r *RPCPurger) PurgeCache() {
 	//var AnalyticsValues []interface{}
 
-	AnalyticsValues := RPCListener.GetAndDeleteSet(ANALYTICS_KEYNAME)
+	AnalyticsValues := r.Store.GetAndDeleteSet(ANALYTICS_KEYNAME)
 
 	if len(AnalyticsValues) > 0 {
 		keys := make([]AnalyticsRecord, len(AnalyticsValues), len(AnalyticsValues))
