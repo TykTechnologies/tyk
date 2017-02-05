@@ -150,9 +150,10 @@ func (r *RPCStorageHandler) ReConnect() {
 	// r.Disconnect()
 
 	return
-	RPCClientIsConnected = false
-	r.Connect()
-	log.Info("Reconnected.")
+
+	// RPCClientIsConnected = false
+	// r.Connect()
+	// log.Info("Reconnected.")
 }
 
 var RPCCLientSingleton *gorpc.Client
