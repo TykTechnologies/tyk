@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"time"
-	
+
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
