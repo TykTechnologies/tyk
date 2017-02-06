@@ -73,7 +73,6 @@ import "C"
 
 import (
 	"io/ioutil"
-	"path"
 	"path/filepath"
 	"unsafe"
 
@@ -134,7 +133,7 @@ func (d *LuaDispatcher) Reload() {
 	}
 
 	for _, f := range files {
-		middlewarePath := path.Join(MiddlewareBasePath, f.Name())
+		middlewarePath := filepath.Join(MiddlewareBasePath, f.Name())
 		contents, err := ioutil.ReadFile(middlewarePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -170,7 +169,7 @@ func (d *LuaDispatcher) LoadModules() {
 		gModuleCache = d.ModuleCache
 	}
 
-	middlewarePath := path.Join(ModuleBasePath, "bundle.lua")
+	middlewarePath := filepath.Join(ModuleBasePath, "bundle.lua")
 	contents, err := ioutil.ReadFile(middlewarePath)
 
 	if err == nil {

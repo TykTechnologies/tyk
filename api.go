@@ -9,7 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -689,7 +689,7 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 
 	// Create a filename
 	defFilename := newDef.APIID + ".json"
-	defFilePath := path.Join(config.AppPath, defFilename)
+	defFilePath := filepath.Join(config.AppPath, defFilename)
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err == nil {
@@ -744,7 +744,7 @@ func HandleDeleteAPI(APIID string) ([]byte, int) {
 
 	// Generate a filename
 	defFilename := APIID + ".json"
-	defFilePath := path.Join(config.AppPath, defFilename)
+	defFilePath := filepath.Join(config.AppPath, defFilename)
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {

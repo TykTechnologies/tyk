@@ -171,7 +171,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"unsafe"
@@ -296,10 +295,10 @@ func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 
 	workDir, _ := os.Getwd()
 
-	dispatcherPath := path.Join(workDir, "coprocess/python")
-	middlewarePath := path.Join(workDir, "middleware/python")
-	eventHandlerPath := path.Join(workDir, "event_handlers")
-	protoPath := path.Join(workDir, "coprocess/python/proto")
+	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
+	middlewarePath := filepath.Join(workDir, "middleware", "python")
+	eventHandlerPath := filepath.Join(workDir, "event_handlers")
+	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
 
 	paths := []string{dispatcherPath, middlewarePath, eventHandlerPath, protoPath}
 
