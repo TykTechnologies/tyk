@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -45,14 +44,6 @@ type VMReturnObject struct {
 	SessionMeta map[string]string
 	Session     SessionState
 	AuthValue   string
-}
-
-type nopCloser struct {
-	io.Reader
-}
-
-func (nopCloser) Close() error {
-	return nil
 }
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
@@ -174,10 +165,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Reconstruct the request parts
 	if newRequestData.Request.IgnoreBody {
 		r.ContentLength = int64(len(originalBody))
-		r.Body = nopCloser{bytes.NewBuffer(originalBody)}
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
 	} else {
 		r.ContentLength = int64(len(newRequestData.Request.Body))
-		r.Body = nopCloser{bytes.NewBufferString(newRequestData.Request.Body)}
+		r.Body = ioutil.NopCloser(bytes.NewBufferString(newRequestData.Request.Body))
 	}
 
 	r.URL.Path = newRequestData.Request.URL
