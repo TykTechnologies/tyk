@@ -24,7 +24,7 @@ import (
 var tykBundlePath string
 
 func init() {
-	tykBundlePath = filepath.Join(config.MiddlewarePath, "middleware/bundles")
+	tykBundlePath = filepath.Join(config.MiddlewarePath, "middleware", "bundles")
 }
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.

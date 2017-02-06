@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime/pprof"
 	"strconv"
@@ -487,7 +486,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	// Load from folder
 
 	// Get PRE folder path
-	middlwareFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "pre")
+	middlwareFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "pre")
 	files, _ := ioutil.ReadDir(middlwareFolderPath)
 	for _, f := range files {
 		if strings.Contains(f.Name(), ".js") {
@@ -515,7 +514,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	}
 
 	// Get Auth folder path
-	middlewareAuthFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "auth")
+	middlewareAuthFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "auth")
 	mwAuthFiles, _ := ioutil.ReadDir(middlewareAuthFolderPath)
 	for _, f := range mwAuthFiles {
 		if strings.Contains(f.Name(), ".js") {
@@ -541,7 +540,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	}
 
 	// Get POSTKeyAuth folder path
-	middlewarePostKeyAuthFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post_auth")
+	middlewarePostKeyAuthFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post_auth")
 	mwPostKeyAuthFiles, _ := ioutil.ReadDir(middlewarePostKeyAuthFolderPath)
 	for _, f := range mwPostKeyAuthFiles {
 		if strings.Contains(f.Name(), ".js") {
@@ -569,7 +568,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	}
 
 	// Get POST folder path
-	middlewarePostFolderPath := path.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post")
+	middlewarePostFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post")
 	mwPostFiles, _ := ioutil.ReadDir(middlewarePostFolderPath)
 	for _, f := range mwPostFiles {
 		if strings.Contains(f.Name(), ".js") {
