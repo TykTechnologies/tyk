@@ -86,9 +86,9 @@ func TestBatchSuccess(t *testing.T) {
 	r, _ := http.NewRequest("POST", "/vi/tyk/batch/", strings.NewReader(testBatchRequest))
 
 	// Test decode
-	batchRequest, decodeErr := batchHandler.DecodeBatchRequest(r)
-	if decodeErr != nil {
-		t.Error("Decode batch request body failed: ", decodeErr)
+	batchRequest, err := batchHandler.DecodeBatchRequest(r)
+	if err != nil {
+		t.Error("Decode batch request body failed: ", err)
 	}
 
 	if len(batchRequest.Requests) != 3 {
@@ -101,8 +101,8 @@ func TestBatchSuccess(t *testing.T) {
 
 	// Test request constructions:
 
-	requestSet, createReqErr := batchHandler.ConstructRequests(batchRequest, false)
-	if createReqErr != nil {
+	requestSet, err := batchHandler.ConstructRequests(batchRequest, false)
+	if err != nil {
 		t.Error("Batch request creation failed , request structure malformed")
 	}
 

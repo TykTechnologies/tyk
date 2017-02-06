@@ -34,9 +34,9 @@ func (l *JSVMEventHandler) New(handlerConf interface{}) (TykEventHandler, error)
 		OrgID: l.Spec.OrgID,
 	}
 
-	gValAsJSON, gErr := json.Marshal(globalVals)
-	if gErr != nil {
-		log.Error("Failed to marshal globals! ", gErr)
+	gValAsJSON, err := json.Marshal(globalVals)
+	if err != nil {
+		log.Error("Failed to marshal globals! ", err)
 	}
 
 	handler.SpecJSON = string(gValAsJSON)
@@ -50,9 +50,9 @@ func (l *JSVMEventHandler) HandleEvent(em EventMessage) {
 	methodName := l.conf["name"].(string)
 
 	// 2. JSON-encode the event data object
-	msgAsJSON, encErr := json.Marshal(em)
-	if encErr != nil {
-		log.Error("Failed to encode event data: ", encErr)
+	msgAsJSON, err := json.Marshal(em)
+	if err != nil {
+		log.Error("Failed to encode event data: ", err)
 		return
 	}
 

@@ -29,13 +29,13 @@ func (u *RedisNotificationHandler) Start() {
 }
 
 func (u *RedisNotificationHandler) Notify(n InterfaceNotification) error {
-	json_err, encErr := json.Marshal(n)
-	if encErr != nil {
-		return encErr
+	jsonError, err := json.Marshal(n)
+	if err != nil {
+		return err
 	}
 
 	if u.CacheStore != nil {
-		u.CacheStore.Publish(UIChanName, string(json_err))
+		u.CacheStore.Publish(UIChanName, string(jsonError))
 	}
 
 	return nil

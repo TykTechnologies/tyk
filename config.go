@@ -261,11 +261,10 @@ func WriteDefaultConf(conf *Config) {
 	conf.UseAsyncSessionWrite = false
 	conf.HideGeneratorHeader = false
 	conf.OauthRedirectUriSeparator = ""
-	newConfig, err := json.MarshalIndent(conf, "", "    ")
-	overrideErr := envconfig.Process(ENV_PREVIX, conf)
-	if overrideErr != nil {
-		log.Error("Failed to process environment variables: ", overrideErr)
+	if err := envconfig.Process(ENV_PREVIX, conf); err != nil {
+		log.Error("Failed to process environment variables: ", err)
 	}
+	newConfig, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
 		log.Error("Problem marshalling default configuration!")
 		log.Error(err)
@@ -294,9 +293,8 @@ func loadConfig(filePath string, conf *Config) {
 			log.Error(err)
 		}
 
-		overrideErr := envconfig.Process(ENV_PREVIX, conf)
-		if overrideErr != nil {
-			log.Error("Failed to process environment variables after file load: ", overrideErr)
+		if err := envconfig.Process(ENV_PREVIX, conf); err != nil {
+			log.Error("Failed to process environment variables after file load: ", err)
 		}
 	}
 

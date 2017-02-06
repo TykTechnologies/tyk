@@ -53,10 +53,9 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
 		log.Debug("Checking: ", r.URL.Path)
 		log.Debug("Against: ", accessSpec.URL)
-		asRegex, regexpErr := regexp.Compile(accessSpec.URL)
-
-		if regexpErr != nil {
-			log.Error("Regex error: ", regexpErr)
+		asRegex, err := regexp.Compile(accessSpec.URL)
+		if err != nil {
+			log.Error("Regex error: ", err)
 			return nil, 200
 		}
 

@@ -83,10 +83,9 @@ func (h *HTTPDashboardHandler) Register() error {
 	c := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	response, reqErr := c.Do(newRequest)
-
-	if reqErr != nil {
-		log.Error("Request failed: ", reqErr)
+	response, err := c.Do(newRequest)
+	if err != nil {
+		log.Error("Request failed: ", err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
@@ -106,10 +105,9 @@ func (h *HTTPDashboardHandler) Register() error {
 	}
 
 	val := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &val)
-	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
-		return decErr
+	if err := json.Unmarshal(retBody, &val); err != nil {
+		log.Error("Failed to decode body: ", err)
+		return err
 	}
 
 	// Set the NodeID
@@ -170,9 +168,8 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 	c := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	response, reqErr := c.Do(newRequest)
-
-	if reqErr != nil || response.StatusCode != 200 {
+	response, err := c.Do(newRequest)
+	if err != nil || response.StatusCode != 200 {
 		return errors.New("dashboard is down? Heartbeat is failing")
 	}
 
@@ -184,10 +181,9 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) err
 	}
 
 	val := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &val)
-	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
-		return decErr
+	if err := json.Unmarshal(retBody, &val); err != nil {
+		log.Error("Failed to decode body: ", err)
+		return err
 	}
 
 	// Set the nonce
@@ -220,11 +216,10 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	c := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	response, reqErr := c.Do(newRequest)
-
-	if reqErr != nil {
-		log.Error("Dashboard is down? Failed fo de-register: ", reqErr)
-		return reqErr
+	response, err := c.Do(newRequest)
+	if err != nil {
+		log.Error("Dashboard is down? Failed fo de-register: ", err)
+		return err
 	}
 
 	if response.StatusCode != 200 {
@@ -240,10 +235,9 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	}
 
 	val := NodeResponseOK{}
-	decErr := json.Unmarshal(retBody, &val)
-	if decErr != nil {
-		log.Error("Failed to decode body: ", decErr)
-		return decErr
+	if err := json.Unmarshal(retBody, &val); err != nil {
+		log.Error("Failed to decode body: ", err)
+		return err
 	}
 
 	// Set the nonce

@@ -87,16 +87,15 @@ func (r *RPCPurger) PurgeCache() {
 			}
 		}
 
-		data, dErr := json.Marshal(keys)
-		if dErr != nil {
+		data, err := json.Marshal(keys)
+		if err != nil {
 			log.Error("Failed to marshal analytics data")
 			return
 		}
 
 		// Send keys to RPC
-		_, callErr := r.Client.Call("PurgeAnalyticsData", string(data))
-		if callErr != nil {
-			log.Error("Failed to call purge (reconnecting): ", callErr)
+		if _, err := r.Client.Call("PurgeAnalyticsData", string(data)); err != nil {
+			log.Error("Failed to call purge (reconnecting): ", err)
 			r.ReConnect()
 		}
 	}

@@ -173,12 +173,12 @@ func setupGlobals() {
 	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
 
 	if config.Monitor.EnableTriggerMonitors {
-		var monitorErr error
-		MonitoringHandler, monitorErr = (&WebHookHandler{}).New(config.Monitor.Config)
-		if monitorErr != nil {
+		var err error
+		MonitoringHandler, err = (&WebHookHandler{}).New(config.Monitor.Config)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Error("Failed to initialise monitor! ", monitorErr)
+			}).Error("Failed to initialise monitor! ", err)
 		}
 	}
 
@@ -956,12 +956,10 @@ func initialiseSystem(arguments map[string]interface{}) {
 	}).Info("PIDFile location set to: ", config.PIDFileLocation)
 
 	pidfile.SetPidfilePath(config.PIDFileLocation)
-	pfErr := pidfile.Write()
-
-	if pfErr != nil {
+	if err := pidfile.Write(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Error("Failed to write PIDFile: ", pfErr)
+		}).Error("Failed to write PIDFile: ", err)
 	}
 
 	GetHostDetails()

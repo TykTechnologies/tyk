@@ -53,7 +53,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 		var tmpl *template.Template
 		templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
 
-		// templateError := templates.ExecuteTemplate(w, templateName, &apiErr)
+		// templateError := templates.ExecuteTemplate(w, templateName, &apiError)
 
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
 		tmpl = templates.Lookup(templateName)
@@ -74,8 +74,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 		// Need to return the correct error code!
 		w.WriteHeader(errCode)
 
-		apiErr := APIError{fmt.Sprintf("%s", err)}
-		tmpl.Execute(w, &apiErr)
+		apiError := APIError{fmt.Sprintf("%s", err)}
+		tmpl.Execute(w, &apiError)
 
 		if doMemoryProfile {
 			pprof.WriteHeapProfile(profileFile)
@@ -225,7 +225,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 	}
 
 	var ip string
-	if clientIP, _, derr := net.SplitHostPort(r.RemoteAddr); derr == nil {
+	if clientIP, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		// If we aren't the first proxy retain prior
 		// X-Forwarded-For information as a comma+space
 		// separated list and fold multiple headers into one.
@@ -246,8 +246,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 
 	log.Debug("Returning error header")
 	w.WriteHeader(errCode)
-	apiErr := APIError{fmt.Sprintf("%s", err)}
-	templates.ExecuteTemplate(w, "error.json", &apiErr)
+	apiError := APIError{fmt.Sprintf("%s", err)}
+	templates.ExecuteTemplate(w, "error.json", &apiError)
 	if doMemoryProfile {
 		pprof.WriteHeapProfile(profileFile)
 	}

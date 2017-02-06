@@ -191,10 +191,10 @@ func (r *RedisClusterStorageManager) SetKey(keyName string, sessionState string,
 	}
 	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", r.fixKey(keyName), sessionState)
 	if timeout > 0 {
-		_, expErr := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", r.fixKey(keyName), timeout)
-		if expErr != nil {
-			log.Error("Could not EXPIRE key: ", expErr)
-			return expErr
+		_, err := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", r.fixKey(keyName), timeout)
+		if err != nil {
+			log.Error("Could not EXPIRE key: ", err)
+			return err
 		}
 	}
 	if err != nil {
@@ -213,10 +213,10 @@ func (r *RedisClusterStorageManager) SetRawKey(keyName string, sessionState stri
 	}
 	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", keyName, sessionState)
 	if timeout > 0 {
-		_, expErr := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", keyName, timeout)
-		if expErr != nil {
-			log.Error("Could not EXPIRE key: ", expErr)
-			return expErr
+		_, err := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", keyName, timeout)
+		if err != nil {
+			log.Error("Could not EXPIRE key: ", err)
+			return err
 		}
 	}
 	if err != nil {

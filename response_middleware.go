@@ -35,9 +35,8 @@ func (r ResponseChain) Go(chain *[]TykResponseHandler, rw http.ResponseWriter, r
 	}
 
 	for _, rh := range *chain {
-		mwErr := rh.HandleResponse(rw, res, req, ses)
-		if mwErr != nil {
-			return mwErr
+		if err := rh.HandleResponse(rw, res, req, ses); err != nil {
+			return err
 		}
 	}
 

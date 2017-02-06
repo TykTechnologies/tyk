@@ -140,9 +140,6 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 
 	t1 := time.Now()
 
-	var response *http.Response
-	var respErr error
-
 	useMethod := toCheck.Method
 	if toCheck.Method == "" {
 		useMethod = "GET"
@@ -159,7 +156,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 	}
 	req.Header.Set("Connection", "close")
 
-	response, respErr = HostCheckerClient.Do(req)
+	response, err := HostCheckerClient.Do(req)
 
 	t2 := time.Now()
 
@@ -170,7 +167,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		Latency:  millisec,
 	}
 
-	if respErr != nil {
+	if err != nil {
 		report.IsTCPError = true
 		h.errorChan <- report
 		return

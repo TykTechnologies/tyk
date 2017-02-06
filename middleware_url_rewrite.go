@@ -16,10 +16,10 @@ type URLRewriter struct{}
 
 func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
 	// Find all the matching groups:
-	mp, mpErr := regexp.Compile(meta.MatchPattern)
-	if mpErr != nil {
-		log.Debug("Compilation error: ", mpErr)
-		return "", mpErr
+	mp, err := regexp.Compile(meta.MatchPattern)
+	if err != nil {
+		log.Debug("Compilation error: ", err)
+		return "", err
 	}
 	log.Debug("Inbound path: ", path)
 	newpath := path
@@ -176,15 +176,15 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		umeta := meta.(*apidef.URLRewriteMeta)
 		log.Debug(r.URL)
 		oldPath := r.URL.String()
-		p, pErr := m.Rewriter.Rewrite(umeta, r.URL.String(), true, r)
-		if pErr != nil {
-			return pErr, 500
+		p, err := m.Rewriter.Rewrite(umeta, r.URL.String(), true, r)
+		if err != nil {
+			return err, 500
 		}
 
 		m.CheckHostRewrite(oldPath, p, r)
 
-		newURL, uErr := url.Parse(p)
-		if uErr != nil {
+		newURL, err := url.Parse(p)
+		if err != nil {
 			log.Error("URL Rewrite failed, could not parse: ", p)
 		} else {
 			r.URL = newURL

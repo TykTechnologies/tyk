@@ -271,8 +271,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		if dont_reset == "1" {
 			suppress_reset = true
 		}
-		addUpdateErr := doAddOrUpdate(keyName, newSession, suppress_reset)
-		if addUpdateErr != nil {
+		if err := doAddOrUpdate(keyName, newSession, suppress_reset); err != nil {
 			success = false
 			responseMessage = createError("Failed to create key, ensure security settings are correct.")
 		}
@@ -698,15 +697,14 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 	}
 
 	// unmarshal the object into the file
-	asByte, mErr := json.MarshalIndent(newDef, "", "  ")
-	if mErr != nil {
-		log.Error("Marshalling of API Definition failed: ", mErr)
+	asByte, err := json.MarshalIndent(newDef, "", "  ")
+	if err != nil {
+		log.Error("Marshalling of API Definition failed: ", err)
 		return createError("Marshalling failed"), 500
 	}
 
-	wErr := ioutil.WriteFile(defFilePath, asByte, 0644)
-	if wErr != nil {
-		log.Error("Failed to create file! - ", wErr)
+	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+		log.Error("Failed to create file! - ", err)
 		success = false
 		return createError("File object creation failed, write error"), 500
 	}
@@ -907,14 +905,14 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
-	rawSessionData, sessErr := sessStore.GetRawKey(setKeyName)
+	rawSessionData, err := sessStore.GetRawKey(setKeyName)
 
-	if sessErr != nil {
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err":    sessErr,
+			"err":    err,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Key not found"}
@@ -923,13 +921,12 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	}
 
 	sess := SessionState{}
-	jsErr := json.Unmarshal([]byte(rawSessionData), &sess)
-	if jsErr != nil {
+	if err := json.Unmarshal([]byte(rawSessionData), &sess); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err":    jsErr,
+			"err":    err,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Unmarshalling failed"}
@@ -941,13 +938,13 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	sess.ApplyPolicyID = policyId
 
-	sessAsJS, encErr := json.Marshal(sess)
-	if encErr != nil {
+	sessAsJS, err := json.Marshal(sess)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err":    encErr,
+			"err":    err,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Marshalling failed"}
@@ -955,13 +952,12 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 		return responseMessage, 400
 	}
 
-	setErr := sessStore.SetRawKey(setKeyName, string(sessAsJS), 0)
-	if setErr != nil {
+	if err := sessStore.SetRawKey(setKeyName, string(sessAsJS), 0); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    keyName,
 			"status": "fail",
-			"err":    setErr,
+			"err":    err,
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Could not write key data"}
@@ -1527,14 +1523,13 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			}).Error("Failed to create OAuth client")
 		}
 
-		storeErr := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
-
-		if storeErr != nil {
+		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
 				"apiID":  newOauthClient.APIID,
 				"status": "fail",
-				"err":    storeErr,
+				"err":    err,
 			}).Error("Failed to create OAuth client")
 			responseMessage = createError("Failure in storing client data.")
 		}
@@ -1546,7 +1541,6 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			PolicyID:          newClient.GetPolicyID(),
 		}
 
-		var err error
 		responseMessage, err = json.Marshal(&reportableClientData)
 
 		if err != nil {
@@ -1611,14 +1605,14 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		storeErr := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
+		err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
 
-		if storeErr != nil {
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
 				"apiID":  APIID,
 				"status": "fail",
-				"err":    storeErr,
+				"err":    err,
 			}).Error("Failed to invalidate refresh token")
 
 			DoJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
@@ -1856,13 +1850,13 @@ func getOauthClients(APIID string) ([]byte, int) {
 		return responseMessage, 400
 	}
 
-	clientData, getClientsErr := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
-	if getClientsErr != nil {
+	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  APIID,
 			"status": "fail",
-			"err":    getClientsErr,
+			"err":    err,
 		}).Error("Failed to report OAuth client list")
 
 		success = false
@@ -1965,8 +1959,8 @@ func UserRatesCheck() http.HandlerFunc {
 		returnSession.RateLimit.Rate = userSession.Rate
 		returnSession.RateLimit.Per = userSession.Per
 
-		responseMessage, jsonErr := json.Marshal(returnSession)
-		if jsonErr != nil {
+		responseMessage, err := json.Marshal(returnSession)
+		if err != nil {
 			code = 405
 			responseMessage = createError("Failed to encode data")
 			DoJSONWrite(w, code, responseMessage)
@@ -1980,17 +1974,16 @@ func UserRatesCheck() http.HandlerFunc {
 }
 
 func getIPHelper(r *http.Request) string {
-	var ip string
-	if clientIP, _, derr := net.SplitHostPort(r.RemoteAddr); derr == nil {
+	if clientIP, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		// If we aren't the first proxy retain prior
 		// X-Forwarded-For information as a comma+space
 		// separated list and fold multiple headers into one.
 		if prior, ok := r.Header["X-Forwarded-For"]; ok {
 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
 		}
-		ip = clientIP
+		return clientIP
 	}
-	return ip
+	return ""
 }
 
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {

@@ -144,9 +144,8 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, Spec *A
 		if ok != nil {
 			log.Error("Failed to unmarshal handler meta! ", ok)
 		}
-		mErr := json.Unmarshal(asByte, &conf)
-		if mErr != nil {
-			log.Error("Return conversion failed, ", mErr)
+		if err := json.Unmarshal(asByte, &conf); err != nil {
+			log.Error("Return conversion failed, ", err)
 		}
 	default:
 		conf = handlerConf.HandlerMeta

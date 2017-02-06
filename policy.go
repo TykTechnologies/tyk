@@ -74,11 +74,10 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 		return policies
 	}
 
-	mErr := json.Unmarshal(policyConfig, &policies)
-	if mErr != nil {
+	if err := json.Unmarshal(policyConfig, &policies); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
-		}).Error("Couldn't unmarshal policies: ", mErr)
+		}).Error("Couldn't unmarshal policies: ", err)
 	}
 
 	return policies
@@ -110,10 +109,9 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Calling dashboard service for policy list")
-	response, reqErr := c.Do(newRequest)
-
-	if reqErr != nil {
-		log.Error("Policy request failed: ", reqErr)
+	response, err := c.Do(newRequest)
+	if err != nil {
+		log.Error("Policy request failed: ", err)
 
 		return policies
 	}
@@ -144,9 +142,8 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 
 	list := NodeResponseOK{}
 
-	decErr := json.Unmarshal(retBody, &list)
-	if decErr != nil {
-		log.Error("Failed to decode policy body: ", decErr, "Returned: ", string(retBody))
+	if err := json.Unmarshal(retBody, &list); err != nil {
+		log.Error("Failed to decode policy body: ", err, "Returned: ", string(retBody))
 
 		return policies
 	}

@@ -126,9 +126,9 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 			log.Debug("V is: ", string(v.([]byte)))
 			splitValues := strings.Split(string(v.([]byte)), ".")
 			if len(splitValues) > 1 {
-				vInt, cErr := strconv.Atoi(splitValues[1])
-				if cErr != nil {
-					log.Error("Couldn't convert tracked latency value to Int, vl is: ", cErr)
+				vInt, err := strconv.Atoi(splitValues[1])
+				if err != nil {
+					log.Error("Couldn't convert tracked latency value to Int, vl is: ", err)
 				} else {
 					runningTotal += vInt
 				}

@@ -67,11 +67,10 @@ type LE_ServerInfo struct {
 
 func OnLESSLStatusReceivedHandler(payload string) {
 	serverData := LE_ServerInfo{}
-	jsErr := json.Unmarshal([]byte(payload), &serverData)
-	if jsErr != nil {
+	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed unmarshal server data: ", jsErr)
+		}).Error("Failed unmarshal server data: ", err)
 		return
 	}
 

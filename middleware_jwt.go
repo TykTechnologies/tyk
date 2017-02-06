@@ -81,9 +81,8 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 			return nil, err
 		}
 
-		decErr := json.Unmarshal(contents, &jwkSet)
-		if decErr != nil {
-			log.Error("Failed to decode body JWK: ", decErr)
+		if err := json.Unmarshal(contents, &jwkSet); err != nil {
+			log.Error("Failed to decode body JWK: ", err)
 			return nil, err
 		}
 
@@ -100,9 +99,9 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 			if strings.ToLower(val.Kty) == strings.ToLower(keyType) {
 				if len(val.X5c) > 0 {
 					// Use the first cert only
-					decodedCert, decErr := b64.StdEncoding.DecodeString(val.X5c[0])
-					if decErr != nil {
-						return nil, decErr
+					decodedCert, err := b64.StdEncoding.DecodeString(val.X5c[0])
+					if err != nil {
+						return nil, err
 					}
 					log.Debug("Found cert! Replying...")
 					log.Debug("Cert was: ", string(decodedCert))
@@ -143,18 +142,18 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 
 		// Is it a URL?
 		if strings.HasPrefix(strings.ToLower(config.JWTSource), "http://") || strings.HasPrefix(strings.ToLower(config.JWTSource), "https://") {
-			secret, urlErr := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.TykMiddleware.Spec.JWTSigningMethod)
-			if urlErr != nil {
-				return nil, urlErr
+			secret, err := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.TykMiddleware.Spec.JWTSigningMethod)
+			if err != nil {
+				return nil, err
 			}
 
 			return secret, nil
 		}
 
 		// If not, return the actual value
-		decodedCert, decErr := b64.StdEncoding.DecodeString(config.JWTSource)
-		if decErr != nil {
-			return nil, decErr
+		decodedCert, err := b64.StdEncoding.DecodeString(config.JWTSource)
+		if err != nil {
+			return nil, err
 		}
 		return decodedCert, nil
 	}
@@ -330,8 +329,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 	if config.UseCookie {
 		tempRes := CopyRequest(r)
-		authCookie, notFoundErr := tempRes.Cookie(config.AuthHeaderName)
-		if notFoundErr != nil {
+		authCookie, err := tempRes.Cookie(config.AuthHeaderName)
+		if err != nil {
 			rawJWT = ""
 		} else {
 			rawJWT = authCookie.Value

@@ -125,15 +125,14 @@ func IsPayloadSignatureValid(notification Notification) bool {
 	}
 
 	if notificationVerifier != nil {
-		signed, decErr := b64.StdEncoding.DecodeString(notification.Signature)
-		if decErr != nil {
+		signed, err := b64.StdEncoding.DecodeString(notification.Signature)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
-			}).Error("Failed to decode signature: ", decErr)
+			}).Error("Failed to decode signature: ", err)
 			return false
 		}
-		err := notificationVerifier.Verify([]byte(notification.Payload), signed)
-		if err != nil {
+		if err := notificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Error("Could not verify notification: ", err, ": ", notification)

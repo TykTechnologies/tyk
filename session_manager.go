@@ -96,11 +96,10 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 				rate = uint(DRLManager.CurrentTokenValue)
 			}
 
-			userBucket, cErr := BucketStore.Create(bucketKey,
+			userBucket, err := BucketStore.Create(bucketKey,
 				rate,
 				time.Duration(currentSession.Per)*time.Second)
-
-			if cErr != nil {
+			if err != nil {
 				log.Error("Failed to create bucket!")
 				return false, 1
 			}
