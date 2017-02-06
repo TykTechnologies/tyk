@@ -307,7 +307,7 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 		}
 
 		value := kv[1]
-		value = strings.Trim(value, "\"")
+		value = strings.Trim(value, `"`)
 
 		switch key {
 		case "keyid":

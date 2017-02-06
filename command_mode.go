@@ -109,7 +109,7 @@ func printDef(def *apidef.APIDefinition) {
 	}
 
 	// The id attribute is for BSON only and breaks the parser if it's empty, cull it here.
-	fixed := strings.Replace(string(asJson), "    \"id\": \"\",", "", 1)
+	fixed := strings.Replace(string(asJson), `    "id": "",`, "", 1)
 	fmt.Printf(fixed)
 }
 

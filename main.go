@@ -70,7 +70,7 @@ var runningTests = false
 
 const (
 	// Generic system error
-	E_SYSTEM_ERROR = "{\"status\": \"system error, please contact administrator\"}"
+	E_SYSTEM_ERROR = `{"status": "system error, please contact administrator"}`
 	OAUTH_PREFIX   = "oauth-data."
 )
 
