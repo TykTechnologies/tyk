@@ -258,16 +258,15 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	c := &http.Client{
 		Timeout: 120 * time.Second,
 	}
-	response, reqErr := c.Do(newRequest)
-
-	if reqErr != nil {
-		log.Error("Request failed: ", reqErr)
+	response, err := c.Do(newRequest)
+	if err != nil {
+		log.Error("Request failed: ", err)
 		return &APISpecs
 	}
 
-	retBody, bErr := a.readBody(response)
-	if bErr != nil {
-		log.Error("Failed to read body: ", bErr)
+	retBody, err := a.readBody(response)
+	if err != nil {
+		log.Error("Failed to read body: ", err)
 		return &APISpecs
 	}
 
@@ -299,9 +298,8 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 	}
 
 	rawList := make(map[string]interface{})
-	rawdecErr := json.Unmarshal(retBody, &rawList)
-	if rawdecErr != nil {
-		log.Error("Failed to decode body (raw): ", rawdecErr)
+	if err := json.Unmarshal(retBody, &rawList); err != nil {
+		log.Error("Failed to decode body (raw): ", err)
 		return &APISpecs
 	}
 
@@ -555,18 +553,18 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMe
 		newTransformSpec := TransformSpec{TemplateMeta: stringSpec}
 
 		// Load the templates
-		var templErr error
+		var err error
 
 		switch stringSpec.TemplateData.Mode {
 		case apidef.UseFile:
 			log.Debug("-- Using File mode")
-			newTransformSpec.Template, templErr = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
+			newTransformSpec.Template, err = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
 		case apidef.UseBlob:
 			log.Debug("-- Blob mode")
-			newTransformSpec.Template, templErr = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
+			newTransformSpec.Template, err = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
 		default:
 			log.Warning("[Transform Templates] No template mode defined! Found: ", stringSpec.TemplateData.Mode)
-			templErr = errors.New("No valid template mode defined, must be either 'file' or 'blob'")
+			err = errors.New("No valid template mode defined, must be either 'file' or 'blob'")
 		}
 
 		if stat == Transformed {
@@ -575,11 +573,11 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMe
 			newSpec.TransformResponseAction = newTransformSpec
 		}
 
-		if templErr == nil {
+		if err == nil {
 			urlSpec = append(urlSpec, newSpec)
 			log.Debug("-- Loaded")
 		} else {
-			log.Error("Template load failure! Skipping transformation: ", templErr)
+			log.Error("Template load failure! Skipping transformation: ", err)
 		}
 
 	}

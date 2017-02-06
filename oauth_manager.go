@@ -97,15 +97,14 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 		delete(osinResponse.Output, "state")
 	}
 
-	redirect, rediErr := osinResponse.GetRedirectUrl()
-
-	if rediErr == nil {
+	redirect, err := osinResponse.GetRedirectUrl()
+	if err == nil {
 		// Hack to inject redirect into response
 		osinResponse.Output["redirect_to"] = redirect
 	}
 
-	respData, marshalErr := json.Marshal(&osinResponse.Output)
-	if marshalErr != nil {
+	respData, err := json.Marshal(&osinResponse.Output)
+	if err != nil {
 		return []byte{}, false
 	}
 	return respData, true
@@ -372,9 +371,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				keyName := o.API.OrgID + username
 
 				log.Debug("Updating user:", keyName)
-				sErr := o.API.SessionManager.UpdateSession(keyName, *sessionState, GetLifetime(o.API, sessionState))
-				if sErr != nil {
-					log.Error(sErr)
+				err := o.API.SessionManager.UpdateSession(keyName, *sessionState, GetLifetime(o.API, sessionState))
+				if err != nil {
+					log.Error(err)
 				}
 			}
 		}
@@ -504,18 +503,17 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 
 	log.Info("Getting client ID:", id)
 
-	clientJSON, storeErr := r.store.GetKey(key)
-
-	if storeErr != nil {
+	clientJSON, err := r.store.GetKey(key)
+	if err != nil {
 		log.Error("Failure retreiving client ID key: ", key)
-		log.Error(storeErr)
-		return nil, storeErr
+		log.Error(err)
+		return nil, err
 	}
 
 	client := new(OAuthClient)
-	if marshalErr := json.Unmarshal([]byte(clientJSON), &client); marshalErr != nil {
+	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
 		log.Error("Couldn't unmarshal OAuth client object")
-		log.Error(marshalErr)
+		log.Error(err)
 	}
 
 	return client, nil
@@ -527,18 +525,18 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 
 	key := id
 
-	clientJSON, storeErr := r.store.GetKey(key)
+	clientJSON, err := r.store.GetKey(key)
 
-	if storeErr != nil {
+	if err != nil {
 		log.Error("Failure retreiving client ID key")
-		log.Error(storeErr)
-		return nil, storeErr
+		log.Error(err)
+		return nil, err
 	}
 
 	client := new(OAuthClient)
-	if marshalErr := json.Unmarshal([]byte(clientJSON), &client); marshalErr != nil {
+	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
 		log.Error("Couldn't unmarshal OAuth client object")
-		log.Error(marshalErr)
+		log.Error(err)
 	}
 
 	return client, nil
@@ -566,10 +564,10 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 
 	for _, clientJSON := range clientJSON {
 		client := new(OAuthClient)
-		if marshalErr := json.Unmarshal([]byte(clientJSON), &client); marshalErr != nil {
+		if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
 			log.Error("Couldn't unmarshal OAuth client object")
-			log.Error(marshalErr)
-			return theseClients, marshalErr
+			log.Error(err)
+			return theseClients, err
 		}
 		theseClients = append(theseClients, client)
 	}
@@ -612,8 +610,8 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) e
 	}
 
 	// Get the raw vals:
-	clientJSON, storeErr := r.store.GetKey(key)
-	if storeErr == nil {
+	clientJSON, err := r.store.GetKey(key)
+	if err == nil {
 		log.Debug("Removing from set")
 		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
 		r.store.RemoveFromSet(KeyForSet, clientJSON)
@@ -626,9 +624,9 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) e
 
 // SaveAuthorize saves authorisation data to REdis
 func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error {
-	authDataJSON, marshalErr := json.Marshal(&authData)
-	if marshalErr != nil {
-		return marshalErr
+	authDataJSON, err := json.Marshal(&authData)
+	if err != nil {
+		return err
 	}
 	key := AUTH_PREFIX + authData.Code
 	log.Debug("Saving auth code: ", key)
@@ -641,20 +639,20 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 	key := AUTH_PREFIX + code
 	log.Debug("Loading auth code: ", key)
-	authJSON, storeErr := r.store.GetKey(key)
+	authJSON, err := r.store.GetKey(key)
 
-	if storeErr != nil {
+	if err != nil {
 		log.Error("Failure retreiving auth code key")
-		log.Error(storeErr)
-		return nil, storeErr
+		log.Error(err)
+		return nil, err
 	}
 
 	authData := osin.AuthorizeData{}
 	authData.Client = new(OAuthClient)
-	if marshalErr := json.Unmarshal([]byte(authJSON), &authData); marshalErr != nil {
+	if err := json.Unmarshal([]byte(authJSON), &authData); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadAuthorize)")
-		log.Error(marshalErr)
-		return nil, marshalErr
+		log.Error(err)
+		return nil, err
 	}
 
 	return &authData, nil
@@ -669,9 +667,9 @@ func (r *RedisOsinStorageInterface) RemoveAuthorize(code string) error {
 
 // SaveAccess will save a token and it's access data to redis
 func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) error {
-	authDataJSON, marshalErr := json.Marshal(accessData)
-	if marshalErr != nil {
-		return marshalErr
+	authDataJSON, err := json.Marshal(accessData)
+	if err != nil {
+		return err
 	}
 
 	key := ACCESS_PREFIX + accessData.AccessToken
@@ -691,17 +689,17 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	checkPolicy := true
 	if accessData.UserData != nil {
 		checkPolicy = false
-		marshalErr := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
-		if marshalErr != nil {
-			log.Info("Couldn't decode SessionState from UserData, checking policy: ", marshalErr)
+		err := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
+		if err != nil {
+			log.Info("Couldn't decode SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
 		}
 	}
 
 	if checkPolicy {
 		// defined in JWT middleware
-		sessionFromPolicy, notFoundErr := generateSessionFromPolicy(accessData.Client.GetPolicyID(), "", false)
-		if notFoundErr != nil {
+		sessionFromPolicy, err := generateSessionFromPolicy(accessData.Client.GetPolicyID(), "", false)
+		if err != nil {
 			return errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
@@ -721,9 +719,9 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
-		accessDataJSON, marshalErr := json.Marshal(accessData)
-		if marshalErr != nil {
-			return marshalErr
+		accessDataJSON, err := json.Marshal(accessData)
+		if err != nil {
+			return err
 		}
 		key := REFRESH_PREFIX + accessData.RefreshToken
 		log.Debug("Saving REFRESH key: ", key)
@@ -743,20 +741,20 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
 	key := ACCESS_PREFIX + token
 	log.Debug("Loading ACCESS key: ", key)
-	accessJSON, storeErr := r.store.GetKey(key)
+	accessJSON, err := r.store.GetKey(key)
 
-	if storeErr != nil {
+	if err != nil {
 		log.Error("Failure retreiving access token by key")
-		log.Error(storeErr)
-		return nil, storeErr
+		log.Error(err)
+		return nil, err
 	}
 
 	accessData := osin.AccessData{}
 	accessData.Client = new(OAuthClient)
-	if marshalErr := json.Unmarshal([]byte(accessJSON), &accessData); marshalErr != nil {
+	if err := json.Unmarshal([]byte(accessJSON), &accessData); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadAccess)")
-		log.Error(marshalErr)
-		return nil, marshalErr
+		log.Error(err)
+		return nil, err
 	}
 
 	return &accessData, nil
@@ -777,22 +775,22 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error) {
 	key := REFRESH_PREFIX + token
 	log.Debug("Loading REFRESH key: ", key)
-	accessJSON, storeErr := r.store.GetKey(key)
+	accessJSON, err := r.store.GetKey(key)
 
-	if storeErr != nil {
+	if err != nil {
 		log.Error("Failure retreiving access token by key")
-		log.Error(storeErr)
-		return nil, storeErr
+		log.Error(err)
+		return nil, err
 	}
 
 	// new interface means having to make this nested... ick.
 	accessData := osin.AccessData{}
 	accessData.Client = new(OAuthClient)
 
-	if marshalErr := json.Unmarshal([]byte(accessJSON), &accessData); marshalErr != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", marshalErr)
+	if err := json.Unmarshal([]byte(accessJSON), &accessData); err != nil {
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err)
 		log.Error("Decoding:", accessJSON)
-		return nil, marshalErr
+		return nil, err
 	}
 
 	return &accessData, nil
@@ -816,17 +814,17 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 	checkPolicy := true
 	if data.UserData != nil {
 		checkPolicy = false
-		marshalErr := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
-		if marshalErr != nil {
-			log.Info("[GenerateAccessToken] Couldn't decode SessionState from UserData, checking policy: ", marshalErr)
+		err := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
+		if err != nil {
+			log.Info("[GenerateAccessToken] Couldn't decode SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
 		}
 	}
 
 	if checkPolicy {
 		// defined in JWT middleware
-		sessionFromPolicy, notFoundErr := generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
-		if notFoundErr != nil {
+		sessionFromPolicy, err := generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
+		if err != nil {
 			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
 		}
 
@@ -846,20 +844,20 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, error) {
 	key := username
 	log.Debug("Loading User key: ", key)
-	accessJSON, storeErr := r.store.GetRawKey(key)
+	accessJSON, err := r.store.GetRawKey(key)
 
-	if storeErr != nil {
-		log.Error("Failure retreiving access token by key: ", storeErr)
-		return nil, storeErr
+	if err != nil {
+		log.Error("Failure retreiving access token by key: ", err)
+		return nil, err
 	}
 
 	// new interface means having to make this nested... ick.
 	session := SessionState{}
 
-	if marshalErr := json.Unmarshal([]byte(accessJSON), &session); marshalErr != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", marshalErr)
+	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err)
 		log.Error("Decoding:", accessJSON)
-		return nil, marshalErr
+		return nil, err
 	}
 
 	return &session, nil
@@ -867,16 +865,14 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, err
 
 func (r *RedisOsinStorageInterface) SetUser(username string, sessionState *SessionState, timeout int64) error {
 	key := username
-	authDataJSON, marshalErr := json.Marshal(sessionState)
-	if marshalErr != nil {
-		return marshalErr
+	authDataJSON, err := json.Marshal(sessionState)
+	if err != nil {
+		return err
 	}
 
-	storeErr := r.store.SetRawKey(key, string(authDataJSON), timeout)
-
-	if storeErr != nil {
-		log.Error("Failure setting user token by key: ", storeErr)
-		return storeErr
+	if err := r.store.SetRawKey(key, string(authDataJSON), timeout); err != nil {
+		log.Error("Failure setting user token by key: ", err)
+		return err
 	}
 
 	return nil

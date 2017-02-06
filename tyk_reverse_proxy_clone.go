@@ -171,9 +171,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 	director := func(req *http.Request) {
 		var targetSet bool
 		if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-			tempTargetURL, tErr := GetURLFromService(spec)
-			if tErr != nil {
-				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", tErr)
+			tempTargetURL, err := GetURLFromService(spec)
+			if err != nil {
+				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 			} else {
 				// No error, replace the target
 				if spec.Proxy.EnableLoadBalancing {
@@ -204,9 +204,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0))
-				if lbErr != nil {
-					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
+				lbRemote, err := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0))
+				if err != nil {
+					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 				} else {
 					// Only replace target if everything is OK
 					target = lbRemote
@@ -224,9 +224,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			if found {
 				if URLRewriteContainsTarget.(bool) {
 					log.Debug("Detected host rewrite, overriding target")
-					tmpTarget, pErr := url.Parse(req.URL.String())
-					if pErr != nil {
-						log.Error("Failed to parse URL! Err: ", pErr)
+					tmpTarget, err := url.Parse(req.URL.String())
+					if err != nil {
+						log.Error("Failed to parse URL! Err: ", err)
 					} else {
 						newTarget = tmpTarget
 						switchTargets = true
@@ -617,9 +617,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if p.TykAPISpec.ResponseHandlersActive {
 		// Middleware chain handling here - very simple, but should do the trick
-		chainErr := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
-		if chainErr != nil {
-			log.Error("Response chain failed! ", chainErr)
+		err := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
+		if err != nil {
+			log.Error("Response chain failed! ", err)
 		}
 	}
 

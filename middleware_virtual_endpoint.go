@@ -51,9 +51,9 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	}
 	if meta != nil {
 		if meta.FunctionSourceType == "file" {
-			js, loadErr := ioutil.ReadFile(meta.FunctionSourceURI)
-			if loadErr != nil {
-				log.Error("Failed to load Endpoint JS: ", loadErr)
+			js, err := ioutil.ReadFile(meta.FunctionSourceURI)
+			if err != nil {
+				log.Error("Failed to load Endpoint JS: ", err)
 			} else {
 				// No error, load the JS into the VM
 				log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
@@ -65,9 +65,9 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 				return
 			}
 
-			js, loadErr := b64.StdEncoding.DecodeString(meta.FunctionSourceURI)
-			if loadErr != nil {
-				log.Error("Failed to load blob JS: ", loadErr)
+			js, err := b64.StdEncoding.DecodeString(meta.FunctionSourceURI)
+			if err != nil {
+				log.Error("Failed to load blob JS: ", err)
 			} else {
 				// No error, load the JS into the VM
 				log.Debug("Loading JS blob")
@@ -150,22 +150,22 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	r.ParseForm()
 	requestData.Params = r.Form
 
-	asJsonRequestObj, encErr := json.Marshal(requestData)
-	if encErr != nil {
-		log.Error("Failed to encode request object for virtual endpoint: ", encErr)
+	asJsonRequestObj, err := json.Marshal(requestData)
+	if err != nil {
+		log.Error("Failed to encode request object for virtual endpoint: ", err)
 		return nil
 	}
 
 	// Encode the configuration data too
-	configData, cErr := d.GetConfig()
-	if cErr != nil {
-		log.Error("Failed to parse configuration data: ", cErr)
+	configData, err := d.GetConfig()
+	if err != nil {
+		log.Error("Failed to parse configuration data: ", err)
 		configData = make(map[string]string)
 	}
 
-	asJsonConfigData, encErr := json.Marshal(configData)
-	if encErr != nil {
-		log.Error("Failed to encode request object for virtual endpoint: ", encErr)
+	asJsonConfigData, err := json.Marshal(configData)
+	if err != nil {
+		log.Error("Failed to encode request object for virtual endpoint: ", err)
 		return nil
 	}
 
@@ -178,10 +178,9 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		authHeaderValue = context.Get(r, AuthHeaderValue).(string)
 	}
 
-	sessionAsJsonObj, sessEncErr := json.Marshal(sessionState)
-
-	if sessEncErr != nil {
-		log.Error("Failed to encode session for VM: ", sessEncErr)
+	sessionAsJsonObj, err := json.Marshal(sessionState)
+	if err != nil {
+		log.Error("Failed to encode session for VM: ", err)
 		return nil
 	}
 
@@ -192,10 +191,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Decode the return object
 	newResponseData := VMResponseObject{}
-	decErr := json.Unmarshal([]byte(returnDataStr), &newResponseData)
-
-	if decErr != nil {
-		log.Error("Failed to decode virtual endpoint response data on return from VM: ", decErr)
+	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
+		log.Error("Failed to decode virtual endpoint response data on return from VM: ", err)
 		log.Error("--> Returned: ", returnDataStr)
 		return nil
 	}
@@ -232,9 +229,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Handle response middleware
 	ResponseHandler := ResponseChain{}
 
-	chainErr := ResponseHandler.Go(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &sessionState)
-	if chainErr != nil {
-		log.Error("Response chain failed! ", chainErr)
+	if err := ResponseHandler.Go(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &sessionState); err != nil {
+		log.Error("Response chain failed! ", err)
 	}
 
 	// deep logging

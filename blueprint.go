@@ -113,12 +113,10 @@ type BluePrintAST struct {
 }
 
 func (b *BluePrintAST) ReadString(asJson string) error {
-	marshallErr := json.Unmarshal([]byte(asJson), &b)
-	if marshallErr != nil {
-		log.Error("Marshalling failed: ", marshallErr)
+	if err := json.Unmarshal([]byte(asJson), &b); err != nil {
+		log.Error("Marshalling failed: ", err)
 		return errors.New("Could not unmarshal string for Bluprint AST object")
 	}
-
 	return nil
 }
 

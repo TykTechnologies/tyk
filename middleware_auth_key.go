@@ -100,9 +100,9 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 			tempRes = CopyRequest(r)
 		}
 
-		authCookie, notFoundErr := tempRes.Cookie(cookieName)
+		authCookie, err := tempRes.Cookie(cookieName)
 		cookieValue := ""
-		if notFoundErr == nil {
+		if err == nil {
 			cookieValue = authCookie.Value
 		}
 

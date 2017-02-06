@@ -76,12 +76,10 @@ type SwaggerAST struct {
 }
 
 func (s *SwaggerAST) ReadString(asJson string) error {
-	marshallErr := json.Unmarshal([]byte(asJson), &s)
-	if marshallErr != nil {
-		log.Error("Marshalling failed: ", marshallErr)
-		return marshallErr
+	if err := json.Unmarshal([]byte(asJson), &s); err != nil {
+		log.Error("Marshalling failed: ", err)
+		return err
 	}
-
 	return nil
 }
 
@@ -153,8 +151,8 @@ func handleSwaggerMode(arguments map[string]interface{}) {
 				return
 			}
 
-			def, dErr := createDefFromSwagger(s, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
-			if dErr != nil {
+			def, err := createDefFromSwagger(s, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
+			if err != nil {
 				log.Error("Failed to create API Defintition from file")
 				return
 			}
@@ -196,9 +194,8 @@ func handleSwaggerMode(arguments map[string]interface{}) {
 			log.Error("Conversion into API Def failed: ", err)
 		}
 
-		insertErr := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string))
-		if insertErr != nil {
-			log.Error("Insertion failed: ", insertErr)
+		if err := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string)); err != nil {
+			log.Error("Insertion failed: ", err)
 			return
 		}
 
@@ -236,11 +233,10 @@ func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool
 }
 
 func swaggerLoadFile(filePath string) (*SwaggerAST, error) {
-	swagger, astErr := GetImporterForSource(SwaggerSource)
-
-	if astErr != nil {
-		log.Error("Couldn't get swagger importer: ", astErr)
-		return swagger.(*SwaggerAST), astErr
+	swagger, err := GetImporterForSource(SwaggerSource)
+	if err != nil {
+		log.Error("Couldn't get swagger importer: ", err)
+		return swagger.(*SwaggerAST), err
 	}
 
 	swaggerFileData, err := ioutil.ReadFile(filePath)
@@ -250,10 +246,9 @@ func swaggerLoadFile(filePath string) (*SwaggerAST, error) {
 		return swagger.(*SwaggerAST), err
 	}
 
-	readErr := swagger.ReadString(string(swaggerFileData))
-	if readErr != nil {
+	if err := swagger.ReadString(string(swaggerFileData)); err != nil {
 		log.Error("Failed to decode object")
-		return swagger.(*SwaggerAST), readErr
+		return swagger.(*SwaggerAST), err
 	}
 
 	return swagger.(*SwaggerAST), nil

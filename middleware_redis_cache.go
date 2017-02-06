@@ -122,9 +122,9 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 	}
 
 	if len(data) == 2 {
-		sDec, decodeErr := b64.StdEncoding.DecodeString(data[0])
-		if decodeErr != nil {
-			return "", "", decodeErr
+		sDec, err := b64.StdEncoding.DecodeString(data[0])
+		if err != nil {
+			return "", "", err
 		}
 
 		return string(sDec), data[1], nil
@@ -233,9 +233,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 					ttl := reqVal.Header.Get(UPSTREAM_CACHE_TTL_HEADER_NAME)
 					if ttl != "" {
 						log.Debug("TTL Set upstream")
-						cacheAsInt, valErr := strconv.Atoi(ttl)
-						if valErr != nil {
-							log.Error("Failed to decode TTL cache value: ", valErr)
+						cacheAsInt, err := strconv.Atoi(ttl)
+						if err != nil {
+							log.Error("Failed to decode TTL cache value: ", err)
 							cacheTTL = m.Spec.APIDefinition.CacheOptions.CacheTimeout
 						} else {
 							cacheTTL = int64(cacheAsInt)
@@ -257,8 +257,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 			}
 
-			cachedData, timestamp, decErr := m.decodePayload(retBlob)
-			if decErr != nil {
+			cachedData, timestamp, err := m.decodePayload(retBlob)
+			if err != nil {
 				// Tere was an issue with this cache entry - lets remove it:
 				m.CacheStore.DeleteKey(key)
 				return nil, 200
@@ -278,9 +278,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("Cache got: ", cachedData)
 
 			asBufioReader := bufio.NewReader(retObj)
-			newRes, resErr := http.ReadResponse(asBufioReader, r)
-			if resErr != nil {
-				log.Error("Could not create response object: ", resErr)
+			newRes, err := http.ReadResponse(asBufioReader, r)
+			if err != nil {
+				log.Error("Could not create response object: ", err)
 			}
 
 			defer newRes.Body.Close()

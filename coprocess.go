@@ -265,9 +265,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	object := coProcessor.GetObjectFromRequest(r)
 
-	returnObject, dispatchErr := coProcessor.Dispatch(object)
-
-	if dispatchErr != nil {
+	returnObject, err := coProcessor.Dispatch(object)
+	if err != nil {
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
 			return errors.New("Key not authorised"), 403
 		} else {

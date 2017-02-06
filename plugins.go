@@ -141,12 +141,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	sessionAsJsonObj, sessEncErr := json.Marshal(sessionState)
-
-	if sessEncErr != nil {
+	sessionAsJsonObj, err := json.Marshal(sessionState)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
-		}).Error("Failed to encode session for VM: ", sessEncErr)
+		}).Error("Failed to encode session for VM: ", err)
 		return nil, 200
 	}
 
@@ -162,12 +161,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Decode the return object
 	newRequestData := VMReturnObject{}
 
-	decErr := json.Unmarshal([]byte(returnDataStr), &newRequestData)
-
-	if decErr != nil {
+	if err := json.Unmarshal([]byte(returnDataStr), &newRequestData); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
-		}).Error("Failed to decode middleware request data on return from VM: ", decErr)
+		}).Error("Failed to decode middleware request data on return from VM: ", err)
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Debug(returnDataStr)
@@ -265,11 +262,11 @@ func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
 		if pathPrefix != "" {
 			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
 		}
-		js, loadErr := ioutil.ReadFile(mwPath)
-		if loadErr != nil {
+		js, err := ioutil.ReadFile(mwPath)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("Failed to load Middleware JS: ", loadErr)
+			}).Error("Failed to load Middleware JS: ", err)
 		} else {
 			// No error, load the JS into the VM
 			log.WithFields(logrus.Fields{
@@ -311,8 +308,7 @@ func (j *JSVM) LoadTykJSApi() {
 		jsonHRO := call.Argument(0).String()
 		HRO := TykJSHttpRequest{}
 		if jsonHRO != "undefined" {
-			jsonErr := json.Unmarshal([]byte(jsonHRO), &HRO)
-			if jsonErr != nil {
+			if err := json.Unmarshal([]byte(jsonHRO), &HRO); err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "jsvm",
 				}).Error("JSVM: Failed to deserialise HTTP Request object")
@@ -349,12 +345,11 @@ func (j *JSVM) LoadTykJSApi() {
 				r.Header.Add(k, v)
 			}
 			r.Close = true
-			resp, respErr := client.Do(r)
-
-			if respErr != nil {
+			resp, err := client.Do(r)
+			if err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "jsvm",
-				}).Error("[JSVM]: Request failed: ", respErr)
+				}).Error("[JSVM]: Request failed: ", err)
 				return otto.Value{}
 			}
 
@@ -366,11 +361,11 @@ func (j *JSVM) LoadTykJSApi() {
 			}
 
 			retAsStr, _ := json.Marshal(tykResp)
-			returnVal, retErr := j.VM.ToValue(string(retAsStr))
-			if retErr != nil {
+			returnVal, err := j.VM.ToValue(string(retAsStr))
+			if err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "jsvm",
-				}).Error("[JSVM]: Failed to encode return value: ", retErr)
+				}).Error("[JSVM]: Failed to encode return value: ", err)
 				return otto.Value{}
 			}
 
@@ -390,11 +385,11 @@ func (j *JSVM) LoadTykJSApi() {
 
 		byteArray, _ := handleGetDetail(apiKey, apiId)
 
-		returnVal, retErr := j.VM.ToValue(string(byteArray))
-		if retErr != nil {
+		returnVal, err := j.VM.ToValue(string(byteArray))
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to encode return value: ", retErr)
+			}).Error("[JSVM]: Failed to encode return value: ", err)
 			return otto.Value{}
 		}
 
@@ -407,9 +402,8 @@ func (j *JSVM) LoadTykJSApi() {
 		suppress_reset := call.Argument(2).String()
 
 		newSession := SessionState{}
-		decErr := json.Unmarshal([]byte(encoddedSession), &newSession)
-
-		if decErr != nil {
+		err := json.Unmarshal([]byte(encoddedSession), &newSession)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
 			}).Error("[JSVM]: Failed to decode the sesison data")
@@ -435,11 +429,11 @@ func (j *JSVM) LoadTykJSApi() {
 
 		byteArray := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 
-		returnVal, retErr := j.VM.ToValue(string(byteArray))
-		if retErr != nil {
+		returnVal, err := j.VM.ToValue(string(byteArray))
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to encode return value: ", retErr)
+			}).Error("[JSVM]: Failed to encode return value: ", err)
 			return otto.Value{}
 		}
 

@@ -60,9 +60,9 @@ func (b *DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSt
 		return newSession, false
 	}
 
-	if marshalErr := json.Unmarshal([]byte(jsonKeyVal), &newSession); marshalErr != nil {
+	if err := json.Unmarshal([]byte(jsonKeyVal), &newSession); err != nil {
 		log.Error("Couldn't unmarshal session object")
-		log.Error(marshalErr)
+		log.Error(err)
 		return newSession, false
 	}
 
@@ -139,8 +139,8 @@ func (b *DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, 
 		return session, false
 	}
 
-	if marshalErr := json.Unmarshal([]byte(jsonKeyVal), &session); marshalErr != nil {
-		log.Error("Couldn't unmarshal session object (may be cache miss): ", marshalErr)
+	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
+		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
 		return session, false
 	}
 

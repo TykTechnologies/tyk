@@ -44,9 +44,9 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 		return errors.New("Content length is required for this request"), 411
 	}
 
-	asInt, convErr := strconv.Atoi(statedCL)
-	if convErr != nil {
-		log.Error("String conversion for content length failed:", convErr)
+	asInt, err := strconv.Atoi(statedCL)
+	if err != nil {
+		log.Error("String conversion for content length failed:", err)
 		return errors.New("content length is not a valid Integer"), 400
 	}
 
@@ -88,10 +88,10 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	// Manage global headers first
 	if vInfo.GlobalSizeLimit > 0 {
 		log.Debug("Checking global limit")
-		globErr, code := t.checkRequestLimit(r, vInfo.GlobalSizeLimit)
+		err, code := t.checkRequestLimit(r, vInfo.GlobalSizeLimit)
 		// If not OK, block
 		if code != 200 {
-			return globErr, code
+			return err, code
 		}
 	}
 

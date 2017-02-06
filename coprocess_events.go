@@ -36,9 +36,9 @@ func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, er
 		OrgID: l.Spec.OrgID,
 	}
 
-	gValAsJSON, gErr := json.Marshal(globalVals)
-	if gErr != nil {
-		log.Error("Failed to marshal globals! ", gErr)
+	gValAsJSON, err := json.Marshal(globalVals)
+	if err != nil {
+		log.Error("Failed to marshal globals! ", err)
 	}
 
 	// handler.SpecJSON = string(gValAsJSON)
@@ -58,9 +58,9 @@ func (l CoProcessEventHandler) HandleEvent(em EventMessage) {
 	}
 
 	// 2. JSON-encode the event data object
-	msgAsJSON, encErr := json.Marshal(eventWrapper)
-	if encErr != nil {
-		log.Error("Failed to encode event data: ", encErr)
+	msgAsJSON, err := json.Marshal(eventWrapper)
+	if err != nil {
+		log.Error("Failed to encode event data: ", err)
 		return
 	}
 

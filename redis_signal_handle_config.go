@@ -104,19 +104,17 @@ func HandleNewConfiguration(payload string) {
 		return
 	}
 
-	backupErr := BackupConfiguration()
-	if backupErr != nil {
+	if err := BackupConfiguration(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed to backup existing configuration: ", backupErr)
+		}).Error("Failed to backup existing configuration: ", err)
 		return
 	}
 
-	writeErr := WriteNewConfiguration(configPayload)
-	if writeErr != nil {
+	if err := WriteNewConfiguration(configPayload); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed to write new configuration: ", writeErr)
+		}).Error("Failed to write new configuration: ", err)
 		return
 	}
 
@@ -135,9 +133,7 @@ func ReloadConfiguration() {
 	}
 
 	log.Info("Sending reload signal to PID: ", myPID)
-
-	callErr := syscall.Kill(myPID, syscall.SIGUSR2)
-	if callErr != nil {
-		log.Error("Process reload failed: ", callErr)
+	if err := syscall.Kill(myPID, syscall.SIGUSR2); err != nil {
+		log.Error("Process reload failed: ", err)
 	}
 }

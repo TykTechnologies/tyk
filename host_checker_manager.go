@@ -282,10 +282,10 @@ func (hc *HostCheckerManager) IsHostDown(urlStr string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
-	_, fErr := hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
+	_, err = hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
 
 	// Found a key, the host is down
-	return fErr != nil
+	return err != nil
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, APIID string) (HostData, error) {
@@ -396,19 +396,17 @@ func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, erro
 	// The returned data is a string, so lets unmarshal it:
 	checkTargets := make([]apidef.HostCheckObject, 0)
 	data0, _ := data.GetIndex(0)
-	decodeErr := json.Unmarshal([]byte(data0), &checkTargets)
-
-	if decodeErr != nil {
+	if err := json.Unmarshal([]byte(data0), &checkTargets); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Error("[HOST CHECKER MANAGER] Decoder failed: ", decodeErr)
-		return []HostData{}, decodeErr
+		}).Error("[HOST CHECKER MANAGER] Decoder failed: ", err)
+		return []HostData{}, err
 	}
 
 	hostData := make([]HostData, len(checkTargets))
 	for i, target := range checkTargets {
-		newHostDoc, hdGenErr := GlobalHostChecker.PrepareTrackingHost(target, spec.APIID)
-		if hdGenErr != nil {
+		newHostDoc, err := GlobalHostChecker.PrepareTrackingHost(target, spec.APIID)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
 			}).Error("[HOST CHECKER MANAGER] failed to convert to HostData", err)
@@ -506,8 +504,8 @@ func SetCheckerHostList() {
 	hostList := []HostData{}
 	for _, spec := range ApiSpecRegister {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
-			hostList, sdErr := GlobalHostChecker.GetListFromService(spec.APIID)
-			if sdErr == nil {
+			hostList, err := GlobalHostChecker.GetListFromService(spec.APIID)
+			if err == nil {
 				hostList = append(hostList, hostList...)
 				for _, t := range hostList {
 					log.WithFields(logrus.Fields{
@@ -519,8 +517,8 @@ func SetCheckerHostList() {
 			}
 		} else {
 			for _, checkItem := range spec.UptimeTests.CheckList {
-				newHostDoc, hdGenErr := GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
-				if hdGenErr == nil {
+				newHostDoc, err := GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
+				if err == nil {
 					hostList = append(hostList, newHostDoc)
 					log.WithFields(logrus.Fields{
 						"prefix": "host-check-mgr",
@@ -531,7 +529,7 @@ func SetCheckerHostList() {
 					}).Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
 					log.WithFields(logrus.Fields{
 						"prefix": "host-check-mgr",
-					}).Warning("--------> Error was: ", hdGenErr)
+					}).Warning("--------> Error was: ", err)
 				}
 
 			}

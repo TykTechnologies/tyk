@@ -51,9 +51,9 @@ func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	}
 
 	defer resp.Body.Close()
-	contents, readErr := ioutil.ReadAll(resp.Body)
+	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", readErr
+		return "", err
 	}
 
 	return string(contents), nil
@@ -235,13 +235,13 @@ func (s *ServiceDiscovery) ConvertRawListToObj(RawData *string) {
 
 func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Container) error {
 	log.Debug("Parsing raw data: ", contents)
-	jp, pErr := gabs.ParseJSON([]byte(contents))
-	if pErr != nil {
-		log.Error(pErr)
+	jp, err := gabs.ParseJSON([]byte(contents))
+	if err != nil {
+		log.Error(err)
 	}
 	*jsonParsed = *jp
 	log.Debug("Got:", jsonParsed)
-	return pErr
+	return err
 }
 
 func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, error) {

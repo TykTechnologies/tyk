@@ -48,9 +48,8 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 	mw.New()
 
 	// Pull the configuration
-	mwConf, confErr := mw.GetConfig()
-
-	if confErr != nil {
+	mwConf, err := mw.GetConfig()
+	if err != nil {
 		log.Fatal("[Middleware] Configuration load failed")
 	}
 
@@ -73,11 +72,11 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 			if tykMwSuper.Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
 			} else {
-				reqErr, errCode := mw.ProcessRequest(w, r, mwConf)
-				if reqErr != nil {
+				err, errCode := mw.ProcessRequest(w, r, mwConf)
+				if err != nil {
 					handler := ErrorHandler{tykMwSuper}
-					handler.HandleError(w, r, reqErr.Error(), errCode)
-					meta["error"] = reqErr.Error()
+					handler.HandleError(w, r, err.Error(), errCode)
+					meta["error"] = err.Error()
 					job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 					job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
 					return

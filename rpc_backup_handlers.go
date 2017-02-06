@@ -45,9 +45,9 @@ func SaveRPCDefinitionsBackup(list string) {
 
 	secret := rightPad2Len(config.Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
-	rErr := store.SetKey(BackupKeyBase+tagList, cryptoText, -1)
-	if rErr != nil {
-		log.Error("Failed to store node backup: ", rErr)
+	err := store.SetKey(BackupKeyBase+tagList, cryptoText, -1)
+	if err != nil {
+		log.Error("Failed to store node backup: ", err)
 	}
 }
 
@@ -66,11 +66,11 @@ func LoadDefinitionsFromRPCBackup() *[]*APISpec {
 	}
 
 	secret := rightPad2Len(config.Secret, "=", 32)
-	cryptoText, rErr := store.GetKey(checkKey)
+	cryptoText, err := store.GetKey(checkKey)
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
-	if rErr != nil {
-		log.Error("[RPC] --> Failed to get node backup (", checkKey, "): ", rErr)
+	if err != nil {
+		log.Error("[RPC] --> Failed to get node backup (", checkKey, "): ", err)
 		return nil
 	}
 

@@ -101,11 +101,11 @@ func HandleSendMiniConfig(payload string) {
 		TimeStamp:     time.Now().Unix(),
 	}
 
-	payloadAsJSON, jsmErr := json.Marshal(returnPayload)
-	if jsmErr != nil {
+	payloadAsJSON, err := json.Marshal(returnPayload)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Error("Failed to get marshal configuration: ", jsmErr)
+		}).Error("Failed to get marshal configuration: ", err)
 		return
 	}
 

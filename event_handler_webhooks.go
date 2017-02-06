@@ -175,11 +175,10 @@ func (w *WebHookHandler) checkURL(r string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Checking URL: ", r)
-	_, urlErr := url.ParseRequestURI(r)
-	if urlErr != nil {
+	if _, err := url.ParseRequestURI(r); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
-		}).Error("Failed to parse URL! ", urlErr, r)
+		}).Error("Failed to parse URL! ", err, r)
 		return false
 	}
 	return true
@@ -205,12 +204,12 @@ func (w *WebHookHandler) GetChecksum(reqBody string) (string, error) {
 }
 
 func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
-	req, reqErr := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
-	if reqErr != nil {
+	req, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
-		}).Error("Failed to create request object: ", reqErr)
-		return nil, reqErr
+		}).Error("Failed to create request object: ", err)
+		return nil, err
 	}
 
 	req.Header.Add("User-Agent", "Tyk-Hookshot")
@@ -236,8 +235,8 @@ func (w *WebHookHandler) HandleEvent(em EventMessage) {
 	reqBody, _ := w.CreateBody(em)
 
 	// Construct request (method, body, params)
-	req, reqErr := w.BuildRequest(reqBody)
-	if reqErr != nil {
+	req, err := w.BuildRequest(reqBody)
+	if err != nil {
 		return
 	}
 
@@ -249,23 +248,23 @@ func (w *WebHookHandler) HandleEvent(em EventMessage) {
 		// Fire web hook routine (setHookFired())
 
 		client := &http.Client{}
-		resp, doReqErr := client.Do(req)
+		resp, err := client.Do(req)
 
-		if doReqErr != nil {
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
-			}).Error("Webhook request failed: ", doReqErr)
+			}).Error("Webhook request failed: ", err)
 		} else {
 			defer resp.Body.Close()
-			content, readErr := ioutil.ReadAll(resp.Body)
-			if readErr == nil {
+			content, err := ioutil.ReadAll(resp.Body)
+			if err == nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "webhooks",
 				}).Debug(string(content))
 			} else {
 				log.WithFields(logrus.Fields{
 					"prefix": "webhooks",
-				}).Error(readErr)
+				}).Error(err)
 			}
 		}
 

@@ -48,8 +48,8 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 				return
 			}
 
-			def, dErr := createDefFromBluePrint(bp, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
-			if dErr != nil {
+			def, err := createDefFromBluePrint(bp, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
+			if err != nil {
 				log.Error("Failed to create API Defintition from file")
 				return
 			}
@@ -91,9 +91,8 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 			log.Error("onversion into API Def failed: ", err)
 		}
 
-		insertErr := bp.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string))
-		if insertErr != nil {
-			log.Error("Insertion failed: ", insertErr)
+		if err := bp.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string)); err != nil {
+			log.Error("Insertion failed: ", err)
 			return
 		}
 
@@ -139,11 +138,10 @@ func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock
 }
 
 func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
-	blueprint, astErr := GetImporterForSource(ApiaryBluePrint)
-
-	if astErr != nil {
-		log.Error("Couldn't get blueprint importer: ", astErr)
-		return blueprint.(*BluePrintAST), astErr
+	blueprint, err := GetImporterForSource(ApiaryBluePrint)
+	if err != nil {
+		log.Error("Couldn't get blueprint importer: ", err)
+		return blueprint.(*BluePrintAST), err
 	}
 
 	bluePrintFileData, err := ioutil.ReadFile(filePath)
@@ -153,10 +151,9 @@ func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
 		return blueprint.(*BluePrintAST), err
 	}
 
-	readErr := blueprint.ReadString(string(bluePrintFileData))
-	if readErr != nil {
+	if err := blueprint.ReadString(string(bluePrintFileData)); err != nil {
 		log.Error("Failed to decode object")
-		return blueprint.(*BluePrintAST), readErr
+		return blueprint.(*BluePrintAST), err
 	}
 
 	return blueprint.(*BluePrintAST), nil
@@ -172,10 +169,9 @@ func apiDefLoadFile(filePath string) (*apidef.APIDefinition, error) {
 		return def, err
 	}
 
-	jsonErr := json.Unmarshal(defFileData, &def)
-	if jsonErr != nil {
-		log.Error("Failed to unmarshal the JSON definition: ", jsonErr)
-		return def, jsonErr
+	if err := json.Unmarshal(defFileData, &def); err != nil {
+		log.Error("Failed to unmarshal the JSON definition: ", err)
+		return def, err
 	}
 
 	return def, nil

@@ -40,17 +40,16 @@ type BatchRequestHandler struct {
 // doAsyncRequest runs an async request and replies to a channel
 func (b *BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, out chan BatchReplyUnit) {
 	client := &http.Client{}
-	resp, doReqErr := client.Do(req)
-
-	if doReqErr != nil {
-		log.Error("Webhook request failed: ", doReqErr)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error("Webhook request failed: ", err)
 		return
 	}
 
 	defer resp.Body.Close()
-	content, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		log.Warning("Body read failure! ", readErr)
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Warning("Body read failure! ", err)
 		return
 	}
 
@@ -68,17 +67,16 @@ func (b *BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, o
 // doSyncRequest will make the same request but return a BatchReplyUnit
 func (b *BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) BatchReplyUnit {
 	client := &http.Client{}
-	resp, doReqErr := client.Do(req)
-
-	if doReqErr != nil {
-		log.Error("Webhook request failed: ", doReqErr)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error("Webhook request failed: ", err)
 		return BatchReplyUnit{}
 	}
 
 	defer resp.Body.Close()
-	content, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
-		log.Warning("Body read failure! ", readErr)
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Warning("Body read failure! ", err)
 		return BatchReplyUnit{}
 	}
 
@@ -93,11 +91,9 @@ func (b *BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) Ba
 }
 
 func (b *BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestStructure, error) {
-	decoder := json.NewDecoder(r.Body)
 	var batchRequest BatchRequestStructure
-	decodeErr := decoder.Decode(&batchRequest)
-
-	return batchRequest, decodeErr
+	err := json.NewDecoder(r.Body).Decode(&batchRequest)
+	return batchRequest, err
 }
 
 func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructure, unsafe bool) ([]*http.Request, error) {
@@ -165,9 +161,9 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 	if r.Method == "POST" {
 
 		// Decode request
-		batchRequest, decodeErr := b.DecodeBatchRequest(r)
-		if decodeErr != nil {
-			log.Error("Could not decode batch request, decoding failed: ", decodeErr)
+		batchRequest, err := b.DecodeBatchRequest(r)
+		if err != nil {
+			log.Error("Could not decode batch request, decoding failed: ", err)
 			ReturnError("Batch request malformed", w)
 			return
 		}
@@ -183,9 +179,9 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 		ReplySet := b.MakeRequests(batchRequest, requestSet)
 
 		// Encode responses
-		replyMessage, encErr := json.Marshal(&ReplySet)
-		if encErr != nil {
-			log.Error("Couldn't encode response to string! ", encErr)
+		replyMessage, err := json.Marshal(&ReplySet)
+		if err != nil {
+			log.Error("Couldn't encode response to string! ", err)
 			return
 		}
 
@@ -200,10 +196,8 @@ func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 
 	// Decode request
 	var batchRequest BatchRequestStructure
-	decodeErr := json.Unmarshal(RequestObject, &batchRequest)
-
-	if decodeErr != nil {
-		log.Error("Could not decode batch request, decoding failed: ", decodeErr)
+	if err := json.Unmarshal(RequestObject, &batchRequest); err != nil {
+		log.Error("Could not decode batch request, decoding failed: ", err)
 		return []byte{}
 	}
 
@@ -218,9 +212,9 @@ func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 	ReplySet := b.MakeRequests(batchRequest, requestSet)
 
 	// Encode responses
-	replyMessage, encErr := json.Marshal(&ReplySet)
-	if encErr != nil {
-		log.Error("Couldn't encode response to string! ", encErr)
+	replyMessage, err := json.Marshal(&ReplySet)
+	if err != nil {
+		log.Error("Couldn't encode response to string! ", err)
 		return []byte{}
 	}
 

@@ -27,9 +27,9 @@ func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
 		return nil
 	}
 
-	newEntry, fmtErr := hook.formatter.Format(entry)
-	if fmtErr != nil {
-		log.Error(fmtErr)
+	newEntry, err := hook.formatter.Format(entry)
+	if err != nil {
+		log.Error(err)
 		return nil
 	}
 

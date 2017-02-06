@@ -56,22 +56,22 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	log.Debug(authHeaderValue)
 
 	// Separate out the field values
-	fieldValues, fErr := getFieldValues(authHeaderValue)
-	if fErr != nil {
+	fieldValues, err := getFieldValues(authHeaderValue)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
-			"error":  fErr,
+			"error":  err,
 			"header": authHeaderValue,
 		}).Error("Field extraction failed")
 		return hm.authorizationError(w, r)
 	}
 
 	// Generate a signature string
-	signatureString, sErr := generateHMACSignatureStringFromRequest(r, fieldValues)
-	if sErr != nil {
+	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":           "hmac",
-			"error":            fErr,
+			"error":            err,
 			"signature_string": signatureString,
 		}).Error("Signature string generation failed")
 		return hm.authorizationError(w, r)

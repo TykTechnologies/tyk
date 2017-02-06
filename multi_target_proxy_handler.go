@@ -73,7 +73,7 @@ func (m *MultiTargetProxy) New(c interface{}, spec *APISpec) (TykResponseHandler
 			}).Info("----> Version ", versionName, " has no override target")
 			m.VersionProxyMap[versionName] = m.defaultProxy
 		} else {
-			versionRemote, vRemoteErr := url.Parse(versionData.OverrideTarget)
+			versionRemote, err := url.Parse(versionData.OverrideTarget)
 			log.WithFields(logrus.Fields{
 				"prefix": "multi-target",
 			}).Info("----> Version ", versionName, " has '", versionData.OverrideTarget, "' for override target")
@@ -83,10 +83,10 @@ func (m *MultiTargetProxy) New(c interface{}, spec *APISpec) (TykResponseHandler
 			log.WithFields(logrus.Fields{
 				"prefix": "multi-target",
 			}).Debug("Multi-target URL (obj): ", versionRemote)
-			if vRemoteErr != nil {
+			if err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "multi-target",
-				}).Error("Couldn't parse version target URL in MultiTarget: ", vRemoteErr)
+				}).Error("Couldn't parse version target URL in MultiTarget: ", err)
 			}
 			versionProxy := TykNewSingleHostReverseProxy(versionRemote, spec)
 			versionProxy.New(nil, spec)

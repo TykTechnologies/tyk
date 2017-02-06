@@ -330,8 +330,7 @@ func loadBundle(spec *APISpec) {
 	if err := loadBundleManifest(&bundle, spec, false); err != nil {
 		bundleError(spec, err, "Couldn't load bundle")
 
-		removeErr := os.RemoveAll(bundle.Path)
-		if removeErr != nil {
+		if err := os.RemoveAll(bundle.Path); err != nil {
 			bundleError(spec, err, "Couldn't remove bundle")
 		}
 		return
