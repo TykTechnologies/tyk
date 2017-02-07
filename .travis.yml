@@ -17,10 +17,9 @@ addons:
 
 matrix:
   include:
-    - go: 1.6.x
     - go: 1.7.x
-      env: LATEST_GO=true # run linters and report coverage
     - go: 1.8rc3
+      env: LATEST_GO=true # run linters and report coverage
 
 services:
   - redis-server
