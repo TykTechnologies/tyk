@@ -6,248 +6,240 @@ import (
 	"testing"
 )
 
-var nonExpiringExtendedDef = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": false,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
-					},
-					"use_extended_paths": true,
-					"extended_paths": {
-						"ignored": [
-							{
-								"path": "/v1/ignored/noregex",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "/v1/ignored/with_id/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+const nonExpiringExtendedDef = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": false,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
+				},
+				"use_extended_paths": true,
+				"extended_paths": {
+					"ignored": [
+						{
+							"path": "/v1/ignored/noregex",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						],
-						"white_list": [
-							{
-								"path": "v1/allowed/whitelist/literal",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "v1/allowed/whitelist/reply/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "reply",
-										"code": 200,
-										"data": "flump",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "v1/allowed/whitelist/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+						},
+						{
+							"path": "/v1/ignored/with_id/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						],
-						"black_list": [
-							{
-								"path": "v1/disallowed/blacklist/literal",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "v1/disallowed/blacklist/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+						}
+					],
+					"white_list": [
+						{
+							"path": "v1/allowed/whitelist/literal",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						]
-					}
+						},
+						{
+							"path": "v1/allowed/whitelist/reply/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "reply",
+									"code": 200,
+									"data": "flump",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "v1/allowed/whitelist/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					],
+					"black_list": [
+						{
+							"path": "v1/disallowed/blacklist/literal",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "v1/disallowed/blacklist/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					]
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://lonelycode.com",
+		"strip_listen_path": false
 	}
+}`
 
-`
-
-var nonExpiringExtendedDefNoWhitelist = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": false,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
-					},
-					"use_extended_paths": true,
-					"extended_paths": {
-						"ignored": [
-							{
-								"path": "/v1/ignored/noregex",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "/v1/ignored/with_id/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+const nonExpiringExtendedDefNoWhitelist = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": false,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
+				},
+				"use_extended_paths": true,
+				"extended_paths": {
+					"ignored": [
+						{
+							"path": "/v1/ignored/noregex",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						],
-						"white_list": [],
-						"black_list": [
-							{
-								"path": "v1/disallowed/blacklist/literal",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "v1/disallowed/blacklist/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+						},
+						{
+							"path": "/v1/ignored/with_id/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						]
-					}
+						}
+					],
+					"white_list": [],
+					"black_list": [
+						{
+							"path": "v1/disallowed/blacklist/literal",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "v1/disallowed/blacklist/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					]
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://lonelycode.com",
+		"strip_listen_path": false
 	}
-
-`
+}`
 
 func TestExtendedBlacklistLinks(t *testing.T) {
 	uri := "v1/disallowed/blacklist/literal"

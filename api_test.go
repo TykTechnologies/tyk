@@ -13,43 +13,39 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var apiTestDef = `
-
-	{
-		"id": "507f1f77bcf86cd799439011",
-		"name": "Tyk Test API ONE",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": false,
-			"versions": {
-				"Default": {
-					"name": "Default",
-					"expires": "3006-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
-					}
+const apiTestDef = `{
+	"id": "507f1f77bcf86cd799439011",
+	"name": "Tyk Test API ONE",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": false,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"expires": "3006-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://lonelycode.com",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://lonelycode.com",
+		"strip_listen_path": false
 	}
-
-`
+}`
 
 func makeSampleAPI(t *testing.T) *APISpec {
 	spec := createSpecTest(t, apiTestDef)

@@ -67,16 +67,14 @@ func TestNewInvlalid(t *testing.T) {
 }
 
 func TestGetChecksum(t *testing.T) {
-	rBody := `
-	{
+	rBody := `{
 		"event": "QuotaExceeded",
 		"message": "Key Quota Limit Exceeded",
 		"path": "/about-lonelycoder/",
 		"origin": "",
 		"key": "4321",
 		"timestamp": 2014-11-27 12:52:05.944549825 &#43;0000 GMT
-	}
-	`
+	}`
 
 	hook := createHookObj()
 	checksum, err := hook.GetChecksum(rBody)
@@ -85,7 +83,7 @@ func TestGetChecksum(t *testing.T) {
 		t.Error("Checksum should not have failed with good objet and body")
 	}
 
-	if checksum != "1dedfbf3c3286d6d0d6e54a8df5212a2" {
+	if checksum != "4bc27072fc0aa154b74d5535486f673b" {
 		t.Error("Checksum is incorrect")
 		t.Error(checksum)
 	}
@@ -94,16 +92,14 @@ func TestGetChecksum(t *testing.T) {
 func TestBuildRequest(t *testing.T) {
 	hook := createHookObj()
 
-	rBody := `
-	{
+	rBody := `{
 		"event": "QuotaExceeded",
 		"message": "Key Quota Limit Exceeded",
 		"path": "/about-lonelycoder/",
 		"origin": "",
 		"key": "4321",
 		"timestamp": 2014-11-27 12:52:05.944549825 &#43;0000 GMT
-	}
-	`
+	}`
 
 	req, err := hook.BuildRequest(rBody)
 	if err != nil {
