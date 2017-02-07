@@ -13,45 +13,41 @@ import (
 	"github.com/justinas/alice"
 )
 
-var multiAuthDev = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "55",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"use_basic_auth": true,
-		"use_standard_auth": true,
-		"base_identity_provided_by": "auth_token",
-		"auth": {
-			"auth_header_name": "x-standard-auth"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"Default": {
-					"name": "Default",
-					"use_extended_paths": true,
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
-					}
+const multiAuthDev = `{
+	"name": "Tyk Test API",
+	"api_id": "55",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"use_basic_auth": true,
+	"use_standard_auth": true,
+	"base_identity_provided_by": "auth_token",
+	"auth": {
+		"auth_header_name": "x-standard-auth"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"use_extended_paths": true,
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com/",
-			"strip_listen_path": true
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com/",
+		"strip_listen_path": true
 	}
-
-`
+}`
 
 func createMultiAuthKeyAuthSession() SessionState {
 	var session SessionState

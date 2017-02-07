@@ -13,43 +13,39 @@ import (
 	"github.com/justinas/alice"
 )
 
-var basicAuthDef = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"use_basic_auth": true,
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"Default": {
-					"name": "Default",
-					"use_extended_paths": true,
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
-					}
+const basicAuthDef = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"use_basic_auth": true,
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"use_extended_paths": true,
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com/",
-			"strip_listen_path": true
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com/",
+		"strip_listen_path": true
 	}
-
-`
+}`
 
 func createBasicAuthSession() SessionState {
 	var session SessionState

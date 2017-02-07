@@ -24,56 +24,63 @@ const (
 	T_CLIENT_SECRET = "aabbccdd"
 )
 
-var keyRules = `
-{     "last_check": 1402492859,     "org_id": "53ac07777cbb8c2d53000002",     "allowance": 0,     "rate": 1,     "per": 1,     "expires": 0,     "quota_max": -1,     "quota_renews": 1399567002,     "quota_remaining": 10,     "quota_renewal_rate": 300 }
-`
+const keyRules = `{
+	"last_check": 1402492859,
+	"org_id": "53ac07777cbb8c2d53000002",
+	"allowance": 0,
+	"rate": 1,
+	"per": 1,
+	"expires": 0,
+	"quota_max": -1,
+	"quota_renews": 1399567002,
+	"quota_remaining": 10,
+	"quota_renewal_rate": 300
+}`
 
-var oauthDefinition = `
-	{
-		"name": "OAUTH Test API",
-		"api_id": "999999",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"use_oauth2": true,
-		"oauth_meta": {
-			"allowed_access_types": [
-				"authorization_code",
-				"refresh_token",
-				"client_credentials"
-			],
-			"allowed_authorize_types": [
-				"code",
-				"token"
-			],
-			"auth_login_redirect": "http://posttestserver.com/post.php?dir=gateway_authorization"
-		},
-		"notifications": {
-			"shared_secret": "9878767657654343123434556564444",
-			"oauth_on_keychange_url": "http://posttestserver.com/post.php?dir=oauth_notifications"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"Default": {
-					"name": "Default",
-					"use_extended_paths": true,
-					"expires": "3000-01-02 15:04"
-				}
+const oauthDefinition = `{
+	"name": "OAUTH Test API",
+	"api_id": "999999",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"use_oauth2": true,
+	"oauth_meta": {
+		"allowed_access_types": [
+			"authorization_code",
+			"refresh_token",
+			"client_credentials"
+		],
+		"allowed_authorize_types": [
+			"code",
+			"token"
+		],
+		"auth_login_redirect": "http://posttestserver.com/post.php?dir=gateway_authorization"
+	},
+	"notifications": {
+		"shared_secret": "9878767657654343123434556564444",
+		"oauth_on_keychange_url": "http://posttestserver.com/post.php?dir=oauth_notifications"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"use_extended_paths": true,
+				"expires": "3000-01-02 15:04"
 			}
-		},
-		"proxy": {
-			"listen_path": "/APIID/",
-			"target_url": "http://example.com",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/APIID/",
+		"target_url": "http://example.com",
+		"strip_listen_path": false
 	}
-`
+}`
 
 func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place

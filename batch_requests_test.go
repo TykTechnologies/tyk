@@ -6,50 +6,44 @@ import (
 	"testing"
 )
 
-var batchTestDef = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "987999",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"Default": {
-					"name": "Default",
-					"expires": "3000-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": [],
-						"black_list": [],
-						"white_list": []
-					}
+const batchTestDef = `{
+	"name": "Tyk Test API",
+	"api_id": "987999",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"expires": "3000-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": [],
+					"black_list": [],
+					"white_list": []
 				}
 			}
-		},
-		"event_handlers": {
-			"events": {}
-		},
-		"proxy": {
-			"listen_path": "/v1/",
-			"target_url": "http://httpbin.org",
-			"strip_listen_path": true
-		},
-		"enable_batch_request_support": true
-	}
+		}
+	},
+	"event_handlers": {
+		"events": {}
+	},
+	"proxy": {
+		"listen_path": "/v1/",
+		"target_url": "http://httpbin.org",
+		"strip_listen_path": true
+	},
+	"enable_batch_request_support": true
+}`
 
-`
-
-var testBatchRequest = `
-
-{
+const testBatchRequest = `{
 	"requests": [
 	{
 		"method": "GET",
@@ -74,9 +68,7 @@ var testBatchRequest = `
 	}
 	],
 	"suppress_parallel_execution": true
-}
-
-`
+}`
 
 func TestBatchSuccess(t *testing.T) {
 	spec := createSpecTest(t, batchTestDef)

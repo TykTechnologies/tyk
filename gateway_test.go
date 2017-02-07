@@ -162,297 +162,288 @@ func getChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-var nonExpiringDefNoWhiteList = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": [],
-						"black_list": [],
-						"white_list": []
-					}
+const nonExpiringDefNoWhiteList = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": [],
+					"black_list": [],
+					"white_list": []
 				}
 			}
-		},
-		"event_handlers": {
-			"events": {
-				"QuotaExceeded": [
-					{
-						"handler_name":"eh_log_handler",
-						"handler_meta": {
-							"prefix": "LOG-HANDLER-PREFIX"
-						}
-					},
-					{
-						"handler_name":"eh_web_hook_handler",
-						"handler_meta": {
-							"method": "POST",
-							"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
-							"template_path": "templates/default_webhook.json",
-							"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
-							"event_timeout": 10
-						}
-					}
-				]
-			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com/",
-			"strip_listen_path": false
 		}
-	}
-`
-
-var versionedDefinition = `
-	{
-		"name": "Tyk Test API",
-		"api_id": "9991",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": false,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "3000-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": [],
-						"black_list": [],
-						"white_list": []
+	},
+	"event_handlers": {
+		"events": {
+			"QuotaExceeded": [
+				{
+					"handler_name":"eh_log_handler",
+					"handler_meta": {
+						"prefix": "LOG-HANDLER-PREFIX"
+					}
+				},
+				{
+					"handler_name":"eh_web_hook_handler",
+					"handler_meta": {
+						"method": "POST",
+						"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
+						"template_path": "templates/default_webhook.json",
+						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+						"event_timeout": 10
 					}
 				}
-			}
-		},
-		"event_handlers": {
-			"events": {
-				"QuotaExceeded": [
-					{
-						"handler_name":"eh_log_handler",
-						"handler_meta": {
-							"prefix": "LOG-HANDLER-PREFIX"
-						}
-					},
-					{
-						"handler_name":"eh_web_hook_handler",
-						"handler_meta": {
-							"method": "POST",
-							"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
-							"template_path": "templates/default_webhook.json",
-							"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
-							"event_timeout": 10
-						}
-					}
-				]
-			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com/",
-			"strip_listen_path": false
+			]
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com/",
+		"strip_listen_path": false
 	}
-`
+}`
 
-var pathBasedDefinition = `
-	{
-		"name": "Tyk Test API",
-		"api_id": "9992",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"use_param": true,
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"default": {
-					"name": "default",
-					"expires": "3000-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": [],
-						"black_list": [],
-						"white_list": []
-					}
+const versionedDefinition = `{
+	"name": "Tyk Test API",
+	"api_id": "9991",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": false,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": [],
+					"black_list": [],
+					"white_list": []
 				}
 			}
-		},
-		"event_handlers": {},
-		"proxy": {
-			"listen_path": "/pathBased/",
-			"target_url": "http://httpbin.org/",
-			"strip_listen_path": true
 		}
+	},
+	"event_handlers": {
+		"events": {
+			"QuotaExceeded": [
+				{
+					"handler_name":"eh_log_handler",
+					"handler_meta": {
+						"prefix": "LOG-HANDLER-PREFIX"
+					}
+				},
+				{
+					"handler_name":"eh_web_hook_handler",
+					"handler_meta": {
+						"method": "POST",
+						"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
+						"template_path": "templates/default_webhook.json",
+						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+						"event_timeout": 10
+					}
+				}
+			]
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com/",
+		"strip_listen_path": false
 	}
-`
+}`
 
-var extendedPathGatewaySetup = `
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"Default": {
-					"name": "Default",
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
-					},
-					"use_extended_paths": true,
-					"extended_paths": {
-						"ignored": [
-							{
-								"path": "/v1/ignored/noregex",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "/v1/ignored/with_id/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+const pathBasedDefinition = `{
+	"name": "Tyk Test API",
+	"api_id": "9992",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"use_param": true,
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"default": {
+				"name": "default",
+				"expires": "3000-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": [],
+					"black_list": [],
+					"white_list": []
+				}
+			}
+		}
+	},
+	"event_handlers": {},
+	"proxy": {
+		"listen_path": "/pathBased/",
+		"target_url": "http://httpbin.org/",
+		"strip_listen_path": true
+	}
+}`
+
+const extendedPathGatewaySetup = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
+				},
+				"use_extended_paths": true,
+				"extended_paths": {
+					"ignored": [
+						{
+							"path": "/v1/ignored/noregex",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						],
-						"white_list": [
-							{
-								"path": "v1/allowed/whitelist/literal",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "v1/allowed/whitelist/reply/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "reply",
-										"code": 200,
-										"data": "flump",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "v1/allowed/whitelist/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+						},
+						{
+							"path": "/v1/ignored/with_id/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						],
-						"black_list": [
-							{
-								"path": "v1/disallowed/blacklist/literal",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
-									}
-								}
-							},
-							{
-								"path": "v1/disallowed/blacklist/{id}",
-								"method_actions": {
-									"GET": {
-										"action": "no_action",
-										"code": 200,
-										"data": "",
-										"headers": {
-											"x-tyk-override-test": "tyk-override",
-											"x-tyk-override-test-2": "tyk-override-2"
-										}
+						}
+					],
+					"white_list": [
+						{
+							"path": "v1/allowed/whitelist/literal",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
 									}
 								}
 							}
-						]
-					}
+						},
+						{
+							"path": "v1/allowed/whitelist/reply/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "reply",
+									"code": 200,
+									"data": "flump",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "v1/allowed/whitelist/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					],
+					"black_list": [
+						{
+							"path": "v1/disallowed/blacklist/literal",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "v1/disallowed/blacklist/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"data": "",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					]
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com/",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com/",
+		"strip_listen_path": false
 	}
-`
+}`
 
 func testName(t *testing.T) string {
 	// TODO(mvdan): replace with t.Name() once 1.9 is out and we

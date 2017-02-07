@@ -6,123 +6,111 @@ import (
 	"testing"
 )
 
-var sampleDefiniton = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": false,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "2006-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-						"white_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"],
-						"black_list": ["v1/disallowed/whitelist/literal", "v1/disallowed/whitelist/{id}"]
-					}
+const sampleDefiniton = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": false,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "2006-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+					"white_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"],
+					"black_list": ["v1/disallowed/whitelist/literal", "v1/disallowed/whitelist/{id}"]
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com",
+		"strip_listen_path": false
 	}
+}`
 
-`
-
-var nonExpiringDef = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": false,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-						"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
-						"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
-					}
+const nonExpiringDef = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": false,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+					"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
+					"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com",
+		"strip_listen_path": false
 	}
+}`
 
-`
-
-var nonExpiringMultiDef = `
-
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": false,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-						"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
-						"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
-					}
-				},
-				"v2": {
-					"name": "v2",
-					"expires": "3000-01-02 15:04",
-					"paths": {
-						"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-						"white_list": [],
-						"black_list": ["v1/disallowed/blacklist/literal"]
-					}
+const nonExpiringMultiDef = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": false,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+					"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
+					"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
+				}
+			},
+			"v2": {
+				"name": "v2",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+					"white_list": [],
+					"black_list": ["v1/disallowed/blacklist/literal"]
 				}
 			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://example.com",
-			"strip_listen_path": false
 		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://example.com",
+		"strip_listen_path": false
 	}
-
-`
+}`
 
 func createDefinitionFromString(defStr string) *APISpec {
 	var loader = APIDefinitionLoader{}

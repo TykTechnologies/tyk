@@ -189,188 +189,181 @@ func computeSessionID(input []byte, tykMiddleware *TykMiddleware) (sessionID str
 	return tykMiddleware.Spec.OrgID + tokenID
 }
 
-var idExtractorCoProcessDef = `
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "2100-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
+const idExtractorCoProcessDef = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "2100-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
+				}
+			}
+		}
+	},
+	"event_handlers": {
+		"events": {
+			"AuthFailure": [
+				{
+					"handler_name":"cp_dynamic_handler",
+					"handler_meta": {
+						"name": "my_handler"
 					}
 				}
-			}
-		},
-		"event_handlers": {
-			"events": {
-				"AuthFailure": [
-								{
-										"handler_name":"cp_dynamic_handler",
-										"handler_meta": {
-												"name": "my_handler"
-										}
-								}
-						]
-			}
-		},
-		"custom_middleware": {
-			"pre": [
-			{
-				"name": "MyPreMiddleware",
-				"require_session": false
-			}
-			],
-			"id_extractor": {
-				"extract_from": "header",
-				"extract_with": "value",
-				"extractor_config": {
-					"header_name": "Authorization"
-				}
-			},
-			"driver": "grpc"
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://httpbin.org",
-			"strip_listen_path": false
+			]
 		}
+	},
+	"custom_middleware": {
+		"pre": [
+		{
+			"name": "MyPreMiddleware",
+			"require_session": false
+		}
+		],
+		"id_extractor": {
+			"extract_from": "header",
+			"extract_with": "value",
+			"extractor_config": {
+				"header_name": "Authorization"
+			}
+		},
+		"driver": "grpc"
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://httpbin.org",
+		"strip_listen_path": false
 	}
-`
+}`
 
-var valueExtractorFormSource = `
-	{
-		"name": "Tyk Test API",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "2100-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
+const valueExtractorFormSource = `{
+	"name": "Tyk Test API",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "2100-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
+				}
+			}
+		}
+	},
+	"event_handlers": {
+		"events": {
+			"AuthFailure": [
+				{
+					"handler_name":"cp_dynamic_handler",
+					"handler_meta": {
+						"name": "my_handler"
 					}
 				}
-			}
-		},
-		"event_handlers": {
-			"events": {
-				"AuthFailure": [
-								{
-										"handler_name":"cp_dynamic_handler",
-										"handler_meta": {
-												"name": "my_handler"
-										}
-								}
-						]
-			}
-		},
-		"custom_middleware": {
-			"pre": [
-			{
-				"name": "MyPreMiddleware",
-				"require_session": false
-			}
-			],
-			"id_extractor": {
-				"extract_from": "form",
-				"extract_with": "value",
-				"extractor_config": {
-					"param_name": "auth"
-				}
-			},
-			"driver": "grpc"
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://httpbin.org",
-			"strip_listen_path": false
+			]
 		}
+	},
+	"custom_middleware": {
+		"pre": [
+		{
+			"name": "MyPreMiddleware",
+			"require_session": false
+		}
+		],
+		"id_extractor": {
+			"extract_from": "form",
+			"extract_with": "value",
+			"extractor_config": {
+				"param_name": "auth"
+			}
+		},
+		"driver": "grpc"
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://httpbin.org",
+		"strip_listen_path": false
 	}
-	`
+}`
 
-var regexExtractorDef = `
-
-	{
-		"name": "Tyk Test API - ValueExtractor/XPath",
-		"api_id": "1",
-		"org_id": "default",
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {
-			"auth_header_name": "authorization"
-		},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "2100-01-02 15:04",
-					"use_extended_paths": true,
-					"paths": {
-						"ignored": [],
-						"white_list": [],
-						"black_list": []
+const regexExtractorDef = `{
+	"name": "Tyk Test API - ValueExtractor/XPath",
+	"api_id": "1",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "2100-01-02 15:04",
+				"use_extended_paths": true,
+				"paths": {
+					"ignored": [],
+					"white_list": [],
+					"black_list": []
+				}
+			}
+		}
+	},
+	"event_handlers": {
+		"events": {
+			"AuthFailure": [
+				{
+					"handler_name":"cp_dynamic_handler",
+					"handler_meta": {
+						"name": "my_handler"
 					}
 				}
-			}
-		},
-		"event_handlers": {
-			"events": {
-				"AuthFailure": [
-								{
-										"handler_name":"cp_dynamic_handler",
-										"handler_meta": {
-												"name": "my_handler"
-										}
-								}
-						]
-			}
-		},
-		"custom_middleware": {
-			"id_extractor": {
-				"extract_from": "header",
-				"extract_with": "regex",
-				"extractor_config": {
-					"header_name": "Authorization",
-					"regex_expression": "[^\\\\-]+",
-					"regex_match_index": 1
-				}
-			},
-			"driver": "grpc"
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"target_url": "http://httpbin.org",
-			"strip_listen_path": false
+			]
 		}
+	},
+	"custom_middleware": {
+		"id_extractor": {
+			"extract_from": "header",
+			"extract_with": "regex",
+			"extractor_config": {
+				"header_name": "Authorization",
+				"regex_expression": "[^\\\\-]+",
+				"regex_match_index": 1
+			}
+		},
+		"driver": "grpc"
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "http://httpbin.org",
+		"strip_listen_path": false
 	}
-`
+}`

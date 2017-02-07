@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-var consul = `
+const consul = `
 [{
 	"Node": "foobar",
 	"Address": "10.1.10.12",
@@ -25,8 +25,7 @@ var consul = `
 }]
 `
 
-var eureka_real = `
-{
+const eureka_real = `{
 	"application": {
 		"name": "ROUTE",
 		"instance": [{
@@ -111,10 +110,9 @@ var eureka_real = `
 			"actionType": "ADDED"
 		}]
 	}
-}
-`
+}`
 
-var nested_consul = `
+const nested_consul = `
 [{
 	"Name": "beep",
 	"Data": "{\"hostname\": \"httpbin1.org\", \"port\": \"80\"}"
@@ -122,11 +120,9 @@ var nested_consul = `
 {
 	"Name": "boop",
 	"Data": "{\"hostname\": \"httpbin2.org\", \"port\": \"80\"}"
-}]
-`
+}]`
 
-var etcd = `
-{
+const etcd = `{
 	"action": "get",
 	"node": {
 		"key": "/services/single",
@@ -134,11 +130,9 @@ var etcd = `
 		"modifiedIndex": 6,
 		"createdIndex": 6
 	}
-}
-`
+}`
 
-var nested = `
-{
+const nested = `{
 	"action": "get",
 	"node": {
 		"key": "/services/single",
@@ -146,11 +140,9 @@ var nested = `
 		"modifiedIndex": 6,
 		"createdIndex": 6
 	}
-}
-`
+}`
 
-var nested_list = `
-{
+const nested_list = `{
 	"action": "get",
 	"node": {
 		"key": "/services/single",
@@ -158,11 +150,9 @@ var nested_list = `
 		"modifiedIndex": 6,
 		"createdIndex": 6
 	}
-}
-`
+}`
 
-var mesosphere = `
-{
+const mesosphere = `{
 	"tasks": [{
 		"id": "myservice.7fc21d4c-eabb-11e5-b381-066c48d09c8f",
 		"host": "httpbin.org",
@@ -174,8 +164,7 @@ var mesosphere = `
 		"slaveId": "d70867df-fdb2-4889-abeb-0829c742fded-S2",
 		"appId": "/httpbin"
 	}]
-}
-`
+}`
 
 func configureService(name string, sd *ServiceDiscovery) string {
 	log.Info("Getting ", name)
