@@ -75,10 +75,8 @@ func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
 
-	var count int
-	count, _ = h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
+	count, _ := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
 	log.Debug("Count is: ", count)
-	//count = int64(len(keys))
 	divisor := float64(config.HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
 		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")

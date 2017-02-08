@@ -97,7 +97,6 @@ func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
-	//ApiSpecRegister[spec.APIID] = spec
 	Muxer.Handle(spec.Proxy.ListenPath, chain)
 }
 

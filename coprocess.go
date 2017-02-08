@@ -104,8 +104,6 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 	object.Metadata = make(map[string]string, 0)
 	object.Spec = make(map[string]string, 0)
 
-	// object.Session = SessionState{}
-
 	// Append spec data:
 	if c.Middleware != nil {
 		object.Spec = map[string]string{

@@ -149,8 +149,6 @@ func setupGlobals() {
 
 	}
 
-	//genericOsinStorage = MakeNewOsinServer()
-
 	// Load all the files that have the "error" prefix.
 	templatesDir := filepath.Join(config.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
@@ -426,8 +424,6 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
-
-	// osinServer.AccessTokenGen = &AccessTokenGenTyk{}
 
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
@@ -1283,24 +1279,13 @@ func handleDashboardRegistration() {
 }
 
 func startHeartBeat() {
-	// heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-	// if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
-	// 	log.Fatal("Connection string is empty, failing.")
-	// }
-
-	// log.WithFields(logrus.Fields{
-	// 	"prefix": "main",
-	// }).Info("Starting heartbeat.")
-	// heartbeatConnStr = heartbeatConnStr + "/register/ping"
 	if config.UseDBAppConfigs {
 		if DashService == nil {
 			DashService = &HTTPDashboardHandler{}
 			DashService.Init()
 		}
-
 		go DashService.StartBeating()
 	}
-
 }
 
 func StartDRL() {
