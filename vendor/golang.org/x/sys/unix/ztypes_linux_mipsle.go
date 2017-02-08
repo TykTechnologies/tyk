@@ -1,14 +1,14 @@
-// +build amd64,linux
+// +build mipsle,linux
 // Created by cgo -godefs - DO NOT EDIT
-// cgo -godefs types_linux.go
+// cgo -godefs types_linux.go | go run mkpost.go
 
 package unix
 
 const (
-	sizeofPtr      = 0x8
+	sizeofPtr      = 0x4
 	sizeofShort    = 0x2
 	sizeofInt      = 0x4
-	sizeofLong     = 0x8
+	sizeofLong     = 0x4
 	sizeofLongLong = 0x8
 	PathMax        = 0x1000
 )
@@ -16,78 +16,75 @@ const (
 type (
 	_C_short     int16
 	_C_int       int32
-	_C_long      int64
+	_C_long      int32
 	_C_long_long int64
 )
 
 type Timespec struct {
-	Sec  int64
-	Nsec int64
+	Sec  int32
+	Nsec int32
 }
 
 type Timeval struct {
-	Sec  int64
-	Usec int64
+	Sec  int32
+	Usec int32
 }
 
 type Timex struct {
 	Modes     uint32
-	Pad_cgo_0 [4]byte
-	Offset    int64
-	Freq      int64
-	Maxerror  int64
-	Esterror  int64
+	Offset    int32
+	Freq      int32
+	Maxerror  int32
+	Esterror  int32
 	Status    int32
-	Pad_cgo_1 [4]byte
-	Constant  int64
-	Precision int64
-	Tolerance int64
+	Constant  int32
+	Precision int32
+	Tolerance int32
 	Time      Timeval
-	Tick      int64
-	Ppsfreq   int64
-	Jitter    int64
+	Tick      int32
+	Ppsfreq   int32
+	Jitter    int32
 	Shift     int32
-	Pad_cgo_2 [4]byte
-	Stabil    int64
-	Jitcnt    int64
-	Calcnt    int64
-	Errcnt    int64
-	Stbcnt    int64
+	Stabil    int32
+	Jitcnt    int32
+	Calcnt    int32
+	Errcnt    int32
+	Stbcnt    int32
 	Tai       int32
-	Pad_cgo_3 [44]byte
+	Pad_cgo_0 [44]byte
 }
 
-type Time_t int64
+type Time_t int32
 
 type Tms struct {
-	Utime  int64
-	Stime  int64
-	Cutime int64
-	Cstime int64
+	Utime  int32
+	Stime  int32
+	Cutime int32
+	Cstime int32
 }
 
 type Utimbuf struct {
-	Actime  int64
-	Modtime int64
+	Actime  int32
+	Modtime int32
 }
 
 type Rusage struct {
 	Utime    Timeval
 	Stime    Timeval
-	Maxrss   int64
-	Ixrss    int64
-	Idrss    int64
-	Isrss    int64
-	Minflt   int64
-	Majflt   int64
-	Nswap    int64
-	Inblock  int64
-	Oublock  int64
-	Msgsnd   int64
-	Msgrcv   int64
-	Nsignals int64
-	Nvcsw    int64
-	Nivcsw   int64
+	Maxrss   int32
+	Ixrss    int32
+	Idrss    int32
+	Isrss    int32
+	Minflt   int32
+	Majflt   int32
+	Nswap    int32
+	Inblock  int32
+	Oublock  int32
+	Msgsnd   int32
+	Msgrcv   int32
+	Nsignals int32
+	Nvcsw    int32
+	Nivcsw   int32
 }
 
 type Rlimit struct {
@@ -98,36 +95,40 @@ type Rlimit struct {
 type _Gid_t uint32
 
 type Stat_t struct {
-	Dev       uint64
-	Ino       uint64
-	Nlink     uint64
-	Mode      uint32
-	Uid       uint32
-	Gid       uint32
-	X__pad0   int32
-	Rdev      uint64
-	Size      int64
-	Blksize   int64
-	Blocks    int64
-	Atim      Timespec
-	Mtim      Timespec
-	Ctim      Timespec
-	X__unused [3]int64
+	Dev     uint32
+	Pad1    [3]int32
+	Ino     uint64
+	Mode    uint32
+	Nlink   uint32
+	Uid     uint32
+	Gid     uint32
+	Rdev    uint32
+	Pad2    [3]int32
+	Size    int64
+	Atim    Timespec
+	Mtim    Timespec
+	Ctim    Timespec
+	Blksize int32
+	Pad4    int32
+	Blocks  int64
+	Pad5    [14]int32
 }
 
 type Statfs_t struct {
-	Type    int64
-	Bsize   int64
-	Blocks  uint64
-	Bfree   uint64
-	Bavail  uint64
-	Files   uint64
-	Ffree   uint64
-	Fsid    Fsid
-	Namelen int64
-	Frsize  int64
-	Flags   int64
-	Spare   [4]int64
+	Type      int32
+	Bsize     int32
+	Frsize    int32
+	Pad_cgo_0 [4]byte
+	Blocks    uint64
+	Bfree     uint64
+	Files     uint64
+	Ffree     uint64
+	Bavail    uint64
+	Fsid      Fsid
+	Namelen   int32
+	Flags     int32
+	Spare     [5]int32
+	Pad_cgo_1 [4]byte
 }
 
 type Dirent struct {
@@ -231,7 +232,7 @@ type Linger struct {
 
 type Iovec struct {
 	Base *byte
-	Len  uint64
+	Len  uint32
 }
 
 type IPMreq struct {
@@ -253,20 +254,17 @@ type IPv6Mreq struct {
 type Msghdr struct {
 	Name       *byte
 	Namelen    uint32
-	Pad_cgo_0  [4]byte
 	Iov        *Iovec
-	Iovlen     uint64
+	Iovlen     uint32
 	Control    *byte
-	Controllen uint64
+	Controllen uint32
 	Flags      int32
-	Pad_cgo_1  [4]byte
 }
 
 type Cmsghdr struct {
-	Len          uint64
-	Level        int32
-	Type         int32
-	X__cmsg_data [0]uint8
+	Len   uint32
+	Level int32
+	Type  int32
 }
 
 type Inet4Pktinfo struct {
@@ -342,8 +340,8 @@ const (
 	SizeofIPMreq            = 0x8
 	SizeofIPMreqn           = 0xc
 	SizeofIPv6Mreq          = 0x14
-	SizeofMsghdr            = 0x38
-	SizeofCmsghdr           = 0x10
+	SizeofMsghdr            = 0x1c
+	SizeofCmsghdr           = 0xc
 	SizeofInet4Pktinfo      = 0xc
 	SizeofInet6Pktinfo      = 0x14
 	SizeofIPv6MTUInfo       = 0x20
@@ -382,7 +380,7 @@ const (
 	IFLA_LINKINFO       = 0x12
 	IFLA_NET_NS_PID     = 0x13
 	IFLA_IFALIAS        = 0x14
-	IFLA_MAX            = 0x1d
+	IFLA_MAX            = 0x2a
 	RT_SCOPE_UNIVERSE   = 0x0
 	RT_SCOPE_SITE       = 0xc8
 	RT_SCOPE_LINK       = 0xfd
@@ -511,7 +509,7 @@ type RtNexthop struct {
 
 const (
 	SizeofSockFilter = 0x8
-	SizeofSockFprog  = 0x10
+	SizeofSockFprog  = 0x8
 )
 
 type SockFilter struct {
@@ -523,7 +521,7 @@ type SockFilter struct {
 
 type SockFprog struct {
 	Len       uint16
-	Pad_cgo_0 [6]byte
+	Pad_cgo_0 [2]byte
 	Filter    *SockFilter
 }
 
@@ -532,62 +530,52 @@ type InotifyEvent struct {
 	Mask   uint32
 	Cookie uint32
 	Len    uint32
-	Name   [0]int8
 }
 
 const SizeofInotifyEvent = 0x10
 
 type PtraceRegs struct {
-	R15      uint64
-	R14      uint64
-	R13      uint64
-	R12      uint64
-	Rbp      uint64
-	Rbx      uint64
-	R11      uint64
-	R10      uint64
-	R9       uint64
-	R8       uint64
-	Rax      uint64
-	Rcx      uint64
-	Rdx      uint64
-	Rsi      uint64
-	Rdi      uint64
-	Orig_rax uint64
-	Rip      uint64
-	Cs       uint64
-	Eflags   uint64
-	Rsp      uint64
-	Ss       uint64
-	Fs_base  uint64
-	Gs_base  uint64
-	Ds       uint64
-	Es       uint64
-	Fs       uint64
-	Gs       uint64
+	Regs        [109]uint32
+	U_tsize     uint32
+	U_dsize     uint32
+	U_ssize     uint32
+	Start_code  uint32
+	Start_data  uint32
+	Start_stack uint32
+	Signal      int32
+	U_ar0       *byte
+	Magic       uint32
+	U_comm      [32]int8
+}
+
+type ptracePsw struct {
+}
+
+type ptraceFpregs struct {
+}
+
+type ptracePer struct {
 }
 
 type FdSet struct {
-	Bits [16]int64
+	Bits [32]int32
 }
 
 type Sysinfo_t struct {
-	Uptime    int64
-	Loads     [3]uint64
-	Totalram  uint64
-	Freeram   uint64
-	Sharedram uint64
-	Bufferram uint64
-	Totalswap uint64
-	Freeswap  uint64
+	Uptime    int32
+	Loads     [3]uint32
+	Totalram  uint32
+	Freeram   uint32
+	Sharedram uint32
+	Bufferram uint32
+	Totalswap uint32
+	Freeswap  uint32
 	Procs     uint16
 	Pad       uint16
-	Pad_cgo_0 [4]byte
-	Totalhigh uint64
-	Freehigh  uint64
+	Totalhigh uint32
+	Freehigh  uint32
 	Unit      uint32
-	X_f       [0]int8
-	Pad_cgo_1 [4]byte
+	X_f       [8]int8
 }
 
 type Utsname struct {
@@ -600,16 +588,15 @@ type Utsname struct {
 }
 
 type Ustat_t struct {
-	Tfree     int32
-	Pad_cgo_0 [4]byte
-	Tinode    uint64
-	Fname     [6]int8
-	Fpack     [6]int8
-	Pad_cgo_1 [4]byte
+	Tfree  int32
+	Tinode uint32
+	Fname  [6]int8
+	Fpack  [6]int8
 }
 
 type EpollEvent struct {
 	Events uint32
+	PadFd  int32
 	Fd     int32
 	Pad    int32
 }
@@ -638,8 +625,10 @@ const (
 )
 
 type Sigset_t struct {
-	X__val [16]uint64
+	X__val [32]uint32
 }
+
+const _SC_PAGESIZE = 0x1e
 
 type Termios struct {
 	Iflag  uint32
@@ -647,7 +636,7 @@ type Termios struct {
 	Cflag  uint32
 	Lflag  uint32
 	Line   uint8
-	Cc     [19]uint8
+	Cc     [23]uint8
 	Ispeed uint32
 	Ospeed uint32
 }
