@@ -1,5 +1,5 @@
 #!/bin/bash
-export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3\.$4"' version.go)
+export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)
 
 export SOURCEBIN=tyk
 export CLIBIN=tyk-cli

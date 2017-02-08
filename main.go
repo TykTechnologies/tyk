@@ -138,10 +138,12 @@ func setupGlobals() {
 
 		if config.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
-			thisPurger := RPCPurger{Store: &AnalyticsStore}
-			thisPurger.Connect()
-			analytics.Clean = &thisPurger
-			go analytics.Clean.StartPurgeLoop(10)
+
+			purger := RPCPurger{Store: &AnalyticsStore}
+			purger.Connect()
+			analytics.Clean = &purger
+			go analytics.Clean.PurgeLoop(10 * time.Second)
+
 		}
 
 	}
@@ -1372,11 +1374,10 @@ func listen(l net.Listener, err error) {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Printf("Gateway started (%v)", VERSION)
-			if RPC_EmergencyMode {
-				go http.Serve(l, nil)
-			} else {
-				go http.Serve(l, mainRouter)
+			if !RPC_EmergencyMode {
+				http.Handle("/", mainRouter)
 			}
+			go http.Serve(l, nil)
 			displayConfig()
 		}
 
