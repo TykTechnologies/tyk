@@ -140,30 +140,29 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, e
 			newMetaData.MethodActions = make(map[string]apidef.EndpointMethodMeta)
 
 			for _, action := range resource.Actions {
-				if len(action.Examples) > 0 {
-					if len(action.Examples[0].Responses) > 0 {
-						endPointMethodMeta := apidef.EndpointMethodMeta{}
-						code, err := strconv.Atoi(action.Examples[0].Responses[0].Name)
-						if err != nil {
-							log.Warning("Could not genrate response code form Name field, using 200")
-							code = 200
-						}
-						endPointMethodMeta.Code = code
-
-						if asMock {
-							endPointMethodMeta.Action = apidef.Reply
-						} else {
-							endPointMethodMeta.Action = apidef.NoAction
-						}
-
-						for _, h := range action.Examples[0].Responses[0].Headers {
-							endPointMethodMeta.Headers = make(map[string]string)
-							endPointMethodMeta.Headers[h.Name] = h.Value
-						}
-						endPointMethodMeta.Data = action.Examples[0].Responses[0].Body
-						newMetaData.MethodActions[action.Method] = endPointMethodMeta
-					}
+				if len(action.Examples) == 0 || len(action.Examples[0].Responses) == 0 {
+					continue
 				}
+				endPointMethodMeta := apidef.EndpointMethodMeta{}
+				code, err := strconv.Atoi(action.Examples[0].Responses[0].Name)
+				if err != nil {
+					log.Warning("Could not genrate response code form Name field, using 200")
+					code = 200
+				}
+				endPointMethodMeta.Code = code
+
+				if asMock {
+					endPointMethodMeta.Action = apidef.Reply
+				} else {
+					endPointMethodMeta.Action = apidef.NoAction
+				}
+
+				for _, h := range action.Examples[0].Responses[0].Headers {
+					endPointMethodMeta.Headers = make(map[string]string)
+					endPointMethodMeta.Headers[h.Name] = h.Value
+				}
+				endPointMethodMeta.Data = action.Examples[0].Responses[0].Body
+				newMetaData.MethodActions[action.Method] = endPointMethodMeta
 			}
 
 			// Add it to the version

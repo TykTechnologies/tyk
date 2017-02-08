@@ -95,21 +95,20 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string)
 
 	log.Debug("Checking JWKs...")
 	for _, val := range jwkSet.Keys {
-		if val.KID == kid {
-			if strings.ToLower(val.Kty) == strings.ToLower(keyType) {
-				if len(val.X5c) > 0 {
-					// Use the first cert only
-					decodedCert, err := b64.StdEncoding.DecodeString(val.X5c[0])
-					if err != nil {
-						return nil, err
-					}
-					log.Debug("Found cert! Replying...")
-					log.Debug("Cert was: ", string(decodedCert))
-					return decodedCert, nil
-				}
-				return nil, errors.New("no certificates in JWK")
-			}
+		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
+			continue
 		}
+		if len(val.X5c) > 0 {
+			// Use the first cert only
+			decodedCert, err := b64.StdEncoding.DecodeString(val.X5c[0])
+			if err != nil {
+				return nil, err
+			}
+			log.Debug("Found cert! Replying...")
+			log.Debug("Cert was: ", string(decodedCert))
+			return decodedCert, nil
+		}
+		return nil, errors.New("no certificates in JWK")
 	}
 
 	return nil, errors.New("No matching KID could be found")
