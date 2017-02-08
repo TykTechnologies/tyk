@@ -45,14 +45,8 @@ func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
 }
 
 func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
-	var newKey string
-	//now := time.Now().UnixNano()
-
 	// Key should be API-ID.SubKey.123456789
-	//newKey = strings.Join([]string{h.APIID, string(subKey), strconv.FormatInt(now, 10)}, ".")
-	newKey = strings.Join([]string{h.APIID, string(subKey)}, ".")
-
-	return newKey
+	return strings.Join([]string{h.APIID, string(subKey)}, ".")
 }
 
 // ReportHealthCheckValue is a shortcut we can use throughout the app to push a health check value
@@ -78,8 +72,6 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
-	//searchStr := strings.Join([]string{h.APIID, string(prefix)}, ".")
-
 	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
 
@@ -117,7 +109,6 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	// Get the micro latency graph, an average upstream latency
 	searchStr := strings.Join([]string{h.APIID, string(RequestLog)}, ".")
 	log.Debug("Searching KV for: ", searchStr)
-	//kv := h.storage.GetKeysAndValuesWithFilter(searchStr)
 	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
 	log.Debug("Found: ", vals)
 	var runningTotal int

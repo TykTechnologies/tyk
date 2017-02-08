@@ -136,7 +136,6 @@ func doLoadWithBackup(specs *[]*APISpec) {
 
 // encrypt string to base64 crypto using AES
 func encrypt(key []byte, text string) string {
-	// key := []byte(keyText)
 	plaintext := []byte(text)
 
 	block, err := aes.NewCipher(key)

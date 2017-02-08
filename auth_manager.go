@@ -73,7 +73,6 @@ func (b *DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSt
 // IsKeyExpired checks if a key has expired, if the value of SessionState.Expires is 0, it will be ignored
 func (b *DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
 	if newSession.Expires >= 1 {
-		//diff := newSession.Expires - time.Now().Unix()
 		return time.Now().After(time.Unix(newSession.Expires, 0))
 	}
 	return false

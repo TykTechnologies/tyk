@@ -193,20 +193,14 @@ type PythonDispatcher struct {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
-
-	var object *C.struct_CoProcessMessage
-	object = (*C.struct_CoProcessMessage)(objectPtr)
-
-	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = C.Python_DispatchHook(object)
-
+	object := (*C.struct_CoProcessMessage)(objectPtr)
+	newObjectPtr := C.Python_DispatchHook(object)
 	return unsafe.Pointer(newObjectPtr)
 }
 
 // DispatchEvent dispatches a Tyk event.
 func (d *PythonDispatcher) DispatchEvent(eventJSON []byte) {
-	var CEventJSON *C.char
-	CEventJSON = C.CString(string(eventJSON))
+	CEventJSON := C.CString(string(eventJSON))
 	C.Python_DispatchEvent(CEventJSON)
 	C.free(unsafe.Pointer(CEventJSON))
 	return
@@ -219,8 +213,7 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
-	var CBundlePath *C.char
-	CBundlePath = C.CString(basePath)
+	CBundlePath := C.CString(basePath)
 	C.Python_HandleMiddlewareCache(CBundlePath)
 	return
 }
@@ -245,14 +238,9 @@ func PythonLoadDispatcher() (err error) {
 
 // PythonNewDispatcher creates an instance of TykDispatcher.
 func PythonNewDispatcher(middlewarePath string, eventHandlerPath string, bundlePaths []string) (dispatcher coprocess.Dispatcher, err error) {
-	var CMiddlewarePath *C.char
-	CMiddlewarePath = C.CString(middlewarePath)
-
-	var CEventHandlerPath *C.char
-	CEventHandlerPath = C.CString(eventHandlerPath)
-
-	var CBundlePaths *C.char
-	CBundlePaths = C.CString(strings.Join(bundlePaths, ":"))
+	CMiddlewarePath := C.CString(middlewarePath)
+	CEventHandlerPath := C.CString(eventHandlerPath)
+	CBundlePaths := C.CString(strings.Join(bundlePaths, ":"))
 
 	result := C.Python_NewDispatcher(CMiddlewarePath, CEventHandlerPath, CBundlePaths)
 
@@ -270,10 +258,8 @@ func PythonNewDispatcher(middlewarePath string, eventHandlerPath string, bundleP
 
 // PythonSetEnv sets PYTHONPATH, it's called before initializing the interpreter.
 func PythonSetEnv(pythonPaths ...string) {
-	var CPythonPath *C.char
-	CPythonPath = C.CString(strings.Join(pythonPaths, ":"))
+	CPythonPath := C.CString(strings.Join(pythonPaths, ":"))
 	C.Python_SetEnv(CPythonPath)
-
 	C.free(unsafe.Pointer(CPythonPath))
 }
 

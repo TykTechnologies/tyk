@@ -276,7 +276,6 @@ func processSpec(referenceSpec *APISpec,
 	// Create the response processors
 	creeateResponseMiddlewareChain(referenceSpec)
 
-	//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
 	tykMiddleware := &TykMiddleware{referenceSpec, proxy}
 	CheckCBEnabled(tykMiddleware)
 	CheckETEnabled(tykMiddleware)
