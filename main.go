@@ -141,7 +141,8 @@ func setupGlobals() {
 
 		if config.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
-			purger := RPCPurger{Store: &AnalyticsStore, Address: config.SlaveOptions.ConnectionString}
+
+			purger := RPCPurger{Store: &AnalyticsStore}
 			purger.Connect()
 			analytics.Clean = &purger
 			go analytics.Clean.PurgeLoop(10 * time.Second)
@@ -708,6 +709,13 @@ func doReload() {
 
 	// load the specs
 	specs := getAPISpecs()
+
+	if specs == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("No API Definitions found (nil), not reloading")
+		return
+	}
 
 	if len(specs) == 0 {
 		log.WithFields(logrus.Fields{
@@ -1324,8 +1332,10 @@ func listen(l net.Listener, err error) {
 
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
-			loadApps(specs, defaultRouter)
-			getPolicies()
+			if specs != nil {
+				loadApps(specs, defaultRouter)
+				getPolicies()
+			}
 		}
 
 		// Use a custom server so we can control keepalives
@@ -1385,8 +1395,11 @@ func listen(l net.Listener, err error) {
 		// Resume accepting connections in a new goroutine.
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
-			loadApps(specs, defaultRouter)
-			getPolicies()
+			if specs != nil {
+				loadApps(specs, defaultRouter)
+				getPolicies()
+			}
+
 			startHeartBeat()
 		}
 

@@ -129,7 +129,7 @@ AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
 AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
 
 echo "Signing AMD RPM"
-~/build_tools/rpm-sign.exp $amd64TGZDIR/$AMDRPMNAME
+/src/github.com/TykTechnologies/tyk/build_tools/rpm-sign.exp $amd64TGZDIR/$AMDRPMNAME
 
 echo Creating Deb Package for i386
 cd $i386TGZDIR/
@@ -140,7 +140,7 @@ i386DEBNAME="tyk-gateway_"$VERSION"_i386.deb"
 i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
 
 echo "Signing i386 RPM"
-~/build_tools/rpm-sign.exp $i386TGZDIR/$i386RPMNAME
+/src/github.com/TykTechnologies/tyk/build_tools/rpm-sign.exp $i386TGZDIR/$i386RPMNAME
 
 echo Creating Deb Package for ARM
 cd $armTGZDIR/
@@ -151,4 +151,4 @@ ARMDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
 ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
 
 echo "Signing Arm RPM"
-~/build_tools/rpm-sign.exp $armTGZDIR/$ARMRPMNAME
+/src/github.com/TykTechnologies/tyk/build_tools/rpm-sign.exp $armTGZDIR/$ARMRPMNAME
