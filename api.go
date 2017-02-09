@@ -1462,9 +1462,7 @@ type NewClientRequest struct {
 }
 
 func createOauthClientStorageID(APIID string, clientID string) string {
-	// storageID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX + clientID
-	storageID := CLIENT_PREFIX + clientID
-	return storageID
+	return CLIENT_PREFIX + clientID
 }
 
 func createOauthClient(w http.ResponseWriter, r *http.Request) {
@@ -1818,7 +1816,6 @@ func getOauthClients(APIID string) ([]byte, int) {
 	var err error
 	code := 200
 
-	// filterID := OAUTH_PREFIX + APIID + "." + CLIENT_PREFIX
 	filterID := CLIENT_PREFIX
 
 	apiSpec := GetSpecForApi(APIID)

@@ -149,8 +149,6 @@ func setupGlobals() {
 
 	}
 
-	//genericOsinStorage = MakeNewOsinServer()
-
 	// Load all the files that have the "error" prefix.
 	templatesDir := filepath.Join(config.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
@@ -313,35 +311,34 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 		"prefix": "main",
 	}).Info("Initialising Tyk REST API Endpoints")
 
-	var ApiMuxer *mux.Router
-	ApiMuxer = Muxer
+	apiMuxer := Muxer
 	if config.EnableAPISegregation {
 		if config.ControlAPIHostname != "" {
-			ApiMuxer = Muxer.Host(config.ControlAPIHostname).Subrouter()
+			apiMuxer = Muxer.Host(config.ControlAPIHostname).Subrouter()
 		}
 	}
 
 	// set up main API handlers
-	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(InstrumentationMW(groupResetHandler)))
-	ApiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(InstrumentationMW(resetHandler)))
+	apiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(InstrumentationMW(groupResetHandler)))
+	apiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(InstrumentationMW(resetHandler)))
 
 	if !IsRPCMode() {
-		ApiMuxer.HandleFunc("/tyk/org/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(orgHandler)))
-		ApiMuxer.HandleFunc("/tyk/keys/policy/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
-		ApiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(InstrumentationMW(createKeyHandler)))
-		ApiMuxer.HandleFunc("/tyk/apis/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
-		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(InstrumentationMW(healthCheckhandler)))
-		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(InstrumentationMW(createOauthClient)))
-		ApiMuxer.HandleFunc("/tyk/oauth/refresh/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
-		ApiMuxer.HandleFunc("/tyk/cache/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
+		apiMuxer.HandleFunc("/tyk/org/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(orgHandler)))
+		apiMuxer.HandleFunc("/tyk/keys/policy/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
+		apiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(InstrumentationMW(createKeyHandler)))
+		apiMuxer.HandleFunc("/tyk/apis/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
+		apiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(InstrumentationMW(healthCheckhandler)))
+		apiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(InstrumentationMW(createOauthClient)))
+		apiMuxer.HandleFunc("/tyk/oauth/refresh/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
+		apiMuxer.HandleFunc("/tyk/cache/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	ApiMuxer.HandleFunc("/tyk/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(keyHandler)))
-	ApiMuxer.HandleFunc("/tyk/oauth/clients/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
+	apiMuxer.HandleFunc("/tyk/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(keyHandler)))
+	apiMuxer.HandleFunc("/tyk/oauth/clients/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -388,7 +385,6 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	serverConfig.RedirectUriSeparator = config.OauthRedirectUriSeparator
 
 	OAuthPrefix := generateOAuthPrefix(spec.APIID)
-	//storageManager := RedisClusterStorageManager{KeyPrefix: OAuthPrefix}
 	storageManager := GetGlobalStorageHandler(OAuthPrefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
@@ -428,8 +424,6 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
-
-	// osinServer.AccessTokenGen = &AccessTokenGenTyk{}
 
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
@@ -1285,24 +1279,13 @@ func handleDashboardRegistration() {
 }
 
 func startHeartBeat() {
-	// heartbeatConnStr := config.DBAppConfOptions.ConnectionString
-	// if heartbeatConnStr == "" && config.DisableDashboardZeroConf {
-	// 	log.Fatal("Connection string is empty, failing.")
-	// }
-
-	// log.WithFields(logrus.Fields{
-	// 	"prefix": "main",
-	// }).Info("Starting heartbeat.")
-	// heartbeatConnStr = heartbeatConnStr + "/register/ping"
 	if config.UseDBAppConfigs {
 		if DashService == nil {
 			DashService = &HTTPDashboardHandler{}
 			DashService.Init()
 		}
-
 		go DashService.StartBeating()
 	}
-
 }
 
 func StartDRL() {

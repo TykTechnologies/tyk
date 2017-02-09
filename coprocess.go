@@ -73,10 +73,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 	defer r.Body.Close()
 	originalBody, _ := ioutil.ReadAll(r.Body)
 
-	var object *coprocess.Object
-	var miniRequestObject *coprocess.MiniRequestObject
-
-	miniRequestObject = &coprocess.MiniRequestObject{
+	miniRequestObject := &coprocess.MiniRequestObject{
 		Headers:        ProtoMap(r.Header),
 		SetHeaders:     make(map[string]string, 0),
 		DeleteHeaders:  make([]string, 0),
@@ -92,7 +89,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 		},
 	}
 
-	object = &coprocess.Object{
+	object := &coprocess.Object{
 		Request:  miniRequestObject,
 		HookName: c.Middleware.HookName,
 	}
@@ -106,8 +103,6 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	object.Metadata = make(map[string]string, 0)
 	object.Spec = make(map[string]string, 0)
-
-	// object.Session = SessionState{}
 
 	// Append spec data:
 	if c.Middleware != nil {

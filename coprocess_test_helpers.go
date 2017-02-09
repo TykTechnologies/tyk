@@ -51,12 +51,8 @@ type TestDispatcher struct {
 /* Basic CoProcessDispatcher functions */
 
 func (d *TestDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
-	var object *C.struct_CoProcessMessage
-	object = (*C.struct_CoProcessMessage)(objectPtr)
-
-	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = C.TestDispatchHook(object)
-
+	object := (*C.struct_CoProcessMessage)(objectPtr)
+	newObjectPtr := C.TestDispatchHook(object)
 	return unsafe.Pointer(newObjectPtr)
 }
 
@@ -83,13 +79,9 @@ func (d *TestDispatcher) ToCoProcessMessage(object *coprocess.Object) unsafe.Poi
 	objectMsg, _ := proto.Marshal(object)
 
 	objectMsgStr := string(objectMsg)
+	CObjectStr := C.CString(objectMsgStr)
 
-	var CObjectStr *C.char
-	CObjectStr = C.CString(objectMsgStr)
-
-	var messagePtr *C.struct_CoProcessMessage
-
-	messagePtr = (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
+	messagePtr := (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
 	messagePtr.p_data = unsafe.Pointer(CObjectStr)
 	messagePtr.length = C.int(len(objectMsg))
 
@@ -97,26 +89,17 @@ func (d *TestDispatcher) ToCoProcessMessage(object *coprocess.Object) unsafe.Poi
 }
 
 func (d *TestDispatcher) ToCoProcessObject(messagePtr unsafe.Pointer) *coprocess.Object {
-	var message *C.struct_CoProcessMessage
-	message = (*C.struct_CoProcessMessage)(messagePtr)
-
-	var object *coprocess.Object
-	object = &coprocess.Object{}
+	message := (*C.struct_CoProcessMessage)(messagePtr)
+	object := &coprocess.Object{}
 
 	objectBytes := C.GoBytes(message.p_data, message.length)
-
 	proto.Unmarshal(objectBytes, object)
-
 	return object
 }
 
-func (d *TestDispatcher) TestMessageLength(messagePtr unsafe.Pointer) (length int) {
-	var message *C.struct_CoProcessMessage
-	message = (*C.struct_CoProcessMessage)(messagePtr)
-
-	length = int(C.TestMessageLength(message))
-
-	return length
+func (d *TestDispatcher) TestMessageLength(messagePtr unsafe.Pointer) int {
+	message := (*C.struct_CoProcessMessage)(messagePtr)
+	return int(C.TestMessageLength(message))
 }
 
 func TestTykStoreData(key string, value string, ttl int) {
@@ -144,9 +127,7 @@ func TestTykTriggerEvent(eventName string, eventPayload string) {
 
 //export applyTestHooks
 func applyTestHooks(objectPtr unsafe.Pointer) {
-	var objectStruct *C.struct_CoProcessMessage
-	objectStruct = (*C.struct_CoProcessMessage)(objectPtr)
-
+	objectStruct := (*C.struct_CoProcessMessage)(objectPtr)
 	objectBytes := C.GoBytes(objectStruct.p_data, objectStruct.length)
 
 	object := &coprocess.Object{}

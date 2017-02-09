@@ -152,14 +152,9 @@ func processSpec(referenceSpec *APISpec,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	var authStore StorageHandler
-	var sessionStore StorageHandler
-	var orgStore StorageHandler
+	var authStore, sessionStore, orgStore StorageHandler
 
 	authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
-	// if config.SlaveOptions.OverrideDefinitionStorageSettings {
-	// 	authStorageEngineToUse = RPCStorageEngine
-	// }
 
 	switch authStorageEngineToUse {
 	case DefaultStorageEngine:
@@ -182,9 +177,6 @@ func processSpec(referenceSpec *APISpec,
 	}
 
 	SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
-	// if config.SlaveOptions.OverrideDefinitionStorageSettings {
-	// 	SessionStorageEngineToUse = RPCStorageEngine
-	// }
 
 	switch SessionStorageEngineToUse {
 	case DefaultStorageEngine:
@@ -276,7 +268,6 @@ func processSpec(referenceSpec *APISpec,
 	// Create the response processors
 	creeateResponseMiddlewareChain(referenceSpec)
 
-	//proxyHandler := http.HandlerFunc(ProxyHandler(proxy, referenceSpec))
 	tykMiddleware := &TykMiddleware{referenceSpec, proxy}
 	CheckCBEnabled(tykMiddleware)
 	CheckETEnabled(tykMiddleware)

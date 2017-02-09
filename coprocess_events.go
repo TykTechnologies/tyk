@@ -3,9 +3,9 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
-	// "fmt"
 	"encoding/json"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // Constant for event system.
@@ -41,9 +41,7 @@ func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, er
 		log.Error("Failed to marshal globals! ", err)
 	}
 
-	// handler.SpecJSON = string(gValAsJSON)
 	handler.SpecJSON = json.RawMessage(gValAsJSON)
-
 	return handler, nil
 }
 

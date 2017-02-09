@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
-	"unsafe"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -30,21 +29,16 @@ var (
 /* Dispatcher functions */
 
 func TestCoProcessDispatch(t *testing.T) {
-	var object, newObject *coprocess.Object
-	var messagePtr, newMessagePtr unsafe.Pointer
-
-	object = &coprocess.Object{
+	object := &coprocess.Object{
 		HookType: coprocess.HookType_Pre,
 		HookName: "test",
 	}
 
-	messagePtr = testDispatcher.ToCoProcessMessage(object)
-	newMessagePtr = testDispatcher.Dispatch(messagePtr)
+	messagePtr := testDispatcher.ToCoProcessMessage(object)
+	newMessagePtr := testDispatcher.Dispatch(messagePtr)
 
-	newObject = testDispatcher.ToCoProcessObject(newMessagePtr)
-
+	newObject := testDispatcher.ToCoProcessObject(newMessagePtr)
 	t.Log(newObject)
-
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
@@ -99,24 +93,18 @@ func TestCoProcessReload(t *testing.T) {
 /* Serialization, CP Objects */
 
 func TestCoProcessSerialization(t *testing.T) {
-	var object *coprocess.Object
-
-	object = &coprocess.Object{
+	object := &coprocess.Object{
 		HookType: coprocess.HookType_Pre,
 		HookName: "test_hook",
 	}
 
 	data, err := proto.Marshal(object)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var messagePtr unsafe.Pointer
-	messagePtr = testDispatcher.ToCoProcessMessage(object)
-
-	var length int
-	length = testDispatcher.TestMessageLength(messagePtr)
+	messagePtr := testDispatcher.ToCoProcessMessage(object)
+	length := testDispatcher.TestMessageLength(messagePtr)
 
 	if len(data) != length {
 		err := "The length of the serialized object doesn't match."

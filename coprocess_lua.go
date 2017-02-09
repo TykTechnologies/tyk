@@ -109,18 +109,13 @@ type LuaDispatcher struct {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
-	var object *C.struct_CoProcessMessage
-	object = (*C.struct_CoProcessMessage)(objectPtr)
-
-	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = C.LuaDispatchHook(object)
-
+	object := (*C.struct_CoProcessMessage)(objectPtr)
+	newObjectPtr := C.LuaDispatchHook(object)
 	return unsafe.Pointer(newObjectPtr)
 }
 
 // Reload will perform a middleware reload when a hot reload is triggered.
 func (d *LuaDispatcher) Reload() {
-	// modules, _ := ioutil.ReadDir(ModuleBasePath)
 	files, _ := ioutil.ReadDir(MiddlewareBasePath)
 
 	if d.MiddlewareCache == nil {
@@ -184,9 +179,8 @@ func (d *LuaDispatcher) LoadModules() {
 //export LoadCachedModules
 func LoadCachedModules(luaState unsafe.Pointer) {
 	for moduleName, moduleContents := range gModuleCache {
-		var cModuleName, cModuleContents *C.char
-		cModuleName = C.CString(moduleName)
-		cModuleContents = C.CString(moduleContents)
+		cModuleName := C.CString(moduleName)
+		cModuleContents := C.CString(moduleContents)
 		C.LoadMiddlewareIntoState((*C.struct_lua_State)(luaState), cModuleName, cModuleContents)
 		C.free(unsafe.Pointer(cModuleName))
 		C.free(unsafe.Pointer(cModuleContents))
@@ -197,9 +191,8 @@ func LoadCachedModules(luaState unsafe.Pointer) {
 //export LoadCachedMiddleware
 func LoadCachedMiddleware(luaState unsafe.Pointer) {
 	for middlewareName, middlewareContents := range gMiddlewareCache {
-		var cMiddlewareName, cMiddlewareContents *C.char
-		cMiddlewareName = C.CString(middlewareName)
-		cMiddlewareContents = C.CString(middlewareContents)
+		cMiddlewareName := C.CString(middlewareName)
+		cMiddlewareContents := C.CString(middlewareContents)
 		C.LoadMiddlewareIntoState((*C.struct_lua_State)(luaState), cMiddlewareName, cMiddlewareContents)
 		C.free(unsafe.Pointer(cMiddlewareName))
 		C.free(unsafe.Pointer(cMiddlewareContents))
@@ -208,8 +201,7 @@ func LoadCachedMiddleware(luaState unsafe.Pointer) {
 }
 
 func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
-	var CEventJSON *C.char
-	CEventJSON = C.CString(string(eventJSON))
+	CEventJSON := C.CString(string(eventJSON))
 	C.LuaDispatchEvent(CEventJSON)
 	C.free(unsafe.Pointer(CEventJSON))
 	return

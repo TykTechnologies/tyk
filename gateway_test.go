@@ -147,7 +147,6 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.HandlerFunc {
 
 func getChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
-	//remote, _ := url.Parse("http://example.com/")
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 	tykMiddleware := &TykMiddleware{spec, proxy}

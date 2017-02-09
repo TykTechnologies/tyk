@@ -129,10 +129,8 @@ func (a *AnalyticsRecord) NormalisePath() {
 		if config.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
 			a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
 		}
-		if len(config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom) > 0 {
-			for _, r := range config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom {
-				a.Path = r.ReplaceAllString(a.Path, "{var}")
-			}
+		for _, r := range config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom {
+			a.Path = r.ReplaceAllString(a.Path, "{var}")
 		}
 	}
 

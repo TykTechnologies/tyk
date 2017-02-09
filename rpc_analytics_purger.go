@@ -68,8 +68,6 @@ func (r RPCPurger) PurgeLoop(sleep time.Duration) {
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *RPCPurger) PurgeCache() {
-	//var AnalyticsValues []interface{}
-
 	AnalyticsValues := r.Store.GetAndDeleteSet(ANALYTICS_KEYNAME)
 
 	if len(AnalyticsValues) > 0 {

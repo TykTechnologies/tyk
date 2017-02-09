@@ -29,10 +29,9 @@ import (
 )
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
-func (c *CoProcessor) Dispatch(object *coprocess.Object) (newObject *coprocess.Object, err error) {
+func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 
 	var objectMsg []byte
-
 	if MessageType == coprocess.ProtobufMessage {
 		objectMsg, _ = proto.Marshal(object)
 	} else if MessageType == coprocess.JsonMessage {
@@ -41,22 +40,17 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (newObject *coprocess.O
 
 	objectMsgStr := string(objectMsg)
 
-	var CObjectStr *C.char
-	CObjectStr = C.CString(objectMsgStr)
+	CObjectStr := C.CString(objectMsgStr)
 
-	var objectPtr *C.struct_CoProcessMessage
-
-	objectPtr = (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
+	objectPtr := (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
 	objectPtr.p_data = unsafe.Pointer(CObjectStr)
 	objectPtr.length = C.int(len(objectMsg))
 
-	var newObjectPtr *C.struct_CoProcessMessage
-	newObjectPtr = (*C.struct_CoProcessMessage)(GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr)))
+	newObjectPtr := (*C.struct_CoProcessMessage)(GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr)))
 
-	var newObjectBytes []byte
-	newObjectBytes = C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
+	newObjectBytes := C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 
-	newObject = &coprocess.Object{}
+	newObject := &coprocess.Object{}
 
 	if MessageType == coprocess.ProtobufMessage {
 		proto.Unmarshal(newObjectBytes, newObject)
@@ -68,5 +62,5 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (newObject *coprocess.O
 	C.free(unsafe.Pointer(objectPtr))
 	C.free(unsafe.Pointer(newObjectPtr))
 
-	return newObject, err
+	return newObject, nil
 }

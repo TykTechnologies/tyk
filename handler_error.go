@@ -4,7 +4,6 @@ import (
 	"bytes"
 	b64 "encoding/base64"
 	"fmt"
-	"html/template"
 	"net"
 	"net/http"
 	"runtime/pprof"
@@ -50,13 +49,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 
 		w.Header().Set("Content-Type", contentType)
 
-		var tmpl *template.Template
 		templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
 
-		// templateError := templates.ExecuteTemplate(w, templateName, &apiError)
-
 		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl = templates.Lookup(templateName)
+		tmpl := templates.Lookup(templateName)
 
 		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 		if tmpl == nil {
