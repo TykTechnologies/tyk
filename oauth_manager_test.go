@@ -102,16 +102,7 @@ func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 
 func makeOAuthAPI(t *testing.T) *APISpec {
 	spec := createSpecTest(t, oauthDefinition)
-
-	specs := []*APISpec{spec}
-	newMuxes := mux.NewRouter()
-	loadAPIEndpoints(newMuxes)
-	loadApps(specs, newMuxes)
-
-	newHttpMux := http.NewServeMux()
-	newHttpMux.Handle("/", newMuxes)
-	http.DefaultServeMux = newHttpMux
-
+	loadApps([]*APISpec{spec}, discardMuxer)
 	return spec
 }
 

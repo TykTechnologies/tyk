@@ -14,12 +14,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 )
 
 func init() {
 	runningTests = true
 }
+
+var discardMuxer = mux.NewRouter()
 
 func TestMain(m *testing.M) {
 	WriteDefaultConf(&config)

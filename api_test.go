@@ -50,17 +50,7 @@ const apiTestDef = `{
 
 func makeSampleAPI(t *testing.T) *APISpec {
 	spec := createSpecTest(t, apiTestDef)
-
-	specs := []*APISpec{spec}
-	newMuxes := mux.NewRouter()
-	loadAPIEndpoints(newMuxes)
-	loadApps(specs, newMuxes)
-
-	newHttmMuxer := http.NewServeMux()
-
-	newHttmMuxer.Handle("/", newMuxes)
-
-	http.DefaultServeMux = newHttmMuxer
+	loadApps([]*APISpec{spec}, discardMuxer)
 	return spec
 }
 

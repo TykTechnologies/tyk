@@ -5,8 +5,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
-
-	"github.com/gorilla/mux"
 )
 
 const ipMiddlewareTestDefinitionEnabledFail = `{
@@ -148,19 +146,8 @@ const ipMiddlewareTestDefinitionMissing = `{
 }`
 
 func createIPSampleAPI(t *testing.T, apiTestDef string) *APISpec {
-	log.Debug("CREATING TEMPORARY API FOR IP WHITELIST")
 	spec := createSpecTest(t, apiTestDef)
-
-	specs := []*APISpec{spec}
-	newMuxes := mux.NewRouter()
-	loadAPIEndpoints(newMuxes)
-	loadApps(specs, newMuxes)
-	newHttpMuxer := http.NewServeMux()
-	newHttpMuxer.Handle("/", newMuxes)
-
-	http.DefaultServeMux = newHttpMuxer
-	log.Debug("IP TEST Reload complete")
-
+	loadApps([]*APISpec{spec}, discardMuxer)
 	return spec
 }
 
