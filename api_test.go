@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -559,4 +560,52 @@ func TestGetOAuthClients(t *testing.T) {
 	}
 
 	ApiSpecRegister = nil
+}
+
+const apiBenchDef = `{
+	"name": "Bench API",
+	"api_id": "REPLACE",
+	"org_id": "default",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"use_extended_paths": true
+			}
+		}
+	},
+	"proxy": {
+		"listen_path": "/listen-REPLACE",
+		"target_url": "http://httpbin.org/",
+		"strip_listen_path": false
+	}
+}`
+
+func BenchmarkApiInsertReload(b *testing.B) {
+	redisStore := &RedisClusterStorageManager{KeyPrefix: "apikey."}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
+
+	specs := make([]*APISpec, 1000)
+	for i := range specs {
+		id := strconv.Itoa(i + 1)
+		def := strings.Replace(apiBenchDef, "REPLACE", id, -1)
+		spec := createDefinitionFromString(def)
+		spec.Init(redisStore, redisStore, healthStore, orgStore)
+		specs[i] = spec
+	}
+
+	for i := 0; i < b.N; i++ {
+		newMuxes := mux.NewRouter()
+		loadAPIEndpoints(newMuxes)
+		loadApps(&specs, newMuxes)
+	}
 }
