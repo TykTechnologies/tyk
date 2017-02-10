@@ -195,9 +195,9 @@ LOOP:
 func (s *StatsDSink) processCmd(cmd *statsdEmitCmd) {
 	switch cmd.Kind {
 	case statsdCmdKindEvent:
-		s.processEvent(cmd.Job, cmd.Event)
+		s.processEvent(cmd.Job, cmd.Event, "")
 	case statsdCmdKindEventErr:
-		s.processEventErr(cmd.Job, cmd.Event)
+		s.processEvent(cmd.Job, cmd.Event, "error")
 	case statsdCmdKindTiming:
 		s.processTiming(cmd.Job, cmd.Event, cmd.Nanos)
 	case statsdCmdKindGauge:
@@ -207,29 +207,15 @@ func (s *StatsDSink) processCmd(cmd *statsdEmitCmd) {
 	}
 }
 
-func (s *StatsDSink) processEvent(job string, event string) {
+func (s *StatsDSink) processEvent(job, event, extra string) {
 	if !s.options.SkipTopLevelEvents {
-		pb := s.getPrefixBuffer("", event, "")
+		pb := s.getPrefixBuffer("", event, extra)
 		pb.WriteString("1|c\n")
 		s.writeStatsDMetric(pb.Bytes())
 	}
 
 	if !s.options.SkipNestedEvents {
-		pb := s.getPrefixBuffer(job, event, "")
-		pb.WriteString("1|c\n")
-		s.writeStatsDMetric(pb.Bytes())
-	}
-}
-
-func (s *StatsDSink) processEventErr(job string, event string) {
-	if !s.options.SkipTopLevelEvents {
-		pb := s.getPrefixBuffer("", event, "error")
-		pb.WriteString("1|c\n")
-		s.writeStatsDMetric(pb.Bytes())
-	}
-
-	if !s.options.SkipNestedEvents {
-		pb := s.getPrefixBuffer(job, event, "error")
+		pb := s.getPrefixBuffer(job, event, extra)
 		pb.WriteString("1|c\n")
 		s.writeStatsDMetric(pb.Bytes())
 	}
