@@ -102,7 +102,7 @@ func (d *TestDispatcher) TestMessageLength(messagePtr unsafe.Pointer) int {
 	return int(C.TestMessageLength(message))
 }
 
-func TestTykStoreData(key string, value string, ttl int) {
+func TestTykStoreData(key, value string, ttl int) {
 	Ckey := C.CString(key)
 	Cvalue := C.CString(value)
 	Cttl := C.int(ttl)
@@ -117,7 +117,7 @@ func TestTykGetData(key string) string {
 
 /* Events */
 
-func TestTykTriggerEvent(eventName string, eventPayload string) {
+func TestTykTriggerEvent(eventName, eventPayload string) {
 	CeventName := C.CString(eventName)
 	CeventPayload := C.CString(eventPayload)
 	TykTriggerEvent(CeventName, CeventPayload)

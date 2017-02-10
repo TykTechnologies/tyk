@@ -118,12 +118,12 @@ func (l *LDAPStorageHandler) GetKeysAndValuesWithFilter(filter string) map[strin
 	return s
 }
 
-func (l *LDAPStorageHandler) SetKey(cn string, sessionState string, timeout int64) error {
+func (l *LDAPStorageHandler) SetKey(cn, sessionState string, timeout int64) error {
 	l.notifyReadOnly()
 	return nil
 }
 
-func (l *LDAPStorageHandler) SetRawKey(cn string, sessionState string, timeout int64) error {
+func (l *LDAPStorageHandler) SetRawKey(cn, sessionState string, timeout int64) error {
 	l.notifyReadOnly()
 	return nil
 }
@@ -169,11 +169,11 @@ func (s LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {
 	return map[string]string{}, nil
 }
 
-func (s LDAPStorageHandler) AddToSet(keyName string, value string) {
+func (s LDAPStorageHandler) AddToSet(keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (s LDAPStorageHandler) RemoveFromSet(keyName string, value string) {
+func (s LDAPStorageHandler) RemoveFromSet(keyName, value string) {
 	log.Error("Not implemented")
 }
 

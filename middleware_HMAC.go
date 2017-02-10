@@ -356,7 +356,7 @@ func generateHMACSignatureStringFromRequest(r *http.Request, fieldValues *HMACFi
 	return signatureString, nil
 }
 
-func generateEncodedSignature(signatureString string, secret string) string {
+func generateEncodedSignature(signatureString, secret string) string {
 	key := []byte(secret)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(signatureString))

@@ -134,19 +134,19 @@ func (s *StatsDSink) Drain() {
 	<-s.drainDoneChan
 }
 
-func (s *StatsDSink) EmitEvent(job string, event string, kvs map[string]string) {
+func (s *StatsDSink) EmitEvent(job, event string, kvs map[string]string) {
 	s.cmdChan <- statsdEmitCmd{Kind: statsdCmdKindEvent, Job: job, Event: event}
 }
 
-func (s *StatsDSink) EmitEventErr(job string, event string, inputErr error, kvs map[string]string) {
+func (s *StatsDSink) EmitEventErr(job, event string, inputErr error, kvs map[string]string) {
 	s.cmdChan <- statsdEmitCmd{Kind: statsdCmdKindEventErr, Job: job, Event: event}
 }
 
-func (s *StatsDSink) EmitTiming(job string, event string, nanos int64, kvs map[string]string) {
+func (s *StatsDSink) EmitTiming(job, event string, nanos int64, kvs map[string]string) {
 	s.cmdChan <- statsdEmitCmd{Kind: statsdCmdKindTiming, Job: job, Event: event, Nanos: nanos}
 }
 
-func (s *StatsDSink) EmitGauge(job string, event string, value float64, kvs map[string]string) {
+func (s *StatsDSink) EmitGauge(job, event string, value float64, kvs map[string]string) {
 	s.cmdChan <- statsdEmitCmd{Kind: statsdCmdKindGauge, Job: job, Event: event, Value: value}
 }
 
@@ -221,7 +221,7 @@ func (s *StatsDSink) processEvent(job, event, extra string) {
 	}
 }
 
-func (s *StatsDSink) processTiming(job string, event string, nanos int64) {
+func (s *StatsDSink) processTiming(job, event string, nanos int64) {
 	s.writeNanosToTimingBuf(nanos)
 
 	if !s.options.SkipTopLevelEvents {
@@ -239,7 +239,7 @@ func (s *StatsDSink) processTiming(job string, event string, nanos int64) {
 	}
 }
 
-func (s *StatsDSink) processGauge(job string, event string, value float64) {
+func (s *StatsDSink) processGauge(job, event string, value float64) {
 	s.timingBuf = s.timingBuf[0:0]
 	prec := 2
 	if value < 0.1 && value > -0.1 {

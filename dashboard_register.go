@@ -149,7 +149,7 @@ func (h *HTTPDashboardHandler) StopBeating() {
 	h.heartBeatStopSentinel = true
 }
 
-func (h *HTTPDashboardHandler) SendHeartBeat(endpoint string, secret string) error {
+func (h *HTTPDashboardHandler) SendHeartBeat(endpoint, secret string) error {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)

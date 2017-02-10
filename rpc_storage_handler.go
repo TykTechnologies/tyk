@@ -346,7 +346,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout int64) error {
+func (r *RPCStorageHandler) SetKey(keyName, sessionState string, timeout int64) error {
 	start := time.Now() // get current time
 	ibd := InboundData{
 		KeyName:      r.fixKey(keyName),
@@ -367,7 +367,7 @@ func (r *RPCStorageHandler) SetKey(keyName string, sessionState string, timeout 
 
 }
 
-func (r *RPCStorageHandler) SetRawKey(keyName string, sessionState string, timeout int64) error {
+func (r *RPCStorageHandler) SetRawKey(keyName, sessionState string, timeout int64) error {
 	return nil
 }
 
@@ -527,7 +527,7 @@ func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(red
 	return nil
 }
 
-func (r *RPCStorageHandler) Publish(channel string, message string) error {
+func (r *RPCStorageHandler) Publish(channel, message string) error {
 	log.Warning("NO PUBSUB DEFINED")
 	return nil
 }
@@ -538,7 +538,7 @@ func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
 	return []interface{}{}
 }
 
-func (r *RPCStorageHandler) AppendToSet(keyName string, value string) {
+func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 
 	ibd := InboundData{
 		KeyName: keyName,
@@ -590,11 +590,11 @@ func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
 	return map[string]string{}, nil
 }
 
-func (r RPCStorageHandler) AddToSet(keyName string, value string) {
+func (r RPCStorageHandler) AddToSet(keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (r RPCStorageHandler) RemoveFromSet(keyName string, value string) {
+func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
 	log.Error("Not implemented")
 }
 
@@ -747,7 +747,7 @@ func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
 func GetDispatcher() *gorpc.Dispatcher {
 	Dispatch := gorpc.NewDispatcher()
 
-	Dispatch.AddFunc("Login", func(clientAddr string, userKey string) bool {
+	Dispatch.AddFunc("Login", func(clientAddr, userKey string) bool {
 		return false
 	})
 
@@ -819,11 +819,11 @@ func GetDispatcher() *gorpc.Dispatcher {
 		return nil
 	})
 
-	Dispatch.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
+	Dispatch.AddFunc("CheckReload", func(clientAddr, orgId string) (bool, error) {
 		return false, nil
 	})
 
-	Dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr string, orgId string) ([]string, error) {
+	Dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgId string) ([]string, error) {
 		return []string{}, nil
 	})
 

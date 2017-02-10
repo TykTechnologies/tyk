@@ -239,7 +239,7 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 }
 
 // LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint string, secret string) []*APISpec {
+func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secret string) []*APISpec {
 	var APISpecs = []*APISpec{}
 
 	// Get the definitions
