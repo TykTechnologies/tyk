@@ -183,18 +183,19 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, Spec *A
 }
 
 // FireEvent is added to the tykMiddleware object so it is available across the entire stack
-func (t *TykMiddleware) FireEvent(eventName apidef.TykEvent, eventMetaData interface{}) {
+func (t *TykMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
+	fireEvent(name, meta, t.Spec.EventPaths)
+}
 
-	log.Debug("EVENT FIRED")
-	handlers, handlerExists := t.Spec.EventPaths[eventName]
-
-	if handlerExists {
+func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]TykEventHandler) {
+	log.Debug("EVENT FIRED: ", name)
+	if handlers, e := handlers[name]; e {
 		log.Debug("FOUND EVENT HANDLERS")
-		eventMessage := EventMessage{}
-		eventMessage.EventMetaData = eventMetaData
-		eventMessage.EventType = eventName
-		eventMessage.TimeStamp = time.Now().Local().String()
-
+		eventMessage := EventMessage{
+			EventMetaData: meta,
+			EventType:     name,
+			TimeStamp:     time.Now().Local().String(),
+		}
 		for _, handler := range handlers {
 			log.Debug("FIRING HANDLER")
 			go handler.HandleEvent(eventMessage)
@@ -202,23 +203,8 @@ func (t *TykMiddleware) FireEvent(eventName apidef.TykEvent, eventMetaData inter
 	}
 }
 
-func (s *APISpec) FireEvent(eventName apidef.TykEvent, eventMetaData interface{}) {
-
-	log.Debug("EVENT FIRED: ", eventName)
-	handlers, handlerExists := s.EventPaths[eventName]
-
-	if handlerExists {
-		log.Debug("FOUND EVENT HANDLERS")
-		eventMessage := EventMessage{}
-		eventMessage.EventMetaData = eventMetaData
-		eventMessage.EventType = eventName
-		eventMessage.TimeStamp = time.Now().Local().String()
-
-		for _, handler := range handlers {
-			log.Debug("FIRING HANDLER")
-			go handler.HandleEvent(eventMessage)
-		}
-	}
+func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
+	fireEvent(name, meta, s.EventPaths)
 }
 
 // LogMessageEventHandler is a sample Event Handler
@@ -271,21 +257,6 @@ func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[api
 	return actualEventHandlers
 }
 
-func FireSystemEvent(eventName apidef.TykEvent, eventMetaData interface{}) {
-
-	log.Debug("EVENT FIRED: ", eventName)
-	handlers, handlerExists := config.EventTriggers[eventName]
-
-	if handlerExists {
-		log.Debug("FOUND EVENT HANDLERS")
-		eventMessage := EventMessage{}
-		eventMessage.EventMetaData = eventMetaData
-		eventMessage.EventType = eventName
-		eventMessage.TimeStamp = time.Now().Local().String()
-
-		for _, handler := range handlers {
-			log.Debug("FIRING HANDLER")
-			go handler.HandleEvent(eventMessage)
-		}
-	}
+func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
+	fireEvent(name, meta, config.EventTriggers)
 }
