@@ -56,9 +56,8 @@ func CoProcessInit() {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Info("Disabled feature")
-	return
 }
 
-func doCoprocessReload() { return }
+func doCoprocessReload() {}
 
 func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {}

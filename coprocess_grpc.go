@@ -75,19 +75,13 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 			"prefix": "coprocess-grpc",
 		}).Error(err)
 	}
-
-	return
 }
 
 // Reload triggers a reload affecting CP middlewares and event handlers.
-func (d *GRPCDispatcher) Reload() {
-	return
-}
+func (d *GRPCDispatcher) Reload() {}
 
 // HandleMiddlewareCache isn't used by gRPC.
-func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
-	return
-}
+func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {

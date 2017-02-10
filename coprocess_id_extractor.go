@@ -50,8 +50,6 @@ func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, 
 
 	context.Set(r, SessionData, sessionState)
 	context.Set(r, AuthHeaderValue, SessionID)
-
-	return
 }
 
 // ExtractHeader is used when a HeaderSource is specified.
