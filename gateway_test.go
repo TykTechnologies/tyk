@@ -31,6 +31,9 @@ func TestMain(m *testing.M) {
 	config.EnableAnalytics = true
 	config.AnalyticsConfig.EnableGeoIP = true
 	config.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	config.EnableJSVM = true
+	config.Monitor.EnableTriggerMonitors = true
+	config.AnalyticsConfig.NormaliseUrls.Enabled = true
 	initialiseSystem(nil)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
