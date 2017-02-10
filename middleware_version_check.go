@@ -42,7 +42,6 @@ func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 
 	w.WriteHeader(emeta.Code)
 	fmt.Fprintf(w, string(responseMessage))
-	return
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

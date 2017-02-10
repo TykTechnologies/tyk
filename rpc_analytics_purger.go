@@ -30,8 +30,6 @@ func (r *RPCPurger) Connect() {
 			}
 		}
 	}
-
-	return
 }
 
 // PurgeLoop starts the loop that will pull data out of the in-memory

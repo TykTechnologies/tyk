@@ -185,7 +185,6 @@ func LoadCachedModules(luaState unsafe.Pointer) {
 		C.free(unsafe.Pointer(cModuleName))
 		C.free(unsafe.Pointer(cModuleContents))
 	}
-	return
 }
 
 //export LoadCachedMiddleware
@@ -197,14 +196,12 @@ func LoadCachedMiddleware(luaState unsafe.Pointer) {
 		C.free(unsafe.Pointer(cMiddlewareName))
 		C.free(unsafe.Pointer(cMiddlewareContents))
 	}
-	return
 }
 
 func (d *LuaDispatcher) DispatchEvent(eventJSON []byte) {
 	CEventJSON := C.CString(string(eventJSON))
 	C.LuaDispatchEvent(CEventJSON)
 	C.free(unsafe.Pointer(CEventJSON))
-	return
 }
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.

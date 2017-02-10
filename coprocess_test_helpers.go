@@ -58,12 +58,10 @@ func (d *TestDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
 
 func (d *TestDispatcher) DispatchEvent(eventJSON []byte) {
 	CoProcessDispatchEvent <- eventJSON
-	return
 }
 
 func (d *TestDispatcher) Reload() {
 	CoProcessReload <- true
-	return
 }
 
 /* General test helpers */

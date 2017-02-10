@@ -203,7 +203,6 @@ func (d *PythonDispatcher) DispatchEvent(eventJSON []byte) {
 	CEventJSON := C.CString(string(eventJSON))
 	C.Python_DispatchEvent(CEventJSON)
 	C.free(unsafe.Pointer(CEventJSON))
-	return
 }
 
 // Reload triggers a reload affecting CP middlewares and event handlers.
@@ -215,25 +214,24 @@ func (d *PythonDispatcher) Reload() {
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
 	CBundlePath := C.CString(basePath)
 	C.Python_HandleMiddlewareCache(CBundlePath)
-	return
 }
 
 // PythonInit initializes the Python interpreter.
-func PythonInit() (err error) {
+func PythonInit() error {
 	result := C.Python_Init()
 	if result == 0 {
-		err = errors.New("Can't Py_Initialize()")
+		return errors.New("Can't Py_Initialize()")
 	}
-	return err
+	return nil
 }
 
 // PythonLoadDispatcher creates reference to the dispatcher class.
-func PythonLoadDispatcher() (err error) {
+func PythonLoadDispatcher() error {
 	result := C.Python_LoadDispatcher()
 	if result == -1 {
-		err = errors.New("Can't load dispatcher")
+		return errors.New("Can't load dispatcher")
 	}
-	return err
+	return nil
 }
 
 // PythonNewDispatcher creates an instance of TykDispatcher.

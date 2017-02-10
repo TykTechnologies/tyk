@@ -550,7 +550,6 @@ type DummyProxyHandler struct {
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
-	return
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware

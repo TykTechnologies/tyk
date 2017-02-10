@@ -1643,8 +1643,6 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	DoJSONWrite(w, 405, createError("Method not supported"))
-	return
-
 }
 
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
