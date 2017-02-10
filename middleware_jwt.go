@@ -55,7 +55,7 @@ func (a *JWTMiddleware) IsEnabledForSpec() bool {
 	return true
 }
 
-func (k *JWTMiddleware) getSecretFromURL(url string, kid string, keyType string) ([]byte, error) {
+func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, error) {
 	// Implement a cache
 	if JWKCache == nil {
 		log.Debug("Creating JWK Cache")
@@ -445,7 +445,7 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 	}
 }
 
-func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (SessionState, error) {
+func generateSessionFromPolicy(policyID, OrgID string, enforceOrg bool) (SessionState, error) {
 	log.Debug("Generating from policyID: ", policyID)
 	log.Debug(Policies)
 	policy, ok := Policies[policyID]

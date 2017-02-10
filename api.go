@@ -82,7 +82,7 @@ func GetSpecForOrg(APIID string) *APISpec {
 	return ApiSpecRegister[aKey]
 }
 
-func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionState) {
+func checkAndApplyTrialPeriod(keyName, apiId string, newSession *SessionState) {
 	// Check the policy to see if we are forcing an expiry on the key
 	if newSession.ApplyPolicyID != "" {
 		policy, ok := Policies[newSession.ApplyPolicyID]
@@ -202,7 +202,7 @@ func SetSessionPassword(session *SessionState) {
 	session.BasicAuthData.Password = string(newPass)
 }
 
-func GetKeyDetail(key string, APIID string) (SessionState, bool) {
+func GetKeyDetail(key, APIID string) (SessionState, bool) {
 
 	sessionManager := FallbackKeySesionManager
 	if APIID != "" {
@@ -313,7 +313,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
+func handleGetDetail(sessionKey, APIID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
@@ -367,7 +367,7 @@ type APIAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
+func handleGetAllKeys(filter, APIID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	code := 200
@@ -438,7 +438,7 @@ type APIStatusMessage struct {
 	Message string `json:"message"`
 }
 
-func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
+func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
@@ -506,7 +506,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
+func handleDeleteHashedKey(keyName, APIID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
@@ -885,7 +885,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	DoJSONWrite(w, code, responseMessage)
 }
 
-func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byte, int) {
+func handleUpdateHashedKey(keyName, APIID, policyId string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
@@ -1461,7 +1461,7 @@ type NewClientRequest struct {
 	ClientSecret      string `json:"secret"`
 }
 
-func createOauthClientStorageID(APIID string, clientID string) string {
+func createOauthClientStorageID(APIID, clientID string) string {
 	return CLIENT_PREFIX + clientID
 }
 
@@ -1691,7 +1691,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get client details
-func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
+func getOauthClientDetails(keyName, APIID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
@@ -1753,7 +1753,7 @@ func getOauthClientDetails(keyName string, APIID string) ([]byte, int) {
 }
 
 // Delete Client
-func handleDeleteOAuthClient(keyName string, APIID string) ([]byte, int) {
+func handleDeleteOAuthClient(keyName, APIID string) ([]byte, int) {
 	var responseMessage []byte
 
 	storageID := createOauthClientStorageID(APIID, keyName)

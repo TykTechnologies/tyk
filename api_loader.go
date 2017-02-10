@@ -89,7 +89,7 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 	return false
 }
 
-func generateDomainPath(hostname string, listenPath string) string {
+func generateDomainPath(hostname, listenPath string) string {
 	return hostname + listenPath
 }
 

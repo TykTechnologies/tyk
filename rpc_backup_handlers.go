@@ -187,7 +187,7 @@ func decrypt(key []byte, cryptoText string) string {
 	return fmt.Sprintf("%s", ciphertext)
 }
 
-func rightPad2Len(s string, padStr string, overallLen int) string {
+func rightPad2Len(s, padStr string, overallLen int) string {
 	padCountInt := 1 + (overallLen-len(padStr))/len(padStr)
 	retStr := s + strings.Repeat(padStr, padCountInt)
 	return retStr[:overallLen]

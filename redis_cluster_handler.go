@@ -180,7 +180,7 @@ func (r *RedisClusterStorageManager) GetExp(keyName string) (int64, error) {
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RedisClusterStorageManager) SetKey(keyName string, sessionState string, timeout int64) error {
+func (r *RedisClusterStorageManager) SetKey(keyName, sessionState string, timeout int64) error {
 	log.Debug("[STORE] SET Raw key is: ", keyName)
 	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
@@ -204,7 +204,7 @@ func (r *RedisClusterStorageManager) SetKey(keyName string, sessionState string,
 	return nil
 }
 
-func (r *RedisClusterStorageManager) SetRawKey(keyName string, sessionState string, timeout int64) error {
+func (r *RedisClusterStorageManager) SetRawKey(keyName, sessionState string, timeout int64) error {
 
 	if GetRelevantClusterReference(r.IsCache) == nil {
 		log.Info("Connection dropped, connecting..")
@@ -532,7 +532,7 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 	}
 }
 
-func (r *RedisClusterStorageManager) Publish(channel string, message string) error {
+func (r *RedisClusterStorageManager) Publish(channel, message string) error {
 	if GetRelevantClusterReference(r.IsCache) == nil {
 		log.Info("Connection dropped, Connecting..")
 		r.Connect()
@@ -588,7 +588,7 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 	return []interface{}{}
 }
 
-func (r *RedisClusterStorageManager) AppendToSet(keyName string, value string) {
+func (r *RedisClusterStorageManager) AppendToSet(keyName, value string) {
 	log.Debug("Pushing to raw key list: ", keyName)
 	log.Debug("Appending to fixed key list: ", r.fixKey(keyName))
 	if GetRelevantClusterReference(r.IsCache) == nil {
@@ -633,7 +633,7 @@ func (r *RedisClusterStorageManager) GetSet(keyName string) (map[string]string, 
 	return map[string]string{}, nil
 }
 
-func (r *RedisClusterStorageManager) AddToSet(keyName string, value string) {
+func (r *RedisClusterStorageManager) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
 	if GetRelevantClusterReference(r.IsCache) == nil {
@@ -652,7 +652,7 @@ func (r *RedisClusterStorageManager) AddToSet(keyName string, value string) {
 	}
 }
 
-func (r *RedisClusterStorageManager) RemoveFromSet(keyName string, value string) {
+func (r *RedisClusterStorageManager) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from raw key set: ", keyName)
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
 	if GetRelevantClusterReference(r.IsCache) == nil {

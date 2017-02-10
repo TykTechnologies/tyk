@@ -84,7 +84,7 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit bool) map[string]Policy {
+func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]Policy {
 
 	policies := make(map[string]Policy)
 

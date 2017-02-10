@@ -807,7 +807,7 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 type AccessTokenGenTyk struct{}
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
-func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken string, refreshtoken string, err error) {
+func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
 	log.Info("[OAuth] Generating new token")
 
 	var newSession SessionState

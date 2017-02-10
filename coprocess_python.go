@@ -237,7 +237,7 @@ func PythonLoadDispatcher() (err error) {
 }
 
 // PythonNewDispatcher creates an instance of TykDispatcher.
-func PythonNewDispatcher(middlewarePath string, eventHandlerPath string, bundlePaths []string) (dispatcher coprocess.Dispatcher, err error) {
+func PythonNewDispatcher(middlewarePath, eventHandlerPath string, bundlePaths []string) (dispatcher coprocess.Dispatcher, err error) {
 	CMiddlewarePath := C.CString(middlewarePath)
 	CEventHandlerPath := C.CString(eventHandlerPath)
 	CBundlePaths := C.CString(strings.Join(bundlePaths, ":"))
