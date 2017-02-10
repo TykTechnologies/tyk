@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 
@@ -11,21 +12,20 @@ import (
 )
 
 func GetIPFromRequest(r *http.Request) string {
-	remoteIPString := r.RemoteAddr
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		ips := strings.Split(forwarded, ", ")
-		remoteIPString = ips[0]
-		log.Debug("X-Forwarded-For set, remote IP: ", remoteIPString)
+	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
+		// X-Forwarded-For has no port
+		if i := strings.IndexByte(fw, ','); i >= 0 {
+			return fw[:i]
+		}
+		return fw
 	}
 
-	//Split off port
-	ipPort := strings.Split(remoteIPString, ":")
-	if len(ipPort) > 1 {
-		remoteIPString = ipPort[0]
-	}
-
-	return remoteIPString
+	// From net/http.Request.RemoteAddr:
+	//   The HTTP server in this package sets RemoteAddr to an
+	//   "IP:port" address before invoking a handler.
+	// So we can ignore the case of the port missing.
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return host
 }
 
 func CopyHttpRequest(r *http.Request) *http.Request {

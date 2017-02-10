@@ -9,13 +9,17 @@ func TestGetIPFromRequest(t *testing.T) {
 	tests := []struct {
 		remote, forwarded, want string
 	}{
+		// missing ip or port
 		{"", "", ""},
 		{":80", "", ""},
-		{":80", ":80, px1, px2", ""},
-		{"1.2.3.4", "", "1.2.3.4"},
+		{"1.2.3.4", "", ""},
+		{"[::1]", "", ""},
+		// not forwarded
 		{"1.2.3.4:80", "", "1.2.3.4"},
-		{"1.2.3.4", "5.6.7.8, px1, px2", "5.6.7.8"},
-		{"1.2.3.4:80", "5.6.7.8:80, px1, px2", "5.6.7.8"},
+		{"[::1]:80", "", "::1"},
+		// forwarded
+		{"1.2.3.4:80", "5.6.7.8, px1, px2", "5.6.7.8"},
+		{"[::1]:80", "::2", "::2"},
 	}
 	for _, tc := range tests {
 		r := &http.Request{RemoteAddr: tc.remote, Header: http.Header{}}
