@@ -891,9 +891,9 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths *[]URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
+func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
-	for _, v := range *RxPaths {
+	for _, v := range RxPaths {
 		match := v.Spec.MatchString(strings.ToLower(url))
 		if match {
 			if v.MethodActions != nil {
@@ -952,9 +952,9 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths *[]URLSpec,
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
-func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths *[]URLSpec, mode URLStatus) (bool, interface{}) {
+func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
-	for _, v := range *RxPaths {
+	for _, v := range RxPaths {
 		match := v.Spec.MatchString(url)
 		// only return it it's what we are looking for
 		if !match || mode != v.Status {
@@ -1120,7 +1120,7 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 
 // GetVersionData attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
-func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, *[]URLSpec, bool, RequestStatus) {
+func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
 	var version = apidef.VersionInfo{}
 	var versionKey string
 	var versionRxPaths = []URLSpec{}
@@ -1145,7 +1145,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, *[]URLSp
 			// Extract Version Info
 			versionKey = a.getVersionFromRequest(r)
 			if versionKey == "" {
-				return &version, &versionRxPaths, versionWLStatus, VersionNotFound
+				return &version, versionRxPaths, versionWLStatus, VersionNotFound
 			}
 		}
 
@@ -1153,7 +1153,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, *[]URLSp
 		var ok bool
 		version, ok = a.APIDefinition.VersionData.Versions[versionKey]
 		if !ok {
-			return &version, &versionRxPaths, versionWLStatus, VersionDoesNotExist
+			return &version, versionRxPaths, versionWLStatus, VersionDoesNotExist
 		}
 
 		// Lets save this for the future
@@ -1168,17 +1168,17 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, *[]URLSp
 	if !rxOk {
 		log.Error("no RX Paths found for version")
 		log.Error(versionKey)
-		return &version, &versionRxPaths, versionWLStatus, VersionDoesNotExist
+		return &version, versionRxPaths, versionWLStatus, VersionDoesNotExist
 	}
 
 	if !wlOk {
 		log.Error("No whitelist data found")
-		return &version, &versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
+		return &version, versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
 	}
 
 	versionRxPaths = RxPaths
 	versionWLStatus = WhiteListStatus
 
-	return &version, &versionRxPaths, versionWLStatus, StatusOk
+	return &version, versionRxPaths, versionWLStatus, StatusOk
 
 }
