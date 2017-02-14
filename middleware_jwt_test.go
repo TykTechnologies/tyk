@@ -248,7 +248,7 @@ func getJWTChain(spec *APISpec) http.Handler {
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "hmac"
 	session := createJWTSession()
@@ -288,7 +288,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 }
 
 func TestJWTSessionRSA(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	session := createJWTSessionWithRSA()
@@ -332,7 +332,7 @@ func TestJWTSessionRSA(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	session := createJWTSessionWithRSA()
@@ -378,7 +378,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	session := createJWTSessionWithRSA()
@@ -421,7 +421,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	session := createJWTSessionWithRSA()
@@ -467,7 +467,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.DoNotTrack = true
 	spec.JWTSigningMethod = "rsa"
@@ -514,7 +514,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 }
 
 func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	session := createJWTSessionWithRSA()
@@ -560,7 +560,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	session := createJWTSessionWithRSA()
@@ -605,7 +605,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 }
 
 func TestJWTSessionRSABearerInvalid(t *testing.T) {
-	tokenKID := randSeq(10)
+	tokenKID := testKey(t, "token")
 	spec := createSpecTest(t, jwtDef)
 	spec.JWTSigningMethod = "rsa"
 	session := createJWTSessionWithRSA()
@@ -678,7 +678,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
-	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["user_id"] = testKey(t, "token")
 	token.Claims.(jwt.MapClaims)["azp"] = tokenID
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
@@ -734,7 +734,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	token.Header["kid"] = "12345"
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
-	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["user_id"] = testKey(t, "token")
 	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
@@ -790,7 +790,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	token.Header["kid"] = "12345"
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
-	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["user_id"] = testKey(t, "token")
 	token.Claims.(jwt.MapClaims)["policy_id"] = "1234567898978788"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
@@ -846,7 +846,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	token.Header["kid"] = "12345"
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
-	token.Claims.(jwt.MapClaims)["user_id"] = randSeq(10)
+	token.Claims.(jwt.MapClaims)["user_id"] = testKey(t, "token")
 	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string

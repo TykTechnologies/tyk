@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -54,24 +53,13 @@ func TestMain(m *testing.M) {
 }
 
 func emptyRedis(port string) error {
-	c, err := redis.Dial("tcp", ":" + port)
+	c, err := redis.Dial("tcp", ":"+port)
 	if err != nil {
 		return fmt.Errorf("could not connect to redis: %v", err)
 	}
 	defer c.Close()
 	_, err = c.Do("FLUSHALL")
 	return err
-}
-
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func randSeq(n int) string {
-	rand.Seed(time.Now().UTC().UnixNano())
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }
 
 func createNonThrottledSession() (session SessionState) {
@@ -473,6 +461,10 @@ func createSpecTest(t *testing.T, def string) *APISpec {
 	return spec
 }
 
+func testKey(t *testing.T, name string) string {
+	return fmt.Sprintf("%s-%s", testName(t), name)
+}
+
 func TestParambasedAuth(t *testing.T) {
 	spec := createSpecTest(t, pathBasedDefinition)
 	session := createParamAuthSession()
@@ -619,7 +611,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 	spec := createSpecTest(t, extendedPathGatewaySetup)
 	session := createStandardSession()
 
-	keyId := randSeq(10)
+	keyId := testKey(t, "key")
 
 	spec.SessionManager.UpdateSession(keyId, session, 60)
 	uri := "v1/allowed/whitelist/reply/"
@@ -648,7 +640,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 func TestQuota(t *testing.T) {
 	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createQuotaSession()
-	keyId := randSeq(10)
+	keyId := testKey(t, "key")
 	spec.SessionManager.UpdateSession(keyId, session, 60)
 	uri := "/"
 	method := "GET"
