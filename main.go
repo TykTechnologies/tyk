@@ -241,6 +241,10 @@ func getAPISpecs() *[]*APISpec {
 		APISpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
+	if APISpecs == nil {
+		return nil
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Printf("Detected %v APIs", len(*APISpecs))
