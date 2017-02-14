@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+
+	"github.com/lonelycode/gorpc"
 )
 
 const sampleDefiniton = `{
@@ -390,4 +392,77 @@ func TestBlacklistLinksMulti(t *testing.T) {
 		t.Error("Request should return StatusOK as URL not blacklisted!")
 		t.Error(status)
 	}
+}
+
+func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
+	config.SlaveOptions.UseRPC = true
+	config.SlaveOptions.RPCKey = "test_org"
+	config.SlaveOptions.APIKey = "test"
+
+	server := gorpc.NewTCPServer(":9090", dispatcher.NewHandlerFunc())
+	go server.Serve()
+	config.SlaveOptions.ConnectionString = server.Addr
+
+	RPCCLientSingleton = gorpc.NewTCPClient(server.Addr)
+	RPCCLientSingleton.Conns = 1
+	RPCCLientSingleton.Start()
+	RPCClientIsConnected = true
+	RPCFuncClientSingleton = GetDispatcher().NewFuncClient(RPCCLientSingleton)
+
+	return server
+}
+
+func stopRPCMock(server *gorpc.Server) {
+	config.SlaveOptions.ConnectionString = ""
+	config.SlaveOptions.RPCKey = ""
+	config.SlaveOptions.APIKey = ""
+	config.SlaveOptions.UseRPC = false
+
+	server.Listener.Close()
+	server.Stop()
+
+	RPCCLientSingleton.Stop()
+	RPCClientIsConnected = false
+	RPCClients = map[string]chan int{}
+	RPCCLientSingleton = nil
+	RPCFuncClientSingleton = nil
+}
+
+func TestGetAPISpecsRPCFailure(t *testing.T) {
+	// Mock RPC
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+		return "malformed json", nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr string, userKey string) bool {
+		return true
+	})
+
+	rpc := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc)
+
+	specs := getAPISpecs()
+	if len(specs) != 0 {
+		t.Error("Should return empty value for malformed rpc response", specs)
+	}
+}
+
+func TestGetAPISpecsRPCSuccess(t *testing.T) {
+	// Mock RPC
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+		return "[{}]", nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr string, userKey string) bool {
+		return true
+	})
+
+	rpc := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc)
+
+	specs := getAPISpecs()
+	if len(specs) != 1 {
+		t.Error("Should return array with one spec", specs)
+	}
+
 }
