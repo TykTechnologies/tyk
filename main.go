@@ -625,7 +625,7 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 		}).Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = processor
 	}
-	referenceSpec.ResponseChain = &responseChain
+	referenceSpec.ResponseChain = responseChain
 	if len(responseChain) > 0 {
 		referenceSpec.ResponseHandlersActive = true
 	}
