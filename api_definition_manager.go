@@ -540,13 +540,13 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) *[]*AP
 
 	if jErr1 != nil {
 		log.Error("Failed decode: ", jErr1)
-		return nil
+		return &APISpecs
 	}
 
 	jErr2 := json.Unmarshal([]byte(apiCollection), &StringDefs)
 	if jErr2 != nil {
 		log.Error("Failed decode: ", jErr2)
-		return nil
+		return &APISpecs
 	}
 
 	for i, thisAppConfig := range APIDefinitions {
