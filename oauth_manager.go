@@ -505,15 +505,13 @@ func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
 
 	clientJSON, err := r.store.GetKey(key)
 	if err != nil {
-		log.Error("Failure retreiving client ID key: ", key)
-		log.Error(err)
+		log.Errorf("Failure retreiving client ID key %q: %v", key, err)
 		return nil, err
 	}
 
 	client := new(OAuthClient)
 	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
-		log.Error("Couldn't unmarshal OAuth client object")
-		log.Error(err)
+		log.Error("Couldn't unmarshal OAuth client object: ", err)
 	}
 
 	return client, nil
@@ -528,15 +526,13 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 	clientJSON, err := r.store.GetKey(key)
 
 	if err != nil {
-		log.Error("Failure retreiving client ID key")
-		log.Error(err)
+		log.Error("Failure retreiving client ID key: ", err)
 		return nil, err
 	}
 
 	client := new(OAuthClient)
 	if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
-		log.Error("Couldn't unmarshal OAuth client object")
-		log.Error(err)
+		log.Error("Couldn't unmarshal OAuth client object: ", err)
 	}
 
 	return client, nil
@@ -565,8 +561,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	for _, clientJSON := range clientJSON {
 		client := new(OAuthClient)
 		if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
-			log.Error("Couldn't unmarshal OAuth client object")
-			log.Error(err)
+			log.Error("Couldn't unmarshal OAuth client object: ", err)
 			return theseClients, err
 		}
 		theseClients = append(theseClients, client)
@@ -580,8 +575,7 @@ func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ign
 	clientDataJSON, err := json.Marshal(client)
 
 	if err != nil {
-		log.Error("Couldn't marshal client data")
-		log.Error(err)
+		log.Error("Couldn't marshal client data: ", err)
 		return err
 	}
 
@@ -642,16 +636,14 @@ func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeD
 	authJSON, err := r.store.GetKey(key)
 
 	if err != nil {
-		log.Error("Failure retreiving auth code key")
-		log.Error(err)
+		log.Error("Failure retreiving auth code key: ", err)
 		return nil, err
 	}
 
 	authData := osin.AuthorizeData{}
 	authData.Client = new(OAuthClient)
 	if err := json.Unmarshal([]byte(authJSON), &authData); err != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object (LoadAuthorize)")
-		log.Error(err)
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadAuthorize): ", err)
 		return nil, err
 	}
 
@@ -744,16 +736,14 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 	accessJSON, err := r.store.GetKey(key)
 
 	if err != nil {
-		log.Error("Failure retreiving access token by key")
-		log.Error(err)
+		log.Error("Failure retreiving access token by key: ", err)
 		return nil, err
 	}
 
 	accessData := osin.AccessData{}
 	accessData.Client = new(OAuthClient)
 	if err := json.Unmarshal([]byte(accessJSON), &accessData); err != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object (LoadAccess)")
-		log.Error(err)
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadAccess): ", err)
 		return nil, err
 	}
 
@@ -778,8 +768,7 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 	accessJSON, err := r.store.GetKey(key)
 
 	if err != nil {
-		log.Error("Failure retreiving access token by key")
-		log.Error(err)
+		log.Error("Failure retreiving access token by key: ", err)
 		return nil, err
 	}
 
