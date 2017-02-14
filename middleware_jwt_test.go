@@ -1,17 +1,13 @@
 package main
 
 import (
-	//"encoding/base64"
-	//"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-
-	"github.com/dgrijalva/jwt-go"
-	//"strings"
 	"testing"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/justinas/alice"
 )
 
@@ -209,8 +205,7 @@ jQIDAQAB
 -----END PUBLIC KEY-----
 `
 
-func createJWTSession() SessionState {
-	var session SessionState
+func createJWTSession() (session SessionState) {
 	session.Rate = 1000000.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix() - 10
@@ -221,39 +216,18 @@ func createJWTSession() SessionState {
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
 	session.JWTData.Secret = jwtSecret
-
-	return session
+	return
 }
 
 func createJWTSessionWithRSA() SessionState {
-	var session SessionState
-	session.Rate = 1000000.0
-	session.Allowance = session.Rate
-	session.LastCheck = time.Now().Unix() - 10
-	session.Per = 1.0
-	session.Expires = 0
-	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews = time.Now().Unix() + 20
-	session.QuotaRemaining = 1
-	session.QuotaMax = -1
+	session := createJWTSession()
 	session.JWTData.Secret = jwtRSAPubKey
-
 	return session
 }
 
 func createJWTSessionWithRSAWithPolicy() SessionState {
-	var session SessionState
-	session.Rate = 1000000.0
-	session.Allowance = session.Rate
-	session.LastCheck = time.Now().Unix() - 10
-	session.Per = 1.0
-	session.Expires = 0
-	session.QuotaRenewalRate = 300 // 5 minutes
-	session.QuotaRenews = time.Now().Unix() + 20
-	session.QuotaRemaining = 1
-	session.QuotaMax = -1
+	session := createJWTSessionWithRSA()
 	session.ApplyPolicyID = "987654321"
-
 	return session
 }
 

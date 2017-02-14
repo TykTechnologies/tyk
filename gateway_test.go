@@ -58,8 +58,7 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func createNonThrottledSession() SessionState {
-	var session SessionState
+func createNonThrottledSession() (session SessionState) {
 	session.Rate = 100.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -70,12 +69,10 @@ func createNonThrottledSession() SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
 	session.Alias = "TEST-ALIAS"
-
-	return session
+	return
 }
 
-func createQuotaSession() SessionState {
-	var session SessionState
+func createQuotaSession() (session SessionState) {
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -85,12 +82,10 @@ func createQuotaSession() SessionState {
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 2
 	session.QuotaMax = 2
-
-	return session
+	return
 }
 
-func createVersionedSession() SessionState {
-	var session SessionState
+func createVersionedSession() (session SessionState) {
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -101,12 +96,10 @@ func createVersionedSession() SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
 	session.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
-
-	return session
+	return
 }
 
-func createParamAuthSession() SessionState {
-	var session SessionState
+func createParamAuthSession() (session SessionState) {
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -117,12 +110,10 @@ func createParamAuthSession() SessionState {
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
 	session.AccessRights = map[string]AccessDefinition{"9992": {APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
-
-	return session
+	return
 }
 
-func createStandardSession() SessionState {
-	var session SessionState
+func createStandardSession() (session SessionState) {
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -132,8 +123,7 @@ func createStandardSession() SessionState {
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
-
-	return session
+	return
 }
 
 type tykErrorResponse struct {
