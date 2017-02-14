@@ -266,8 +266,7 @@ func WriteDefaultConf(conf *Config) {
 	}
 	newConfig, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
-		log.Error("Problem marshalling default configuration!")
-		log.Error(err)
+		log.Error("Problem marshalling default configuration: ", err)
 	} else if !runningTests {
 		ioutil.WriteFile("tyk.conf", newConfig, 0644)
 	}
@@ -280,8 +279,7 @@ func loadConfig(filePath string, conf *Config) {
 	configuration, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		if !runningTests {
-			log.Error("Couldn't load configuration file")
-			log.Error(err)
+			log.Error("Couldn't load configuration file: ", err)
 			log.Info("Writing a default file to ./tyk.conf")
 			WriteDefaultConf(conf)
 			log.Info("Loading default configuration...")
@@ -289,8 +287,7 @@ func loadConfig(filePath string, conf *Config) {
 		}
 	} else {
 		if err := json.Unmarshal(configuration, &conf); err != nil {
-			log.Error("Couldn't unmarshal configuration")
-			log.Error(err)
+			log.Error("Couldn't unmarshal configuration: ", err)
 		}
 
 		if err := envconfig.Process(ENV_PREVIX, conf); err != nil {

@@ -53,8 +53,7 @@ func (r *RPCPurger) PurgeCache() {
 			err := msgpack.Unmarshal(v.([]byte), &decoded)
 			log.Debug("Decoded Record: ", decoded)
 			if err != nil {
-				log.Error("Couldn't unmarshal analytics data:")
-				log.Error(err)
+				log.Error("Couldn't unmarshal analytics data: ", err)
 			} else {
 				keys[i] = decoded
 			}

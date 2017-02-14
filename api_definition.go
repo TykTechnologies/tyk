@@ -411,8 +411,7 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*API
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*apidef.APIDefinition, map[string]interface{}) {
 	appConfig := &apidef.APIDefinition{}
 	if err := json.Unmarshal(apiDef, appConfig); err != nil {
-		log.Error("[RPC] --> Couldn't unmarshal api configuration")
-		log.Error(err)
+		log.Error("[RPC] --> Couldn't unmarshal api configuration: ", err)
 	}
 
 	// Got the structured version - now lets get a raw copy for modules
@@ -435,8 +434,7 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
 			appConfigBody, err := ioutil.ReadFile(filePath)
 			appConfig, rawConfig := a.ParseDefinition(appConfigBody)
 			if err != nil {
-				log.Error("Couldn't load app configuration file")
-				log.Error(err)
+				log.Error("Couldn't load app configuration file: ", err)
 			}
 
 			appConfig.RawData = rawConfig // Lets keep a copy for plugable modules
@@ -1068,8 +1066,7 @@ func (a *APISpec) IsThisAPIVersionExpired(versionDef *apidef.VersionInfo) bool {
 	// otherwise - calculate the time
 	t, err := time.Parse("2006-01-02 15:04", versionDef.Expires)
 	if err != nil {
-		log.Error("Could not parse expiry date for API, dissallow")
-		log.Error(err)
+		log.Error("Could not parse expiry date for API, dissallow: ", err)
 		return true
 	}
 

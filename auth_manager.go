@@ -61,8 +61,7 @@ func (b *DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSt
 	}
 
 	if err := json.Unmarshal([]byte(jsonKeyVal), &newSession); err != nil {
-		log.Error("Couldn't unmarshal session object")
-		log.Error(err)
+		log.Error("Couldn't unmarshal session object: ", err)
 		return newSession, false
 	}
 

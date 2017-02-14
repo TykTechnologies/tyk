@@ -933,10 +933,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Error("Port specified in flags must be a number!")
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error(err)
+			}).Error("Port specified in flags must be a number: ", err)
 		} else {
 			config.ListenPort = portNum
 		}

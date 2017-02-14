@@ -280,8 +280,7 @@ func (r *RedisClusterStorageManager) GetKeys(filter string) []string {
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
-		log.Error("Error trying to get all keys:")
-		log.Error(err)
+		log.Error("Error trying to get all keys: ", err)
 
 	} else {
 		sessions, _ := redis.Strings(sessionsInterface, err)
@@ -308,8 +307,7 @@ func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) m
 	log.Debug("[STORE] Getting list by: ", searchStr)
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
-		log.Error("Error trying to get filtered client keys:")
-		log.Error(err)
+		log.Error("Error trying to get filtered client keys: ", err)
 
 	} else {
 		keys, _ := redis.Strings(sessionsInterface, err)
@@ -338,8 +336,7 @@ func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
 	searchStr := r.KeyPrefix + "*"
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
-		log.Error("Error trying to get all keys:")
-		log.Error(err)
+		log.Error("Error trying to get all keys: ", err)
 
 	} else {
 		keys, _ := redis.Strings(sessionsInterface, err)
@@ -369,8 +366,7 @@ func (r *RedisClusterStorageManager) DeleteKey(keyName string) bool {
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
 	_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", r.fixKey(keyName))
 	if err != nil {
-		log.Error("Error trying to delete key:")
-		log.Error(err)
+		log.Error("Error trying to delete key: ", err)
 	}
 
 	return true
@@ -387,8 +383,7 @@ func (r *RedisClusterStorageManager) DeleteRawKey(keyName string) bool {
 
 	_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", keyName)
 	if err != nil {
-		log.Error("Error trying to delete key:")
-		log.Error(err)
+		log.Error("Error trying to delete key: ", err)
 	}
 
 	return true
@@ -464,8 +459,7 @@ func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
 		log.Debug("Deleting: ", asInterface)
 		_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", asInterface...)
 		if err != nil {
-			log.Error("Error trying to delete keys:")
-			log.Error(err)
+			log.Error("Error trying to delete keys: ", err)
 		}
 	} else {
 		log.Debug("RedisClusterStorageManager called DEL - Nothing to delete")
@@ -492,8 +486,7 @@ func (r *RedisClusterStorageManager) DeleteRawKeys(keys []string, prefix string)
 		log.Debug("Deleting: ", asInterface)
 		_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", asInterface...)
 		if err != nil {
-			log.Error("Error trying to delete keys:")
-			log.Error(err)
+			log.Error("Error trying to delete keys: ", err)
 		}
 	} else {
 		log.Debug("RedisClusterStorageManager called DEL - Nothing to delete")
@@ -540,8 +533,7 @@ func (r *RedisClusterStorageManager) Publish(channel, message string) error {
 	} else {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("PUBLISH", channel, message)
 		if err != nil {
-			log.Error("Error trying to set value:")
-			log.Error(err)
+			log.Error("Error trying to set value: ", err)
 			return err
 		}
 	}
@@ -599,8 +591,7 @@ func (r *RedisClusterStorageManager) AppendToSet(keyName, value string) {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("RPUSH", r.fixKey(keyName), value)
 
 		if err != nil {
-			log.Error("Error trying to delete keys:")
-			log.Error(err)
+			log.Error("Error trying to delete keys: ", err)
 		}
 
 		return
@@ -644,8 +635,7 @@ func (r *RedisClusterStorageManager) AddToSet(keyName, value string) {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("SADD", r.fixKey(keyName), value)
 
 		if err != nil {
-			log.Error("Error trying to append keys:")
-			log.Error(err)
+			log.Error("Error trying to append keys: ", err)
 		}
 
 		return
@@ -663,8 +653,7 @@ func (r *RedisClusterStorageManager) RemoveFromSet(keyName, value string) {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("SREM", r.fixKey(keyName), value)
 
 		if err != nil {
-			log.Error("Error trying to remove keys:")
-			log.Error(err)
+			log.Error("Error trying to remove keys: ", err)
 		}
 
 		return
