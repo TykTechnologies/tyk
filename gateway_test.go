@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -10,10 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 )
@@ -26,6 +29,9 @@ var discardMuxer = mux.NewRouter()
 
 func TestMain(m *testing.M) {
 	WriteDefaultConf(&config)
+	if err := emptyRedis(strconv.Itoa(config.Storage.Port)); err != nil {
+		panic(err)
+	}
 	var err error
 	config.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	if err != nil {
@@ -45,6 +51,16 @@ func TestMain(m *testing.M) {
 
 	os.RemoveAll(config.AppPath)
 	os.Exit(exitCode)
+}
+
+func emptyRedis(port string) error {
+	c, err := redis.Dial("tcp", ":" + port)
+	if err != nil {
+		return fmt.Errorf("could not connect to redis: %v", err)
+	}
+	defer c.Close()
+	_, err = c.Do("FLUSHALL")
+	return err
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
