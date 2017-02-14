@@ -19,7 +19,7 @@ func (v *VersionCheck) New() {
 	v.sh = SuccessHandler{v.TykMiddleware}
 }
 
-func (mw *VersionCheck) GetName() string {
+func (v *VersionCheck) GetName() string {
 	return "VersionCheck"
 }
 
@@ -28,9 +28,7 @@ func (v *VersionCheck) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (a *VersionCheck) IsEnabledForSpec() bool {
-	return true
-}
+func (v *VersionCheck) IsEnabledForSpec() bool { return true }
 
 func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 	// Reply with some alternate data

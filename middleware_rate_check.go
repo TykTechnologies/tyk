@@ -10,16 +10,14 @@ type RateCheckMW struct {
 	*TykMiddleware
 }
 
-func (mw *RateCheckMW) GetName() string {
+func (m *RateCheckMW) GetName() string {
 	return "RateCheckMW"
 }
 
 // New lets you do any initialisations for the object can be done here
 func (m *RateCheckMW) New() {}
 
-func (m *RateCheckMW) IsEnabledForSpec() bool {
-	return true
-}
+func (m *RateCheckMW) IsEnabledForSpec() bool { return true }
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *RateCheckMW) GetConfig() (interface{}, error) {

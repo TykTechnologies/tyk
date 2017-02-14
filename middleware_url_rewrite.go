@@ -131,7 +131,7 @@ type URLRewriteMiddleware struct {
 	Rewriter *URLRewriter
 }
 
-func (mw *URLRewriteMiddleware) GetName() string {
+func (m *URLRewriteMiddleware) GetName() string {
 	return "URLRewriteMiddleware"
 }
 

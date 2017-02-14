@@ -28,7 +28,7 @@ type RedisCacheMiddleware struct {
 	sh         SuccessHandler
 }
 
-func (mw *RedisCacheMiddleware) GetName() string {
+func (m *RedisCacheMiddleware) GetName() string {
 	return "RedisCacheMiddleware"
 }
 

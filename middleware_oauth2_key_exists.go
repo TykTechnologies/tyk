@@ -20,7 +20,7 @@ type Oauth2KeyExists struct {
 // New lets you do any initialisations for the object can be done here
 func (k *Oauth2KeyExists) New() {}
 
-func (mw *Oauth2KeyExists) GetName() string {
+func (k *Oauth2KeyExists) GetName() string {
 	return "Oauth2KeyExists"
 }
 
@@ -29,9 +29,7 @@ func (k *Oauth2KeyExists) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (a *Oauth2KeyExists) IsEnabledForSpec() bool {
-	return true
-}
+func (k *Oauth2KeyExists) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {

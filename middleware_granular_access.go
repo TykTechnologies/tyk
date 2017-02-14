@@ -16,7 +16,7 @@ type GranularAccessMiddleware struct {
 
 func (m *GranularAccessMiddleware) New() {}
 
-func (mw *GranularAccessMiddleware) GetName() string {
+func (m *GranularAccessMiddleware) GetName() string {
 	return "GranularAccessMiddleware"
 }
 
@@ -25,9 +25,7 @@ func (m *GranularAccessMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (a *GranularAccessMiddleware) IsEnabledForSpec() bool {
-	return true
-}
+func (m *GranularAccessMiddleware) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {

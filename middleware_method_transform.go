@@ -13,7 +13,7 @@ type TransformMethod struct {
 	*TykMiddleware
 }
 
-func (mw *TransformMethod) GetName() string {
+func (t *TransformMethod) GetName() string {
 	return "TransformMethod"
 }
 
