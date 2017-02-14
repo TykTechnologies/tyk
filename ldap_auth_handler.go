@@ -154,30 +154,30 @@ func (l *LDAPStorageHandler) notifyReadOnly() bool {
 	return false
 }
 
-func (s *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, val string) (int, []interface{}) {
+func (l *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, val string) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, []interface{}{}
 }
 
-func (s *LDAPStorageHandler) SetRollingWindowPipeline(keyName string, per int64, val string) (int, []interface{}) {
+func (l *LDAPStorageHandler) SetRollingWindowPipeline(keyName string, per int64, val string) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, []interface{}{}
 }
 
-func (s LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {
+func (l LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {
 	log.Error("Not implemented")
 	return map[string]string{}, nil
 }
 
-func (s LDAPStorageHandler) AddToSet(keyName, value string) {
+func (l LDAPStorageHandler) AddToSet(keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (s LDAPStorageHandler) RemoveFromSet(keyName, value string) {
+func (l LDAPStorageHandler) RemoveFromSet(keyName, value string) {
 	log.Error("Not implemented")
 }
 
-func (s LDAPStorageHandler) DeleteScanMatch(pattern string) bool {
+func (l LDAPStorageHandler) DeleteScanMatch(pattern string) bool {
 	log.Error("Not implemented")
 	return false
 }

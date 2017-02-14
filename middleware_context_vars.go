@@ -16,7 +16,7 @@ type MiddlewareContextVarsConfig struct{}
 // New lets you do any initialisations for the object can be done here
 func (m *MiddlewareContextVars) New() {}
 
-func (mw *MiddlewareContextVars) GetName() string {
+func (m *MiddlewareContextVars) GetName() string {
 	return "MiddlewareContextVars"
 }
 
@@ -26,8 +26,8 @@ func (m *MiddlewareContextVars) GetConfig() (interface{}, error) {
 	return moduleConfig, nil
 }
 
-func (a *MiddlewareContextVars) IsEnabledForSpec() bool {
-	return a.Spec.EnableContextVars
+func (m *MiddlewareContextVars) IsEnabledForSpec() bool {
+	return m.Spec.EnableContextVars
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

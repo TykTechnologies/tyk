@@ -30,9 +30,7 @@ func (k *AuthKey) GetConfig() (interface{}, error) {
 	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
 }
 
-func (a *AuthKey) IsEnabledForSpec() bool {
-	return true
-}
+func (k *AuthKey) IsEnabledForSpec() bool { return true }
 
 func CopyRequest(r *http.Request) *http.Request {
 	tempRes := new(http.Request)

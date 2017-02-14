@@ -59,16 +59,14 @@ type DynamicMiddlewareConfig struct {
 	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
 }
 
-func (mw *DynamicMiddleware) GetName() string {
+func (d *DynamicMiddleware) GetName() string {
 	return "DynamicMiddleware"
 }
 
 // New lets you do any initialisations for the object can be done here
 func (d *DynamicMiddleware) New() {}
 
-func (a *DynamicMiddleware) IsEnabledForSpec() bool {
-	return true
-}
+func (d *DynamicMiddleware) IsEnabledForSpec() bool { return true }
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *DynamicMiddleware) GetConfig() (interface{}, error) {

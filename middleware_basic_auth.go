@@ -18,7 +18,7 @@ type BasicAuthKeyIsValid struct {
 	*TykMiddleware
 }
 
-func (mw *BasicAuthKeyIsValid) GetName() string {
+func (k *BasicAuthKeyIsValid) GetName() string {
 	return "BasicAuthKeyIsValid"
 }
 
@@ -30,9 +30,7 @@ func (k *BasicAuthKeyIsValid) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (a *BasicAuthKeyIsValid) IsEnabledForSpec() bool {
-	return true
-}
+func (k *BasicAuthKeyIsValid) IsEnabledForSpec() bool { return true }
 
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
 func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {

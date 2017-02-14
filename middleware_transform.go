@@ -23,12 +23,12 @@ type TransformMiddleware struct {
 	*TykMiddleware
 }
 
-func (mw *TransformMiddleware) GetName() string {
+func (t *TransformMiddleware) GetName() string {
 	return "TransformMiddleware"
 }
 
 // New lets you do any initialisations for the object can be done here
-func (m *TransformMiddleware) New() {}
+func (t *TransformMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (t *TransformMiddleware) GetConfig() (interface{}, error) {

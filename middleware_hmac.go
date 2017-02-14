@@ -26,7 +26,7 @@ type HMACMiddleware struct {
 	lowercasePattern *regexp.Regexp
 }
 
-func (mw *HMACMiddleware) GetName() string {
+func (hm *HMACMiddleware) GetName() string {
 	return "HMAC"
 }
 
@@ -35,9 +35,7 @@ func (hm *HMACMiddleware) New() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 
-func (a *HMACMiddleware) IsEnabledForSpec() bool {
-	return true
-}
+func (hm *HMACMiddleware) IsEnabledForSpec() bool { return true }
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (hm *HMACMiddleware) GetConfig() (interface{}, error) {

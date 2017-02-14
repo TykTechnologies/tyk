@@ -40,7 +40,7 @@ type VirtualEndpoint struct {
 	sh SuccessHandler
 }
 
-func (mw *VirtualEndpoint) GetName() string {
+func (d *VirtualEndpoint) GetName() string {
 	return "VirtualEndpoint"
 }
 

@@ -32,7 +32,7 @@ type OrganizationMonitor struct {
 	mon            Monitor
 }
 
-func (mw *OrganizationMonitor) GetName() string {
+func (k *OrganizationMonitor) GetName() string {
 	return "OrganizationMonitor"
 }
 
@@ -42,7 +42,7 @@ func (k *OrganizationMonitor) New() {
 	k.mon = Monitor{}
 }
 
-func (a *OrganizationMonitor) IsEnabledForSpec() bool {
+func (k *OrganizationMonitor) IsEnabledForSpec() bool {
 	// If false, we aren't enforcing quotas so skip this mw
 	// altogether
 	return config.EnforceOrgQuotas

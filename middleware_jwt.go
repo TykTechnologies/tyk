@@ -23,7 +23,7 @@ type JWTMiddleware struct {
 	*TykMiddleware
 }
 
-func (mw *JWTMiddleware) GetName() string {
+func (k *JWTMiddleware) GetName() string {
 	return "JWTMiddleware"
 }
 
@@ -51,9 +51,7 @@ func (k *JWTMiddleware) GetConfig() (interface{}, error) {
 	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
 }
 
-func (a *JWTMiddleware) IsEnabledForSpec() bool {
-	return true
-}
+func (k *JWTMiddleware) IsEnabledForSpec() bool { return true }
 
 func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, error) {
 	// Implement a cache

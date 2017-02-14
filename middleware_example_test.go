@@ -20,7 +20,7 @@ type modifiedMiddlewareConfig struct {
 	CustomConfigVar string `mapstructure:"custom_config_var" bson:"custom_config_var" json:"custom_config_var"`
 }
 
-func (mw *modifiedMiddleware) GetName() string {
+func (m *modifiedMiddleware) GetName() string {
 	return "modifiedMiddleware"
 }
 

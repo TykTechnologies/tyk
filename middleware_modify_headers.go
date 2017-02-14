@@ -18,7 +18,7 @@ type TransformHeaders struct {
 const TYK_META_LABEL = "$tyk_meta."
 const TYK_CONTEXT_LABEL = "$tyk_context."
 
-func (mw *TransformHeaders) GetName() string {
+func (t *TransformHeaders) GetName() string {
 	return "TransformHeaders"
 }
 

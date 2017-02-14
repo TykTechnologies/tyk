@@ -25,7 +25,7 @@ type OpenIDMW struct {
 	lock                      sync.RWMutex
 }
 
-func (mw *OpenIDMW) GetName() string {
+func (k *OpenIDMW) GetName() string {
 	return "OpenIDMW"
 }
 
@@ -45,9 +45,7 @@ func (k *OpenIDMW) New() {
 	}
 }
 
-func (a *OpenIDMW) IsEnabledForSpec() bool {
-	return true
-}
+func (k *OpenIDMW) IsEnabledForSpec() bool { return true }
 
 func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 	providers := []openid.Provider{}

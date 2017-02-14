@@ -16,7 +16,7 @@ type AccessRightsCheck struct {
 	*TykMiddleware
 }
 
-func (mw *AccessRightsCheck) GetName() string {
+func (a *AccessRightsCheck) GetName() string {
 	return "AccessRightsCheck"
 }
 
@@ -28,9 +28,7 @@ func (a *AccessRightsCheck) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (a *AccessRightsCheck) IsEnabledForSpec() bool {
-	return true
-}
+func (a *AccessRightsCheck) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {

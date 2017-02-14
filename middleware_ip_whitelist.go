@@ -12,7 +12,7 @@ type IPWhiteListMiddleware struct {
 	*TykMiddleware
 }
 
-func (mw *IPWhiteListMiddleware) GetName() string {
+func (i *IPWhiteListMiddleware) GetName() string {
 	return "IPWhiteListMiddleware"
 }
 

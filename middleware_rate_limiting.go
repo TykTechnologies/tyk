@@ -18,7 +18,7 @@ type RateLimitAndQuotaCheck struct {
 	*TykMiddleware
 }
 
-func (mw *RateLimitAndQuotaCheck) GetName() string {
+func (k *RateLimitAndQuotaCheck) GetName() string {
 	return "RateLimitAndQuotaCheck"
 }
 
@@ -31,10 +31,7 @@ func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
 }
 
 func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
-	if k.TykMiddleware.Spec.DisableRateLimit && k.TykMiddleware.Spec.DisableQuota {
-		return false
-	}
-	return true
+	return !k.TykMiddleware.Spec.DisableRateLimit || !k.TykMiddleware.Spec.DisableQuota
 }
 
 func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(w http.ResponseWriter, r *http.Request, authHeaderValue string) (error, int) {

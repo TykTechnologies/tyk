@@ -17,7 +17,7 @@ type RequestSizeLimitMiddleware struct {
 // New lets you do any initialisations for the object can be done here
 func (t *RequestSizeLimitMiddleware) New() {}
 
-func (mw *RequestSizeLimitMiddleware) GetName() string {
+func (t *RequestSizeLimitMiddleware) GetName() string {
 	return "RequestSizeLimitMiddleware"
 }
 
