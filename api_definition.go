@@ -125,7 +125,7 @@ type APISpec struct {
 	EventPaths               map[apidef.TykEvent][]TykEventHandler
 	Health                   HealthChecker
 	JSVM                     *JSVM
-	ResponseChain            *[]TykResponseHandler
+	ResponseChain            []TykResponseHandler
 	RoundRobin               *RoundRobin
 	URLRewriteEnabled        bool
 	CircuitBreakerEnabled    bool
