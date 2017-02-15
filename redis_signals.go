@@ -1,7 +1,7 @@
 package main
 
 import (
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"time"
 
@@ -125,7 +125,7 @@ func IsPayloadSignatureValid(notification Notification) bool {
 	}
 
 	if notificationVerifier != nil {
-		signed, err := b64.StdEncoding.DecodeString(notification.Signature)
+		signed, err := base64.StdEncoding.DecodeString(notification.Signature)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",

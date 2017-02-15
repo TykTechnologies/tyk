@@ -1,7 +1,7 @@
 package main
 
 import (
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -302,7 +302,7 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 	var bodyData string
 	var bodyByteArr []byte
 	if len(checkObject.Body) > 0 {
-		bodyByteArr, err = b64.StdEncoding.DecodeString(checkObject.Body)
+		bodyByteArr, err = base64.StdEncoding.DecodeString(checkObject.Body)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",

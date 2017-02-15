@@ -1,7 +1,7 @@
 package main
 
 import (
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -527,7 +527,7 @@ func (a *APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Templ
 
 func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
 	log.Debug("-- Loading blob")
-	uDec, err := b64.StdEncoding.DecodeString(blob)
+	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
 		return nil, err
 	}

@@ -4,7 +4,7 @@ import "net/http"
 
 import (
 	"crypto/md5"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -57,7 +57,7 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 
 		i := 0
 		for clientID, policyID := range provider.ClientIDs {
-			clID, _ := b64.StdEncoding.DecodeString(clientID)
+			clID, _ := base64.StdEncoding.DecodeString(clientID)
 			clientID := string(clID)
 
 			k.lock.Lock()
