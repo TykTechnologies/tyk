@@ -7,7 +7,7 @@ import (
 
 func createGetHandler() *WebHookHandler {
 	eventHandlerConf := WebHookHandlerConf{
-		TargetPath:   "http://httpbin.org/get",
+		TargetPath:   testHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
 		TemplatePath: "templates/default_webhook.json",
@@ -21,7 +21,7 @@ func TestNewValid(t *testing.T) {
 	o := WebHookHandler{}
 	_, err := o.New(map[string]interface{}{
 		"method":        "POST",
-		"target_path":   "http://posttestserver.com/post.php?dir=tyk-event-test",
+		"target_path":   testHttpPost,
 		"template_path": "templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
@@ -35,7 +35,7 @@ func TestNewInvlalid(t *testing.T) {
 	o := WebHookHandler{}
 	_, err := o.New(map[string]interface{}{
 		"method":        123,
-		"target_path":   "http://posttestserver.com/post.php?dir=tyk-event-test",
+		"target_path":   testHttpPost,
 		"template_path": "templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
@@ -62,7 +62,7 @@ func TestGetChecksum(t *testing.T) {
 		t.Error("Checksum should not have failed with good objet and body")
 	}
 
-	if checksum != "4bc27072fc0aa154b74d5535486f673b" {
+	if checksum != "62a6b4fa9b45cd372b871764296fb3a5" {
 		t.Error("Checksum is incorrect")
 		t.Error(checksum)
 	}

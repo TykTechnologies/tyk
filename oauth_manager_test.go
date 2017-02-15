@@ -86,7 +86,7 @@ func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(Muxer)
 	addOAuthHandlers(spec, Muxer, true)
-	remote, _ := url.Parse("http://example.com/")
+	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 	tykMiddleware := &TykMiddleware{spec, proxy}
