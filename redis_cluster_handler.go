@@ -490,7 +490,7 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 	redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoTransaction([]rediscluster.ClusterTransaction{lrange, delCmd}))
 	if err != nil {
 		log.Error("Multi command failed: ", err)
-		r.Connect()
+		return []interface{}{}
 	}
 
 	log.Debug("Analytics returned: ", redVal)
