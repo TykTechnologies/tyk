@@ -118,7 +118,7 @@ func TestCreateBody(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	eventHandlerConf := WebHookHandlerConf{
-		TargetPath:   "http://httpbin.org/get",
+		TargetPath:   testHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
 		TemplatePath: "templates/default_webhook.json",
