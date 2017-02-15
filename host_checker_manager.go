@@ -549,7 +549,7 @@ uptime_tests: {
 		"url": "http://google.com:3000/"
 	},
 	{
-		"url": "http://posttestserver.com/post.php?dir=tyk-checker-target-test&beep=boop",
+		"url": "`+testHttpPost+`",
 		"method": "POST",
 		"headers": {
 			"this": "that",

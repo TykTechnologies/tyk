@@ -262,7 +262,7 @@ const nonExpiringDefNoWhiteList = `{
 					"handler_name":"eh_web_hook_handler",
 					"handler_meta": {
 						"method": "POST",
-						"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
+						"target_path": "` + testHttpPost + `",
 						"template_path": "templates/default_webhook.json",
 						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 						"event_timeout": 10
@@ -317,7 +317,7 @@ const versionedDefinition = `{
 					"handler_name":"eh_web_hook_handler",
 					"handler_meta": {
 						"method": "POST",
-						"target_path": "http://posttestserver.com/post.php?dir=tyk-event-test",
+						"target_path": "` + testHttpPost + `",
 						"template_path": "templates/default_webhook.json",
 						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 						"event_timeout": 10

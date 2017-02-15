@@ -59,11 +59,11 @@ const oauthDefinition = `{
 			"code",
 			"token"
 		],
-		"auth_login_redirect": "http://posttestserver.com/post.php?dir=gateway_authorization"
+		"auth_login_redirect": "` + testHttpPost + `"
 	},
 	"notifications": {
 		"shared_secret": "9878767657654343123434556564444",
-		"oauth_on_keychange_url": "http://posttestserver.com/post.php?dir=oauth_notifications"
+		"oauth_on_keychange_url": "` + testHttpPost + `"
 	},
 	"version_data": {
 		"not_versioned": true,

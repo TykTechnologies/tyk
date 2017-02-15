@@ -153,7 +153,7 @@ func TestGet(t *testing.T) {
 
 func TestPost(t *testing.T) {
 	eventHandlerConf := WebHookHandlerConf{
-		TargetPath:   "http://posttestserver.com/post.php?dir=tyk",
+		TargetPath:   "`+testHttpPost+`",
 		Method:       "POST",
 		EventTimeout: 10,
 		TemplatePath: "templates/default_webhook.json",
