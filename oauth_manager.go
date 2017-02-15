@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -127,10 +126,6 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 		sessionStateJSONData := r.FormValue("key_rules")
 		if sessionStateJSONData == "" {
 			log.Warning("Authorise request is missing key_rules in params, policy will be required!")
-			//responseMessage := createError("Authorise request is missing key_rules in params")
-			//w.WriteHeader(400)
-			//fmt.Fprintf(w, string(responseMessage))
-			//return
 		}
 
 		// Handle the authorisation and write the JSON output to the resource provider
@@ -149,7 +144,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	w.Write(responseMessage)
 }
 
 // HandleAuthorizePassthrough handles a Client Auth request, first it checks if the client
@@ -167,7 +162,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 			// Something went wrong, write out the error details and kill the response
 			w.WriteHeader(resp.ErrorStatusCode)
 			responseMessage = createError(resp.StatusText)
-			fmt.Fprintf(w, string(responseMessage))
+			w.Write(responseMessage)
 			return
 		}
 		if r.Method == "GET" {
@@ -189,7 +184,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 		code = 405
 		responseMessage = createError("Method not supported")
 		w.WriteHeader(code)
-		fmt.Fprintf(w, string(responseMessage))
+		w.Write(responseMessage)
 	}
 
 }
@@ -208,7 +203,7 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 		if resp.IsError {
 			// Something went wrong, write out the error details and kill the response
 			w.WriteHeader(resp.ErrorStatusCode)
-			fmt.Fprintf(w, string(responseMessage))
+			w.Write(responseMessage)
 			return
 		}
 
@@ -251,7 +246,7 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	w.Write(responseMessage)
 }
 
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
