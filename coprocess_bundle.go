@@ -8,7 +8,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -82,7 +82,7 @@ func (b *Bundle) Verify() (err error) {
 
 	if useSignature {
 		var signed []byte
-		signed, err = b64.StdEncoding.DecodeString(b.Manifest.Signature)
+		signed, err = base64.StdEncoding.DecodeString(b.Manifest.Signature)
 		if err != nil {
 			return err
 		}

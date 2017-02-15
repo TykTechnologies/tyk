@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -65,7 +65,7 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 				return
 			}
 
-			js, err := b64.StdEncoding.DecodeString(meta.FunctionSourceURI)
+			js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 			if err != nil {
 				log.Error("Failed to load blob JS: ", err)
 			} else {
@@ -74,7 +74,7 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 				j.VM.Run(js)
 			}
 		} else {
-			log.Error("Type must be either file or blob (b64)!")
+			log.Error("Type must be either file or blob (base64)!")
 		}
 	}
 }

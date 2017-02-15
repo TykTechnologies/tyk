@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -125,13 +125,13 @@ type TykEventHandler interface {
 	HandleEvent(EventMessage)
 }
 
-// EncodeRequestToEvent will write the request out in wire protocol and encode it to b64 and store it in an Event object
+// EncodeRequestToEvent will write the request out in wire protocol and
+// encode it to base64 and store it in an Event object
 func EncodeRequestToEvent(r *http.Request) string {
 	var asBytes bytes.Buffer
 	r.Write(&asBytes)
 
-	uEnc := b64.StdEncoding.EncodeToString(asBytes.Bytes())
-	return uEnc
+	return base64.StdEncoding.EncodeToString(asBytes.Bytes())
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition

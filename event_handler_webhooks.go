@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"html/template"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -185,22 +184,11 @@ func (w *WebHookHandler) checkURL(r string) bool {
 }
 
 func (w *WebHookHandler) GetChecksum(reqBody string) (string, error) {
-	var rawRequest bytes.Buffer
 	// We do this twice because fuck it.
 	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
-
-	localRequest.Write(&rawRequest)
 	h := md5.New()
-
-	log.WithFields(logrus.Fields{
-		"prefix": "webhooks",
-	}).Debug("REQUEST: \n", rawRequest.String())
-
-	io.WriteString(h, rawRequest.String())
-
-	reqChecksum := hex.EncodeToString(h.Sum(nil))
-
-	return reqChecksum, nil
+	localRequest.Write(h)
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {

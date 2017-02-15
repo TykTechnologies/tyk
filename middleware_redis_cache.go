@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/md5"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -107,7 +107,7 @@ func (m *RedisCacheMiddleware) isTimeStampExpired(timestamp string) bool {
 }
 
 func (m *RedisCacheMiddleware) encodePayload(payload, timestamp string) string {
-	sEnc := b64.StdEncoding.EncodeToString([]byte(payload))
+	sEnc := base64.StdEncoding.EncodeToString([]byte(payload))
 	return sEnc + "|" + timestamp
 }
 
@@ -119,7 +119,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 	}
 
 	if len(data) == 2 {
-		sDec, err := b64.StdEncoding.DecodeString(data[0])
+		sDec, err := base64.StdEncoding.DecodeString(data[0])
 		if err != nil {
 			return "", "", err
 		}

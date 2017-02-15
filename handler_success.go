@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"runtime/pprof"
@@ -260,13 +260,13 @@ func (s *SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timin
 				// Get the wire format representation
 				var wireFormatReq bytes.Buffer
 				requestCopy.Write(&wireFormatReq)
-				rawRequest = b64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+				rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 			}
 			if responseCopy != nil {
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
 				responseCopy.Write(&wireFormatRes)
-				rawResponse = b64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
 

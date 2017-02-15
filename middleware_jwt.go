@@ -4,7 +4,7 @@ import "net/http"
 
 import (
 	"crypto/md5"
-	b64 "encoding/base64"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,7 +98,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 		}
 		if len(val.X5c) > 0 {
 			// Use the first cert only
-			decodedCert, err := b64.StdEncoding.DecodeString(val.X5c[0])
+			decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
 			if err != nil {
 				return nil, err
 			}
@@ -148,7 +148,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 		}
 
 		// If not, return the actual value
-		decodedCert, err := b64.StdEncoding.DecodeString(config.JWTSource)
+		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 		return nil, errors.New("Key ID not found")
 	}
 
-	// Couldn't b64 decode the kid, so lets try it raw
+	// Couldn't base64 decode the kid, so lets try it raw
 	log.Debug("Getting key: ", tykId)
 	sessionState, rawKeyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !rawKeyExists {
