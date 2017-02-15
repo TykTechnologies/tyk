@@ -37,7 +37,7 @@ const batchTestDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1/",
-		"target_url": "http://httpbin.org",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": true
 	},
 	"enable_batch_request_support": true
