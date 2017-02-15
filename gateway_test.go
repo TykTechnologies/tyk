@@ -24,9 +24,10 @@ func init() {
 	runningTests = true
 }
 
-var (
-	// to register to, but never used
-	discardMuxer = mux.NewRouter()
+// to register to, but never used
+var discardMuxer = mux.NewRouter()
+
+const (
 	// we need a static port so that the urls can be used in static
 	// test data and the requests aren't randomized for checksums
 	// port 16500 should be obscure and unused
@@ -272,7 +273,7 @@ const nonExpiringDefNoWhiteList = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`
@@ -327,7 +328,7 @@ const versionedDefinition = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`
@@ -501,7 +502,7 @@ const extendedPathGatewaySetup = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`

@@ -40,7 +40,7 @@ const jwtDef = `{
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": true
 	}
 }`
@@ -78,7 +78,7 @@ const jwtWithJWKDef = `{
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": true
 	}
 }`
@@ -116,7 +116,7 @@ const jwtWithCentralDef = `{
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": true
 	}
 }`
@@ -154,7 +154,7 @@ const jwtWithCentralDefNoPolicyBaseField = `{
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": true
 	}
 }`

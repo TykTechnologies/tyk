@@ -36,7 +36,7 @@ const sampleDefiniton = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`
@@ -68,7 +68,7 @@ const nonExpiringDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`
@@ -109,7 +109,7 @@ const nonExpiringMultiDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`

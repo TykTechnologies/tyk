@@ -77,7 +77,7 @@ const oauthDefinition = `{
 	},
 	"proxy": {
 		"listen_path": "/APIID/",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`
