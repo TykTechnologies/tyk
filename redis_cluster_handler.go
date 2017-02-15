@@ -128,13 +128,25 @@ func (r *RedisClusterStorageManager) cleanKey(keyName string) string {
 	return setKeyName
 }
 
+func (r *RedisClusterStorageManager) ensureConnection() {
+	if GetRelevantClusterReference(r.IsCache) != nil {
+		// already connected
+		return
+	}
+	log.Info("Connection dropped, reconnecting...")
+	for {
+		r.Connect()
+		if GetRelevantClusterReference(r.IsCache) != nil {
+			// reconnection worked
+			return
+		}
+		log.Info("Reconnecting again...")
+	}
+}
+
 // GetKey will retrieve a key from the database
 func (r *RedisClusterStorageManager) GetKey(keyName string) (string, error) {
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.GetKey(keyName)
-	}
+	r.ensureConnection()
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 	value, err := redis.String(GetRelevantClusterReference(r.IsCache).Do("GET", r.fixKey(keyName)))
@@ -147,11 +159,7 @@ func (r *RedisClusterStorageManager) GetKey(keyName string) (string, error) {
 }
 
 func (r *RedisClusterStorageManager) GetRawKey(keyName string) (string, error) {
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.GetRawKey(keyName)
-	}
+	r.ensureConnection()
 	value, err := redis.String(GetRelevantClusterReference(r.IsCache).Do("GET", keyName))
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
@@ -163,11 +171,7 @@ func (r *RedisClusterStorageManager) GetRawKey(keyName string) (string, error) {
 
 func (r *RedisClusterStorageManager) GetExp(keyName string) (int64, error) {
 	log.Debug("Getting exp for key: ", r.fixKey(keyName))
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.GetExp(keyName)
-	}
+	r.ensureConnection()
 
 	value, err := redis.Int64(GetRelevantClusterReference(r.IsCache).Do("TTL", r.fixKey(keyName)))
 	if err != nil {
@@ -184,11 +188,7 @@ func (r *RedisClusterStorageManager) SetKey(keyName, sessionState string, timeou
 	log.Debug("[STORE] SET Raw key is: ", keyName)
 	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.SetKey(keyName, sessionState, timeout)
-	}
+	r.ensureConnection()
 	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", r.fixKey(keyName), sessionState)
 	if timeout > 0 {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", r.fixKey(keyName), timeout)
@@ -206,11 +206,7 @@ func (r *RedisClusterStorageManager) SetKey(keyName, sessionState string, timeou
 
 func (r *RedisClusterStorageManager) SetRawKey(keyName, sessionState string, timeout int64) error {
 
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.SetRawKey(keyName, sessionState, timeout)
-	}
+	r.ensureConnection()
 	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", keyName, sessionState)
 	if timeout > 0 {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", keyName, timeout)
@@ -231,16 +227,10 @@ func (r *RedisClusterStorageManager) Decrement(keyName string) {
 
 	keyName = r.fixKey(keyName)
 	log.Debug("Decrementing key: ", keyName)
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		r.Decrement(keyName)
-	} else {
-		err := GetRelevantClusterReference(r.IsCache).Send("DECR", keyName)
-
-		if err != nil {
-			log.Error("Error trying to decrement value:", err)
-		}
+	r.ensureConnection()
+	err := GetRelevantClusterReference(r.IsCache).Send("DECR", keyName)
+	if err != nil {
+		log.Error("Error trying to decrement value:", err)
 	}
 }
 
@@ -248,35 +238,24 @@ func (r *RedisClusterStorageManager) Decrement(keyName string) {
 func (r *RedisClusterStorageManager) IncrememntWithExpire(keyName string, expire int64) int64 {
 
 	log.Debug("Incrementing raw key: ", keyName)
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		r.IncrememntWithExpire(keyName, expire)
-	} else {
-		// This function uses a raw key, so we shouldn't call fixKey
-		fixedKey := keyName
-		val, err := redis.Int64(GetRelevantClusterReference(r.IsCache).Do("INCR", fixedKey))
-		log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
-		if val == 1 {
-			log.Debug("--> Setting Expire")
-			GetRelevantClusterReference(r.IsCache).Do("EXPIRE", fixedKey, expire)
-		}
-		if err != nil {
-			log.Error("Error trying to increment value:", err)
-		}
-		return val
+	r.ensureConnection()
+	// This function uses a raw key, so we shouldn't call fixKey
+	fixedKey := keyName
+	val, err := redis.Int64(GetRelevantClusterReference(r.IsCache).Do("INCR", fixedKey))
+	log.Debug("Incremented key: ", fixedKey, ", val is: ", val)
+	if val == 1 {
+		log.Debug("--> Setting Expire")
+		GetRelevantClusterReference(r.IsCache).Do("EXPIRE", fixedKey, expire)
 	}
-	return 0
+	if err != nil {
+		log.Error("Error trying to increment value:", err)
+	}
+	return val
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RedisClusterStorageManager) GetKeys(filter string) []string {
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.GetKeys(filter)
-	}
-
+	r.ensureConnection()
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
@@ -296,13 +275,7 @@ func (r *RedisClusterStorageManager) GetKeys(filter string) []string {
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) map[string]string {
-
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.GetKeysAndValuesWithFilter(filter)
-	}
-
+	r.ensureConnection()
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
@@ -326,13 +299,7 @@ func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) m
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly
 func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
-
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.GetKeysAndValues()
-	}
-
+	r.ensureConnection()
 	searchStr := r.KeyPrefix + "*"
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
@@ -355,13 +322,7 @@ func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
 
 // DeleteKey will remove a key from the database
 func (r *RedisClusterStorageManager) DeleteKey(keyName string) bool {
-
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.DeleteKey(keyName)
-	}
-
+	r.ensureConnection()
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
 	_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", r.fixKey(keyName))
@@ -374,13 +335,7 @@ func (r *RedisClusterStorageManager) DeleteKey(keyName string) bool {
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RedisClusterStorageManager) DeleteRawKey(keyName string) bool {
-
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.DeleteRawKey(keyName)
-	}
-
+	r.ensureConnection()
 	_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", keyName)
 	if err != nil {
 		log.Error("Error trying to delete key: ", err)
@@ -391,13 +346,7 @@ func (r *RedisClusterStorageManager) DeleteRawKey(keyName string) bool {
 
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
-
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.DeleteScanMatch(pattern)
-	}
-
+	r.ensureConnection()
 	log.Debug("Deleting: ", pattern)
 
 	// here we'll store our iterator value
@@ -443,13 +392,7 @@ func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
 
 // DeleteKeys will remove a group of keys in bulk
 func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
-
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.DeleteKeys(keys)
-	}
-
+	r.ensureConnection()
 	if len(keys) > 0 {
 		asInterface := make([]interface{}, len(keys))
 		for i, v := range keys {
@@ -470,13 +413,7 @@ func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
 
 // DeleteKeys will remove a group of keys in bulk without a prefix handler
 func (r *RedisClusterStorageManager) DeleteRawKeys(keys []string, prefix string) bool {
-
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.DeleteKeys(keys)
-	}
-
+	r.ensureConnection()
 	if len(keys) > 0 {
 		asInterface := make([]interface{}, len(keys))
 		for i, v := range keys {
@@ -526,137 +463,97 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 }
 
 func (r *RedisClusterStorageManager) Publish(channel, message string) error {
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, Connecting..")
-		r.Connect()
-		r.Publish(channel, message)
-	} else {
-		_, err := GetRelevantClusterReference(r.IsCache).Do("PUBLISH", channel, message)
-		if err != nil {
-			log.Error("Error trying to set value: ", err)
-			return err
-		}
+	r.ensureConnection()
+	_, err := GetRelevantClusterReference(r.IsCache).Do("PUBLISH", channel, message)
+	if err != nil {
+		log.Error("Error trying to set value: ", err)
+		return err
 	}
 	return nil
 }
 
 func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface{} {
-
 	log.Debug("Getting raw key set: ", keyName)
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Warning("Connection dropped, connecting..")
+	r.ensureConnection()
+	log.Debug("keyName is: ", keyName)
+	fixedKey := r.fixKey(keyName)
+	log.Debug("Fixed keyname is: ", fixedKey)
+
+	lrange := rediscluster.ClusterTransaction{}
+	lrange.Cmd = "LRANGE"
+	lrange.Args = []interface{}{fixedKey, 0, -1}
+
+	delCmd := rediscluster.ClusterTransaction{}
+	delCmd.Cmd = "DEL"
+	delCmd.Args = []interface{}{fixedKey}
+
+	redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoTransaction([]rediscluster.ClusterTransaction{lrange, delCmd}))
+	if err != nil {
+		log.Error("Multi command failed: ", err)
 		r.Connect()
-		r.GetAndDeleteSet(keyName)
-	} else {
-		log.Debug("keyName is: ", keyName)
-		fixedKey := r.fixKey(keyName)
-		log.Debug("Fixed keyname is: ", fixedKey)
-
-		lrange := rediscluster.ClusterTransaction{}
-		lrange.Cmd = "LRANGE"
-		lrange.Args = []interface{}{fixedKey, 0, -1}
-
-		delCmd := rediscluster.ClusterTransaction{}
-		delCmd.Cmd = "DEL"
-		delCmd.Args = []interface{}{fixedKey}
-
-		redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoTransaction([]rediscluster.ClusterTransaction{lrange, delCmd}))
-		if err != nil {
-			log.Error("Multi command failed: ", err)
-			r.Connect()
-		}
-
-		log.Debug("Analytics returned: ", redVal)
-		if len(redVal) == 0 {
-			return []interface{}{}
-		}
-
-		vals := redVal[0].([]interface{})
-
-		log.Debug("Unpacked vals: ", vals)
-
-		return vals
 	}
-	return []interface{}{}
+
+	log.Debug("Analytics returned: ", redVal)
+	if len(redVal) == 0 {
+		return []interface{}{}
+	}
+
+	vals := redVal[0].([]interface{})
+
+	log.Debug("Unpacked vals: ", vals)
+
+	return vals
 }
 
 func (r *RedisClusterStorageManager) AppendToSet(keyName, value string) {
 	log.Debug("Pushing to raw key list: ", keyName)
 	log.Debug("Appending to fixed key list: ", r.fixKey(keyName))
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Warning("Connection dropped, connecting..")
-		r.Connect()
-		r.AppendToSet(keyName, value)
-	} else {
-		_, err := GetRelevantClusterReference(r.IsCache).Do("RPUSH", r.fixKey(keyName), value)
+	r.ensureConnection()
+	_, err := GetRelevantClusterReference(r.IsCache).Do("RPUSH", r.fixKey(keyName), value)
 
-		if err != nil {
-			log.Error("Error trying to delete keys: ", err)
-		}
-
-		return
+	if err != nil {
+		log.Error("Error trying to delete keys: ", err)
 	}
 }
 
 func (r *RedisClusterStorageManager) GetSet(keyName string) (map[string]string, error) {
 	log.Debug("Getting from key set: ", keyName)
 	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Warning("Connection dropped, connecting..")
-		r.Connect()
-		r.GetSet(keyName)
-	} else {
-		val, err := GetRelevantClusterReference(r.IsCache).Do("SMEMBERS", r.fixKey(keyName))
-		if err != nil {
-			log.Error("Error trying to get key set:", err)
-			return map[string]string{}, err
-		}
-
-		asValues, _ := redis.Strings(val, err)
-
-		vals := make(map[string]string)
-		for i, value := range asValues {
-			vals[strconv.Itoa(i)] = value
-		}
-
-		return vals, nil
+	r.ensureConnection()
+	val, err := GetRelevantClusterReference(r.IsCache).Do("SMEMBERS", r.fixKey(keyName))
+	if err != nil {
+		log.Error("Error trying to get key set:", err)
+		return map[string]string{}, err
 	}
-	return map[string]string{}, nil
+
+	asValues, _ := redis.Strings(val, err)
+
+	vals := make(map[string]string)
+	for i, value := range asValues {
+		vals[strconv.Itoa(i)] = value
+	}
+	return vals, nil
 }
 
 func (r *RedisClusterStorageManager) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Warning("Connection dropped, connecting..")
-		r.Connect()
-		r.AddToSet(keyName, value)
-	} else {
-		_, err := GetRelevantClusterReference(r.IsCache).Do("SADD", r.fixKey(keyName), value)
+	r.ensureConnection()
+	_, err := GetRelevantClusterReference(r.IsCache).Do("SADD", r.fixKey(keyName), value)
 
-		if err != nil {
-			log.Error("Error trying to append keys: ", err)
-		}
-
-		return
+	if err != nil {
+		log.Error("Error trying to append keys: ", err)
 	}
 }
 
 func (r *RedisClusterStorageManager) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from raw key set: ", keyName)
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Warning("Connection dropped, connecting..")
-		r.Connect()
-		r.RemoveFromSet(keyName, value)
-	} else {
-		_, err := GetRelevantClusterReference(r.IsCache).Do("SREM", r.fixKey(keyName), value)
+	r.ensureConnection()
+	_, err := GetRelevantClusterReference(r.IsCache).Do("SREM", r.fixKey(keyName), value)
 
-		if err != nil {
-			log.Error("Error trying to remove keys: ", err)
-		}
-
-		return
+	if err != nil {
+		log.Error("Error trying to remove keys: ", err)
 	}
 }
 
@@ -664,11 +561,7 @@ func (r *RedisClusterStorageManager) RemoveFromSet(keyName, value string) {
 func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, value_override string) (int, []interface{}) {
 
 	log.Debug("Incrementing raw key: ", keyName)
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.SetRollingWindow(keyName, per, value_override)
-	}
+	r.ensureConnection()
 	log.Debug("keyName is: ", keyName)
 	now := time.Now()
 	log.Debug("Now is:", now)
@@ -733,11 +626,7 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, per int64, value_override string) (int, []interface{}) {
 
 	log.Debug("Incrementing raw key: ", keyName)
-	if GetRelevantClusterReference(r.IsCache) == nil {
-		log.Info("Connection dropped, connecting..")
-		r.Connect()
-		return r.SetRollingWindow(keyName, per, value_override)
-	}
+	r.ensureConnection()
 	log.Debug("keyName is: ", keyName)
 	now := time.Now()
 	log.Debug("Now is:", now)
