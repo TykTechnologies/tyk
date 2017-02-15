@@ -29,6 +29,7 @@ import (
 	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+	"github.com/lonelycode/gorpc"
 	"github.com/lonelycode/logrus-graylog-hook"
 	osin "github.com/lonelycode/osin"
 	"github.com/rs/cors"
@@ -897,6 +898,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 		// output
 		log.Level = logrus.ErrorLevel
 		log.Out = ioutil.Discard
+		gorpc.SetErrorLogger(func(string, ...interface{}) {})
 	} else if dbg, _ := arguments["--debug"]; dbg == true {
 		log.Level = logrus.DebugLevel
 		log.WithFields(logrus.Fields{
