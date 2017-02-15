@@ -35,7 +35,7 @@ type Bundle struct {
 	Manifest apidef.BundleManifest
 }
 
-func (b *Bundle) Verify() (err error) {
+func (b *Bundle) Verify() error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
@@ -47,14 +47,14 @@ func (b *Bundle) Verify() (err error) {
 	if config.PublicKeyPath != "" {
 		if b.Manifest.Signature == "" {
 			// Error: A public key is set, but the bundle isn't signed.
-			err = errors.New("Bundle isn't signed")
+			return errors.New("Bundle isn't signed")
 		}
 		if notificationVerifier == nil {
+			var err error
 			bundleVerifier, err = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
-		}
-
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 
 		useSignature = true
@@ -65,8 +65,7 @@ func (b *Bundle) Verify() (err error) {
 	for _, f := range b.Manifest.FileList {
 		extractedFilePath := filepath.Join(b.Path, f)
 
-		var data []byte
-		data, err = ioutil.ReadFile(extractedFilePath)
+		data, err := ioutil.ReadFile(extractedFilePath)
 		if err != nil {
 			break
 		}
@@ -77,23 +76,21 @@ func (b *Bundle) Verify() (err error) {
 	checksum := fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
 
 	if checksum != b.Manifest.Checksum {
-		err = errors.New("Invalid checksum")
+		return errors.New("Invalid checksum")
 	}
 
 	if useSignature {
-		var signed []byte
-		signed, err = base64.StdEncoding.DecodeString(b.Manifest.Signature)
+		signed, err := base64.StdEncoding.DecodeString(b.Manifest.Signature)
 		if err != nil {
 			return err
 		}
-		err = bundleVerifier.Verify(bundleData.Bytes(), signed)
-		if err != nil {
+		if err := bundleVerifier.Verify(bundleData.Bytes(), signed); err != nil {
 			return err
 		}
 
 	}
 
-	return err
+	return nil
 }
 
 func (b *Bundle) AddToSpec() {
@@ -138,7 +135,7 @@ type BundleSaver interface {
 type ZipBundleSaver struct{}
 
 // Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
-func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) (err error) {
+func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
 	buf := bytes.NewReader(bundle.Data)
 	reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
 
@@ -163,7 +160,7 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 			return err
 		}
 	}
-	return err
+	return nil
 }
 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
@@ -206,7 +203,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 }
 
 // saveBundle will save a bundle to the disk, see ZipBundleSaver methods for reference.
-func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
+func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 	bundleFormat := "zip"
 
 	var bundleSaver BundleSaver
@@ -219,7 +216,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) (err error) {
 
 	bundleSaver.Save(bundle, destPath, spec)
 
-	return err
+	return nil
 }
 
 // loadBundleManifest will parse the manifest file and return the bundle parameters.
