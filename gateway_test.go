@@ -28,7 +28,8 @@ var discardMuxer = mux.NewRouter()
 
 func TestMain(m *testing.M) {
 	WriteDefaultConf(&config)
-	if err := emptyRedis(strconv.Itoa(config.Storage.Port)); err != nil {
+	config.Storage.Database = 1
+	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
 	var err error
@@ -52,13 +53,18 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func emptyRedis(port string) error {
-	c, err := redis.Dial("tcp", ":"+port)
+func emptyRedis() error {
+	addr := ":" + strconv.Itoa(config.Storage.Port)
+	c, err := redis.Dial("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not connect to redis: %v", err)
 	}
 	defer c.Close()
-	_, err = c.Do("FLUSHALL")
+	dbName := strconv.Itoa(config.Storage.Database)
+	if _, err := c.Do("SELECT", dbName); err != nil {
+		return err
+	}
+	_, err = c.Do("FLUSHDB")
 	return err
 }
 
