@@ -46,7 +46,7 @@ const hmacAuthDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com/",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": true
 	}
 }`

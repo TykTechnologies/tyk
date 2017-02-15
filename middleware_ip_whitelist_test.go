@@ -35,7 +35,7 @@ const ipMiddlewareTestDefinitionEnabledFail = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	},
 	"enable_ip_whitelisting": true,
@@ -70,7 +70,7 @@ const ipMiddlewareTestDefinitionEnabledPass = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	},
 	"enable_ip_whitelisting": true,
@@ -105,7 +105,7 @@ const ipMiddlewareTestDefinitionDisabled = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	},
 	"enable_ip_whitelisting": false,
@@ -140,7 +140,7 @@ const ipMiddlewareTestDefinitionMissing = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://example.com",
+		"target_url": "` + testHttpAny + `",
 		"strip_listen_path": false
 	}
 }`
