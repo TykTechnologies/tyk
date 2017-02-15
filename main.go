@@ -360,8 +360,7 @@ func CheckIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
 
 			responseMessage := createError("Forbidden")
 			w.WriteHeader(403)
-			fmt.Fprintf(w, string(responseMessage))
-
+			w.Write(responseMessage)
 			return
 		}
 

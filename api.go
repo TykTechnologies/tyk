@@ -48,7 +48,7 @@ func createError(errorMsg string) []byte {
 func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	fmt.Fprintf(w, string(responseMessage))
+	w.Write(responseMessage)
 	if code != 200 {
 		job := instrument.NewJob("SystemAPIError")
 		job.Event(strconv.Itoa(code))

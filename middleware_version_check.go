@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -39,7 +38,7 @@ func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 	}
 
 	w.WriteHeader(emeta.Code)
-	fmt.Fprintf(w, string(responseMessage))
+	w.Write(responseMessage)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
