@@ -274,7 +274,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				return nil, 200
 			}
 
-			retObj := bytes.NewReader([]byte(cachedData))
+			retObj := strings.NewReader(cachedData)
 			log.Debug("Cache got: ", cachedData)
 
 			asBufioReader := bufio.NewReader(retObj)

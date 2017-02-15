@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -129,7 +130,7 @@ func TestApiHandler(t *testing.T) {
 
 		makeSampleAPI(t, apiTestDef)
 
-		req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+		req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
 
 		if err != nil {
 			t.Fatal(err)
@@ -166,7 +167,7 @@ func TestApiHandlerGetSingle(t *testing.T) {
 
 	makeSampleAPI(t, apiTestDef)
 
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+	req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
 
 	if err != nil {
 		t.Fatal(err)
@@ -255,7 +256,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 
 	makeSampleAPI(t, apiTestDef)
 	param.Set("api_id", "1")
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+	req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
 
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +289,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 	param := make(url.Values)
 	makeSampleAPI(t, apiTestDef)
 	param.Set("api_id", "1")
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+	req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
 
 	if err != nil {
 		t.Fatal(err)
@@ -380,7 +381,7 @@ func createKey() {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, _ := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+	req, _ := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
 
 	keyHandler(recorder, req)
 }
@@ -431,7 +432,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 	param := make(url.Values)
 	makeSampleAPI(t, apiTestDef)
 	param.Set("api_id", "1")
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+	req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
 
 	if err != nil {
 		t.Fatal(err)
@@ -466,7 +467,7 @@ func TestCreateKeyHandlerCreateNewKeyNoAPIID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	makeSampleAPI(t, apiTestDef)
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(string(body)))
+	req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
 
 	if err != nil {
 		t.Fatal(err)

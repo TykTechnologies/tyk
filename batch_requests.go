@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -110,7 +109,7 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 			absURL = requestDef.RelativeURL
 		}
 
-		request, err := http.NewRequest(requestDef.Method, absURL, bytes.NewBuffer([]byte(requestDef.Body)))
+		request, err := http.NewRequest(requestDef.Method, absURL, strings.NewReader(requestDef.Body))
 		if err != nil {
 			log.Error("Failure generating batch request for request spec index: ", i)
 			return nil, err

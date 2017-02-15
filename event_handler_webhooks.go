@@ -187,7 +187,7 @@ func (w *WebHookHandler) checkURL(r string) bool {
 func (w *WebHookHandler) GetChecksum(reqBody string) (string, error) {
 	var rawRequest bytes.Buffer
 	// We do this twice because fuck it.
-	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
+	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
 
 	localRequest.Write(&rawRequest)
 	h := md5.New()
@@ -204,7 +204,7 @@ func (w *WebHookHandler) GetChecksum(reqBody string) (string, error) {
 }
 
 func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
-	req, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, bytes.NewBuffer([]byte(reqBody)))
+	req, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
