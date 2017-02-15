@@ -24,9 +24,65 @@ func init() {
 	runningTests = true
 }
 
-var discardMuxer = mux.NewRouter()
+var (
+	// to register to, but never used
+	discardMuxer = mux.NewRouter()
+	// we need a static port so that the urls can be used in static
+	// test data and the requests aren't randomized for checksums
+	// port 16500 should be obscure and unused
+	testHttpListen = "127.0.0.1:16500"
+	// accepts any http requests on /, only allows GET on /get, etc
+	// all return a JSON with request info
+	testHttpAny  = "http://" + testHttpListen
+	testHttpGet  = testHttpAny + "/get"
+	testHttpPost = testHttpAny + "/post"
+	testHttpPut  = testHttpAny + "/put"
+)
+
+func testHttpHandler() http.Handler {
+	httpError := func(w http.ResponseWriter, status int) {
+		http.Error(w, http.StatusText(status), status)
+	}
+	writeDetails := func(w http.ResponseWriter, r *http.Request) {
+		body, _ := ioutil.ReadAll(r.Body)
+		err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"method":  r.Method,
+			"url":     r.URL.String(),
+			"headers": r.Header,
+			"body":    string(body),
+		})
+		if err != nil {
+			httpError(w, http.StatusInternalServerError)
+		}
+	}
+	handleMethod := func(method string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if method != "" && r.Method != method {
+				httpError(w, http.StatusMethodNotAllowed)
+			} else {
+				writeDetails(w, r)
+			}
+		}
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handleMethod(""))
+	mux.HandleFunc("/get", handleMethod("GET"))
+	mux.HandleFunc("/post", handleMethod("POST"))
+	mux.HandleFunc("/put", handleMethod("PUT"))
+	return mux
+}
 
 func TestMain(m *testing.M) {
+	testServer := &http.Server{
+		Addr:           testHttpListen,
+		Handler:        testHttpHandler(),
+		ReadTimeout:    1 * time.Second,
+		WriteTimeout:   1 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	go func() {
+		panic(testServer.ListenAndServe())
+	}()
 	WriteDefaultConf(&config)
 	config.Storage.Database = 1
 	if err := emptyRedis(); err != nil {
