@@ -5,62 +5,41 @@ import (
 	"testing"
 )
 
-func createHookObj() *WebHookHandler {
-	eventHandlerConf := WebHookHandlerConf{}
-	eventHandlerConf.TargetPath = "http://httpbin.org/get"
-	eventHandlerConf.Method = "GET"
-	eventHandlerConf.EventTimeout = 10
-	eventHandlerConf.TemplatePath = "templates/default_webhook.json"
-	eventHandlerConf.HeaderList = make(map[string]string)
-	eventHandlerConf.HeaderList["x-tyk-test"] = "TEST"
-
-	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
-
-	myEventHandler := ev.(*WebHookHandler)
-
-	eventMessage := EventMessage{}
-	eventMessage.EventType = EVENT_KeyExpired
-	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
-		Path:             "/banana",
-		Origin:           "tyk.io",
-		Key:              "123456789",
+func createGetHandler() *WebHookHandler {
+	eventHandlerConf := WebHookHandlerConf{
+		TargetPath:   "http://httpbin.org/get",
+		Method:       "GET",
+		EventTimeout: 10,
+		TemplatePath: "templates/default_webhook.json",
+		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
-
-	return myEventHandler
+	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
+	return ev.(*WebHookHandler)
 }
 
 func TestNewValid(t *testing.T) {
-
 	o := WebHookHandler{}
-	var conf = make(map[string]interface{})
-
-	conf["method"] = "POST"
-	conf["target_path"] = "http://posttestserver.com/post.php?dir=tyk-event-test"
-	conf["template_path"] = "templates/default_webhook.json"
-	conf["header_map"] = map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"}
-	conf["event_timeout"] = 10
-
-	_, err := o.New(conf)
-
+	_, err := o.New(map[string]interface{}{
+		"method":        "POST",
+		"target_path":   "http://posttestserver.com/post.php?dir=tyk-event-test",
+		"template_path": "templates/default_webhook.json",
+		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+		"event_timeout": 10,
+	})
 	if err != nil {
 		t.Error("Webhook Handler should have created valid configuration")
 	}
 }
 
 func TestNewInvlalid(t *testing.T) {
-
 	o := WebHookHandler{}
-	var conf = make(map[string]interface{})
-
-	conf["method"] = 123
-	conf["target_path"] = "http://posttestserver.com/post.php?dir=tyk-event-test"
-	conf["template_path"] = "templates/default_webhook.json"
-	conf["header_map"] = map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"}
-	conf["event_timeout"] = 10
-
-	_, err := o.New(conf)
-
+	_, err := o.New(map[string]interface{}{
+		"method":        123,
+		"target_path":   "http://posttestserver.com/post.php?dir=tyk-event-test",
+		"template_path": "templates/default_webhook.json",
+		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+		"event_timeout": 10,
+	})
 	if err == nil {
 		t.Error("Webhook Handler should have failed")
 	}
@@ -76,7 +55,7 @@ func TestGetChecksum(t *testing.T) {
 		"timestamp": 2014-11-27 12:52:05.944549825 &#43;0000 GMT
 	}`
 
-	hook := createHookObj()
+	hook := createGetHandler()
 	checksum, err := hook.GetChecksum(rBody)
 
 	if err != nil {
@@ -90,7 +69,7 @@ func TestGetChecksum(t *testing.T) {
 }
 
 func TestBuildRequest(t *testing.T) {
-	hook := createHookObj()
+	hook := createGetHandler()
 
 	rBody := `{
 		"event": "QuotaExceeded",
@@ -105,7 +84,6 @@ func TestBuildRequest(t *testing.T) {
 	if err != nil {
 		t.Error("Request should have built cleanly.")
 	}
-
 	if req.Method != "GET" {
 		t.Error("Method hould be GET")
 	}
@@ -118,18 +96,16 @@ func TestBuildRequest(t *testing.T) {
 	if hVal[0] != "Tyk-Hookshot" {
 		t.Error("Header User Agent is not correct!")
 	}
-
 }
 
 func TestCreateBody(t *testing.T) {
-	em := EventMessage{}
-	em.EventType = EVENT_QuotaExceeded
-	em.TimeStamp = "0"
+	em := EventMessage{
+		EventType: EVENT_QuotaExceeded,
+		TimeStamp: "0",
+	}
 
-	hook := createHookObj()
-
+	hook := createGetHandler()
 	body, err := hook.CreateBody(em)
-
 	if err != nil {
 		t.Error("Create body failed with error! ", err)
 	}
@@ -138,78 +114,73 @@ func TestCreateBody(t *testing.T) {
 	if !strings.Contains(body, expectedBody) {
 		t.Error("Body incorrect, is: ", body)
 	}
-
 }
 
 func TestGet(t *testing.T) {
-	eventHandlerConf := WebHookHandlerConf{}
-	eventHandlerConf.TargetPath = "http://httpbin.org/get"
-	eventHandlerConf.Method = "GET"
-	eventHandlerConf.EventTimeout = 10
-	eventHandlerConf.TemplatePath = "templates/default_webhook.json"
-	eventHandlerConf.HeaderList = make(map[string]string)
-	eventHandlerConf.HeaderList["x-tyk-test"] = "TEST"
+	eventHandlerConf := WebHookHandlerConf{
+		TargetPath:   "http://httpbin.org/get",
+		Method:       "GET",
+		EventTimeout: 10,
+		TemplatePath: "templates/default_webhook.json",
+		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
+	}
 
 	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
 
-	myEventHandler := ev.(*WebHookHandler)
+	eventHandler := ev.(*WebHookHandler)
 
-	eventMessage := EventMessage{}
-	eventMessage.EventType = EVENT_KeyExpired
-	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
-		Path:             "/banana",
-		Origin:           "tyk.io",
-		Key:              "123456789",
+	eventMessage := EventMessage{
+		EventType: EVENT_KeyExpired,
+		EventMetaData: EVENT_AuthFailureMeta{
+			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
+			Path:             "/banana",
+			Origin:           "tyk.io",
+			Key:              "123456789",
+		},
 	}
+	body, _ := eventHandler.CreateBody(eventMessage)
 
-	body, _ := myEventHandler.CreateBody(eventMessage)
+	checksum, _ := eventHandler.GetChecksum(body)
+	eventHandler.HandleEvent(eventMessage)
 
-	checksum, _ := myEventHandler.GetChecksum(body)
-	myEventHandler.HandleEvent(eventMessage)
+	log.Info("Test Checksum: ", checksum)
 
-	wasFired := myEventHandler.WasHookFired(checksum)
-
-	log.Warning("Test Checksum: ", checksum)
-
-	if !wasFired {
+	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
 	}
 
 }
 
 func TestPost(t *testing.T) {
-	eventHandlerConf := WebHookHandlerConf{}
-	eventHandlerConf.TargetPath = "http://posttestserver.com/post.php?dir=tyk"
-	eventHandlerConf.Method = "POST"
-	eventHandlerConf.EventTimeout = 10
-	eventHandlerConf.TemplatePath = "templates/default_webhook.json"
-	eventHandlerConf.HeaderList = make(map[string]string)
-	eventHandlerConf.HeaderList["x-tyk-test"] = "TEST POST"
+	eventHandlerConf := WebHookHandlerConf{
+		TargetPath:   "http://posttestserver.com/post.php?dir=tyk",
+		Method:       "POST",
+		EventTimeout: 10,
+		TemplatePath: "templates/default_webhook.json",
+		HeaderList:   map[string]string{"x-tyk-test": "TEST POST"},
+	}
 
 	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
-	myEventHandler := ev.(*WebHookHandler)
+	eventHandler := ev.(*WebHookHandler)
 
-	eventMessage := EventMessage{}
-	eventMessage.EventType = EVENT_KeyExpired
-	eventMessage.EventMetaData = EVENT_AuthFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
-		Path:             "/banana",
-		Origin:           "tyk.io",
-		Key:              "123456789",
+	eventMessage := EventMessage{
+		EventType: EVENT_KeyExpired,
+		EventMetaData: EVENT_AuthFailureMeta{
+			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
+			Path:             "/banana",
+			Origin:           "tyk.io",
+			Key:              "123456789",
+		},
 	}
 
-	body, _ := myEventHandler.CreateBody(eventMessage)
+	body, _ := eventHandler.CreateBody(eventMessage)
 
-	checksum, _ := myEventHandler.GetChecksum(body)
-	myEventHandler.HandleEvent(eventMessage)
+	checksum, _ := eventHandler.GetChecksum(body)
+	eventHandler.HandleEvent(eventMessage)
 
-	wasFired := myEventHandler.WasHookFired(checksum)
+	log.Info("Test Checksum: ", checksum)
 
-	log.Warning("Test Checksum: ", checksum)
-
-	if !wasFired {
+	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
 	}
-
 }
