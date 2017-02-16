@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -84,18 +85,15 @@ func GetURLFromService(spec *APISpec) (*apidef.HostList, error) {
 	return cachedServiceData.(*apidef.HostList), nil
 }
 
+// httpScheme matches http://* and https://*, case insensitive
+var httpScheme = regexp.MustCompile(`^(?i)https?://`)
+
 func EnsureTransport(host string) string {
-	if strings.HasPrefix(host, "https://") {
+	if httpScheme.MatchString(host) {
 		return host
 	}
-
-	if strings.HasPrefix(host, "http://") {
-		return host
-	}
-
-	// no prototcol, assum ehttp
-	host = "http://" + host
-	return host
+	// no prototcol, assume http
+	return "http://" + host
 }
 
 func GetNextTarget(targetData *apidef.HostList, spec *APISpec, tryCount int) string {

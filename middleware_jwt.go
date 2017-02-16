@@ -138,7 +138,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	if config.JWTSource != "" {
 
 		// Is it a URL?
-		if strings.HasPrefix(strings.ToLower(config.JWTSource), "http://") || strings.HasPrefix(strings.ToLower(config.JWTSource), "https://") {
+		if httpScheme.MatchString(config.JWTSource) {
 			secret, err := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.TykMiddleware.Spec.JWTSigningMethod)
 			if err != nil {
 				return nil, err
