@@ -481,115 +481,47 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 		}).Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
 
-	// Load from folder
+	// Load from folders
+	for _, folder := range [...]struct {
+		name    string
+		single  *apidef.MiddlewareDefinition
+		slice   *[]apidef.MiddlewareDefinition
+		session bool
+	}{
+		{name: "pre", slice: &mwPreFuncs, session: true},
+		{name: "auth", single: &mwAuthCheckFunc},
+		{name: "post_auth", slice: &mwPostKeyAuthFuncs, session: true},
+		{name: "post", slice: &mwPostFuncs, session: true},
+	} {
+		dirPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, folder.name)
+		files, _ := ioutil.ReadDir(dirPath)
+		for _, f := range files {
+			if strings.Contains(f.Name(), ".js") {
+				filePath := filepath.Join(dirPath, f.Name())
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("Loading file middleware from ", filePath)
+				mwObjName := strings.Split(f.Name(), ".")[0]
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("-- Middleware name ", mwObjName)
 
-	// Get PRE folder path
-	middlwareFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "pre")
-	files, _ := ioutil.ReadDir(middlwareFolderPath)
-	for _, f := range files {
-		if strings.Contains(f.Name(), ".js") {
-			filePath := filepath.Join(middlwareFolderPath, f.Name())
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Loading PRE-PROCESSOR file middleware from ", filePath)
-			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware name ", middlewareObjectName)
-
-			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware requires session: ", requiresSession)
-			mwDef := apidef.MiddlewareDefinition{}
-			mwDef.Name = middlewareObjectName
-			mwDef.Path = filePath
-			mwDef.RequireSession = requiresSession
-
-			mwPaths = append(mwPaths, filePath)
-			mwPreFuncs = append(mwPreFuncs, mwDef)
-		}
-	}
-
-	// Get Auth folder path
-	middlewareAuthFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "auth")
-	mwAuthFiles, _ := ioutil.ReadDir(middlewareAuthFolderPath)
-	for _, f := range mwAuthFiles {
-		if strings.Contains(f.Name(), ".js") {
-			filePath := filepath.Join(middlewareAuthFolderPath, f.Name())
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Loading Auth file middleware from ", filePath)
-			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware name ", middlewareObjectName)
-
-			mwDef := apidef.MiddlewareDefinition{}
-			mwDef.Name = middlewareObjectName
-			mwDef.Path = filePath
-			mwDef.RequireSession = false
-
-			mwPaths = append(mwPaths, filePath)
-			mwAuthCheckFunc = mwDef
-			// only one allowed!
-			break
-		}
-	}
-
-	// Get POSTKeyAuth folder path
-	middlewarePostKeyAuthFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post_auth")
-	mwPostKeyAuthFiles, _ := ioutil.ReadDir(middlewarePostKeyAuthFolderPath)
-	for _, f := range mwPostKeyAuthFiles {
-		if strings.Contains(f.Name(), ".js") {
-			filePath := filepath.Join(middlewarePostKeyAuthFolderPath, f.Name())
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Loading POST-KEY-AUTH-PROCESSOR file middleware from ", filePath)
-			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware name ", middlewareObjectName)
-
-			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware requires session: ", requiresSession)
-			mwDef := apidef.MiddlewareDefinition{}
-			mwDef.Name = middlewareObjectName
-			mwDef.Path = filePath
-			mwDef.RequireSession = requiresSession
-
-			mwPaths = append(mwPaths, filePath)
-			mwPostKeyAuthFuncs = append(mwPostFuncs, mwDef)
-		}
-	}
-
-	// Get POST folder path
-	middlewarePostFolderPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, "post")
-	mwPostFiles, _ := ioutil.ReadDir(middlewarePostFolderPath)
-	for _, f := range mwPostFiles {
-		if strings.Contains(f.Name(), ".js") {
-			filePath := filepath.Join(middlewarePostFolderPath, f.Name())
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Loading POST-PROCESSOR file middleware from ", filePath)
-			middlewareObjectName := strings.Split(f.Name(), ".")[0]
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware name ", middlewareObjectName)
-
-			requiresSession := strings.Contains(middlewareObjectName, "_with_session")
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware requires session: ", requiresSession)
-			mwDef := apidef.MiddlewareDefinition{}
-			mwDef.Name = middlewareObjectName
-			mwDef.Path = filePath
-			mwDef.RequireSession = requiresSession
-
-			mwPaths = append(mwPaths, filePath)
-			mwPostFuncs = append(mwPostFuncs, mwDef)
+				mwDef := apidef.MiddlewareDefinition{}
+				mwDef.Name = mwObjName
+				mwDef.Path = filePath
+				if folder.session {
+					mwDef.RequireSession = strings.Contains(mwObjName, "_with_session")
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Debug("-- Middleware requires session: ", mwDef.RequireSession)
+				}
+				mwPaths = append(mwPaths, filePath)
+				if folder.single != nil {
+					*folder.single = mwDef
+				} else {
+					*folder.slice = append(*folder.slice, mwDef)
+				}
+			}
 		}
 	}
 
