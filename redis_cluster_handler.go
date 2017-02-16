@@ -140,7 +140,7 @@ func (r *RedisClusterStorageManager) GetKey(keyName string) (string, error) {
 	value, err := redis.String(GetRelevantClusterReference(r.IsCache).Do("GET", r.fixKey(keyName)))
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
-		return "", KeyError{}
+		return "", errKeyNotFound
 	}
 
 	return value, nil
@@ -155,7 +155,7 @@ func (r *RedisClusterStorageManager) GetRawKey(keyName string) (string, error) {
 	value, err := redis.String(GetRelevantClusterReference(r.IsCache).Do("GET", keyName))
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
-		return "", KeyError{}
+		return "", errKeyNotFound
 	}
 
 	return value, nil
@@ -176,7 +176,7 @@ func (r *RedisClusterStorageManager) GetExp(keyName string) (int64, error) {
 		return value, nil
 	}
 
-	return 0, KeyError{}
+	return 0, errKeyNotFound
 }
 
 // SetKey will create (or update) a key value in the store

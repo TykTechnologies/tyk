@@ -2,16 +2,13 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 
 	"github.com/spaolacci/murmur3"
 )
 
-// KeyError is a standard error for when a key is not found in the storage engine
-type KeyError struct{}
-
-func (e KeyError) Error() string {
-	return "Key not found"
-}
+// errKeyNotFound is a standard error for when a key is not found in the storage engine
+var errKeyNotFound = errors.New("key not found")
 
 // StorageHandler is a standard interface to a storage backend,
 // used by AuthorisationManager to read and write key values to the backend
