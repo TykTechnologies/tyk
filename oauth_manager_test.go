@@ -466,7 +466,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	uri1 := "/tyk/oauth/refresh/" + tokenData.RefreshToken + "?"
 	method1 := "DELETE"
 
-	recorder1 := httptest.NewRecorder()
+	recorder := httptest.NewRecorder()
 	param1 := make(url.Values)
 	//MakeSampleAPI()
 	param1.Set("api_id", "999999")
@@ -478,21 +478,21 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 
 	req1.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-	testMuxer.ServeHTTP(recorder1, req1)
+	testMuxer.ServeHTTP(recorder, req1)
 
 	newSuccess := apiSuccess{}
-	err := json.Unmarshal([]byte(recorder1.Body.String()), &newSuccess)
+	err := json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
-		t.Error(recorder1.Body.String())
+		t.Error(recorder.Body.String())
 	} else {
 		if newSuccess.Status != "ok" {
-			t.Error("key not deleted, status error:\n", recorder1.Body.String())
+			t.Error("key not deleted, status error:\n", recorder.Body.String())
 			t.Error(ApiSpecRegister)
 		}
 		if newSuccess.Action != "deleted" {
-			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder1.Body.String())
+			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
 		}
 	}
 
@@ -514,7 +514,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recorder := httptest.NewRecorder()
+	recorder = httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
 
 	if recorder.Code == 200 {

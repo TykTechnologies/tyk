@@ -85,7 +85,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	healthCheckhandler(recorder, req)
 
 	var ApiHealthValues HealthCheckValues
-	err = json.Unmarshal([]byte(recorder.Body.String()), &ApiHealthValues)
+	err = json.Unmarshal(recorder.Body.Bytes(), &ApiHealthValues)
 
 	if err != nil {
 		t.Error("Could not unmarshal API Health check:\n", err, recorder.Body.String())
@@ -140,7 +140,7 @@ func TestApiHandler(t *testing.T) {
 
 		// We can't deserialize BSON ObjectID's if they are not in th test base!
 		var ApiList []testAPIDefinition
-		err = json.Unmarshal([]byte(recorder.Body.String()), &ApiList)
+		err = json.Unmarshal(recorder.Body.Bytes(), &ApiList)
 
 		if err != nil {
 			t.Error("Could not unmarshal API List:\n", err, recorder.Body.String(), uri)
@@ -177,7 +177,7 @@ func TestApiHandlerGetSingle(t *testing.T) {
 
 	// We can't deserialize BSON ObjectID's if they are not in th test base!
 	var ApiDefinition testAPIDefinition
-	err = json.Unmarshal([]byte(recorder.Body.String()), &ApiDefinition)
+	err = json.Unmarshal(recorder.Body.Bytes(), &ApiDefinition)
 
 	if err != nil {
 		t.Error("Could not unmarshal API Definition:\n", err, recorder.Body.String())
@@ -204,7 +204,7 @@ func TestApiHandlerPost(t *testing.T) {
 	apiHandler(recorder, req)
 
 	var success apiSuccess
-	err = json.Unmarshal([]byte(recorder.Body.String()), &success)
+	err = json.Unmarshal(recorder.Body.Bytes(), &success)
 
 	if err != nil {
 		t.Error("Could not unmarshal POST result:\n", err, recorder.Body.String())
@@ -234,7 +234,7 @@ func TestApiHandlerPostDbConfig(t *testing.T) {
 	apiHandler(recorder, req)
 
 	var success apiSuccess
-	err = json.Unmarshal([]byte(recorder.Body.String()), &success)
+	err = json.Unmarshal(recorder.Body.Bytes(), &success)
 
 	if err != nil {
 		t.Error("Could not unmarshal POST result:\n", err, recorder.Body.String())
@@ -265,7 +265,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 	keyHandler(recorder, req)
 
 	newSuccess := apiSuccess{}
-	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+	err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
@@ -298,7 +298,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 	keyHandler(recorder, req)
 
 	newSuccess := apiSuccess{}
-	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+	err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
@@ -332,7 +332,7 @@ func TestKeyHandlerGetKey(t *testing.T) {
 	keyHandler(recorder, req)
 
 	newSuccess := make(map[string]interface{})
-	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+	err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
@@ -362,7 +362,7 @@ func TestKeyHandlerGetKeyNoAPIID(t *testing.T) {
 	keyHandler(recorder, req)
 
 	newSuccess := make(map[string]interface{})
-	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+	err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
@@ -405,7 +405,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 	keyHandler(recorder, req)
 
 	newSuccess := apiSuccess{}
-	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+	err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
@@ -441,7 +441,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 	createKeyHandler(recorder, req)
 
 	newSuccess := apiSuccess{}
-	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+	err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
@@ -476,7 +476,7 @@ func TestCreateKeyHandlerCreateNewKeyNoAPIID(t *testing.T) {
 	createKeyHandler(recorder, req)
 
 	newSuccess := apiSuccess{}
-	err = json.Unmarshal([]byte(recorder.Body.String()), &newSuccess)
+	err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
 		t.Error("Could not unmarshal success message:\n", err)
