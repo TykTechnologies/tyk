@@ -10,15 +10,15 @@ import (
 	"github.com/lonelycode/go-uuid/uuid"
 )
 
-var CommandModeOptions = map[string]bool{
-	"--import-blueprint": true,
-	"--import-swagger":   true,
-	"--create-api":       true,
-	"--org-id":           true,
-	"--upstream-target":  true,
-	"--as-mock":          true,
-	"--for-api":          true,
-	"--as-version":       true,
+var commandModeOptions = []string{
+	"--import-blueprint",
+	"--import-swagger",
+	"--create-api",
+	"--org-id",
+	"--upstream-target",
+	"--as-mock",
+	"--for-api",
+	"--as-version",
 }
 
 // ./tyk --import-blueprint=blueprint.json --create-api --org-id=<id> --upstream-target="http://widgets.com/api/"`

@@ -881,20 +881,16 @@ func setupLogger() {
 func initialiseSystem(arguments map[string]interface{}) {
 
 	// Enable command mode
-	for k := range CommandModeOptions {
-
-		v := arguments[k]
-
+	for _, opt := range commandModeOptions {
+		v := arguments[opt]
 		if v == true {
 			HandleCommandModeArgs(arguments)
 			os.Exit(0)
 		}
-
 		if v != nil && v != false {
 			HandleCommandModeArgs(arguments)
 			os.Exit(0)
 		}
-
 	}
 
 	if runningTests && os.Getenv("TYK_LOGLEVEL") == "" {
