@@ -62,9 +62,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 
 	eventJSON := <-CoProcessDispatchEvent
 	eventWrapper := CoProcessEventWrapper{}
-	err := json.Unmarshal(eventJSON, &eventWrapper)
-
-	if err != nil {
+	if err := json.Unmarshal(eventJSON, &eventWrapper); err != nil {
 		t.Fatal(err)
 	}
 
@@ -136,17 +134,6 @@ func TestCoProcessTykTriggerEvent(t *testing.T) {
 
 /* Middleware */
 
-type httpbinGetResponse struct {
-	Params  map[string]string `json:"args"`
-	Headers map[string]string `json:"headers"`
-	Origin  string            `json:"origin"`
-	Url     string            `json:"url"`
-}
-
-type httpbinHeadersResponse struct {
-	Headers map[string]string `json:"headers"`
-}
-
 func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver apidef.MiddlewareDriver) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
@@ -208,18 +195,14 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	chain.ServeHTTP(recorder, req)
 
-	headersResponse := httpbinHeadersResponse{}
-	err = json.Unmarshal(recorder.Body.Bytes(), &headersResponse)
-
-	if err != nil {
+	resp := testHttpResponse{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-
-	if headersResponse.Headers["Test"] != "value" {
+	if resp.Headers["Test"] != "value" {
 		t.Fatal("ObjectPostProcess couldn't add a header.")
 	}
-
-	if headersResponse.Headers["Deletethisheader"] != "" {
+	if resp.Headers["Deletethisheader"] != "" {
 		t.Fatal("ObjectPostProcess couldn't delete a header.")
 	}
 
@@ -235,25 +218,20 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	chain.ServeHTTP(recorder, getReq)
 
-	getResponse := httpbinGetResponse{}
-	err = json.Unmarshal(recorder.Body.Bytes(), &getResponse)
-
-	if err != nil {
+	resp = testHttpResponse{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
 
-	if getResponse.Params["a"] != "a_value" || getResponse.Params["b"] != "123" {
+	if resp.Form["a"] != "a_value" || resp.Form["b"] != "123" {
 		t.Fatal("The original parameters don't match.")
 	}
-
-	if getResponse.Params["remove"] != "" {
+	if resp.Form["remove"] != "" {
 		t.Fatal("ObjectPostProcess couldn't remove a parameter.")
 	}
-
-	if getResponse.Params["customparam"] != "customvalue" {
+	if resp.Form["customparam"] != "customvalue" {
 		t.Fatal("ObjectPostProcess couldn't set custom parameters.")
 	}
-
 }
 
 /* CP authentication */
@@ -337,7 +315,7 @@ const basicCoProcessDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://httpbin.org",
+		"target_url": "` + testHttpGet + `",
 		"strip_listen_path": false
 	}
 }`
@@ -390,7 +368,7 @@ const protectedCoProcessDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://httpbin.org",
+		"target_url": "` + testHttpGet + `",
 		"strip_listen_path": false
 	}
 }`

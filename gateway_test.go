@@ -37,20 +37,29 @@ const (
 	testHttpAny  = "http://" + testHttpListen
 	testHttpGet  = testHttpAny + "/get"
 	testHttpPost = testHttpAny + "/post"
-	testHttpPut  = testHttpAny + "/put"
 )
+
+type testHttpResponse struct {
+	Method  string
+	Url     string
+	Headers map[string]string
+	Form    map[string]string
+}
 
 func testHttpHandler() http.Handler {
 	httpError := func(w http.ResponseWriter, status int) {
 		http.Error(w, http.StatusText(status), status)
 	}
 	writeDetails := func(w http.ResponseWriter, r *http.Request) {
-		body, _ := ioutil.ReadAll(r.Body)
-		err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"method":  r.Method,
-			"url":     r.URL.String(),
-			"headers": r.Header,
-			"body":    string(body),
+		if err := r.ParseForm(); err != nil {
+			httpError(w, http.StatusInternalServerError)
+			return
+		}
+		err := json.NewEncoder(w).Encode(testHttpResponse{
+			Method:  r.Method,
+			Url:     r.URL.String(),
+			Headers: firstVals(r.Header),
+			Form:    firstVals(r.Form),
 		})
 		if err != nil {
 			httpError(w, http.StatusInternalServerError)
@@ -69,8 +78,15 @@ func testHttpHandler() http.Handler {
 	mux.HandleFunc("/", handleMethod(""))
 	mux.HandleFunc("/get", handleMethod("GET"))
 	mux.HandleFunc("/post", handleMethod("POST"))
-	mux.HandleFunc("/put", handleMethod("PUT"))
 	return mux
+}
+
+func firstVals(vals map[string][]string) map[string]string {
+	m := make(map[string]string, len(vals))
+	for k, vs := range vals {
+		m[k] = vs[0]
+	}
+	return m
 }
 
 func TestMain(m *testing.M) {
@@ -363,7 +379,7 @@ const pathBasedDefinition = `{
 	"event_handlers": {},
 	"proxy": {
 		"listen_path": "/pathBased/",
-		"target_url": "http://httpbin.org/",
+		"target_url": "` + testHttpGet + `",
 		"strip_listen_path": true
 	}
 }`
@@ -559,35 +575,23 @@ func TestParambasedAuth(t *testing.T) {
 		t.Error(recorder.Body)
 	}
 
-	// Ensure the post data is still sent
-	contents, _ := ioutil.ReadAll(recorder.Body)
-	dat := make(map[string]interface{})
-
-	if err := json.Unmarshal(contents, &dat); err != nil {
+	var resp testHttpResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&resp); err != nil {
 		t.Fatal("JSON decoding failed:", err)
 	}
 
-	args, ok := dat["args"].(map[string]interface{})
-	if !ok {
-		t.Fatal("Invalid response")
-	}
-	if args["authorization"].(string) != "54321" {
+	if resp.Form["authorization"] != "54321" {
 		t.Error("Request params did not arrive")
 	}
-	fmap, ok := dat["form"].(map[string]interface{})
-	if !ok {
-		t.Fatal("Invalid response")
-	}
-	if fmap["foo"].(string) != "swiggetty" {
+	if resp.Form["foo"] != "swiggetty" {
 		t.Error("Form param 1 did not arrive")
 	}
-	if fmap["bar"].(string) != "swoggetty" {
+	if resp.Form["bar"] != "swoggetty" {
 		t.Error("Form param 2 did not arrive")
 	}
-	if fmap["baz"].(string) != "swoogetty" {
+	if resp.Form["baz"] != "swoogetty" {
 		t.Error("Form param 3 did not arrive")
 	}
-
 }
 
 func TestVersioningRequestOK(t *testing.T) {
