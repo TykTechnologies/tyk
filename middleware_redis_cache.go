@@ -113,12 +113,10 @@ func (m *RedisCacheMiddleware) encodePayload(payload, timestamp string) string {
 
 func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, error) {
 	data := strings.Split(payload, "|")
-
-	if len(data) == 1 {
+	switch len(data) {
+	case 1:
 		return data[0], "", nil
-	}
-
-	if len(data) == 2 {
+	case 2:
 		sDec, err := base64.StdEncoding.DecodeString(data[0])
 		if err != nil {
 			return "", "", err
@@ -126,9 +124,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 
 		return string(sDec), data[1], nil
 	}
-
 	return "", "", errors.New("Decoding failed, array length wrong")
-
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -138,7 +134,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if !m.Spec.APIDefinition.CacheOptions.EnableCache {
 		return nil, 200
 	}
-
 	// Only allow idempotent (safe) methods
 	if r.Method != "GET" && r.Method != "HEAD" {
 		return nil, 200
@@ -213,7 +208,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			foundCode := false
 			for _, code := range m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes {
 				if code == reqVal.StatusCode {
-					cacheThisRequest = true
 					foundCode = true
 					break
 				}
@@ -266,21 +260,14 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, 200
 	}
 
-	if m.isTimeStampExpired(timestamp) {
+	if m.isTimeStampExpired(timestamp) || len(cachedData) == 0 {
 		m.CacheStore.DeleteKey(key)
 		return nil, 200
 	}
 
-	if len(cachedData) == 0 {
-		m.CacheStore.DeleteKey(key)
-		return nil, 200
-	}
-
-	retObj := strings.NewReader(cachedData)
 	log.Debug("Cache got: ", cachedData)
-
-	asBufioReader := bufio.NewReader(retObj)
-	newRes, err := http.ReadResponse(asBufioReader, r)
+	bufData := bufio.NewReader(strings.NewReader(cachedData))
+	newRes, err := http.ReadResponse(bufData, r)
 	if err != nil {
 		log.Error("Could not create response object: ", err)
 	}
