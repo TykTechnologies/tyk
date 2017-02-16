@@ -742,7 +742,7 @@ func TestQuota(t *testing.T) {
 	}
 
 	newAPIError := tykErrorResponse{}
-	json.Unmarshal([]byte(thirdRecorder.Body.String()), &newAPIError)
+	json.Unmarshal(thirdRecorder.Body.Bytes(), &newAPIError)
 
 	if newAPIError.Error != "Quota exceeded" {
 		t.Error("Third request returned invalid message, got: \n", newAPIError.Error)
