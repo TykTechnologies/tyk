@@ -139,176 +139,177 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		return nil, 200
 	}
 
+	// Only allow idempotent (safe) methods
+	if r.Method != "GET" && r.Method != "HEAD" {
+		return nil, 200
+	}
+
 	var stat RequestStatus
 	var isVirtual bool
-	// Only allow idempotent (safe) methods
-	if r.Method == "GET" || r.Method == "HEAD" {
-		// Lets see if we can throw a sledgehammer at this
-		if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
+	// Lets see if we can throw a sledgehammer at this
+	if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
+		stat = StatusCached
+	} else {
+		// New request checker, more targeted, less likely to fail
+		_, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
+		found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
+		isVirtual, _ = m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+		if found {
 			stat = StatusCached
-		} else {
-			// New request checker, more targeted, less likely to fail
-			_, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
-			found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
-			isVirtual, _ = m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
-			if found {
-				stat = StatusCached
-			}
-		}
-
-		// Cached route matched, let go
-		if stat == StatusCached {
-			var authHeaderValue string
-			authVal := context.Get(r, AuthHeaderValue)
-
-			// No authentication data? use the IP.
-			if authVal == nil {
-				var err error
-				if authHeaderValue, err = GetIP(GetIPFromRequest(r)); err != nil {
-					log.Error(err)
-					return nil, 200
-				}
-			} else {
-				authHeaderValue = authVal.(string)
-			}
-
-			var copiedRequest *http.Request
-			if RecordDetail(r) {
-				copiedRequest = CopyHttpRequest(r)
-			}
-
-			key := m.CreateCheckSum(r, authHeaderValue)
-			retBlob, found := m.CacheStore.GetKey(key)
-			if found != nil {
-				log.Debug("Cache enabled, but record not found")
-				// Pass through to proxy AND CACHE RESULT
-
-				var reqVal *http.Response
-				if isVirtual {
-					log.Debug("This is a virtual function")
-					vp := VirtualEndpoint{TykMiddleware: m.TykMiddleware}
-					vp.New()
-					reqVal = vp.ServeHTTPForCache(w, r)
-				} else {
-					// This passes through and will write the value to the writer, but spit out a copy for the cache
-					log.Debug("Not virtual, passing")
-					reqVal = m.sh.ServeHTTPWithCache(w, r)
-				}
-
-				cacheThisRequest := true
-				cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
-
-				if reqVal == nil {
-					log.Warning("Upstream request must have failed, response is empty")
-					return nil, 200
-				}
-
-				// make sure the status codes match if specified
-				if len(m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes) > 0 {
-					foundCode := false
-					for _, code := range m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes {
-						if code == reqVal.StatusCode {
-							cacheThisRequest = true
-							foundCode = true
-							break
-						}
-					}
-					if !foundCode {
-						cacheThisRequest = false
-					}
-				}
-
-				// Are we using upstream cache control?
-				if m.Spec.APIDefinition.CacheOptions.EnableUpstreamCacheControl {
-					log.Debug("Upstream control enabled")
-					// Do we cache?
-					if reqVal.Header.Get(UPSTREAM_CACHE_HEADER_NAME) == "" {
-						log.Warning("Upstream cache action not found, not caching")
-						cacheThisRequest = false
-					}
-					// Do we override TTL?
-					ttl := reqVal.Header.Get(UPSTREAM_CACHE_TTL_HEADER_NAME)
-					if ttl != "" {
-						log.Debug("TTL Set upstream")
-						cacheAsInt, err := strconv.Atoi(ttl)
-						if err != nil {
-							log.Error("Failed to decode TTL cache value: ", err)
-							cacheTTL = m.Spec.APIDefinition.CacheOptions.CacheTimeout
-						} else {
-							cacheTTL = int64(cacheAsInt)
-						}
-					}
-				}
-
-				if cacheThisRequest {
-					log.Debug("Caching request to redis")
-					var wireFormatReq bytes.Buffer
-					reqVal.Write(&wireFormatReq)
-					log.Debug("Cache TTL is:", cacheTTL)
-					ts := m.getTimeTTL(cacheTTL)
-					toStore := m.encodePayload(wireFormatReq.String(), ts)
-					go m.CacheStore.SetKey(key, toStore, cacheTTL)
-
-				}
-				return nil, 666
-
-			}
-
-			cachedData, timestamp, err := m.decodePayload(retBlob)
-			if err != nil {
-				// Tere was an issue with this cache entry - lets remove it:
-				m.CacheStore.DeleteKey(key)
-				return nil, 200
-			}
-
-			if m.isTimeStampExpired(timestamp) {
-				m.CacheStore.DeleteKey(key)
-				return nil, 200
-			}
-
-			if len(cachedData) == 0 {
-				m.CacheStore.DeleteKey(key)
-				return nil, 200
-			}
-
-			retObj := strings.NewReader(cachedData)
-			log.Debug("Cache got: ", cachedData)
-
-			asBufioReader := bufio.NewReader(retObj)
-			newRes, err := http.ReadResponse(asBufioReader, r)
-			if err != nil {
-				log.Error("Could not create response object: ", err)
-			}
-
-			defer newRes.Body.Close()
-			for _, h := range hopHeaders {
-				newRes.Header.Del(h)
-			}
-
-			copyHeader(w.Header(), newRes.Header)
-			sessObj := context.Get(r, SessionData)
-			var sessionState SessionState
-
-			// Only add ratelimit data to keyed sessions
-			if sessObj != nil {
-				sessionState = sessObj.(SessionState)
-				w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(sessionState.QuotaMax)))
-				w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(sessionState.QuotaRemaining)))
-				w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(sessionState.QuotaRenews)))
-			}
-			w.Header().Add("x-tyk-cached-response", "1")
-			w.WriteHeader(newRes.StatusCode)
-			m.Proxy.CopyResponse(w, newRes.Body)
-
-			// Record analytics
-			if !m.Spec.DoNotTrack {
-				go m.sh.RecordHit(w, r, 0, newRes.StatusCode, copiedRequest, nil)
-			}
-
-			// Stop any further execution
-			return nil, 666
 		}
 	}
 
-	return nil, 200
+	// Cached route matched, let go
+	if stat != StatusCached {
+		return nil, 200
+	}
+	var authHeaderValue string
+	authVal := context.Get(r, AuthHeaderValue)
+
+	// No authentication data? use the IP.
+	if authVal == nil {
+		var err error
+		if authHeaderValue, err = GetIP(GetIPFromRequest(r)); err != nil {
+			log.Error(err)
+			return nil, 200
+		}
+	} else {
+		authHeaderValue = authVal.(string)
+	}
+
+	var copiedRequest *http.Request
+	if RecordDetail(r) {
+		copiedRequest = CopyHttpRequest(r)
+	}
+
+	key := m.CreateCheckSum(r, authHeaderValue)
+	retBlob, found := m.CacheStore.GetKey(key)
+	if found != nil {
+		log.Debug("Cache enabled, but record not found")
+		// Pass through to proxy AND CACHE RESULT
+
+		var reqVal *http.Response
+		if isVirtual {
+			log.Debug("This is a virtual function")
+			vp := VirtualEndpoint{TykMiddleware: m.TykMiddleware}
+			vp.New()
+			reqVal = vp.ServeHTTPForCache(w, r)
+		} else {
+			// This passes through and will write the value to the writer, but spit out a copy for the cache
+			log.Debug("Not virtual, passing")
+			reqVal = m.sh.ServeHTTPWithCache(w, r)
+		}
+
+		cacheThisRequest := true
+		cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
+
+		if reqVal == nil {
+			log.Warning("Upstream request must have failed, response is empty")
+			return nil, 200
+		}
+
+		// make sure the status codes match if specified
+		if len(m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes) > 0 {
+			foundCode := false
+			for _, code := range m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes {
+				if code == reqVal.StatusCode {
+					cacheThisRequest = true
+					foundCode = true
+					break
+				}
+			}
+			if !foundCode {
+				cacheThisRequest = false
+			}
+		}
+
+		// Are we using upstream cache control?
+		if m.Spec.APIDefinition.CacheOptions.EnableUpstreamCacheControl {
+			log.Debug("Upstream control enabled")
+			// Do we cache?
+			if reqVal.Header.Get(UPSTREAM_CACHE_HEADER_NAME) == "" {
+				log.Warning("Upstream cache action not found, not caching")
+				cacheThisRequest = false
+			}
+			// Do we override TTL?
+			ttl := reqVal.Header.Get(UPSTREAM_CACHE_TTL_HEADER_NAME)
+			if ttl != "" {
+				log.Debug("TTL Set upstream")
+				cacheAsInt, err := strconv.Atoi(ttl)
+				if err != nil {
+					log.Error("Failed to decode TTL cache value: ", err)
+					cacheTTL = m.Spec.APIDefinition.CacheOptions.CacheTimeout
+				} else {
+					cacheTTL = int64(cacheAsInt)
+				}
+			}
+		}
+
+		if cacheThisRequest {
+			log.Debug("Caching request to redis")
+			var wireFormatReq bytes.Buffer
+			reqVal.Write(&wireFormatReq)
+			log.Debug("Cache TTL is:", cacheTTL)
+			ts := m.getTimeTTL(cacheTTL)
+			toStore := m.encodePayload(wireFormatReq.String(), ts)
+			go m.CacheStore.SetKey(key, toStore, cacheTTL)
+
+		}
+		return nil, 666
+
+	}
+
+	cachedData, timestamp, err := m.decodePayload(retBlob)
+	if err != nil {
+		// Tere was an issue with this cache entry - lets remove it:
+		m.CacheStore.DeleteKey(key)
+		return nil, 200
+	}
+
+	if m.isTimeStampExpired(timestamp) {
+		m.CacheStore.DeleteKey(key)
+		return nil, 200
+	}
+
+	if len(cachedData) == 0 {
+		m.CacheStore.DeleteKey(key)
+		return nil, 200
+	}
+
+	retObj := strings.NewReader(cachedData)
+	log.Debug("Cache got: ", cachedData)
+
+	asBufioReader := bufio.NewReader(retObj)
+	newRes, err := http.ReadResponse(asBufioReader, r)
+	if err != nil {
+		log.Error("Could not create response object: ", err)
+	}
+
+	defer newRes.Body.Close()
+	for _, h := range hopHeaders {
+		newRes.Header.Del(h)
+	}
+
+	copyHeader(w.Header(), newRes.Header)
+	sessObj := context.Get(r, SessionData)
+	var sessionState SessionState
+
+	// Only add ratelimit data to keyed sessions
+	if sessObj != nil {
+		sessionState = sessObj.(SessionState)
+		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(sessionState.QuotaMax)))
+		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(sessionState.QuotaRemaining)))
+		w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(sessionState.QuotaRenews)))
+	}
+	w.Header().Add("x-tyk-cached-response", "1")
+	w.WriteHeader(newRes.StatusCode)
+	m.Proxy.CopyResponse(w, newRes.Body)
+
+	// Record analytics
+	if !m.Spec.DoNotTrack {
+		go m.sh.RecordHit(w, r, 0, newRes.StatusCode, copiedRequest, nil)
+	}
+
+	// Stop any further execution
+	return nil, 666
 }
