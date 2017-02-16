@@ -98,8 +98,7 @@ func (h *HostUptimeChecker) HostReporter() {
 		select {
 		case okHost := <-h.okChan:
 			// Clear host from unhealthylist if it exists
-			found, _ := h.unHealthyList[okHost.ID]
-			if found {
+			if h.unHealthyList[okHost.ID] {
 				h.upCallback(okHost)
 				delete(h.unHealthyList, okHost.ID)
 			}

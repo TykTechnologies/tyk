@@ -205,8 +205,8 @@ func (a *APIDefinitionLoader) MakeSpec(appConfig *apidef.APIDefinition) *APISpec
 		}
 	}
 
-	newAppSpec.RxPaths = make(map[string][]URLSpec)
-	newAppSpec.WhiteListEnabled = make(map[string]bool)
+	newAppSpec.RxPaths = make(map[string][]URLSpec, len(appConfig.VersionData.Versions))
+	newAppSpec.WhiteListEnabled = make(map[string]bool, len(appConfig.VersionData.Versions))
 	for _, v := range appConfig.VersionData.Versions {
 		var pathSpecs []URLSpec
 		var whiteListSpecs bool
@@ -306,7 +306,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 	APIDefinitions := make([]*apidef.APIDefinition, 0)
 
 	if config.DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool)
+		tagList := make(map[string]bool, len(config.DBAppConfOptions.Tags))
 		toLoad := make(map[string]*apidef.APIDefinition)
 
 		for _, mt := range config.DBAppConfOptions.Tags {
@@ -315,8 +315,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 
 		for index, apiEntry := range list.Message {
 			for _, t := range apiEntry.ApiDefinition.Tags {
-				_, ok := tagList[t]
-				if ok {
+				if tagList[t] {
 					apiEntry.ApiDefinition.RawData = rawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
 					toLoad[apiEntry.ApiDefinition.APIID] = apiEntry.ApiDefinition
 				}

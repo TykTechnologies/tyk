@@ -276,11 +276,6 @@ var validKeyHeaders = map[string]bool{
 	"signature": true,
 }
 
-func isHeaderFieldKeyValid(key string) bool {
-	_, found := validKeyHeaders[key]
-	return found
-}
-
 func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 	AsElements := strings.Split(authHeader, ",")
 	set := HMACFieldValues{}
@@ -296,7 +291,7 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 		}
 
 		key := strings.ToLower(kv[0])
-		if !isHeaderFieldKeyValid(key) {
+		if !validKeyHeaders[key] {
 			log.WithFields(logrus.Fields{
 				"prefix": "hmac",
 				"field":  kv[0],
