@@ -326,10 +326,7 @@ func (c *Config) StoreAnalytics(r *http.Request) bool {
 		ips := strings.Split(forwarded, ", ")
 		ip = ips[0]
 	}
-
-	_, ignore := c.AnalyticsConfig.ignoredIPsCompiled[ip]
-
-	return !ignore
+	return !c.AnalyticsConfig.ignoredIPsCompiled[ip]
 }
 
 func generateRandomNodeID() string {
