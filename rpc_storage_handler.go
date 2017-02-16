@@ -309,7 +309,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 		}
 
 		log.Debug("Error trying to get value:", err)
-		return "", KeyError{}
+		return "", errKeyNotFound
 	}
 	elapsed := time.Since(start)
 	log.Debug("GetKey took ", elapsed)
@@ -342,7 +342,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 		return value.(int64), nil
 	}
 
-	return 0, KeyError{}
+	return 0, errKeyNotFound
 }
 
 // SetKey will create (or update) a key value in the store
