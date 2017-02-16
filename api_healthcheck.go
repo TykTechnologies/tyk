@@ -46,7 +46,7 @@ func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
 
 func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
 	// Key should be API-ID.SubKey.123456789
-	return strings.Join([]string{h.APIID, string(subKey)}, ".")
+	return h.APIID + "." + string(subKey)
 }
 
 // ReportHealthCheckValue is a shortcut we can use throughout the app to push a health check value
@@ -105,7 +105,7 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	values.AvgRequestsPS = h.getAvgCount(RequestLog)
 
 	// Get the micro latency graph, an average upstream latency
-	searchStr := strings.Join([]string{h.APIID, string(RequestLog)}, ".")
+	searchStr := h.APIID + "." + string(RequestLog)
 	log.Debug("Searching KV for: ", searchStr)
 	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
 	log.Debug("Found: ", vals)

@@ -18,7 +18,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 var tykBundlePath string
@@ -178,7 +177,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		return bundle, err
 	}
 
-	bundleUrl := strings.Join([]string{config.BundleBaseURL, spec.CustomMiddlewareBundle}, "")
+	bundleUrl := config.BundleBaseURL + spec.CustomMiddlewareBundle
 
 	var getter BundleGetter
 
@@ -269,7 +268,7 @@ func loadBundle(spec *APISpec) {
 	}
 
 	// Skip if the bundle destination path already exists.
-	bundlePath := strings.Join([]string{spec.APIID, spec.CustomMiddlewareBundle}, "-")
+	bundlePath := spec.APIID + "-" + spec.CustomMiddlewareBundle
 	destPath := filepath.Join(tykBundlePath, bundlePath)
 
 	// The bundle exists, load and return:
