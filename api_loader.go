@@ -216,7 +216,7 @@ func processSpec(referenceSpec *APISpec,
 		if config.EnableJSVM && mwDriver == apidef.OttoDriver {
 			var pathPrefix string
 			if referenceSpec.CustomMiddlewareBundle != "" {
-				pathPrefix = strings.Join([]string{referenceSpec.APIID, referenceSpec.CustomMiddlewareBundle}, "-")
+				pathPrefix = referenceSpec.APIID + "-" + referenceSpec.CustomMiddlewareBundle
 			}
 			referenceSpec.JSVM.LoadJSPaths(mwPaths, pathPrefix)
 		}

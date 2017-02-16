@@ -58,14 +58,11 @@ func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
 
 func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {
 	h := md5.New()
-	toEncode := strings.Join([]string{req.Method, req.URL.String()}, "-")
-	log.Debug("Cache encoding: ", toEncode)
-	io.WriteString(h, toEncode)
+	io.WriteString(h, req.Method)
+	io.WriteString(h, "-")
+	io.WriteString(h, req.URL.String())
 	reqChecksum := hex.EncodeToString(h.Sum(nil))
-
-	cacheKey := m.Spec.APIDefinition.APIID + keyName + reqChecksum
-
-	return cacheKey
+	return m.Spec.APIDefinition.APIID + keyName + reqChecksum
 }
 
 func GetIP(ip string) (string, error) {
