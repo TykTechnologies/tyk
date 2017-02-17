@@ -188,7 +188,7 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint, secret string) error {
 
 	// Set the nonce
 	ServiceNonce = val.Nonce
-	log.Debug("Hearbeat Finished: Nonce Set: ", ServiceNonce)
+	log.Debug("Heartbeat Finished: Nonce Set: ", ServiceNonce)
 
 	return nil
 }
