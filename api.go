@@ -782,7 +782,6 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	var responseMessage []byte
 	var code int
 
-	log.Debug(r.Method)
 	switch r.Method {
 	case "GET":
 		if APIID != "" {
@@ -796,10 +795,14 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Creating new definition file")
 		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
 	case "PUT":
-		log.Debug("Updating existing API: ", APIID)
-		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+		if APIID != "" {
+			log.Debug("Updating existing API: ", APIID)
+			responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+		} else {
+			code = 400
+			responseMessage = createError("Must specify an APIID to update")
+		}
 	case "DELETE":
-		log.Debug("Deleting existing API: ", APIID)
 		if APIID != "" {
 			log.Debug("Deleting API definition for: ", APIID)
 			responseMessage, code = HandleDeleteAPI(APIID)

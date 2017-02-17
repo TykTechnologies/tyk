@@ -248,6 +248,44 @@ func TestApiHandlerPostDbConfig(t *testing.T) {
 	}
 }
 
+func TestApiHandlerMethodAPIID(t *testing.T) {
+	base := "/tyk/apis"
+	tests := [...]struct {
+		method, path string
+		code         int
+	}{
+		// GET and POST can do either
+		{"GET", "/", 200},
+		{"GET", "/missing", 404},
+		{"POST", "/", 200},
+		{"POST", "/1", 200},
+		// PUT and DELETE must use one
+		{"PUT", "/1", 200},
+		{"PUT", "/", 400},
+		{"DELETE", "/1", 200},
+		{"DELETE", "/", 400},
+
+		// apiid mismatch
+		{"POST", "/mismatch", 400},
+		{"PUT", "/mismatch", 400},
+	}
+	for _, tc := range tests {
+		rec := httptest.NewRecorder()
+		url := base + tc.path
+		req, err := http.NewRequest(tc.method, url,
+			strings.NewReader(apiTestDef))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		apiHandler(rec, req)
+		if tc.code != rec.Code {
+			t.Errorf("%s %s got %d, want %d", tc.method, url,
+				rec.Code, tc.code)
+		}
+	}
+}
+
 func TestKeyHandlerNewKey(t *testing.T) {
 	uri := "/tyk/keys/1234"
 	method := "POST"
