@@ -23,19 +23,11 @@ type Notification struct {
 	Signature string              `json:"signature"`
 }
 
-// Notifier is an interface that sends notifications
-type Notifier interface {
-	Notify(Notification) bool
-}
-
-// RedisNotifier implements Notifier and will use redis pub/sub channles to send notifications
+// RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
 	store   *RedisClusterStorageManager
 	channel string
 }
-
-// ensure that it implements the interface
-var _ Notifier = &RedisNotifier{}
 
 // Notify will send a notification to a channel
 func (r *RedisNotifier) Notify(notification Notification) bool {
