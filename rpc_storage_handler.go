@@ -7,11 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/gorpc"
 	"github.com/pmylund/go-cache"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 type InboundData struct {

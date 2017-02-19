@@ -9,11 +9,12 @@ import (
 	"net/url"
 	"time"
 
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
 // CoProcessName specifies the driver name.

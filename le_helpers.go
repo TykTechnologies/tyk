@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/TykTechnologies/logrus"
 	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 const LEKeyPrefix = "le_ssl:"

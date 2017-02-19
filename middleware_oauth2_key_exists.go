@@ -6,9 +6,10 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/gorilla/context"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/gorilla/context"
 )
 
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,

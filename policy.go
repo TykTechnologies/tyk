@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 type Policy struct {

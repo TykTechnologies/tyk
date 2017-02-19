@@ -5,11 +5,12 @@ package main
 import (
 	"regexp"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/xmlpath.v2"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"bytes"
 	"crypto/md5"

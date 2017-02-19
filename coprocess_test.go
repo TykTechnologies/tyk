@@ -12,10 +12,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/coprocess"
 )
 
 const baseMiddlewarePath = "middleware/python"

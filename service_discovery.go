@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/lonelycode/gabs"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const ARRAY_NAME = "tyk_array"

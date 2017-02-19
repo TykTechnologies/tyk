@@ -8,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/kelseyhightower/envconfig"
 	uuid "github.com/nu7hatch/gouuid"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type PoliciesConfig struct {

@@ -12,9 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/context"
+
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/gorilla/context"
 )
 
 const DateHeaderSpec = "Date"
