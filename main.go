@@ -905,6 +905,24 @@ func initialiseSystem(arguments map[string]interface{}) {
 	go StartPeriodicStateBackup(&LE_MANAGER)
 }
 
+type AuditHostDetails struct {
+	Hostname string
+	PID      int
+}
+
+var HostDetails AuditHostDetails
+
+func GetHostDetails() {
+	var err error
+	if HostDetails.PID, err = pidfile.Read(); err != nil {
+		log.Error("Failed ot get host pid: ", err)
+	}
+
+	if HostDetails.Hostname, err = os.Hostname(); err != nil {
+		log.Error("Failed ot get hostname: ", err)
+	}
+}
+
 func getCmdArguments() map[string]interface{} {
 	usage := `Tyk API Gateway.
 
