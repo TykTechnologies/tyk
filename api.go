@@ -14,11 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful

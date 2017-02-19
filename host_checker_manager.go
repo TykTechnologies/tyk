@@ -7,10 +7,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/lonelycode/go-uuid/uuid"
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var GlobalHostChecker HostCheckerManager

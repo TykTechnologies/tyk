@@ -10,9 +10,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/mux"
 	"github.com/rcrowley/goagain"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 const RPCKeyPrefix = "rpc:"

@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/clbanning/mxj"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type ResponsetransformOptions struct {

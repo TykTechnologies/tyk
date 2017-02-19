@@ -11,11 +11,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 // Lets the user override and return a response from middleware

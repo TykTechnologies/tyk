@@ -5,8 +5,9 @@ import "net/http"
 import (
 	"errors"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/gorilla/context"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 var sessionLimiter = SessionLimiter{}

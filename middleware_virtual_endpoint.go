@@ -10,9 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware

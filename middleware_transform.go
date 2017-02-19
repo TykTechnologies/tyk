@@ -7,11 +7,12 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/context"
 	"golang.org/x/net/html/charset"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func WrappedCharsetReader(s string, i io.Reader) (io.Reader, error) {

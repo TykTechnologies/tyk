@@ -6,8 +6,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API

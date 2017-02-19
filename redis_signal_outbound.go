@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/garyburd/redigo/redis"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 type InterfaceNotification struct {

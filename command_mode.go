@@ -6,8 +6,9 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/lonelycode/go-uuid/uuid"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var commandModeOptions = []string{

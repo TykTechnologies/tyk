@@ -19,12 +19,6 @@ import (
 
 	logger "github.com/TykTechnologies/tyk/log"
 
-	"github.com/TykTechnologies/goagain"
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/logrus-logstash-hook"
-	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
-	"github.com/TykTechnologies/logrus_sentry"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/docopt/docopt.go"
 	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
@@ -34,6 +28,13 @@ import (
 	osin "github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/goagain"
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/logrus-logstash-hook"
+	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
+	"github.com/TykTechnologies/logrus_sentry"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var (

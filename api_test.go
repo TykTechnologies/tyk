@@ -11,9 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const apiTestDef = `{

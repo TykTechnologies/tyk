@@ -20,10 +20,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var ServiceCache *cache.Cache

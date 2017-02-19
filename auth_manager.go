@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/nu7hatch/gouuid"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 // AuthorisationHandler is used to validate a session key,

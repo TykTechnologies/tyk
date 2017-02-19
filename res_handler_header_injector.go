@@ -3,8 +3,9 @@ package main
 import (
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type HeaderInjectorOptions struct {

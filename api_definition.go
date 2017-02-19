@@ -13,9 +13,10 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"github.com/rubyist/circuitbreaker"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const (

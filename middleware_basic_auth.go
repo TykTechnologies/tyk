@@ -7,10 +7,11 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/gorilla/context"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // BasicAuthKeyIsValid uses a username instead of
