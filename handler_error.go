@@ -35,50 +35,49 @@ type ErrorHandler struct {
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
+	var templateExtension string
+	var contentType string
+
+	switch r.Header.Get("Content-Type") {
+	case "application/xml":
+		templateExtension = "xml"
+		contentType = "application/xml"
+	default:
+		templateExtension = "json"
+		contentType = "application/json"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+
+	templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
+
+	// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
+	tmpl := templates.Lookup(templateName)
+
+	// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
+	if tmpl == nil {
+		templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
+		tmpl = templates.Lookup(templateName)
+	}
+
+	// If no template is available for this content type, fallback to "error.json".
+	if tmpl == nil {
+		templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
+		tmpl = templates.Lookup(templateName)
+		w.Header().Set("Content-Type", defaultContentType)
+	}
+
+	// Need to return the correct error code!
+	w.WriteHeader(errCode)
+
+	apiError := APIError{fmt.Sprintf("%s", err)}
+	tmpl.Execute(w, &apiError)
+
+	if doMemoryProfile {
+		pprof.WriteHeapProfile(profileFile)
+	}
+
 	if e.Spec.DoNotTrack {
-		var templateExtension string
-		var contentType string
-
-		switch r.Header.Get("Content-Type") {
-		case "application/xml":
-			templateExtension = "xml"
-			contentType = "application/xml"
-		default:
-			templateExtension = "json"
-			contentType = "application/json"
-		}
-
-		w.Header().Set("Content-Type", contentType)
-
-		templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
-
-		// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
-		tmpl := templates.Lookup(templateName)
-
-		// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
-		if tmpl == nil {
-			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
-			tmpl = templates.Lookup(templateName)
-		}
-
-		// If no template is available for this content type, fallback to "error.json".
-		if tmpl == nil {
-			templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
-			tmpl = templates.Lookup(templateName)
-			w.Header().Set("Content-Type", defaultContentType)
-		}
-
-		// Need to return the correct error code!
-		w.WriteHeader(errCode)
-
-		apiError := APIError{fmt.Sprintf("%s", err)}
-		tmpl.Execute(w, &apiError)
-
-		if doMemoryProfile {
-			pprof.WriteHeapProfile(profileFile)
-		}
-
-		// Clean up
 		context.Clear(r)
 		return
 	}
@@ -203,8 +202,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 	// Report in health check
 	ReportHealthCheckValue(e.Spec.Health, BlockedRequestLog, "-1")
 
-	w.Header().Add("Content-Type", "application/json")
-
 	//If the config option is not set or is false, add the header
 	if !config.HideGeneratorHeader {
 		w.Header().Add("X-Generator", "tyk.io")
@@ -241,10 +238,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 		"path":        r.URL.Path,
 	}).Error("request error: ", err)
 
-	log.Debug("Returning error header")
-	w.WriteHeader(errCode)
-	apiError := APIError{fmt.Sprintf("%s", err)}
-	templates.ExecuteTemplate(w, "error.json", &apiError)
 	if doMemoryProfile {
 		pprof.WriteHeapProfile(profileFile)
 	}
