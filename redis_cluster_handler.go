@@ -446,7 +446,9 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 	psc := redis.PubSubConn{
 		Conn: GetRelevantClusterReference(r.IsCache).RandomRedisHandle().Pool.Get(),
 	}
-	psc.Subscribe(channel)
+	if err := psc.Subscribe(channel); err != nil {
+		return err
+	}
 	for {
 		switch v := psc.Receive().(type) {
 		case redis.Message:
