@@ -588,7 +588,7 @@ func TestGroupResetHandler(t *testing.T) {
 	cacheStore.Connect()
 
 	go func() {
-		cacheStore.StartPubSubHandler(RedisPubSubChannel, func(message redis.Message) {
+		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(message redis.Message) {
 			notif := Notification{}
 			if err := json.Unmarshal(message.Data, &notif); err != nil {
 				t.Fatal("Unmarshalling message body failed, malformed: ", err)
@@ -599,6 +599,11 @@ func TestGroupResetHandler(t *testing.T) {
 				signalChan <- false
 			}
 		})
+		if err != nil {
+			t.Log(err)
+			t.Fail()
+			signalChan <- true
+		}
 	}()
 
 	uri := "/tyk/reload/group"
