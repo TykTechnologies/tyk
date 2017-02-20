@@ -638,8 +638,6 @@ func RPCReloadLoop(RPCKey string) {
 }
 
 func doReload() {
-	time.Sleep(10 * time.Second)
-
 	// Load the API Policies
 	getPolicies()
 
@@ -657,7 +655,6 @@ func doReload() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
-		reloadScheduled = false
 		return
 	}
 
@@ -698,23 +695,40 @@ func doReload() {
 	// Unset these
 	RPC_EmergencyModeLoaded = false
 	RPC_EmergencyMode = false
-
-	reloadScheduled = false
 }
 
-var reloadScheduled bool
+var (
+	// reloadInterval is the amount of time to sleep after every
+	// reload. In other words, a reload will run at most once every
+	// reloadInterval.
+	reloadInterval = 10 * time.Second
 
-func checkReloadTimeout() {
-	if reloadScheduled {
-		wait := config.ReloadWaitTime
-		if config.ReloadWaitTime == 0 {
-			wait = 10
+	// reloadChan is a queue for incoming reload requests. At most,
+	// we want to have one reload running and one queued. If one is
+	// already queued, any reload requests should do nothing as a
+	// reload is already going to start at some point. Hence, buffer
+	// of size 1.
+	reloadChan = make(chan struct{}, 1)
+
+	// reloadDone is for the tests - for every reload request, the
+	// gateway will send true if it was queued and finished
+	// executing, or false if it wasn't queued since there already
+	// was one queued.
+	reloadDone chan (bool)
+)
+
+func reloadLoop() {
+	for range reloadChan {
+		log.Info("Initiating reload")
+		doReload()
+		log.Info("Initiating coprocess reload")
+		doCoprocessReload()
+
+		select {
+		case reloadDone <- true:
+		default:
 		}
-		time.Sleep(time.Duration(wait) * time.Second)
-		if reloadScheduled {
-			log.Warning("Reloader timed out! Removing sentinel")
-			reloadScheduled = false
-		}
+		time.Sleep(reloadInterval)
 	}
 }
 
@@ -722,14 +736,15 @@ func checkReloadTimeout() {
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
 func ReloadURLStructure() {
-	if !reloadScheduled {
-		reloadScheduled = true
-		log.Info("Initiating reload")
-		go doReload()
-		log.Info("Initiating coprocess reload")
-		go doCoprocessReload()
-		log.Info("Starting reload monitor...")
-		go checkReloadTimeout()
+	select {
+	case reloadChan <- struct{}{}:
+		log.Info("Reload queued")
+	default:
+		log.Info("Reload already queued")
+		select {
+		case reloadDone <- false:
+		default:
+		}
 	}
 }
 
@@ -901,6 +916,8 @@ func initialiseSystem(arguments map[string]interface{}) {
 	//doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
 	//SetupInstrumentation(doInstrumentation)
 	SetupInstrumentation(true)
+
+	go reloadLoop()
 
 	go StartPeriodicStateBackup(&LE_MANAGER)
 }
