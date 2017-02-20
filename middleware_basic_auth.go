@@ -1,10 +1,9 @@
 package main
 
-import "net/http"
-
 import (
 	"encoding/base64"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/gorilla/context"

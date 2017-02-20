@@ -4,11 +4,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/gorilla/context"
-)
-
-import (
 	"errors"
+
+	"github.com/gorilla/context"
 
 	"github.com/TykTechnologies/logrus"
 )

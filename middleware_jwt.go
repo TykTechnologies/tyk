@@ -1,7 +1,5 @@
 package main
 
-import "net/http"
-
 import (
 	"crypto/md5"
 	"encoding/base64"
@@ -9,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 
