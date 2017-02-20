@@ -1,9 +1,8 @@
 package main
 
-import "net/http"
-
 import (
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/gorilla/context"

@@ -1,7 +1,10 @@
 package main
 
-import "testing"
-import "github.com/TykTechnologies/tyk/apidef"
+import (
+	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
+)
 
 func TestRR(t *testing.T) {
 	arr1 := []string{"1", "2", "3"}

@@ -1,12 +1,11 @@
 package main
 
-import "net/http"
-
 import (
 	"crypto/md5"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/dgrijalva/jwt-go"
