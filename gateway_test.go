@@ -22,6 +22,7 @@ import (
 
 func init() {
 	runningTests = true
+	reloadInterval = 0
 }
 
 // to register to, but never used
