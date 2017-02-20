@@ -139,8 +139,6 @@ func LoadPoliciesFromDashboard(endpoint string, secret string, allowExplicit boo
 
 	if response.StatusCode == 403 {
 		log.Error("Policy request login failure, Response was: ", string(retBody))
-		reloadScheduled = false
-
 		ReLogin()
 		return policies
 	}

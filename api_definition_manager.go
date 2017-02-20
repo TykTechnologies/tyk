@@ -427,7 +427,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint strin
 
 	if response.StatusCode == 403 {
 		log.Error("Login failure, Response was: ", string(retBody))
-		reloadScheduled = false
 		ReLogin()
 		return &APISpecs
 	}
