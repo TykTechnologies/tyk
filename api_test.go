@@ -583,26 +583,30 @@ func TestResetHandler(t *testing.T) {
 }
 
 func TestGroupResetHandler(t *testing.T) {
-	signalChan := make(chan bool)
+	didSubscribe := make(chan bool)
+	didReload := make(chan bool)
 	cacheStore := RedisClusterStorageManager{}
 	cacheStore.Connect()
 
 	go func() {
-		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(message redis.Message) {
-			notif := Notification{}
-			if err := json.Unmarshal(message.Data, &notif); err != nil {
-				t.Fatal("Unmarshalling message body failed, malformed: ", err)
-			}
-			if notif.Command == NoticeGroupReload {
-				signalChan <- true
-			} else {
-				signalChan <- false
+		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
+			switch x := v.(type) {
+			case redis.Subscription:
+				didSubscribe <- true
+			case redis.Message:
+				notf := Notification{}
+				if err := json.Unmarshal(x.Data, &notf); err != nil {
+					t.Fatal(err)
+				}
+				if notf.Command == NoticeGroupReload {
+					didReload <- true
+				}
 			}
 		})
 		if err != nil {
 			t.Log(err)
 			t.Fail()
-			signalChan <- true
+			close(didReload)
 		}
 	}()
 
@@ -615,6 +619,9 @@ func TestGroupResetHandler(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	params := make(url.Values)
 
+	// If we don't wait for the subscription to be done, we might do
+	// the reload before pub/sub is in place to receive our message.
+	<-didSubscribe
 	req, err := http.NewRequest("GET", uri+params.Encode(), nil)
 
 	if err != nil {
@@ -631,14 +638,10 @@ func TestGroupResetHandler(t *testing.T) {
 		t.Fatal("Hot reload (group) was triggered but no APIs were found.")
 	}
 
-	// We wait for the right notification (NoticeGroupReload), other type of notifications may be received during tests, as this is the cluster channel:
-	for {
-		recvSignal := <-signalChan
-		if recvSignal {
-			break
-		}
-	}
-
+	// We wait for the right notification (NoticeGroupReload), other
+	// type of notifications may be received during tests, as this
+	// is the cluster channel:
+	<-didReload
 }
 
 const apiBenchDef = `{

@@ -20,7 +20,7 @@ func StartPubSubLoop() {
 	CacheStore.Connect()
 	// On message, synchronise
 	for {
-		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisMsg)
+		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisEvent)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
@@ -33,13 +33,17 @@ func StartPubSubLoop() {
 			}).Warning("Reconnecting")
 
 			CacheStore.Connect()
-			CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisMsg)
+			CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisEvent)
 		}
 
 	}
 }
 
-func HandleRedisMsg(message redis.Message) {
+func HandleRedisEvent(v interface{}) {
+	message, ok := v.(redis.Message)
+	if !ok {
+		return
+	}
 	notif := Notification{}
 	if err := json.Unmarshal(message.Data, &notif); err != nil {
 		log.Error("Unmarshalling message body failed, malformed: ", err)
