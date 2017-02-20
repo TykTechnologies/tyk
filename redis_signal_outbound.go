@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
-
 	"github.com/TykTechnologies/logrus"
 )
 
@@ -47,7 +45,7 @@ func (u *RedisNotificationHandler) StartUIPubSubConn() {
 	u.CacheStore.Connect()
 	// On message, synchronize
 	for {
-		err := u.CacheStore.StartPubSubHandler(UIChanName, u.HandleIncommingRedisMessage)
+		err := u.CacheStore.StartPubSubHandler(UIChanName, u.HandleIncommingRedisEvent)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "log-notifications",
@@ -60,12 +58,12 @@ func (u *RedisNotificationHandler) StartUIPubSubConn() {
 			}).Warning("Reconnecting")
 
 			u.CacheStore.Connect()
-			u.CacheStore.StartPubSubHandler(UIChanName, u.HandleIncommingRedisMessage)
+			u.CacheStore.StartPubSubHandler(UIChanName, u.HandleIncommingRedisEvent)
 		}
 
 	}
 }
 
-func (u *RedisNotificationHandler) HandleIncommingRedisMessage(message redis.Message) {
-	log.Debug("Inbound message received")
+func (u *RedisNotificationHandler) HandleIncommingRedisEvent(v interface{}) {
+	log.Debug("Inbound redis event received")
 }

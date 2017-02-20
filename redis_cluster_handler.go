@@ -432,8 +432,9 @@ func (r *RedisClusterStorageManager) DeleteRawKeys(keys []string, prefix string)
 	return true
 }
 
-// StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback func(redis.Message)) error {
+// StartPubSubHandler will listen for a signal and run the callback for
+// every subscription and message event.
+func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback func(interface{})) error {
 	if GetRelevantClusterReference(r.IsCache) == nil {
 		return errors.New("Redis connection failed")
 	}
@@ -455,7 +456,7 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 			callback(v)
 
 		case redis.Subscription:
-			log.Debug("Subscription started: ", v.Channel)
+			callback(v)
 
 		case error:
 			log.Error("Redis disconnected or error received, attempting to reconnect: ", v)
