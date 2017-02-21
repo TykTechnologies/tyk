@@ -45,9 +45,7 @@ type UptimeReportData struct {
 }
 
 func (u *UptimeReportData) SetExpiry(expiresInSeconds int64) {
-	var expiry time.Duration
-
-	expiry = time.Duration(expiresInSeconds) * time.Second
+	expiry := time.Duration(expiresInSeconds) * time.Second
 
 	if expiresInSeconds == 0 {
 		// Expiry is set to 100 years

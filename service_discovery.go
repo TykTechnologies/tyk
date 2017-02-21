@@ -222,16 +222,12 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 }
 
 func (s *ServiceDiscovery) GetSubObject(obj *gabs.Container) string {
-	var hostname string
-	hostname = s.GetHostname(obj) + s.targetPath
-
-	return hostname
+	return s.GetHostname(obj) + s.targetPath
 }
 
 func (s *ServiceDiscovery) ConvertRawListToObj(RawData *string) {
 	// Modify to turn a list object into a regular object
-	d := `{"` + ARRAY_NAME + `":` + *RawData + `}`
-	*RawData = d
+	*RawData = `{"` + ARRAY_NAME + `":` + *RawData + `}`
 }
 
 func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Container) error {
