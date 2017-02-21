@@ -31,9 +31,6 @@ func StartPubSubLoop() {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Warning("Reconnecting")
-
-			CacheStore.Connect()
-			CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisEvent)
 		}
 
 	}
