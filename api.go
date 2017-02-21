@@ -566,7 +566,7 @@ func handleURLReload() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	ReloadURLStructure()
+	ReloadURLStructure(nil)
 
 	code := 200
 
