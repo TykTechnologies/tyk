@@ -173,10 +173,9 @@ func TestMultiAuthSession(t *testing.T) {
 
 	var req *http.Request
 	var err error
-	var recorder *httptest.ResponseRecorder
 
 	// Set the url param
-	recorder = httptest.NewRecorder()
+	recorder := httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), strings.NewReader("")); err != nil {
 		log.Error("Problem creating new request object.", err)
 	}
