@@ -701,7 +701,7 @@ var (
 	// reloadInterval is the amount of time to sleep after every
 	// reload. In other words, a reload will run at most once every
 	// reloadInterval.
-	reloadInterval = 10 * time.Second
+	reloadInterval = 1 * time.Second
 
 	// reloadChan is a queue for incoming reload requests. At most,
 	// we want to have one reload running and one queued. If one is
