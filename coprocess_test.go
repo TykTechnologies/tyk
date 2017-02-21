@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -80,13 +81,26 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	}
 }
 
-// Makes sense when testing with -timeout
 func TestCoProcessReload(t *testing.T) {
 	if testDispatcher == nil {
 		testDispatcher, _ = NewCoProcessDispatcher()
 	}
-	ReloadURLStructure()
-	<-CoProcessReload
+	testDispatcher.reloaded = false
+	var wg sync.WaitGroup
+	wg.Add(1)
+	fn := func() {
+		wg.Done()
+	}
+	for {
+		if ReloadURLStructure(fn) {
+			// was actually queued
+			break
+		}
+	}
+	wg.Wait()
+	if !testDispatcher.reloaded {
+		t.Fatal("coprocess reload wasn't run")
+	}
 }
 
 /* Serialization, CP Objects */

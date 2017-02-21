@@ -47,6 +47,7 @@ var CoProcessDispatchEvent = make(chan []byte)
 
 type TestDispatcher struct {
 	coprocess.Dispatcher
+	reloaded bool
 }
 
 /* Basic CoProcessDispatcher functions */
@@ -62,7 +63,7 @@ func (d *TestDispatcher) DispatchEvent(eventJSON []byte) {
 }
 
 func (d *TestDispatcher) Reload() {
-	CoProcessReload <- true
+	d.reloaded = true
 }
 
 /* General test helpers */
