@@ -93,7 +93,7 @@ func HandleReloadMsg() {
 	log.WithFields(logrus.Fields{
 		"prefix": "pub-sub",
 	}).Info("Reloading endpoints")
-	ReloadURLStructure()
+	ReloadURLStructure(nil)
 }
 
 var warnedOnce bool

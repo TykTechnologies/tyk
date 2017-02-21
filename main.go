@@ -708,25 +708,20 @@ var (
 	// already queued, any reload requests should do nothing as a
 	// reload is already going to start at some point. Hence, buffer
 	// of size 1.
-	reloadChan = make(chan struct{}, 1)
-
-	// reloadDone is for the tests - for every reload request, the
-	// gateway will send true if it was queued and finished
-	// executing, or false if it wasn't queued since there already
-	// was one queued.
-	reloadDone chan (bool)
+	// If the queued func is non-nil, it is called once the reload
+	// is done.
+	reloadChan = make(chan func(), 1)
 )
 
 func reloadLoop() {
-	for range reloadChan {
+	for fn := range reloadChan {
 		log.Info("Initiating reload")
 		doReload()
 		log.Info("Initiating coprocess reload")
 		doCoprocessReload()
 
-		select {
-		case reloadDone <- true:
-		default:
+		if fn != nil {
+			fn()
 		}
 		time.Sleep(reloadInterval)
 	}
@@ -735,16 +730,15 @@ func reloadLoop() {
 // ReloadURLStructure will create a new muxer, reload all the app configs for an
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
-func ReloadURLStructure() {
+// It returns true if it was queued, or false if it wasn't.
+func ReloadURLStructure(fn func()) bool {
 	select {
-	case reloadChan <- struct{}{}:
+	case reloadChan <- fn:
 		log.Info("Reload queued")
+		return true
 	default:
 		log.Info("Reload already queued")
-		select {
-		case reloadDone <- false:
-		default:
-		}
+		return false
 	}
 }
 

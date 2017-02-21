@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -642,6 +644,64 @@ func TestGroupResetHandler(t *testing.T) {
 	// type of notifications may be received during tests, as this
 	// is the cluster channel:
 	<-didReload
+}
+
+func TestHotReloadSingle(t *testing.T) {
+	oldRouter := mainRouter
+	var wg sync.WaitGroup
+	fn := func() {
+		wg.Done()
+	}
+	for {
+		if ReloadURLStructure(fn) {
+			// it wasn't just queued
+			wg.Add(1)
+			break
+		}
+	}
+	wg.Wait()
+	if mainRouter == oldRouter {
+		t.Fatal("router wasn't swapped")
+	}
+}
+
+func TestHotReloadMany(t *testing.T) {
+	// TODO(mvdan): make this test deterministic in a way that
+	// doesn't depend on a very slow test with sleeps and the
+	// scheduler playing along
+
+	var done uint32 = 0
+	var wg sync.WaitGroup
+	fn := func() {
+		wg.Done()
+	}
+	// to give the reload worker time to be ready
+	time.Sleep(reloadInterval * 2)
+	wg.Add(25)
+	// Two spikes of 25 reloads, waiting for the queue to be empty
+	// in between. This should result in both spikes triggering two
+	// reloads, one queued and running and one queued and waiting.
+	for i := 0; i < 50; i++ {
+		if i == 25 {
+			wg.Wait()
+			// to give the reload worker time to be ready
+			time.Sleep(reloadInterval * 2)
+			wg.Add(25)
+		}
+		go func() {
+			if ReloadURLStructure(fn) {
+				wg.Add(1)
+				atomic.AddUint32(&done, 1)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	// to give the reload worker time to be ready
+	time.Sleep(reloadInterval * 2)
+	if want := uint32(4); done != want {
+		t.Fatalf("wanted actual reloads to be %d, was %d", want, done)
+	}
 }
 
 const apiBenchDef = `{

@@ -22,7 +22,7 @@ import (
 
 func init() {
 	runningTests = true
-	reloadInterval = 0
+	reloadInterval = 5 * time.Millisecond
 }
 
 // to register to, but never used
