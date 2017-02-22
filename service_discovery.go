@@ -98,45 +98,30 @@ func (s *ServiceDiscovery) GetPortFromObject(host *string, obj *gabs.Container) 
 }
 
 func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
-	log.Debug("Parent Data: ", item)
 	parentData := s.decodeToNameSpace(s.parentPath, item)
 	// Get the data path from the decoded object
 	subContainer := gabs.Container{}
-	switch parentData.(type) {
+	switch x := parentData.(type) {
+	case string:
+		s.ParseObject(x, &subContainer)
 	default:
 		log.Debug("Get Nested Object: parentData is not a string")
 		return ""
-	case string:
 	}
-	s.ParseObject(parentData.(string), &subContainer)
-	log.Debug("Parent SubContainer: ", subContainer)
-	// Get the hostname
-	hostnameData := s.decodeToNameSpace(s.dataPath, &subContainer)
-	switch hostnameData.(type) {
-	default:
-		log.Debug("Get Nested Object: hostname is not a string")
-		return ""
-	case string:
-	}
-	hostname := hostnameData.(string)
-	// Get the port
-	s.GetPortFromObject(&hostname, &subContainer)
-	return hostname
+	return s.GetObject(&subContainer)
 }
 
 func (s *ServiceDiscovery) GetObject(item *gabs.Container) string {
 	hostnameData := s.decodeToNameSpace(s.dataPath, item)
-	switch hostnameData.(type) {
+	switch x := hostnameData.(type) {
+	case string:
+		// Get the port
+		s.GetPortFromObject(&x, item)
+		return x
 	default:
 		log.Warning("Get Object: hostname is not a string")
-		return ""
-	case string:
 	}
-	hostname := hostnameData.(string)
-	log.Debug("get object hostname: ", hostname)
-	// Get the port
-	s.GetPortFromObject(&hostname, item)
-	return hostname
+	return ""
 }
 
 func (s *ServiceDiscovery) GetHostname(item *gabs.Container) string {
