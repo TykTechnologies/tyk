@@ -100,7 +100,7 @@ func TestBuildRequest(t *testing.T) {
 
 func TestCreateBody(t *testing.T) {
 	em := EventMessage{
-		EventType: EVENT_QuotaExceeded,
+		EventType: EventQuotaExceeded,
 		TimeStamp: "0",
 	}
 
@@ -130,8 +130,8 @@ func TestGet(t *testing.T) {
 	eventHandler := ev.(*WebHookHandler)
 
 	eventMessage := EventMessage{
-		EventType: EVENT_KeyExpired,
-		EventMetaData: EVENT_AuthFailureMeta{
+		EventType: EventKeyExpired,
+		EventMetaData: EventAuthFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
 			Path:             "/banana",
 			Origin:           "tyk.io",
@@ -164,8 +164,8 @@ func TestPost(t *testing.T) {
 	eventHandler := ev.(*WebHookHandler)
 
 	eventMessage := EventMessage{
-		EventType: EVENT_KeyExpired,
-		EventMetaData: EVENT_AuthFailureMeta{
+		EventType: EventKeyExpired,
+		EventMetaData: EventAuthFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
 			Path:             "/banana",
 			Origin:           "tyk.io",

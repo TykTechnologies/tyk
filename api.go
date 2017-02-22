@@ -279,10 +279,10 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	}
 
 	action := "modified"
-	event := EVENT_TokenUpdated
+	event := EventTokenUpdated
 	if r.Method == "POST" {
 		action = "added"
-		event = EVENT_TokenCreated
+		event = EventTokenCreated
 	}
 
 	if success {
@@ -302,7 +302,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		}
 	}
 
-	FireSystemEvent(event, EVENT_TokenMeta{
+	FireSystemEvent(event, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{
 			Message:            "Key modified.",
 			OriginatingRequest: "",
@@ -489,7 +489,7 @@ func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 		return []byte(E_SYSTEM_ERROR), 500
 	}
 
-	FireSystemEvent(EVENT_TokenDeleted, EVENT_TokenMeta{
+	FireSystemEvent(EventTokenDeleted, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{
 			Message:            "Key deleted.",
 			OriginatingRequest: "",
@@ -1420,7 +1420,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				code = 500
 			} else {
 
-				FireSystemEvent(EVENT_TokenCreated, EVENT_TokenMeta{
+				FireSystemEvent(EventTokenCreated, EventTokenMeta{
 					EventMetaDefault: EventMetaDefault{
 						Message:            "Key generated.",
 						OriginatingRequest: "",
