@@ -54,13 +54,12 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	eventOrigin := "127.0.0.1"
 	eventKey := "abc"
 
-	tykMiddleware.FireEvent(EventAuthFailure,
-		EventAuthFailureMeta{
-			EventMetaDefault: EventMetaDefault{Message: eventMessage},
-			Path:             eventPath,
-			Origin:           eventOrigin,
-			Key:              eventKey,
-		})
+	tykMiddleware.FireEvent(EventAuthFailure, EventAuthFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: eventMessage},
+		Path:             eventPath,
+		Origin:           eventOrigin,
+		Key:              eventKey,
+	})
 
 	eventJSON := <-CoProcessDispatchEvent
 	eventWrapper := CoProcessEventWrapper{}

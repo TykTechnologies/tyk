@@ -216,11 +216,10 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 		return
 	}
 
-	spec.FireEvent(EventHOSTDOWN,
-		EventHostStatusMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Uptime test failed"},
-			HostInfo:         report,
-		})
+	spec.FireEvent(EventHOSTDOWN, EventHostStatusMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Uptime test failed"},
+		HostInfo:         report,
+	})
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
@@ -259,11 +258,10 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
 		return
 	}
-	spec.FireEvent(EventHOSTUP,
-		EventHostStatusMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Uptime test succeeded"},
-			HostInfo:         report,
-		})
+	spec.FireEvent(EventHOSTUP, EventHostStatusMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Uptime test succeeded"},
+		HostInfo:         report,
+	})
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
