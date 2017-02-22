@@ -54,8 +54,8 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	eventOrigin := "127.0.0.1"
 	eventKey := "abc"
 
-	go tykMiddleware.FireEvent(EVENT_AuthFailure,
-		EVENT_AuthFailureMeta{
+	go tykMiddleware.FireEvent(EventAuthFailure,
+		EventAuthFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: eventMessage},
 			Path:             eventPath,
 			Origin:           eventOrigin,
@@ -70,7 +70,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 
 	eventMetadata := eventWrapper.Event.EventMetaData.(map[string]interface{})
 
-	if eventWrapper.Event.EventType != EVENT_AuthFailure {
+	if eventWrapper.Event.EventType != EventAuthFailure {
 		err := "Wrong event Type."
 		t.Fatal(err)
 	}

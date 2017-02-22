@@ -698,8 +698,8 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circu
 						}
 					}
 
-					spec.FireEvent(EVENT_BreakerTriggered,
-						EVENT_CurcuitBreakerMeta{
+					spec.FireEvent(EventBreakerTriggered,
+						EventCurcuitBreakerMeta{
 							EventMetaDefault: EventMetaDefault{Message: "Breaker Tripped"},
 							CircuitEvent:     e,
 							Path:             path,
@@ -707,8 +707,8 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circu
 						})
 
 				case circuit.BreakerReset:
-					spec.FireEvent(EVENT_BreakerTriggered,
-						EVENT_CurcuitBreakerMeta{
+					spec.FireEvent(EventBreakerTriggered,
+						EventCurcuitBreakerMeta{
 							EventMetaDefault: EventMetaDefault{Message: "Breaker Reset"},
 							CircuitEvent:     e,
 							Path:             path,

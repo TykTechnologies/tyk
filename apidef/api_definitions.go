@@ -10,7 +10,7 @@ import (
 type AuthProviderCode string
 type SessionProviderCode string
 type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EVENT_QuotaExceeded
+type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
 type TykEventHandlerName string // A type for handler codes in API definitions
 
 type EndpointMethodAction string

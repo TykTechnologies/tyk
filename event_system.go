@@ -22,19 +22,19 @@ const (
 
 // Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
-	EVENT_QuotaExceeded     apidef.TykEvent = "QuotaExceeded"
-	EVENT_RateLimitExceeded apidef.TykEvent = "RatelimitExceeded"
-	EVENT_AuthFailure       apidef.TykEvent = "AuthFailure"
-	EVENT_KeyExpired        apidef.TykEvent = "KeyExpired"
-	EVENT_VersionFailure    apidef.TykEvent = "VersionFailure"
-	EVENT_OrgQuotaExceeded  apidef.TykEvent = "OrgQuotaExceeded"
-	EVENT_TriggerExceeded   apidef.TykEvent = "TriggerExceeded"
-	EVENT_BreakerTriggered  apidef.TykEvent = "BreakerTriggered"
-	EVENT_HOSTDOWN          apidef.TykEvent = "HostDown"
-	EVENT_HOSTUP            apidef.TykEvent = "HostUp"
-	EVENT_TokenCreated      apidef.TykEvent = "TokenCreated"
-	EVENT_TokenUpdated      apidef.TykEvent = "TokenUpdated"
-	EVENT_TokenDeleted      apidef.TykEvent = "TokenDeleted"
+	EventQuotaExceeded     apidef.TykEvent = "QuotaExceeded"
+	EventRateLimitExceeded apidef.TykEvent = "RatelimitExceeded"
+	EventAuthFailure       apidef.TykEvent = "AuthFailure"
+	EventKeyExpired        apidef.TykEvent = "KeyExpired"
+	EventVersionFailure    apidef.TykEvent = "VersionFailure"
+	EventOrgQuotaExceeded  apidef.TykEvent = "OrgQuotaExceeded"
+	EventTriggerExceeded   apidef.TykEvent = "TriggerExceeded"
+	EventBreakerTriggered  apidef.TykEvent = "BreakerTriggered"
+	EventHOSTDOWN          apidef.TykEvent = "HostDown"
+	EventHOSTUP            apidef.TykEvent = "HostUp"
+	EventTokenCreated      apidef.TykEvent = "TokenCreated"
+	EventTokenUpdated      apidef.TykEvent = "TokenUpdated"
+	EventTokenDeleted      apidef.TykEvent = "TokenDeleted"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -44,53 +44,53 @@ type EventMetaDefault struct {
 	OriginatingRequest string
 }
 
-type EVENT_HostStatusMeta struct {
+type EventHostStatusMeta struct {
 	EventMetaDefault
 	HostInfo HostHealthReport
 }
 
-// EVENT_QuotaExceededMeta is the metadata structure for a quota exceeded event (EVENT_QuotaExceeded)
-type EVENT_QuotaExceededMeta struct {
+// EventQuotaExceededMeta is the metadata structure for a quota exceeded event (EventQuotaExceeded)
+type EventQuotaExceededMeta struct {
 	EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
 }
 
-// EVENT_RateLimitExceededMeta is the metadata structure for a rate limit exceeded event (EVENT_RateLimitExceeded)
-type EVENT_RateLimitExceededMeta struct {
+// EventRateLimitExceededMeta is the metadata structure for a rate limit exceeded event (EventRateLimitExceeded)
+type EventRateLimitExceededMeta struct {
 	EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
 }
 
-// EVENT_AuthFailureMeta is the metadata structure for an auth failure (EVENT_AuthFailure)
-type EVENT_AuthFailureMeta struct {
+// EventAuthFailureMeta is the metadata structure for an auth failure (EventAuthFailure)
+type EventAuthFailureMeta struct {
 	EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
 }
 
-// EVENT_CurcuitBreakerMeta is the event status for a circuit breaker tripping
-type EVENT_CurcuitBreakerMeta struct {
+// EventCurcuitBreakerMeta is the event status for a circuit breaker tripping
+type EventCurcuitBreakerMeta struct {
 	EventMetaDefault
 	Path         string
 	APIID        string
 	CircuitEvent circuit.BreakerEvent
 }
 
-// EVENT_KeyExpiredMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
-type EVENT_KeyExpiredMeta struct {
+// EventKeyExpiredMeta is the metadata structure for an auth failure (EventKeyExpired)
+type EventKeyExpiredMeta struct {
 	EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
 }
 
-// EVENT_VersionFailureMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
-type EVENT_VersionFailureMeta struct {
+// EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
+type EventVersionFailureMeta struct {
 	EventMetaDefault
 	Path   string
 	Origin string
@@ -98,16 +98,16 @@ type EVENT_VersionFailureMeta struct {
 	Reason string
 }
 
-// EVENT_VersionFailureMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
-type EVENT_TriggerExceededMeta struct {
+// EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
+type EventTriggerExceededMeta struct {
 	EventMetaDefault
 	Org          string
 	Key          string
 	TriggerLimit int64
 }
 
-// EVENT_VersionFailureMeta is the metadata structure for an auth failure (EVENT_KeyExpired)
-type EVENT_TokenMeta struct {
+// EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
+type EventTokenMeta struct {
 	EventMetaDefault
 	Org string
 	Key string
@@ -225,13 +225,13 @@ func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
 	formattedMsgString := fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.EventType)
 
 	// We can handle specific event types easily
-	if em.EventType == EVENT_QuotaExceeded {
-		msgConf := em.EventMetaData.(EVENT_QuotaExceededMeta)
+	if em.EventType == EventQuotaExceeded {
+		msgConf := em.EventMetaData.(EventQuotaExceededMeta)
 		formattedMsgString = fmt.Sprintf("%s:%s:%s:%s", formattedMsgString, msgConf.Key, msgConf.Origin, msgConf.Path)
 	}
 
-	if em.EventType == EVENT_BreakerTriggered {
-		msgConf := em.EventMetaData.(EVENT_CurcuitBreakerMeta)
+	if em.EventType == EventBreakerTriggered {
+		msgConf := em.EventMetaData.(EventCurcuitBreakerMeta)
 		formattedMsgString = fmt.Sprintf("%s:%s:%s: [STATUS] %v", formattedMsgString, msgConf.APIID, msgConf.Path, msgConf.CircuitEvent)
 	}
 

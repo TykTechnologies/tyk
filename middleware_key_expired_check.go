@@ -47,8 +47,8 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		}).Info("Attempted access from inactive key.")
 
 		// Fire a key expired event
-		go k.TykMiddleware.FireEvent(EVENT_KeyExpired,
-			EVENT_KeyExpiredMeta{
+		go k.TykMiddleware.FireEvent(EventKeyExpired,
+			EventKeyExpiredMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
 				Origin:           GetIPFromRequest(r),
@@ -72,8 +72,8 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		}).Info("Attempted access from expired key.")
 
 		// Fire a key expired event
-		go k.TykMiddleware.FireEvent(EVENT_KeyExpired,
-			EVENT_KeyExpiredMeta{
+		go k.TykMiddleware.FireEvent(EventKeyExpired,
+			EventKeyExpiredMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
 				Path:             r.URL.Path,
 				Origin:           GetIPFromRequest(r),

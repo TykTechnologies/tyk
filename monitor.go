@@ -10,8 +10,8 @@ func (m *Monitor) IsMonitorEnabled() bool {
 
 func (m *Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
 	em := EventMessage{
-		EventType: EVENT_TriggerExceeded,
-		EventMetaData: EVENT_TriggerExceededMeta{
+		EventType: EventTriggerExceeded,
+		EventMetaData: EventTriggerExceededMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Quota trigger reached", OriginatingRequest: ""},
 			Org:              sessionData.OrgID,
 			Key:              key,

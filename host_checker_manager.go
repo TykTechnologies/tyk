@@ -216,8 +216,8 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 		return
 	}
 
-	go spec.FireEvent(EVENT_HOSTDOWN,
-		EVENT_HostStatusMeta{
+	go spec.FireEvent(EventHOSTDOWN,
+		EventHostStatusMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Uptime test failed"},
 			HostInfo:         report,
 		})
@@ -259,8 +259,8 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
 		return
 	}
-	go spec.FireEvent(EVENT_HOSTUP,
-		EVENT_HostStatusMeta{
+	go spec.FireEvent(EventHOSTUP,
+		EventHostStatusMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Uptime test succeeded"},
 			HostInfo:         report,
 		})
