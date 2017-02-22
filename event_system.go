@@ -189,16 +189,13 @@ func (t *TykMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 }
 
 func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]TykEventHandler) {
-	log.Debug("EVENT FIRED: ", name)
 	if handlers, e := handlers[name]; e {
-		log.Debug("FOUND EVENT HANDLERS")
 		eventMessage := EventMessage{
 			EventMetaData: meta,
 			EventType:     name,
 			TimeStamp:     time.Now().Local().String(),
 		}
 		for _, handler := range handlers {
-			log.Debug("FIRING HANDLER")
 			go handler.HandleEvent(eventMessage)
 		}
 	}
@@ -206,6 +203,10 @@ func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEv
 
 func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, s.EventPaths)
+}
+
+func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
+	fireEvent(name, meta, config.EventTriggers)
 }
 
 // LogMessageEventHandler is a sample Event Handler
@@ -256,8 +257,4 @@ func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[api
 		}
 	}
 	return actualEventHandlers
-}
-
-func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, config.EventTriggers)
 }

@@ -47,7 +47,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 	requestValid, stat, meta := v.TykMiddleware.Spec.IsRequestValid(r)
 	if !requestValid {
 		// Fire a versioning failure event
-		go v.TykMiddleware.FireEvent(EventVersionFailure,
+		v.TykMiddleware.FireEvent(EventVersionFailure,
 			EventVersionFailureMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
