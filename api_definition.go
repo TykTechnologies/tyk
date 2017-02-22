@@ -949,7 +949,7 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
-func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+func (a *APISpec) CheckSpecMatchesStatus(url string, method string, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
 	for _, v := range RxPaths {
 		match := v.Spec.MatchString(url)
@@ -961,52 +961,51 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method interface{}, RxPaths
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
 		case Transformed:
-			if method != nil && method.(string) == v.TransformAction.TemplateMeta.Method {
+			if method == v.TransformAction.TemplateMeta.Method {
 				return true, &v.TransformAction
 			}
 		case HeaderInjected:
-			if method != nil && method.(string) == v.InjectHeaders.Method {
+			if method == v.InjectHeaders.Method {
 				return true, &v.InjectHeaders
 			}
 		case HeaderInjectedResponse:
-			if method != nil && method.(string) == v.InjectHeadersResponse.Method {
+			if method == v.InjectHeadersResponse.Method {
 				return true, &v.InjectHeadersResponse
 			}
 		case TransformedResponse:
-			if method != nil && method.(string) == v.TransformResponseAction.TemplateMeta.Method {
+			if method == v.TransformResponseAction.TemplateMeta.Method {
 				return true, &v.TransformResponseAction
 			}
 		case HardTimeout:
-			if method != nil && method.(string) == v.HardTimeout.Method {
+			if method == v.HardTimeout.Method {
 				return true, &v.HardTimeout.TimeOut
 			}
 		case CircuitBreaker:
-			if method != nil && method.(string) == v.CircuitBreaker.Method {
+			if method == v.CircuitBreaker.Method {
 				return true, &v.CircuitBreaker
 			}
 		case URLRewrite:
-			if method != nil && method.(string) == v.URLRewrite.Method {
+			if method == v.URLRewrite.Method {
 				return true, &v.URLRewrite
 			}
 		case VirtualPath:
-			if method != nil && method.(string) == v.VirtualPathSpec.Method {
+			if method == v.VirtualPathSpec.Method {
 				return true, &v.VirtualPathSpec
 			}
 		case RequestSizeLimit:
-			if method != nil && method.(string) == v.RequestSize.Method {
+			if method == v.RequestSize.Method {
 				return true, &v.RequestSize
 			}
 		case MethodTransformed:
-			if method != nil && method.(string) == v.MethodTransform.Method {
+			if method == v.MethodTransform.Method {
 				return true, &v.MethodTransform
 			}
-
 		case RequestTracked:
-			if method != nil && method.(string) == v.TrackEndpoint.Method {
+			if method == v.TrackEndpoint.Method {
 				return true, &v.TrackEndpoint
 			}
 		case RequestNotTracked:
-			if method != nil && method.(string) == v.DoNotTrackEndpoint.Method {
+			if method == v.DoNotTrackEndpoint.Method {
 				return true, &v.DoNotTrackEndpoint
 			}
 		}
