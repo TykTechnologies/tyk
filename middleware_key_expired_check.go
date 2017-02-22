@@ -47,13 +47,12 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		}).Info("Attempted access from inactive key.")
 
 		// Fire a key expired event
-		k.TykMiddleware.FireEvent(EventKeyExpired,
-			EventKeyExpiredMeta{
-				EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
-				Path:             r.URL.Path,
-				Origin:           GetIPFromRequest(r),
-				Key:              authHeaderValue,
-			})
+		k.TykMiddleware.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
+			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
+			Path:             r.URL.Path,
+			Origin:           GetIPFromRequest(r),
+			Key:              authHeaderValue,
+		})
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
@@ -72,13 +71,12 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		}).Info("Attempted access from expired key.")
 
 		// Fire a key expired event
-		k.TykMiddleware.FireEvent(EventKeyExpired,
-			EventKeyExpiredMeta{
-				EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
-				Path:             r.URL.Path,
-				Origin:           GetIPFromRequest(r),
-				Key:              authHeaderValue,
-			})
+		k.TykMiddleware.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
+			EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
+			Path:             r.URL.Path,
+			Origin:           GetIPFromRequest(r),
+			Key:              authHeaderValue,
+		})
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")

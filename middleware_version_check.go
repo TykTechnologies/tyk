@@ -47,14 +47,13 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 	requestValid, stat, meta := v.TykMiddleware.Spec.IsRequestValid(r)
 	if !requestValid {
 		// Fire a versioning failure event
-		v.TykMiddleware.FireEvent(EventVersionFailure,
-			EventVersionFailureMeta{
-				EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
-				Path:             r.URL.Path,
-				Origin:           GetIPFromRequest(r),
-				Key:              "",
-				Reason:           string(stat),
-			})
+		v.TykMiddleware.FireEvent(EventVersionFailure, EventVersionFailureMeta{
+			EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
+			Path:             r.URL.Path,
+			Origin:           GetIPFromRequest(r),
+			Key:              "",
+			Reason:           string(stat),
+		})
 		return errors.New(string(stat)), 403
 	}
 
