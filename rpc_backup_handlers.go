@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -185,7 +184,7 @@ func decrypt(key []byte, cryptoText string) string {
 	// XORKeyStream can work in-place if the two arguments are the same.
 	stream.XORKeyStream(ciphertext, ciphertext)
 
-	return fmt.Sprintf("%s", ciphertext)
+	return string(ciphertext)
 }
 
 func rightPad2Len(s, padStr string, overallLen int) string {

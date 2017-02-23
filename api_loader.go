@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -511,7 +510,7 @@ func processSpec(referenceSpec *APISpec,
 
 		simpleChain := alice.New(fullSimpleChain...).Then(userCheckHandler)
 
-		rateLimitPath := fmt.Sprintf("%s%s", referenceSpec.Proxy.ListenPath, "tyk/rate-limits/")
+		rateLimitPath := referenceSpec.Proxy.ListenPath + "tyk/rate-limits/"
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": referenceSpec.APIDefinition.Name,

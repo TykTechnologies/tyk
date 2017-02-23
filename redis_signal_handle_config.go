@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"syscall"
 	"time"
@@ -41,7 +40,7 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Info(fmt.Sprintf("Using %s for configuration", value.(string)))
+		}).Infof("Using %s for configuration", value.(string))
 		filename = argumentsBackup["--conf"].(string)
 	} else {
 		log.WithFields(logrus.Fields{
@@ -59,7 +58,7 @@ func GetExistingRawConfig() Config {
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Info(fmt.Sprintf("Using %s for configuration", value.(string)))
+		}).Infof("Using %s for configuration", value.(string))
 		filename = argumentsBackup["--conf"].(string)
 	} else {
 		log.WithFields(logrus.Fields{

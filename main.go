@@ -845,7 +845,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debug(fmt.Sprintf("Using %s for configuration", value.(string)))
+		}).Debugf("Using %s for configuration", value.(string))
 		filename = arguments["--conf"].(string)
 	} else {
 		log.WithFields(logrus.Fields{

@@ -34,7 +34,7 @@ type ErrorHandler struct {
 }
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
-func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err string, errCode int) {
+func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int) {
 	var templateExtension string
 	var contentType string
 
@@ -70,7 +70,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 	// Need to return the correct error code!
 	w.WriteHeader(errCode)
 
-	apiError := APIError{fmt.Sprintf("%s", err)}
+	apiError := APIError{errMsg}
 	tmpl.Execute(w, &apiError)
 
 	if doMemoryProfile {
@@ -219,7 +219,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 	}
 
 	var ip string
-	if clientIP, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
 		// If we aren't the first proxy retain prior
 		// X-Forwarded-For information as a comma+space
 		// separated list and fold multiple headers into one.
@@ -227,16 +228,17 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err s
 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
 		}
 		ip = clientIP
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix":      "gateway",
+			"user_ip":     ip,
+			"server_name": e.Spec.APIDefinition.Proxy.TargetURL,
+			"user_id":     obfuscated,
+			"org_id":      e.Spec.APIDefinition.OrgID,
+			"api_id":      e.Spec.APIDefinition.APIID,
+			"path":        r.URL.Path,
+		}).Error("request error: ", err)
 	}
-	log.WithFields(logrus.Fields{
-		"prefix":      "gateway",
-		"user_ip":     ip,
-		"server_name": e.Spec.APIDefinition.Proxy.TargetURL,
-		"user_id":     obfuscated,
-		"org_id":      e.Spec.APIDefinition.OrgID,
-		"api_id":      e.Spec.APIDefinition.APIID,
-		"path":        r.URL.Path,
-	}).Error("request error: ", err)
 
 	if doMemoryProfile {
 		pprof.WriteHeapProfile(profileFile)
