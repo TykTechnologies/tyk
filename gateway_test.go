@@ -22,11 +22,15 @@ import (
 
 func init() {
 	runningTests = true
-	reloadInterval = 5 * time.Millisecond
 }
 
-// to register to, but never used
-var discardMuxer = mux.NewRouter()
+var (
+	// to register to, but never used
+	discardMuxer = mux.NewRouter()
+
+	// to simulate time ticks for tests that do reloads
+	reloadTick = make(chan time.Time)
+)
 
 const (
 	// we need a static port so that the urls can be used in static
@@ -121,6 +125,9 @@ func TestMain(m *testing.M) {
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
+
+	go reloadLoop(reloadTick)
+
 	exitCode := m.Run()
 
 	os.RemoveAll(config.AppPath)

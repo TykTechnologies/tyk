@@ -691,23 +691,15 @@ func doReload() {
 	RPC_EmergencyMode = false
 }
 
-var (
-	// reloadInterval is the minimum amount of time between hot
-	// reloads. The interval counts from the start of one reload to
-	// the next.
-	reloadInterval = 1 * time.Second
-
-	// reloadChan is a queue for incoming reload requests. At most,
-	// we want to have one reload running and one queued. If one is
-	// already queued, any reload requests should do nothing as a
-	// reload is already going to start at some point. Hence, buffer
-	// of size 1.
-	// If the queued func is non-nil, it is called once the reload
-	// is done.
-	reloadChan = make(chan func(), 1)
-)
+// reloadChan is a queue for incoming reload requests. At most, we want
+// to have one reload running and one queued. If one is already queued,
+// any reload requests should do nothing as a reload is already going to
+// start at some point. Hence, buffer of size 1.
+// If the queued func is non-nil, it is called once the reload is done.
+var reloadChan = make(chan func(), 1)
 
 func reloadLoop(tick <-chan time.Time) {
+	<-tick
 	for fn := range reloadChan {
 		log.Info("Initiating reload")
 		doReload()
@@ -904,8 +896,6 @@ func initialiseSystem(arguments map[string]interface{}) {
 	//doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
 	//SetupInstrumentation(doInstrumentation)
 	SetupInstrumentation(true)
-
-	go reloadLoop(time.Tick(reloadInterval))
 
 	go StartPeriodicStateBackup(&LE_MANAGER)
 }
@@ -1170,6 +1160,9 @@ func start() {
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
 
+	// 1s is the minimum amount of time between hot reloads. The
+	// interval counts from the start of one reload to the next.
+	go reloadLoop(time.Tick(time.Second))
 }
 
 func generateListener(l net.Listener, listenAddress string, listenPort int) (net.Listener, error) {

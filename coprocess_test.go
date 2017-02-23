@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
@@ -87,15 +88,10 @@ func TestCoProcessReload(t *testing.T) {
 	testDispatcher.reloaded = false
 	var wg sync.WaitGroup
 	wg.Add(1)
-	fn := func() {
-		wg.Done()
+	if !ReloadURLStructure(wg.Done) {
+		t.Fatal("reload wasn't queued")
 	}
-	for {
-		if ReloadURLStructure(fn) {
-			// was actually queued
-			break
-		}
-	}
+	reloadTick <- time.Time{}
 	wg.Wait()
 	if !testDispatcher.reloaded {
 		t.Fatal("coprocess reload wasn't run")
