@@ -347,11 +347,14 @@ func (s *StatsDSink) writeNanosToTimingBuf(nanos int64) {
 
 func sanitizeKey(b *bytes.Buffer, s string) {
 	b.Grow(len(s) + 1)
-	for i := 0; i < len(s); i++ {
-		si := s[i]
-		if ('A' <= si && si <= 'Z') || ('a' <= si && si <= 'z') || ('0' <= si && s[i] <= '9') || si == '_' || si == '.' || si == '-' {
-			b.WriteByte(si)
-		} else {
+	for _, r := range s {
+		switch {
+		case 'A' <= r && r <= 'Z',
+			'a' <= r && r <= 'z',
+			'0' <= r && r <= '9',
+			r == '_', r == '.', r == '-':
+			b.WriteRune(r)
+		default:
 			b.WriteByte('$')
 		}
 	}
