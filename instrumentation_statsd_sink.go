@@ -164,11 +164,11 @@ func (s *StatsDSink) loop() {
 		}
 	}()
 
-LOOP:
+loop:
 	for cmd := range cmdChan {
 		switch cmd.Kind {
 		case statsdCmdKindDrain:
-		DRAIN_LOOP:
+		drainLoop:
 			for {
 				select {
 				case cmd := <-cmdChan:
@@ -176,12 +176,12 @@ LOOP:
 				default:
 					s.flush()
 					s.drainDoneChan <- struct{}{}
-					break DRAIN_LOOP
+					break drainLoop
 				}
 			}
 		case statsdCmdKindStop:
 			s.stopDoneChan <- struct{}{}
-			break LOOP
+			break loop
 		case statsdCmdKindFlush:
 			s.flush()
 		default:
