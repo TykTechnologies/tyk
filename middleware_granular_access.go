@@ -39,11 +39,6 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, 200
 	}
 
-	if sessionVersionData.AllowedURLs == nil {
-		log.Debug("No allowed URLS")
-		return nil, 200
-	}
-
 	if len(sessionVersionData.AllowedURLs) == 0 {
 		log.Debug("No allowed URLS")
 		return nil, 200
