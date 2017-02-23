@@ -156,12 +156,12 @@ func (l *LDAPStorageHandler) notifyReadOnly() bool {
 
 func (l *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, val string) (int, []interface{}) {
 	log.Warning("Not Implemented!")
-	return 0, []interface{}{}
+	return 0, nil
 }
 
 func (l *LDAPStorageHandler) SetRollingWindowPipeline(keyName string, per int64, val string) (int, []interface{}) {
 	log.Warning("Not Implemented!")
-	return 0, []interface{}{}
+	return 0, nil
 }
 
 func (l LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {

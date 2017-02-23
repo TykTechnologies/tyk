@@ -409,10 +409,8 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RPCStorageHandler) GetKeys(filter string) []string {
-
 	log.Error("GetKeys Not Implemented")
-
-	return []string{}
+	return nil
 }
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
@@ -535,8 +533,7 @@ func (r *RPCStorageHandler) Publish(channel, message string) error {
 
 func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
 	log.Error("GetAndDeleteSet Not implemented, please disable your purger")
-
-	return []interface{}{}
+	return nil
 }
 
 func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
@@ -575,10 +572,10 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 
 	if intVal == nil {
 		log.Warning("RPC Handler: SetRollingWindow() returned nil, returning 0")
-		return 0, []interface{}{}
+		return 0, nil
 	}
 
-	return intVal.(int), []interface{}{}
+	return intVal.(int), nil
 
 }
 
@@ -769,7 +766,7 @@ func GetDispatcher() *gorpc.Dispatcher {
 	})
 
 	Dispatch.AddFunc("GetKeys", func(keyName string) ([]string, error) {
-		return []string{}, nil
+		return nil, nil
 	})
 
 	Dispatch.AddFunc("DeleteKey", func(keyName string) (bool, error) {
@@ -825,11 +822,11 @@ func GetDispatcher() *gorpc.Dispatcher {
 	})
 
 	Dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgId string) ([]string, error) {
-		return []string{}, nil
+		return nil, nil
 	})
 
 	Dispatch.AddFunc("GetGroupKeySpaceUpdate", func(clientAddr string, groupData *GroupKeySpaceRequest) ([]string, error) {
-		return []string{}, nil
+		return nil, nil
 	})
 
 	Dispatch.AddFunc("Ping", func() bool {

@@ -104,7 +104,7 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 
 	respData, err := json.Marshal(&osinResponse.Output)
 	if err != nil {
-		return []byte{}, false
+		return nil, false
 	}
 	return respData, true
 
@@ -547,7 +547,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
 		var err error
 		if clientJSON, err = r.store.GetSet(KeyForSet); err != nil {
-			return []osin.Client{}, err
+			return nil, err
 		}
 	}
 
