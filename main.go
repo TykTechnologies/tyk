@@ -643,14 +643,6 @@ func doReload() {
 
 	// load the specs
 	specs := getAPISpecs()
-
-	if specs == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("No API Definitions found (nil), not reloading")
-		return
-	}
-
 	if len(specs) == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
