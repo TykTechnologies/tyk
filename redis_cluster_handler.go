@@ -260,17 +260,14 @@ func (r *RedisClusterStorageManager) GetKeys(filter string) []string {
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get all keys: ", err)
+		return nil
 
-	} else {
-		sessions, _ := redis.Strings(sessionsInterface, err)
-		for i, v := range sessions {
-			sessions[i] = r.cleanKey(v)
-		}
-
-		return sessions
 	}
-
-	return []string{}
+	sessions, _ := redis.Strings(sessionsInterface, err)
+	for i, v := range sessions {
+		sessions[i] = r.cleanKey(v)
+	}
+	return sessions
 }
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
