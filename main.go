@@ -1003,26 +1003,10 @@ func GetGlobalLocalCacheStorageHandler(KeyPrefix string, hashKeys bool) StorageH
 }
 
 func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
-	var Name apidef.StorageEngineCode
-	// Select configuration options
 	if config.SlaveOptions.UseRPC {
-		Name = RPCStorageEngine
-	} else {
-		Name = DefaultStorageEngine
+		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	}
-
-	switch Name {
-	case DefaultStorageEngine:
-		return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
-	case RPCStorageEngine:
-		engine := &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-		return engine
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Error("No storage handler found!")
-	return nil
+	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
 }
 
 // Handles pre-fork actions if we get a SIGHUP2

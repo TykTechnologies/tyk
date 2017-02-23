@@ -20,11 +20,8 @@ import (
 )
 
 const (
-	DefaultAuthProvider    apidef.AuthProviderCode    = "default"
-	DefaultSessionProvider apidef.SessionProviderCode = "default"
-	DefaultStorageEngine   apidef.StorageEngineCode   = "redis"
-	LDAPStorageEngine      apidef.StorageEngineCode   = "ldap"
-	RPCStorageEngine       apidef.StorageEngineCode   = "rpc"
+	LDAPStorageEngine apidef.StorageEngineCode = "ldap"
+	RPCStorageEngine  apidef.StorageEngineCode = "rpc"
 )
 
 // URLStatus is a custom enum type to avoid collisions
@@ -156,30 +153,10 @@ func (a *APIDefinitionLoader) MakeSpec(appConfig *apidef.APIDefinition) *APISpec
 	}
 
 	// Add any new session managers or auth handlers here
-	if newAppSpec.APIDefinition.AuthProvider.Name != "" {
-		switch newAppSpec.APIDefinition.AuthProvider.Name {
-		case DefaultAuthProvider:
-			newAppSpec.AuthManager = &DefaultAuthorisationManager{}
-		default:
-			newAppSpec.AuthManager = &DefaultAuthorisationManager{}
-		}
-	} else {
-		newAppSpec.AuthManager = &DefaultAuthorisationManager{}
-	}
+	newAppSpec.AuthManager = &DefaultAuthorisationManager{}
 
-	if newAppSpec.APIDefinition.SessionProvider.Name != "" {
-		switch newAppSpec.APIDefinition.SessionProvider.Name {
-		case DefaultSessionProvider:
-			newAppSpec.SessionManager = &DefaultSessionManager{}
-			newAppSpec.OrgSessionManager = &DefaultSessionManager{}
-		default:
-			newAppSpec.SessionManager = &DefaultSessionManager{}
-			newAppSpec.OrgSessionManager = &DefaultSessionManager{}
-		}
-	} else {
-		newAppSpec.SessionManager = &DefaultSessionManager{}
-		newAppSpec.OrgSessionManager = &DefaultSessionManager{}
-	}
+	newAppSpec.SessionManager = &DefaultSessionManager{}
+	newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 
 	// Create and init the virtual Machine
 	if config.EnableJSVM {

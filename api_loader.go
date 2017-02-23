@@ -155,12 +155,7 @@ func processSpec(referenceSpec *APISpec,
 	// Initialise the auth and session managers (use Redis for now)
 	var authStore, sessionStore, orgStore StorageHandler
 
-	authStorageEngineToUse := referenceSpec.AuthProvider.StorageEngine
-
-	switch authStorageEngineToUse {
-	case DefaultStorageEngine:
-		authStore = redisStore
-		orgStore = redisOrgStore
+	switch referenceSpec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
 		storageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
@@ -177,12 +172,7 @@ func processSpec(referenceSpec *APISpec,
 		orgStore = redisOrgStore
 	}
 
-	SessionStorageEngineToUse := referenceSpec.SessionProvider.StorageEngine
-
-	switch SessionStorageEngineToUse {
-	case DefaultStorageEngine:
-		sessionStore = redisStore
-
+	switch referenceSpec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
 		sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	default:
