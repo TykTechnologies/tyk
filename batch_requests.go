@@ -52,15 +52,12 @@ func (b *BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, o
 		return
 	}
 
-	reply := BatchReplyUnit{
+	out <- BatchReplyUnit{
 		RelativeURL: relURL,
 		Code:        resp.StatusCode,
 		Headers:     resp.Header,
 		Body:        string(content),
 	}
-
-	out <- reply
-
 }
 
 // doSyncRequest will make the same request but return a BatchReplyUnit
@@ -79,14 +76,12 @@ func (b *BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) Ba
 		return BatchReplyUnit{}
 	}
 
-	reply := BatchReplyUnit{
+	return BatchReplyUnit{
 		RelativeURL: relURL,
 		Code:        resp.StatusCode,
 		Headers:     resp.Header,
 		Body:        string(content),
 	}
-
-	return reply
 }
 
 func (b *BatchRequestHandler) DecodeBatchRequest(r *http.Request) (BatchRequestStructure, error) {
@@ -139,10 +134,8 @@ func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, r
 			go b.doAsyncRequest(req, batchRequest.Requests[index].RelativeURL, replies)
 		}
 
-		for i := 0; i < len(batchRequest.Requests); i++ {
-			val := <-replies
-
-			ReplySet = append(ReplySet, val)
+		for range batchRequest.Requests {
+			ReplySet = append(ReplySet, <-replies)
 		}
 	} else {
 		for index, req := range requestSet {
@@ -156,38 +149,37 @@ func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, r
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
 func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method == "POST" {
-
-		// Decode request
-		batchRequest, err := b.DecodeBatchRequest(r)
-		if err != nil {
-			log.Error("Could not decode batch request, decoding failed: ", err)
-			ReturnError("Batch request malformed", w)
-			return
-		}
-
-		// Construct the requests
-		requestSet, err := b.ConstructRequests(batchRequest, false)
-		if err != nil {
-			ReturnError(fmt.Sprintf("Batch request creation failed , request structure malformed"), w)
-			return
-		}
-
-		// Run requests and collate responses
-		ReplySet := b.MakeRequests(batchRequest, requestSet)
-
-		// Encode responses
-		replyMessage, err := json.Marshal(&ReplySet)
-		if err != nil {
-			log.Error("Couldn't encode response to string! ", err)
-			return
-		}
-
-		// Respond
-		DoJSONWrite(w, 200, replyMessage)
+	if r.Method != "POST" {
+		return
 	}
 
+	// Decode request
+	batchRequest, err := b.DecodeBatchRequest(r)
+	if err != nil {
+		log.Error("Could not decode batch request, decoding failed: ", err)
+		ReturnError("Batch request malformed", w)
+		return
+	}
+
+	// Construct the requests
+	requestSet, err := b.ConstructRequests(batchRequest, false)
+	if err != nil {
+		ReturnError(fmt.Sprintf("Batch request creation failed , request structure malformed"), w)
+		return
+	}
+
+	// Run requests and collate responses
+	ReplySet := b.MakeRequests(batchRequest, requestSet)
+
+	// Encode responses
+	replyMessage, err := json.Marshal(&ReplySet)
+	if err != nil {
+		log.Error("Couldn't encode response to string! ", err)
+		return
+	}
+
+	// Respond
+	DoJSONWrite(w, 200, replyMessage)
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
