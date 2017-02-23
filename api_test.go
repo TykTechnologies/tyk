@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -678,6 +677,8 @@ func TestGroupResetHandler(t *testing.T) {
 		t.Fatal("Hot reload (group) was triggered but no APIs were found.")
 	}
 
+	reloadTick <- time.Time{}
+
 	// We wait for the right notification (NoticeGroupReload), other
 	// type of notifications may be received during tests, as this
 	// is the cluster channel:
@@ -687,16 +688,11 @@ func TestGroupResetHandler(t *testing.T) {
 func TestHotReloadSingle(t *testing.T) {
 	oldRouter := mainRouter
 	var wg sync.WaitGroup
-	fn := func() {
-		wg.Done()
+	if !ReloadURLStructure(wg.Done) {
+		t.Fatal("reload wasn't queued")
 	}
-	for {
-		if ReloadURLStructure(fn) {
-			// it wasn't just queued
-			wg.Add(1)
-			break
-		}
-	}
+	wg.Add(1)
+	reloadTick <- time.Time{}
 	wg.Wait()
 	if mainRouter == oldRouter {
 		t.Fatal("router wasn't swapped")
@@ -704,40 +700,35 @@ func TestHotReloadSingle(t *testing.T) {
 }
 
 func TestHotReloadMany(t *testing.T) {
-	// TODO(mvdan): make this test deterministic in a way that
-	// doesn't depend on a very slow test with sleeps and the
-	// scheduler playing along
-
-	var done uint32 = 0
+	done := 0
 	var wg sync.WaitGroup
-	fn := func() {
-		wg.Done()
-	}
-	// to give the reload worker time to be ready
-	time.Sleep(reloadInterval * 2)
-	wg.Add(25)
-	// Two spikes of 25 reloads, waiting for the queue to be empty
-	// in between. This should result in both spikes triggering two
-	// reloads, one queued and running and one queued and waiting.
-	for i := 0; i < 50; i++ {
-		if i == 25 {
-			wg.Wait()
-			// to give the reload worker time to be ready
-			time.Sleep(reloadInterval * 2)
-			wg.Add(25)
+	// Spike of 25 reloads all at once, not giving any time for the
+	// reload worker to pick up any of them. A single one is queued
+	// and waits.
+	for i := 0; i < 25; i++ {
+		if ReloadURLStructure(wg.Done) {
+			wg.Add(1)
+			done++
 		}
-		go func() {
-			if ReloadURLStructure(fn) {
-				wg.Add(1)
-				atomic.AddUint32(&done, 1)
-			}
-			wg.Done()
-		}()
 	}
+	if want := 1; done != want {
+		t.Fatalf("wanted actual reloads to be %d, was %d", want, done)
+	}
+	// pick it up and finish it
+	reloadTick <- time.Time{}
 	wg.Wait()
-	// to give the reload worker time to be ready
-	time.Sleep(reloadInterval * 2)
-	if want := uint32(4); done != want {
+	// 5 reloads, but this time slower - the reload worker has time
+	// to do all of them.
+	for i := 0; i < 5; i++ {
+		if ReloadURLStructure(wg.Done) {
+			wg.Add(1)
+			done++
+		}
+		// pick it up and finish it
+		reloadTick <- time.Time{}
+		wg.Wait()
+	}
+	if want := 6; done != want {
 		t.Fatalf("wanted actual reloads to be %d, was %d", want, done)
 	}
 }
