@@ -692,9 +692,9 @@ func doReload() {
 }
 
 var (
-	// reloadInterval is the amount of time to sleep after every
-	// reload. In other words, a reload will run at most once every
-	// reloadInterval.
+	// reloadInterval is the minimum amount of time between hot
+	// reloads. The interval counts from the start of one reload to
+	// the next.
 	reloadInterval = 1 * time.Second
 
 	// reloadChan is a queue for incoming reload requests. At most,
@@ -707,7 +707,7 @@ var (
 	reloadChan = make(chan func(), 1)
 )
 
-func reloadLoop() {
+func reloadLoop(tick <-chan time.Time) {
 	for fn := range reloadChan {
 		log.Info("Initiating reload")
 		doReload()
@@ -717,7 +717,7 @@ func reloadLoop() {
 		if fn != nil {
 			fn()
 		}
-		time.Sleep(reloadInterval)
+		<-tick
 	}
 }
 
@@ -905,7 +905,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 	//SetupInstrumentation(doInstrumentation)
 	SetupInstrumentation(true)
 
-	go reloadLoop()
+	go reloadLoop(time.Tick(reloadInterval))
 
 	go StartPeriodicStateBackup(&LE_MANAGER)
 }
