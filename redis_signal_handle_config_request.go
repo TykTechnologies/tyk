@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"time"
 
@@ -49,7 +48,7 @@ func GetExistingConfig() (MicroConfig, error) {
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Info(fmt.Sprintf("Using %s for configuration", value.(string)))
+		}).Infof("Using %s for configuration", value.(string))
 		filename = argumentsBackup["--conf"].(string)
 	} else {
 		log.WithFields(logrus.Fields{

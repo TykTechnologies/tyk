@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -309,7 +308,7 @@ func (j *JSVM) LoadTykJSApi() {
 
 			u, _ := url.ParseRequestURI(domain)
 			u.Path = HRO.Resource
-			urlStr := fmt.Sprintf("%v", u) // "https://api.com/user/"
+			urlStr := u.String() // "https://api.com/user/"
 
 			client := &http.Client{}
 

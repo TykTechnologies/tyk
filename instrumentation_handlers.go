@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -51,7 +50,7 @@ func InstrumentationMW(handler http.HandlerFunc) http.HandlerFunc {
 
 		handler(w, r)
 		job.EventKv("called", health.Kvs{
-			"from_ip":  fmt.Sprint(r.RemoteAddr),
+			"from_ip":  r.RemoteAddr,
 			"method":   r.Method,
 			"endpoint": r.URL.Path,
 			"raw_url":  r.URL.String(),

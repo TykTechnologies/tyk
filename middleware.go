@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -58,7 +57,7 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
-				"from_ip":  fmt.Sprint(r.RemoteAddr),
+				"from_ip":  r.RemoteAddr,
 				"method":   r.Method,
 				"endpoint": r.URL.Path,
 				"raw_url":  r.URL.String(),

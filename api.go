@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -1281,14 +1280,6 @@ func resetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	DoJSONWrite(w, code, responseMessage)
-}
-
-func expandKey(orgID, key string) string {
-	if orgID == "" {
-		return fmt.Sprintf("%s", key)
-	}
-
-	return fmt.Sprintf("%s%s", orgID, key)
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
