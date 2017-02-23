@@ -189,14 +189,14 @@ func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 	var batchRequest BatchRequestStructure
 	if err := json.Unmarshal(RequestObject, &batchRequest); err != nil {
 		log.Error("Could not decode batch request, decoding failed: ", err)
-		return []byte{}
+		return nil
 	}
 
 	// Construct the unsafe requests
 	requestSet, err := b.ConstructRequests(batchRequest, true)
 	if err != nil {
 		log.Error("Batch request creation failed , request structure malformed: ", err)
-		return []byte{}
+		return nil
 	}
 
 	// Run requests and collate responses
@@ -206,11 +206,10 @@ func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 	replyMessage, err := json.Marshal(&ReplySet)
 	if err != nil {
 		log.Error("Couldn't encode response to string! ", err)
-		return []byte{}
+		return nil
 	}
 
 	return replyMessage
-
 }
 
 // ReturnError returns an error to the http response writer

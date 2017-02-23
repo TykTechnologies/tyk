@@ -377,7 +377,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
 	spec, found := ApiSpecRegister[APIID]
 	if !found {
-		return []HostData{}, errors.New("API ID not found in register")
+		return nil, errors.New("API ID not found in register")
 	}
 	sd := ServiceDiscovery{}
 	sd.New(&spec.UptimeTests.Config.ServiceDiscovery)
@@ -387,7 +387,7 @@ func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, erro
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Error("[HOST CHECKER MANAGER] Failed to retrieve host list: ", err)
-		return []HostData{}, err
+		return nil, err
 	}
 
 	// The returned data is a string, so lets unmarshal it:
@@ -397,7 +397,7 @@ func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, erro
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Error("[HOST CHECKER MANAGER] Decoder failed: ", err)
-		return []HostData{}, err
+		return nil, err
 	}
 
 	hostData := make([]HostData, len(checkTargets))
