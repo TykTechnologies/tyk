@@ -337,7 +337,7 @@ func (s *SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timin
 	ReportHealthCheckValue(s.Spec.Health, RequestLog, strconv.FormatInt(timing, 10))
 
 	if doMemoryProfile {
-		pprof.WriteHeapProfile(profileFile)
+		pprof.WriteHeapProfile(memProfFile)
 	}
 
 	context.Clear(r)
