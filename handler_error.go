@@ -74,7 +74,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	tmpl.Execute(w, &apiError)
 
 	if doMemoryProfile {
-		pprof.WriteHeapProfile(profileFile)
+		pprof.WriteHeapProfile(memProfFile)
 	}
 
 	if e.Spec.DoNotTrack {
@@ -241,7 +241,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	if doMemoryProfile {
-		pprof.WriteHeapProfile(profileFile)
+		pprof.WriteHeapProfile(memProfFile)
 	}
 
 	// Clean up

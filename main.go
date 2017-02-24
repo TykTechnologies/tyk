@@ -42,8 +42,9 @@ var (
 	config                   = Config{}
 	templates                = &template.Template{}
 	analytics                = RedisAnalyticsHandler{}
-	profileFile              = &os.File{}
 	GlobalEventsJSVM         = &JSVM{}
+	cpuProfFile              *os.File
+	memProfFile              *os.File
 	doHTTPProfile            bool
 	doMemoryProfile          bool
 	doCpuProfile             bool
@@ -1103,15 +1104,21 @@ func start() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Memory profiling active")
-		profileFile, _ = os.Create("tyk.mprof")
-		defer profileFile.Close()
+		var err error
+		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
+			panic(err)
+		}
+		defer memProfFile.Close()
 	}
 	if doCpuProfile {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Cpu profiling active")
-		profileFile, _ = os.Create("tyk.prof")
-		pprof.StartCPUProfile(profileFile)
+		var err error
+		if cpuProfFile, err = os.Create("tyk.prof"); err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(cpuProfFile)
 		defer pprof.StopCPUProfile()
 	}
 
