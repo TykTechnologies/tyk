@@ -258,17 +258,14 @@ func TestJWTSessionHMAC(t *testing.T) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	// Set the token ID
 	token.Header["kid"] = tokenKID
-	log.Info("Kid is: ", tokenKID)
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	// Sign and get the complete encoded token as a string
 	tokenString, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -276,7 +273,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 	req.Header.Add("authorization", tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -304,15 +301,12 @@ func TestJWTSessionRSA(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -320,7 +314,7 @@ func TestJWTSessionRSA(t *testing.T) {
 	req.Header.Add("authorization", tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -345,18 +339,6 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-	// Sign and get the complete encoded token as a string
-	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
-	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
-	}
-	tokenString, err := token.SignedString(signKey)
-	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
-	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -366,7 +348,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	req.Header.Add("authorization", "")
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -391,25 +373,13 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-	// Sign and get the complete encoded token as a string
-	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
-	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
-	}
-	tokenString, err := token.SignedString(signKey)
-	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
-	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -437,15 +407,12 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -455,7 +422,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -484,15 +451,12 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -502,7 +466,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -527,18 +491,6 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	// Set some claims
 	token.Claims.(jwt.MapClaims)["foo"] = "bar"
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-	// Sign and get the complete encoded token as a string
-	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
-	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
-	}
-	tokenString, err := token.SignedString(signKey)
-	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
-	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -548,7 +500,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	req.Header.Add("authorization", "123")
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -577,15 +529,12 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -593,7 +542,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -621,15 +570,12 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -638,7 +584,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	req.Header.Add("authorization", "Bearer: "+tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -684,15 +630,12 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -701,7 +644,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -740,15 +683,12 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -757,7 +697,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -796,15 +736,12 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	//log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -813,7 +750,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)
@@ -852,15 +789,12 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	// Sign and get the complete encoded token as a string
 	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
 	if err != nil {
-		log.Error("Couldn't extract private key: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't extract private key: ", err)
 	}
 	tokenString, err := token.SignedString(signKey)
 	if err != nil {
-		log.Error("Couldn't create JWT token: ")
-		t.Fatal(err)
+		t.Fatal("Couldn't create JWT token: ", err)
 	}
-	//log.Info(tokenString)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
@@ -869,7 +803,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
 	if err != nil {
-		log.Error("Problem generating the test token: ", err)
+		t.Fatal("Problem generating the test token: ", err)
 	}
 
 	chain := getJWTChain(spec)

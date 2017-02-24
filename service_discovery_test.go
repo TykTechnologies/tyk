@@ -167,7 +167,6 @@ const mesosphere = `{
 }`
 
 func configureService(name string, sd *ServiceDiscovery) string {
-	log.Info("Getting ", name)
 	switch name {
 	case "consul":
 		sd.isNested = false

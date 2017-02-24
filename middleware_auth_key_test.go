@@ -58,7 +58,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 	req, err := http.NewRequest("GET", "/auth_key_test/", nil)
 
 	if err != nil {
-		log.Error("Problem creating new request object.", err)
+		t.Fatal("Problem creating new request object.", err)
 	}
 
 	req.Header.Add("authorization", "Bearer "+customToken)
@@ -117,7 +117,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), strings.NewReader(""))
 
 	if err != nil {
-		log.Error("Problem creating new request object.", err)
+		t.Fatal("Problem creating new request object.", err)
 	}
 
 	chain := getAuthKeyChain(spec)
@@ -177,7 +177,7 @@ func TestMultiAuthSession(t *testing.T) {
 	// Set the url param
 	recorder := httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), strings.NewReader("")); err != nil {
-		log.Error("Problem creating new request object.", err)
+		t.Fatal("Problem creating new request object.", err)
 	}
 
 	chain := getAuthKeyChain(spec)
@@ -191,7 +191,7 @@ func TestMultiAuthSession(t *testing.T) {
 	// Set the header
 	recorder = httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", "/auth_key_test/?token=", strings.NewReader("")); err != nil {
-		log.Error("Problem creating new request object.", err)
+		t.Fatal("Problem creating new request object.", err)
 	}
 	req.Header.Add("authorization", customToken)
 
@@ -205,7 +205,7 @@ func TestMultiAuthSession(t *testing.T) {
 	// Set the cookie
 	recorder = httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", "/auth_key_test/?token=", strings.NewReader("")); err != nil {
-		log.Error("Problem creating new request object.", err)
+		t.Fatal("Problem creating new request object.", err)
 	}
 	req.AddCookie(&http.Cookie{Name: "oreo", Value: customToken})
 
@@ -219,7 +219,7 @@ func TestMultiAuthSession(t *testing.T) {
 	// No header, param or cookie
 	recorder = httptest.NewRecorder()
 	if req, err = http.NewRequest("GET", "/auth_key_test/", strings.NewReader("")); err != nil {
-		log.Error("Problem creating new request object.", err)
+		t.Fatal("Problem creating new request object.", err)
 	}
 
 	chain.ServeHTTP(recorder, req)

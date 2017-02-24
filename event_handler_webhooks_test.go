@@ -143,8 +143,6 @@ func TestGet(t *testing.T) {
 	checksum, _ := eventHandler.GetChecksum(body)
 	eventHandler.HandleEvent(eventMessage)
 
-	log.Info("Test Checksum: ", checksum)
-
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
 	}
@@ -177,8 +175,6 @@ func TestPost(t *testing.T) {
 
 	checksum, _ := eventHandler.GetChecksum(body)
 	eventHandler.HandleEvent(eventMessage)
-
-	log.Info("Test Checksum: ", checksum)
 
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
