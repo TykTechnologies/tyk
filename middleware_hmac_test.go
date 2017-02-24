@@ -115,10 +115,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
-	log.Debug("Encoded signature string: ", encodedString)
 	log.Info("[TEST] URL Encoded: ", url.QueryEscape(encodedString))
-
-	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
@@ -156,7 +153,6 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	tim := time.Now().Format(refDate)
 	req.Header.Add("x-aux-date", tim)
 	signatureString := strings.ToLower("x-aux-date") + ": " + tim
-	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
 	key := []byte(session.HmacSecret)
@@ -165,10 +161,6 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
-	log.Debug("Encoded signature string: ", encodedString)
-	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
-
-	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
@@ -206,7 +198,6 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	tim := time.Now().Format(refDate)
 	req.Header.Add("Date", tim)
 	signatureString := strings.ToLower("Date") + ":" + tim
-	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
 	key := []byte(session.HmacSecret)
@@ -215,10 +206,6 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
-	log.Debug("Encoded signature string: ", encodedString)
-	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
-
-	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
@@ -256,7 +243,6 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	tim := time.Now().Format(refDate)
 	req.Header.Add("Date", tim)
 	signatureString := strings.ToLower("Date") + ":" + tim
-	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
 	key := []byte(session.HmacSecret)
@@ -265,10 +251,6 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
-	log.Debug("Encoded signature string: ", encodedString)
-	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
-
-	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
@@ -306,7 +288,6 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	tim := time.Now().Format(refDate)
 	req.Header.Add("Date", tim)
 	signatureString := strings.ToLower("Date") + ":" + tim
-	log.Debug("Signature string before encoding: ", signatureString)
 
 	// Encode it
 	key := []byte(session.HmacSecret)
@@ -315,10 +296,6 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
-	log.Debug("Encoded signature string: ", encodedString)
-	log.Debug("URL Encoded: ", url.QueryEscape(encodedString))
-
-	log.Debug("Signature string: ", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha1\", signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha256\", signature=\"%s\"", encodedString))
 
@@ -370,10 +347,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
-	log.Debug("Encoded signature string: ", encodedString)
 	log.Info("[TEST] URL Encoded: ", url.QueryEscape(encodedString))
-
-	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", encodedString))
 
@@ -447,10 +421,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	_, upperCaseList := getUpperCaseEscaped(encodedString)
 	newEncodedSignature := replaceUpperCase(encodedString, upperCaseList)
 
-	log.Debug("Encoded signature string: ", newEncodedSignature)
 	log.Info("[TEST] URL Encoded: ", url.QueryEscape(newEncodedSignature))
-
-	log.Debug("Signature string: ", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", newEncodedSignature))
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", newEncodedSignature))
 
