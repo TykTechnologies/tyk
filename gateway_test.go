@@ -571,8 +571,6 @@ func TestParambasedAuth(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: ", recorder.Code)
-		log.Error("URI: ", uri)
-		log.Error("Proxy To:", spec.Proxy.TargetURL)
 		t.Error(recorder.Body)
 	}
 

@@ -396,10 +396,9 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 
 	var response = tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-	err := json.Unmarshal(body, &response)
-	if err != nil {
+	if err := json.Unmarshal(body, &response); err != nil {
+		t.Fatal(err)
 	}
-	log.Info("Access token: ", response.AccessToken)
 
 	if recorder.Code != 200 {
 		t.Error("Response code should have 200 error but is: ", recorder.Code)
@@ -458,8 +457,6 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	spec := makeOAuthAPI(t)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(spec, testMuxer)
-	log.Warning("Created OAUTH API with APIID: ", spec.APIID)
-	log.Warning("SPEC REGISTER: ", ApiSpecRegister)
 
 	// Step 2 - invalidate the refresh token
 
