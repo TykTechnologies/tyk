@@ -701,6 +701,7 @@ func TestQuota(t *testing.T) {
 	session := createQuotaSession()
 	keyId := testKey(t, "key")
 	spec.SessionManager.UpdateSession(keyId, session, 60)
+	defer spec.SessionManager.ResetQuota(keyId, session)
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
