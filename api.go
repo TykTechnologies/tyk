@@ -65,7 +65,6 @@ func GetSpecForApi(APIID string) *APISpec {
 	if !ok {
 		return nil
 	}
-
 	return spec
 }
 
@@ -86,17 +85,18 @@ func checkAndApplyTrialPeriod(keyName, apiId string, newSession *SessionState) {
 	// Check the policy to see if we are forcing an expiry on the key
 	if newSession.ApplyPolicyID != "" {
 		policy, ok := Policies[newSession.ApplyPolicyID]
-		if ok {
-			// Are we foring an expiry?
-			if policy.KeyExpiresIn > 0 {
-				// We are, does the key exist?
-				_, found := GetKeyDetail(keyName, apiId)
-				if !found {
-					// this is a new key, lets expire it
-					newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
-				}
-
+		if !ok {
+			return
+		}
+		// Are we foring an expiry?
+		if policy.KeyExpiresIn > 0 {
+			// We are, does the key exist?
+			_, found := GetKeyDetail(keyName, apiId)
+			if !found {
+				// this is a new key, lets expire it
+				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
 			}
+
 		}
 	}
 }
@@ -108,24 +108,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 		// We have a specific list of access rules, only add / update those
 		for apiId := range newSession.AccessRights {
 			apiSpec := GetSpecForApi(apiId)
-			if apiSpec != nil {
-
-				checkAndApplyTrialPeriod(keyName, apiId, &newSession)
-
-				// Lets reset keys if they are edited by admin
-				if !apiSpec.DontSetQuotasOnCreate {
-					// Reset quote by default
-					if !dontReset {
-						apiSpec.SessionManager.ResetQuota(keyName, newSession)
-						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-					}
-
-					err := apiSpec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(apiSpec, &newSession))
-					if err != nil {
-						return err
-					}
-				}
-			} else {
+			if apiSpec == nil {
 				log.WithFields(logrus.Fields{
 					"prefix":      "api",
 					"key":         keyName,
@@ -138,27 +121,40 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 				}).Error("Could not add key for this API ID, API doesn't exist.")
 				return errors.New("API must be active to add keys")
 			}
-		}
-	} else {
-		// nothing defined, add key to ALL
-		if config.AllowMasterKeys {
-			log.Warning("No API Access Rights set, adding key to ALL.")
-			for _, spec := range ApiSpecRegister {
+			checkAndApplyTrialPeriod(keyName, apiId, &newSession)
+
+			// Lets reset keys if they are edited by admin
+			if !apiSpec.DontSetQuotasOnCreate {
+				// Reset quote by default
 				if !dontReset {
-					spec.SessionManager.ResetQuota(keyName, newSession)
+					apiSpec.SessionManager.ResetQuota(keyName, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				checkAndApplyTrialPeriod(keyName, spec.APIID, &newSession)
-				err := spec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(spec, &newSession))
+
+				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(apiSpec, &newSession))
 				if err != nil {
 					return err
 				}
 			}
-		} else {
+		}
+	} else {
+		// nothing defined, add key to ALL
+		if !config.AllowMasterKeys {
 			log.Error("Master keys disallowed in configuration, key not added.")
 			return errors.New("Master keys not allowed")
 		}
-
+		log.Warning("No API Access Rights set, adding key to ALL.")
+		for _, spec := range ApiSpecRegister {
+			if !dontReset {
+				spec.SessionManager.ResetQuota(keyName, newSession)
+				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+			}
+			checkAndApplyTrialPeriod(keyName, spec.APIID, &newSession)
+			err := spec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(spec, &newSession))
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	log.WithFields(logrus.Fields{
@@ -218,63 +214,61 @@ func GetKeyDetail(key, APIID string) (SessionState, bool) {
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
-	success := true
 	decoder := json.NewDecoder(r.Body)
-	var responseMessage []byte
 	var newSession SessionState
-	code := 200
 
 	if err := decoder.Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
-		code = 400
-		success = false
-		responseMessage = createError("Request malformed")
-	} else {
-		// DO ADD OR UPDATE
-		// Update our session object (create it)
-		if newSession.BasicAuthData.Password != "" {
-			// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
-			// Only if it's NEW
-			if r.Method == "POST" {
-				keyName = newSession.OrgID + keyName
-				// It's a create, so lets hash the password
-				SetSessionPassword(&newSession)
-			}
+		return createError("Request malformed"), 400
+	}
+	success := true
+	var responseMessage []byte
+	code := 200
 
-			if r.Method == "PUT" {
-				// Ge the session
-				var originalKey SessionState
-				var found bool
-				for api_id := range newSession.AccessRights {
-					originalKey, found = GetKeyDetail(keyName, api_id)
-					if found {
-						break
-					}
-				}
+	// DO ADD OR UPDATE
+	// Update our session object (create it)
+	if newSession.BasicAuthData.Password != "" {
+		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
+		// Only if it's NEW
+		if r.Method == "POST" {
+			keyName = newSession.OrgID + keyName
+			// It's a create, so lets hash the password
+			SetSessionPassword(&newSession)
+		}
 
+		if r.Method == "PUT" {
+			// Ge the session
+			var originalKey SessionState
+			var found bool
+			for api_id := range newSession.AccessRights {
+				originalKey, found = GetKeyDetail(keyName, api_id)
 				if found {
-					// Found the key
-					if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
-						// passwords dont match assume it's new, lets hash it
-						log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
-						log.Debug("New: newSession.BasicAuthData.Password")
-						log.Debug("Changing password")
-						SetSessionPassword(&newSession)
-					}
+					break
 				}
 			}
 
+			if found {
+				// Found the key
+				if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
+					// passwords dont match assume it's new, lets hash it
+					log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
+					log.Debug("New: newSession.BasicAuthData.Password")
+					log.Debug("Changing password")
+					SetSessionPassword(&newSession)
+				}
+			}
 		}
-		dont_reset := r.FormValue("suppress_reset")
-		suppress_reset := false
 
-		if dont_reset == "1" {
-			suppress_reset = true
-		}
-		if err := doAddOrUpdate(keyName, newSession, suppress_reset); err != nil {
-			success = false
-			responseMessage = createError("Failed to create key, ensure security settings are correct.")
-		}
+	}
+	dont_reset := r.FormValue("suppress_reset")
+	suppress_reset := false
+
+	if dont_reset == "1" {
+		suppress_reset = true
+	}
+	if err := doAddOrUpdate(keyName, newSession, suppress_reset); err != nil {
+		success = false
+		responseMessage = createError("Failed to create key, ensure security settings are correct.")
 	}
 
 	action := "modified"
@@ -398,10 +392,8 @@ func handleGetAllKeys(filter, APIID string) ([]byte, int) {
 
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
-		if !strings.Contains(s, QuotaKeyPrefix) {
-			if !strings.Contains(s, RateLimitKeyPrefix) {
-				fixed_sessions = append(fixed_sessions, s)
-			}
+		if !strings.Contains(s, QuotaKeyPrefix) && !strings.Contains(s, RateLimitKeyPrefix) {
+			fixed_sessions = append(fixed_sessions, s)
 		}
 	}
 

@@ -866,50 +866,48 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
 	for _, v := range RxPaths {
-		match := v.Spec.MatchString(strings.ToLower(url))
-		if match {
-			if v.MethodActions != nil {
-				// We are using an extended path set, check for the method
-				methodMeta, matchMethodOk := v.MethodActions[method]
-				if matchMethodOk {
-					// Matched the method, check what status it is:
-					if methodMeta.Action != apidef.NoAction {
-						// TODO: Extend here for additional reply options
-						switch methodMeta.Action {
-						case apidef.Reply:
-							return StatusRedirectFlowByReply, &methodMeta
-						default:
-							log.Error("URL Method Action was not set to NoAction, blocking.")
-							return EndPointNotAllowed, nil
-						}
-					}
-
+		if !v.Spec.MatchString(strings.ToLower(url)) {
+			continue
+		}
+		if v.MethodActions != nil {
+			// We are using an extended path set, check for the method
+			methodMeta, matchMethodOk := v.MethodActions[method]
+			if matchMethodOk {
+				// Matched the method, check what status it is:
+				if methodMeta.Action == apidef.NoAction {
 					// NoAction status means we're not treating this request in any special or exceptional way
 					return a.getURLStatus(v.Status), nil
-
 				}
-
-				if WhiteListStatus {
-					// We have a whitelist, nothing gets through unless specifically defined
+				// TODO: Extend here for additional reply options
+				switch methodMeta.Action {
+				case apidef.Reply:
+					return StatusRedirectFlowByReply, &methodMeta
+				default:
+					log.Error("URL Method Action was not set to NoAction, blocking.")
 					return EndPointNotAllowed, nil
 				}
-
-				// Method not matched in an extended set, means it can be passed through
-				return StatusOk, nil
 			}
 
-			if v.TransformAction.Template != nil {
-				return a.getURLStatus(v.Status), &v.TransformAction
+			if WhiteListStatus {
+				// We have a whitelist, nothing gets through unless specifically defined
+				return EndPointNotAllowed, nil
 			}
 
-			// TODO: Fix, Not a great detection method
-			if len(v.InjectHeaders.Path) > 0 {
-				return a.getURLStatus(v.Status), &v.InjectHeaders
-			}
-
-			// Using a legacy path, handle it raw.
-			return a.getURLStatus(v.Status), nil
+			// Method not matched in an extended set, means it can be passed through
+			return StatusOk, nil
 		}
+
+		if v.TransformAction.Template != nil {
+			return a.getURLStatus(v.Status), &v.TransformAction
+		}
+
+		// TODO: Fix, Not a great detection method
+		if len(v.InjectHeaders.Path) > 0 {
+			return a.getURLStatus(v.Status), &v.InjectHeaders
+		}
+
+		// Using a legacy path, handle it raw.
+		return a.getURLStatus(v.Status), nil
 	}
 
 	// Nothing matched - should we still let it through?
