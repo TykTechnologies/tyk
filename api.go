@@ -61,11 +61,7 @@ func GetSpecForApi(APIID string) *APISpec {
 		return nil
 	}
 
-	spec, ok := ApiSpecRegister[APIID]
-	if !ok {
-		return nil
-	}
-	return spec
+	return ApiSpecRegister[APIID]
 }
 
 func GetSpecForOrg(APIID string) *APISpec {
@@ -465,7 +461,6 @@ func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 
 	sessionManager.RemoveSession(keyName)
 	sessionManager.ResetQuota(keyName, SessionState{})
-	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
 	responseMessage, err = json.Marshal(&statusObj)
@@ -495,7 +490,7 @@ func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 		"status": "ok",
 	}).Info("Deleted key.")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 func handleDeleteHashedKey(keyName, APIID string) ([]byte, int) {
@@ -534,7 +529,6 @@ func handleDeleteHashedKey(keyName, APIID string) ([]byte, int) {
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
 	sessStore.DeleteRawKey(setKeyName)
-	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
 	responseMessage, err = json.Marshal(&statusObj)
@@ -550,7 +544,7 @@ func handleDeleteHashedKey(keyName, APIID string) ([]byte, int) {
 		"status": "ok",
 	}).Info("Deleted hashed key.")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 func handleURLReload() ([]byte, int) {
@@ -558,8 +552,6 @@ func handleURLReload() ([]byte, int) {
 	var err error
 
 	ReloadURLStructure(nil)
-
-	code := 200
 
 	statusObj := APIErrorMessage{"ok", ""}
 	responseMessage, err = json.Marshal(&statusObj)
@@ -572,7 +564,7 @@ func handleURLReload() ([]byte, int) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api"}).Info("Reload URL Structure - Scheduled")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 func signalGroupReload() ([]byte, int) {
@@ -586,8 +578,6 @@ func signalGroupReload() ([]byte, int) {
 	// Signal to the group via redis
 	MainNotifier.Notify(notice)
 
-	code := 200
-
 	statusObj := APIErrorMessage{"ok", ""}
 	responseMessage, err = json.Marshal(&statusObj)
 
@@ -599,7 +589,7 @@ func signalGroupReload() ([]byte, int) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api"}).Info("Reloaded URL Structure - Success")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 func HandleGetAPIList() ([]byte, int) {
@@ -649,8 +639,7 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 	}).Error("API doesn't exist.")
 	notFound := APIStatusMessage{"error", "API not found"}
 	responseMessage, _ = json.Marshal(&notFound)
-	code := 404
-	return responseMessage, code
+	return responseMessage, 404
 }
 
 func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
@@ -960,8 +949,6 @@ func handleUpdateHashedKey(keyName, APIID, policyId string) ([]byte, int) {
 		return responseMessage, 400
 	}
 
-	code := 200
-
 	statusObj := APIModifyKeySuccess{keyName, "ok", "updated"}
 	responseMessage, err = json.Marshal(&statusObj)
 
@@ -976,7 +963,7 @@ func handleUpdateHashedKey(keyName, APIID, policyId string) ([]byte, int) {
 		"status": "ok",
 	}).Info("Updated hashed key.")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 func orgHandler(w http.ResponseWriter, r *http.Request) {
@@ -2026,10 +2013,8 @@ func HandleInvalidateAPICache(APIID string) error {
 	matchPattern := keyPrefix + "*"
 	store := GetGlobalLocalCacheStorageHandler(keyPrefix, false)
 
-	ok := store.DeleteScanMatch(matchPattern)
-	if !ok {
-		return errors.New("Scan/delete failed")
+	if ok := store.DeleteScanMatch(matchPattern); !ok {
+		return errors.New("scan/delete failed")
 	}
-
 	return nil
 }
