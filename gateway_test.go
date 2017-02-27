@@ -550,7 +550,6 @@ func TestParambasedAuth(t *testing.T) {
 	session := createParamAuthSession()
 	spec.SessionManager.UpdateSession("54321", session, 60)
 	uri := "/pathBased/post?authorization=54321"
-	method := "POST"
 
 	form := url.Values{}
 	form.Add("foo", "swiggetty")
@@ -559,7 +558,7 @@ func TestParambasedAuth(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(form.Encode()))
+	req, err := http.NewRequest("POST", uri+param.Encode(), strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	if err != nil {
@@ -597,12 +596,10 @@ func TestVersioningRequestOK(t *testing.T) {
 	spec := createSpecTest(t, versionedDefinition)
 	session := createVersionedSession()
 	spec.SessionManager.UpdateSession("96869686969", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", param.Encode(), nil)
 	req.Header.Add("authorization", "96869686969")
 	req.Header.Add("version", "v1")
 
@@ -625,12 +622,10 @@ func TestVersioningRequestFail(t *testing.T) {
 
 	// no version allowed
 	spec.SessionManager.UpdateSession("zz1234", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", param.Encode(), nil)
 	req.Header.Add("authorization", "zz1234")
 	req.Header.Add("version", "v1")
 
@@ -652,11 +647,10 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 
 	spec.SessionManager.UpdateSession("tyutyu345345dgh", session, 60)
 	uri := "/v1/ignored/noregex"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri+param.Encode(), nil)
 
 	// No auth information, it's an ignored path!
 	//	req.Header.Add("authorization", "1234")
@@ -680,12 +674,11 @@ func TestWhitelistRequestReply(t *testing.T) {
 	keyId := testKey(t, "key")
 
 	spec.SessionManager.UpdateSession(keyId, session, 60)
-	uri := "v1/allowed/whitelist/reply/"
-	method := "GET"
+	uri := "/v1/allowed/whitelist/reply/"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri+param.Encode(), nil)
 
 	req.Header.Add("authorization", keyId)
 
@@ -708,24 +701,20 @@ func TestQuota(t *testing.T) {
 	session := createQuotaSession()
 	keyId := testKey(t, "key")
 	spec.SessionManager.UpdateSession(keyId, session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("authorization", keyId)
-
+	req, err := http.NewRequest("GET", param.Encode(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("authorization", keyId)
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code: \n", recorder.Code, " Header:", recorder.HeaderMap)
-
 	}
 
 	secondRecorder := httptest.NewRecorder()
@@ -733,9 +722,6 @@ func TestQuota(t *testing.T) {
 	thirdRecorder := httptest.NewRecorder()
 	chain.ServeHTTP(thirdRecorder, req)
 
-	if thirdRecorder.Code == 200 {
-		t.Error("Third request failed, should not be 200!: \n", thirdRecorder.Code)
-	}
 	if thirdRecorder.Code != 403 {
 		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
 	}
@@ -752,12 +738,10 @@ func TestWithAnalytics(t *testing.T) {
 	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("ert1234ert", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", param.Encode(), nil)
 	req.Header.Add("authorization", "ert1234ert")
 
 	if err != nil {
@@ -786,12 +770,10 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("fgh561234", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", param.Encode(), nil)
 	req.Header.Add("authorization", "dfgjg345316ertdg")
 
 	if err != nil {
