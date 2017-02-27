@@ -918,7 +918,6 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 
 	// No whitelist, but also not in any of the other lists, let it through and filter
 	return StatusOk, nil
-
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
@@ -1026,11 +1025,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 // IsThisAPIVersionExpired checks if an API version (during a proxied request) is expired
 func (a *APISpec) IsThisAPIVersionExpired(versionDef *apidef.VersionInfo) bool {
 	// Never expires
-	if versionDef.Expires == "-1" {
-		return false
-	}
-
-	if versionDef.Expires == "" {
+	if versionDef.Expires == "" || versionDef.Expires == "-1" {
 		return false
 	}
 
