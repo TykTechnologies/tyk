@@ -76,7 +76,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	miniRequestObject := &coprocess.MiniRequestObject{
 		Headers:        ProtoMap(r.Header),
-		SetHeaders:     make(map[string]string, 0),
+		SetHeaders:     make(map[string]string),
 		DeleteHeaders:  make([]string, 0),
 		Body:           string(originalBody),
 		Url:            r.URL.Path,
@@ -102,8 +102,8 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	object.HookType = c.HookType
 
-	object.Metadata = make(map[string]string, 0)
-	object.Spec = make(map[string]string, 0)
+	object.Metadata = make(map[string]string)
+	object.Spec = make(map[string]string)
 
 	// Append spec data:
 	if c.Middleware != nil {
@@ -115,8 +115,7 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	// Encode the session object (if not a pre-process & not a custom key check):
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
-		var session interface{}
-		session = context.Get(r, SessionData)
+		session := context.Get(r, SessionData)
 		if session != nil {
 			sessionState := session.(SessionState)
 			object.Session = ProtoSessionState(sessionState)
