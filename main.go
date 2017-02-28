@@ -268,7 +268,7 @@ func getAPISpecs() []*APISpec {
 }
 
 func getPolicies() {
-	thesePolicies := make(map[string]Policy)
+	pols := make(map[string]Policy)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")
@@ -282,7 +282,7 @@ func getPolicies() {
 				"prefix": "main",
 			}).Info("Using Policies from Dashboard Service")
 
-			thesePolicies = LoadPoliciesFromDashboard(connStr, config.NodeSecret, config.Policies.AllowExplicitPolicyID)
+			pols = LoadPoliciesFromDashboard(connStr, config.NodeSecret, config.Policies.AllowExplicitPolicyID)
 
 		} else {
 			log.WithFields(logrus.Fields{
@@ -294,7 +294,7 @@ func getPolicies() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using Policies from RPC")
-		thesePolicies = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
+		pols = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 		// this is the only case now where we need a policy record name
 		if config.Policies.PolicyRecordName == "" {
@@ -303,11 +303,11 @@ func getPolicies() {
 			}).Debug("No policy record name defined, skipping...")
 			return
 		}
-		thesePolicies = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
+		pols = LoadPoliciesFromFile(config.Policies.PolicyRecordName)
 	}
 
-	if len(thesePolicies) > 0 {
-		Policies = thesePolicies
+	if len(pols) > 0 {
+		Policies = pols
 		return
 	}
 }
