@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	UPSTREAM_CACHE_HEADER_NAME     = "x-tyk-cache-action-set"
-	UPSTREAM_CACHE_TTL_HEADER_NAME = "x-tyk-cache-action-set-ttl"
+	upstreamCacheHeader    = "x-tyk-cache-action-set"
+	upstreamCacheTTLHeader = "x-tyk-cache-action-set-ttl"
 )
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
@@ -221,12 +221,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		if m.Spec.APIDefinition.CacheOptions.EnableUpstreamCacheControl {
 			log.Debug("Upstream control enabled")
 			// Do we cache?
-			if reqVal.Header.Get(UPSTREAM_CACHE_HEADER_NAME) == "" {
+			if reqVal.Header.Get(upstreamCacheHeader) == "" {
 				log.Warning("Upstream cache action not found, not caching")
 				cacheThisRequest = false
 			}
 			// Do we override TTL?
-			ttl := reqVal.Header.Get(UPSTREAM_CACHE_TTL_HEADER_NAME)
+			ttl := reqVal.Header.Get(upstreamCacheTTLHeader)
 			if ttl != "" {
 				log.Debug("TTL Set upstream")
 				cacheAsInt, err := strconv.Atoi(ttl)

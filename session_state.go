@@ -12,8 +12,8 @@ import (
 type HashType string
 
 const (
-	HASH_PlainText HashType = ""
-	HASH_BCrypt    HashType = "bcrypt"
+	HashPlainText HashType = ""
+	HashBCrypt    HashType = "bcrypt"
 )
 
 // AccessSpecs define what URLS a user has access to an what methods are enabled

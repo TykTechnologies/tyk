@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	T_REDIRECT_URI  = "http://client.oauth.com"
-	T_REDIRECT_URI2 = "http://client2.oauth.com"
-	T_CLIENT_ID     = "1234"
-	T_CLIENT_SECRET = "aabbccdd"
+	authRedirectUri  = "http://client.oauth.com"
+	authRedirectUri2 = "http://client2.oauth.com"
+	authClientID     = "1234"
+	authClientSecret = "aabbccdd"
 )
 
 const keyRules = `{
@@ -116,8 +116,8 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -148,8 +148,8 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
-	param.Set("redirect_uri", T_REDIRECT_URI2)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri2)
+	param.Set("client_id", authClientID)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -180,8 +180,8 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
-	param.Set("redirect_uri", T_REDIRECT_URI2)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri2)
+	param.Set("client_id", authClientID)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -209,8 +209,8 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
@@ -240,8 +240,8 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
@@ -271,8 +271,8 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
@@ -322,8 +322,8 @@ func getAuthCode(t *testing.T) map[string]string {
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
 	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
@@ -357,8 +357,8 @@ func getToken(t *testing.T) tokenData {
 
 	param := make(url.Values)
 	param.Set("grant_type", "authorization_code")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("code", authData["code"])
 	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
@@ -384,8 +384,8 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("grant_type", "client_credentials")
-	param.Set("client_id", T_CLIENT_ID)
-	param.Set("client_secret", T_CLIENT_SECRET)
+	param.Set("client_id", authClientID)
+	param.Set("client_secret", authClientSecret)
 
 	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
@@ -427,8 +427,8 @@ func TestClientAccessRequest(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("grant_type", "authorization_code")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("code", authData["code"])
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
@@ -500,8 +500,8 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("grant_type", "refresh_token")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
@@ -535,8 +535,8 @@ func TestClientRefreshRequest(t *testing.T) {
 
 	param := make(url.Values)
 	param.Set("grant_type", "refresh_token")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
@@ -571,8 +571,8 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	// req 1
 	param := make(url.Values)
 	param.Set("grant_type", "refresh_token")
-	param.Set("redirect_uri", T_REDIRECT_URI)
-	param.Set("client_id", T_CLIENT_ID)
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
 	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
@@ -598,8 +598,8 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 
 	param2 := make(url.Values)
 	param2.Set("grant_type", "refresh_token")
-	param2.Set("redirect_uri", T_REDIRECT_URI)
-	param2.Set("client_id", T_CLIENT_ID)
+	param2.Set("redirect_uri", authRedirectUri)
+	param2.Set("client_id", authClientID)
 	param2.Set("refresh_token", token)
 	req2, err2 := http.NewRequest(method, uri, bytes.NewBufferString(param2.Encode()))
 	req2.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")

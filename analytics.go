@@ -58,9 +58,7 @@ type GeoData struct {
 	} `maxminddb:"location"`
 }
 
-const (
-	ANALYTICS_KEYNAME = "tyk-system-analytics"
-)
+const analyticsKeyName = "tyk-system-analytics"
 
 func (a *AnalyticsRecord) GetGeo(ipStr string) {
 	if !config.AnalyticsConfig.EnableGeoIP {
@@ -236,7 +234,7 @@ func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 			log.Error("Error encoding analytics data: ", err)
 		}
 
-		r.Store.AppendToSet(ANALYTICS_KEYNAME, string(encoded))
+		r.Store.AppendToSet(analyticsKeyName, string(encoded))
 	})
 
 	return nil

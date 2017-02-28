@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-var RESPONSE_PROCESSORS = map[string]TykResponseHandler{
+var responseProcessors = map[string]TykResponseHandler{
 	"header_injector":         HeaderInjector{},
 	"response_body_transform": ResponseTransformMiddleware{},
 	"header_transform":        HeaderTransform{},
@@ -17,7 +17,7 @@ type TykResponseHandler interface {
 }
 
 func GetResponseProcessorByName(name string) (TykResponseHandler, error) {
-	processor, ok := RESPONSE_PROCESSORS[name]
+	processor, ok := responseProcessors[name]
 	if !ok {
 		return nil, errors.New("Not found")
 	}
