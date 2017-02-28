@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"gopkg.in/mgo.v2/bson"
@@ -65,16 +66,17 @@ func (d *DBPolicy) ToRegularPolicy() Policy {
 }
 
 func LoadPoliciesFromFile(filePath string) map[string]Policy {
-	policyConfig, err := ioutil.ReadFile(filePath)
+	f, err := os.Open(filePath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
-		}).Error("Couldn't load policy file: ", err)
+		}).Error("Couldn't open policy file: ", err)
 		return nil
 	}
+	defer f.Close()
 
 	var policies map[string]Policy
-	if err := json.Unmarshal(policyConfig, &policies); err != nil {
+	if err := json.NewDecoder(f).Decode(&policies); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Couldn't unmarshal policies: ", err)

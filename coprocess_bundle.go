@@ -226,13 +226,13 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 	}).Info("----> Loading bundle: ", spec.CustomMiddlewareBundle)
 
 	manifestPath := filepath.Join(bundle.Path, "manifest.json")
-	manifestData, err := ioutil.ReadFile(manifestPath)
+	f, err := os.Open(manifestPath)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
-	err = json.Unmarshal(manifestData, &bundle.Manifest)
-	if err != nil {
+	if err := json.NewDecoder(f).Decode(&bundle.Manifest); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Couldn't unmarshal the manifest file for bundle: ", spec.CustomMiddlewareBundle)
@@ -240,15 +240,15 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 	}
 
 	if skipVerification {
-		return err
+		return nil
 	}
 
-	if err = bundle.Verify(); err != nil {
+	if err := bundle.Verify(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
 	}
-	return err
+	return nil
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
