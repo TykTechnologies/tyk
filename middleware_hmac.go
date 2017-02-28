@@ -270,38 +270,17 @@ func getDateHeader(r *http.Request) (string, string) {
 	return "", ""
 }
 
-var validKeyHeaders = map[string]bool{
-	"keyid":     true,
-	"algorithm": true,
-	"headers":   true,
-	"signature": true,
-}
-
 func getFieldValues(authHeader string) (*HMACFieldValues, error) {
-	AsElements := strings.Split(authHeader, ",")
 	set := HMACFieldValues{}
 
-	for _, element := range AsElements {
+	for _, element := range strings.Split(authHeader, ",") {
 		kv := strings.Split(element, "=")
-		log.Debug("Checking: ", kv)
-		if len(kv) < 2 {
-			return nil, errors.New("Header field value malformed (less than two elements in field)")
-		}
-		if len(kv) > 2 {
-			return nil, errors.New("Header field value malformed (more than two elements in field)")
+		if len(kv) != 2 {
+			return nil, errors.New("Header field value malformed (need two elements in field)")
 		}
 
 		key := strings.ToLower(kv[0])
-		if !validKeyHeaders[key] {
-			log.WithFields(logrus.Fields{
-				"prefix": "hmac",
-				"field":  kv[0],
-			}).Warning("Invalid header field found")
-			return nil, errors.New("Header key is not valid, not in allowed parameter list")
-		}
-
-		value := kv[1]
-		value = strings.Trim(value, `"`)
+		value := strings.Trim(kv[1], `"`)
 
 		switch key {
 		case "keyid":
@@ -312,6 +291,12 @@ func getFieldValues(authHeader string) (*HMACFieldValues, error) {
 			set.Headers = strings.Split(value, " ")
 		case "signature":
 			set.Signature = value
+		default:
+			log.WithFields(logrus.Fields{
+				"prefix": "hmac",
+				"field":  kv[0],
+			}).Warning("Invalid header field found")
+			return nil, errors.New("Header key is not valid, not in allowed parameter list")
 		}
 	}
 
