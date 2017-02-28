@@ -140,23 +140,27 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 	reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
 
 	for _, f := range reader.File {
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
 		destPath := filepath.Join(bundlePath, f.Name)
 
 		if f.FileHeader.Mode().IsDir() {
-			if err = os.Mkdir(destPath, 0755); err != nil {
+			if err := os.Mkdir(destPath, 0755); err != nil {
 				return err
 			}
 			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return err
 		}
 		newFile, err := os.Create(destPath)
 		if err != nil {
 			return err
 		}
 		if _, err = io.Copy(newFile, rc); err != nil {
+			return err
+		}
+		rc.Close()
+		if err := newFile.Close(); err != nil {
 			return err
 		}
 	}
