@@ -69,10 +69,8 @@ func HandleRedisEvent(v interface{}) {
 	switch notif.Command {
 	case NoticeDashboardZeroConf:
 		HandleDashboardZeroConfMessage(notif.Payload)
-		break
 	case NoticeConfigUpdate:
 		HandleNewConfiguration(notif.Payload)
-		break
 	case NoticeDashboardConfigRequest:
 		HandleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
@@ -81,7 +79,6 @@ func HandleRedisEvent(v interface{}) {
 		OnLESSLStatusReceivedHandler(notif.Payload)
 	default:
 		HandleReloadMsg()
-		break
 	}
 
 }

@@ -34,15 +34,9 @@ func (t *TransformHeaders) GetConfig() (interface{}, error) {
 func (t *TransformHeaders) IsEnabledForSpec() bool {
 	var used bool
 	for _, version := range t.TykMiddleware.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.TransformHeader) > 0 {
-			used = true
-			break
-		}
-		if len(version.GlobalHeaders) > 0 {
-			used = true
-			break
-		}
-		if len(version.GlobalHeadersRemove) > 0 {
+		if len(version.ExtendedPaths.TransformHeader) > 0 ||
+			len(version.GlobalHeaders) > 0 ||
+			len(version.GlobalHeadersRemove) > 0 {
 			used = true
 			break
 		}

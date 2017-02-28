@@ -69,10 +69,7 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 }
 
 func (h *HostUptimeChecker) HostCheckLoop() {
-	for {
-		if h.stopLoop {
-			break
-		}
+	for !h.stopLoop {
 		if h.doResetList {
 			if h.newList != nil {
 				h.HostList = h.newList
