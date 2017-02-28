@@ -68,13 +68,14 @@ var (
 	LE_FIRSTRUN   bool
 
 	NodeID string
-)
 
-var runningTests = false
+	runningTests = false
+
+	systemError = []byte(`{"status": "system error, please contact administrator"}`)
+)
 
 const (
 	// Generic system error
-	systemError = `{"status": "system error, please contact administrator"}`
 	oauthPrefix = "oauth-data."
 )
 
