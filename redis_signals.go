@@ -48,13 +48,8 @@ func HandleRedisEvent(v interface{}) {
 	}
 
 	// Add messages to ignore here
-	ignoreMessageList := map[NotificationCommand]bool{
-		NoticeGatewayConfigResponse: true,
-	}
-
-	// Don't react to all messages
-	_, ignore := ignoreMessageList[notif.Command]
-	if ignore {
+	switch notif.Command {
+	case NoticeGatewayConfigResponse:
 		return
 	}
 
