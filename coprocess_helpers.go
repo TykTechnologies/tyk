@@ -151,7 +151,7 @@ func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
 
 // ProtoMap is a helper function for maps with string slice values.
 func ProtoMap(inputMap map[string][]string) map[string]string {
-	newMap := make(map[string]string, 0)
+	newMap := make(map[string]string)
 
 	if inputMap != nil {
 		for k, v := range inputMap {
