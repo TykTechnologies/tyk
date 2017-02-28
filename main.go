@@ -632,9 +632,9 @@ func notifyAPILoaded(spec *APISpec) {
 
 }
 
-func RPCReloadLoop(RPCKey string) {
+func RPCReloadLoop(rpcKey string) {
 	for {
-		RPCListener.CheckForReload(config.SlaveOptions.RPCKey)
+		RPCListener.CheckForReload(rpcKey)
 	}
 }
 
