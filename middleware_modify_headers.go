@@ -16,8 +16,10 @@ type TransformHeaders struct {
 	*TykMiddleware
 }
 
-const TYK_META_LABEL = "$tyk_meta."
-const TYK_CONTEXT_LABEL = "$tyk_context."
+const (
+	metaLabel    = "$tyk_meta."
+	contextLabel = "$tyk_context."
+)
 
 func (t *TransformHeaders) GetName() string {
 	return "TransformHeaders"
@@ -64,10 +66,10 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 
 	// Iterate and manage key array injection
 	for nKey, nVal := range kv {
-		if strings.Contains(nVal, TYK_META_LABEL) {
+		if strings.Contains(nVal, metaLabel) {
 			// Using meta_data key
 			if found {
-				metaKey := strings.Replace(nVal, TYK_META_LABEL, "", 1)
+				metaKey := strings.Replace(nVal, metaLabel, "", 1)
 				if sessionState.MetaData != nil {
 					tempVal, ok := sessionState.MetaData.(map[string]interface{})[metaKey]
 					if ok {
@@ -82,10 +84,10 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 				}
 			}
 
-		} else if strings.Contains(nVal, TYK_CONTEXT_LABEL) {
+		} else if strings.Contains(nVal, contextLabel) {
 			// Using context key
 			if contextFound {
-				metaKey := strings.Replace(nVal, TYK_CONTEXT_LABEL, "", 1)
+				metaKey := strings.Replace(nVal, contextLabel, "", 1)
 				if contextData != nil {
 					tempVal, ok := contextData[metaKey]
 					if ok {

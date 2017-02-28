@@ -383,7 +383,7 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("TykSetKeyData", func(call otto.FunctionCall) otto.Value {
 		apiKey := call.Argument(0).String()
 		encoddedSession := call.Argument(1).String()
-		suppress_reset := call.Argument(2).String()
+		suppressReset := call.Argument(2).String()
 
 		newSession := SessionState{}
 		err := json.Unmarshal([]byte(encoddedSession), &newSession)
@@ -395,7 +395,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		dontReset := false
-		if suppress_reset == "1" {
+		if suppressReset == "1" {
 			dontReset = true
 		}
 		doAddOrUpdate(apiKey, newSession, dontReset)

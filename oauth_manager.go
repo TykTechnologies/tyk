@@ -69,8 +69,8 @@ type OAuthNotificationType string
 
 // Notifcation codes for new and refresh codes
 const (
-	NEW_ACCESS_TOKEN     OAuthNotificationType = "new"
-	REFRESH_ACCESS_TOKEN OAuthNotificationType = "refresh"
+	newAccessToken     OAuthNotificationType = "new"
+	refreshAccessToken OAuthNotificationType = "refresh"
 )
 
 // NewOAuthNotification is a notification sent to a
@@ -224,9 +224,9 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 		log.Debug("REFRESH: ", RefreshToken)
 		log.Debug("Old REFRESH: ", OldRefreshToken)
 
-		notificationType := NEW_ACCESS_TOKEN
+		notificationType := newAccessToken
 		if OldRefreshToken != "" {
-			notificationType = REFRESH_ACCESS_TOKEN
+			notificationType = refreshAccessToken
 		}
 
 		newNotification := NewOAuthNotification{
@@ -299,7 +299,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
 				var passMatch bool
-				if sessionState.BasicAuthData.Hash == HASH_BCrypt {
+				if sessionState.BasicAuthData.Hash == HashBCrypt {
 					err := bcrypt.CompareHashAndPassword([]byte(sessionState.BasicAuthData.Password), []byte(password))
 
 					if err == nil {
@@ -307,7 +307,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 					}
 				}
 
-				if sessionState.BasicAuthData.Hash == HASH_PlainText {
+				if sessionState.BasicAuthData.Hash == HashPlainText {
 					if sessionState.BasicAuthData.Password == password {
 						passMatch = true
 					}
@@ -384,11 +384,11 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 // These enums fix the prefix to use when storing various OAuth keys and data, since we
 // delegate everything to the osin framework
 const (
-	AUTH_PREFIX            = "oauth-authorize."
-	CLIENT_PREFIX          = "oauth-clientid."
-	ACCESS_PREFIX          = "oauth-access."
-	REFRESH_PREFIX         = "oauth-refresh."
-	OAUTH_CLIENTSET_PREFIX = "oauth-clientset."
+	prefixAuth      = "oauth-authorize."
+	prefixClient    = "oauth-clientid."
+	prefixAccess    = "oauth-access."
+	prefixRefresh   = "oauth-refresh."
+	prefixClientset = "oauth-clientset."
 )
 
 type ExtendedOsinStorageInterface interface {
@@ -494,7 +494,7 @@ func (r *RedisOsinStorageInterface) Close() {}
 
 // GetClient will retrieve client data
 func (r *RedisOsinStorageInterface) GetClient(id string) (osin.Client, error) {
-	key := CLIENT_PREFIX + id
+	key := prefixClient + id
 
 	log.Info("Getting client ID:", id)
 
@@ -535,7 +535,7 @@ func (r *RedisOsinStorageInterface) GetClientNoPrefix(id string) (osin.Client, e
 
 // GetClients will retrieve a list of clients for a prefix
 func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool) ([]osin.Client, error) {
-	key := CLIENT_PREFIX + filter
+	key := prefixClient + filter
 	if ignorePrefix {
 		key = filter
 	}
@@ -544,7 +544,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	if !config.Storage.EnableCluster {
 		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
 	} else {
-		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
+		KeyForSet := prefixClientset + prefixClient // Org ID
 		var err error
 		if clientJSON, err = r.store.GetSet(KeyForSet); err != nil {
 			return nil, err
@@ -574,7 +574,7 @@ func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ign
 		return err
 	}
 
-	key := CLIENT_PREFIX + id
+	key := prefixClient + id
 
 	if ignorePrefix {
 		key = id
@@ -586,14 +586,14 @@ func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ign
 
 	log.Debug("Storing copy in set")
 
-	KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
+	KeyForSet := prefixClientset + prefixClient // Org ID
 	r.store.AddToSet(KeyForSet, string(clientDataJSON))
 	return nil
 }
 
 // DeleteClient Removes a client from the system
 func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) error {
-	key := CLIENT_PREFIX + id
+	key := prefixClient + id
 	if ignorePrefix {
 		key = id
 	}
@@ -602,7 +602,7 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) e
 	clientJSON, err := r.store.GetKey(key)
 	if err == nil {
 		log.Debug("Removing from set")
-		KeyForSet := OAUTH_CLIENTSET_PREFIX + CLIENT_PREFIX // Org ID
+		KeyForSet := prefixClientset + prefixClient // Org ID
 		r.store.RemoveFromSet(KeyForSet, clientJSON)
 	}
 
@@ -617,7 +617,7 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	if err != nil {
 		return err
 	}
-	key := AUTH_PREFIX + authData.Code
+	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
 	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
 	return nil
@@ -626,7 +626,7 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 
 // LoadAuthorize loads auth data from redis
 func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
-	key := AUTH_PREFIX + code
+	key := prefixAuth + code
 	log.Debug("Loading auth code: ", key)
 	authJSON, err := r.store.GetKey(key)
 
@@ -647,7 +647,7 @@ func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeD
 
 // RemoveAuthorize removes authorisation keys from redis
 func (r *RedisOsinStorageInterface) RemoveAuthorize(code string) error {
-	key := AUTH_PREFIX + code
+	key := prefixAuth + code
 	r.store.DeleteKey(key)
 	return nil
 }
@@ -659,7 +659,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		return err
 	}
 
-	key := ACCESS_PREFIX + accessData.AccessToken
+	key := prefixAccess + accessData.AccessToken
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
@@ -710,7 +710,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		if err != nil {
 			return err
 		}
-		key := REFRESH_PREFIX + accessData.RefreshToken
+		key := prefixRefresh + accessData.RefreshToken
 		log.Debug("Saving REFRESH key: ", key)
 		refreshExpire := int64(1209600) // 14 days
 		if config.OauthRefreshExpire != 0 {
@@ -726,7 +726,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 // LoadAccess will load access data from redis
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
-	key := ACCESS_PREFIX + token
+	key := prefixAccess + token
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, err := r.store.GetKey(key)
 
@@ -747,7 +747,7 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 
 // RemoveAccess will remove access data from Redis
 func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
-	key := ACCESS_PREFIX + token
+	key := prefixAccess + token
 	r.store.DeleteKey(key)
 
 	// remove the access token from central storage too
@@ -758,7 +758,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 
 // LoadRefresh will load access data from Redis
 func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData, error) {
-	key := REFRESH_PREFIX + token
+	key := prefixRefresh + token
 	log.Debug("Loading REFRESH key: ", key)
 	accessJSON, err := r.store.GetKey(key)
 
@@ -782,7 +782,7 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 
 // RemoveRefresh will remove a refresh token from redis
 func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
-	key := REFRESH_PREFIX + token
+	key := prefixRefresh + token
 	r.store.DeleteKey(key)
 	return nil
 }

@@ -191,11 +191,11 @@ func ObfuscateKeyString(keyName string) string {
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
 func SetSessionPassword(session *SessionState) {
-	session.BasicAuthData.Hash = HASH_BCrypt
+	session.BasicAuthData.Hash = HashBCrypt
 	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
 	if err != nil {
 		log.Error("Could not hash password, setting to plaintext, error was: ", err)
-		session.BasicAuthData.Hash = HASH_PlainText
+		session.BasicAuthData.Hash = HashPlainText
 		return
 	}
 
@@ -297,7 +297,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		if err != nil {
 			log.Error("Could not create response message: ", err)
 			code = 500
-			responseMessage = []byte(E_SYSTEM_ERROR)
+			responseMessage = []byte(systemError)
 		}
 	}
 
@@ -428,7 +428,7 @@ func handleGetAllKeys(filter, APIID string) ([]byte, int) {
 		return responseMessage, code
 	}
 
-	return []byte(E_SYSTEM_ERROR), code
+	return []byte(systemError), code
 
 }
 
@@ -485,7 +485,7 @@ func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to delete key.")
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	FireSystemEvent(EventTokenDeleted, EventTokenMeta{
@@ -549,7 +549,7 @@ func handleDeleteHashedKey(keyName, APIID string) ([]byte, int) {
 
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	log.WithFields(logrus.Fields{
@@ -574,7 +574,7 @@ func handleURLReload() ([]byte, int) {
 
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	log.WithFields(logrus.Fields{
@@ -601,7 +601,7 @@ func signalGroupReload() ([]byte, int) {
 
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	log.WithFields(logrus.Fields{
@@ -627,7 +627,7 @@ func HandleGetAPIList() ([]byte, int) {
 
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	return responseMessage, 200
@@ -644,7 +644,7 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 
 			if err != nil {
 				log.Error("Marshalling failed: ", err)
-				return []byte(E_SYSTEM_ERROR), 500
+				return []byte(systemError), 500
 			}
 
 			return responseMessage, 200
@@ -728,7 +728,7 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 		if err != nil {
 			log.Error("Could not create response message: ", err)
 			code = 500
-			responseMessage = []byte(E_SYSTEM_ERROR)
+			responseMessage = []byte(systemError)
 		}
 	}
 
@@ -764,7 +764,7 @@ func HandleDeleteAPI(APIID string) ([]byte, int) {
 		if err != nil {
 			log.Error("Could not create response message: ", err)
 			code = 500
-			responseMessage = []byte(E_SYSTEM_ERROR)
+			responseMessage = []byte(systemError)
 		}
 	}
 
@@ -975,7 +975,7 @@ func handleUpdateHashedKey(keyName, APIID, policyId string) ([]byte, int) {
 
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1092,7 +1092,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		if err != nil {
 			log.Error("Could not create response message: ", err)
 			code = 500
-			responseMessage = []byte(E_SYSTEM_ERROR)
+			responseMessage = []byte(systemError)
 		}
 	}
 
@@ -1192,7 +1192,7 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 		"status": "fail",
 	}).Error("Failed orgs retrieval.")
 
-	return []byte(E_SYSTEM_ERROR), code
+	return []byte(systemError), code
 
 }
 
@@ -1228,7 +1228,7 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 			"err":    err,
 		}).Error("Failed to delete org key.")
 
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1291,7 +1291,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(r.Body)
 		var newSession SessionState
 		if err := decoder.Decode(&newSession); err != nil {
-			responseMessage = []byte(E_SYSTEM_ERROR)
+			responseMessage = []byte(systemError)
 			code = 500
 
 			log.WithFields(logrus.Fields{
@@ -1407,7 +1407,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					"server_name": "system",
 				}).Error("System error, failed to generate key.")
 
-				responseMessage = []byte(E_SYSTEM_ERROR)
+				responseMessage = []byte(systemError)
 				code = 500
 			} else {
 
@@ -1457,7 +1457,7 @@ type NewClientRequest struct {
 }
 
 func createOauthClientStorageID(APIID, clientID string) string {
-	return CLIENT_PREFIX + clientID
+	return prefixClient + clientID
 }
 
 func createOauthClient(w http.ResponseWriter, r *http.Request) {
@@ -1468,7 +1468,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(r.Body)
 		var newOauthClient NewClientRequest
 		if err := decoder.Decode(&newOauthClient); err != nil {
-			responseMessage = []byte(E_SYSTEM_ERROR)
+			responseMessage = []byte(systemError)
 			code = 500
 
 			log.WithFields(logrus.Fields{
@@ -1538,7 +1538,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 			log.Error("Marshalling failed: ", err)
-			responseMessage = []byte(E_SYSTEM_ERROR)
+			responseMessage = []byte(systemError)
 			code = 500
 		} else {
 			log.WithFields(logrus.Fields{
@@ -1789,7 +1789,7 @@ func handleDeleteOAuthClient(keyName, APIID string) ([]byte, int) {
 			"client": keyName,
 			"err":    err,
 		}).Error("Failed to report OAuth delete success")
-		return []byte(E_SYSTEM_ERROR), 500
+		return []byte(systemError), 500
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1809,7 +1809,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 	var err error
 	code := 200
 
-	filterID := CLIENT_PREFIX
+	filterID := prefixClient
 
 	apiSpec := GetSpecForApi(APIID)
 	if apiSpec == nil {

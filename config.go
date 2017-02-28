@@ -238,7 +238,7 @@ type CertData struct {
 	KeyFile  string `json:"key_file"`
 }
 
-const ENV_PREVIX = "TYK_GW"
+const envPrefix = "TYK_GW"
 
 // WriteDefaultConf will create a default configuration file and set the storage type to "memory"
 func WriteDefaultConf(conf *Config) {
@@ -263,7 +263,7 @@ func WriteDefaultConf(conf *Config) {
 	conf.UseAsyncSessionWrite = false
 	conf.HideGeneratorHeader = false
 	conf.OauthRedirectUriSeparator = ""
-	if err := envconfig.Process(ENV_PREVIX, conf); err != nil {
+	if err := envconfig.Process(envPrefix, conf); err != nil {
 		log.Error("Failed to process environment variables: ", err)
 	}
 	newConfig, err := json.MarshalIndent(conf, "", "    ")
@@ -292,7 +292,7 @@ func loadConfig(filePath string, conf *Config) {
 			log.Error("Couldn't unmarshal configuration: ", err)
 		}
 
-		if err := envconfig.Process(ENV_PREVIX, conf); err != nil {
+		if err := envconfig.Process(envPrefix, conf); err != nil {
 			log.Error("Failed to process environment variables after file load: ", err)
 		}
 	}

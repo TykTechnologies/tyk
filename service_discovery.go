@@ -11,7 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const ARRAY_NAME = "tyk_array"
+const arrayName = "tyk_array"
 
 type ServiceDiscovery struct {
 	spec                *apidef.ServiceDiscoveryConfiguration
@@ -145,7 +145,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 	var set []*gabs.Container
 	if s.endpointReturnsList {
 		// pre-process the object since we've nested it
-		set = s.decodeToNameSpaceAsArray(ARRAY_NAME, objList)
+		set = s.decodeToNameSpaceAsArray(arrayName, objList)
 		log.Debug("set: ", set)
 	} else {
 		// It's an object, but the value may be nested
@@ -167,7 +167,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 				log.Debug("Yup, it's a list")
 				s.ConvertRawListToObj(&nestedString)
 				s.ParseObject(nestedString, &subContainer)
-				set = s.decodeToNameSpaceAsArray(ARRAY_NAME, &subContainer)
+				set = s.decodeToNameSpaceAsArray(arrayName, &subContainer)
 
 				// Hijack this here because we need to use a non-nested get
 				for _, item := range set {
@@ -212,7 +212,7 @@ func (s *ServiceDiscovery) GetSubObject(obj *gabs.Container) string {
 
 func (s *ServiceDiscovery) ConvertRawListToObj(RawData *string) {
 	// Modify to turn a list object into a regular object
-	*RawData = `{"` + ARRAY_NAME + `":` + *RawData + `}`
+	*RawData = `{"` + arrayName + `":` + *RawData + `}`
 }
 
 func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Container) error {

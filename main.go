@@ -74,8 +74,8 @@ var runningTests = false
 
 const (
 	// Generic system error
-	E_SYSTEM_ERROR = `{"status": "system error, please contact administrator"}`
-	OAUTH_PREFIX   = "oauth-data."
+	systemError = `{"status": "system error, please contact administrator"}`
+	oauthPrefix = "oauth-data."
 )
 
 // Display configuration options
@@ -375,7 +375,7 @@ func CheckIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
 }
 
 func generateOAuthPrefix(apiID string) string {
-	return OAUTH_PREFIX + apiID + "."
+	return oauthPrefix + apiID + "."
 }
 
 // Create API-specific OAuth handlers and respective auth servers
@@ -390,8 +390,8 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 	serverConfig.RedirectUriSeparator = config.OauthRedirectUriSeparator
 
-	OAuthPrefix := generateOAuthPrefix(spec.APIID)
-	storageManager := GetGlobalStorageHandler(OAuthPrefix, false)
+	prefix := generateOAuthPrefix(spec.APIID)
+	storageManager := GetGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
