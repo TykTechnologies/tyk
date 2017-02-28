@@ -65,29 +65,25 @@ func (d *DBPolicy) ToRegularPolicy() Policy {
 }
 
 func LoadPoliciesFromFile(filePath string) map[string]Policy {
-	policies := make(map[string]Policy)
-
 	policyConfig, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Couldn't load policy file: ", err)
-		return policies
+		return nil
 	}
 
+	var policies map[string]Policy
 	if err := json.Unmarshal(policyConfig, &policies); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Couldn't unmarshal policies: ", err)
 	}
-
 	return policies
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
 func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]Policy {
-
-	policies := make(map[string]Policy)
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -113,8 +109,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	response, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Policy request failed: ", err)
-
-		return policies
+		return nil
 	}
 
 	defer response.Body.Close()
@@ -123,7 +118,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	if err != nil {
 		log.Error("Failed to read policy body: ", err)
 
-		return policies
+		return nil
 	}
 
 	// Extract Policies
@@ -136,7 +131,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	if response.StatusCode == 403 {
 		log.Error("Policy request login failure, Response was: ", string(retBody))
 		ReLogin()
-		return policies
+		return nil
 	}
 
 	list := NodeResponseOK{}
@@ -144,11 +139,13 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	if err := json.Unmarshal(retBody, &list); err != nil {
 		log.Error("Failed to decode policy body: ", err, "Returned: ", string(retBody))
 
-		return policies
+		return nil
 	}
 
 	ServiceNonce = list.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
+
+	policies := make(map[string]Policy, len(list.Message))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -181,8 +178,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 }
 
 func LoadPoliciesFromRPC(orgId string) map[string]Policy {
-	dbPolicyList := make([]Policy, 0)
-	policies := make(map[string]Policy)
+	var dbPolicyList []Policy
 
 	store := &RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	store.Connect()
@@ -191,14 +187,14 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 
 	//store.Disconnect()
 
-	jErr1 := json.Unmarshal([]byte(rpcPolicies), &dbPolicyList)
-
-	if jErr1 != nil {
+	if err := json.Unmarshal([]byte(rpcPolicies), &dbPolicyList); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
-		}).Error("Failed decode: ", jErr1)
-		return policies
+		}).Error("Failed decode: ", err)
+		return nil
 	}
+
+	policies := make(map[string]Policy, len(dbPolicyList))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
