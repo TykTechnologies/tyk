@@ -827,7 +827,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 		log.Level = logrus.ErrorLevel
 		log.Out = ioutil.Discard
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-	} else if dbg, _ := arguments["--debug"]; dbg == true {
+	} else if arguments["--debug"] == true {
 		log.Level = logrus.DebugLevel
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -835,11 +835,10 @@ func initialiseSystem(arguments map[string]interface{}) {
 	}
 
 	filename := "/etc/tyk/tyk.conf"
-	value, _ := arguments["--conf"]
-	if value != nil {
+	if conf := arguments["--conf"]; conf != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debugf("Using %s for configuration", value.(string))
+		}).Debugf("Using %s for configuration", conf.(string))
 		filename = arguments["--conf"].(string)
 	} else {
 		log.WithFields(logrus.Fields{
@@ -857,8 +856,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 
 	setupGlobals()
 
-	port, _ := arguments["--port"]
-	if port != nil {
+	if port := arguments["--port"]; port != nil {
 		portNum, err := strconv.Atoi(port.(string))
 		if err != nil {
 			log.WithFields(logrus.Fields{

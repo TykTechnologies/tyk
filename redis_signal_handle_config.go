@@ -35,13 +35,12 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 		return err
 	}
 
-	value, _ := argumentsBackup["--conf"]
 	filename := "./tyk.conf"
-	if value != nil {
+	if conf := argumentsBackup["--conf"]; conf != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Infof("Using %s for configuration", value.(string))
-		filename = argumentsBackup["--conf"].(string)
+		}).Infof("Using %s for configuration", conf.(string))
+		filename = conf.(string)
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -53,13 +52,12 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 }
 
 func GetExistingRawConfig() Config {
-	value, _ := argumentsBackup["--conf"]
 	filename := "./tyk.conf"
-	if value != nil {
+	if conf := argumentsBackup["--conf"]; conf != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Infof("Using %s for configuration", value.(string))
-		filename = argumentsBackup["--conf"].(string)
+		}).Infof("Using %s for configuration", conf.(string))
+		filename = conf.(string)
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
