@@ -372,14 +372,13 @@ func (a *APIDefinition) EncodeForDB() {
 	}
 
 	a.VersionData.Versions = new_version
-	//	log.Warning(a.VersionData.Versions)
 }
 
 func (a *APIDefinition) DecodeFromDB() {
 	new_version := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
-		newK, decErr := base64.StdEncoding.DecodeString(k)
-		if decErr != nil {
+		newK, err := base64.StdEncoding.DecodeString(k)
+		if err != nil {
 			log.Error("Couldn't Decode, leaving as it may be legacy...")
 			new_version[k] = v
 		} else {
@@ -389,5 +388,4 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 
 	a.VersionData.Versions = new_version
-	//	log.Warning(a.VersionData.Versions)
 }
