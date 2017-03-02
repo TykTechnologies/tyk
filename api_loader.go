@@ -119,11 +119,7 @@ func generateListenPathMap(apiSpecs []*APISpec) {
 }
 
 func processSpec(referenceSpec *APISpec,
-	redisStore *RedisClusterStorageManager,
-	redisOrgStore *RedisClusterStorageManager,
-	healthStore *RedisClusterStorageManager,
-	rpcAuthStore *RPCStorageHandler,
-	rpcOrgStore *RPCStorageHandler,
+	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore StorageHandler,
 	subrouter *mux.Router) *ChainObject {
 
 	var chainDef = ChainObject{}
