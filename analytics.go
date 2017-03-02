@@ -108,7 +108,7 @@ type NormaliseURLPatterns struct {
 	Custom []*regexp.Regexp
 }
 
-func InitNormalisationPatterns() NormaliseURLPatterns {
+func initNormalisationPatterns() NormaliseURLPatterns {
 	thesePatterns := NormaliseURLPatterns{}
 
 	uuidPat := regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)

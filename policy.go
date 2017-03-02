@@ -132,7 +132,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 
 	if response.StatusCode == 403 {
 		log.Error("Policy request login failure, Response was: ", string(retBody))
-		ReLogin()
+		reLogin()
 		return nil
 	}
 

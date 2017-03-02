@@ -45,7 +45,7 @@ func createError(errorMsg string) []byte {
 	return responseMsg
 }
 
-func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
+func doJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	w.Write(responseMessage)
@@ -551,7 +551,7 @@ func handleURLReload() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	ReloadURLStructure(nil)
+	reloadURLStructure(nil)
 
 	statusObj := APIErrorMessage{"ok", ""}
 	responseMessage, err = json.Marshal(&statusObj)
@@ -796,7 +796,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
@@ -834,7 +834,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 type PolicyUpdateObj struct {
@@ -854,7 +854,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		if err := decoder.Decode(&policRecord); err != nil {
 			decodeFail := APIStatusMessage{"error", "Couldn't decode instruction"}
 			responseMessage, _ = json.Marshal(&decodeFail)
-			DoJSONWrite(w, 400, responseMessage)
+			doJSONWrite(w, 400, responseMessage)
 			return
 		}
 
@@ -866,7 +866,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func handleUpdateHashedKey(keyName, APIID, policyId string) ([]byte, int) {
@@ -996,7 +996,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
@@ -1242,7 +1242,7 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func resetHandler(w http.ResponseWriter, r *http.Request) {
@@ -1258,7 +1258,7 @@ func resetHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
@@ -1302,7 +1302,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						err := apiSpec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(apiSpec, &newSession))
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
-							DoJSONWrite(w, 403, responseMessage)
+							doJSONWrite(w, 403, responseMessage)
 							return
 						}
 					} else {
@@ -1313,7 +1313,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						err := sessionManager.UpdateSession(newKey, newSession, -1)
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
-							DoJSONWrite(w, 403, responseMessage)
+							doJSONWrite(w, 403, responseMessage)
 							return
 						}
 					}
@@ -1342,7 +1342,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						err := spec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(spec, &newSession))
 						if err != nil {
 							responseMessage = createError("Failed to create key - " + err.Error())
-							DoJSONWrite(w, 403, responseMessage)
+							doJSONWrite(w, 403, responseMessage)
 							return
 						}
 					}
@@ -1361,7 +1361,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 					responseMessage = createError("Failed to create key, keys must have at least one Access Rights record set.")
 					code = 403
-					DoJSONWrite(w, code, responseMessage)
+					doJSONWrite(w, code, responseMessage)
 					return
 				}
 
@@ -1423,7 +1423,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		}).Warning("Attempted to create key with wrong HTTP method.")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
@@ -1534,7 +1534,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
@@ -1543,7 +1543,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "DELETE" {
 		APIID := r.FormValue("api_id")
 		if APIID == "" {
-			DoJSONWrite(w, 400, createError("Missing parameter api_id"))
+			doJSONWrite(w, 400, createError("Missing parameter api_id"))
 			return
 		}
 		apiSpec := GetSpecForApi(APIID)
@@ -1561,7 +1561,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 				"err":    "API not found",
 			}).Error("Failed to invalidate refresh token")
 
-			DoJSONWrite(w, 400, createError("API for this refresh token not found"))
+			doJSONWrite(w, 400, createError("API for this refresh token not found"))
 			return
 		}
 
@@ -1573,7 +1573,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 				"err":    "API is not OAuth",
 			}).Error("Failed to invalidate refresh token")
 
-			DoJSONWrite(w, 400, createError("OAuth is not enabled on this API"))
+			doJSONWrite(w, 400, createError("OAuth is not enabled on this API"))
 			return
 		}
 
@@ -1587,7 +1587,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 				"err":    err,
 			}).Error("Failed to invalidate refresh token")
 
-			DoJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
+			doJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
 			return
 		}
 
@@ -1601,7 +1601,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 			log.Error(err)
-			DoJSONWrite(w, 400, createError("Failed to marshal data"))
+			doJSONWrite(w, 400, createError("Failed to marshal data"))
 			return
 		}
 
@@ -1612,11 +1612,11 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 			"status": "ok",
 		}).Info("Invalidated refresh token")
 
-		DoJSONWrite(w, 200, responseMessage)
+		doJSONWrite(w, 200, responseMessage)
 		return
 	}
 
-	DoJSONWrite(w, 405, createError("Method not supported"))
+	doJSONWrite(w, 405, createError("Method not supported"))
 }
 
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -1637,7 +1637,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		// Return Not supported message (and code)
 		code = 405
 		responseMessage = createError("Method not supported")
-		DoJSONWrite(w, code, responseMessage)
+		doJSONWrite(w, code, responseMessage)
 		return
 	}
 
@@ -1659,7 +1659,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 // Get client details
@@ -1905,7 +1905,7 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func UserRatesCheck() http.HandlerFunc {
@@ -1916,7 +1916,7 @@ func UserRatesCheck() http.HandlerFunc {
 		if sessionState == nil {
 			code = 405
 			responseMessage := createError("Health checks are not enabled for this node")
-			DoJSONWrite(w, code, responseMessage)
+			doJSONWrite(w, code, responseMessage)
 			return
 		}
 
@@ -1932,11 +1932,11 @@ func UserRatesCheck() http.HandlerFunc {
 		if err != nil {
 			code = 405
 			responseMessage = createError("Failed to encode data")
-			DoJSONWrite(w, code, responseMessage)
+			doJSONWrite(w, code, responseMessage)
 			return
 		}
 
-		DoJSONWrite(w, code, responseMessage)
+		doJSONWrite(w, code, responseMessage)
 
 		return
 	}
@@ -1983,7 +1983,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 			code = 500
 			responseMessage = createError("Cache invalidation failed")
-			DoJSONWrite(w, code, responseMessage)
+			doJSONWrite(w, code, responseMessage)
 			return
 		}
 
@@ -2005,7 +2005,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage = createError("Method not supported")
 	}
 
-	DoJSONWrite(w, code, responseMessage)
+	doJSONWrite(w, code, responseMessage)
 }
 
 func HandleInvalidateAPICache(APIID string) error {

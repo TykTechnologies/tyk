@@ -179,7 +179,7 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Respond
-	DoJSONWrite(w, 200, replyMessage)
+	doJSONWrite(w, 200, replyMessage)
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
@@ -215,5 +215,5 @@ func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 // ReturnError returns an error to the http response writer
 func ReturnError(err string, w http.ResponseWriter) {
 	replyMessage := createError(err)
-	DoJSONWrite(w, 400, replyMessage)
+	doJSONWrite(w, 400, replyMessage)
 }

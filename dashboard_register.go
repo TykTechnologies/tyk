@@ -33,7 +33,7 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
-func ReLogin() {
+func reLogin() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Registering node (again).")

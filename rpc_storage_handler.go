@@ -665,7 +665,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			// Do the reload!
 			log.Warning("[RPC STORE] Received Reload instruction!")
 			go signalGroupReload()
-			//go ReloadURLStructure()
+			//go reloadURLStructure()
 		}
 	}
 

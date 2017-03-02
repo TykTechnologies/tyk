@@ -35,7 +35,7 @@ func TestURLReplacer(t *testing.T) {
 	recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
 	recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
-	config.AnalyticsConfig.NormaliseUrls.compiledPatternSet = InitNormalisationPatterns()
+	config.AnalyticsConfig.NormaliseUrls.compiledPatternSet = initNormalisationPatterns()
 
 	recordUUID1.NormalisePath()
 	recordUUID2.NormalisePath()
