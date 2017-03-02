@@ -218,7 +218,7 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 
 // LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secret string) []*APISpec {
-	var APISpecs = []*APISpec{}
+	var apiSpecs = []*APISpec{}
 
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
@@ -239,19 +239,19 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 	response, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Request failed: ", err)
-		return APISpecs
+		return apiSpecs
 	}
 
 	retBody, err := a.readBody(response)
 	if err != nil {
 		log.Error("Failed to read body: ", err)
-		return APISpecs
+		return apiSpecs
 	}
 
 	if response.StatusCode == 403 {
 		log.Error("Login failure, Response was: ", string(retBody))
 		reLogin()
-		return APISpecs
+		return apiSpecs
 	}
 
 	// Extract tagged APIs#
@@ -270,17 +270,17 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 	if err := json.Unmarshal(retBody, &list); err != nil {
 		log.Error("Failed to decode body: ", err, "Response was: ", string(retBody))
 		log.Info("--> Retrying in 5s")
-		return APISpecs
+		return apiSpecs
 	}
 
 	rawList := make(map[string]interface{})
 	if err := json.Unmarshal(retBody, &rawList); err != nil {
 		log.Error("Failed to decode body (raw): ", err)
-		return APISpecs
+		return apiSpecs
 	}
 
 	// Extract tagged entries only
-	APIDefinitions := make([]*apidef.APIDefinition, 0)
+	apiDefs := make([]*apidef.APIDefinition, 0)
 
 	if config.DBAppConfOptions.NodeIsSegmented {
 		tagList := make(map[string]bool, len(config.DBAppConfOptions.Tags))
@@ -301,26 +301,26 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 		}
 
 		for _, apiDef := range toLoad {
-			APIDefinitions = append(APIDefinitions, apiDef)
+			apiDefs = append(apiDefs, apiDef)
 		}
 	} else {
 		for index, apiEntry := range list.Message {
 			apiEntry.ApiDefinition.RawData = rawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
-			APIDefinitions = append(APIDefinitions, apiEntry.ApiDefinition)
+			apiDefs = append(apiDefs, apiEntry.ApiDefinition)
 		}
 	}
 
 	// Process
-	for _, appConfig := range APIDefinitions {
+	for _, appConfig := range apiDefs {
 		newAppSpec := a.MakeSpec(appConfig)
-		APISpecs = append(APISpecs, newAppSpec)
+		apiSpecs = append(apiSpecs, newAppSpec)
 	}
 
 	// Set the nonce
 	ServiceNonce = list.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
-	return APISpecs
+	return apiSpecs
 }
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -349,23 +349,23 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
 }
 
 func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APISpec {
-	var APISpecs = []*APISpec{}
+	var apiSpecs = []*APISpec{}
 
-	var APIDefinitions = []*apidef.APIDefinition{}
-	var StringDefs = make([]map[string]interface{}, 0)
+	var apiDefs = []*apidef.APIDefinition{}
+	var strDefs = make([]map[string]interface{}, 0)
 
-	if err := json.Unmarshal([]byte(apiCollection), &APIDefinitions); err != nil {
+	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
 		log.Error("Failed decode: ", err)
 		return nil
 	}
-	if err := json.Unmarshal([]byte(apiCollection), &StringDefs); err != nil {
+	if err := json.Unmarshal([]byte(apiCollection), &strDefs); err != nil {
 		log.Error("Failed decode: ", err)
 		return nil
 	}
 
-	for i, appConfig := range APIDefinitions {
+	for i, appConfig := range apiDefs {
 		appConfig.DecodeFromDB()
-		appConfig.RawData = StringDefs[i] // Lets keep a copy for plugable modules
+		appConfig.RawData = strDefs[i] // Lets keep a copy for plugable modules
 
 		if config.SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + appConfig.Slug //+ "/"
@@ -378,10 +378,10 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*API
 		}
 
 		newAppSpec := a.MakeSpec(appConfig)
-		APISpecs = append(APISpecs, newAppSpec)
+		apiSpecs = append(apiSpecs, newAppSpec)
 	}
 
-	return APISpecs
+	return apiSpecs
 }
 
 func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*apidef.APIDefinition, map[string]interface{}) {
@@ -400,7 +400,7 @@ func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*apidef.APIDefinit
 // LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
-	var APISpecs = []*APISpec{}
+	var apiSpecs = []*APISpec{}
 	// Grab json files from directory
 	files, _ := ioutil.ReadDir(dir)
 	for _, f := range files {
@@ -415,12 +415,12 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
 
 			appConfig.RawData = rawConfig // Lets keep a copy for plugable modules
 			newAppSpec := a.MakeSpec(appConfig)
-			APISpecs = append(APISpecs, newAppSpec)
+			apiSpecs = append(apiSpecs, newAppSpec)
 
 		}
 	}
 
-	return APISpecs
+	return apiSpecs
 }
 
 func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {

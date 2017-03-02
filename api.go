@@ -753,10 +753,10 @@ func HandleDeleteAPI(APIID string) ([]byte, int) {
 }
 
 func apiHandler(w http.ResponseWriter, r *http.Request) {
-	var APIID string
+	var apiID string
 
 	if r.URL.Path != "/tyk/apis" {
-		APIID = r.URL.Path[len("/tyk/apis/"):]
+		apiID = r.URL.Path[len("/tyk/apis/"):]
 	}
 
 	var responseMessage []byte
@@ -764,31 +764,31 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		if APIID != "" {
-			log.Debug("Requesting API definition for", APIID)
-			responseMessage, code = HandleGetAPI(APIID)
+		if apiID != "" {
+			log.Debug("Requesting API definition for", apiID)
+			responseMessage, code = HandleGetAPI(apiID)
 		} else {
 			log.Debug("Requesting API list")
 			responseMessage, code = HandleGetAPIList()
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+		responseMessage, code = HandleAddOrUpdateApi(apiID, r)
 	case "PUT":
-		if APIID != "" {
-			log.Debug("Updating existing API: ", APIID)
-			responseMessage, code = HandleAddOrUpdateApi(APIID, r)
+		if apiID != "" {
+			log.Debug("Updating existing API: ", apiID)
+			responseMessage, code = HandleAddOrUpdateApi(apiID, r)
 		} else {
 			code = 400
-			responseMessage = createError("Must specify an APIID to update")
+			responseMessage = createError("Must specify an apiID to update")
 		}
 	case "DELETE":
-		if APIID != "" {
-			log.Debug("Deleting API definition for: ", APIID)
-			responseMessage, code = HandleDeleteAPI(APIID)
+		if apiID != "" {
+			log.Debug("Deleting API definition for: ", apiID)
+			responseMessage, code = HandleDeleteAPI(apiID)
 		} else {
 			code = 400
-			responseMessage = createError("Must specify an APIID to delete")
+			responseMessage = createError("Must specify an apiID to delete")
 		}
 	default:
 		// Return Not supported message (and code)
@@ -802,7 +802,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := r.URL.Path[len("/tyk/keys/"):]
 	filter := r.FormValue("filter")
-	APIID := r.FormValue("api_id")
+	apiID := r.FormValue("api_id")
 	var responseMessage []byte
 	var code int
 
@@ -813,19 +813,19 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if keyName != "" {
 			// Return single key detail
-			responseMessage, code = handleGetDetail(keyName, APIID)
+			responseMessage, code = handleGetDetail(keyName, apiID)
 		} else {
 			// Return list of keys
-			responseMessage, code = handleGetAllKeys(filter, APIID)
+			responseMessage, code = handleGetAllKeys(filter, apiID)
 		}
 
 	case "DELETE":
 		hashed := r.FormValue("hashed")
 		// Remove a key
 		if hashed == "" {
-			responseMessage, code = handleDeleteKey(keyName, APIID)
+			responseMessage, code = handleDeleteKey(keyName, apiID)
 		} else {
-			responseMessage, code = handleDeleteHashedKey(keyName, APIID)
+			responseMessage, code = handleDeleteHashedKey(keyName, apiID)
 		}
 
 	default:
@@ -844,7 +844,7 @@ type PolicyUpdateObj struct {
 func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Warning("Hashed key change request detected!")
 	keyName := r.URL.Path[len("/tyk/keys/policy/"):]
-	APIID := r.FormValue("api_id")
+	apiID := r.FormValue("api_id")
 	var responseMessage []byte
 	var code int
 
@@ -858,7 +858,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		responseMessage, code = handleUpdateHashedKey(keyName, APIID, policRecord.Policy)
+		responseMessage, code = handleUpdateHashedKey(keyName, apiID, policRecord.Policy)
 
 	} else {
 		// Return Not supported message (and code)
@@ -869,13 +869,13 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, responseMessage)
 }
 
-func handleUpdateHashedKey(keyName, APIID, policyId string) ([]byte, int) {
+func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
 	sessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
+	if apiID != "" {
+		thiSpec := GetSpecForApi(apiID)
 		if thiSpec == nil {
 			notFound := APIStatusMessage{"error", "API not found"}
 			responseMessage, _ = json.Marshal(&notFound)
@@ -1289,10 +1289,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 			if len(newSession.AccessRights) > 0 {
-				for apiId := range newSession.AccessRights {
-					apiSpec := GetSpecForApi(apiId)
+				for apiID := range newSession.AccessRights {
+					apiSpec := GetSpecForApi(apiID)
 					if apiSpec != nil {
-						checkAndApplyTrialPeriod(newKey, apiId, &newSession)
+						checkAndApplyTrialPeriod(newKey, apiID, &newSession)
 						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
 						if !apiSpec.DontSetQuotasOnCreate {
 							// Reset quota by default
