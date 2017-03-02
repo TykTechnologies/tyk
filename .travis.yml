@@ -26,7 +26,6 @@ services:
 
 install:
   - go install ./...
-  - go get -u golang.org/x/tools/cmd/goimports github.com/{wadey/gocovmerge,mattn/goveralls}
 
 script:
   - go build -tags 'coprocess python'

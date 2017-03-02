@@ -237,6 +237,12 @@
 			"revisionTime": "2017-01-05T07:49:30Z"
 		},
 		{
+			"checksumSHA1": "ONHg+36MIdsQOl6NZeYa8ryl+OE=",
+			"path": "github.com/mattn/goveralls",
+			"revision": "8482d0ebd2a64f95ce02d2b9b7065b0d6fe9151b",
+			"revisionTime": "2016-12-09T06:16:23Z"
+		},
+		{
 			"checksumSHA1": "Jok28OroSdzQaC1bdTp+yEIVy30=",
 			"path": "github.com/mavricknz/asn1-ber",
 			"revision": "b9df1c2f4213e9acfe05cbd20696ac5fc0d5c70e",
@@ -385,6 +391,12 @@
 			"path": "github.com/streamrail/concurrent-map",
 			"revision": "8bf1e9bacbf65b10c81d0f4314cf2b1ebef728b5",
 			"revisionTime": "2016-08-23T15:06:47Z"
+		},
+		{
+			"checksumSHA1": "ih4CCYD19rjjF9fjid+l7w/+cIg=",
+			"path": "github.com/wadey/gocovmerge",
+			"revision": "b5bfa59ec0adc420475f97f89b58045c721d761c",
+			"revisionTime": "2016-03-31T18:18:00Z"
 		},
 		{
 			"checksumSHA1": "vE43s37+4CJ2CDU6TlOUOYE0K9c=",
@@ -571,6 +583,30 @@
 			"path": "golang.org/x/time/rate",
 			"revision": "f51c12702a4d776e4c1fa9b0fabab841babae631",
 			"revisionTime": "2016-10-28T04:02:39Z"
+		},
+		{
+			"checksumSHA1": "BYBZeG+34v5zNQ9lEsuZaB5EDR0=",
+			"path": "golang.org/x/tools/cmd/goimports",
+			"revision": "1dce95f761bfeb6fe2aa3c4e9ffdb261b69b3fc4",
+			"revisionTime": "2017-03-01T11:38:50Z"
+		},
+		{
+			"checksumSHA1": "O5eYI3n1WdaC30AxQjETe3dAQHU=",
+			"path": "golang.org/x/tools/cover",
+			"revision": "1dce95f761bfeb6fe2aa3c4e9ffdb261b69b3fc4",
+			"revisionTime": "2017-03-01T11:38:50Z"
+		},
+		{
+			"checksumSHA1": "ikor+YKJu2eKwyFteBWhsb8IGy8=",
+			"path": "golang.org/x/tools/go/ast/astutil",
+			"revision": "1dce95f761bfeb6fe2aa3c4e9ffdb261b69b3fc4",
+			"revisionTime": "2017-03-01T11:38:50Z"
+		},
+		{
+			"checksumSHA1": "KZkRMLZpwjt9gg4vRVzyTdrVym0=",
+			"path": "golang.org/x/tools/imports",
+			"revision": "1dce95f761bfeb6fe2aa3c4e9ffdb261b69b3fc4",
+			"revisionTime": "2017-03-01T11:38:50Z"
 		},
 		{
 			"checksumSHA1": "+qB6gzApLVQj5Am4zO/a5VP+dCc=",
