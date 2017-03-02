@@ -75,9 +75,6 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 }
 
 func TestCoProcessReload(t *testing.T) {
-	if testDispatcher == nil {
-		testDispatcher, _ = NewCoProcessDispatcher()
-	}
 	testDispatcher.reloaded = false
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -259,6 +256,7 @@ func TestCoProcessAuth(t *testing.T) {
 	if recorder.Code != 403 {
 		t.Fatal("Authentication should fail! But it's returning:", recorder.Code)
 	}
+	<-CoProcessDispatchEvent
 }
 
 const basicCoProcessDef = `{
