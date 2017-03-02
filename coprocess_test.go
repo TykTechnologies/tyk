@@ -48,36 +48,29 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	mw := &TykMiddleware{spec, proxy}
 
-	eventMessage := "Auth Failure"
-	eventPath := "/"
-	eventOrigin := "127.0.0.1"
-	eventKey := "abc"
+	meta := EventAuthFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
+		Path:             "/",
+		Origin:           "127.0.0.1",
+		Key:              "abc",
+	}
 
-	tykMiddleware.FireEvent(EventAuthFailure, EventAuthFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: eventMessage},
-		Path:             eventPath,
-		Origin:           eventOrigin,
-		Key:              eventKey,
-	})
+	mw.FireEvent(EventAuthFailure, meta)
 
-	eventJSON := <-CoProcessDispatchEvent
-	eventWrapper := CoProcessEventWrapper{}
-	if err := json.Unmarshal(eventJSON, &eventWrapper); err != nil {
+	wrapper := CoProcessEventWrapper{}
+	if err := json.Unmarshal(<-CoProcessDispatchEvent, &wrapper); err != nil {
 		t.Fatal(err)
 	}
 
-	eventMetadata := eventWrapper.Event.EventMetaData.(map[string]interface{})
-
-	if eventWrapper.Event.EventType != EventAuthFailure {
-		err := "Wrong event Type."
-		t.Fatal(err)
+	if wrapper.Event.EventType != EventAuthFailure {
+		t.Fatal("Wrong event type")
 	}
 
-	if eventMetadata["Message"] != eventMessage || eventMetadata["Path"] != eventPath || eventMetadata["Origin"] != eventOrigin || eventMetadata["Key"] != eventKey {
-		err := "Wrong event metadata."
-		t.Fatal(err)
+	got := wrapper.Event.EventMetaData.(map[string]interface{})
+	if got["Message"] != meta.EventMetaDefault.Message || got["Path"] != meta.Path || got["Origin"] != meta.Origin || got["Key"] != meta.Key {
+		t.Fatalf("Wrong event metadata\ngot: %#v\nwant: %#v", got, meta)
 	}
 }
 
