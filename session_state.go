@@ -1,5 +1,3 @@
-//go:generate msgp
-
 package main
 
 import (
