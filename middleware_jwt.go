@@ -228,11 +228,11 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	log.Debug("Base Field ID set to: ", baseFieldData)
 	data := []byte(baseFieldData)
 	tokenID = fmt.Sprintf("%x", md5.Sum(data))
-	SessionID := k.TykMiddleware.Spec.OrgID + tokenID
+	sessionID := k.TykMiddleware.Spec.OrgID + tokenID
 
-	log.Debug("JWT Temporary session ID is: ", SessionID)
+	log.Debug("JWT Temporary session ID is: ", sessionID)
 
-	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
@@ -250,17 +250,17 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 
 		if err == nil {
 			sessionState = newSessionState
-			sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID}
+			sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
 			sessionState.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again
-			k.Spec.SessionManager.UpdateSession(SessionID, sessionState, GetLifetime(k.Spec, &sessionState))
+			k.Spec.SessionManager.UpdateSession(sessionID, sessionState, GetLifetime(k.Spec, &sessionState))
 			log.Debug("Policy applied to key")
 
 			switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 			case apidef.JWTClaim, apidef.UnsetAuth:
 				context.Set(r, SessionData, sessionState)
-				context.Set(r, AuthHeaderValue, SessionID)
+				context.Set(r, AuthHeaderValue, sessionID)
 			}
 			k.setContextVars(r, token)
 			return nil, 200
@@ -275,7 +275,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
-		context.Set(r, AuthHeaderValue, SessionID)
+		context.Set(r, AuthHeaderValue, sessionID)
 	}
 	k.setContextVars(r, token)
 	return nil, 200

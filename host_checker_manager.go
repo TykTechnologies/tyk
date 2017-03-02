@@ -130,7 +130,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		}).Error("No storage instance set for uptime tests! Disabling poller...")
 		return false
 	}
-	ActiveInstance, err := hc.store.GetKey(PollerCacheKey)
+	activeInstance, err := hc.store.GetKey(PollerCacheKey)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -139,7 +139,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		return true
 	}
 
-	if ActiveInstance == hc.Id {
+	if activeInstance == hc.Id {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Primary instance set, I am master")
@@ -149,7 +149,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Debug("Active Instance is: ", ActiveInstance)
+	}).Debug("Active Instance is: ", activeInstance)
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("--- I am: ", hc.Id)

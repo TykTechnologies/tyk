@@ -122,7 +122,7 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 }
 
 func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, requestSet []*http.Request) []BatchReplyUnit {
-	ReplySet := []BatchReplyUnit{}
+	replySet := []BatchReplyUnit{}
 
 	if len(batchRequest.Requests) != len(requestSet) {
 		log.Error("Something went wrong creating requests, they are of mismatched lengths!", len(batchRequest.Requests), len(requestSet))
@@ -135,16 +135,16 @@ func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, r
 		}
 
 		for range batchRequest.Requests {
-			ReplySet = append(ReplySet, <-replies)
+			replySet = append(replySet, <-replies)
 		}
 	} else {
 		for index, req := range requestSet {
 			reply := b.doSyncRequest(req, batchRequest.Requests[index].RelativeURL)
-			ReplySet = append(ReplySet, reply)
+			replySet = append(replySet, reply)
 		}
 	}
 
-	return ReplySet
+	return replySet
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
@@ -169,10 +169,10 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Run requests and collate responses
-	ReplySet := b.MakeRequests(batchRequest, requestSet)
+	replySet := b.MakeRequests(batchRequest, requestSet)
 
 	// Encode responses
-	replyMessage, err := json.Marshal(&ReplySet)
+	replyMessage, err := json.Marshal(&replySet)
 	if err != nil {
 		log.Error("Couldn't encode response to string! ", err)
 		return
@@ -200,10 +200,10 @@ func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
 	}
 
 	// Run requests and collate responses
-	ReplySet := b.MakeRequests(batchRequest, requestSet)
+	replySet := b.MakeRequests(batchRequest, requestSet)
 
 	// Encode responses
-	replyMessage, err := json.Marshal(&ReplySet)
+	replyMessage, err := json.Marshal(&replySet)
 	if err != nil {
 		log.Error("Couldn't encode response to string! ", err)
 		return nil

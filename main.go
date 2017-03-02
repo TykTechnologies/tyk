@@ -130,18 +130,18 @@ func setupGlobals() {
 	}
 
 	// Initialise our Host Checker
-	HealthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(HealthCheckStore)
+	healthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
+	InitHostCheckManager(healthCheckStore)
 
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
-		AnalyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
+		analyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Setting up analytics DB connection")
 
 		analytics = RedisAnalyticsHandler{
-			Store: &AnalyticsStore,
+			Store: &analyticsStore,
 		}
 
 		analytics.Init()
@@ -149,7 +149,7 @@ func setupGlobals() {
 		if config.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
 
-			purger := RPCPurger{Store: &AnalyticsStore}
+			purger := RPCPurger{Store: &analyticsStore}
 			purger.Connect()
 			analytics.Clean = &purger
 			go analytics.Clean.PurgeLoop(10 * time.Second)
@@ -174,9 +174,9 @@ func setupGlobals() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Debug("Notifier will not work in hybrid mode")
-	MainNotifierStore := RedisClusterStorageManager{}
-	MainNotifierStore.Connect()
-	MainNotifier = RedisNotifier{&MainNotifierStore, RedisPubSubChannel}
+	mainNotifierStore := RedisClusterStorageManager{}
+	mainNotifierStore.Connect()
+	MainNotifier = RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
 
 	if config.Monitor.EnableTriggerMonitors {
 		var err error
@@ -1260,15 +1260,15 @@ func startDRL() {
 }
 
 func listen(l net.Listener, controlListener net.Listener, err error) {
-	ReadTimeout := 120
-	WriteTimeout := 120
+	readtimeout := 120
+	writeTimeout := 120
 	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 	if config.HttpServerOptions.ReadTimeout > 0 {
-		ReadTimeout = config.HttpServerOptions.ReadTimeout
+		readtimeout = config.HttpServerOptions.ReadTimeout
 	}
 
 	if config.HttpServerOptions.WriteTimeout > 0 {
-		WriteTimeout = config.HttpServerOptions.WriteTimeout
+		writeTimeout = config.HttpServerOptions.WriteTimeout
 	}
 
 	// Handle reload when SIGUSR2 is received
@@ -1307,8 +1307,8 @@ func listen(l net.Listener, controlListener net.Listener, err error) {
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
-				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
-				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				ReadTimeout:  time.Duration(readtimeout) * time.Second,
+				WriteTimeout: time.Duration(writeTimeout) * time.Second,
 				Handler:      defaultRouter,
 			}
 
@@ -1370,8 +1370,8 @@ func listen(l net.Listener, controlListener net.Listener, err error) {
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
-				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
-				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				ReadTimeout:  time.Duration(readtimeout) * time.Second,
+				WriteTimeout: time.Duration(writeTimeout) * time.Second,
 				Handler:      defaultRouter,
 			}
 

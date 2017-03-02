@@ -43,12 +43,12 @@ func (r RPCPurger) PurgeLoop(sleep time.Duration) {
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *RPCPurger) PurgeCache() {
-	AnalyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
+	analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
 
-	if len(AnalyticsValues) > 0 {
-		keys := make([]AnalyticsRecord, len(AnalyticsValues))
+	if len(analyticsValues) > 0 {
+		keys := make([]AnalyticsRecord, len(analyticsValues))
 
-		for i, v := range AnalyticsValues {
+		for i, v := range analyticsValues {
 			decoded := AnalyticsRecord{}
 			err := msgpack.Unmarshal(v.([]byte), &decoded)
 			log.Debug("Decoded Record: ", decoded)

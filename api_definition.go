@@ -1125,8 +1125,8 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 	}
 
 	// Load path data and whitelist data for version
-	RxPaths, rxOk := a.RxPaths[versionKey]
-	WhiteListStatus, wlOk := a.WhiteListEnabled[versionKey]
+	rxPaths, rxOk := a.RxPaths[versionKey]
+	whiteListStatus, wlOk := a.WhiteListEnabled[versionKey]
 
 	if !rxOk {
 		log.Error("no RX Paths found for version")
@@ -1139,8 +1139,8 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 		return &version, versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
 	}
 
-	versionRxPaths = RxPaths
-	versionWLStatus = WhiteListStatus
+	versionRxPaths = rxPaths
+	versionWLStatus = whiteListStatus
 
 	return &version, versionRxPaths, versionWLStatus, StatusOk
 

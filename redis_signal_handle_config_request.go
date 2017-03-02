@@ -25,7 +25,7 @@ type MicroConfig map[string]interface{}
 
 func SanitizeConfig(mc MicroConfig) MicroConfig {
 
-	SanitzeFields := []string{
+	sanitzeFields := []string{
 		"secret",
 		"node_secret",
 		"storage",
@@ -33,7 +33,7 @@ func SanitizeConfig(mc MicroConfig) MicroConfig {
 		"auth_override",
 	}
 
-	for _, field_name := range SanitzeFields {
+	for _, field_name := range sanitzeFields {
 		delete(mc, field_name)
 	}
 

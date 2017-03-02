@@ -219,9 +219,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		switchTargets := false
 
 		if spec.URLRewriteEnabled {
-			URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+			urlRewriteContainsTarget, found := context.GetOk(req, RetainHost)
 			if found {
-				if URLRewriteContainsTarget.(bool) {
+				if urlRewriteContainsTarget.(bool) {
 					log.Debug("Detected host rewrite, overriding target")
 					tmpTarget, err := url.Parse(req.URL.String())
 					if err != nil {
@@ -457,9 +457,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// We need to double set the context for the outbound request to reprocess the target
 	if p.TykAPISpec.URLRewriteEnabled {
-		URLRewriteContainsTarget, found := context.GetOk(req, RetainHost)
+		urlRewriteContainsTarget, found := context.GetOk(req, RetainHost)
 		if found {
-			if URLRewriteContainsTarget.(bool) {
+			if urlRewriteContainsTarget.(bool) {
 				log.Debug("Detected host rewrite, notifying director")
 				context.Set(outreq, RetainHost, true)
 			}

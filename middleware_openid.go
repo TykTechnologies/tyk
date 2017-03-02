@@ -166,16 +166,16 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 
 	data := []byte(user.ID)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	SessionID := k.TykMiddleware.Spec.OrgID + tokenID
+	sessionID := k.TykMiddleware.Spec.OrgID + tokenID
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
 		log.Debug("Client ID:", clientID)
-		SessionID = k.TykMiddleware.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(clientID))) + tokenID
+		sessionID = k.TykMiddleware.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(clientID))) + tokenID
 	}
 
-	log.Debug("Generated Session ID: ", SessionID)
+	log.Debug("Generated Session ID: ", sessionID)
 
-	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
@@ -187,7 +187,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 			true)
 
 		if err != nil {
-			k.reportLoginFailure(SessionID, r)
+			k.reportLoginFailure(sessionID, r)
 			log.WithFields(logrus.Fields{
 				"prefix": OIDPREFIX,
 			}).Error("Could not find a valid policy to apply to this token!")
@@ -195,11 +195,11 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		}
 
 		sessionState = newSessionState
-		sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID, "ClientID": clientID}
+		sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
 		sessionState.Alias = clientID + ":" + user.ID
 
 		// Update the session in the session manager in case it gets called again
-		k.Spec.SessionManager.UpdateSession(SessionID, sessionState, GetLifetime(k.Spec, &sessionState))
+		k.Spec.SessionManager.UpdateSession(sessionID, sessionState, GetLifetime(k.Spec, &sessionState))
 		log.Debug("Policy applied to key")
 
 	}
@@ -208,7 +208,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
 		context.Set(r, SessionData, sessionState)
-		context.Set(r, AuthHeaderValue, SessionID)
+		context.Set(r, AuthHeaderValue, sessionID)
 	}
 	k.setContextVars(r, token)
 

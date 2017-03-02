@@ -210,30 +210,30 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 		// Ping endpoint with o_auth key and auth_key
 		code = 200
 		code := r.FormValue("code")
-		OldRefreshToken := r.FormValue("refresh_token")
+		oldRefreshToken := r.FormValue("refresh_token")
 		log.Debug("AUTH CODE: ", code)
-		NewOAuthToken := ""
+		newOauthToken := ""
 		if resp.Output["access_token"] != nil {
-			NewOAuthToken = resp.Output["access_token"].(string)
+			newOauthToken = resp.Output["access_token"].(string)
 		}
-		log.Debug("TOKEN: ", NewOAuthToken)
-		RefreshToken := ""
+		log.Debug("TOKEN: ", newOauthToken)
+		refreshToken := ""
 		if resp.Output["refresh_token"] != nil {
-			RefreshToken = resp.Output["refresh_token"].(string)
+			refreshToken = resp.Output["refresh_token"].(string)
 		}
-		log.Debug("REFRESH: ", RefreshToken)
-		log.Debug("Old REFRESH: ", OldRefreshToken)
+		log.Debug("REFRESH: ", refreshToken)
+		log.Debug("Old REFRESH: ", oldRefreshToken)
 
 		notificationType := newAccessToken
-		if OldRefreshToken != "" {
+		if oldRefreshToken != "" {
 			notificationType = refreshAccessToken
 		}
 
 		newNotification := NewOAuthNotification{
 			AuthCode:         code,
-			NewOAuthToken:    NewOAuthToken,
-			RefreshToken:     RefreshToken,
-			OldRefreshToken:  OldRefreshToken,
+			NewOAuthToken:    newOauthToken,
+			RefreshToken:     refreshToken,
+			OldRefreshToken:  oldRefreshToken,
 			NotificationType: notificationType,
 		}
 
@@ -544,9 +544,9 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	if !config.Storage.EnableCluster {
 		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
 	} else {
-		KeyForSet := prefixClientset + prefixClient // Org ID
+		keyForSet := prefixClientset + prefixClient // Org ID
 		var err error
-		if clientJSON, err = r.store.GetSet(KeyForSet); err != nil {
+		if clientJSON, err = r.store.GetSet(keyForSet); err != nil {
 			return nil, err
 		}
 	}
@@ -586,8 +586,8 @@ func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ign
 
 	log.Debug("Storing copy in set")
 
-	KeyForSet := prefixClientset + prefixClient // Org ID
-	r.store.AddToSet(KeyForSet, string(clientDataJSON))
+	keyForSet := prefixClientset + prefixClient // Org ID
+	r.store.AddToSet(keyForSet, string(clientDataJSON))
 	return nil
 }
 
@@ -602,8 +602,8 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) e
 	clientJSON, err := r.store.GetKey(key)
 	if err == nil {
 		log.Debug("Removing from set")
-		KeyForSet := prefixClientset + prefixClient // Org ID
-		r.store.RemoveFromSet(KeyForSet, clientJSON)
+		keyForSet := prefixClientset + prefixClient // Org ID
+		r.store.RemoveFromSet(keyForSet, clientJSON)
 	}
 
 	r.store.DeleteKey(key)

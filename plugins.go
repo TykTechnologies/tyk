@@ -290,9 +290,9 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 
 		jsonHRO := call.Argument(0).String()
-		HRO := TykJSHttpRequest{}
+		hro := TykJSHttpRequest{}
 		if jsonHRO != "undefined" {
-			if err := json.Unmarshal([]byte(jsonHRO), &HRO); err != nil {
+			if err := json.Unmarshal([]byte(jsonHRO), &hro); err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "jsvm",
 				}).Error("JSVM: Failed to deserialise HTTP Request object")
@@ -300,32 +300,32 @@ func (j *JSVM) LoadTykJSApi() {
 			}
 
 			// Make the request
-			domain := HRO.Domain
+			domain := hro.Domain
 			data := url.Values{}
-			for k, v := range HRO.FormData {
+			for k, v := range hro.FormData {
 				data.Set(k, v)
 			}
 
 			u, _ := url.ParseRequestURI(domain)
-			u.Path = HRO.Resource
+			u.Path = hro.Resource
 			urlStr := u.String() // "https://api.com/user/"
 
 			client := &http.Client{}
 
 			var d string
-			if HRO.Body != "" {
-				d = HRO.Body
-			} else if len(HRO.FormData) > 0 {
+			if hro.Body != "" {
+				d = hro.Body
+			} else if len(hro.FormData) > 0 {
 				d = data.Encode()
 			}
 
-			r, _ := http.NewRequest(HRO.Method, urlStr, nil)
+			r, _ := http.NewRequest(hro.Method, urlStr, nil)
 
 			if d != "" {
-				r, _ = http.NewRequest(HRO.Method, urlStr, bytes.NewBufferString(d))
+				r, _ = http.NewRequest(hro.Method, urlStr, bytes.NewBufferString(d))
 			}
 
-			for k, v := range HRO.Headers {
+			for k, v := range hro.Headers {
 				r.Header.Add(k, v)
 			}
 			r.Close = true
@@ -424,11 +424,11 @@ func (j *JSVM) LoadTykJSApi() {
 		return returnVal
 	})
 
-	TykReturnFunc := `
+	tykReturnFunc := `
 	function TykJsResponse(response, session_meta) {
 		return JSON.stringify({Response: response, SessionMeta: session_meta})
 	};`
 
-	j.VM.Run(TykReturnFunc)
+	j.VM.Run(tykReturnFunc)
 
 }
