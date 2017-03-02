@@ -75,26 +75,26 @@ func (s *ServiceDiscovery) decodeToNameSpaceAsArray(namespace string, jsonParsed
 }
 
 func (s *ServiceDiscovery) GetPortFromObject(host *string, obj *gabs.Container) {
-	if s.portSeperate {
-		// Grab the port object
-		port := s.decodeToNameSpace(s.portPath, obj)
-
-		switch port.(type) {
-		case []interface{}:
-			port = port.([]interface{})[0]
-		}
-
-		var portToUse string
-		switch port.(type) {
-		case string:
-			portToUse = port.(string)
-		case float64:
-			portToUse = strconv.Itoa(int(port.(float64)))
-		}
-
-		*host += ":" + portToUse
-		log.Debug("Host: ", *host)
+	if !s.portSeperate {
+		return
 	}
+	// Grab the port object
+	port := s.decodeToNameSpace(s.portPath, obj)
+
+	switch port.(type) {
+	case []interface{}:
+		port = port.([]interface{})[0]
+	}
+
+	var portToUse string
+	switch port.(type) {
+	case string:
+		portToUse = port.(string)
+	case float64:
+		portToUse = strconv.Itoa(int(port.(float64)))
+	}
+
+	*host += ":" + portToUse
 }
 
 func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
@@ -113,14 +113,12 @@ func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
 
 func (s *ServiceDiscovery) GetObject(item *gabs.Container) string {
 	hostnameData := s.decodeToNameSpace(s.dataPath, item)
-	switch x := hostnameData.(type) {
-	case string:
+	if str, ok := hostnameData.(string); ok {
 		// Get the port
-		s.GetPortFromObject(&x, item)
-		return x
-	default:
-		log.Warning("Get Object: hostname is not a string")
+		s.GetPortFromObject(&str, item)
+		return str
 	}
+	log.Warning("Get Object: hostname is not a string")
 	return ""
 }
 

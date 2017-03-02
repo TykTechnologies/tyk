@@ -291,74 +291,72 @@ func (j *JSVM) LoadTykJSApi() {
 
 		jsonHRO := call.Argument(0).String()
 		hro := TykJSHttpRequest{}
-		if jsonHRO != "undefined" {
-			if err := json.Unmarshal([]byte(jsonHRO), &hro); err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "jsvm",
-				}).Error("JSVM: Failed to deserialise HTTP Request object")
-				return otto.Value{}
-			}
-
-			// Make the request
-			domain := hro.Domain
-			data := url.Values{}
-			for k, v := range hro.FormData {
-				data.Set(k, v)
-			}
-
-			u, _ := url.ParseRequestURI(domain)
-			u.Path = hro.Resource
-			urlStr := u.String() // "https://api.com/user/"
-
-			client := &http.Client{}
-
-			var d string
-			if hro.Body != "" {
-				d = hro.Body
-			} else if len(hro.FormData) > 0 {
-				d = data.Encode()
-			}
-
-			r, _ := http.NewRequest(hro.Method, urlStr, nil)
-
-			if d != "" {
-				r, _ = http.NewRequest(hro.Method, urlStr, bytes.NewBufferString(d))
-			}
-
-			for k, v := range hro.Headers {
-				r.Header.Add(k, v)
-			}
-			r.Close = true
-			resp, err := client.Do(r)
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "jsvm",
-				}).Error("[JSVM]: Request failed: ", err)
-				return otto.Value{}
-			}
-
-			body, _ := ioutil.ReadAll(resp.Body)
-			tykResp := TykJSHttpResponse{
-				Code:    resp.StatusCode,
-				Body:    string(body),
-				Headers: resp.Header,
-			}
-
-			retAsStr, _ := json.Marshal(tykResp)
-			returnVal, err := j.VM.ToValue(string(retAsStr))
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "jsvm",
-				}).Error("[JSVM]: Failed to encode return value: ", err)
-				return otto.Value{}
-			}
-
-			return returnVal
-
+		if jsonHRO == "undefined" {
+			// Nope, return nothing
+			return otto.Value{}
+		}
+		if err := json.Unmarshal([]byte(jsonHRO), &hro); err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("JSVM: Failed to deserialise HTTP Request object")
+			return otto.Value{}
 		}
 
-		// Nope, return nothing
-		return otto.Value{}
+		// Make the request
+		domain := hro.Domain
+		data := url.Values{}
+		for k, v := range hro.FormData {
+			data.Set(k, v)
+		}
+
+		u, _ := url.ParseRequestURI(domain)
+		u.Path = hro.Resource
+		urlStr := u.String() // "https://api.com/user/"
+
+		client := &http.Client{}
+
+		var d string
+		if hro.Body != "" {
+			d = hro.Body
+		} else if len(hro.FormData) > 0 {
+			d = data.Encode()
+		}
+
+		r, _ := http.NewRequest(hro.Method, urlStr, nil)
+
+		if d != "" {
+			r, _ = http.NewRequest(hro.Method, urlStr, bytes.NewBufferString(d))
+		}
+
+		for k, v := range hro.Headers {
+			r.Header.Add(k, v)
+		}
+		r.Close = true
+		resp, err := client.Do(r)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Request failed: ", err)
+			return otto.Value{}
+		}
+
+		body, _ := ioutil.ReadAll(resp.Body)
+		tykResp := TykJSHttpResponse{
+			Code:    resp.StatusCode,
+			Body:    string(body),
+			Headers: resp.Header,
+		}
+
+		retAsStr, _ := json.Marshal(tykResp)
+		returnVal, err := j.VM.ToValue(string(retAsStr))
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Failed to encode return value: ", err)
+			return otto.Value{}
+		}
+
+		return returnVal
 	})
 
 	// Expose Setters and Getters in the REST API for a key:
