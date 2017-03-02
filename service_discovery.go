@@ -210,9 +210,9 @@ func (s *ServiceDiscovery) GetSubObject(obj *gabs.Container) string {
 	return s.GetHostname(obj) + s.targetPath
 }
 
-func (s *ServiceDiscovery) ConvertRawListToObj(RawData *string) {
+func (s *ServiceDiscovery) ConvertRawListToObj(rawData *string) {
 	// Modify to turn a list object into a regular object
-	*RawData = `{"` + arrayName + `":` + *RawData + `}`
+	*rawData = `{"` + arrayName + `":` + *rawData + `}`
 }
 
 func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Container) error {

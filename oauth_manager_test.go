@@ -82,10 +82,10 @@ const oauthDefinition = `{
 	}
 }`
 
-func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
+func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
-	loadAPIEndpoints(Muxer)
-	addOAuthHandlers(spec, Muxer, true)
+	loadAPIEndpoints(muxer)
+	addOAuthHandlers(spec, muxer, true)
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
@@ -97,7 +97,7 @@ func getOAuthChain(spec *APISpec, Muxer *mux.Router) {
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
-	Muxer.Handle(spec.Proxy.ListenPath, chain)
+	muxer.Handle(spec.Proxy.ListenPath, chain)
 }
 
 func makeOAuthAPI(t *testing.T) *APISpec {

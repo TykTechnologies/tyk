@@ -183,11 +183,11 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
-func (b *BatchRequestHandler) ManualBatchRequest(RequestObject []byte) []byte {
+func (b *BatchRequestHandler) ManualBatchRequest(requestObject []byte) []byte {
 
 	// Decode request
 	var batchRequest BatchRequestStructure
-	if err := json.Unmarshal(RequestObject, &batchRequest); err != nil {
+	if err := json.Unmarshal(requestObject, &batchRequest); err != nil {
 		log.Error("Could not decode batch request, decoding failed: ", err)
 		return nil
 	}

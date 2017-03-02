@@ -37,7 +37,7 @@ type BaseExtractor struct {
 }
 
 // ExtractAndCheck is called from the CP middleware, if ID extractor is enabled for the current API.
-func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
+func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, returnOverrides ReturnOverrides) {
 	log.WithFields(logrus.Fields{
 		"prefix": "idextractor",
 	}).Error("This extractor doesn't implement an extraction method, rejecting.")
@@ -45,12 +45,12 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (SessionID string, retu
 }
 
 // PostProcess sets context variables and updates the storage.
-func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, SessionID string) {
+func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, sessionID string) {
 	var sessionLifetime = GetLifetime(e.Spec, &sessionState)
-	e.Spec.SessionManager.UpdateSession(SessionID, sessionState, sessionLifetime)
+	e.Spec.SessionManager.UpdateSession(sessionID, sessionState, sessionLifetime)
 
 	context.Set(r, SessionData, sessionState)
-	context.Set(r, AuthHeaderValue, SessionID)
+	context.Set(r, AuthHeaderValue, sessionID)
 }
 
 // ExtractHeader is used when a HeaderSource is specified.
@@ -101,11 +101,11 @@ func (e *BaseExtractor) Error(r *http.Request, err error, message string) (retur
 }
 
 // GenerateSessionID is a helper for generating session IDs, it takes an input (usually the extractor output) and a middleware pointer.
-func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (SessionID string) {
+func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (sessionID string) {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	SessionID = mw.Spec.OrgID + tokenID
-	return SessionID
+	sessionID = mw.Spec.OrgID + tokenID
+	return sessionID
 }
 
 type ValueExtractor struct {
@@ -122,14 +122,14 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 	return headerValue
 }
 
-func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
+func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, returnOverrides ReturnOverrides) {
 	var extractorOutput string
 	var config ValueExtractorConfig
 
 	err := mapstructure.Decode(e.Config.ExtractorConfig, &config)
 	if err != nil {
 		returnOverrides = e.Error(r, err, "Couldn't decode ValueExtractor configuration")
-		return SessionID, returnOverrides
+		return sessionID, returnOverrides
 	}
 
 	switch e.Config.ExtractFrom {
@@ -141,26 +141,26 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	if err != nil {
 		returnOverrides = e.Error(r, err, "ValueExtractor error")
-		return SessionID, returnOverrides
+		return sessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
+	sessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
 
-	previousSessionState, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSessionState, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
 
 	if keyExists {
 		lastUpdated, _ := strconv.Atoi(previousSessionState.LastUpdated)
 
 		deadlineTs := int64(lastUpdated) + previousSessionState.IdExtractorDeadline
 		if deadlineTs > time.Now().Unix() {
-			e.PostProcess(r, previousSessionState, SessionID)
+			e.PostProcess(r, previousSessionState, sessionID)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
 		}
 	}
 
-	return SessionID, returnOverrides
+	return sessionID, returnOverrides
 }
 
 type RegexExtractor struct {

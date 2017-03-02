@@ -157,10 +157,10 @@ type DefaultKeyGenerator struct {
 }
 
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
-func (b *DefaultKeyGenerator) GenerateAuthKey(OrgID string) string {
+func (b *DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
 	u5, _ := uuid.NewV4()
 	cleanSting := strings.Replace(u5.String(), "-", "", -1)
-	return OrgID + cleanSting
+	return orgID + cleanSting
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key

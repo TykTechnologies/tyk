@@ -20,21 +20,21 @@ type TykMiddlewareImplementation interface {
 	GetName() string
 }
 
-func CreateDynamicMiddleware(MiddlewareName string, IsPre, UseSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateDynamicMiddleware(middlewareName string, isPre, useSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		TykMiddleware:       tykMwSuper,
-		MiddlewareClassName: MiddlewareName,
-		Pre:                 IsPre,
-		UseSession:          UseSession,
+		MiddlewareClassName: middlewareName,
+		Pre:                 isPre,
+		UseSession:          useSession,
 	}
 
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
-func CreateDynamicAuthMiddleware(MiddlewareName string, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateDynamicAuthMiddleware(middlewareName string, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		TykMiddleware:       tykMwSuper,
-		MiddlewareClassName: MiddlewareName,
+		MiddlewareClassName: middlewareName,
 		Auth:                true,
 		UseSession:          false,
 	}
