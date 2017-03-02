@@ -1435,7 +1435,7 @@ type NewClientRequest struct {
 	ClientSecret      string `json:"secret"`
 }
 
-func createOauthClientStorageID(apiID, clientID string) string {
+func createOauthClientStorageID(clientID string) string {
 	return prefixClient + clientID
 }
 
@@ -1480,7 +1480,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			PolicyID:          newOauthClient.PolicyID,
 		}
 
-		storageID := createOauthClientStorageID(newOauthClient.APIID, newClient.GetId())
+		storageID := createOauthClientStorageID(newClient.GetId())
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 		}).Debug("Created storage ID: ", storageID)
@@ -1669,7 +1669,7 @@ func getOauthClientDetails(keyName, apiID string) ([]byte, int) {
 	var err error
 	code := 200
 
-	storageID := createOauthClientStorageID(apiID, keyName)
+	storageID := createOauthClientStorageID(keyName)
 	apiSpec := GetSpecForApi(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -1728,7 +1728,7 @@ func getOauthClientDetails(keyName, apiID string) ([]byte, int) {
 func handleDeleteOAuthClient(keyName, apiID string) ([]byte, int) {
 	var responseMessage []byte
 
-	storageID := createOauthClientStorageID(apiID, keyName)
+	storageID := createOauthClientStorageID(keyName)
 
 	apiSpec := GetSpecForApi(apiID)
 	if apiSpec == nil {

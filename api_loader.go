@@ -119,8 +119,6 @@ func generateListenPathMap(apiSpecs []*APISpec) {
 }
 
 func processSpec(referenceSpec *APISpec,
-	muxer *mux.Router,
-	index int,
 	redisStore *RedisClusterStorageManager,
 	redisOrgStore *RedisClusterStorageManager,
 	healthStore *RedisClusterStorageManager,
@@ -574,7 +572,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 				}).Info("Custom Domain set.")
 				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
 			}
-			chainObj := processSpec(referenceSpec, muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
+			chainObj := processSpec(referenceSpec, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
 		}(referenceSpec, i)
