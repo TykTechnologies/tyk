@@ -227,12 +227,12 @@ func buildConnStr(resource string) string {
 var APILoader = APIDefinitionLoader{}
 
 func getAPISpecs() []*APISpec {
-	var APISpecs []*APISpec
+	var apiSpecs []*APISpec
 
 	if config.UseDBAppConfigs {
 
 		connStr := buildConnStr("/system/apis")
-		APISpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
+		apiSpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -242,30 +242,29 @@ func getAPISpecs() []*APISpec {
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
 
-		APISpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
+		apiSpecs = APILoader.LoadDefinitionsFromRPC(config.SlaveOptions.RPCKey)
 	} else {
 
-		APISpecs = APILoader.LoadDefinitions(config.AppPath)
+		apiSpecs = APILoader.LoadDefinitions(config.AppPath)
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Printf("Detected %v APIs", len(APISpecs))
+	}).Printf("Detected %v APIs", len(apiSpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i := range APISpecs {
-			APISpecs[i].AuthProvider = config.AuthOverride.AuthProvider
-
+		for i := range apiSpecs {
+			apiSpecs[i].AuthProvider = config.AuthOverride.AuthProvider
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i := range APISpecs {
-			APISpecs[i].SessionProvider = config.AuthOverride.SessionProvider
+		for i := range apiSpecs {
+			apiSpecs[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
 
-	return APISpecs
+	return apiSpecs
 }
 
 func getPolicies() {

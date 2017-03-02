@@ -86,8 +86,8 @@ func TestHealthCheckEndpoint(t *testing.T) {
 
 	healthCheckhandler(recorder, req)
 
-	var ApiHealthValues HealthCheckValues
-	err = json.Unmarshal(recorder.Body.Bytes(), &ApiHealthValues)
+	var apiHealthValues HealthCheckValues
+	err = json.Unmarshal(recorder.Body.Bytes(), &apiHealthValues)
 
 	if err != nil {
 		t.Error("Could not unmarshal API Health check:\n", err, recorder.Body.String())
@@ -141,16 +141,16 @@ func TestApiHandler(t *testing.T) {
 		apiHandler(recorder, req)
 
 		// We can't deserialize BSON ObjectID's if they are not in th test base!
-		var ApiList []testAPIDefinition
-		err = json.Unmarshal(recorder.Body.Bytes(), &ApiList)
+		var apiList []testAPIDefinition
+		err = json.Unmarshal(recorder.Body.Bytes(), &apiList)
 
 		if err != nil {
 			t.Error("Could not unmarshal API List:\n", err, recorder.Body.String(), uri)
 		} else {
-			if len(ApiList) != 1 {
-				t.Error("API's not returned, len was: \n", len(ApiList), recorder.Body.String(), uri)
+			if len(apiList) != 1 {
+				t.Error("API's not returned, len was: \n", len(apiList), recorder.Body.String(), uri)
 			} else {
-				if ApiList[0].APIID != "1" {
+				if apiList[0].APIID != "1" {
 					t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String(), uri)
 				}
 			}
@@ -178,13 +178,13 @@ func TestApiHandlerGetSingle(t *testing.T) {
 	apiHandler(recorder, req)
 
 	// We can't deserialize BSON ObjectID's if they are not in th test base!
-	var ApiDefinition testAPIDefinition
-	err = json.Unmarshal(recorder.Body.Bytes(), &ApiDefinition)
+	var apiDef testAPIDefinition
+	err = json.Unmarshal(recorder.Body.Bytes(), &apiDef)
 
 	if err != nil {
 		t.Error("Could not unmarshal API Definition:\n", err, recorder.Body.String())
 	} else {
-		if ApiDefinition.APIID != "1" {
+		if apiDef.APIID != "1" {
 			t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
 		}
 	}

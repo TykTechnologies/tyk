@@ -237,10 +237,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	var returnOverrides ReturnOverrides
-	var SessionID string
+	var sessionID string
 
 	if m.HookType == coprocess.HookType_CustomKeyCheck && extractor != nil {
-		SessionID, returnOverrides = extractor.ExtractAndCheck(r)
+		sessionID, returnOverrides = extractor.ExtractAndCheck(r)
 
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
@@ -308,7 +308,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			context.Set(r, AuthHeaderValue, authHeaderValue)
 		} else {
 			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
-			extractor.PostProcess(r, returnedSessionState, SessionID)
+			extractor.PostProcess(r, returnedSessionState, sessionID)
 		}
 	}
 
