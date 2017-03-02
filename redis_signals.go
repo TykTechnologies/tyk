@@ -16,11 +16,11 @@ const (
 )
 
 func startPubSubLoop() {
-	CacheStore := RedisClusterStorageManager{}
-	CacheStore.Connect()
+	cacheStore := RedisClusterStorageManager{}
+	cacheStore.Connect()
 	// On message, synchronise
 	for {
-		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, handleRedisEvent)
+		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, handleRedisEvent)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",

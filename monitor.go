@@ -37,11 +37,11 @@ func (m *Monitor) Check(sessionData *SessionState, key string) {
 	usagePerc = (float64(remainder) / float64(sessionData.QuotaMax)) * 100.0
 
 	log.Debug("Perc is: ", usagePerc)
-	RenewalDate := time.Unix(sessionData.QuotaRenews, 0)
+	renewalDate := time.Unix(sessionData.QuotaRenews, 0)
 
 	log.Debug("Now is: ", time.Now())
-	log.Debug("Renewal is: ", RenewalDate)
-	if time.Now().After(RenewalDate) {
+	log.Debug("Renewal is: ", renewalDate)
+	if time.Now().After(renewalDate) {
 		// Make sure that renewal is still in the future, If renewal is in the past,
 		// then the quota can expire and will auto-renew
 		log.Debug("Renewal date is in the past, skipping")

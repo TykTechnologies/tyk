@@ -242,13 +242,13 @@ func (s *SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timin
 		}
 
 		// If OAuth, we need to grab it from the session, which may or may not exist
-		OauthClientID := ""
+		oauthClientID := ""
 		tags := make([]string, 0)
 		var alias string
 		sessionState := context.Get(r, SessionData)
 
 		if sessionState != nil {
-			OauthClientID = sessionState.(SessionState).OauthClientID
+			oauthClientID = sessionState.(SessionState).OauthClientID
 			tags = sessionState.(SessionState).Tags
 			alias = sessionState.(SessionState).Alias
 		}
@@ -301,7 +301,7 @@ func (s *SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timin
 			s.Spec.APIDefinition.Name,
 			s.Spec.APIDefinition.APIID,
 			s.Spec.APIDefinition.OrgID,
-			OauthClientID,
+			oauthClientID,
 			timing,
 			rawRequest,
 			rawResponse,

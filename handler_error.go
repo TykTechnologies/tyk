@@ -110,12 +110,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/")
 		}
 
-		OauthClientID := ""
+		oauthClientID := ""
 		tags := make([]string, 0)
 		sessionState := context.Get(r, SessionData)
 
 		if sessionState != nil {
-			OauthClientID = sessionState.(SessionState).OauthClientID
+			oauthClientID = sessionState.(SessionState).OauthClientID
 			alias = sessionState.(SessionState).Alias
 			tags = sessionState.(SessionState).Tags
 		}
@@ -167,7 +167,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			e.Spec.APIDefinition.Name,
 			e.Spec.APIDefinition.APIID,
 			e.Spec.APIDefinition.OrgID,
-			OauthClientID,
+			oauthClientID,
 			0,
 			rawRequest,
 			rawResponse,

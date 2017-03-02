@@ -50,8 +50,8 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	SessionID, returnOverrides := extractor.ExtractAndCheck(req)
-	_, _ = SessionID, returnOverrides
+	sessionID, returnOverrides := extractor.ExtractAndCheck(req)
+	_, _ = sessionID, returnOverrides
 }
 
 /* Value Extractor tests, using "form" source */
@@ -96,10 +96,10 @@ func TestValueExtractorFormSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	SessionID, _ := extractor.ExtractAndCheck(req)
+	sessionID, _ := extractor.ExtractAndCheck(req)
 	expectedSessionID := computeSessionID([]byte(authValue), tykMiddleware)
 
-	if SessionID != expectedSessionID {
+	if sessionID != expectedSessionID {
 		t.Fatal("Value Extractor output (using form source) doesn't match the computed session ID.")
 	}
 }
@@ -175,10 +175,10 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	SessionID, _ := extractor.ExtractAndCheck(req)
+	sessionID, _ := extractor.ExtractAndCheck(req)
 	expectedSessionID := computeSessionID(matchedHeaderValue, tykMiddleware)
 
-	if SessionID != expectedSessionID {
+	if sessionID != expectedSessionID {
 		t.Fatal("Regex Extractor output doesn't match the computed session ID.")
 	}
 

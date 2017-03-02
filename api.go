@@ -55,19 +55,19 @@ func doJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 	}
 }
 
-func GetSpecForApi(APIID string) *APISpec {
+func GetSpecForApi(apiID string) *APISpec {
 	if ApiSpecRegister == nil {
 		log.Error("No API Register present!")
 		return nil
 	}
 
-	return ApiSpecRegister[APIID]
+	return ApiSpecRegister[apiID]
 }
 
-func GetSpecForOrg(APIID string) *APISpec {
+func GetSpecForOrg(apiID string) *APISpec {
 	var aKey string
 	for k, v := range ApiSpecRegister {
-		if v.OrgID == APIID {
+		if v.OrgID == apiID {
 			return v
 		}
 		aKey = k
@@ -194,11 +194,11 @@ func SetSessionPassword(session *SessionState) {
 	session.BasicAuthData.Password = string(newPass)
 }
 
-func GetKeyDetail(key, APIID string) (SessionState, bool) {
+func GetKeyDetail(key, apiID string) (SessionState, bool) {
 
 	sessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		spec := GetSpecForApi(APIID)
+	if apiID != "" {
+		spec := GetSpecForApi(apiID)
 		if spec == nil {
 			log.Error("No API Spec found for this keyspace")
 			return SessionState{}, false
@@ -303,15 +303,15 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleGetDetail(sessionKey, APIID string) ([]byte, int) {
+func handleGetDetail(sessionKey, apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
 	code := 200
 
 	sessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
+	if apiID != "" {
+		thiSpec := GetSpecForApi(apiID)
 		if thiSpec == nil {
 			notFound := APIStatusMessage{"error", "API not found"}
 			responseMessage, _ = json.Marshal(&notFound)
@@ -357,7 +357,7 @@ type APIAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func handleGetAllKeys(filter, APIID string) ([]byte, int) {
+func handleGetAllKeys(filter, apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	code := 200
@@ -374,8 +374,8 @@ func handleGetAllKeys(filter, APIID string) ([]byte, int) {
 	}
 
 	sessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
+	if apiID != "" {
+		thiSpec := GetSpecForApi(apiID)
 		if thiSpec == nil {
 			notFound := APIStatusMessage{"error", "API not found"}
 			responseMessage, _ = json.Marshal(&notFound)
@@ -426,11 +426,11 @@ type APIStatusMessage struct {
 	Message string `json:"message"`
 }
 
-func handleDeleteKey(keyName, APIID string) ([]byte, int) {
+func handleDeleteKey(keyName, apiID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	if APIID == "-1" {
+	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		for _, spec := range ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
@@ -446,16 +446,16 @@ func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 		return responseMessage, 200
 	}
 
-	OrgID := ""
+	orgID := ""
 	sessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
+	if apiID != "" {
+		thiSpec := GetSpecForApi(apiID)
 		if thiSpec == nil {
 			notFound := APIStatusMessage{"error", "API not found"}
 			responseMessage, _ = json.Marshal(&notFound)
 			return responseMessage, 400
 		}
-		OrgID = thiSpec.OrgID
+		orgID = thiSpec.OrgID
 		sessionManager = thiSpec.SessionManager
 	}
 
@@ -480,7 +480,7 @@ func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 			Message:            "Key deleted.",
 			OriginatingRequest: "",
 		},
-		Org: OrgID,
+		Org: orgID,
 		Key: keyName,
 	})
 
@@ -493,11 +493,11 @@ func handleDeleteKey(keyName, APIID string) ([]byte, int) {
 	return responseMessage, 200
 }
 
-func handleDeleteHashedKey(keyName, APIID string) ([]byte, int) {
+func handleDeleteHashedKey(keyName, apiID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	if APIID == "-1" {
+	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		for _, spec := range ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
@@ -513,8 +513,8 @@ func handleDeleteHashedKey(keyName, APIID string) ([]byte, int) {
 	}
 
 	sessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
+	if apiID != "" {
+		thiSpec := GetSpecForApi(apiID)
 		if thiSpec == nil {
 			notFound := APIStatusMessage{"error", "API not found"}
 			responseMessage, _ = json.Marshal(&notFound)
@@ -615,12 +615,12 @@ func HandleGetAPIList() ([]byte, int) {
 	return responseMessage, 200
 }
 
-func HandleGetAPI(APIID string) ([]byte, int) {
+func HandleGetAPI(apiID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
 	for _, apiSpec := range ApiSpecRegister {
-		if apiSpec.APIDefinition.APIID == APIID {
+		if apiSpec.APIDefinition.APIID == apiID {
 
 			responseMessage, err = json.Marshal(apiSpec.APIDefinition)
 
@@ -635,14 +635,14 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"apiID":  APIID,
+		"apiID":  apiID,
 	}).Error("API doesn't exist.")
 	notFound := APIStatusMessage{"error", "API not found"}
 	responseMessage, _ = json.Marshal(&notFound)
 	return responseMessage, 404
 }
 
-func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
+func HandleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
 	if config.UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return createError("Due to enabled use_db_app_configs, please use the Dashboard API"), 500
@@ -660,8 +660,8 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 		return createError("Request malformed"), 400
 	}
 
-	if APIID != "" {
-		if newDef.APIID != APIID {
+	if apiID != "" {
+		if newDef.APIID != apiID {
 			log.Error("PUT operation on different APIIDs")
 			return createError("Request APIID does not match that in Definition! For Updtae operations these must match."), 400
 		}
@@ -716,13 +716,13 @@ func HandleAddOrUpdateApi(APIID string, r *http.Request) ([]byte, int) {
 	return responseMessage, code
 }
 
-func HandleDeleteAPI(APIID string) ([]byte, int) {
+func HandleDeleteAPI(apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	code := 200
 
 	// Generate a filename
-	defFilename := APIID + ".json"
+	defFilename := apiID + ".json"
 	defFilePath := filepath.Join(config.AppPath, defFilename)
 
 	// If it exists, delete it
@@ -735,7 +735,7 @@ func HandleDeleteAPI(APIID string) ([]byte, int) {
 
 	if success {
 		response := APIModifyKeySuccess{
-			APIID,
+			apiID,
 			"ok",
 			"deleted"}
 
@@ -1078,20 +1078,20 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleGetOrgDetail(ORGID string) ([]byte, int) {
+func handleGetOrgDetail(orgID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
 	code := 200
 
-	thiSpec := GetSpecForOrg(ORGID)
+	thiSpec := GetSpecForOrg(orgID)
 	if thiSpec == nil {
 		notFound := APIStatusMessage{"error", "Org not found"}
 		responseMessage, _ = json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
-	session, ok := thiSpec.OrgSessionManager.GetSessionDetail(ORGID)
+	session, ok := thiSpec.OrgSessionManager.GetSessionDetail(orgID)
 	if !ok {
 		success = false
 	} else {
@@ -1108,14 +1108,14 @@ func handleGetOrgDetail(ORGID string) ([]byte, int) {
 		code = 404
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"org":    ORGID,
+			"org":    orgID,
 			"status": "fail",
 			"err":    "not found",
 		}).Error("Failed retrieval of record for ORG ID.")
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"org":    ORGID,
+			"org":    orgID,
 			"status": "ok",
 		}).Info("Retrieved record for ORG ID.")
 	}
@@ -1123,14 +1123,14 @@ func handleGetOrgDetail(ORGID string) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
+func handleGetAllOrgKeys(filter, orgID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	code := 200
 
 	var err error
 
-	thiSpec := GetSpecForOrg(ORGID)
+	thiSpec := GetSpecForOrg(orgID)
 	if thiSpec == nil {
 		notFound := APIStatusMessage{"error", "ORG not found"}
 		responseMessage, _ = json.Marshal(&notFound)
@@ -1158,7 +1158,7 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 	if success {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"org":    ORGID,
+			"org":    orgID,
 			"status": "ok",
 		}).Info("Successful orgs retrieval.")
 
@@ -1167,7 +1167,7 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"org":    ORGID,
+		"org":    orgID,
 		"status": "fail",
 	}).Error("Failed orgs retrieval.")
 
@@ -1175,15 +1175,15 @@ func handleGetAllOrgKeys(filter, ORGID string) ([]byte, int) {
 
 }
 
-func handleDeleteOrgKey(ORGID string) ([]byte, int) {
+func handleDeleteOrgKey(orgID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	thiSpec := GetSpecForOrg(ORGID)
+	thiSpec := GetSpecForOrg(orgID)
 	if thiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    ORGID,
+			"key":    orgID,
 			"status": "fail",
 			"err":    "not found",
 		}).Error("Failed to delete org key.")
@@ -1193,16 +1193,16 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 		return responseMessage, 400
 	}
 
-	thiSpec.OrgSessionManager.RemoveSession(ORGID)
+	thiSpec.OrgSessionManager.RemoveSession(orgID)
 	code := 200
 
-	statusObj := APIModifyKeySuccess{ORGID, "ok", "deleted"}
+	statusObj := APIModifyKeySuccess{orgID, "ok", "deleted"}
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"key":    ORGID,
+			"key":    orgID,
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to delete org key.")
@@ -1212,7 +1212,7 @@ func handleDeleteOrgKey(ORGID string) ([]byte, int) {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    ORGID,
+		"key":    orgID,
 		"status": "ok",
 	}).Info("Org key deleted.")
 
@@ -1435,7 +1435,7 @@ type NewClientRequest struct {
 	ClientSecret      string `json:"secret"`
 }
 
-func createOauthClientStorageID(APIID, clientID string) string {
+func createOauthClientStorageID(apiID, clientID string) string {
 	return prefixClient + clientID
 }
 
@@ -1541,22 +1541,22 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	keyCombined := r.URL.Path[len("/tyk/oauth/refresh/"):]
 
 	if r.Method == "DELETE" {
-		APIID := r.FormValue("api_id")
-		if APIID == "" {
+		apiID := r.FormValue("api_id")
+		if apiID == "" {
 			doJSONWrite(w, 400, createError("Missing parameter api_id"))
 			return
 		}
-		apiSpec := GetSpecForApi(APIID)
+		apiSpec := GetSpecForApi(apiID)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 		}).Debug("Looking for refresh token in API Register")
 
 		if apiSpec == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
-				"apiID":  APIID,
+				"apiID":  apiID,
 				"status": "fail",
 				"err":    "API not found",
 			}).Error("Failed to invalidate refresh token")
@@ -1568,7 +1568,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 		if apiSpec.OAuthManager == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
-				"apiID":  APIID,
+				"apiID":  apiID,
 				"status": "fail",
 				"err":    "API is not OAuth",
 			}).Error("Failed to invalidate refresh token")
@@ -1582,7 +1582,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
-				"apiID":  APIID,
+				"apiID":  apiID,
 				"status": "fail",
 				"err":    err,
 			}).Error("Failed to invalidate refresh token")
@@ -1607,7 +1607,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"token":  keyCombined,
 			"status": "ok",
 		}).Info("Invalidated refresh token")
@@ -1663,18 +1663,18 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get client details
-func getOauthClientDetails(keyName, APIID string) ([]byte, int) {
+func getOauthClientDetails(keyName, apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
 	code := 200
 
-	storageID := createOauthClientStorageID(APIID, keyName)
-	apiSpec := GetSpecForApi(APIID)
+	storageID := createOauthClientStorageID(apiID, keyName)
+	apiSpec := GetSpecForApi(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "fail",
 			"client": keyName,
 			"err":    "not found",
@@ -1699,7 +1699,7 @@ func getOauthClientDetails(keyName, APIID string) ([]byte, int) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
-				"apiID":  APIID,
+				"apiID":  apiID,
 				"status": "fail",
 				"client": keyName,
 				"err":    err,
@@ -1715,7 +1715,7 @@ func getOauthClientDetails(keyName, APIID string) ([]byte, int) {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "ok",
 			"client": keyName,
 		}).Info("Retrieved OAuth client ID")
@@ -1725,16 +1725,16 @@ func getOauthClientDetails(keyName, APIID string) ([]byte, int) {
 }
 
 // Delete Client
-func handleDeleteOAuthClient(keyName, APIID string) ([]byte, int) {
+func handleDeleteOAuthClient(keyName, apiID string) ([]byte, int) {
 	var responseMessage []byte
 
-	storageID := createOauthClientStorageID(APIID, keyName)
+	storageID := createOauthClientStorageID(apiID, keyName)
 
-	apiSpec := GetSpecForApi(APIID)
+	apiSpec := GetSpecForApi(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "fail",
 			"client": keyName,
 			"err":    "not found",
@@ -1763,7 +1763,7 @@ func handleDeleteOAuthClient(keyName, APIID string) ([]byte, int) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "fail",
 			"client": keyName,
 			"err":    err,
@@ -1773,7 +1773,7 @@ func handleDeleteOAuthClient(keyName, APIID string) ([]byte, int) {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"apiID":  APIID,
+		"apiID":  apiID,
 		"status": "ok",
 		"client": keyName,
 	}).Info("Deleted OAuth client")
@@ -1782,7 +1782,7 @@ func handleDeleteOAuthClient(keyName, APIID string) ([]byte, int) {
 }
 
 // List Clients
-func getOauthClients(APIID string) ([]byte, int) {
+func getOauthClients(apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
@@ -1790,11 +1790,11 @@ func getOauthClients(APIID string) ([]byte, int) {
 
 	filterID := prefixClient
 
-	apiSpec := GetSpecForApi(APIID)
+	apiSpec := GetSpecForApi(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
@@ -1808,7 +1808,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 	if apiSpec.OAuthManager == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
@@ -1823,7 +1823,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to report OAuth client list")
@@ -1846,7 +1846,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
-				"apiID":  APIID,
+				"apiID":  apiID,
 				"status": "fail",
 				"err":    err,
 			}).Error("Failed to report OAuth client list")
@@ -1861,7 +1861,7 @@ func getOauthClients(APIID string) ([]byte, int) {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-			"apiID":  APIID,
+			"apiID":  apiID,
 			"status": "ok",
 		}).Info("Retrieved OAuth client list")
 	}
@@ -1875,12 +1875,12 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		if config.HealthCheck.EnableHealthChecks {
-			APIID := r.FormValue("api_id")
-			if APIID == "" {
+			apiID := r.FormValue("api_id")
+			if apiID == "" {
 				code = 405
 				responseMessage = createError("missing api_id parameter")
 			} else {
-				apiSpec := GetSpecForApi(APIID)
+				apiSpec := GetSpecForApi(apiID)
 				if apiSpec != nil {
 					health, _ := apiSpec.Health.GetApiHealthValues()
 					var err error
@@ -1960,18 +1960,18 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	code := 200
 
 	if r.Method == "DELETE" {
-		APIID := r.URL.Path[len("/tyk/cache/"):]
+		apiID := r.URL.Path[len("/tyk/cache/"):]
 
-		spec := GetSpecForApi(APIID)
+		spec := GetSpecForApi(apiID)
 		var orgid string
 		if spec != nil {
 			orgid = spec.OrgID
 		}
 
-		if err := HandleInvalidateAPICache(APIID); err != nil {
+		if err := HandleInvalidateAPICache(apiID); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
-				"api_id":      APIID,
+				"api_id":      apiID,
 				"status":      "fail",
 				"err":         err,
 				"org_id":      orgid,
@@ -1993,7 +1993,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 			"prefix":      "api",
 			"status":      "ok",
 			"org_id":      orgid,
-			"api_id":      APIID,
+			"api_id":      apiID,
 			"user_id":     "system",
 			"user_ip":     getIPHelper(r),
 			"path":        "--",
@@ -2008,8 +2008,8 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, responseMessage)
 }
 
-func HandleInvalidateAPICache(APIID string) error {
-	keyPrefix := "cache-" + strings.Replace(APIID, "/", "", -1)
+func HandleInvalidateAPICache(apiID string) error {
+	keyPrefix := "cache-" + strings.Replace(apiID, "/", "", -1)
 	matchPattern := keyPrefix + "*"
 	store := GetGlobalLocalCacheStorageHandler(keyPrefix, false)
 

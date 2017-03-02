@@ -66,15 +66,15 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string)
 }
 
 func GetIP(ip string) (string, error) {
-	IPWithoutPort := strings.Split(ip, ":")
+	ipWithoutPort := strings.Split(ip, ":")
 
-	if len(IPWithoutPort) > 1 {
-		ip = IPWithoutPort[0]
+	if len(ipWithoutPort) > 1 {
+		ip = ipWithoutPort[0]
 	} else {
-		if len(IPWithoutPort) == 1 {
+		if len(ipWithoutPort) == 1 {
 			return ip, nil
 		}
-		log.Warning(IPWithoutPort)
+		log.Warning(ipWithoutPort)
 		return ip, errors.New("IP Address malformed")
 	}
 	return ip, nil

@@ -211,12 +211,12 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 	if RPC_LoadCount == 0 {
 		if !RPC_EmergencyModeLoaded {
 			log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
-			APIlist := LoadDefinitionsFromRPCBackup()
+			apiList := LoadDefinitionsFromRPCBackup()
 			log.Warning("[RPC Store] --> Done")
-			if APIlist != nil {
+			if apiList != nil {
 				RPC_EmergencyMode = true
 				log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-				doLoadWithBackup(APIlist)
+				doLoadWithBackup(apiList)
 			}
 
 			//LoadPoliciesFromRPCBackup()
@@ -743,96 +743,96 @@ func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
 }
 
 func GetDispatcher() *gorpc.Dispatcher {
-	Dispatch := gorpc.NewDispatcher()
+	dispatch := gorpc.NewDispatcher()
 
-	Dispatch.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatch.AddFunc("Login", func(clientAddr, userKey string) bool {
 		return false
 	})
 
-	Dispatch.AddFunc("LoginWithGroup", func(clientAddr string, groupData *GroupLoginRequest) bool {
+	dispatch.AddFunc("LoginWithGroup", func(clientAddr string, groupData *GroupLoginRequest) bool {
 		return false
 	})
 
-	Dispatch.AddFunc("GetKey", func(keyName string) (string, error) {
+	dispatch.AddFunc("GetKey", func(keyName string) (string, error) {
 		return "", nil
 	})
 
-	Dispatch.AddFunc("SetKey", func(ibd *InboundData) error {
+	dispatch.AddFunc("SetKey", func(ibd *InboundData) error {
 		return nil
 	})
 
-	Dispatch.AddFunc("GetExp", func(keyName string) (int64, error) {
+	dispatch.AddFunc("GetExp", func(keyName string) (int64, error) {
 		return 0, nil
 	})
 
-	Dispatch.AddFunc("GetKeys", func(keyName string) ([]string, error) {
+	dispatch.AddFunc("GetKeys", func(keyName string) ([]string, error) {
 		return nil, nil
 	})
 
-	Dispatch.AddFunc("DeleteKey", func(keyName string) (bool, error) {
+	dispatch.AddFunc("DeleteKey", func(keyName string) (bool, error) {
 		return true, nil
 	})
 
-	Dispatch.AddFunc("DeleteRawKey", func(keyName string) (bool, error) {
+	dispatch.AddFunc("DeleteRawKey", func(keyName string) (bool, error) {
 		return true, nil
 	})
 
-	Dispatch.AddFunc("GetKeysAndValues", func(searchString string) (*KeysValuesPair, error) {
+	dispatch.AddFunc("GetKeysAndValues", func(searchString string) (*KeysValuesPair, error) {
 		return nil, nil
 	})
 
-	Dispatch.AddFunc("GetKeysAndValuesWithFilter", func(searchString string) (*KeysValuesPair, error) {
+	dispatch.AddFunc("GetKeysAndValuesWithFilter", func(searchString string) (*KeysValuesPair, error) {
 		return nil, nil
 	})
 
-	Dispatch.AddFunc("DeleteKeys", func(keys []string) (bool, error) {
+	dispatch.AddFunc("DeleteKeys", func(keys []string) (bool, error) {
 		return true, nil
 	})
 
-	Dispatch.AddFunc("Decrement", func(keyName string) error {
+	dispatch.AddFunc("Decrement", func(keyName string) error {
 		return nil
 	})
 
-	Dispatch.AddFunc("IncrememntWithExpire", func(ibd *InboundData) (int64, error) {
+	dispatch.AddFunc("IncrememntWithExpire", func(ibd *InboundData) (int64, error) {
 		return 0, nil
 	})
 
-	Dispatch.AddFunc("AppendToSet", func(ibd *InboundData) error {
+	dispatch.AddFunc("AppendToSet", func(ibd *InboundData) error {
 		return nil
 	})
 
-	Dispatch.AddFunc("SetRollingWindow", func(ibd *InboundData) (int, error) {
+	dispatch.AddFunc("SetRollingWindow", func(ibd *InboundData) (int, error) {
 		return 0, nil
 	})
 
-	Dispatch.AddFunc("GetApiDefinitions", func(dr *DefRequest) (string, error) {
+	dispatch.AddFunc("GetApiDefinitions", func(dr *DefRequest) (string, error) {
 		return "", nil
 	})
 
-	Dispatch.AddFunc("GetPolicies", func(orgId string) (string, error) {
+	dispatch.AddFunc("GetPolicies", func(orgId string) (string, error) {
 		return "", nil
 	})
 
-	Dispatch.AddFunc("PurgeAnalyticsData", func(data string) error {
+	dispatch.AddFunc("PurgeAnalyticsData", func(data string) error {
 		return nil
 	})
 
-	Dispatch.AddFunc("CheckReload", func(clientAddr, orgId string) (bool, error) {
+	dispatch.AddFunc("CheckReload", func(clientAddr, orgId string) (bool, error) {
 		return false, nil
 	})
 
-	Dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgId string) ([]string, error) {
+	dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgId string) ([]string, error) {
 		return nil, nil
 	})
 
-	Dispatch.AddFunc("GetGroupKeySpaceUpdate", func(clientAddr string, groupData *GroupKeySpaceRequest) ([]string, error) {
+	dispatch.AddFunc("GetGroupKeySpaceUpdate", func(clientAddr string, groupData *GroupKeySpaceRequest) ([]string, error) {
 		return nil, nil
 	})
 
-	Dispatch.AddFunc("Ping", func() bool {
+	dispatch.AddFunc("Ping", func() bool {
 		return false
 	})
 
-	return Dispatch
+	return dispatch
 
 }
