@@ -72,8 +72,12 @@ func handleRedisEvent(v interface{}) {
 		OnServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
 		OnLESSLStatusReceivedHandler(notif.Payload)
-	default:
+	case NoticeGroupReload:
 		handleReloadMsg()
+	default:
+		log.WithFields(logrus.Fields{
+			"prefix": "pub-sub",
+		}).Warnf("Unknown notification command: %q", notif.Command)
 	}
 
 }
