@@ -108,8 +108,7 @@ func TestCoProcessSerialization(t *testing.T) {
 	length := testDispatcher.TestMessageLength(messagePtr)
 
 	if len(data) != length {
-		err := "The length of the serialized object doesn't match."
-		t.Fatal(err)
+		t.Fatal("The length of the serialized object doesn't match")
 	}
 }
 
@@ -125,10 +124,8 @@ func TestCoProcessGetSetData(t *testing.T) {
 	retrievedValue := TestTykGetData("testkey")
 
 	if retrievedValue != value {
-		err := "Couldn't retrieve key value using CP API"
-		t.Fatal(err)
+		t.Fatal("Couldn't retrieve key value using CP API")
 	}
-
 }
 
 func TestCoProcessTykTriggerEvent(t *testing.T) {
@@ -143,8 +140,7 @@ func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.Hook
 	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
 	tykMiddleware := &TykMiddleware{spec, proxy}
 	mw := CreateCoProcessMiddleware(hookName, hookType, driver, tykMiddleware)
-	chain := alice.New(mw).Then(proxyHandler)
-	return chain
+	return alice.New(mw).Then(proxyHandler)
 }
 
 func TestCoProcessMiddleware(t *testing.T) {
@@ -156,13 +152,12 @@ func TestCoProcessMiddleware(t *testing.T) {
 	spec.SessionManager.UpdateSession("abc", session, 60)
 
 	uri := "/headers"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 
 	param := make(url.Values)
 
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Add("authorization", "abc")
 
 	if err != nil {
@@ -170,7 +165,6 @@ func TestCoProcessMiddleware(t *testing.T) {
 	}
 
 	chain.ServeHTTP(recorder, req)
-
 }
 
 func TestCoProcessObjectPostProcess(t *testing.T) {
@@ -182,13 +176,12 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	spec.SessionManager.UpdateSession("abc", session, 60)
 
 	uri := "/headers"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 
 	param := make(url.Values)
 
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Add("authorization", "abc")
 	req.Header.Add("Deletethisheader", "value")
 
@@ -212,7 +205,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	recorder = httptest.NewRecorder()
 
 	uri = "/get?a=a_value&b=123&remove=3"
-	getReq, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	getReq, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
 	getReq.Header.Add("authorization", "abc")
 
 	if err != nil {
@@ -249,13 +242,12 @@ func TestCoProcessAuth(t *testing.T) {
 	spec.SessionManager.UpdateSession("abc", session, 60)
 
 	uri := "/headers"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
 
 	param := make(url.Values)
 
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Add("authorization", "abc")
 
 	if err != nil {
@@ -298,13 +290,13 @@ const basicCoProcessDef = `{
 	"event_handlers": {
 		"events": {
 			"AuthFailure": [
-							{
-									"handler_name":"cp_dynamic_handler",
-									"handler_meta": {
-											"name": "my_handler"
-									}
-							}
-					]
+				{
+					"handler_name":"cp_dynamic_handler",
+					"handler_meta": {
+						"name": "my_handler"
+					}
+				}
+			]
 		}
 	},
 	"custom_middleware": {
@@ -354,13 +346,13 @@ const protectedCoProcessDef = `{
 	"event_handlers": {
 		"events": {
 			"AuthFailure": [
-							{
-									"handler_name":"cp_dynamic_handler",
-									"handler_meta": {
-											"name": "my_handler"
-									}
-							}
-					]
+				{
+					"handler_name":"cp_dynamic_handler",
+					"handler_meta": {
+						"name": "my_handler"
+					}
+				}
+			]
 		}
 	},
 	"custom_middleware": {
