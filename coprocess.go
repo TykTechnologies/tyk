@@ -1,8 +1,5 @@
 // +build coprocess
 
-//go:generate msgp
-//msgp:ignore CoProcessor CoProcessMiddleware CoProcessMiddlewareConfig TykMiddleware
-
 package main
 
 import (
