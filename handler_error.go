@@ -218,7 +218,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		obfuscated = "****" + keyName[len(keyName)-4:]
 	}
 
-	var ip string
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
 		// If we aren't the first proxy retain prior
@@ -227,11 +226,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		if prior, ok := r.Header["X-Forwarded-For"]; ok {
 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
 		}
-		ip = clientIP
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix":      "gateway",
-			"user_ip":     ip,
+			"user_ip":     r.RemoteAddr,
 			"server_name": e.Spec.APIDefinition.Proxy.TargetURL,
 			"user_id":     obfuscated,
 			"org_id":      e.Spec.APIDefinition.OrgID,
