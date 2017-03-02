@@ -815,9 +815,9 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionI
 	return combinedPath, false
 }
 
-func (a *APISpec) Init(AuthStore StorageHandler, SessionStore StorageHandler, healthStorageHandler StorageHandler, orgStorageHandler StorageHandler) {
-	a.AuthManager.Init(AuthStore)
-	a.SessionManager.Init(SessionStore)
+func (a *APISpec) Init(authStore StorageHandler, sessionStore StorageHandler, healthStorageHandler StorageHandler, orgStorageHandler StorageHandler) {
+	a.AuthManager.Init(authStore)
+	a.SessionManager.Init(sessionStore)
 	a.Health.Init(healthStorageHandler)
 	a.OrgSessionManager.Init(orgStorageHandler)
 }
@@ -863,9 +863,9 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, WhiteListStatus bool) (RequestStatus, interface{}) {
+func (a *APISpec) IsURLAllowedAndIgnored(method, url string, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
-	for _, v := range RxPaths {
+	for _, v := range rxPaths {
 		if !v.Spec.MatchString(strings.ToLower(url)) {
 			continue
 		}
@@ -888,7 +888,7 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 				}
 			}
 
-			if WhiteListStatus {
+			if whiteListStatus {
 				// We have a whitelist, nothing gets through unless specifically defined
 				return EndPointNotAllowed, nil
 			}
@@ -911,7 +911,7 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 	}
 
 	// Nothing matched - should we still let it through?
-	if WhiteListStatus {
+	if whiteListStatus {
 		// We have a whitelist, nothing gets through unless specifically defined
 		return EndPointNotAllowed, nil
 	}
@@ -921,9 +921,9 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, RxPaths []URLSpec, 
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
-func (a *APISpec) CheckSpecMatchesStatus(url string, method string, RxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
-	for _, v := range RxPaths {
+	for _, v := range rxPaths {
 		match := v.Spec.MatchString(url)
 		// only return it it's what we are looking for
 		if !match || mode != v.Status {

@@ -136,7 +136,7 @@ func EncodeRequestToEvent(r *http.Request) string {
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
-func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, Spec *APISpec) (TykEventHandler, error) {
+func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (TykEventHandler, error) {
 
 	var conf interface{}
 	switch handlerConf.HandlerMeta.(type) {
@@ -159,21 +159,21 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, Spec *A
 		return (&WebHookHandler{}).New(conf)
 	case EH_JSVMHandler:
 		// Load the globals and file here
-		if Spec != nil {
-			jsVmEventHandler, err := (&JSVMEventHandler{Spec: Spec}).New(conf)
+		if spec != nil {
+			jsVmEventHandler, err := (&JSVMEventHandler{Spec: spec}).New(conf)
 			if err == nil {
 				GlobalEventsJSVM.LoadJSPaths([]string{conf.(map[string]interface{})["path"].(string)}, "")
 			}
 			return jsVmEventHandler, err
 		}
 	case EH_CoProcessHandler:
-		if Spec != nil {
+		if spec != nil {
 			var coprocessEventHandler TykEventHandler
 			var err error
 			if GlobalDispatcher == nil {
 				err = errors.New("no CP available")
 			} else {
-				coprocessEventHandler, err = CoProcessEventHandler{Spec: Spec}.New(conf)
+				coprocessEventHandler, err = CoProcessEventHandler{Spec: spec}.New(conf)
 			}
 			return coprocessEventHandler, err
 		}

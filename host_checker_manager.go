@@ -285,7 +285,7 @@ func (hc *HostCheckerManager) IsHostDown(urlStr string) bool {
 	return err != nil
 }
 
-func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, APIID string) (HostData, error) {
+func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, apiID string) (HostData, error) {
 	// Build the check URL:
 	var hostData HostData
 	u, err := url.Parse(checkObject.CheckURL)
@@ -320,7 +320,7 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 
 	// Add our specific metadata
 	hostData.MetaData[UnHealthyHostMetaDataTargetKey] = checkObject.CheckURL
-	hostData.MetaData[UnHealthyHostMetaDataAPIKey] = APIID
+	hostData.MetaData[UnHealthyHostMetaDataAPIKey] = apiID
 	hostData.MetaData[UnHealthyHostMetaDataHostKey] = u.Host
 
 	return hostData, nil
@@ -374,8 +374,8 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 	}).Info("--- Queued tracking list update for API: ", apiId)
 }
 
-func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
-	spec, found := ApiSpecRegister[APIID]
+func (hc *HostCheckerManager) GetListFromService(apiID string) ([]HostData, error) {
+	spec, found := ApiSpecRegister[apiID]
 	if !found {
 		return nil, errors.New("API ID not found in register")
 	}
@@ -414,11 +414,11 @@ func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, erro
 	return hostData, nil
 }
 
-func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(APIID string) {
+func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("[HOST CHECKER MANAGER] Getting data from service")
-	hostData, err := hc.GetListFromService(APIID)
+	hostData, err := hc.GetListFromService(apiID)
 	if err != nil {
 		return
 	}
@@ -428,8 +428,8 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(APIID string) {
 	}).Debug("[HOST CHECKER MANAGER] Data was: \n", hostData)
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Info("[HOST CHECKER MANAGER] Refreshing uptime tests from service for API: ", APIID)
-	hc.UpdateTrackingListByAPIID(hostData, APIID)
+	}).Info("[HOST CHECKER MANAGER] Refreshing uptime tests from service for API: ", apiID)
+	hc.UpdateTrackingListByAPIID(hostData, apiID)
 }
 
 // RecordHit will store an AnalyticsRecord in Redis

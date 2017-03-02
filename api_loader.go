@@ -40,9 +40,9 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
-func prepareSortOrder(APISpecs []*APISpec) {
-	sort.Sort(SortableAPISpecListByHost(APISpecs))
-	sort.Sort(SortableAPISpecListByListen(APISpecs))
+func prepareSortOrder(apiSpecs []*APISpec) {
+	sort.Sort(SortableAPISpecListByHost(apiSpecs))
+	sort.Sort(SortableAPISpecListByListen(apiSpecs))
 }
 
 func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
@@ -93,9 +93,9 @@ func generateDomainPath(hostname, listenPath string) string {
 	return hostname + listenPath
 }
 
-func generateListenPathMap(APISpecs []*APISpec) {
+func generateListenPathMap(apiSpecs []*APISpec) {
 	// We must track the hostname no matter what
-	for _, referenceSpec := range APISpecs {
+	for _, referenceSpec := range apiSpecs {
 		domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
 		val, ok := ListenPathMap.Get(domainHash)
 		if ok {
@@ -119,7 +119,7 @@ func generateListenPathMap(APISpecs []*APISpec) {
 }
 
 func processSpec(referenceSpec *APISpec,
-	Muxer *mux.Router,
+	muxer *mux.Router,
 	index int,
 	redisStore *RedisClusterStorageManager,
 	redisOrgStore *RedisClusterStorageManager,
@@ -543,7 +543,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(APISpecs []*APISpec, Muxer *mux.Router) {
+func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 	ListenPathMap = cmap.New()
 	// load the APi defs
 	log.WithFields(logrus.Fields{
@@ -555,16 +555,16 @@ func loadApps(APISpecs []*APISpec, Muxer *mux.Router) {
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
 
-	prepareSortOrder(APISpecs)
+	prepareSortOrder(apiSpecs)
 
 	chainChannel := make(chan *ChainObject)
 
 	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(APISpecs))
-	generateListenPathMap(APISpecs)
-	for i, referenceSpec := range APISpecs {
+	loadList := make([]*ChainObject, len(apiSpecs))
+	generateListenPathMap(apiSpecs)
+	for i, referenceSpec := range apiSpecs {
 		go func(referenceSpec *APISpec, i int) {
-			subrouter := Muxer
+			subrouter := muxer
 			// Handle custom domains
 			if config.EnableCustomDomains && referenceSpec.Domain != "" {
 				log.WithFields(logrus.Fields{
@@ -574,7 +574,7 @@ func loadApps(APISpecs []*APISpec, Muxer *mux.Router) {
 				}).Info("Custom Domain set.")
 				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
 			}
-			chainObj := processSpec(referenceSpec, Muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
+			chainObj := processSpec(referenceSpec, muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
 		}(referenceSpec, i)
@@ -583,7 +583,7 @@ func loadApps(APISpecs []*APISpec, Muxer *mux.Router) {
 		tmpSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
 	}
 
-	for range APISpecs {
+	for range apiSpecs {
 		chObj := <-chainChannel
 		loadList[chObj.Index] = chObj
 	}
@@ -603,7 +603,7 @@ func loadApps(APISpecs []*APISpec, Muxer *mux.Router) {
 
 	// All APIs processed, now we can healthcheck
 	// Add a root message to check all is OK
-	Muxer.HandleFunc("/hello", pingTest)
+	muxer.HandleFunc("/hello", pingTest)
 
 	// Swap in the new register
 	ApiSpecRegister = tmpSpecRegister

@@ -293,8 +293,8 @@ type TykTransporter struct {
 	http.Transport
 }
 
-func (t *TykTransporter) SetDialFunc(Dial func(string, string) (net.Conn, error)) {
-	t.Dial = Dial
+func (t *TykTransporter) SetDialFunc(dial func(string, string) (net.Conn, error)) {
+	t.Dial = dial
 }
 
 func (t *TykTransporter) SetTimeout(timeOut int) {

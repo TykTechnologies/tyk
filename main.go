@@ -313,15 +313,15 @@ func getPolicies() {
 }
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
-func loadAPIEndpoints(Muxer *mux.Router) {
+func loadAPIEndpoints(muxer *mux.Router) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising Tyk REST API Endpoints")
 
-	apiMuxer := Muxer
+	apiMuxer := muxer
 	if config.EnableAPISegregation {
 		if config.ControlAPIHostname != "" {
-			apiMuxer = Muxer.Host(config.ControlAPIHostname).Subrouter()
+			apiMuxer = muxer.Host(config.ControlAPIHostname).Subrouter()
 		}
 	}
 
@@ -379,7 +379,7 @@ func generateOAuthPrefix(apiID string) string {
 }
 
 // Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager {
+func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager {
 	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
 	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
@@ -434,20 +434,20 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
-	Muxer.HandleFunc(apiAuthorizePath, checkIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
-	Muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
-	Muxer.HandleFunc(clientAccessPath, oauthHandlers.HandleAccessRequest)
+	muxer.HandleFunc(apiAuthorizePath, checkIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
+	muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
+	muxer.HandleFunc(clientAccessPath, oauthHandlers.HandleAccessRequest)
 
 	return &oauthManager
 }
 
-func addBatchEndpoint(spec *APISpec, Muxer *mux.Router) {
+func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	batchHandler := BatchRequestHandler{API: spec}
-	Muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
+	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
 func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
@@ -983,19 +983,19 @@ func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 	}()
 }
 
-func GetGlobalLocalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
-	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+func GetGlobalLocalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
+	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
-func GetGlobalLocalCacheStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
-	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys, IsCache: true}
+func GetGlobalLocalCacheStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
+	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys, IsCache: true}
 }
 
-func GetGlobalStorageHandler(KeyPrefix string, hashKeys bool) StorageHandler {
+func GetGlobalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
 	if config.SlaveOptions.UseRPC {
-		return &RPCStorageHandler{KeyPrefix: KeyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	}
-	return &RedisClusterStorageManager{KeyPrefix: KeyPrefix, HashKeys: hashKeys}
+	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
 // Handles pre-fork actions if we get a SIGHUP2
