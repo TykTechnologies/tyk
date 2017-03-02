@@ -240,8 +240,8 @@ type CertData struct {
 
 const envPrefix = "TYK_GW"
 
-// WriteDefaultConf will create a default configuration file and set the storage type to "memory"
-func WriteDefaultConf(conf *Config) {
+// writeDefaultConf will create a default configuration file and set the storage type to "memory"
+func writeDefaultConf(conf *Config) {
 	conf.ListenAddress = ""
 	conf.ListenPort = 8080
 	conf.Secret = "352d20ee67be67f6340b4c0605b044b7"
@@ -283,7 +283,7 @@ func loadConfig(filePath string, conf *Config) {
 		if !runningTests {
 			log.Error("Couldn't load configuration file: ", err)
 			log.Info("Writing a default file to ./tyk.conf")
-			WriteDefaultConf(conf)
+			writeDefaultConf(conf)
 			log.Info("Loading default configuration...")
 			loadConfig("tyk.conf", conf)
 		}

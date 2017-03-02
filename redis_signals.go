@@ -15,12 +15,12 @@ const (
 	RedisPubSubChannel = "tyk.cluster.notifications"
 )
 
-func StartPubSubLoop() {
+func startPubSubLoop() {
 	CacheStore := RedisClusterStorageManager{}
 	CacheStore.Connect()
 	// On message, synchronise
 	for {
-		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, HandleRedisEvent)
+		err := CacheStore.StartPubSubHandler(RedisPubSubChannel, handleRedisEvent)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
@@ -36,7 +36,7 @@ func StartPubSubLoop() {
 	}
 }
 
-func HandleRedisEvent(v interface{}) {
+func handleRedisEvent(v interface{}) {
 	message, ok := v.(redis.Message)
 	if !ok {
 		return
@@ -54,7 +54,7 @@ func HandleRedisEvent(v interface{}) {
 	}
 
 	// Check for a signature, if not signature found, handle
-	if !IsPayloadSignatureValid(notif) {
+	if !isPayloadSignatureValid(notif) {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Error("Payload signature is invalid!")
@@ -73,22 +73,22 @@ func HandleRedisEvent(v interface{}) {
 	case NoticeGatewayLENotification:
 		OnLESSLStatusReceivedHandler(notif.Payload)
 	default:
-		HandleReloadMsg()
+		handleReloadMsg()
 	}
 
 }
 
-func HandleReloadMsg() {
+func handleReloadMsg() {
 	log.WithFields(logrus.Fields{
 		"prefix": "pub-sub",
 	}).Info("Reloading endpoints")
-	ReloadURLStructure(nil)
+	reloadURLStructure(nil)
 }
 
 var warnedOnce bool
 var notificationVerifier goverify.Verifier
 
-func IsPayloadSignatureValid(notification Notification) bool {
+func isPayloadSignatureValid(notification Notification) bool {
 	switch notification.Command {
 	case NoticeGatewayDRLNotification, NoticeGatewayLENotification:
 		// Gateway to gateway

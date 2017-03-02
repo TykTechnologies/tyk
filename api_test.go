@@ -545,7 +545,7 @@ func TestAPIAuthFail(t *testing.T) {
 	}
 
 	makeSampleAPI(t, apiTestDef)
-	CheckIsAPIOwner(healthCheckhandler)(recorder, req)
+	checkIsAPIOwner(healthCheckhandler)(recorder, req)
 
 	if recorder.Code == 200 {
 		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
@@ -567,7 +567,7 @@ func TestAPIAuthOk(t *testing.T) {
 	}
 
 	makeSampleAPI(t, apiTestDef)
-	CheckIsAPIOwner(healthCheckhandler)(recorder, req)
+	checkIsAPIOwner(healthCheckhandler)(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
@@ -688,7 +688,7 @@ func TestGroupResetHandler(t *testing.T) {
 func TestHotReloadSingle(t *testing.T) {
 	oldRouter := mainRouter
 	var wg sync.WaitGroup
-	if !ReloadURLStructure(wg.Done) {
+	if !reloadURLStructure(wg.Done) {
 		t.Fatal("reload wasn't queued")
 	}
 	wg.Add(1)
@@ -706,7 +706,7 @@ func TestHotReloadMany(t *testing.T) {
 	// reload worker to pick up any of them. A single one is queued
 	// and waits.
 	for i := 0; i < 25; i++ {
-		if ReloadURLStructure(wg.Done) {
+		if reloadURLStructure(wg.Done) {
 			wg.Add(1)
 			done++
 		}
@@ -720,7 +720,7 @@ func TestHotReloadMany(t *testing.T) {
 	// 5 reloads, but this time slower - the reload worker has time
 	// to do all of them.
 	for i := 0; i < 5; i++ {
-		if ReloadURLStructure(wg.Done) {
+		if reloadURLStructure(wg.Done) {
 			wg.Add(1)
 			done++
 		}

@@ -83,7 +83,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 		} else {
 			// In-memory limiter
 			if BucketStore == nil {
-				InitBucketStore()
+				initBucketStore()
 			}
 
 			// If a token has been updated, we must ensure we dont use
@@ -129,7 +129,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 
 var BucketStore leakybucket.Storage
 
-func InitBucketStore() {
+func initBucketStore() {
 	BucketStore = memorycache.New()
 }
 

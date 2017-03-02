@@ -192,7 +192,7 @@ func setupGlobals() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Setting up analytics normaliser")
-		config.AnalyticsConfig.NormaliseUrls.compiledPatternSet = InitNormalisationPatterns()
+		config.AnalyticsConfig.NormaliseUrls.compiledPatternSet = initNormalisationPatterns()
 	}
 
 }
@@ -327,37 +327,37 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 	}
 
 	// set up main API handlers
-	apiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(InstrumentationMW(groupResetHandler)))
-	apiMuxer.HandleFunc("/tyk/reload/", CheckIsAPIOwner(InstrumentationMW(resetHandler)))
+	apiMuxer.HandleFunc("/tyk/reload/group", checkIsAPIOwner(InstrumentationMW(groupResetHandler)))
+	apiMuxer.HandleFunc("/tyk/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler)))
 
-	if !IsRPCMode() {
-		apiMuxer.HandleFunc("/tyk/org/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(orgHandler)))
-		apiMuxer.HandleFunc("/tyk/keys/policy/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
-		apiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(InstrumentationMW(createKeyHandler)))
-		apiMuxer.HandleFunc("/tyk/apis/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
-		apiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(InstrumentationMW(healthCheckhandler)))
-		apiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(InstrumentationMW(createOauthClient)))
-		apiMuxer.HandleFunc("/tyk/oauth/refresh/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
-		apiMuxer.HandleFunc("/tyk/cache/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
+	if !isRPCMode() {
+		apiMuxer.HandleFunc("/tyk/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler)))
+		apiMuxer.HandleFunc("/tyk/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
+		apiMuxer.HandleFunc("/tyk/keys/create", checkIsAPIOwner(InstrumentationMW(createKeyHandler)))
+		apiMuxer.HandleFunc("/tyk/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(apiHandler)))
+		apiMuxer.HandleFunc("/tyk/health/", checkIsAPIOwner(InstrumentationMW(healthCheckhandler)))
+		apiMuxer.HandleFunc("/tyk/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(createOauthClient)))
+		apiMuxer.HandleFunc("/tyk/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
+		apiMuxer.HandleFunc("/tyk/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	apiMuxer.HandleFunc("/tyk/keys/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(keyHandler)))
-	apiMuxer.HandleFunc("/tyk/oauth/clients/{rest:.*}", CheckIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
+	apiMuxer.HandleFunc("/tyk/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(keyHandler)))
+	apiMuxer.HandleFunc("/tyk/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Debug("Loaded API Endpoints")
 }
 
-// CheckIsAPIOwner will ensure that the accessor of the tyk API has the
+// checkIsAPIOwner will ensure that the accessor of the tyk API has the
 // correct security credentials - this is a shared secret between the
 // client and the owner and is set in the tyk.conf file. This should
 // never be made public!
-func CheckIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
+func checkIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
 		if tykAuthKey != config.Secret {
@@ -435,7 +435,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
-	Muxer.HandleFunc(apiAuthorizePath, CheckIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
+	Muxer.HandleFunc(apiAuthorizePath, checkIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
 	Muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
 	Muxer.HandleFunc(clientAccessPath, oauthHandlers.HandleAccessRequest)
 
@@ -590,7 +590,7 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 	}
 }
 
-func IsRPCMode() bool {
+func isRPCMode() bool {
 	return config.AuthOverride.ForceAuthProvider &&
 		config.AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
 }
@@ -633,7 +633,7 @@ func notifyAPILoaded(spec *APISpec) {
 
 }
 
-func RPCReloadLoop(rpcKey string) {
+func rpcReloadLoop(rpcKey string) {
 	for {
 		RPCListener.CheckForReload(rpcKey)
 	}
@@ -713,11 +713,11 @@ func reloadLoop(tick <-chan time.Time) {
 	}
 }
 
-// ReloadURLStructure will create a new muxer, reload all the app configs for an
+// reloadURLStructure will create a new muxer, reload all the app configs for an
 // instance and then replace the DefaultServeMux with the new one, this enables a
 // reconfiguration to take place without stopping any requests from being handled.
 // It returns true if it was queued, or false if it wasn't.
-func ReloadURLStructure(fn func()) bool {
+func reloadURLStructure(fn func()) bool {
 	select {
 	case reloadChan <- fn:
 		log.Info("Reload queued")
@@ -889,7 +889,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 		}).Error("Failed to write PIDFile: ", err)
 	}
 
-	GetHostDetails()
+	getHostDetails()
 
 	//doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
 	//SetupInstrumentation(doInstrumentation)
@@ -905,7 +905,7 @@ type AuditHostDetails struct {
 
 var HostDetails AuditHostDetails
 
-func GetHostDetails() {
+func getHostDetails() {
 	var err error
 	if HostDetails.PID, err = pidfile.Read(); err != nil {
 		log.Error("Failed ot get host pid: ", err)
@@ -1140,7 +1140,7 @@ func start() {
 
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
-		go StartPubSubLoop()
+		go startPubSubLoop()
 	}
 
 	if config.SlaveOptions.UseRPC {
@@ -1154,7 +1154,7 @@ func start() {
 			SuppressRegister: true,
 		}
 		RPCListener.Connect()
-		go RPCReloadLoop(config.SlaveOptions.RPCKey)
+		go rpcReloadLoop(config.SlaveOptions.RPCKey)
 		go RPCListener.StartRPCLoopCheck(config.SlaveOptions.RPCKey)
 	}
 
@@ -1250,13 +1250,13 @@ func startHeartBeat() {
 	}
 }
 
-func StartDRL() {
+func startDRL() {
 	if !config.EnableSentinelRateLImiter && !config.EnableRedisRollingLimiter {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Initialising distributed rate limiter")
-		SetupDRL()
-		StartRateLimitNotifications()
+		setupDRL()
+		startRateLimitNotifications()
 	}
 }
 
@@ -1282,7 +1282,7 @@ func listen(l net.Listener, controlListener net.Listener, err error) {
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
 
-		StartDRL()
+		startDRL()
 
 		if !RPC_EmergencyMode {
 			specs := getAPISpecs()
@@ -1352,7 +1352,7 @@ func listen(l net.Listener, controlListener net.Listener, err error) {
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")
 		}
-		StartDRL()
+		startDRL()
 
 		// Resume accepting connections in a new goroutine.
 		if !RPC_EmergencyMode {

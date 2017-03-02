@@ -10,7 +10,7 @@ import (
 
 var DRLManager = &drl.DRL{}
 
-func SetupDRL() {
+func setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
 	drlManager.ThisServerID = NodeID + "|" + HostDetails.Hostname
@@ -18,7 +18,7 @@ func SetupDRL() {
 	DRLManager = drlManager
 }
 
-func StartRateLimitNotifications() {
+func startRateLimitNotifications() {
 	notificationFreq := config.DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
