@@ -24,17 +24,12 @@ func (m *Monitor) Fire(sessionData *SessionState, key string, triggerLimit float
 }
 
 func (m *Monitor) Check(sessionData *SessionState, key string) {
-	if !m.IsMonitorEnabled() {
+	if !m.IsMonitorEnabled() || sessionData.QuotaMax == -1 {
 		return
 	}
 
-	if sessionData.QuotaMax == -1 {
-		return
-	}
-
-	var usagePerc float64
 	remainder := sessionData.QuotaMax - sessionData.QuotaRemaining
-	usagePerc = (float64(remainder) / float64(sessionData.QuotaMax)) * 100.0
+	usagePerc := (float64(remainder) / float64(sessionData.QuotaMax)) * 100.0
 
 	log.Debug("Perc is: ", usagePerc)
 	renewalDate := time.Unix(sessionData.QuotaRenews, 0)
