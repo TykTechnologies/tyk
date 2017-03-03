@@ -232,30 +232,30 @@ func (w *WebHookHandler) HandleEvent(em EventMessage) {
 	reqChecksum, _ := w.GetChecksum(reqBody)
 
 	// Check request velocity for this hook (wasHookFired())
-	if !w.WasHookFired(reqChecksum) {
-		// Fire web hook routine (setHookFired())
+	if w.WasHookFired(reqChecksum) {
+		return
+	}
+	// Fire web hook routine (setHookFired())
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
-
-		if err != nil {
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Webhook request failed: ", err)
+	} else {
+		defer resp.Body.Close()
+		content, err := ioutil.ReadAll(resp.Body)
+		if err == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
-			}).Error("Webhook request failed: ", err)
+			}).Debug(string(content))
 		} else {
-			defer resp.Body.Close()
-			content, err := ioutil.ReadAll(resp.Body)
-			if err == nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "webhooks",
-				}).Debug(string(content))
-			} else {
-				log.WithFields(logrus.Fields{
-					"prefix": "webhooks",
-				}).Error(err)
-			}
+			log.WithFields(logrus.Fields{
+				"prefix": "webhooks",
+			}).Error(err)
 		}
-
-		w.setHookFired(reqChecksum)
 	}
+
+	w.setHookFired(reqChecksum)
 }
