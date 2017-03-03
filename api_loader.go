@@ -155,9 +155,9 @@ func processSpec(referenceSpec *APISpec,
 		authStore = &storageEngine
 		orgStore = redisOrgStore
 	case RPCStorageEngine:
-		storageEngine := rpcAuthStore // &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		storageEngine := rpcAuthStore
 		authStore = storageEngine
-		orgStore = rpcOrgStore // &RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		orgStore = rpcOrgStore
 		config.EnforceOrgDataAge = true
 
 	default:
