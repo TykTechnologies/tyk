@@ -270,10 +270,10 @@ func processSpec(referenceSpec *APISpec,
 		}).Info("Checking security policy: Open")
 
 		// Add pre-process MW
-		var chainArray = []alice.Constructor{}
+		chainArray := []alice.Constructor{}
 		handleCORS(&chainArray, referenceSpec)
 
-		var baseChainArray = []alice.Constructor{}
+		baseChainArray := []alice.Constructor{}
 		AppendMiddleware(&baseChainArray, &RateCheckMW{TykMiddleware: tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray, &IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray, &OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware)

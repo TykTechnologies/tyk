@@ -56,19 +56,20 @@ func ReportHealthCheckValue(checker HealthChecker, counter HealthPrefix, value s
 }
 
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
-	if config.HealthCheck.EnableHealthChecks {
-		searchStr := h.CreateKeyName(counterType)
-		log.Debug("Adding Healthcheck to: ", searchStr)
-		log.Debug("Val is: ", value)
-		//go h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
-		if value != "-1" {
-			// need to ensure uniqueness
-			now_string := strconv.Itoa(int(time.Now().UnixNano()))
-			value = now_string + "." + value
-			log.Debug("Set value to: ", value)
-		}
-		go h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, value)
+	if !config.HealthCheck.EnableHealthChecks {
+		return
 	}
+	searchStr := h.CreateKeyName(counterType)
+	log.Debug("Adding Healthcheck to: ", searchStr)
+	log.Debug("Val is: ", value)
+	//go h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
+	if value != "-1" {
+		// need to ensure uniqueness
+		now_string := strconv.Itoa(int(time.Now().UnixNano()))
+		value = now_string + "." + value
+		log.Debug("Set value to: ", value)
+	}
+	go h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, value)
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
@@ -90,9 +91,7 @@ func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 }
 
 func roundValue(untruncated float64) float64 {
-	truncated := float64(int(untruncated*100)) / 100
-
-	return truncated
+	return float64(int(untruncated*100)) / 100
 }
 
 func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
@@ -109,8 +108,8 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	log.Debug("Searching KV for: ", searchStr)
 	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
 	log.Debug("Found: ", vals)
-	var runningTotal int
 	if len(vals) > 0 {
+		var runningTotal int
 		for _, v := range vals {
 			log.Debug("V is: ", string(v.([]byte)))
 			splitValues := strings.Split(string(v.([]byte)), ".")

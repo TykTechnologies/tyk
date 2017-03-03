@@ -210,13 +210,10 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token) (error, int) {
 	log.Debug("JWT authority is centralised")
 	// Generate a virtual token
-	var baseFound bool
-	var baseFieldData string
-	var tokenID string
-	baseFieldData, baseFound = token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
+	baseFieldData, baseFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
 	if !baseFound {
-		var found bool
 		log.Warning("Base Field not found, using SUB")
+		var found bool
 		baseFieldData, found = token.Claims.(jwt.MapClaims)["sub"].(string)
 		if !found {
 			log.Error("ID Could not be generated. Failing Request.")
@@ -227,7 +224,7 @@ func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Req
 	}
 	log.Debug("Base Field ID set to: ", baseFieldData)
 	data := []byte(baseFieldData)
-	tokenID = fmt.Sprintf("%x", md5.Sum(data))
+	tokenID := fmt.Sprintf("%x", md5.Sum(data))
 	sessionID := k.TykMiddleware.Spec.OrgID + tokenID
 
 	log.Debug("JWT Temporary session ID is: ", sessionID)
@@ -421,25 +418,24 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 	// Flatten claims and add to context
-	if k.Spec.EnableContextVars {
-		cnt, contextFound := context.GetOk(r, ContextData)
-		var contextDataObject map[string]interface{}
-		if contextFound {
-			contextDataObject = cnt.(map[string]interface{})
-			claimPrefix := "jwt_claims_"
+	if !k.Spec.EnableContextVars {
+		return
+	}
+	cnt, contextFound := context.GetOk(r, ContextData)
+	if contextFound {
+		contextDataObject := cnt.(map[string]interface{})
+		claimPrefix := "jwt_claims_"
 
-			for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
-				claim := claimPrefix + claimName
-				contextDataObject[claim] = claimValue
-			}
-
-			// Key data
-			authHeaderValue := context.Get(r, AuthHeaderValue)
-			contextDataObject["token"] = authHeaderValue
-
-			context.Set(r, ContextData, contextDataObject)
+		for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
+			claim := claimPrefix + claimName
+			contextDataObject[claim] = claimValue
 		}
 
+		// Key data
+		authHeaderValue := context.Get(r, AuthHeaderValue)
+		contextDataObject["token"] = authHeaderValue
+
+		context.Set(r, ContextData, contextDataObject)
 	}
 }
 
