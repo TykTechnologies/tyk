@@ -47,10 +47,7 @@ type TykMiddleware struct {
 
 func (t *TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
-	var session SessionState
-	var found bool
-
-	session, found = t.Spec.OrgSessionManager.GetSessionDetail(key)
+	session, found := t.Spec.OrgSessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		if config.EnforceOrgDataAge {
@@ -82,96 +79,82 @@ func (t *TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 
 // ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
 func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
-	if session.ApplyPolicyID != "" {
-		log.Debug("Session has policy, checking")
-		policy, ok := Policies[session.ApplyPolicyID]
-		if ok {
-			// Check ownership, policy org owner must be the same as API,
-			// otherwise youcould overwrite a session key with a policy from a different org!
-			if policy.OrgID != t.Spec.APIDefinition.OrgID {
-				log.Error("Attempting to apply policy from different organisation to key, skipping")
-				return
-			}
-
-			log.Debug("Found policy, applying")
-
-			if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
-				// This is a partitioned policy, only apply what is active
-				log.Debug("Applying partitioned policy")
-
-				if policy.Partitions.Quota {
-					// Quotas
-					log.Debug("Applying partition: Quota")
-					session.QuotaMax = policy.QuotaMax
-					session.QuotaRenewalRate = policy.QuotaRenewalRate
-				}
-
-				if policy.Partitions.RateLimit {
-					// Rate limting
-					log.Debug("Applying partition: Rate Limit")
-					session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-					session.Rate = policy.Rate
-					session.Per = policy.Per
-					if policy.LastUpdated != "" {
-						session.LastUpdated = policy.LastUpdated
-					}
-				}
-
-				if policy.Partitions.Acl {
-					// ACL
-					log.Debug("Applying partition: ACL")
-					session.AccessRights = policy.AccessRights
-					session.HMACEnabled = policy.HMACEnabled
-				}
-
-			} else {
-				// This is not a partitioned policy, apply everything
-				log.Debug("Applying regular policy")
-				// Quotas
-				session.QuotaMax = policy.QuotaMax
-				session.QuotaRenewalRate = policy.QuotaRenewalRate
-
-				// Rate limting
-				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-				session.Rate = policy.Rate
-				session.Per = policy.Per
-				if policy.LastUpdated != "" {
-					session.LastUpdated = policy.LastUpdated
-				}
-
-				// ACL
-				session.AccessRights = policy.AccessRights
-				session.HMACEnabled = policy.HMACEnabled
-			}
-
-			// Required for all
-			session.IsInactive = policy.IsInactive
-			session.Tags = policy.Tags
-
-			log.Debug("Policy Applied, Access rights are: ", session.AccessRights)
-			log.Debug("Policy Applied, Access rights were: ", policy.AccessRights)
-
-			// Update the session in the session manager in case it gets called again
-			t.Spec.SessionManager.UpdateSession(key, *session, GetLifetime(t.Spec, session))
-			log.Debug("Policy applied to key")
-		}
+	if session.ApplyPolicyID == "" {
+		return
 	}
+	policy, ok := Policies[session.ApplyPolicyID]
+	if !ok {
+		return
+	}
+	// Check ownership, policy org owner must be the same as API,
+	// otherwise youcould overwrite a session key with a policy from a different org!
+	if policy.OrgID != t.Spec.APIDefinition.OrgID {
+		log.Error("Attempting to apply policy from different organisation to key, skipping")
+		return
+	}
+
+	if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
+		// This is a partitioned policy, only apply what is active
+		if policy.Partitions.Quota {
+			// Quotas
+			session.QuotaMax = policy.QuotaMax
+			session.QuotaRenewalRate = policy.QuotaRenewalRate
+		}
+
+		if policy.Partitions.RateLimit {
+			// Rate limting
+			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+			session.Rate = policy.Rate
+			session.Per = policy.Per
+			if policy.LastUpdated != "" {
+				session.LastUpdated = policy.LastUpdated
+			}
+		}
+
+		if policy.Partitions.Acl {
+			// ACL
+			session.AccessRights = policy.AccessRights
+			session.HMACEnabled = policy.HMACEnabled
+		}
+
+	} else {
+		// This is not a partitioned policy, apply everything
+		// Quotas
+		session.QuotaMax = policy.QuotaMax
+		session.QuotaRenewalRate = policy.QuotaRenewalRate
+
+		// Rate limting
+		session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+		session.Rate = policy.Rate
+		session.Per = policy.Per
+		if policy.LastUpdated != "" {
+			session.LastUpdated = policy.LastUpdated
+		}
+
+		// ACL
+		session.AccessRights = policy.AccessRights
+		session.HMACEnabled = policy.HMACEnabled
+	}
+
+	// Required for all
+	session.IsInactive = policy.IsInactive
+	session.Tags = policy.Tags
+
+	// Update the session in the session manager in case it gets called again
+	t.Spec.SessionManager.UpdateSession(key, *session, GetLifetime(t.Spec, session))
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
 	// Try and get the session from the session store
-	var session SessionState
-	var found bool
-
 	log.Debug("Querying local cache")
 	// Check in-memory cache
 	if !config.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(key)
 		if found {
 			log.Debug("--> Key found in local cache")
-			session = cachedVal.(SessionState)
+			session := cachedVal.(SessionState)
 			t.ApplyPolicyIfExists(key, &session)
 			return session, true
 		}
@@ -179,7 +162,7 @@ func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 
 	// Check session store
 	log.Debug("Querying keystore")
-	session, found = t.Spec.SessionManager.GetSessionDetail(key)
+	session, found := t.Spec.SessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it

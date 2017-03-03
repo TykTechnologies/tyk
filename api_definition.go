@@ -325,8 +325,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
 	if config.DBAppConfOptions.NodeIsSegmented {
 		log.Info("Segmented node, loading: ", config.DBAppConfOptions.Tags)
 		tags = config.DBAppConfOptions.Tags
-	} else {
-		tags = make([]string, 0)
 	}
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
@@ -342,12 +340,12 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
 
 func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APISpec {
 
-	var apiDefs = []*apidef.APIDefinition{}
+	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
 		log.Error("Failed decode: ", err)
 		return nil
 	}
-	var strDefs = make([]map[string]interface{}, 0)
+	var strDefs []map[string]interface{}
 	if err := json.Unmarshal([]byte(apiCollection), &strDefs); err != nil {
 		log.Error("Failed decode: ", err)
 		return nil
