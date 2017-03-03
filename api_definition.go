@@ -56,7 +56,7 @@ type RequestStatus string
 const (
 	VersionNotFound                RequestStatus = "Version information not found"
 	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
-	VersionWhiteListStatusNotFound               = "WhiteListStatus for path not found"
+	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
 	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
 	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
 	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
