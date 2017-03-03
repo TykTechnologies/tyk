@@ -48,22 +48,16 @@ func (m *Monitor) Check(sessionData *SessionState, key string) {
 		return
 	}
 
-	if config.Monitor.GlobalTriggerLimit > 0.0 {
-		if usagePerc >= config.Monitor.GlobalTriggerLimit {
-			log.Info("Firing...")
-			m.Fire(sessionData, key, config.Monitor.GlobalTriggerLimit)
-		}
+	if config.Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Monitor.GlobalTriggerLimit {
+		log.Info("Firing...")
+		m.Fire(sessionData, key, config.Monitor.GlobalTriggerLimit)
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
-		if usagePerc >= triggerLimit {
-
-			if triggerLimit != config.Monitor.GlobalTriggerLimit {
-				log.Info("Firing...")
-				m.Fire(sessionData, key, triggerLimit)
-				break
-			}
-
+		if usagePerc >= triggerLimit && triggerLimit != config.Monitor.GlobalTriggerLimit {
+			log.Info("Firing...")
+			m.Fire(sessionData, key, triggerLimit)
+			break
 		}
 	}
 }

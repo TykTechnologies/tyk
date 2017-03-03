@@ -79,21 +79,22 @@ func GetSpecForOrg(apiID string) *APISpec {
 
 func checkAndApplyTrialPeriod(keyName, apiId string, newSession *SessionState) {
 	// Check the policy to see if we are forcing an expiry on the key
-	if newSession.ApplyPolicyID != "" {
-		policy, ok := Policies[newSession.ApplyPolicyID]
-		if !ok {
-			return
+	if newSession.ApplyPolicyID == "" {
+		return
+	}
+	policy, ok := Policies[newSession.ApplyPolicyID]
+	if !ok {
+		return
+	}
+	// Are we foring an expiry?
+	if policy.KeyExpiresIn > 0 {
+		// We are, does the key exist?
+		_, found := GetKeyDetail(keyName, apiId)
+		if !found {
+			// this is a new key, lets expire it
+			newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
 		}
-		// Are we foring an expiry?
-		if policy.KeyExpiresIn > 0 {
-			// We are, does the key exist?
-			_, found := GetKeyDetail(keyName, apiId)
-			if !found {
-				// this is a new key, lets expire it
-				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
-			}
 
-		}
 	}
 }
 

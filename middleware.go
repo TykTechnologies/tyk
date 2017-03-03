@@ -71,43 +71,40 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 
 			if tykMwSuper.Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
-			} else {
-				err, errCode := mw.ProcessRequest(w, r, mwConf)
-				if err != nil {
-					handler := ErrorHandler{tykMwSuper}
-					handler.HandleError(w, r, err.Error(), errCode)
-					meta["error"] = err.Error()
-					job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
-					job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
-					return
-				}
-
-				// Special code, stops execution
-				if errCode == 1666 {
-					// Stop
-					log.Info("[Middleware] Received stop code")
-					meta["stopped"] = "1"
-					job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
-					job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
-					return
-				}
-
-				// Special code, bypasses all other execution
-				if errCode != 666 {
-					// No error, carry on...
-					meta["bypass"] = "1"
-					h.ServeHTTP(w, r)
-				}
-
+				return
+			}
+			err, errCode := mw.ProcessRequest(w, r, mwConf)
+			if err != nil {
+				handler := ErrorHandler{tykMwSuper}
+				handler.HandleError(w, r, err.Error(), errCode)
+				meta["error"] = err.Error()
 				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
+				return
 			}
 
-		}
+			// Special code, stops execution
+			if errCode == 1666 {
+				// Stop
+				log.Info("[Middleware] Received stop code")
+				meta["stopped"] = "1"
+				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
+				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
+				return
+			}
 
+			// Special code, bypasses all other execution
+			if errCode != 666 {
+				// No error, carry on...
+				meta["bypass"] = "1"
+				h.ServeHTTP(w, r)
+			}
+
+			job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
+			job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
+		}
 		return http.HandlerFunc(handler)
 	}
-
 	return aliceHandler
 }
 
