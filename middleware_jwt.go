@@ -440,45 +440,39 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 }
 
 func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (SessionState, error) {
-	log.Debug("Generating from policyID: ", policyID)
-	log.Debug(Policies)
 	policy, ok := Policies[policyID]
 	sessionState := SessionState{}
-	log.Debug(ok)
-	if ok {
-		log.Debug("Policy found")
-		// Check ownership, policy org owner must be the same as API,
-		// otherwise youcould overwrite a session key with a policy from a different org!
+	if !ok {
+		return sessionState, errors.New("Policy not found")
+	}
+	// Check ownership, policy org owner must be the same as API,
+	// otherwise youcould overwrite a session key with a policy from a different org!
 
-		if enforceOrg {
-			if policy.OrgID != orgID {
-				log.Error("Attempting to apply policy from different organisation to key, skipping")
-				return sessionState, errors.New("Key not authorized: no matching policy")
-			}
-		} else {
-			// Org isn;t enforced, so lets use the policy baseline
-			orgID = policy.OrgID
+	if enforceOrg {
+		if policy.OrgID != orgID {
+			log.Error("Attempting to apply policy from different organisation to key, skipping")
+			return sessionState, errors.New("Key not authorized: no matching policy")
 		}
-
-		log.Debug("Found policy, applying")
-		sessionState.ApplyPolicyID = policyID
-		sessionState.OrgID = orgID
-		sessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-		sessionState.Rate = policy.Rate
-		sessionState.Per = policy.Per
-		sessionState.QuotaMax = policy.QuotaMax
-		sessionState.QuotaRenewalRate = policy.QuotaRenewalRate
-		sessionState.AccessRights = policy.AccessRights
-		sessionState.HMACEnabled = policy.HMACEnabled
-		sessionState.IsInactive = policy.IsInactive
-		sessionState.Tags = policy.Tags
-
-		if policy.KeyExpiresIn > 0 {
-			sessionState.Expires = time.Now().Unix() + policy.KeyExpiresIn
-		}
-
-		return sessionState, nil
+	} else {
+		// Org isn;t enforced, so lets use the policy baseline
+		orgID = policy.OrgID
 	}
 
-	return sessionState, errors.New("Policy not found")
+	sessionState.ApplyPolicyID = policyID
+	sessionState.OrgID = orgID
+	sessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+	sessionState.Rate = policy.Rate
+	sessionState.Per = policy.Per
+	sessionState.QuotaMax = policy.QuotaMax
+	sessionState.QuotaRenewalRate = policy.QuotaRenewalRate
+	sessionState.AccessRights = policy.AccessRights
+	sessionState.HMACEnabled = policy.HMACEnabled
+	sessionState.IsInactive = policy.IsInactive
+	sessionState.Tags = policy.Tags
+
+	if policy.KeyExpiresIn > 0 {
+		sessionState.Expires = time.Now().Unix() + policy.KeyExpiresIn
+	}
+
+	return sessionState, nil
 }

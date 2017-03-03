@@ -18,8 +18,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const DateHeaderSpec = "Date"
-const AltHeaderSpec = "x-aux-date"
+const dateHeaderSpec = "Date"
+const altHeaderSpec = "x-aux-date"
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
@@ -77,11 +77,11 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Get a session for the Key ID
-	secret, sessionState, keyError := hm.getSecretAndSessionForKeyID(fieldValues.KeyID)
-	if keyError != nil {
+	secret, sessionState, err := hm.getSecretAndSessionForKeyID(fieldValues.KeyID)
+	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
-			"error":  keyError,
+			"error":  err,
 			"keyID":  fieldValues.KeyID,
 		}).Error("No HMAC secret for this key")
 		return hm.authorizationError(w, r)
@@ -247,9 +247,7 @@ func (hm *HMACMiddleware) getSecretAndSessionForKeyID(keyId string) (string, Ses
 
 func getDateHeader(r *http.Request) (string, string) {
 
-	auxHeaderVal := r.Header.Get(AltHeaderSpec)
-	dateHeaderVal := r.Header.Get(DateHeaderSpec)
-
+	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
 		authHeaderValue := r.Header.Get("Authorization")
@@ -257,14 +255,15 @@ func getDateHeader(r *http.Request) (string, string) {
 			"prefix":      "hmac",
 			"auth_header": authHeaderValue,
 		}).Warning("Using auxiliary header for this request")
-		return strings.ToLower(AltHeaderSpec), auxHeaderVal
+		return strings.ToLower(altHeaderSpec), auxHeaderVal
 	}
 
+	dateHeaderVal := r.Header.Get(dateHeaderSpec)
 	if dateHeaderVal != "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 		}).Debug("Got date header")
-		return strings.ToLower(DateHeaderSpec), dateHeaderVal
+		return strings.ToLower(dateHeaderSpec), dateHeaderVal
 	}
 
 	return "", ""
@@ -341,6 +340,5 @@ func generateEncodedSignature(signatureString, secret string) string {
 	h.Write([]byte(signatureString))
 
 	encodedString := base64.StdEncoding.EncodeToString(h.Sum(nil))
-	encodedString = url.QueryEscape(encodedString)
-	return encodedString
+	return url.QueryEscape(encodedString)
 }
