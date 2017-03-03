@@ -15,15 +15,15 @@ var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 type TykMiddlewareImplementation interface {
 	New()
 	GetConfig() (interface{}, error)
-	ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) // Handles request
+	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	IsEnabledForSpec() bool
 	GetName() string
 }
 
-func CreateDynamicMiddleware(middlewareName string, isPre, useSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateDynamicMiddleware(name string, isPre, useSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		TykMiddleware:       tykMwSuper,
-		MiddlewareClassName: middlewareName,
+		MiddlewareClassName: name,
 		Pre:                 isPre,
 		UseSession:          useSession,
 	}
@@ -31,15 +31,8 @@ func CreateDynamicMiddleware(middlewareName string, isPre, useSession bool, tykM
 	return CreateMiddleware(dMiddleware, tykMwSuper)
 }
 
-func CreateDynamicAuthMiddleware(middlewareName string, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
-	dMiddleware := &DynamicMiddleware{
-		TykMiddleware:       tykMwSuper,
-		MiddlewareClassName: middlewareName,
-		Auth:                true,
-		UseSession:          false,
-	}
-
-	return CreateMiddleware(dMiddleware, tykMwSuper)
+func CreateDynamicAuthMiddleware(name string, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+	return CreateDynamicMiddleware(name, true, false, tykMwSuper)
 }
 
 // Generic middleware caller to make extension easier
