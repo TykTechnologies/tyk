@@ -115,9 +115,9 @@ type EventTokenMeta struct {
 
 // EventMessage is a standard form to send event data to handlers
 type EventMessage struct {
-	EventType     apidef.TykEvent
-	EventMetaData interface{}
-	TimeStamp     string
+	Type      apidef.TykEvent
+	Meta      interface{}
+	TimeStamp string
 }
 
 // TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
@@ -191,9 +191,9 @@ func (t *TykMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]TykEventHandler) {
 	if handlers, e := handlers[name]; e {
 		eventMessage := EventMessage{
-			EventMetaData: meta,
-			EventType:     name,
-			TimeStamp:     time.Now().Local().String(),
+			Meta:      meta,
+			Type:      name,
+			TimeStamp: time.Now().Local().String(),
 		}
 		for _, handler := range handlers {
 			go handler.HandleEvent(eventMessage)
@@ -223,16 +223,16 @@ func (l *LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, 
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
-	formattedMsgString := fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.EventType)
+	formattedMsgString := fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.Type)
 
 	// We can handle specific event types easily
-	if em.EventType == EventQuotaExceeded {
-		msgConf := em.EventMetaData.(EventQuotaExceededMeta)
+	if em.Type == EventQuotaExceeded {
+		msgConf := em.Meta.(EventQuotaExceededMeta)
 		formattedMsgString = fmt.Sprintf("%s:%s:%s:%s", formattedMsgString, msgConf.Key, msgConf.Origin, msgConf.Path)
 	}
 
-	if em.EventType == EventBreakerTriggered {
-		msgConf := em.EventMetaData.(EventCurcuitBreakerMeta)
+	if em.Type == EventBreakerTriggered {
+		msgConf := em.Meta.(EventCurcuitBreakerMeta)
 		formattedMsgString = fmt.Sprintf("%s:%s:%s: [STATUS] %v", formattedMsgString, msgConf.APIID, msgConf.Path, msgConf.CircuitEvent)
 	}
 

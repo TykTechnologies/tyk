@@ -1,46 +1,46 @@
-{{ if eq .EventType "HostDown"}}
+{{ if eq .Type "HostDown"}}
 {
-    "event": "{{.EventType}}",
-    "message": "{{.EventMetaData.Message}}",
-    "url": "{{.EventMetaData.HostInfo.CheckURL}}",
-    "response_code": "{{.EventMetaData.HostInfo.ResponseCode}}",
-    "tcp_error": "{{.EventMetaData.HostInfo.IsTCPError}}",
-    "host": "{{.EventMetaData.HostInfo.MetaData.host_name}}",
-    "api_id": "{{.EventMetaData.HostInfo.MetaData.api_id}}",
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "url": "{{.Meta.HostInfo.CheckURL}}",
+    "response_code": "{{.Meta.HostInfo.ResponseCode}}",
+    "tcp_error": "{{.Meta.HostInfo.IsTCPError}}",
+    "host": "{{.Meta.HostInfo.MetaData.host_name}}",
+    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}",
 }
-{{ else if eq .EventType "HostUp"}}
+{{ else if eq .Type "HostUp"}}
 {
-    "event": "{{.EventType}}",
-    "message": "{{.EventMetaData.Message}}",
-    "url": "{{.EventMetaData.HostInfo.CheckURL}}",
-    "response_code": "{{.EventMetaData.HostInfo.ResponseCode}}",
-    "tcp_error": "{{.EventMetaData.HostInfo.IsTCPError}}",
-    "host": "{{.EventMetaData.HostInfo.MetaData.host_name}}",
-    "api_id": "{{.EventMetaData.HostInfo.MetaData.api_id}}",
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "url": "{{.Meta.HostInfo.CheckURL}}",
+    "response_code": "{{.Meta.HostInfo.ResponseCode}}",
+    "tcp_error": "{{.Meta.HostInfo.IsTCPError}}",
+    "host": "{{.Meta.HostInfo.MetaData.host_name}}",
+    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}",
 }
-{{ else if eq .EventType "TriggerExceeded"}}
+{{ else if eq .Type "TriggerExceeded"}}
 {
-    "event": "{{.EventType}}",
-    "message": "{{.EventMetaData.Message}}",
-    "org": "{{.EventMetaData.Org}}",
-    "key": "{{.EventMetaData.Key}}",
-    "trigger_limit": "{{.EventMetaData.TriggerLimit}}"
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "org": "{{.Meta.Org}}",
+    "key": "{{.Meta.Key}}",
+    "trigger_limit": "{{.Meta.TriggerLimit}}"
 }
-{{ else if eq .EventType "BreakerTriggered"}}
+{{ else if eq .Type "BreakerTriggered"}}
 {
-    "event": "{{.EventType}}",
-    "message": "{{.EventMetaData.Message}}",
-    "api_id": "{{.EventMetaData.APIID}}",
-    "path": "{{.EventMetaData.Path}}",
-    "Status": "{{.EventMetaData.CircuitEvent}}"
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+    "path": "{{.Meta.Path}}",
+    "Status": "{{.Meta.CircuitEvent}}"
 }
 {{ else}}
 {
-    "event": "{{.EventType}}",
-    "message": "{{.EventMetaData.Message}}",
-    "path": "{{.EventMetaData.Path}}",
-    "origin": "{{.EventMetaData.Origin}}",
-    "key": "{{.EventMetaData.Key}}"
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "path": "{{.Meta.Path}}",
+    "origin": "{{.Meta.Origin}}",
+    "key": "{{.Meta.Key}}"
 }
 {{ end }}
 

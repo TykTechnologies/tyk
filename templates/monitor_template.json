@@ -1,7 +1,7 @@
 {
-    "event": "{{.EventType}}",
-    "message": "{{.EventMetaData.Message}}",
-    "org": "{{.EventMetaData.Org}}",
-    "key": "{{.EventMetaData.Key}}",
-    "trigger_limit": "{{.EventMetaData.TriggerLimit}}"
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "org": "{{.Meta.Org}}",
+    "key": "{{.Meta.Key}}",
+    "trigger_limit": "{{.Meta.TriggerLimit}}"
 }

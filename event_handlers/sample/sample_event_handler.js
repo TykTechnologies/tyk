@@ -7,8 +7,8 @@ sampleHandler.NewHandler(function(event, context) {
     
     /* The Event object:
     {
-        "EventType": "Event Typ Code",
-        "EventMetaData": {
+        "Type": "Event Typ Code",
+        "Meta": {
             "Message": "MEvent descriptions",
             "Path": "/{{api_id}}/{{path}}",
             "Origin": "1.1.1.1:PORT",
