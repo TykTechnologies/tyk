@@ -260,7 +260,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	d.HandleResponse(w, newResponse, &sessionState)
 
 	// Record analytics
-	go d.sh.RecordHit(w, r, 0, newResponse.StatusCode, copiedRequest, copiedResponse)
+	go d.sh.RecordHit(r, 0, newResponse.StatusCode, copiedRequest, copiedResponse)
 
 	return copiedRes
 

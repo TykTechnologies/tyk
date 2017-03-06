@@ -46,7 +46,7 @@ func (hm *HMACMiddleware) GetConfig() (interface{}, error) {
 func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	authHeaderValue := r.Header.Get("Authorization")
 	if authHeaderValue == "" {
-		return hm.authorizationError(w, r)
+		return hm.authorizationError(r)
 	}
 
 	// Clean it
@@ -62,7 +62,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			"error":  err,
 			"header": authHeaderValue,
 		}).Error("Field extraction failed")
-		return hm.authorizationError(w, r)
+		return hm.authorizationError(r)
 	}
 
 	// Generate a signature string
@@ -73,7 +73,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			"error":            err,
 			"signature_string": signatureString,
 		}).Error("Signature string generation failed")
-		return hm.authorizationError(w, r)
+		return hm.authorizationError(r)
 	}
 
 	// Get a session for the Key ID
@@ -84,7 +84,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			"error":  err,
 			"keyID":  fieldValues.KeyID,
 		}).Error("No HMAC secret for this key")
-		return hm.authorizationError(w, r)
+		return hm.authorizationError(r)
 	}
 
 	// Create a signed string with the secret
@@ -115,7 +115,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			"expected": encodedSignature,
 			"got":      fieldValues.Signature,
 		}).Error("Signature string does not match!")
-		return hm.authorizationError(w, r)
+		return hm.authorizationError(r)
 	}
 
 	// Check clock skew
@@ -124,7 +124,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 		}).Error("Clock skew outside of acceptable bounds")
-		return hm.authorizationError(w, r)
+		return hm.authorizationError(r)
 	}
 
 	// Set session state on context, we will need it later
@@ -175,7 +175,7 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 	}
 }
 
-func (hm *HMACMiddleware) authorizationError(w http.ResponseWriter, r *http.Request) (error, int) {
+func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 	log.WithFields(logrus.Fields{
 		"prefix": "hmac",
 		"path":   r.URL.Path,

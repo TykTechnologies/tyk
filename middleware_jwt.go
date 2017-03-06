@@ -207,7 +207,7 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 }
 
 // processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
-func (k *JWTMiddleware) processCentralisedJWT(w http.ResponseWriter, r *http.Request, token *jwt.Token) (error, int) {
+func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
 	log.Debug("JWT authority is centralised")
 	// Generate a virtual token
 	baseFieldData, baseFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
@@ -286,7 +286,7 @@ func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
 }
 
-func (k *JWTMiddleware) processOneToOneTokenMap(w http.ResponseWriter, r *http.Request, token *jwt.Token) (error, int) {
+func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Token) (error, int) {
 	tykId, found := k.getIdentityFomToken(token)
 
 	if !found {
@@ -394,11 +394,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 
 		// Are we mapping to a central JWT Secret?
 		if k.TykMiddleware.Spec.APIDefinition.JWTSource != "" {
-			return k.processCentralisedJWT(w, r, token)
+			return k.processCentralisedJWT(r, token)
 		}
 
 		// No, let's try one-to-one mapping
-		return k.processOneToOneTokenMap(w, r, token)
+		return k.processOneToOneTokenMap(r, token)
 	}
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
