@@ -294,7 +294,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		go m.sh.RecordHit(w, r, 0, newRes.StatusCode, copiedRequest, nil)
+		go m.sh.RecordHit(r, 0, newRes.StatusCode, copiedRequest, nil)
 	}
 
 	// Stop any further execution

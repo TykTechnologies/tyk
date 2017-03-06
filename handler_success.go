@@ -201,7 +201,7 @@ type SuccessHandler struct {
 	*TykMiddleware
 }
 
-func (s *SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
+func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack {
 		return
@@ -351,7 +351,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		if RecordDetail(r) {
 			copiedResponse = CopyHttpResponse(resp)
 		}
-		s.RecordHit(w, r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
+		s.RecordHit(r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
 	log.Debug("Done proxy")
 	return nil
@@ -384,7 +384,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	log.Debug("Upstream request took (ms): ", millisec)
 
 	if inRes != nil {
-		s.RecordHit(w, r, int64(millisec), inRes.StatusCode, copiedRequest, copiedResponse)
+		s.RecordHit(r, int64(millisec), inRes.StatusCode, copiedRequest, copiedResponse)
 	}
 
 	return inRes

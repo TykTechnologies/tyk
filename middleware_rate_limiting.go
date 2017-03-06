@@ -34,7 +34,7 @@ func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
 	return !k.TykMiddleware.Spec.DisableRateLimit || !k.TykMiddleware.Spec.DisableQuota
 }
 
-func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(w http.ResponseWriter, r *http.Request, authHeaderValue string) (error, int) {
+func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, authHeaderValue string) (error, int) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
 		"origin": GetIPFromRequest(r),
@@ -55,7 +55,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(w http.ResponseWriter, r
 	return errors.New("Rate limit exceeded"), 429
 }
 
-func (k *RateLimitAndQuotaCheck) handleQuotaFailure(w http.ResponseWriter, r *http.Request, authHeaderValue string) (error, int) {
+func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, authHeaderValue string) (error, int) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
 		"origin": GetIPFromRequest(r),
@@ -105,9 +105,9 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	if !forwardMessage {
 		// TODO Use an Enum!
 		if reason == 1 {
-			return k.handleRateLimitFailure(w, r, authHeaderValue)
+			return k.handleRateLimitFailure(r, authHeaderValue)
 		} else if reason == 2 {
-			return k.handleQuotaFailure(w, r, authHeaderValue)
+			return k.handleQuotaFailure(r, authHeaderValue)
 		}
 
 		// Other reason? Still not allowed
