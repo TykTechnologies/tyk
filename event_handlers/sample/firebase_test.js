@@ -7,8 +7,8 @@ fbHandler.NewHandler(function(event, context) {
     
     /*      The Event object:
             {
-                "EventType": "Event Typ Code",
-                "EventMetaData": {
+                "Type": "Event Typ Code",
+                "Meta": {
                     "Message": "MEvent descriptions",
                     "Path": "/{{api_id}}/{{path}}",
                     "Origin": "1.1.1.1:PORT",
@@ -65,8 +65,8 @@ fbHandler.NewHandler(function(event, context) {
     log("URL: /middleware/fb/" + fbResponse.name + ".json")
     responseDetails = JSON.parse(TykMakeHttpRequest(JSON.stringify(getDetails))); 
     objDetails = JSON.parse(responseDetails.Body)
-    log("Key: " + objDetails.EventMetaData.Key);
-    log("Message: " + objDetails.EventMetaData.Message);
+    log("Key: " + objDetails.Meta.Key);
+    log("Message: " + objDetails.Meta.Message);
     log("--- DONE ---")
 });
 

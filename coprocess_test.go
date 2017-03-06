@@ -64,12 +64,12 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if wrapper.Event.EventType != EventAuthFailure {
+	if wrapper.Event.Type != EventAuthFailure {
 		t.Fatal("Wrong event type")
 	}
 
-	got := wrapper.Event.EventMetaData.(map[string]interface{})
-	if got["Message"] != meta.EventMetaDefault.Message || got["Path"] != meta.Path || got["Origin"] != meta.Origin || got["Key"] != meta.Key {
+	got := wrapper.Event.Meta.(map[string]interface{})
+	if got["Message"] != meta.Message || got["Path"] != meta.Path || got["Origin"] != meta.Origin || got["Key"] != meta.Key {
 		t.Fatalf("Wrong event metadata\ngot: %#v\nwant: %#v", got, meta)
 	}
 }

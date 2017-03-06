@@ -142,14 +142,14 @@ This function will be called when the specified event occurs, Tyk will pass a Py
 ```json
 {  
    "TimeStamp": "2016-08-19 11:13:31.537047694 -0400 PYT",
-   "EventMetaData":{  
+   "Meta":{  
       "Path":"/coprocess-auth-tyk-api-test/",
       "Origin":"127.0.0.1",
       "Message":"Auth Failure",
       "OriginatingRequest":"R0VUIC9jb3Byb2Nlc3MtYXV0aC10eWstYXBpLXRlc3QvIEhUVFAvMS4xDQpIb3N0OiAxMjcuMC4wLjE6ODA4MA0KVXNlci1BZ2VudDogY3VybC83LjQzLjANCkFjY2VwdDogKi8qDQpBdXRob3JpemF0aW9uOiAxDQoNCg==",
       "Key":""
    },
-   "EventType": "AuthFailure"
+   "Type": "AuthFailure"
 }
 ```
 
