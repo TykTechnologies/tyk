@@ -212,6 +212,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		obfuscated = "****" + keyName[len(keyName)-4:]
 	}
 
+	// TODO: what is this bit of code for?
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
 		// If we aren't the first proxy retain prior

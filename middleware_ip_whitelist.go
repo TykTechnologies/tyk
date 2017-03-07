@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"strings"
 )
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream
@@ -53,21 +52,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 			allowedIP = net.ParseIP(ip)
 		}
 
-		splitIP := strings.Split(r.RemoteAddr, ":")
-		remoteIPString := splitIP[0]
-
-		// If X-Forwarded-For is set, override remoteIPString
-		forwarded := r.Header.Get("X-Forwarded-For")
-		if forwarded != "" {
-			ips := strings.Split(forwarded, ", ")
-			remoteIPString = ips[0]
-			log.Info("X-Forwarded-For set, remote IP: ", remoteIPString)
-		}
-
-		if len(splitIP) > 2 {
-			// Might be an IPv6 address, don't mess with it
-			remoteIPString = r.RemoteAddr
-		}
+		remoteIPString := GetIPFromRequest(r)
 		remoteIP = net.ParseIP(remoteIPString)
 
 		// Check CIDR if possible
