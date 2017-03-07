@@ -81,17 +81,17 @@ func (s *ServiceDiscovery) addPortFromObject(host string, obj *gabs.Container) s
 	// Grab the port object
 	port := s.decodeToNameSpace(s.portPath, obj)
 
-	switch port.(type) {
+	switch x := port.(type) {
 	case []interface{}:
-		port = port.([]interface{})[0]
+		port = x[0]
 	}
 
 	var portToUse string
-	switch port.(type) {
+	switch x := port.(type) {
 	case string:
-		portToUse = port.(string)
+		portToUse = x
 	case float64:
-		portToUse = strconv.Itoa(int(port.(float64)))
+		portToUse = strconv.Itoa(int(x))
 	}
 
 	return host + ":" + portToUse
@@ -153,14 +153,12 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 			// Get the data path from the decoded object
 			subContainer := gabs.Container{}
 
-			switch parentData.(type) {
-			default:
+			// Now check if this string is a list
+			nestedString, ok := parentData.(string)
+			if !ok {
 				log.Debug("parentData is not a string")
 				return hostList
-			case string:
 			}
-			// Now check if this string is a list
-			nestedString := parentData.(string)
 			if s.isList(nestedString) {
 				log.Debug("Yup, it's a list")
 				jsonData := s.rawListToObj(nestedString)
@@ -177,14 +175,9 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 				return hostList
 			}
 			log.Debug("Not a list")
-			switch parentData.(type) {
-			default:
-				log.Debug("parentData is not a string")
-			case string:
-				s.ParseObject(parentData.(string), &subContainer)
-				set = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-				log.Debug("set (object list): ", objList)
-			}
+			s.ParseObject(nestedString, &subContainer)
+			set = s.decodeToNameSpaceAsArray(s.dataPath, objList)
+			log.Debug("set (object list): ", objList)
 		} else if s.parentPath != "" {
 			set = s.decodeToNameSpaceAsArray(s.parentPath, objList)
 		}

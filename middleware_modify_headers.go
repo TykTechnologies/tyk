@@ -91,26 +91,25 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 				if contextData != nil {
 					tempVal, ok := contextData[metaKey]
 					if ok {
-						switch tempVal.(type) {
+						switch x := tempVal.(type) {
 						case string:
-							nVal = tempVal.(string)
+							nVal = x
 						case []string:
-							nVal = strings.Join(tempVal.([]string), ",")
+							nVal = strings.Join(x, ",")
 							// Remove empty start
 							nVal = strings.TrimPrefix(nVal, ",")
 						case url.Values:
-							end := len(tempVal.(url.Values))
 							i := 0
 							nVal = ""
-							for key, val := range tempVal.(url.Values) {
+							for key, val := range x {
 								nVal += key + ":" + strings.Join(val, ",")
-								if i < end-1 {
+								if i < len(x)-1 {
 									nVal += ";"
 								}
 								i++
 							}
 						default:
-							log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
+							log.Error("Context variable type is not supported: ", reflect.TypeOf(x))
 						}
 
 						r.Header.Add(nKey, nVal)
