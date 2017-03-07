@@ -139,9 +139,9 @@ func EncodeRequestToEvent(r *http.Request) string {
 func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (TykEventHandler, error) {
 
 	var conf interface{}
-	switch handlerConf.HandlerMeta.(type) {
+	switch x := handlerConf.HandlerMeta.(type) {
 	case bson.M:
-		asByte, ok := json.Marshal(handlerConf.HandlerMeta)
+		asByte, ok := json.Marshal(x)
 		if ok != nil {
 			log.Error("Failed to unmarshal handler meta! ", ok)
 		}
@@ -149,7 +149,7 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *A
 			log.Error("Return conversion failed, ", err)
 		}
 	default:
-		conf = handlerConf.HandlerMeta
+		conf = x
 	}
 
 	switch handlerConf.Handler {

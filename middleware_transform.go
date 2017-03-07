@@ -83,17 +83,17 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		if tmeta.TemplateMeta.TemplateData.EnableSession {
 			ses := context.Get(r, SessionData).(SessionState)
-			switch bodyData.(type) {
+			switch x := bodyData.(type) {
 			case map[string]interface{}:
-				bodyData.(map[string]interface{})["_tyk_meta"] = ses.MetaData
+				x["_tyk_meta"] = ses.MetaData
 			}
 		}
 
 		if t.Spec.EnableContextVars {
 			contextData := context.Get(r, ContextData)
-			switch bodyData.(type) {
+			switch x := bodyData.(type) {
 			case map[string]interface{}:
-				bodyData.(map[string]interface{})["_tyk_context"] = contextData
+				x["_tyk_context"] = contextData
 			}
 		}
 
