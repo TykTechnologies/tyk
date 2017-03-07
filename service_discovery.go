@@ -74,9 +74,9 @@ func (s *ServiceDiscovery) decodeToNameSpaceAsArray(namespace string, jsonParsed
 	return value
 }
 
-func (s *ServiceDiscovery) GetPortFromObject(host *string, obj *gabs.Container) {
+func (s *ServiceDiscovery) addPortFromObject(host string, obj *gabs.Container) string {
 	if !s.portSeperate {
-		return
+		return host
 	}
 	// Grab the port object
 	port := s.decodeToNameSpace(s.portPath, obj)
@@ -94,7 +94,7 @@ func (s *ServiceDiscovery) GetPortFromObject(host *string, obj *gabs.Container) 
 		portToUse = strconv.Itoa(int(port.(float64)))
 	}
 
-	*host += ":" + portToUse
+	return host + ":" + portToUse
 }
 
 func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
@@ -115,7 +115,7 @@ func (s *ServiceDiscovery) GetObject(item *gabs.Container) string {
 	hostnameData := s.decodeToNameSpace(s.dataPath, item)
 	if str, ok := hostnameData.(string); ok {
 		// Get the port
-		s.GetPortFromObject(&str, item)
+		str = s.addPortFromObject(str, item)
 		return str
 	}
 	log.Warning("Get Object: hostname is not a string")
@@ -163,8 +163,8 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 			nestedString := parentData.(string)
 			if s.isList(nestedString) {
 				log.Debug("Yup, it's a list")
-				s.ConvertRawListToObj(&nestedString)
-				s.ParseObject(nestedString, &subContainer)
+				jsonData := s.rawListToObj(nestedString)
+				s.ParseObject(jsonData, &subContainer)
 				set = s.decodeToNameSpaceAsArray(arrayName, &subContainer)
 
 				// Hijack this here because we need to use a non-nested get
@@ -208,9 +208,9 @@ func (s *ServiceDiscovery) GetSubObject(obj *gabs.Container) string {
 	return s.GetHostname(obj) + s.targetPath
 }
 
-func (s *ServiceDiscovery) ConvertRawListToObj(rawData *string) {
+func (s *ServiceDiscovery) rawListToObj(rawData string) string {
 	// Modify to turn a list object into a regular object
-	*rawData = `{"` + arrayName + `":` + *rawData + `}`
+	return `{"` + arrayName + `":` + rawData + `}`
 }
 
 func (s *ServiceDiscovery) ParseObject(contents string, jsonParsed *gabs.Container) error {
@@ -231,8 +231,8 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, err
 
 	if s.endpointReturnsList {
 		// Convert to an object
-		s.ConvertRawListToObj(&rawData)
-		if err := s.ParseObject(rawData, &jsonParsed); err != nil {
+		jsonData := s.rawListToObj(rawData)
+		if err := s.ParseObject(jsonData, &jsonParsed); err != nil {
 			log.Error("Parse object failed: ", err)
 			return nil, err
 		}
