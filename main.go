@@ -1259,7 +1259,7 @@ func startDRL() {
 	}
 }
 
-func listen(l net.Listener, controlListener net.Listener, err error) {
+func listen(l, controlListener net.Listener, err error) {
 	readtimeout := 120
 	writeTimeout := 120
 	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)

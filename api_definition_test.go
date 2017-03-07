@@ -434,7 +434,7 @@ func TestGetAPISpecsRPCFailure(t *testing.T) {
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
 		return "malformed json", nil
 	})
-	dispatcher.AddFunc("Login", func(clientAddr string, userKey string) bool {
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
 		return true
 	})
 
@@ -453,7 +453,7 @@ func TestGetAPISpecsRPCSuccess(t *testing.T) {
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
 		return "[{}]", nil
 	})
-	dispatcher.AddFunc("Login", func(clientAddr string, userKey string) bool {
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
 		return true
 	})
 

@@ -795,11 +795,11 @@ func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionI
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-func (a *APISpec) Init(authStore StorageHandler, sessionStore StorageHandler, healthStorageHandler StorageHandler, orgStorageHandler StorageHandler) {
+func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore StorageHandler) {
 	a.AuthManager.Init(authStore)
 	a.SessionManager.Init(sessionStore)
-	a.Health.Init(healthStorageHandler)
-	a.OrgSessionManager.Init(orgStorageHandler)
+	a.Health.Init(healthStore)
+	a.OrgSessionManager.Init(orgStore)
 }
 
 func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {

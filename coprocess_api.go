@@ -29,7 +29,7 @@ const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
 // TykStoreData is a CoProcess API function for storing data.
 //export TykStoreData
-func TykStoreData(CKey *C.char, CValue *C.char, CTTL C.int) {
+func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
@@ -51,7 +51,7 @@ func TykGetData(CKey *C.char) *C.char {
 
 // TykTriggerEvent is a CoProcess API function for triggering Tyk system events.
 //export TykTriggerEvent
-func TykTriggerEvent(CEventName *C.char, CPayload *C.char) {
+func TykTriggerEvent(CEventName, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
 	payload := C.GoString(CPayload)
 
@@ -62,7 +62,7 @@ func TykTriggerEvent(CEventName *C.char, CPayload *C.char) {
 
 // CoProcessLog is a bridge for using Tyk log from CP.
 //export CoProcessLog
-func CoProcessLog(CMessage *C.char, CLogLevel *C.char) {
+func CoProcessLog(CMessage, CLogLevel *C.char) {
 	message := C.GoString(CMessage)
 	logLevel := C.GoString(CLogLevel)
 	switch logLevel {
