@@ -239,18 +239,14 @@ func (s *SuccessHandler) RecordHit(w http.ResponseWriter, r *http.Request, timin
 		rawRequest := ""
 		rawResponse := ""
 		if RecordDetail(r) {
-			if requestCopy != nil {
-				// Get the wire format representation
-				var wireFormatReq bytes.Buffer
-				requestCopy.Write(&wireFormatReq)
-				rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-			}
-			if responseCopy != nil {
-				// Get the wire format representation
-				var wireFormatRes bytes.Buffer
-				responseCopy.Write(&wireFormatRes)
-				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
-			}
+			// Get the wire format representation
+			var wireFormatReq bytes.Buffer
+			requestCopy.Write(&wireFormatReq)
+			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+			// Get the wire format representation
+			var wireFormatRes bytes.Buffer
+			responseCopy.Write(&wireFormatRes)
+			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 		}
 
 		trackThisEndpoint, ok := context.GetOk(r, TrackThisEndpoint)

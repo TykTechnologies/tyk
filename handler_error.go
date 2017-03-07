@@ -120,20 +120,14 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tags = sessionState.(SessionState).Tags
 		}
 
-		var requestCopy *http.Request
-		if RecordDetail(r) {
-			requestCopy = CopyHttpRequest(r)
-		}
-
 		rawRequest := ""
 		rawResponse := ""
 		if RecordDetail(r) {
-			if requestCopy != nil {
-				// Get the wire format representation
-				var wireFormatReq bytes.Buffer
-				requestCopy.Write(&wireFormatReq)
-				rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-			}
+			requestCopy := CopyHttpRequest(r)
+			// Get the wire format representation
+			var wireFormatReq bytes.Buffer
+			requestCopy.Write(&wireFormatReq)
+			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 		}
 
 		trackThisEndpoint, ok := context.GetOk(r, TrackThisEndpoint)
