@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -320,13 +319,7 @@ func (c *Config) StoreAnalytics(r *http.Request) bool {
 		return false
 	}
 
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-
-	forwarded := r.Header.Get("X-FORWARDED-FOR")
-	if forwarded != "" {
-		ips := strings.Split(forwarded, ", ")
-		ip = ips[0]
-	}
+	ip := GetIPFromRequest(r)
 	return !c.AnalyticsConfig.ignoredIPsCompiled[ip]
 }
 

@@ -161,7 +161,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.RemoteAddr = "127.0.0.1"
+	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Add("authorization", "1234wer")
 
 	if err != nil {
@@ -186,7 +186,7 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.RemoteAddr = "127.0.0.1"
+	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Add("authorization", "gfgg1234")
 
 	if err != nil {
@@ -211,7 +211,7 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.RemoteAddr = "127.0.0.2"
+	req.RemoteAddr = "127.0.0.2:80"
 	req.Header.Add("authorization", "gfgg1234")
 
 	if err != nil {
@@ -236,7 +236,7 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.RemoteAddr = "10.0.0.1"
+	req.RemoteAddr = "10.0.0.1:80"
 	req.Header.Add("authorization", "gfgg1234")
 
 	if err != nil {
@@ -261,7 +261,7 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
 	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.RemoteAddr = "10.0.0.1"
+	req.RemoteAddr = "10.0.0.1:80"
 	req.Header.Add("X-Forwarded-For", "127.0.0.1")
 	req.Header.Add("authorization", "gfgg1234")
 
