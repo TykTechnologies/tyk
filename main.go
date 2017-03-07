@@ -1047,7 +1047,7 @@ func main() {
 
 		// Kill the parent, now that the child has started successfully.
 		log.Debug("KILLING PARENT PROCESS")
-		if err := goagain.Kill(); nil != err {
+		if err := goagain.Kill(); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Fatalln(err)
@@ -1055,7 +1055,7 @@ func main() {
 	}
 
 	// Block the main goroutine awaiting signals.
-	if _, err := goagain.Wait(l); nil != err {
+	if _, err := goagain.Wait(l); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Fatalln(err)
@@ -1063,7 +1063,7 @@ func main() {
 
 	// Do whatever's necessary to ensure a graceful exit
 	// In this case, we'll simply stop listening and wait one second.
-	if err := l.Close(); nil != err {
+	if err := l.Close(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Error("Listen handler exit: ", err)
@@ -1272,7 +1272,7 @@ func listen(l net.Listener, controlListener net.Listener, err error) {
 	}
 
 	// Handle reload when SIGUSR2 is received
-	if nil != err {
+	if err != nil {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
