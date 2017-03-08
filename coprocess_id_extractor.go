@@ -46,7 +46,7 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 
 // PostProcess sets context variables and updates the storage.
 func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, sessionID string) {
-	var sessionLifetime = GetLifetime(e.Spec, &sessionState)
+	sessionLifetime := GetLifetime(e.Spec, &sessionState)
 	e.Spec.SessionManager.UpdateSession(sessionID, sessionState, sessionLifetime)
 
 	context.Set(r, SessionData, sessionState)
@@ -55,7 +55,7 @@ func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, 
 
 // ExtractHeader is used when a HeaderSource is specified.
 func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err error) {
-	var headerName = e.Config.ExtractorConfig["header_name"].(string)
+	headerName := e.Config.ExtractorConfig["header_name"].(string)
 	headerValue = r.Header.Get(headerName)
 	if headerValue == "" {
 		err = errors.New("Bad header value.")

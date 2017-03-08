@@ -170,8 +170,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	var sessionState = SessionState{}
-	var authHeaderValue = ""
+	sessionState := SessionState{}
+	authHeaderValue := ""
 
 	// Encode the session object (if not a pre-process)
 	if vmeta.UseSession {

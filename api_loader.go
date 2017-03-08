@@ -122,7 +122,7 @@ func processSpec(referenceSpec *APISpec,
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore StorageHandler,
 	subrouter *mux.Router) *ChainObject {
 
-	var chainDef = ChainObject{}
+	var chainDef ChainObject
 	chainDef.Subrouter = subrouter
 
 	log.WithFields(logrus.Fields{
@@ -321,11 +321,11 @@ func processSpec(referenceSpec *APISpec,
 
 	} else {
 
-		var chainArray = []alice.Constructor{}
+		var chainArray []alice.Constructor
 
 		handleCORS(&chainArray, referenceSpec)
 
-		var baseChainArray_PreAuth = []alice.Constructor{}
+		var baseChainArray_PreAuth []alice.Constructor
 		AppendMiddleware(&baseChainArray_PreAuth, &RateCheckMW{TykMiddleware: tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PreAuth, &IPWhiteListMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PreAuth, &OrganizationMonitor{TykMiddleware: tykMiddleware}, tykMiddleware)
@@ -350,7 +350,7 @@ func processSpec(referenceSpec *APISpec,
 		chainArray = append(chainArray, baseChainArray_PreAuth...)
 
 		// Select the keying method to use for setting session states
-		var authArray = []alice.Constructor{}
+		var authArray []alice.Constructor
 		if referenceSpec.APIDefinition.UseOauth2 {
 			// Oauth2
 			log.WithFields(logrus.Fields{
@@ -451,7 +451,7 @@ func processSpec(referenceSpec *APISpec,
 			AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver}, tykMiddleware)
 		}
 
-		var baseChainArray_PostAuth = []alice.Constructor{}
+		var baseChainArray_PostAuth []alice.Constructor
 		AppendMiddleware(&baseChainArray_PostAuth, &KeyExpired{tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PostAuth, &AccessRightsCheck{tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PostAuth, &RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)
@@ -497,7 +497,7 @@ func processSpec(referenceSpec *APISpec,
 			CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 			CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware)}
 
-		var fullSimpleChain = []alice.Constructor{}
+		var fullSimpleChain []alice.Constructor
 		fullSimpleChain = append(fullSimpleChain, simpleChain_PreAuth...)
 		fullSimpleChain = append(fullSimpleChain, authArray...)
 		fullSimpleChain = append(fullSimpleChain, simpleChain_PostAuth...)

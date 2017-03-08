@@ -331,7 +331,7 @@ func getAuthCode(t *testing.T) map[string]string {
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
 
-	var response = map[string]string{}
+	response := map[string]string{}
 	body, _ := ioutil.ReadAll(recorder.Body)
 	if err := json.Unmarshal(body, &response); err != nil {
 	}
@@ -366,7 +366,7 @@ func getToken(t *testing.T) tokenData {
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
 
-	var response = tokenData{}
+	response := tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
 	if err := json.Unmarshal(body, &response); err != nil {
 	}
@@ -393,7 +393,7 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
 
-	var response = tokenData{}
+	response := tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
 	if err := json.Unmarshal(body, &response); err != nil {
 		t.Fatal(err)
