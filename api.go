@@ -824,28 +824,22 @@ type PolicyUpdateObj struct {
 
 func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Warning("Hashed key change request detected!")
+	if r.Method != "POST" {
+		doJSONWrite(w, 405, createError("Method not supported"))
+		return
+	}
+	decoder := json.NewDecoder(r.Body)
+	var policRecord PolicyUpdateObj
+	if err := decoder.Decode(&policRecord); err != nil {
+		decodeFail := APIStatusMessage{"error", "Couldn't decode instruction"}
+		responseMessage, _ := json.Marshal(&decodeFail)
+		doJSONWrite(w, 400, responseMessage)
+		return
+	}
+
 	keyName := r.URL.Path[len("/tyk/keys/policy/"):]
 	apiID := r.FormValue("api_id")
-	var responseMessage []byte
-	var code int
-
-	if r.Method == "POST" {
-		decoder := json.NewDecoder(r.Body)
-		var policRecord PolicyUpdateObj
-		if err := decoder.Decode(&policRecord); err != nil {
-			decodeFail := APIStatusMessage{"error", "Couldn't decode instruction"}
-			responseMessage, _ = json.Marshal(&decodeFail)
-			doJSONWrite(w, 400, responseMessage)
-			return
-		}
-
-		responseMessage, code = handleUpdateHashedKey(keyName, apiID, policRecord.Policy)
-
-	} else {
-		// Return Not supported message (and code)
-		code = 405
-		responseMessage = createError("Method not supported")
-	}
+	responseMessage, code := handleUpdateHashedKey(keyName, apiID, policRecord.Policy)
 
 	doJSONWrite(w, code, responseMessage)
 }
@@ -1514,85 +1508,82 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
-	keyCombined := r.URL.Path[len("/tyk/oauth/refresh/"):]
+	if r.Method != "DELETE" {
+		doJSONWrite(w, 405, createError("Method not supported"))
+		return
+	}
+	apiID := r.FormValue("api_id")
+	if apiID == "" {
+		doJSONWrite(w, 400, createError("Missing parameter api_id"))
+		return
+	}
+	apiSpec := GetSpecForApi(apiID)
 
-	if r.Method == "DELETE" {
-		apiID := r.FormValue("api_id")
-		if apiID == "" {
-			doJSONWrite(w, 400, createError("Missing parameter api_id"))
-			return
-		}
-		apiSpec := GetSpecForApi(apiID)
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"apiID":  apiID,
+	}).Debug("Looking for refresh token in API Register")
 
+	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  apiID,
-		}).Debug("Looking for refresh token in API Register")
+			"status": "fail",
+			"err":    "API not found",
+		}).Error("Failed to invalidate refresh token")
 
-		if apiSpec == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  apiID,
-				"status": "fail",
-				"err":    "API not found",
-			}).Error("Failed to invalidate refresh token")
-
-			doJSONWrite(w, 400, createError("API for this refresh token not found"))
-			return
-		}
-
-		if apiSpec.OAuthManager == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  apiID,
-				"status": "fail",
-				"err":    "API is not OAuth",
-			}).Error("Failed to invalidate refresh token")
-
-			doJSONWrite(w, 400, createError("OAuth is not enabled on this API"))
-			return
-		}
-
-		err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  apiID,
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to invalidate refresh token")
-
-			doJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
-			return
-		}
-
-		success := APIModifyKeySuccess{
-			Key:    keyCombined,
-			Status: "ok",
-			Action: "deleted",
-		}
-
-		responseMessage, err := json.Marshal(&success)
-
-		if err != nil {
-			log.Error(err)
-			doJSONWrite(w, 400, createError("Failed to marshal data"))
-			return
-		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"token":  keyCombined,
-			"status": "ok",
-		}).Info("Invalidated refresh token")
-
-		doJSONWrite(w, 200, responseMessage)
+		doJSONWrite(w, 400, createError("API for this refresh token not found"))
 		return
 	}
 
-	doJSONWrite(w, 405, createError("Method not supported"))
+	if apiSpec.OAuthManager == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"err":    "API is not OAuth",
+		}).Error("Failed to invalidate refresh token")
+
+		doJSONWrite(w, 400, createError("OAuth is not enabled on this API"))
+		return
+	}
+
+	keyCombined := r.URL.Path[len("/tyk/oauth/refresh/"):]
+	err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to invalidate refresh token")
+
+		doJSONWrite(w, 400, createError("Failed to invalidate refresh token"))
+		return
+	}
+
+	success := APIModifyKeySuccess{
+		Key:    keyCombined,
+		Status: "ok",
+		Action: "deleted",
+	}
+
+	responseMessage, err := json.Marshal(&success)
+
+	if err != nil {
+		log.Error(err)
+		doJSONWrite(w, 400, createError("Failed to marshal data"))
+		return
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"apiID":  apiID,
+		"token":  keyCombined,
+		"status": "ok",
+	}).Info("Invalidated refresh token")
+
+	doJSONWrite(w, 200, responseMessage)
 }
 
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -1845,53 +1836,39 @@ func getOauthClients(apiID string) ([]byte, int) {
 }
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	code := 200
-
-	if r.Method == "GET" {
-		if config.HealthCheck.EnableHealthChecks {
-			apiID := r.FormValue("api_id")
-			if apiID == "" {
-				code = 405
-				responseMessage = createError("missing api_id parameter")
-			} else {
-				apiSpec := GetSpecForApi(apiID)
-				if apiSpec != nil {
-					health, _ := apiSpec.Health.GetApiHealthValues()
-					var err error
-					responseMessage, err = json.Marshal(health)
-					if err != nil {
-						code = 405
-						responseMessage = createError("Failed to encode data")
-					}
-				} else {
-					code = 405
-					responseMessage = createError("API ID not found")
-				}
-
-			}
-		} else {
-			code = 405
-			responseMessage = createError("Health checks are not enabled for this node")
-		}
-	} else {
-		// Return Not supported message (and code)
-		code = 405
-		responseMessage = createError("Method not supported")
+	if r.Method != "GET" {
+		doJSONWrite(w, 405, createError("Method not supported"))
+		return
 	}
-
-	doJSONWrite(w, code, responseMessage)
+	if !config.HealthCheck.EnableHealthChecks {
+		doJSONWrite(w, 405, createError("Health checks are not enabled for this node"))
+		return
+	}
+	apiID := r.FormValue("api_id")
+	if apiID == "" {
+		doJSONWrite(w, 405, createError("missing api_id parameter"))
+		return
+	}
+	apiSpec := GetSpecForApi(apiID)
+	if apiSpec == nil {
+		doJSONWrite(w, 405, createError("API ID not found"))
+		return
+	}
+	health, _ := apiSpec.Health.GetApiHealthValues()
+	responseMessage, err := json.Marshal(health)
+	if err != nil {
+		doJSONWrite(w, 405, createError("Failed to encode data"))
+		return
+	}
+	doJSONWrite(w, 200, responseMessage)
 }
 
 func UserRatesCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		code := 200
-
 		sessionState := context.Get(r, SessionData)
 		if sessionState == nil {
-			code = 405
 			responseMessage := createError("Health checks are not enabled for this node")
-			doJSONWrite(w, code, responseMessage)
+			doJSONWrite(w, 405, responseMessage)
 			return
 		}
 
@@ -1905,13 +1882,12 @@ func UserRatesCheck() http.HandlerFunc {
 
 		responseMessage, err := json.Marshal(returnSession)
 		if err != nil {
-			code = 405
 			responseMessage = createError("Failed to encode data")
-			doJSONWrite(w, code, responseMessage)
+			doJSONWrite(w, 405, responseMessage)
 			return
 		}
 
-		doJSONWrite(w, code, responseMessage)
+		doJSONWrite(w, 200, responseMessage)
 	}
 }
 
@@ -1929,56 +1905,49 @@ func getIPHelper(r *http.Request) string {
 }
 
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	code := 200
+	if r.Method != "DELETE" {
+		doJSONWrite(w, 405, createError("Method not supported"))
+		return
+	}
+	apiID := r.URL.Path[len("/tyk/cache/"):]
 
-	if r.Method == "DELETE" {
-		apiID := r.URL.Path[len("/tyk/cache/"):]
+	spec := GetSpecForApi(apiID)
+	var orgid string
+	if spec != nil {
+		orgid = spec.OrgID
+	}
 
-		spec := GetSpecForApi(apiID)
-		var orgid string
-		if spec != nil {
-			orgid = spec.OrgID
-		}
-
-		if err := HandleInvalidateAPICache(apiID); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix":      "api",
-				"api_id":      apiID,
-				"status":      "fail",
-				"err":         err,
-				"org_id":      orgid,
-				"user_id":     "system",
-				"user_ip":     getIPHelper(r),
-				"path":        "--",
-				"server_name": "system",
-			}).Error("Failed to delete cache: ", err)
-
-			code = 500
-			responseMessage = createError("Cache invalidation failed")
-			doJSONWrite(w, code, responseMessage)
-			return
-		}
-
-		okMsg := APIStatusMessage{"ok", "cache invalidated"}
-		responseMessage, _ = json.Marshal(&okMsg)
+	if err := HandleInvalidateAPICache(apiID); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "api",
-			"status":      "ok",
-			"org_id":      orgid,
 			"api_id":      apiID,
+			"status":      "fail",
+			"err":         err,
+			"org_id":      orgid,
 			"user_id":     "system",
 			"user_ip":     getIPHelper(r),
 			"path":        "--",
 			"server_name": "system",
-		}).Info("Cache invalidated successfully")
-	} else {
-		// Return Not supported message (and code)
-		code = 405
-		responseMessage = createError("Method not supported")
+		}).Error("Failed to delete cache: ", err)
+
+		doJSONWrite(w, 500, createError("Cache invalidation failed"))
+		return
 	}
 
-	doJSONWrite(w, code, responseMessage)
+	okMsg := APIStatusMessage{"ok", "cache invalidated"}
+	responseMessage, _ := json.Marshal(&okMsg)
+	log.WithFields(logrus.Fields{
+		"prefix":      "api",
+		"status":      "ok",
+		"org_id":      orgid,
+		"api_id":      apiID,
+		"user_id":     "system",
+		"user_ip":     getIPHelper(r),
+		"path":        "--",
+		"server_name": "system",
+	}).Info("Cache invalidated successfully")
+
+	doJSONWrite(w, 200, responseMessage)
 }
 
 func HandleInvalidateAPICache(apiID string) error {
