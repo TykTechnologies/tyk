@@ -332,6 +332,7 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 		ApiMuxer.HandleFunc("/tyk/org/keys/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(orgHandler)))
 		ApiMuxer.HandleFunc("/tyk/keys/policy/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
 		ApiMuxer.HandleFunc("/tyk/keys/create", CheckIsAPIOwner(InstrumentationMW(createKeyHandler)))
+		ApiMuxer.HandleFunc("/tyk/apis", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
 		ApiMuxer.HandleFunc("/tyk/apis/"+"{rest:.*}", CheckIsAPIOwner(InstrumentationMW(apiHandler)))
 		ApiMuxer.HandleFunc("/tyk/health/", CheckIsAPIOwner(InstrumentationMW(healthCheckhandler)))
 		ApiMuxer.HandleFunc("/tyk/oauth/clients/create", CheckIsAPIOwner(InstrumentationMW(createOauthClient)))
