@@ -1361,6 +1361,10 @@ func listen(l, controlListener net.Listener, err error) {
 			if specs != nil {
 				loadApps(specs, defaultRouter)
 				getPolicies()
+
+				if config.ControlAPIPort > 0 {
+					loadAPIEndpoints(controlRouter)
+				}
 			}
 
 			startHeartBeat()
