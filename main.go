@@ -1321,19 +1321,20 @@ func listen(l, controlListener net.Listener, err error) {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Printf("Gateway started (%v)", VERSION)
-			if !RPC_EmergencyMode {
-				http.Handle("/", mainRouter)
-			}
-			go http.Serve(l, nil)
 
-			if controlListener != nil {
-				go http.Serve(controlListener, controlRouter)
+			if !RPC_EmergencyMode {
+				go http.Serve(l, mainRouter)
+
+				if controlListener != nil {
+					go http.Serve(controlListener, controlRouter)
+				}
+			} else {
+				go http.Serve(l, nil)
 			}
+
 			displayConfig()
 		}
-
 	} else {
-
 		// handle dashboard registration and nonces if available
 		nonce := os.Getenv("TYK_SERVICE_NONCE")
 		nodeID := os.Getenv("TYK_SERVICE_NODEID")
@@ -1401,8 +1402,12 @@ func listen(l, controlListener net.Listener, err error) {
 				"prefix": "main",
 			}).Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
-			http.Handle("/", mainRouter)
-			go http.Serve(l, nil)
+
+			go http.Serve(l, mainRouter)
+
+			if controlListener != nil {
+				go http.Serve(controlListener, controlRouter)
+			}
 		}
 
 		log.WithFields(logrus.Fields{
