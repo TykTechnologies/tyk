@@ -392,11 +392,7 @@ func (j *JSVM) LoadTykJSApi() {
 			return otto.Value{}
 		}
 
-		dontReset := false
-		if suppressReset == "1" {
-			dontReset = true
-		}
-		doAddOrUpdate(apiKey, newSession, dontReset)
+		doAddOrUpdate(apiKey, newSession, suppressReset == "1")
 
 		return otto.Value{}
 	})
