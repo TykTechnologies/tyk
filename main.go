@@ -1252,11 +1252,11 @@ func startDRL() {
 }
 
 func listen(l, controlListener net.Listener, err error) {
-	readtimeout := 120
+	readTimeout := 120
 	writeTimeout := 120
 	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 	if config.HttpServerOptions.ReadTimeout > 0 {
-		readtimeout = config.HttpServerOptions.ReadTimeout
+		readTimeout = config.HttpServerOptions.ReadTimeout
 	}
 
 	if config.HttpServerOptions.WriteTimeout > 0 {
@@ -1299,7 +1299,7 @@ func listen(l, controlListener net.Listener, err error) {
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
-				ReadTimeout:  time.Duration(readtimeout) * time.Second,
+				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
 				Handler:      defaultRouter,
 			}
@@ -1377,7 +1377,7 @@ func listen(l, controlListener net.Listener, err error) {
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
-				ReadTimeout:  time.Duration(readtimeout) * time.Second,
+				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
 				Handler:      defaultRouter,
 			}
