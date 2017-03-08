@@ -1315,6 +1315,16 @@ func listen(l, controlListener net.Listener, err error) {
 
 			// Accept connections in a new goroutine.
 			go s.Serve(l)
+
+			if controlListener != nil {
+				cs := &http.Server{
+					ReadTimeout:  time.Duration(readTimeout) * time.Second,
+					WriteTimeout: time.Duration(writeTimeout) * time.Second,
+					Handler:      controlRouter,
+				}
+				go cs.Serve(controlListener)
+			}
+
 			displayConfig()
 		} else {
 			log.WithFields(logrus.Fields{
@@ -1380,6 +1390,16 @@ func listen(l, controlListener net.Listener, err error) {
 				"prefix": "main",
 			}).Info("Custom gateway started")
 			go s.Serve(l)
+
+			if controlListener != nil {
+				cs := &http.Server{
+					ReadTimeout:  time.Duration(readTimeout) * time.Second,
+					WriteTimeout: time.Duration(writeTimeout) * time.Second,
+					Handler:      controlRouter,
+				}
+				go cs.Serve(controlListener)
+			}
+
 			displayConfig()
 		} else {
 			log.WithFields(logrus.Fields{
