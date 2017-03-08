@@ -211,10 +211,8 @@ func GetKeyDetail(key, apiID string) (SessionState, bool) {
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
-	decoder := json.NewDecoder(r.Body)
 	var newSession SessionState
-
-	if err := decoder.Decode(&newSession); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		return createError("Request malformed"), 400
 	}
@@ -646,10 +644,8 @@ func HandleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
 		return createError("Due to enabled use_db_app_configs, please use the Dashboard API"), 500
 	}
 
-	decoder := json.NewDecoder(r.Body)
 	newDef := &apidef.APIDefinition{}
-
-	if err := decoder.Decode(newDef); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(newDef); err != nil {
 		log.Error("Couldn't decode new API Definition object: ", err)
 		return createError("Request malformed"), 400
 	}
@@ -828,9 +824,9 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		doJSONWrite(w, 405, createError("Method not supported"))
 		return
 	}
-	decoder := json.NewDecoder(r.Body)
+
 	var policRecord PolicyUpdateObj
-	if err := decoder.Decode(&policRecord); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&policRecord); err != nil {
 		decodeFail := APIStatusMessage{"error", "Couldn't decode instruction"}
 		responseMessage, _ := json.Marshal(&decodeFail)
 		doJSONWrite(w, 400, responseMessage)
@@ -976,12 +972,11 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 
 func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	success := false
-	decoder := json.NewDecoder(r.Body)
 	var responseMessage []byte
 	var newSession SessionState
 	code := 200
 
-	if err := decoder.Decode(&newSession); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		code = 400
 		responseMessage = createError("Request malformed")
@@ -1237,9 +1232,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	responseObj := APIModifyKeySuccess{}
 
 	if r.Method == "POST" {
-		decoder := json.NewDecoder(r.Body)
 		var newSession SessionState
-		if err := decoder.Decode(&newSession); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
 			responseMessage = systemError
 			code = 500
 
@@ -1414,9 +1408,8 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	code := 200
 
 	if r.Method == "POST" {
-		decoder := json.NewDecoder(r.Body)
 		var newOauthClient NewClientRequest
-		if err := decoder.Decode(&newOauthClient); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
 			responseMessage = systemError
 			code = 500
 
