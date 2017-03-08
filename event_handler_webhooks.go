@@ -151,17 +151,10 @@ func (w *WebHookHandler) setHookFired(checksum string) {
 }
 
 func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
-	switch strings.ToUpper(m) {
-	case "GET":
-		return WH_GET
-	case "PUT":
-		return WH_PUT
-	case "POST":
-		return WH_POST
-	case "DELETE":
-		return WH_DELETE
-	case "PATCH":
-		return WH_PATCH
+	upper := WebHookRequestMethod(strings.ToUpper(m))
+	switch upper {
+	case WH_GET, WH_PUT, WH_POST, WH_DELETE, WH_PATCH:
+		return upper
 	default:
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
