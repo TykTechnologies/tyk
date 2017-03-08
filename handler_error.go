@@ -73,7 +73,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	apiError := APIError{errMsg}
 	tmpl.Execute(w, &apiError)
 
-	if doMemoryProfile {
+	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)
 	}
 
@@ -232,7 +232,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}).Error("request error: ", err)
 	}
 
-	if doMemoryProfile {
+	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)
 	}
 

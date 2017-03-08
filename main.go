@@ -43,11 +43,7 @@ var (
 	templates                = &template.Template{}
 	analytics                = RedisAnalyticsHandler{}
 	GlobalEventsJSVM         = &JSVM{}
-	cpuProfFile              *os.File
 	memProfFile              *os.File
-	doHTTPProfile            bool
-	doMemoryProfile          bool
-	doCpuProfile             bool
 	Policies                 = map[string]Policy{}
 	MainNotifier             = RedisNotifier{}
 	DefaultOrgStore          = DefaultSessionManager{}
@@ -866,10 +862,6 @@ func initialiseSystem(arguments map[string]interface{}) {
 		}
 	}
 
-	doMemoryProfile, _ = arguments["--memprofile"].(bool)
-	doCpuProfile, _ = arguments["--cpuprofile"].(bool)
-	doHTTPProfile, _ = arguments["--httpprofile"].(bool)
-
 	// Enable all the loggers
 	setupLogger()
 
@@ -1023,7 +1015,7 @@ func main() {
 	controlListener, goAgainErr := goagain.Listener(onFork)
 
 	initialiseSystem(arguments)
-	start()
+	start(arguments)
 
 	if goAgainErr != nil {
 		var err error
@@ -1087,8 +1079,8 @@ func main() {
 	time.Sleep(3 * time.Second)
 }
 
-func start() {
-	if doMemoryProfile {
+func start(arguments map[string]interface{}) {
+	if do, _ := arguments["--memprofile"].(bool); do {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Memory profiling active")
@@ -1098,19 +1090,18 @@ func start() {
 		}
 		defer memProfFile.Close()
 	}
-	if doCpuProfile {
+	if do, _ := arguments["--cpuprofile"].(bool); do {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Cpu profiling active")
-		var err error
-		if cpuProfFile, err = os.Create("tyk.prof"); err != nil {
+		cpuProfFile, err := os.Create("tyk.prof")
+		if err != nil {
 			panic(err)
 		}
 		pprof.StartCPUProfile(cpuProfFile)
 		defer pprof.StopCPUProfile()
 	}
-
-	if doHTTPProfile {
+	if do, _ := arguments["--httpprofile"].(bool); do {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Adding pprof endpoints")
