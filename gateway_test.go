@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -803,4 +804,128 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 		t.Error("Not enough results! Should be 1, is: ", len(results))
 	}
 
+}
+
+type tykHttpTest struct {
+	method, url string
+	code        int
+
+	adminAuth      bool
+	controlRequest bool
+}
+
+func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
+	var testMatrix = []struct {
+		goagain          bool
+		overrideDefaults bool
+	}{
+		{false, false},
+		{false, true},
+		{true, true},
+		{true, false},
+	}
+
+	for _, m := range testMatrix {
+		var ln, cln net.Listener
+
+		ln, _ = net.Listen("tcp", ":0")
+
+		if separateControlPort {
+			cln, _ = net.Listen("tcp", ":0")
+
+			_, port, _ := net.SplitHostPort(cln.Addr().String())
+			config.ControlAPIPort, _ = strconv.Atoi(port)
+		}
+
+		if m.overrideDefaults {
+			config.HttpServerOptions.OverrideDefaults = true
+		} else {
+			config.HttpServerOptions.OverrideDefaults = false
+		}
+
+		initialiseSystem(nil)
+		// This is emulate calling start()
+		// But this lines is the only thing needed for this tests
+		if config.ControlAPIPort == 0 {
+			loadAPIEndpoints(defaultRouter)
+		}
+
+		if m.goagain {
+			listen(ln, cln, nil)
+		} else {
+			listen(ln, cln, fmt.Errorf("Without goagain"))
+		}
+
+		client := &http.Client{}
+
+		for _, tc := range tests {
+			tPrefix := ""
+			if m.goagain {
+				tPrefix += "[Goagain]"
+			}
+			if m.overrideDefaults {
+				tPrefix += "[OverrideDefaults]"
+			}
+			if tc.adminAuth {
+				tPrefix += "[Auth]"
+			}
+			if tc.controlRequest {
+				tPrefix += "[Control]"
+			}
+
+			baseUrl := "http://" + ln.Addr().String()
+
+			if tc.controlRequest {
+				baseUrl = "http://" + cln.Addr().String()
+			}
+
+			req, _ := http.NewRequest(tc.method, baseUrl+tc.url, nil)
+
+			if tc.adminAuth {
+				req.Header.Add("X-Tyk-Authorization", config.Secret)
+			}
+
+			resp, _ := client.Do(req)
+
+			if resp.StatusCode != tc.code {
+				t.Errorf("%s%s %s Status %d, want %d", tPrefix, tc.method, tc.url, resp.StatusCode, tc.code)
+			}
+		}
+
+		ln.Close()
+
+		if cln != nil {
+			cln.Close()
+		}
+	}
+}
+
+func TestListener(t *testing.T) {
+	tests := []tykHttpTest{
+		{"GET", "/", 404, false, false},
+		{"GET", "/tyk/apis/", 403, false, false},
+		{"GET", "/tyk/apis/", 200, true, false},
+		{"GET", "/tyk/apis", 403, false, false},
+		{"GET", "/tyk/apis", 200, true, false},
+	}
+
+	testHttp(t, tests, false)
+	doReload()
+	testHttp(t, tests, false)
+}
+
+// Admin api located on separate port
+func TestControlListener(t *testing.T) {
+	tests := []tykHttpTest{
+		{"GET", "/", 404, false, false},
+		{"GET", "/tyk/apis", 404, false, false},
+
+		// Querying control API
+		{"GET", "/", 404, false, true},
+		{"GET", "/tyk/apis", 403, false, true},
+		{"GET", "/tyk/apis/", 200, true, true},
+	}
+	testHttp(t, tests, true)
+	doReload()
+	testHttp(t, tests, true)
 }
