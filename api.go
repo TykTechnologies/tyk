@@ -545,11 +545,11 @@ func handleDeleteHashedKey(keyName, apiID string) ([]byte, int) {
 	return responseMessage, 200
 }
 
-func handleURLReload() ([]byte, int) {
+func handleURLReload(fn func()) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	reloadURLStructure(nil)
+	reloadURLStructure(fn)
 
 	statusObj := APIErrorMessage{"ok", ""}
 	responseMessage, err = json.Marshal(&statusObj)
@@ -1220,19 +1220,21 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, responseMessage)
 }
 
-func resetHandler(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	var code int
+func resetHandler(fn func()) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var responseMessage []byte
+		var code int
 
-	if r.Method == "GET" {
-		responseMessage, code = handleURLReload()
+		if r.Method == "GET" {
+			responseMessage, code = handleURLReload(fn)
 
-	} else {
-		code = 405
-		responseMessage = createError("Method not supported")
+		} else {
+			code = 405
+			responseMessage = createError("Method not supported")
+		}
+
+		doJSONWrite(w, code, responseMessage)
 	}
-
-	doJSONWrite(w, code, responseMessage)
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {

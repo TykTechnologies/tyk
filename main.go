@@ -327,7 +327,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 
 	// set up main API handlers
 	apiMuxer.HandleFunc("/tyk/reload/group", checkIsAPIOwner(InstrumentationMW(groupResetHandler)))
-	apiMuxer.HandleFunc("/tyk/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler)))
+	apiMuxer.HandleFunc("/tyk/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler(nil))))
 
 	if !isRPCMode() {
 		apiMuxer.HandleFunc("/tyk/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler)))

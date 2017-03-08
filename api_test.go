@@ -609,12 +609,15 @@ func TestResetHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	resetHandler(recorder, req)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	resetHandler(wg.Done)(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Fatal("Hot reload failed, response code was: ", recorder.Code)
 	}
+	reloadTick <- time.Time{}
+	wg.Wait()
 
 	if len(ApiSpecRegister) == 0 {
 		t.Fatal("Hot reload was triggered but no APIs were found.")
@@ -676,8 +679,6 @@ func TestGroupResetHandler(t *testing.T) {
 	if len(ApiSpecRegister) == 0 {
 		t.Fatal("Hot reload (group) was triggered but no APIs were found.")
 	}
-
-	reloadTick <- time.Time{}
 
 	// We wait for the right notification (NoticeGroupReload), other
 	// type of notifications may be received during tests, as this
