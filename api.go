@@ -215,10 +215,6 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		log.Error("Couldn't decode new session object: ", err)
 		return createError("Request malformed"), 400
 	}
-	success := true
-	var responseMessage []byte
-	code := 200
-
 	// DO ADD OR UPDATE
 	// Update our session object (create it)
 	if newSession.BasicAuthData.Password != "" {
@@ -253,15 +249,9 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		}
 
 	}
-	dont_reset := r.FormValue("suppress_reset")
-	suppress_reset := false
-
-	if dont_reset == "1" {
-		suppress_reset = true
-	}
-	if err := doAddOrUpdate(keyName, newSession, suppress_reset); err != nil {
-		success = false
-		responseMessage = createError("Failed to create key, ensure security settings are correct.")
+	suppressReset := r.FormValue("suppress_reset") == "1"
+	if err := doAddOrUpdate(keyName, newSession, suppressReset); err != nil {
+		return createError("Failed to create key, ensure security settings are correct."), 500
 	}
 
 	action := "modified"
@@ -271,21 +261,16 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		event = EventTokenCreated
 	}
 
-	if success {
-		response := APIModifyKeySuccess{
-			keyName,
-			"ok",
-			action,
-		}
+	response := APIModifyKeySuccess{
+		keyName,
+		"ok",
+		action,
+	}
 
-		var err error
-		responseMessage, err = json.Marshal(&response)
-
-		if err != nil {
-			log.Error("Could not create response message: ", err)
-			code = 500
-			responseMessage = systemError
-		}
+	responseMessage, err := json.Marshal(&response)
+	if err != nil {
+		log.Error("Could not create response message: ", err)
+		return systemError, 500
 	}
 
 	FireSystemEvent(event, EventTokenMeta{
@@ -297,14 +282,13 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 		Key: keyName,
 	})
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 func handleGetDetail(sessionKey, apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
-	code := 200
 
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
@@ -330,23 +314,22 @@ func handleGetDetail(sessionKey, apiID string) ([]byte, int) {
 
 	if !success {
 		notFound := APIStatusMessage{"error", "Key not found"}
-		responseMessage, _ = json.Marshal(&notFound)
-		code = 404
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    ObfuscateKeyString(sessionKey),
 			"status": "fail",
 			"err":    "not found",
 		}).Warning("Failed to retrieve key detail.")
-	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    ObfuscateKeyString(sessionKey),
-			"status": "ok",
-		}).Info("Retrieved key detail.")
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 404
 	}
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"key":    ObfuscateKeyString(sessionKey),
+		"status": "ok",
+	}).Info("Retrieved key detail.")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 // APIAllKeys represents a list of keys in the memory store
@@ -355,7 +338,6 @@ type APIAllKeys struct {
 }
 
 func handleGetAllKeys(filter, apiID string) ([]byte, int) {
-	success := true
 	var responseMessage []byte
 
 	var err error
@@ -399,20 +381,15 @@ func handleGetAllKeys(filter, apiID string) ([]byte, int) {
 			"err":    err,
 		}).Error("Failed to retrieve key list.")
 
-		success = false
+		return systemError, 500
 	}
 
-	if success {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"status": "ok",
-		}).Info("Retrieved key list.")
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"status": "ok",
+	}).Info("Retrieved key list.")
 
-		return responseMessage, 200
-	}
-
-	return systemError, 500
-
+	return responseMessage, 200
 }
 
 // APIStatusMessage represents an API status message
@@ -678,11 +655,9 @@ func HandleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
 		return createError("File object creation failed, write error"), 500
 	}
 
-	var action string
+	action := "modified"
 	if r.Method == "POST" {
 		action = "added"
-	} else {
-		action = "modified"
 	}
 
 	response := APIModifyKeySuccess{
@@ -840,15 +815,12 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
-	var responseMessage []byte
-	var err error
-
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
 		spec := GetSpecForApi(apiID)
 		if spec == nil {
 			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
+			responseMessage, _ := json.Marshal(&notFound)
 			return responseMessage, 400
 		}
 		sessionManager = spec.SessionManager
@@ -870,7 +842,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Key not found"}
-		responseMessage, _ = json.Marshal(&notFound)
+		responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
@@ -884,7 +856,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Unmarshalling failed"}
-		responseMessage, _ = json.Marshal(&notFound)
+		responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
@@ -902,7 +874,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Marshalling failed"}
-		responseMessage, _ = json.Marshal(&notFound)
+		responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
@@ -915,13 +887,12 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Could not write key data"}
-		responseMessage, _ = json.Marshal(&notFound)
+		responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "updated"}
-	responseMessage, err = json.Marshal(&statusObj)
-
+	responseMessage, err := json.Marshal(&statusObj)
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
 		return systemError, 500
@@ -970,88 +941,71 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOrgAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
-	success := false
-	var responseMessage []byte
 	var newSession SessionState
-	code := 200
 
 	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
-		code = 400
-		responseMessage = createError("Request malformed")
+		return createError("Request malformed"), 400
+	}
+	// Update our session object (create it)
+
+	spec := GetSpecForOrg(keyName)
+	var sessionManager SessionHandler
+
+	if spec == nil {
+		log.Warning("Couldn't find org session store in active API list")
+		if config.SupressDefaultOrgStore {
+			return createError("No such organisation found in Active API list"), 400
+		}
+		sessionManager = &DefaultOrgStore
 	} else {
-		// Update our session object (create it)
-
-		spec := GetSpecForOrg(keyName)
-		var sessionManager SessionHandler
-
-		if spec == nil {
-			log.Warning("Couldn't find org session store in active API list")
-			if config.SupressDefaultOrgStore {
-				responseMessage = createError("No such organisation found in Active API list")
-				return responseMessage, 400
-			}
-			sessionManager = &DefaultOrgStore
-		} else {
-			sessionManager = spec.OrgSessionManager
-		}
-
-		do_reset := r.FormValue("reset_quota")
-		if do_reset == "1" {
-			sessionManager.ResetQuota(keyName, newSession)
-			newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-			rawKey := QuotaKeyPrefix + publicHash(keyName)
-
-			// manage quotas separately
-			DefaultQuotaStore.RemoveSession(rawKey)
-		}
-
-		err := sessionManager.UpdateSession(keyName, newSession, 0)
-		if err != nil {
-			responseMessage = createError("Error writing to key store " + err.Error())
-			return responseMessage, 400
-		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"org":    keyName,
-			"status": "ok",
-		}).Info("New organization key added or updated.")
-		success = true
+		sessionManager = spec.OrgSessionManager
 	}
 
-	var action string
+	if r.FormValue("reset_quota") == "1" {
+		sessionManager.ResetQuota(keyName, newSession)
+		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+		rawKey := QuotaKeyPrefix + publicHash(keyName)
+
+		// manage quotas separately
+		DefaultQuotaStore.RemoveSession(rawKey)
+	}
+
+	err := sessionManager.UpdateSession(keyName, newSession, 0)
+	if err != nil {
+		return createError("Error writing to key store " + err.Error()), 400
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"org":    keyName,
+		"status": "ok",
+	}).Info("New organization key added or updated.")
+
+	action := "modified"
 	if r.Method == "POST" {
 		action = "added"
-	} else {
-		action = "modified"
 	}
 
-	if success {
-		response := APIModifyKeySuccess{
-			keyName,
-			"ok",
-			action,
-		}
-
-		var err error
-		responseMessage, err = json.Marshal(&response)
-
-		if err != nil {
-			log.Error("Could not create response message: ", err)
-			code = 500
-			responseMessage = systemError
-		}
+	response := APIModifyKeySuccess{
+		keyName,
+		"ok",
+		action,
 	}
 
-	return responseMessage, code
+	responseMessage, err := json.Marshal(&response)
+	if err != nil {
+		log.Error("Could not create response message: ", err)
+		return systemError, 500
+	}
+
+	return responseMessage, 200
 }
 
 func handleGetOrgDetail(orgID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
-	code := 200
 
 	spec := GetSpecForOrg(orgID)
 	if spec == nil {
@@ -1073,36 +1027,28 @@ func handleGetOrgDetail(orgID string) ([]byte, int) {
 
 	if !success {
 		notFound := APIStatusMessage{"error", "Org not found"}
-		responseMessage, _ = json.Marshal(&notFound)
-		code = 404
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"org":    orgID,
 			"status": "fail",
 			"err":    "not found",
 		}).Error("Failed retrieval of record for ORG ID.")
-	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"org":    orgID,
-			"status": "ok",
-		}).Info("Retrieved record for ORG ID.")
+		responseMessage, _ = json.Marshal(&notFound)
+		return responseMessage, 404
 	}
-
-	return responseMessage, code
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"org":    orgID,
+		"status": "ok",
+	}).Info("Retrieved record for ORG ID.")
+	return responseMessage, 200
 }
 
 func handleGetAllOrgKeys(filter, orgID string) ([]byte, int) {
-	success := true
-	var responseMessage []byte
-	code := 200
-
-	var err error
-
 	spec := GetSpecForOrg(orgID)
 	if spec == nil {
 		notFound := APIStatusMessage{"error", "ORG not found"}
-		responseMessage, _ = json.Marshal(&notFound)
+		responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
@@ -1115,31 +1061,18 @@ func handleGetAllOrgKeys(filter, orgID string) ([]byte, int) {
 	}
 	sessionsObj := APIAllKeys{fixed_sessions}
 
-	responseMessage, err = json.Marshal(&sessionsObj)
+	responseMessage, err := json.Marshal(&sessionsObj)
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
-		success = false
-		code = 500
-	}
-
-	if success {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"org":    orgID,
-			"status": "ok",
-		}).Info("Successful orgs retrieval.")
-
-		return responseMessage, code
+		return systemError, 500
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"org":    orgID,
-		"status": "fail",
-	}).Error("Failed orgs retrieval.")
-
-	return systemError, code
-
+		"status": "ok",
+	}).Info("Successful orgs retrieval.")
+	return responseMessage, 200
 }
 
 func handleDeleteOrgKey(orgID string) ([]byte, int) {
@@ -1195,13 +1128,12 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 		responseMessage, code = signalGroupReload()
 
 	} else {
-		// Return Not supported message (and code)
-		code = 405
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"status": "fail",
 			"err":    "wrong method",
 		}).Error("Group reload failed.")
+		code = 405
 		responseMessage = createError("Method not supported")
 	}
 
@@ -1215,7 +1147,6 @@ func resetHandler(fn func()) http.HandlerFunc {
 
 		if r.Method == "GET" {
 			responseMessage, code = handleURLReload(fn)
-
 		} else {
 			code = 405
 			responseMessage = createError("Method not supported")
@@ -1226,167 +1157,157 @@ func resetHandler(fn func()) http.HandlerFunc {
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	code := 200
-	responseObj := APIModifyKeySuccess{}
-
-	if r.Method == "POST" {
-		var newSession SessionState
-		if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
-			responseMessage = systemError
-			code = 500
-
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"status": "fail",
-				"err":    err,
-			}).Error("Key creation failed.")
-
-		} else {
-
-			newKey := keyGen.GenerateAuthKey(newSession.OrgID)
-			if newSession.HMACEnabled {
-				newSession.HmacSecret = keyGen.GenerateHMACSecret()
-			}
-
-			newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-
-			if len(newSession.AccessRights) > 0 {
-				for apiID := range newSession.AccessRights {
-					apiSpec := GetSpecForApi(apiID)
-					if apiSpec != nil {
-						checkAndApplyTrialPeriod(newKey, apiID, &newSession)
-						// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
-						if !apiSpec.DontSetQuotasOnCreate {
-							// Reset quota by default
-							apiSpec.SessionManager.ResetQuota(newKey, newSession)
-							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-						}
-						err := apiSpec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(apiSpec, &newSession))
-						if err != nil {
-							responseMessage = createError("Failed to create key - " + err.Error())
-							doJSONWrite(w, 403, responseMessage)
-							return
-						}
-					} else {
-						// Use fallback
-						sessionManager := FallbackKeySesionManager
-						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-						sessionManager.ResetQuota(newKey, newSession)
-						err := sessionManager.UpdateSession(newKey, newSession, -1)
-						if err != nil {
-							responseMessage = createError("Failed to create key - " + err.Error())
-							doJSONWrite(w, 403, responseMessage)
-							return
-						}
-					}
-				}
-			} else {
-				if config.AllowMasterKeys {
-					// nothing defined, add key to ALL
-					log.WithFields(logrus.Fields{
-						"prefix":      "api",
-						"status":      "warning",
-						"org_id":      newSession.OrgID,
-						"api_id":      "--",
-						"user_id":     "system",
-						"user_ip":     GetIPFromRequest(r),
-						"path":        "--",
-						"server_name": "system",
-					}).Warning("No API Access Rights set on key session, adding key to all APIs.")
-
-					for _, spec := range ApiSpecRegister {
-						checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
-						if !spec.DontSetQuotasOnCreate {
-							// Reset quote by default
-							spec.SessionManager.ResetQuota(newKey, newSession)
-							newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-						}
-						err := spec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(spec, &newSession))
-						if err != nil {
-							responseMessage = createError("Failed to create key - " + err.Error())
-							doJSONWrite(w, 403, responseMessage)
-							return
-						}
-					}
-				} else {
-					log.WithFields(logrus.Fields{
-						"prefix":      "api",
-						"status":      "error",
-						"err":         "master keys disabled",
-						"org_id":      newSession.OrgID,
-						"api_id":      "--",
-						"user_id":     "system",
-						"user_ip":     GetIPFromRequest(r),
-						"path":        "--",
-						"server_name": "system",
-					}).Error("Master keys disallowed in configuration, key not added.")
-
-					responseMessage = createError("Failed to create key, keys must have at least one Access Rights record set.")
-					code = 403
-					doJSONWrite(w, code, responseMessage)
-					return
-				}
-
-			}
-
-			responseObj.Action = "create"
-			responseObj.Key = newKey
-			responseObj.Status = "ok"
-
-			responseMessage, err = json.Marshal(&responseObj)
-
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix":      "api",
-					"status":      "error",
-					"err":         err,
-					"org_id":      newSession.OrgID,
-					"api_id":      "--",
-					"user_id":     "system",
-					"user_ip":     GetIPFromRequest(r),
-					"path":        "--",
-					"server_name": "system",
-				}).Error("System error, failed to generate key.")
-
-				responseMessage = systemError
-				code = 500
-			} else {
-
-				FireSystemEvent(EventTokenCreated, EventTokenMeta{
-					EventMetaDefault: EventMetaDefault{
-						Message:            "Key generated.",
-						OriginatingRequest: "",
-					},
-					Org: newSession.OrgID,
-					Key: newKey,
-				})
-
-				log.WithFields(logrus.Fields{
-					"prefix":      "api",
-					"key":         ObfuscateKeyString(newKey),
-					"status":      "ok",
-					"api_id":      "--",
-					"org_id":      newSession.OrgID,
-					"user_id":     "system",
-					"user_ip":     GetIPFromRequest(r),
-					"path":        "--",
-					"server_name": "system",
-				}).Info("Generated new key: (", ObfuscateKeyString(newKey), ")")
-			}
-		}
-
-	} else {
-		code = 405
-		responseMessage = createError("Method not supported")
+	if r.Method != "POST" {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"status": "fail",
 			"method": r.Method,
 		}).Warning("Attempted to create key with wrong HTTP method.")
+		doJSONWrite(w, 405, createError("Method not supported"))
+		return
+	}
+	responseObj := APIModifyKeySuccess{}
+
+	var newSession SessionState
+	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"status": "fail",
+			"err":    err,
+		}).Error("Key creation failed.")
+		doJSONWrite(w, 500, systemError)
+		return
 	}
 
-	doJSONWrite(w, code, responseMessage)
+	newKey := keyGen.GenerateAuthKey(newSession.OrgID)
+	if newSession.HMACEnabled {
+		newSession.HmacSecret = keyGen.GenerateHMACSecret()
+	}
+
+	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+
+	if len(newSession.AccessRights) > 0 {
+		for apiID := range newSession.AccessRights {
+			apiSpec := GetSpecForApi(apiID)
+			if apiSpec != nil {
+				checkAndApplyTrialPeriod(newKey, apiID, &newSession)
+				// If we have enabled HMAC checking for keys, we need to generate a secret for the client to use
+				if !apiSpec.DontSetQuotasOnCreate {
+					// Reset quota by default
+					apiSpec.SessionManager.ResetQuota(newKey, newSession)
+					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+				}
+				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(apiSpec, &newSession))
+				if err != nil {
+					responseMessage := createError("Failed to create key - " + err.Error())
+					doJSONWrite(w, 403, responseMessage)
+					return
+				}
+			} else {
+				// Use fallback
+				sessionManager := FallbackKeySesionManager
+				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+				sessionManager.ResetQuota(newKey, newSession)
+				err := sessionManager.UpdateSession(newKey, newSession, -1)
+				if err != nil {
+					responseMessage := createError("Failed to create key - " + err.Error())
+					doJSONWrite(w, 403, responseMessage)
+					return
+				}
+			}
+		}
+	} else {
+		if config.AllowMasterKeys {
+			// nothing defined, add key to ALL
+			log.WithFields(logrus.Fields{
+				"prefix":      "api",
+				"status":      "warning",
+				"org_id":      newSession.OrgID,
+				"api_id":      "--",
+				"user_id":     "system",
+				"user_ip":     GetIPFromRequest(r),
+				"path":        "--",
+				"server_name": "system",
+			}).Warning("No API Access Rights set on key session, adding key to all APIs.")
+
+			for _, spec := range ApiSpecRegister {
+				checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
+				if !spec.DontSetQuotasOnCreate {
+					// Reset quote by default
+					spec.SessionManager.ResetQuota(newKey, newSession)
+					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+				}
+				err := spec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(spec, &newSession))
+				if err != nil {
+					responseMessage := createError("Failed to create key - " + err.Error())
+					doJSONWrite(w, 403, responseMessage)
+					return
+				}
+			}
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix":      "api",
+				"status":      "error",
+				"err":         "master keys disabled",
+				"org_id":      newSession.OrgID,
+				"api_id":      "--",
+				"user_id":     "system",
+				"user_ip":     GetIPFromRequest(r),
+				"path":        "--",
+				"server_name": "system",
+			}).Error("Master keys disallowed in configuration, key not added.")
+
+			responseMessage := createError("Failed to create key, keys must have at least one Access Rights record set.")
+			doJSONWrite(w, 403, responseMessage)
+			return
+		}
+
+	}
+
+	responseObj.Action = "create"
+	responseObj.Key = newKey
+	responseObj.Status = "ok"
+
+	responseMessage, err := json.Marshal(&responseObj)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix":      "api",
+			"status":      "error",
+			"err":         err,
+			"org_id":      newSession.OrgID,
+			"api_id":      "--",
+			"user_id":     "system",
+			"user_ip":     GetIPFromRequest(r),
+			"path":        "--",
+			"server_name": "system",
+		}).Error("System error, failed to generate key.")
+
+		doJSONWrite(w, 500, systemError)
+		return
+	}
+
+	FireSystemEvent(EventTokenCreated, EventTokenMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message:            "Key generated.",
+			OriginatingRequest: "",
+		},
+		Org: newSession.OrgID,
+		Key: newKey,
+	})
+
+	log.WithFields(logrus.Fields{
+		"prefix":      "api",
+		"key":         ObfuscateKeyString(newKey),
+		"status":      "ok",
+		"api_id":      "--",
+		"org_id":      newSession.OrgID,
+		"user_id":     "system",
+		"user_ip":     GetIPFromRequest(r),
+		"path":        "--",
+		"server_name": "system",
+	}).Info("Generated new key: (", ObfuscateKeyString(newKey), ")")
+
+	doJSONWrite(w, 200, responseMessage)
 }
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
@@ -1403,100 +1324,93 @@ func createOauthClientStorageID(clientID string) string {
 }
 
 func createOauthClient(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	code := 200
 
-	if r.Method == "POST" {
-		var newOauthClient NewClientRequest
-		if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
-			responseMessage = systemError
-			code = 500
-
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to create OAuth client")
-
-		}
-
-		// Allow the client ID to be set
-		cleanSting := newOauthClient.ClientID
-
-		if newOauthClient.ClientID == "" {
-			u5, _ := uuid.NewV4()
-			cleanSting = strings.Replace(u5.String(), "-", "", -1)
-		}
-
-		// Allow the secret to be set
-		secret := newOauthClient.ClientSecret
-		if newOauthClient.ClientSecret == "" {
-			u5Secret, _ := uuid.NewV4()
-			secret = base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
-		}
-
-		newClient := OAuthClient{
-			ClientID:          cleanSting,
-			ClientRedirectURI: newOauthClient.ClientRedirectURI,
-			ClientSecret:      secret,
-			PolicyID:          newOauthClient.PolicyID,
-		}
-
-		storageID := createOauthClientStorageID(newClient.GetId())
+	if r.Method != "POST" {
+		doJSONWrite(w, 405, createError("Method not supported"))
+		return
+	}
+	var newOauthClient NewClientRequest
+	if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
-		}).Debug("Created storage ID: ", storageID)
-
-		apiSpec := GetSpecForApi(newOauthClient.APIID)
-		if apiSpec == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    "API doesn't exist",
-			}).Error("Failed to create OAuth client")
-		}
-
-		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to create OAuth client")
-			responseMessage = createError("Failure in storing client data.")
-		}
-
-		reportableClientData := NewClientRequest{
-			ClientID:          newClient.GetId(),
-			ClientSecret:      newClient.GetSecret(),
-			ClientRedirectURI: newClient.GetRedirectUri(),
-			PolicyID:          newClient.GetPolicyID(),
-		}
-
-		responseMessage, err = json.Marshal(&reportableClientData)
-
-		if err != nil {
-			log.Error("Marshalling failed: ", err)
-			responseMessage = systemError
-			code = 500
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix":            "api",
-				"apiID":             newOauthClient.APIID,
-				"clientID":          reportableClientData.ClientID,
-				"clientRedirectURI": reportableClientData.ClientRedirectURI,
-				"status":            "ok",
-			}).Info("Created OAuth client")
-		}
-
-	} else {
-		code = 405
-		responseMessage = createError("Method not supported")
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to create OAuth client")
+		doJSONWrite(w, 500, systemError)
+		return
 	}
 
-	doJSONWrite(w, code, responseMessage)
+	// Allow the client ID to be set
+	cleanSting := newOauthClient.ClientID
+
+	if newOauthClient.ClientID == "" {
+		u5, _ := uuid.NewV4()
+		cleanSting = strings.Replace(u5.String(), "-", "", -1)
+	}
+
+	// Allow the secret to be set
+	secret := newOauthClient.ClientSecret
+	if newOauthClient.ClientSecret == "" {
+		u5Secret, _ := uuid.NewV4()
+		secret = base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
+	}
+
+	newClient := OAuthClient{
+		ClientID:          cleanSting,
+		ClientRedirectURI: newOauthClient.ClientRedirectURI,
+		ClientSecret:      secret,
+		PolicyID:          newOauthClient.PolicyID,
+	}
+
+	storageID := createOauthClientStorageID(newClient.GetId())
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+	}).Debug("Created storage ID: ", storageID)
+
+	apiSpec := GetSpecForApi(newOauthClient.APIID)
+	if apiSpec == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  newOauthClient.APIID,
+			"status": "fail",
+			"err":    "API doesn't exist",
+		}).Error("Failed to create OAuth client")
+	}
+
+	err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  newOauthClient.APIID,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to create OAuth client")
+		doJSONWrite(w, 500, createError("Failure in storing client data."))
+		return
+	}
+
+	reportableClientData := NewClientRequest{
+		ClientID:          newClient.GetId(),
+		ClientSecret:      newClient.GetSecret(),
+		ClientRedirectURI: newClient.GetRedirectUri(),
+		PolicyID:          newClient.GetPolicyID(),
+	}
+
+	responseMessage, err := json.Marshal(&reportableClientData)
+	if err != nil {
+		log.Error("Marshalling failed: ", err)
+		doJSONWrite(w, 500, systemError)
+		return
+	}
+	log.WithFields(logrus.Fields{
+		"prefix":            "api",
+		"apiID":             newOauthClient.APIID,
+		"clientID":          reportableClientData.ClientID,
+		"clientRedirectURI": reportableClientData.ClientRedirectURI,
+		"status":            "ok",
+	}).Info("Created OAuth client")
+
+	doJSONWrite(w, 200, responseMessage)
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
@@ -1587,16 +1501,14 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := ""
 
 	parts := strings.Split(keyCombined, "/")
-	if len(parts) == 2 {
+	switch len(parts) {
+	case 2:
 		keyName = parts[1]
 		apiID = parts[0]
-	} else if len(parts) == 1 {
+	case 1:
 		apiID = parts[0]
-	} else {
-		// Return Not supported message (and code)
-		code = 405
-		responseMessage = createError("Method not supported")
-		doJSONWrite(w, code, responseMessage)
+	default:
+		doJSONWrite(w, 405, createError("Method not supported"))
 		return
 	}
 
@@ -1626,7 +1538,6 @@ func getOauthClientDetails(keyName, apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
-	code := 200
 
 	storageID := createOauthClientStorageID(keyName)
 	apiSpec := GetSpecForApi(apiID)
@@ -1668,18 +1579,17 @@ func getOauthClientDetails(keyName, apiID string) ([]byte, int) {
 
 	if !success {
 		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
-		responseMessage, _ = json.Marshal(&notFound)
-		code = 404
-	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "ok",
-			"client": keyName,
-		}).Info("Retrieved OAuth client ID")
+		responseMessage, _ := json.Marshal(&notFound)
+		return responseMessage, 404
 	}
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"apiID":  apiID,
+		"status": "ok",
+		"client": keyName,
+	}).Info("Retrieved OAuth client ID")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 // Delete Client
@@ -1705,17 +1615,13 @@ func handleDeleteOAuthClient(keyName, apiID string) ([]byte, int) {
 	}
 
 	err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, true)
-
-	code := 200
-	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
-
 	if err != nil {
-		code = 500
 		errObj := APIErrorMessage{"error", "Delete failed"}
 		responseMessage, _ = json.Marshal(&errObj)
-		return responseMessage, code
+		return responseMessage, 500
 	}
 
+	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
 	responseMessage, err = json.Marshal(&statusObj)
 
 	if err != nil {
@@ -1736,7 +1642,7 @@ func handleDeleteOAuthClient(keyName, apiID string) ([]byte, int) {
 		"client": keyName,
 	}).Info("Deleted OAuth client")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 // List Clients
@@ -1744,7 +1650,6 @@ func getOauthClients(apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
-	code := 200
 
 	filterID := prefixClient
 
@@ -1815,16 +1720,15 @@ func getOauthClients(apiID string) ([]byte, int) {
 	if !success {
 		notFound := APIStatusMessage{"error", "OAuth slients not found"}
 		responseMessage, _ = json.Marshal(&notFound)
-		code = 404
-	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "ok",
-		}).Info("Retrieved OAuth client list")
+		return responseMessage, 404
 	}
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"apiID":  apiID,
+		"status": "ok",
+	}).Info("Retrieved OAuth client list")
 
-	return responseMessage, code
+	return responseMessage, 200
 }
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
