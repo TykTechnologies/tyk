@@ -187,7 +187,7 @@ func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 
-	var supportedDrivers = []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
+	supportedDrivers := []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
 
 	for _, driver := range supportedDrivers {
 		if m.TykMiddleware.Spec.CustomMiddleware.Driver == driver && CoProcessName == string(driver) {
@@ -298,7 +298,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		returnedSessionState := TykSessionState(returnObject.Session)
 
 		if extractor == nil {
-			var sessionLifetime = GetLifetime(m.Spec, &returnedSessionState)
+			sessionLifetime := GetLifetime(m.Spec, &returnedSessionState)
 			// This API is not using the ID extractor, but we've got a session:
 			m.Spec.SessionManager.UpdateSession(authHeaderValue, returnedSessionState, sessionLifetime)
 			context.Set(r, SessionData, returnedSessionState)

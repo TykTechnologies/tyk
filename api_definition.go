@@ -302,7 +302,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 	}
 
 	// Process
-	var apiSpecs = []*APISpec{}
+	var apiSpecs []*APISpec
 	for _, appConfig := range apiDefs {
 		newAppSpec := a.MakeSpec(appConfig)
 		apiSpecs = append(apiSpecs, newAppSpec)
@@ -351,7 +351,7 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*API
 		return nil
 	}
 
-	var apiSpecs = []*APISpec{}
+	var apiSpecs []*APISpec
 	for i, appConfig := range apiDefs {
 		appConfig.DecodeFromDB()
 		appConfig.RawData = strDefs[i] // Lets keep a copy for plugable modules
@@ -389,7 +389,7 @@ func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*apidef.APIDefinit
 // LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
-	var apiSpecs = []*APISpec{}
+	var apiSpecs []*APISpec
 	// Grab json files from directory
 	files, _ := ioutil.ReadDir(dir)
 	for _, f := range files {
@@ -1056,9 +1056,9 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 // GetVersionData attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
 func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
-	var version = apidef.VersionInfo{}
+	var version apidef.VersionInfo
 	var versionKey string
-	var versionRxPaths = []URLSpec{}
+	var versionRxPaths []URLSpec
 	var versionWLStatus bool
 
 	// try the context first

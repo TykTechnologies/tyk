@@ -575,7 +575,7 @@ func TestAPIAuthOk(t *testing.T) {
 }
 
 func TestGetOAuthClients(t *testing.T) {
-	var testAPIID = "1"
+	testAPIID := "1"
 	var responseCode int
 
 	_, responseCode = getOauthClients(testAPIID)

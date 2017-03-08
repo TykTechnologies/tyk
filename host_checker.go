@@ -141,7 +141,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		useMethod = "GET"
 	}
 
-	var body = []byte(toCheck.Body)
+	body := []byte(toCheck.Body)
 	req, err := http.NewRequest(useMethod, toCheck.CheckURL, bytes.NewBuffer(body))
 	if err != nil {
 		log.Error("Could not create request: ", err)
