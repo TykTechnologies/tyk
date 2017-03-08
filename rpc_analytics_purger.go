@@ -50,11 +50,10 @@ func (r *RPCPurger) PurgeCache() {
 
 		for i, v := range analyticsValues {
 			decoded := AnalyticsRecord{}
-			err := msgpack.Unmarshal(v.([]byte), &decoded)
-			log.Debug("Decoded Record: ", decoded)
-			if err != nil {
+			if err := msgpack.Unmarshal(v.([]byte), &decoded); err != nil {
 				log.Error("Couldn't unmarshal analytics data: ", err)
 			} else {
+				log.Debug("Decoded Record: ", decoded)
 				keys[i] = decoded
 			}
 		}

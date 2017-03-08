@@ -27,8 +27,7 @@ func (rt ResponseTransformMiddleware) New(c interface{}, spec *APISpec) (TykResp
 	handler := ResponseTransformMiddleware{}
 	moduleConfig := ResponsetransformOptions{}
 
-	err := mapstructure.Decode(c, &moduleConfig)
-	if err != nil {
+	if err := mapstructure.Decode(c, &moduleConfig); err != nil {
 		log.Error(err)
 		return nil, err
 	}

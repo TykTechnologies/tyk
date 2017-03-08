@@ -26,8 +26,7 @@ func (h HeaderTransform) New(c interface{}, spec *APISpec) (TykResponseHandler, 
 	handler := HeaderTransform{}
 	moduleConfig := HeaderTransformOptions{}
 
-	err := mapstructure.Decode(c, &moduleConfig)
-	if err != nil {
+	if err := mapstructure.Decode(c, &moduleConfig); err != nil {
 		log.Error(err)
 		return nil, err
 	}

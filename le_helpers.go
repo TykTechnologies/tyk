@@ -29,8 +29,7 @@ func StoreLEState(m *letsencrypt.Manager) {
 	secret := rightPad2Len(config.Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), state)
 
-	err := store.SetKey("cache", cryptoText, -1)
-	if err != nil {
+	if err := store.SetKey("cache", cryptoText, -1); err != nil {
 		log.Error("[SSL] --> Failed to store SSL backup: ", err)
 		return
 	}

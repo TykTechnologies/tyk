@@ -292,8 +292,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	}
 
 	asData := make(map[string]interface{})
-	decoder := json.NewDecoder(recorder.Body)
-	if err := decoder.Decode(&asData); err != nil {
+	if err := json.NewDecoder(recorder.Body).Decode(&asData); err != nil {
 		t.Fatal("Decode failed:", err)
 	}
 	token, ok := asData["access_token"].(string)
