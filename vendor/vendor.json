@@ -3,6 +3,20 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "NRonvQTe073YVead6//CQ5oVgK4=",
+			"path": "github.com/Sirupsen/logrus",
+			"revision": "1deb2db2a6fff8a35532079061b903c3a25eed52",
+			"revisionTime": "2017-03-08T20:36:35Z"
+		},
+		{
+			"checksumSHA1": "63vHVSiItUfflK3tUwe6mrI84BQ=",
+			"path": "github.com/Sirupsen/logrus/hooks/syslog",
+			"revision": "0208149b40d863d2c1a2f8fe5753096a9cf2cc8b",
+			"revisionTime": "2017-02-27T12:44:09Z",
+			"version": "v0.11.4",
+			"versionExact": "v0.11.4"
+		},
+		{
 			"checksumSHA1": "j5NnY7tyNCx+Y5VrAMxKFqPPGWc=",
 			"path": "github.com/TykTechnologies/concurrent-map",
 			"revision": "7de59d53fd5c30afb681bfcfe58842d2e14136bd",
@@ -39,40 +53,16 @@
 			"revisionTime": "2016-08-29T16:00:34Z"
 		},
 		{
-			"checksumSHA1": "C7gtyz3E3AqJVC3vGJP7v2Q33Hg=",
-			"path": "github.com/TykTechnologies/logrus",
-			"revision": "55ff0f4b9b3de929d99bad783723811ff7add9b6",
-			"revisionTime": "2016-12-01T17:12:39Z"
-		},
-		{
-			"checksumSHA1": "1ptzo16UFU1rl7IzZH3mYIQwzzo=",
-			"path": "github.com/TykTechnologies/logrus-logstash-hook",
-			"revision": "887d1c57c3e2d180d9c698ad82fc3f9d2f2a7cba",
-			"revisionTime": "2016-12-01T17:10:59Z"
-		},
-		{
-			"checksumSHA1": "xIq5uj5CzOoqr2MXhoq+Le4iaY8=",
-			"path": "github.com/TykTechnologies/logrus-prefixed-formatter",
-			"revision": "85209afb73a644d3e53cf08a6d0d101f349004a9",
-			"revisionTime": "2016-12-01T17:11:21Z"
-		},
-		{
-			"checksumSHA1": "3Mr3339eVXk4tpit/L43/Zb2dhQ=",
-			"path": "github.com/TykTechnologies/logrus/hooks/syslog",
-			"revision": "55ff0f4b9b3de929d99bad783723811ff7add9b6",
-			"revisionTime": "2016-12-01T17:12:39Z"
-		},
-		{
-			"checksumSHA1": "PGX2azAgFsZo2bk4WOOEPeV6E8o=",
-			"path": "github.com/TykTechnologies/logrus_sentry",
-			"revision": "0a1e372147f56185d6424e204a339a12df9324a4",
-			"revisionTime": "2016-12-01T17:13:01Z"
-		},
-		{
 			"checksumSHA1": "v64AG0uGiKryWV/kqq5360zw1ts=",
 			"path": "github.com/TykTechnologies/openid2go/openid",
 			"revision": "aab5ce1231ab090ca20af7b7b45a86ae34235eef",
 			"revisionTime": "2016-08-17T21:35:54Z"
+		},
+		{
+			"checksumSHA1": "9dh0q0rB99j2KWdfon8u6GtLf6U=",
+			"path": "github.com/bshuster-repo/logrus-logstash-hook",
+			"revision": "5f729f2fb50a301153cae84ff5c58981d51c095a",
+			"revisionTime": "2017-01-02T09:48:09Z"
 		},
 		{
 			"checksumSHA1": "m6QMy+u/IX6knzP28DqMn4sdLSw=",
@@ -81,10 +71,10 @@
 			"revisionTime": "2016-10-20T19:44:10Z"
 		},
 		{
-			"checksumSHA1": "D8gUHzS23ynNPS4imXcAqGnfTck=",
+			"checksumSHA1": "TbUu0oEcNoMuYbLJbnJkTOpZ/iw=",
 			"path": "github.com/certifi/gocertifi",
-			"revision": "a61bf5eafa3aee233ec8043e9da052447e5463dd",
-			"revisionTime": "2016-09-26T11:54:48Z"
+			"revision": "03be5e6bb9874570ea7fb0961225d193cbc374c5",
+			"revisionTime": "2017-01-23T21:22:43Z"
 		},
 		{
 			"checksumSHA1": "ZpbyHYDGQyxkwm325SX9yLTYIj8=",
@@ -103,6 +93,14 @@
 			"path": "github.com/docopt/docopt.go",
 			"revision": "784ddc588536785e7299f7272f39101f7faccc3f",
 			"revisionTime": "2016-02-16T23:20:12Z"
+		},
+		{
+			"checksumSHA1": "CycvZIDE4VWWT1jeYa8N5O9ZCd0=",
+			"path": "github.com/evalphobia/logrus_sentry",
+			"revision": "3515445f906f3bc291b78599b57b7374951cbb79",
+			"revisionTime": "2017-02-24T16:53:27Z",
+			"version": "v0.2.12",
+			"versionExact": "v0.2.12"
 		},
 		{
 			"checksumSHA1": "tGmEgGsqTY3Qel4yz+zoOrtkARw=",
@@ -145,6 +143,14 @@
 			"path": "github.com/garyburd/redigo/redis",
 			"revision": "80f7de34463b0ed3d7c61303e5619efe1b227f92",
 			"revisionTime": "2016-10-24T01:47:02Z"
+		},
+		{
+			"checksumSHA1": "OvNubVhC95zaeONCY6Ztp0DScrc=",
+			"path": "github.com/gemnasium/logrus-graylog-hook",
+			"revision": "3854c2f03d93f9c40791dacb8ca200af51397bb0",
+			"revisionTime": "2017-02-19T20:50:05Z",
+			"version": "2.0.4",
+			"versionExact": "2.0.4"
 		},
 		{
 			"checksumSHA1": "3ur+hHXnLZOIghIdCBBMx9pbP4E=",
@@ -219,12 +225,6 @@
 			"revisionTime": "2015-06-11T14:24:37Z"
 		},
 		{
-			"checksumSHA1": "GunXMhUpMblyWqpuah7dAU8S+nU=",
-			"path": "github.com/lonelycode/logrus-graylog-hook",
-			"revision": "60453d76c3e59e559614378d2ef1ffd3add0e713",
-			"revisionTime": "2016-12-01T17:17:36Z"
-		},
-		{
 			"checksumSHA1": "5OpChAvGZcoxGkZAp3qf5ZxKR84=",
 			"path": "github.com/lonelycode/osin",
 			"revision": "da239c9dacb656fc52eca8e7b879824e3145f242",
@@ -235,6 +235,18 @@
 			"path": "github.com/lonelycode/redigocluster/rediscluster",
 			"revision": "488cecc7456ee5d7665d352ae1f91c4229522bc3",
 			"revisionTime": "2017-01-05T07:49:30Z"
+		},
+		{
+			"checksumSHA1": "plye7pUJSHwBcI5lmVf7vozbRuo=",
+			"path": "github.com/mattn/go-colorable",
+			"revision": "acb9493f2794fd0f820de7a27a217dafbb1b65ea",
+			"revisionTime": "2017-03-04T16:45:43Z"
+		},
+		{
+			"checksumSHA1": "U6lX43KDDlNOn+Z0Yyww+ZzHfFo=",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "57fdcb988a5c543893cc61bce354a6e24ab70022",
+			"revisionTime": "2017-03-07T16:30:44Z"
 		},
 		{
 			"checksumSHA1": "ONHg+36MIdsQOl6NZeYa8ryl+OE=",
@@ -255,10 +267,10 @@
 			"revisionTime": "2016-02-27T18:47:54Z"
 		},
 		{
-			"checksumSHA1": "hBgLmZ/4mCxmnH88mqFKBkpJFUY=",
+			"checksumSHA1": "CIK3BBNX3nuUQCmNqTQydNfMNKI=",
 			"path": "github.com/mgutz/ansi",
-			"revision": "c286dcecd19ff979eeb73ea444e479b903f2cfcb",
-			"revisionTime": "2015-09-14T16:22:38Z"
+			"revision": "9520e82c474b0a04dd04f8a40959027271bab992",
+			"revisionTime": "2017-02-06T15:57:36Z"
 		},
 		{
 			"checksumSHA1": "UuXgD2dDojfS8AViUEe15gLIWZE=",
@@ -287,8 +299,8 @@
 		{
 			"checksumSHA1": "ynJSWoF6v+3zMnh9R0QmmG6iGV8=",
 			"path": "github.com/pkg/errors",
-			"revision": "248dadf4e9068a0b3e79f02ed0a610d935de5302",
-			"revisionTime": "2016-10-29T09:36:37Z"
+			"revision": "bfd5150e4e41705ded2129ec33379de1cb90b513",
+			"revisionTime": "2017-02-27T22:00:37Z"
 		},
 		{
 			"checksumSHA1": "D+eX5lLgOgij1Hs7NO10OLdUVZo=",
@@ -391,6 +403,14 @@
 			"path": "github.com/wadey/gocovmerge",
 			"revision": "b5bfa59ec0adc420475f97f89b58045c721d761c",
 			"revisionTime": "2016-03-31T18:18:00Z"
+		},
+		{
+			"checksumSHA1": "zwn9FlzQzF6L5lEeoV2ejtoLkIw=",
+			"path": "github.com/x-cray/logrus-prefixed-formatter",
+			"revision": "9cd0cf058806896bf8ca66f9a957d36bd9e4ce0f",
+			"revisionTime": "2017-02-08T10:24:50Z",
+			"version": "v0.3.2",
+			"versionExact": "v0.3.2"
 		},
 		{
 			"checksumSHA1": "vE43s37+4CJ2CDU6TlOUOYE0K9c=",
