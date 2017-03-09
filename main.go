@@ -1106,11 +1106,11 @@ func start(arguments map[string]interface{}) {
 			"prefix": "main",
 		}).Debug("Adding pprof endpoints")
 
-		defaultRouter.HandleFunc("/debug/pprof/{rest:.*}", http.HandlerFunc(pprof_http.Index))
-		defaultRouter.HandleFunc("/debug/pprof/cmdline", http.HandlerFunc(pprof_http.Cmdline))
-		defaultRouter.HandleFunc("/debug/pprof/profile", http.HandlerFunc(pprof_http.Profile))
-		defaultRouter.HandleFunc("/debug/pprof/symbol", http.HandlerFunc(pprof_http.Symbol))
-		defaultRouter.HandleFunc("/debug/pprof/trace", http.HandlerFunc(pprof_http.Trace))
+		defaultRouter.HandleFunc("/debug/pprof/{rest:.*}", pprof_http.Index)
+		defaultRouter.HandleFunc("/debug/pprof/cmdline", pprof_http.Cmdline)
+		defaultRouter.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
+		defaultRouter.HandleFunc("/debug/pprof/symbol", pprof_http.Symbol)
+		defaultRouter.HandleFunc("/debug/pprof/trace", pprof_http.Trace)
 	}
 
 	// Set up a default org manager so we can traverse non-live paths

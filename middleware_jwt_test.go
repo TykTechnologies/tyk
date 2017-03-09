@@ -234,7 +234,7 @@ func createJWTSessionWithRSAWithPolicy() SessionState {
 func getJWTChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	proxyHandler := ProxyHandler(proxy, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),

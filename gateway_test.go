@@ -222,20 +222,20 @@ type tykErrorResponse struct {
 }
 
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
-func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tm := TykMiddleware{apiSpec, p}
 		handler := SuccessHandler{&tm}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
 		return
-	}
+	})
 }
 
 func getChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	proxyHandler := ProxyHandler(proxy, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),

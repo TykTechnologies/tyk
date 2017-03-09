@@ -46,8 +46,8 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 		log.Fatal("[Middleware] Configuration load failed")
 	}
 
-	aliceHandler := func(h http.Handler) http.Handler {
-		handler := func(w http.ResponseWriter, r *http.Request) {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
 				"from_ip":  r.RemoteAddr,
@@ -95,10 +95,8 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 
 			job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 			job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
-		}
-		return http.HandlerFunc(handler)
+		})
 	}
-	return aliceHandler
 }
 
 func AppendMiddleware(chain *[]alice.Constructor, mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware) {

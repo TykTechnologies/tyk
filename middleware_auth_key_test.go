@@ -34,7 +34,7 @@ func createAuthKeyAuthSession() SessionState {
 func getAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	proxyHandler := ProxyHandler(proxy, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
