@@ -134,7 +134,7 @@ func TestCoProcessTykTriggerEvent(t *testing.T) {
 func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.HookType, driver apidef.MiddlewareDriver) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	proxyHandler := http.HandlerFunc(ProxyHandler(proxy, spec))
+	proxyHandler := ProxyHandler(proxy, spec)
 	tykMiddleware := &TykMiddleware{spec, proxy}
 	mw := CreateCoProcessMiddleware(hookName, hookType, driver, tykMiddleware)
 	return alice.New(mw).Then(proxyHandler)
