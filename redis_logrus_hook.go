@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 type redisChannelHook struct {

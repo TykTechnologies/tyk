@@ -175,7 +175,8 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 )

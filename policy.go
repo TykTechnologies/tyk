@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 type Policy struct {

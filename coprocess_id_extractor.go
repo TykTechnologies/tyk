@@ -3,23 +3,22 @@
 package main
 
 import (
-	"regexp"
-
-	"github.com/gorilla/context"
-	"github.com/mitchellh/mapstructure"
-	"gopkg.in/xmlpath.v2"
-
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"bytes"
 	"crypto/md5"
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/context"
+	"github.com/mitchellh/mapstructure"
+	"gopkg.in/xmlpath.v2"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 // IdExtractor is the base interface for an ID extractor.

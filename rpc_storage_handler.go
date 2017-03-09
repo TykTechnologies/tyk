@@ -12,7 +12,7 @@ import (
 	"github.com/lonelycode/gorpc"
 	"github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 type InboundData struct {

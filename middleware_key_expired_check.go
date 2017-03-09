@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/context"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.

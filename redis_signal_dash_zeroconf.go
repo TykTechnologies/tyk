@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 type DashboardConfigPayload struct {

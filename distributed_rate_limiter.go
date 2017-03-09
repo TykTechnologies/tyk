@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/drl"
-	"github.com/TykTechnologies/logrus"
 )
 
 var DRLManager = &drl.DRL{}

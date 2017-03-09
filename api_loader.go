@@ -6,11 +6,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/streamrail/concurrent-map"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 )

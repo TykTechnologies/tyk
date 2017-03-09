@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

@@ -5,7 +5,7 @@ import (
 
 	"rsc.io/letsencrypt"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 const LEKeyPrefix = "le_ssl:"
