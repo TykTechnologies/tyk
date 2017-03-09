@@ -166,7 +166,7 @@ func (l *LDAPStorageHandler) SetRollingWindowPipeline(keyName string, per int64,
 
 func (l LDAPStorageHandler) GetSet(keyName string) (map[string]string, error) {
 	log.Error("Not implemented")
-	return map[string]string{}, nil
+	return nil, nil
 }
 
 func (l LDAPStorageHandler) AddToSet(keyName, value string) {
