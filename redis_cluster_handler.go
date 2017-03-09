@@ -33,12 +33,9 @@ type RedisClusterStorageManager struct {
 func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisCluster {
 	redisPtr := redisClusterSingleton
 	cfg := config.Storage
-	if isCache {
-		if config.EnableSeperateCacheStore {
-			redisPtr = redisCacheClusterSingleton
-			cfg = config.CacheStorage
-		}
-
+	if isCache && config.EnableSeperateCacheStore {
+		redisPtr = redisCacheClusterSingleton
+		cfg = config.CacheStorage
 	}
 
 	if !forceReconnect {
@@ -46,10 +43,8 @@ func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisC
 			log.Debug("Redis pool already INITIALISED")
 			return redisPtr
 		}
-	} else {
-		if redisPtr != nil {
-			redisPtr.CloseConnection()
-		}
+	} else if redisPtr != nil {
+		redisPtr.CloseConnection()
 	}
 
 	log.Debug("Creating new Redis connection pool")
@@ -79,11 +74,10 @@ func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisC
 
 	seed_redii := []map[string]string{}
 
-	if len(cfg.Hosts) > 0 {
-		for h, p := range cfg.Hosts {
-			seed_redii = append(seed_redii, map[string]string{h: p})
-		}
-	} else {
+	for h, p := range cfg.Hosts {
+		seed_redii = append(seed_redii, map[string]string{h: p})
+	}
+	if len(seed_redii) == 0 {
 		seed_redii = append(seed_redii, map[string]string{cfg.Host: strconv.Itoa(cfg.Port)})
 	}
 
@@ -176,11 +170,10 @@ func (r *RedisClusterStorageManager) GetExp(keyName string) (int64, error) {
 	value, err := redis.Int64(GetRelevantClusterReference(r.IsCache).Do("TTL", r.fixKey(keyName)))
 	if err != nil {
 		log.Error("Error trying to get TTL: ", err)
-	} else {
-		return value, nil
+		return 0, errKeyNotFound
 	}
+	return value, nil
 
-	return 0, errKeyNotFound
 }
 
 // SetKey will create (or update) a key value in the store
@@ -278,20 +271,18 @@ func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) m
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get filtered client keys: ", err)
-
-	} else {
-		keys, _ := redis.Strings(sessionsInterface, err)
-		valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
-		values, err := redis.Strings(valueObj, err)
-
-		m := make(map[string]string)
-		for i, v := range keys {
-			m[r.cleanKey(v)] = values[i]
-		}
-		return m
+		return nil
 	}
 
-	return map[string]string{}
+	keys, _ := redis.Strings(sessionsInterface, err)
+	valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
+	values, err := redis.Strings(valueObj, err)
+
+	m := make(map[string]string)
+	for i, v := range keys {
+		m[r.cleanKey(v)] = values[i]
+	}
+	return m
 }
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly
@@ -301,20 +292,17 @@ func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get all keys: ", err)
-
-	} else {
-		keys, _ := redis.Strings(sessionsInterface, err)
-		valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
-		values, err := redis.Strings(valueObj, err)
-
-		m := make(map[string]string)
-		for i, v := range keys {
-			m[r.cleanKey(v)] = values[i]
-		}
-		return m
+		return nil
 	}
+	keys, _ := redis.Strings(sessionsInterface, err)
+	valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
+	values, err := redis.Strings(valueObj, err)
 
-	return map[string]string{}
+	m := make(map[string]string)
+	for i, v := range keys {
+		m[r.cleanKey(v)] = values[i]
+	}
+	return m
 }
 
 // DeleteKey will remove a key from the database
@@ -523,7 +511,7 @@ func (r *RedisClusterStorageManager) GetSet(keyName string) (map[string]string, 
 	val, err := GetRelevantClusterReference(r.IsCache).Do("SMEMBERS", r.fixKey(keyName))
 	if err != nil {
 		log.Error("Error trying to get key set:", err)
-		return map[string]string{}, err
+		return nil, err
 	}
 
 	asValues, _ := redis.Strings(val, err)
