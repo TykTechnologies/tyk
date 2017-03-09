@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	uuid "github.com/nu7hatch/gouuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -325,6 +325,6 @@ func (c *Config) StoreAnalytics(r *http.Request) bool {
 }
 
 func generateRandomNodeID() string {
-	u, _ := uuid.NewV4()
+	u := uuid.NewV4()
 	return "solo-" + u.String()
 }

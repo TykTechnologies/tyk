@@ -14,7 +14,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-	"github.com/nu7hatch/gouuid"
+	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -1327,14 +1327,14 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	cleanSting := newOauthClient.ClientID
 
 	if newOauthClient.ClientID == "" {
-		u5, _ := uuid.NewV4()
+		u5 := uuid.NewV4()
 		cleanSting = strings.Replace(u5.String(), "-", "", -1)
 	}
 
 	// Allow the secret to be set
 	secret := newOauthClient.ClientSecret
 	if newOauthClient.ClientSecret == "" {
-		u5Secret, _ := uuid.NewV4()
+		u5Secret := uuid.NewV4()
 		secret = base64.StdEncoding.EncodeToString([]byte(u5Secret.String()))
 	}
 

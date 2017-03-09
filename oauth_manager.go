@@ -9,7 +9,7 @@ import (
 	"time"
 
 	osin "github.com/lonelycode/osin"
-	"github.com/nu7hatch/gouuid"
+	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -818,7 +818,7 @@ func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generater
 	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
 
 	if generaterefresh {
-		u6, _ := uuid.NewV4()
+		u6 := uuid.NewV4()
 		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
 	}
 	return
