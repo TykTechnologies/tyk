@@ -7,7 +7,7 @@ import (
 
 	"github.com/gorilla/context"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key

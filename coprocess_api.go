@@ -18,7 +18,8 @@ package main
 import "C"
 
 import (
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

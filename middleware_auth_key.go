@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

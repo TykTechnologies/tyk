@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 const RPCKeyPrefix = "rpc:"

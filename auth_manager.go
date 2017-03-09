@@ -8,7 +8,7 @@ import (
 
 	"github.com/nu7hatch/gouuid"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 // AuthorisationHandler is used to validate a session key,

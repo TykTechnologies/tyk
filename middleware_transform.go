@@ -7,11 +7,11 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
 	"github.com/gorilla/context"
 	"golang.org/x/net/html/charset"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

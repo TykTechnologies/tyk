@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

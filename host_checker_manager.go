@@ -7,10 +7,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/lonelycode/go-uuid/uuid"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

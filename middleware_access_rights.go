@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/context"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 // AccessRightsCheck is a middleware that will check if the key bing used to access the API has

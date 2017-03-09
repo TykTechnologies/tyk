@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 func canonicalAddr(url *url.URL) string {

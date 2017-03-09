@@ -6,7 +6,7 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"

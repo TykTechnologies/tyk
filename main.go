@@ -19,21 +19,21 @@ import (
 
 	logger "github.com/TykTechnologies/tyk/log"
 
+	"github.com/Sirupsen/logrus"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/docopt/docopt.go"
+	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
+	"github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/gorpc"
-	"github.com/lonelycode/logrus-graylog-hook"
 	osin "github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/logrus-logstash-hook"
-	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
-	"github.com/TykTechnologies/logrus_sentry"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

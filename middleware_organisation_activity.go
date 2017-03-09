@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/context"
 
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 var orgChanMap = make(map[string]chan bool)
