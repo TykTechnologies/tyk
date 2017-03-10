@@ -56,9 +56,6 @@ func (u *RedisNotificationHandler) StartUIPubSubConn() {
 			log.WithFields(logrus.Fields{
 				"prefix": "log-notifications",
 			}).Warning("Reconnecting")
-
-			u.CacheStore.Connect()
-			u.CacheStore.StartPubSubHandler(UIChanName, u.HandleIncommingRedisEvent)
 		}
 
 	}
