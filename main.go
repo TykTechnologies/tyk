@@ -924,7 +924,7 @@ func getCmdArguments() map[string]interface{} {
 		--import-blueprint=<file>    Import an API Blueprint file
 		--import-swagger=<file>      Import a Swagger file
 		--create-api                 Creates a new API Definition from the blueprint
-		--org-id=><id>               Assign the API Defintition to this org_id (required with create)
+		--org-id=<id>                Assign the API Defintition to this org_id (required with create)
 		--upstream-target=<url>      Set the upstream target for the definition
 		--as-mock                    Creates the API as a mock based on example fields
 		--for-api=<path>             Adds blueprint to existing API Defintition as version
