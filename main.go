@@ -1241,13 +1241,17 @@ func startHeartBeat() {
 }
 
 func startDRL() {
-	if !config.EnableSentinelRateLImiter && !config.EnableRedisRollingLimiter {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Initialising distributed rate limiter")
-		setupDRL()
-		startRateLimitNotifications()
+	switch {
+	case config.ManagementNode,
+		config.EnableSentinelRateLImiter,
+		config.EnableRedisRollingLimiter:
+		return
 	}
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Initialising distributed rate limiter")
+	setupDRL()
+	startRateLimitNotifications()
 }
 
 func listen(l, controlListener net.Listener, err error) {

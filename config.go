@@ -194,6 +194,7 @@ type Config struct {
 	EnableNonTransactionalRateLimiter bool                   `json:"enable_non_transactional_rate_limiter"`
 	EnableSentinelRateLImiter         bool                   `json:"enable_sentinel_rate_limiter"`
 	EnableRedisRollingLimiter         bool                   `json:"enable_redis_rolling_limiter"`
+	ManagementNode                    bool                   `json:"management_node"`
 	Monitor                           MonitorConfig
 	OauthRefreshExpire                int64                                 `json:"oauth_refresh_token_expire"`
 	OauthTokenExpire                  int32                                 `json:"oauth_token_expire"`
