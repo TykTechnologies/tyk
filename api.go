@@ -564,7 +564,7 @@ func signalGroupReload() ([]byte, int) {
 	return responseMessage, 200
 }
 
-func HandleGetAPIList() ([]byte, int) {
+func handleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
@@ -587,7 +587,7 @@ func HandleGetAPIList() ([]byte, int) {
 	return responseMessage, 200
 }
 
-func HandleGetAPI(apiID string) ([]byte, int) {
+func handleGetAPI(apiID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
@@ -614,7 +614,7 @@ func HandleGetAPI(apiID string) ([]byte, int) {
 	return responseMessage, 404
 }
 
-func HandleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
+func handleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
 	if config.UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return createError("Due to enabled use_db_app_configs, please use the Dashboard API"), 500
@@ -675,7 +675,7 @@ func HandleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
 	return responseMessage, 200
 }
 
-func HandleDeleteAPI(apiID string) ([]byte, int) {
+func handleDeleteAPI(apiID string) ([]byte, int) {
 	// Generate a filename
 	defFilename := apiID + ".json"
 	defFilePath := filepath.Join(config.AppPath, defFilename)
@@ -717,18 +717,18 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		if apiID != "" {
 			log.Debug("Requesting API definition for", apiID)
-			responseMessage, code = HandleGetAPI(apiID)
+			responseMessage, code = handleGetAPI(apiID)
 		} else {
 			log.Debug("Requesting API list")
-			responseMessage, code = HandleGetAPIList()
+			responseMessage, code = handleGetAPIList()
 		}
 	case "POST":
 		log.Debug("Creating new definition file")
-		responseMessage, code = HandleAddOrUpdateApi(apiID, r)
+		responseMessage, code = handleAddOrUpdateApi(apiID, r)
 	case "PUT":
 		if apiID != "" {
 			log.Debug("Updating existing API: ", apiID)
-			responseMessage, code = HandleAddOrUpdateApi(apiID, r)
+			responseMessage, code = handleAddOrUpdateApi(apiID, r)
 		} else {
 			code = 400
 			responseMessage = createError("Must specify an apiID to update")
@@ -736,7 +736,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		if apiID != "" {
 			log.Debug("Deleting API definition for: ", apiID)
-			responseMessage, code = HandleDeleteAPI(apiID)
+			responseMessage, code = handleDeleteAPI(apiID)
 		} else {
 			code = 400
 			responseMessage = createError("Must specify an apiID to delete")
@@ -1800,7 +1800,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 		orgid = spec.OrgID
 	}
 
-	if err := HandleInvalidateAPICache(apiID); err != nil {
+	if err := handleInvalidateAPICache(apiID); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "api",
 			"api_id":      apiID,
@@ -1833,7 +1833,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, 200, responseMessage)
 }
 
-func HandleInvalidateAPICache(apiID string) error {
+func handleInvalidateAPICache(apiID string) error {
 	keyPrefix := "cache-" + strings.Replace(apiID, "/", "", -1)
 	matchPattern := keyPrefix + "*"
 	store := GetGlobalLocalCacheStorageHandler(keyPrefix, false)

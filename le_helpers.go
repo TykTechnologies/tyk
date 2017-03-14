@@ -65,7 +65,7 @@ type LE_ServerInfo struct {
 	ID       string
 }
 
-func OnLESSLStatusReceivedHandler(payload string) {
+func onLESSLStatusReceivedHandler(payload string) {
 	serverData := LE_ServerInfo{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{

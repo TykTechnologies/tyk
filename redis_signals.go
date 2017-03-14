@@ -63,15 +63,15 @@ func handleRedisEvent(v interface{}) {
 
 	switch notif.Command {
 	case NoticeDashboardZeroConf:
-		HandleDashboardZeroConfMessage(notif.Payload)
+		handleDashboardZeroConfMessage(notif.Payload)
 	case NoticeConfigUpdate:
-		HandleNewConfiguration(notif.Payload)
+		handleNewConfiguration(notif.Payload)
 	case NoticeDashboardConfigRequest:
-		HandleSendMiniConfig(notif.Payload)
+		handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		OnServerStatusReceivedHandler(notif.Payload)
+		onServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
-		OnLESSLStatusReceivedHandler(notif.Payload)
+		onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeGroupReload:
 		handleReloadMsg()
 	default:
