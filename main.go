@@ -1304,8 +1304,11 @@ func listen(l, controlListener net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
-				Handler:      defaultRouter,
 			}
+
+			newServeMux := http.NewServeMux()
+			newServeMux.Handle("/", defaultRouter)
+			http.DefaultServeMux = newServeMux
 
 			// Accept connections in a new goroutine.
 			go s.Serve(l)
@@ -1325,14 +1328,16 @@ func listen(l, controlListener net.Listener, err error) {
 				"prefix": "main",
 			}).Printf("Gateway started (%v)", VERSION)
 
+			go http.Serve(l, nil)
+
 			if !RPC_EmergencyMode {
-				go http.Serve(l, mainRouter)
+				newServeMux := http.NewServeMux()
+				newServeMux.Handle("/", mainRouter)
+				http.DefaultServeMux = newServeMux
 
 				if controlListener != nil {
 					go http.Serve(controlListener, controlRouter)
 				}
-			} else {
-				go http.Serve(l, nil)
 			}
 
 			displayConfig()
@@ -1382,8 +1387,11 @@ func listen(l, controlListener net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
-				Handler:      defaultRouter,
 			}
+
+			newServeMux := http.NewServeMux()
+			newServeMux.Handle("/", defaultRouter)
+			http.DefaultServeMux = newServeMux
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1404,13 +1412,20 @@ func listen(l, controlListener net.Listener, err error) {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Printf("Gateway resumed (%v)", VERSION)
-			displayConfig()
 
-			go http.Serve(l, mainRouter)
+			go http.Serve(l, nil)
 
-			if controlListener != nil {
-				go http.Serve(controlListener, controlRouter)
+			if !RPC_EmergencyMode {
+				newServeMux := http.NewServeMux()
+				newServeMux.Handle("/", mainRouter)
+				http.DefaultServeMux = newServeMux
+
+				if controlListener != nil {
+					go http.Serve(controlListener, controlRouter)
+				}
 			}
+
+			displayConfig()
 		}
 
 		log.WithFields(logrus.Fields{

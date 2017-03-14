@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -464,5 +465,32 @@ func TestGetAPISpecsRPCSuccess(t *testing.T) {
 	if len(specs) != 1 {
 		t.Error("Should return array with one spec", specs)
 	}
+}
 
+func TestGetAPISpecsDashboardSuccess(t *testing.T) {
+	// Mock Dashboard
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/system/apis" {
+			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+		} else {
+			t.Fatal("Unknown dashboard API request", r)
+		}
+	}))
+	defer ts.Close()
+
+	ApiSpecRegister = make(map[string]*APISpec)
+
+	config.UseDBAppConfigs = true
+	config.DBAppConfOptions.ConnectionString = ts.URL
+
+	defer func() {
+		config.UseDBAppConfigs = false
+		config.DBAppConfOptions.ConnectionString = ""
+	}()
+
+	doReload()
+
+	if len(ApiSpecRegister) != 1 {
+		t.Error("Should return array with one spec", ApiSpecRegister)
+	}
 }
