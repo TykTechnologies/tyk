@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -807,9 +808,11 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 }
 
 type tykHttpTest struct {
-	method, url string
-	code        int
+	method, path string
+	code         int
+	data         string
 
+	afterFn        func()
 	adminAuth      bool
 	controlRequest bool
 }
@@ -843,6 +846,15 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			config.HttpServerOptions.OverrideDefaults = false
 		}
 
+		// Ensure that no local API's installed
+		os.RemoveAll(config.AppPath)
+
+		var err error
+		config.AppPath, err = ioutil.TempDir("", "tyk-test-")
+		if err != nil {
+			panic(err)
+		}
+
 		initialiseSystem(nil)
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
@@ -858,7 +870,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 
 		client := &http.Client{}
 
-		for _, tc := range tests {
+		for ti, tc := range tests {
 			tPrefix := ""
 			if m.goagain {
 				tPrefix += "[Goagain]"
@@ -879,7 +891,13 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 				baseUrl = "http://" + cln.Addr().String()
 			}
 
-			req, _ := http.NewRequest(tc.method, baseUrl+tc.url, nil)
+			var bodyReader io.Reader
+
+			if tc.data != "" {
+				bodyReader = strings.NewReader(tc.data)
+			}
+
+			req, _ := http.NewRequest(tc.method, baseUrl+tc.path, bodyReader)
 
 			if tc.adminAuth {
 				req.Header.Add("X-Tyk-Authorization", config.Secret)
@@ -888,7 +906,11 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			resp, _ := client.Do(req)
 
 			if resp.StatusCode != tc.code {
-				t.Errorf("%s%s %s Status %d, want %d", tPrefix, tc.method, tc.url, resp.StatusCode, tc.code)
+				t.Errorf("[%d]%s%s %s Status %d, want %d", ti, tPrefix, tc.method, tc.path, resp.StatusCode, tc.code)
+			}
+
+			if tc.afterFn != nil {
+				tc.afterFn()
 			}
 		}
 
@@ -900,13 +922,40 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 	}
 }
 
+const sampleAPI = `{
+	"name": "API",
+	"slug": "api",
+	"api_id": "test",
+	"use_keyless": true,
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"Default": {
+				"name": "Default",
+				"expires": "3000-01-02 15:04"
+			}
+		}
+	},
+	"proxy": {
+		"listen_path": "/",
+		"target_url": "http://127.0.0.1:16500",
+		"strip_listen_path": true
+	},
+	"active": true
+}`
+
 func TestListener(t *testing.T) {
 	tests := []tykHttpTest{
-		{"GET", "/", 404, false, false},
-		{"GET", "/tyk/apis/", 403, false, false},
-		{"GET", "/tyk/apis/", 200, true, false},
-		{"GET", "/tyk/apis", 403, false, false},
-		{"GET", "/tyk/apis", 200, true, false},
+		{method: "GET", path: "/", code: 404},
+		{method: "GET", path: "/tyk/apis/", code: 403},
+		{method: "GET", path: "/tyk/apis/", adminAuth: true, code: 200},
+		{method: "GET", path: "/tyk/apis", code: 403},
+		{method: "GET", path: "/tyk/apis", adminAuth: true, code: 200},
+		{method: "POST", path: "/tyk/apis", data: sampleAPI, adminAuth: true, code: 200},
+		// API definitions not reloaded yet
+		{method: "GET", path: "/", code: 404},
+		{method: "GET", path: "/tyk/reload/", adminAuth: true, code: 200, afterFn: func() { doReload() }},
+		{method: "GET", path: "/", code: 200},
 	}
 
 	testHttp(t, tests, false)
@@ -917,14 +966,15 @@ func TestListener(t *testing.T) {
 // Admin api located on separate port
 func TestControlListener(t *testing.T) {
 	tests := []tykHttpTest{
-		{"GET", "/", 404, false, false},
-		{"GET", "/tyk/apis", 404, false, false},
+		{method: "GET", path: "/", code: 404},
+		{method: "GET", path: "/tyk/apis", code: 404},
 
 		// Querying control API
-		{"GET", "/", 404, false, true},
-		{"GET", "/tyk/apis", 403, false, true},
-		{"GET", "/tyk/apis/", 200, true, true},
+		{method: "GET", path: "/", code: 404, controlRequest: true},
+		{method: "GET", path: "/tyk/apis", code: 403, controlRequest: true},
+		{method: "GET", path: "/tyk/apis/", code: 200, adminAuth: true, controlRequest: true},
 	}
+
 	testHttp(t, tests, true)
 	doReload()
 	testHttp(t, tests, true)
