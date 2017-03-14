@@ -806,10 +806,6 @@ func initialiseSystem(arguments map[string]interface{}) {
 	// Enable command mode
 	for _, opt := range commandModeOptions {
 		v := arguments[opt]
-		if v == true {
-			handleCommandModeArgs(arguments)
-			os.Exit(0)
-		}
 		if v != nil && v != false {
 			handleCommandModeArgs(arguments)
 			os.Exit(0)
