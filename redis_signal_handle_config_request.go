@@ -66,7 +66,7 @@ func GetExistingConfig() (MicroConfig, error) {
 	return SanitizeConfig(microConfig), nil
 }
 
-func HandleSendMiniConfig(payload string) {
+func handleSendMiniConfig(payload string) {
 	// Decode the configuration from the payload
 	configPayload := GetConfigPayload{}
 	err := json.Unmarshal([]byte(payload), &configPayload)

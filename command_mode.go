@@ -23,8 +23,7 @@ var commandModeOptions = []string{
 }
 
 // ./tyk --import-blueprint=blueprint.json --create-api --org-id=<id> --upstream-target="http://widgets.com/api/"`
-func HandleCommandModeArgs(arguments map[string]interface{}) {
-
+func handleCommandModeArgs(arguments map[string]interface{}) {
 	if arguments["--import-blueprint"] != nil {
 		handleBluePrintMode(arguments)
 	}
@@ -32,7 +31,6 @@ func HandleCommandModeArgs(arguments map[string]interface{}) {
 	if arguments["--import-swagger"] != nil {
 		handleSwaggerMode(arguments)
 	}
-
 }
 
 func handleBluePrintMode(arguments map[string]interface{}) {

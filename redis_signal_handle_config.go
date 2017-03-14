@@ -70,7 +70,7 @@ func GetExistingRawConfig() Config {
 	return existingConfig
 }
 
-func HandleNewConfiguration(payload string) {
+func handleNewConfiguration(payload string) {
 	// Decode the configuration from the payload
 	configPayload := ConfigPayload{}
 

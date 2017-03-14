@@ -33,7 +33,7 @@ func createConnectionStringFromDashboardObject(config DashboardConfigPayload) st
 	return hostname
 }
 
-func HandleDashboardZeroConfMessage(payload string) {
+func handleDashboardZeroConfMessage(payload string) {
 	// Decode the configuration from the payload
 	dashPayload := DashboardConfigPayload{}
 	err := json.Unmarshal([]byte(payload), &dashPayload)

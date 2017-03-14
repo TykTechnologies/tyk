@@ -77,7 +77,7 @@ func NotifyCurrentServerStatus() {
 	MainNotifier.Notify(n)
 }
 
-func OnServerStatusReceivedHandler(payload string) {
+func onServerStatusReceivedHandler(payload string) {
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{

@@ -807,11 +807,11 @@ func initialiseSystem(arguments map[string]interface{}) {
 	for _, opt := range commandModeOptions {
 		v := arguments[opt]
 		if v == true {
-			HandleCommandModeArgs(arguments)
+			handleCommandModeArgs(arguments)
 			os.Exit(0)
 		}
 		if v != nil && v != false {
-			HandleCommandModeArgs(arguments)
+			handleCommandModeArgs(arguments)
 			os.Exit(0)
 		}
 	}
