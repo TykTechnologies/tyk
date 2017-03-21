@@ -72,7 +72,7 @@ func handleRedisEvent(v interface{}) {
 		onServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
 		onLESSLStatusReceivedHandler(notif.Payload)
-	case NoticeGroupReload:
+	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		handleReloadMsg()
 	default:
 		log.WithFields(logrus.Fields{
