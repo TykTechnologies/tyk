@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
 )
 
@@ -481,13 +482,23 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	ApiSpecRegister = make(map[string]*APISpec)
 
 	config.UseDBAppConfigs = true
+	config.AllowInsecureConfigs = true
 	config.DBAppConfOptions.ConnectionString = ts.URL
 
 	defer func() {
 		config.UseDBAppConfigs = false
+		config.AllowInsecureConfigs = false
 		config.DBAppConfOptions.ConnectionString = ""
 	}()
 
+	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
+	handleRedisEvent(msg)
+
+	if len(reloadChan) != 1 {
+		t.Fatal("Should trigger reload")
+	}
+
+	// Since we already know that reload is queued
 	doReload()
 
 	if len(ApiSpecRegister) != 1 {
