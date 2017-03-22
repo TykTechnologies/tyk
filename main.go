@@ -834,7 +834,7 @@ func initialiseSystem(arguments map[string]interface{}) {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debug("No configuration file defined, will try to use default (./tyk.conf)")
+		}).Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
 	loadConfig(filename, &config)

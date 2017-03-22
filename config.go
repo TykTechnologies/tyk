@@ -245,11 +245,11 @@ func writeDefaultConf(conf *Config) {
 	conf.ListenAddress = ""
 	conf.ListenPort = 8080
 	conf.Secret = "352d20ee67be67f6340b4c0605b044b7"
-	conf.TemplatePath = "./templates"
-	conf.TykJSPath = "./js/tyk.js"
-	conf.MiddlewarePath = "./middleware"
+	conf.TemplatePath = "templates"
+	conf.TykJSPath = "js/tyk.js"
+	conf.MiddlewarePath = "middleware"
 	conf.Storage.Type = "redis"
-	conf.AppPath = "./apps/"
+	conf.AppPath = "apps/"
 	conf.Storage.Host = "localhost"
 	conf.Storage.Username = ""
 	conf.Storage.Password = ""
@@ -282,7 +282,7 @@ func loadConfig(filePath string, conf *Config) {
 	if err != nil {
 		if !runningTests {
 			log.Error("Couldn't load configuration file: ", err)
-			log.Info("Writing a default file to ./tyk.conf")
+			log.Info("Writing a default file to tyk.conf")
 			writeDefaultConf(conf)
 			log.Info("Loading default configuration...")
 			loadConfig("tyk.conf", conf)

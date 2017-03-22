@@ -44,7 +44,7 @@ func GetExistingConfig() (MicroConfig, error) {
 	value, _ := argumentsBackup["--conf"]
 	microConfig := MicroConfig{}
 
-	filename := "./tyk.conf"
+	filename := "tyk.conf"
 	if value != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -53,7 +53,7 @@ func GetExistingConfig() (MicroConfig, error) {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Info("No configuration file defined, will try to use default (./tyk.conf)")
+		}).Info("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
 	dat, err := ioutil.ReadFile(filename)
