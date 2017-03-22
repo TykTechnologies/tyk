@@ -20,7 +20,9 @@ func startPubSubLoop() {
 	cacheStore.Connect()
 	// On message, synchronise
 	for {
-		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, handleRedisEvent)
+		err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
+			handleRedisEvent(v, nil)
+		})
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
@@ -36,7 +38,7 @@ func startPubSubLoop() {
 	}
 }
 
-func handleRedisEvent(v interface{}) {
+func handleRedisEvent(v interface{}, reloadFn func()) {
 	message, ok := v.(redis.Message)
 	if !ok {
 		return
@@ -73,20 +75,16 @@ func handleRedisEvent(v interface{}) {
 	case NoticeGatewayLENotification:
 		onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
-		handleReloadMsg()
+		log.WithFields(logrus.Fields{
+			"prefix": "pub-sub",
+		}).Info("Reloading endpoints")
+		reloadURLStructure(reloadFn)
 	default:
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Warnf("Unknown notification command: %q", notif.Command)
 	}
 
-}
-
-func handleReloadMsg() {
-	log.WithFields(logrus.Fields{
-		"prefix": "pub-sub",
-	}).Info("Reloading endpoints")
-	reloadURLStructure(nil)
 }
 
 var warnedOnce bool
