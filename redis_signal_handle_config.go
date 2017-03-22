@@ -35,7 +35,7 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 		return err
 	}
 
-	filename := "./tyk.conf"
+	filename := "tyk.conf"
 	if conf := argumentsBackup["--conf"]; conf != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -44,7 +44,7 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Info("No configuration file defined, will try to use default (./tyk.conf)")
+		}).Info("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
 	ioutil.WriteFile(filename, newConfig, 0644)
@@ -52,7 +52,7 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 }
 
 func GetExistingRawConfig() Config {
-	filename := "./tyk.conf"
+	filename := "tyk.conf"
 	if conf := argumentsBackup["--conf"]; conf != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -61,7 +61,7 @@ func GetExistingRawConfig() Config {
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
-		}).Info("No configuration file defined, will try to use default (./tyk.conf)")
+		}).Info("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
 	existingConfig := Config{}
