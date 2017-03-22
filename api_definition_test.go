@@ -4,7 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
@@ -491,16 +493,20 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 		config.DBAppConfOptions.ConnectionString = ""
 	}()
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
-	handleRedisEvent(msg)
+	handleRedisEvent(msg, wg.Done)
 
 	if len(reloadChan) != 1 {
 		t.Fatal("Should trigger reload")
 	}
 
 	// Since we already know that reload is queued
-	doReload()
+	reloadTick <- time.Time{}
 
+	// Wait for the reload to finish, then check it worked
+	wg.Wait()
 	if len(ApiSpecRegister) != 1 {
 		t.Error("Should return array with one spec", ApiSpecRegister)
 	}
