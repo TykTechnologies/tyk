@@ -282,7 +282,7 @@ func (hc *HostCheckerManager) IsHostDown(urlStr string) bool {
 	_, err = hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
 
 	// Found a key, the host is down
-	return err != nil
+	return err == nil
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckObject, apiID string) (HostData, error) {
@@ -489,6 +489,11 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 }
 
 func InitHostCheckManager(store *RedisClusterStorageManager) {
+	// Already initialized
+	if GlobalHostChecker.Id != "" {
+		return
+	}
+
 	GlobalHostChecker = HostCheckerManager{}
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start()

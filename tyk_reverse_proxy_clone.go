@@ -120,7 +120,7 @@ func GetNextTarget(targetData *apidef.HostList, spec *APISpec, tryCount int) str
 
 		// Check hosts against uptime tests
 		if spec.Proxy.CheckHostAgainstUptimeTests {
-			if !GlobalHostChecker.IsHostDown(host) {
+			if GlobalHostChecker.IsHostDown(host) {
 				// Don't overdo it
 				if tryCount < targetData.Len() {
 					// Host is down, skip
