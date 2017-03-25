@@ -44,6 +44,12 @@ const (
 	testHttpAny  = "http://" + testHttpListen
 	testHttpGet  = testHttpAny + "/get"
 	testHttpPost = testHttpAny + "/post"
+
+	// 16501 port should not be bind to anything, and can be used for testing failures
+	testHttpFailure     = "127.0.0.1:16501"
+	testHttpFailureAny  = "http://" + testHttpFailure
+	testHttpFailureGet  = testHttpFailureAny + "/get"
+	testHttpFailurePost = testHttpFailureAny + "/post"
 )
 
 type testHttpResponse struct {

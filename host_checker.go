@@ -102,25 +102,21 @@ func (h *HostUptimeChecker) HostReporter() {
 			go h.pingCallback(okHost)
 
 		case failedHost := <-h.errorChan:
+			newVal := 1
+			if count, found := h.sampleCache.Get(failedHost.ID); found {
+				newVal = count.(int) + 1
+			}
 
-			cachedHostCount, found := h.sampleCache.Get(failedHost.ID)
-			if !found {
-				go h.sampleCache.Set(failedHost.ID, 1, cache.DefaultExpiration)
+			h.sampleCache.Set(failedHost.ID, newVal, cache.DefaultExpiration)
 
-			} else {
-				newVal := cachedHostCount.(int)
-				newVal++
-				go h.sampleCache.Set(failedHost.ID, newVal, cache.DefaultExpiration)
-
-				if newVal > h.sampleTriggerLimit {
-					log.Debug("[HOST CHECKER] [HOST WARNING]: ", failedHost.CheckURL)
-					// Reset the count
-					go h.sampleCache.Set(failedHost.ID, 1, cache.DefaultExpiration)
-					// track it
-					h.unHealthyList[failedHost.ID] = true
-					// Call the custom callback hook
-					go h.failureCallback(failedHost)
-				}
+			if newVal >= h.sampleTriggerLimit {
+				log.Debug("[HOST CHECKER] [HOST WARNING]: ", failedHost.CheckURL)
+				// Reset the count
+				h.sampleCache.Set(failedHost.ID, 1, cache.DefaultExpiration)
+				// track it
+				h.unHealthyList[failedHost.ID] = true
+				// Call the custom callback hook
+				go h.failureCallback(failedHost)
 			}
 			go h.pingCallback(failedHost)
 
