@@ -1,3 +1,6 @@
+Changelog for versions above 2.3.1 tracked via GitHub releases page https://github.com/TykTechnologies/tyk/releases
+
+
 # v2.3.1
 
 - Added patch for redis cluster driver - in some docker distributions caused deadlocks by setting REDIGOCLUSTER_SHARDCOUNT to a higher value (default 32)
