@@ -1322,7 +1322,7 @@ func listen(l, controlListener net.Listener, err error) {
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Printf("Gateway started (%v)", VERSION)
+			}).Printf("Gateway started (%s)", VERSION)
 
 			go http.Serve(l, nil)
 
@@ -1407,7 +1407,7 @@ func listen(l, controlListener net.Listener, err error) {
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Printf("Gateway resumed (%v)", VERSION)
+			}).Printf("Gateway resumed (%s)", VERSION)
 
 			go http.Serve(l, nil)
 

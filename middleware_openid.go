@@ -16,7 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-var OIDPREFIX = "openid"
+const OIDPREFIX = "openid"
 
 type OpenIDMW struct {
 	*TykMiddleware
