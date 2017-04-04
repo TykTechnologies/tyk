@@ -6,7 +6,7 @@ func TestBundleGetter(t *testing.T) {
 }
 
 func TestHttpBundleGetter(t *testing.T) {
-	getter := &HttpBundleGetter{}
+	getter := &HTTPBundleGetter{}
 	getter.Get()
 }
 

@@ -35,6 +35,7 @@ type Bundle struct {
 	Manifest apidef.BundleManifest
 }
 
+// Verify performs a signature verification on the bundle file.
 func (b *Bundle) Verify() error {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -93,6 +94,7 @@ func (b *Bundle) Verify() error {
 	return nil
 }
 
+// AddToSpec attaches the custom middleware settings to an API definition.
 func (b *Bundle) AddToSpec() {
 	b.Spec.APIDefinition.CustomMiddleware = b.Manifest.CustomMiddleware
 
@@ -106,14 +108,14 @@ type BundleGetter interface {
 	Get() ([]byte, error)
 }
 
-// HttpBundleGetter is a simple HTTP BundleGetter.
-type HttpBundleGetter struct {
-	Url string
+// HTTPBundleGetter is a simple HTTP BundleGetter.
+type HTTPBundleGetter struct {
+	URL string
 }
 
 // Get performs an HTTP GET request.
-func (g *HttpBundleGetter) Get() ([]byte, error) {
-	resp, err := http.Get(g.Url)
+func (g *HTTPBundleGetter) Get() ([]byte, error) {
+	resp, err := http.Get(g.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +145,7 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 		destPath := filepath.Join(bundlePath, f.Name)
 
 		if f.FileHeader.Mode().IsDir() {
-			if err := os.Mkdir(destPath, 0755); err != nil {
+			if err := os.Mkdir(destPath, 0700); err != nil {
 				return err
 			}
 			continue
@@ -178,18 +180,18 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		return bundle, err
 	}
 
-	bundleUrl := config.BundleBaseURL + spec.CustomMiddlewareBundle
+	bundleURL := config.BundleBaseURL + spec.CustomMiddlewareBundle
 
 	var getter BundleGetter
 
-	u, err := url.Parse(bundleUrl)
+	u, err := url.Parse(bundleURL)
 	switch u.Scheme {
 	case "http":
-		getter = &HttpBundleGetter{
-			Url: bundleUrl,
+		getter = &HTTPBundleGetter{
+			URL: bundleURL,
 		}
 	default:
-		err = errors.New("unknown URL scheme")
+		err = errors.New("Unknown URL scheme")
 	}
 	if err != nil {
 		return Bundle{}, err
@@ -310,7 +312,7 @@ func loadBundle(spec *APISpec) {
 		return
 	}
 
-	if err := os.Mkdir(destPath, 0755); err != nil {
+	if err := os.Mkdir(destPath, 0700); err != nil {
 		bundleError(spec, err, "Couldn't create bundle directory")
 		return
 	}
