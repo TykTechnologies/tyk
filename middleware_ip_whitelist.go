@@ -42,7 +42,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		return nil, 200
 	}
 
-	var remoteIP net.IP
+	remoteIP := net.ParseIP(GetIPFromRequest(r))
 
 	// Enabled, check incoming IP address
 	for _, ip := range i.TykMiddleware.Spec.AllowedIPs {
@@ -51,9 +51,6 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		if err != nil {
 			allowedIP = net.ParseIP(ip)
 		}
-
-		remoteIPString := GetIPFromRequest(r)
-		remoteIP = net.ParseIP(remoteIPString)
 
 		// Check CIDR if possible
 		if allowedNet != nil && allowedNet.Contains(remoteIP) {
