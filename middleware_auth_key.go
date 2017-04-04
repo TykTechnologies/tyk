@@ -55,16 +55,15 @@ func CopyRequest(r *http.Request) *http.Request {
 
 func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	// Flatten claims and add to context
-	if k.Spec.EnableContextVars {
-		cnt, contextFound := context.GetOk(r, ContextData)
-		var contextDataObject map[string]interface{}
-		if contextFound {
-			// Key data
-			contextDataObject = cnt.(map[string]interface{})
-			contextDataObject["token"] = token
-			context.Set(r, ContextData, contextDataObject)
-		}
-
+	if !k.Spec.EnableContextVars {
+		return
+	}
+	cnt, contextFound := context.GetOk(r, ContextData)
+	if contextFound {
+		// Key data
+		contextDataObject := cnt.(map[string]interface{})
+		contextDataObject["token"] = token
+		context.Set(r, ContextData, contextDataObject)
 	}
 }
 
