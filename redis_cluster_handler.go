@@ -396,27 +396,6 @@ func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
 	return true
 }
 
-// DeleteKeys will remove a group of keys in bulk without a prefix handler
-func (r *RedisClusterStorageManager) DeleteRawKeys(keys []string, prefix string) bool {
-	r.ensureConnection()
-	if len(keys) > 0 {
-		asInterface := make([]interface{}, len(keys))
-		for i, v := range keys {
-			asInterface[i] = interface{}(prefix + v)
-		}
-
-		log.Debug("Deleting: ", asInterface)
-		_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", asInterface...)
-		if err != nil {
-			log.Error("Error trying to delete keys: ", err)
-		}
-	} else {
-		log.Debug("RedisClusterStorageManager called DEL - Nothing to delete")
-	}
-
-	return true
-}
-
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
 func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback func(interface{})) error {
