@@ -34,35 +34,12 @@ func handleCommandModeArgs(arguments map[string]interface{}) {
 }
 
 func handleBluePrintMode(arguments map[string]interface{}) {
-	doCreate := arguments["--create-api"]
+	doCreate := arguments["--create-api"].(bool)
 	inputFile := arguments["--import-blueprint"]
-	if doCreate == true {
-		upstreamVal := arguments["--upstream-target"]
-		orgId := arguments["--org-id"]
-		if upstreamVal != nil && orgId != nil {
-			// Create the API with the blueprint
-			bp, err := bluePrintLoadFile(inputFile.(string))
-			if err != nil {
-				log.Error("File load error: ", err)
-				return
-			}
-
-			def, err := createDefFromBluePrint(bp, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
-			if err != nil {
-				log.Error("Failed to create API Defintition from file")
-				return
-			}
-
-			printDef(def)
-			return
-		}
-
-		log.Error("No upstream target or org ID defined, these are both required")
-
-	} else {
+	if !doCreate {
 		// Different branch, here we need an API Definition to modify
-		forApiPath := arguments["--for-api"]
-		if forApiPath == nil {
+		forAPIPath := arguments["--for-api"]
+		if forAPIPath == nil {
 			log.Error("If ading to an API, the path to the defintiton must be listed")
 			return
 		}
@@ -73,7 +50,7 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 			return
 		}
 
-		defFromFile, err := apiDefLoadFile(forApiPath.(string))
+		defFromFile, err := apiDefLoadFile(forAPIPath.(string))
 		if err != nil {
 			log.Error("failed to load and decode file data for API Definition: ", err)
 			return
@@ -98,26 +75,50 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 		printDef(defFromFile)
 
 	}
+
+	upstreamVal := arguments["--upstream-target"]
+	orgID := arguments["--org-id"]
+
+	if upstreamVal == nil && orgID == nil {
+		log.Error("No upstream target or org ID defined, these are both required")
+		return
+	}
+
+	// Create the API with the blueprint
+	bp, err := bluePrintLoadFile(inputFile.(string))
+	if err != nil {
+		log.Error("File load error: ", err)
+		return
+	}
+
+	def, err := createDefFromBluePrint(bp, orgID.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
+	if err != nil {
+		log.Error("Failed to create API Defintition from file")
+		return
+	}
+
+	printDef(def)
+	return
 }
 
 func printDef(def *apidef.APIDefinition) {
-	asJson, err := json.MarshalIndent(def, "", "    ")
+	asJSON, err := json.MarshalIndent(def, "", "    ")
 	if err != nil {
 		log.Error("Marshalling failed: ", err)
 	}
 
 	// The id attribute is for BSON only and breaks the parser if it's empty, cull it here.
-	fixed := strings.Replace(string(asJson), `    "id": "",`, "", 1)
-	fmt.Printf(fixed)
+	fixed := strings.Replace(string(asJSON), `    "id": "",`, "", 1)
+	fmt.Println(fixed)
 }
 
-func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
+func createDefFromBluePrint(bp *BluePrintAST, orgID, upstreamURL string, asMock bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
 		Name:             bp.Name,
 		Active:           true,
 		UseKeylessAccess: true,
 		APIID:            uuid.NewUUID().String(),
-		OrgID:            orgId,
+		OrgID:            orgID,
 	}
 	ad.VersionDefinition.Key = "version"
 	ad.VersionDefinition.Location = "header"
@@ -126,14 +127,14 @@ func createDefFromBluePrint(bp *BluePrintAST, orgId, upstreamURL string, as_mock
 	ad.Proxy.StripListenPath = true
 	ad.Proxy.TargetURL = upstreamURL
 
-	versionData, err := bp.ConvertIntoApiVersion(as_mock)
+	versionData, err := bp.ConvertIntoApiVersion(asMock)
 	if err != nil {
 		log.Error("onversion into API Def failed: ", err)
 	}
 
-	bp.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(bp.Name, " "))
+	err = bp.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(bp.Name, " "))
 
-	return &ad, nil
+	return &ad, err
 }
 
 func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
