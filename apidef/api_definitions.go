@@ -368,7 +368,6 @@ func (a *APIDefinition) EncodeForDB() {
 		newK := base64.StdEncoding.EncodeToString([]byte(k))
 		v.Name = newK
 		new_version[newK] = v
-
 	}
 
 	a.VersionData.Versions = new_version

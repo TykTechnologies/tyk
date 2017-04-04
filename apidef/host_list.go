@@ -37,32 +37,21 @@ func (h *HostList) All() []string {
 }
 
 func (h *HostList) GetIndex(i int) (string, error) {
+	if i < 0 {
+		return "", errors.New("index must be positive int")
+	}
 	h.hMutex.RLock()
 	defer h.hMutex.RUnlock()
-	if i < 0 {
-		return "", errors.New("Index must be positive int")
-	}
 
-	if i > (len(h.hosts) - 1) {
-		return "", errors.New("Index out of range")
+	if i > len(h.hosts)-1 {
+		return "", errors.New("index out of range")
 	}
 
 	return h.hosts[i], nil
 }
 
 func (h *HostList) Len() int {
-	if h == nil {
-		return 0
-	}
-
 	h.hMutex.RLock()
 	defer h.hMutex.RUnlock()
-
-	var thisLen int
-
-	if h.hosts != nil {
-		thisLen = len(h.hosts)
-	}
-
-	return thisLen
+	return len(h.hosts)
 }
