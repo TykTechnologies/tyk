@@ -189,7 +189,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 
 	resp := testHttpResponse{}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+	if err = json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
 	if resp.Headers["Test"] != "value" {
