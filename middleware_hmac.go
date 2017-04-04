@@ -162,16 +162,16 @@ func (hm *HMACMiddleware) replaceWithUpperCase(originalSignature string, lowerca
 }
 
 func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
+	if !hm.Spec.EnableContextVars {
+		return
+	}
 	// Flatten claims and add to context
-	if hm.Spec.EnableContextVars {
-		cnt, contextFound := context.GetOk(r, ContextData)
-		var contextDataObject map[string]interface{}
-		if contextFound {
-			// Key data
-			contextDataObject = cnt.(map[string]interface{})
-			contextDataObject["token"] = token
-			context.Set(r, ContextData, contextDataObject)
-		}
+	cnt, contextFound := context.GetOk(r, ContextData)
+	if contextFound {
+		// Key data
+		contextDataObject := cnt.(map[string]interface{})
+		contextDataObject["token"] = token
+		context.Set(r, ContextData, contextDataObject)
 	}
 }
 

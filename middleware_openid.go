@@ -229,25 +229,25 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 }
 
 func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
-	// Flatten claims and add to context
-	if k.Spec.EnableContextVars {
-		cnt, contextFound := context.GetOk(r, ContextData)
-		var contextDataObject map[string]interface{}
-		if contextFound {
-			contextDataObject = cnt.(map[string]interface{})
-			claimPrefix := "jwt_claims_"
-
-			for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
-				claim := claimPrefix + claimName
-				contextDataObject[claim] = claimValue
-			}
-
-			// Key data
-			authHeaderValue := context.Get(r, AuthHeaderValue)
-			contextDataObject["token"] = authHeaderValue
-
-			context.Set(r, ContextData, contextDataObject)
-		}
-
+	if !k.Spec.EnableContextVars {
+		return
 	}
+	// Flatten claims and add to context
+	cnt, contextFound := context.GetOk(r, ContextData)
+	if !contextFound {
+		return
+	}
+	contextDataObject := cnt.(map[string]interface{})
+	claimPrefix := "jwt_claims_"
+
+	for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
+		claim := claimPrefix + claimName
+		contextDataObject[claim] = claimValue
+	}
+
+	// Key data
+	authHeaderValue := context.Get(r, AuthHeaderValue)
+	contextDataObject["token"] = authHeaderValue
+
+	context.Set(r, ContextData, contextDataObject)
 }

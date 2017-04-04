@@ -52,64 +52,65 @@ func (t *TransformMiddleware) IsEnabledForSpec() bool {
 func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	_, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
 	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Transformed)
-	if found {
-		tmeta := meta.(*TransformSpec)
+	if !found {
+		return nil, 200
+	}
+	tmeta := meta.(*TransformSpec)
 
-		// Read the body:
-		defer r.Body.Close()
-		body, err := ioutil.ReadAll(r.Body)
+	// Read the body:
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
 
-		// Put into an interface:
-		var bodyData interface{}
-		switch tmeta.TemplateMeta.TemplateData.Input {
-		case apidef.RequestXML:
-			mxj.XmlCharsetReader = WrappedCharsetReader
-			var err error
-			bodyData, err = mxj.NewMapXml(body) // unmarshal
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix":      "inbound-transform",
-					"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
-					"api_id":      t.Spec.APIDefinition.APIID,
-					"path":        r.URL.Path,
-				}).Error("Error unmarshalling XML: ", err)
-			}
-		case apidef.RequestJSON:
-			json.Unmarshal(body, &bodyData)
-		default:
-			// unset, assume an open field
-			bodyData = make(map[string]interface{})
-		}
-
-		if tmeta.TemplateMeta.TemplateData.EnableSession {
-			ses := context.Get(r, SessionData).(SessionState)
-			switch x := bodyData.(type) {
-			case map[string]interface{}:
-				x["_tyk_meta"] = ses.MetaData
-			}
-		}
-
-		if t.Spec.EnableContextVars {
-			contextData := context.Get(r, ContextData)
-			switch x := bodyData.(type) {
-			case map[string]interface{}:
-				x["_tyk_context"] = contextData
-			}
-		}
-
-		// Apply to template
-		var bodyBuffer bytes.Buffer
-		if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+	// Put into an interface:
+	var bodyData interface{}
+	switch tmeta.TemplateMeta.TemplateData.Input {
+	case apidef.RequestXML:
+		mxj.XmlCharsetReader = WrappedCharsetReader
+		var err error
+		bodyData, err = mxj.NewMapXml(body) // unmarshal
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "inbound-transform",
 				"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
 				"api_id":      t.Spec.APIDefinition.APIID,
 				"path":        r.URL.Path,
-			}).Error("Failed to apply template to request: ", err)
+			}).Error("Error unmarshalling XML: ", err)
 		}
-		r.Body = ioutil.NopCloser(&bodyBuffer)
-		r.ContentLength = int64(bodyBuffer.Len())
+	case apidef.RequestJSON:
+		json.Unmarshal(body, &bodyData)
+	default:
+		// unset, assume an open field
+		bodyData = make(map[string]interface{})
 	}
+
+	if tmeta.TemplateMeta.TemplateData.EnableSession {
+		ses := context.Get(r, SessionData).(SessionState)
+		switch x := bodyData.(type) {
+		case map[string]interface{}:
+			x["_tyk_meta"] = ses.MetaData
+		}
+	}
+
+	if t.Spec.EnableContextVars {
+		contextData := context.Get(r, ContextData)
+		switch x := bodyData.(type) {
+		case map[string]interface{}:
+			x["_tyk_context"] = contextData
+		}
+	}
+
+	// Apply to template
+	var bodyBuffer bytes.Buffer
+	if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix":      "inbound-transform",
+			"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
+			"api_id":      t.Spec.APIDefinition.APIID,
+			"path":        r.URL.Path,
+		}).Error("Failed to apply template to request: ", err)
+	}
+	r.Body = ioutil.NopCloser(&bodyBuffer)
+	r.ContentLength = int64(bodyBuffer.Len())
 
 	return nil, 200
 }
