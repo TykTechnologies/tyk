@@ -514,12 +514,6 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 	return true
 }
 
-// DeleteKeys will remove a group of keys in bulk without a prefix handler
-func (r *RPCStorageHandler) DeleteRawKeys(keys []string, prefix string) bool {
-	log.Error("DeleteRawKeys Not Implemented")
-	return false
-}
-
 // StartPubSubHandler will listen for a signal and run the callback with the message
 func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
 	log.Warning("NO PUBSUB DEFINED")
