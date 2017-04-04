@@ -101,12 +101,12 @@ func GetNextTarget(targetData *apidef.HostList, spec *APISpec, tryCount int) str
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
-		spec.RoundRobin.SetMax(targetData)
+		spec.RoundRobin.SetLen(targetData.Len())
 
 		pos := spec.RoundRobin.GetPos()
 		if pos > targetData.Len()-1 {
 			// problem
-			spec.RoundRobin.SetMax(targetData)
+			spec.RoundRobin.SetLen(targetData.Len())
 			pos = 0
 		}
 
@@ -152,7 +152,6 @@ func GetNextTarget(targetData *apidef.HostList, spec *APISpec, tryCount int) str
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
 	// initialise round robin
 	spec.RoundRobin = &RoundRobin{}
-	spec.RoundRobin.SetMax(apidef.NewHostList())
 
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")

@@ -1,35 +1,14 @@
 package main
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-)
-
-func TestRR(t *testing.T) {
-	arr1 := []string{"1", "2", "3"}
-
+func TestRoundRobin(t *testing.T) {
 	rr := RoundRobin{}
-	asHL := apidef.NewHostListFromList(arr1)
-	rr.SetMax(asHL)
+	rr.SetMax(2)
 
-	val := rr.GetPos()
-	if val != 0 {
-		t.Error("RR Pos wrong, expected: 0 but got: ", val)
-	}
-
-	val = rr.GetPos()
-	if val != 1 {
-		t.Error("RR Pos wrong, expected: 1 but got: ", val)
-	}
-
-	val = rr.GetPos()
-	if val != 2 {
-		t.Error("RR Pos wrong, expected: 2 but got: ", val)
-	}
-
-	val = rr.GetPos()
-	if val != 0 {
-		t.Error("RR Pos wrong, expected: 0 but got: ", val)
+	for _, want := range []int{0, 1, 2, 0} {
+		if got := rr.GetPos(); got != want {
+			t.Errorf("RR Pos wrong: want %d got %d", want, got)
+		}
 	}
 }
