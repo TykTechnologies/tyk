@@ -358,12 +358,11 @@ func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
 	}
 
 	if len(keys) > 0 {
-		for _, v := range keys {
-			name := "" + v
+		for _, name := range keys {
 			log.Info("Deleting: ", name)
 			_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", name)
 			if err != nil {
-				log.Error("Error trying to delete key: ", v, " - ", err)
+				log.Error("Error trying to delete key: ", name, " - ", err)
 
 			}
 		}

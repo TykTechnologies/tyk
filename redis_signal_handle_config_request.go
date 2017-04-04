@@ -41,7 +41,7 @@ func SanitizeConfig(mc MicroConfig) MicroConfig {
 }
 
 func GetExistingConfig() (MicroConfig, error) {
-	value, _ := argumentsBackup["--conf"]
+	value := argumentsBackup["--conf"]
 	microConfig := MicroConfig{}
 
 	filename := "tyk.conf"

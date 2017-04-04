@@ -467,10 +467,7 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 		return r.DeleteKey(keyName)
 	}
 
-	if ok == nil {
-		return false
-	}
-	return ok.(bool)
+	return ok == true
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
@@ -482,10 +479,7 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 		return r.DeleteRawKey(keyName)
 	}
 
-	if ok == nil {
-		return false
-	}
-	return ok.(bool)
+	return ok == true
 }
 
 // DeleteKeys will remove a group of keys in bulk
@@ -504,11 +498,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 			return r.DeleteKeys(keys)
 		}
 
-		if ok == nil {
-			return false
-		}
-
-		return ok.(bool)
+		return ok == true
 	}
 	log.Debug("RPCStorageHandler called DEL - Nothing to delete")
 	return true
