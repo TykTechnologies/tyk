@@ -25,6 +25,7 @@ perl -pi -e 's/var VERSION string = \"(.*)\"/var VERSION string = \"'$NEWVERSION
 
 # ----- END VERSION SETTING -----
 
+
 # Clear build folder:
 echo "Clearing build folder..."
 rm -rf /home/tyk/tyk/build/*
@@ -88,6 +89,8 @@ gox -osarch="linux/amd64" -tags 'coprocess lua' -output '{{.Dir}}_{{.OS}}_{{.Arc
 #     exit $rc
 # fi
 
+CONFIGFILES="--config-files apps --config-files templates --config-files middleware --config-files event_handlers/sample --config-files js --config-files policies --config-files tyk.conf"
+
 echo "Preping TGZ Dirs"
 mkdir $i386TGZDIR/apps
 mkdir $i386TGZDIR/js
@@ -138,8 +141,8 @@ tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION
 
 echo "Creating Deb Package for AMD64"
 cd $amd64TGZDIR/
-fpm -n tyk-gateway -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t deb ./=/opt/tyk-gateway
-fpm -n tyk-gateway -v $VERSION  --rpm-sign  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --rpm-sign  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm ./=/opt/tyk-gateway
 
 package_cloud yank tyk/tyk-gateway/ubuntu/precise *.deb
 package_cloud push tyk/tyk-gateway/ubuntu/precise *.deb
@@ -158,8 +161,8 @@ package_cloud push tyk/tyk-gateway/el/7 *.rpm
 
 echo "Creating Deb Package for i386"
 cd $i386TGZDIR/
-fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb ./=/opt/tyk-gateway
-fpm -n tyk-gateway -v $VERSION --rpm-sign --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t rpm ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --rpm-sign --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t rpm ./=/opt/tyk-gateway
 
 package_cloud yank tyk/tyk-gateway/ubuntu/precise *.deb
 package_cloud push tyk/tyk-gateway/ubuntu/precise *.deb
@@ -178,8 +181,8 @@ package_cloud push tyk/tyk-gateway/el/7 *.rpm
 
 echo "Creating Deb Package for ARM"
 cd $armTGZDIR/
-fpm -n tyk-gateway -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t deb ./=/opt/tyk-gateway
-fpm -n tyk-gateway -v $VERSION --rpm-sign --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t rpm ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --rpm-sign --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t rpm ./=/opt/tyk-gateway
 
 package_cloud yank tyk/tyk-gateway/ubuntu/precise *.deb
 package_cloud push tyk/tyk-gateway/ubuntu/precise *.deb
