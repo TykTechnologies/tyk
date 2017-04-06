@@ -71,6 +71,9 @@ func HandleRedisMsg(message redis.Message) {
 	case NoticeDashboardConfigRequest:
 		HandleSendMiniConfig(thisMessage.Payload)
 	case NoticeGatewayDRLNotification:
+		if config.ManagementNode {
+			return
+		}
 		OnServerStatusReceivedHandler(thisMessage.Payload)
 	case NoticeGatewayLENotification:
 		OnLESSLStatusReceivedHandler(thisMessage.Payload)
