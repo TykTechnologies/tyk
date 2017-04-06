@@ -199,11 +199,9 @@ func GetKeyDetail(key, apiID string) (SessionState, bool) {
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
 		spec := GetSpecForApi(apiID)
-		if spec == nil {
-			log.Error("No API Spec found for this keyspace")
-			return SessionState{}, false
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		sessionManager = spec.SessionManager
 	}
 
 	return sessionManager.GetSessionDetail(key)
@@ -293,12 +291,9 @@ func handleGetDetail(sessionKey, apiID string) ([]byte, int) {
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
 		spec := GetSpecForApi(apiID)
-		if spec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		sessionManager = spec.SessionManager
 	}
 
 	session, ok := sessionManager.GetSessionDetail(sessionKey)
@@ -354,12 +349,9 @@ func handleGetAllKeys(filter, apiID string) ([]byte, int) {
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
 		spec := GetSpecForApi(apiID)
-		if spec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		sessionManager = spec.SessionManager
 	}
 
 	sessions := sessionManager.GetSessions(filter)
@@ -422,13 +414,10 @@ func handleDeleteKey(keyName, apiID string) ([]byte, int) {
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
 		spec := GetSpecForApi(apiID)
-		if spec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+		if spec != nil {
+			orgID = spec.OrgID
+			sessionManager = spec.SessionManager
 		}
-		orgID = spec.OrgID
-		sessionManager = spec.SessionManager
 	}
 
 	sessionManager.RemoveSession(keyName)
@@ -487,12 +476,9 @@ func handleDeleteHashedKey(keyName, apiID string) ([]byte, int) {
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
 		spec := GetSpecForApi(apiID)
-		if spec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		sessionManager = spec.SessionManager
 	}
 
 	// This is so we bypass the hash function
@@ -818,12 +804,9 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
 	sessionManager := FallbackKeySesionManager
 	if apiID != "" {
 		spec := GetSpecForApi(apiID)
-		if spec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ := json.Marshal(&notFound)
-			return responseMessage, 400
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		sessionManager = spec.SessionManager
 	}
 
 	// This is so we bypass the hash function
