@@ -985,3 +985,24 @@ func TestControlListener(t *testing.T) {
 	doReload()
 	testHttp(t, tests, true)
 }
+
+func TestManagementNodeRedisEvents(t *testing.T) {
+	defer func() {
+		config.ManagementNode = false
+	}()
+	config.ManagementNode = false
+	msg := redis.Message{
+		Data: []byte(`{"Command": "NoticeGatewayDRLNotification"}`),
+	}
+	shouldHandle := func(got NotificationCommand) {
+		if want := NoticeGatewayDRLNotification; got != want {
+			t.Fatalf("want %q, got %q", want, got)
+		}
+	}
+	handleRedisEvent(msg, shouldHandle, nil)
+	config.ManagementNode = true
+	notHandle := func(got NotificationCommand) {
+		t.Fatalf("should have not handled redis event")
+	}
+	handleRedisEvent(msg, notHandle, nil)
+}

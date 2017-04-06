@@ -496,8 +496,12 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
-	handleRedisEvent(msg, wg.Done)
-
+	handled := func(got NotificationCommand) {
+		if want := NoticeApiUpdated; got != want {
+			t.Fatalf("want %q, got %q", want, got)
+		}
+	}
+	handleRedisEvent(msg, handled, wg.Done)
 	if len(reloadChan) != 1 {
 		t.Fatal("Should trigger reload")
 	}
