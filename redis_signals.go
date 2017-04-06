@@ -71,6 +71,12 @@ func handleRedisEvent(v interface{}, reloadFn func()) {
 	case NoticeDashboardConfigRequest:
 		handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
+		if config.ManagementNode {
+			// DRL is not initialized, going through would
+			// be mostly harmless but would flood the log
+			// with warnings since DRLManager.Ready == false
+			return
+		}
 		onServerStatusReceivedHandler(notif.Payload)
 	case NoticeGatewayLENotification:
 		onLESSLStatusReceivedHandler(notif.Payload)
