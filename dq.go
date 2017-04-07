@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"time"
-	"strconv"
-	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 	"github.com/TykTechnologies/tyk-cluster-framework/client"
+	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/TykTechnologies/dq"
 	"github.com/TykTechnologies/logrus"
@@ -35,17 +35,17 @@ func getDQTopic() string {
 	return topic
 }
 
-
 func DQErrorHandler(e error) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main.DQ",
 	}).Error(e)
 }
 
-var dummyAPISpec APISpec = APISpec{APIDefinition: &tykcommon.APIDefinition{SessionLifetime:0}}
+var dummyAPISpec APISpec = APISpec{APIDefinition: &tykcommon.APIDefinition{SessionLifetime: 0}}
+
 func DQFlusher(d map[string]*dq.Quota) error {
 	for k, v := range d {
-		DQFlusherPool.SendWork(func () {
+		DQFlusherPool.SendWork(func() {
 			// We will track all the session handlers for this key
 			processedSpecs := map[SessionHandler]struct{}{}
 
@@ -118,7 +118,7 @@ func StartDQ(statusFunc GetLeaderStatusFunc) {
 
 func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState, key string) bool {
 	QuotaHandler.InitQuota(int(currentSession.QuotaMax),
-		int(currentSession.QuotaMax - currentSession.QuotaRemaining),
+		int(currentSession.QuotaMax-currentSession.QuotaRemaining),
 		key, currentSession.AccessRights)
 
 	// TODO: Handle renewal
