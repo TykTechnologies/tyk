@@ -25,7 +25,7 @@ func startRateLimitNotifications() {
 	}
 
 	go func() {
-		log.Info("Starting gateway rate imiter notifications...")
+		log.Info("Starting gateway rate limiter notifications...")
 		for {
 			if NodeID != "" {
 				NotifyCurrentServerStatus()
