@@ -1246,8 +1246,26 @@ func startDRL() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising distributed rate limiter")
+<<<<<<< HEAD
 	setupDRL()
 	startRateLimitNotifications()
+=======
+	SetupDRL()
+	StartRateLimitNotifications()
+
+	// Start the distributed quota system
+	StartDQ(DecideLeaderMechanism())
+}
+
+// In case we want to use a channel or some other leadership checker
+func DecideLeaderMechanism() GetLeaderStatusFunc {
+	switch config.Storage.Type {
+	case "redis":
+		return GetLeaderStatusFromConf
+	default:
+		return GetLeaderStatusFromConf
+	}
+>>>>>>> 68b5205... First integration, no renewals yet
 }
 
 func listen(l, controlListener net.Listener, err error) {
