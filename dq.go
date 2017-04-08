@@ -92,9 +92,10 @@ func DQFlusher(d map[string]*dq.Quota) error {
 							// Only write on count difference
 							if qr != s.QuotaRemaining {
 								s.QuotaRemaining = qr
-
+								fmt.Println("DQ PURGE UPDATE")
 								spec.SessionManager.UpdateSession(k, s, GetLifetime(&dummyAPISpec, &s))
-								log.Debug("Updating quota for: ", k)
+								// Since we've written the token, we don't need to re-do it at the end of the middleware chain
+								s.SetFirstSeenHash()
 								// We've performed a write on this SH now, lets tag that so we don't do it again
 								processedSpecs[spec.SessionManager] = struct{}{}
 							}
@@ -114,6 +115,9 @@ func DQFlusher(d map[string]*dq.Quota) error {
 }
 
 func StartDQ(statusFunc GetLeaderStatusFunc) {
+	log.WithFields(logrus.Fields{
+		"prefix":      "DQuota",
+	}).Info("Using Distributed Quota")
 	p := strconv.Itoa(config.Storage.Port)
 	cs := fmt.Sprintf("redis://%v:%v", config.Storage.Host, p)
 	c1, _ := client.NewClient(cs, encoding.JSON)
@@ -124,8 +128,10 @@ func StartDQ(statusFunc GetLeaderStatusFunc) {
 	// We always need a leader because otherwise we can;t persist data
 	QuotaHandler.SetLeader(statusFunc())
 
-	// TODO: Must be configurable
-	QuotaHandler.FlushInterval = time.Second * 1
+	QuotaHandler.FlushInterval = time.Second * 3
+	if config.DistributedQuotaFlushIntervalInMS != 0 {
+		QuotaHandler.FlushInterval = time.Millisecond * time.Duration(config.DistributedQuotaFlushIntervalInMS)
+	}
 
 	DQFlusherPool.Open()
 
@@ -138,6 +144,7 @@ func StartDQ(statusFunc GetLeaderStatusFunc) {
 }
 
 func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState, key string) bool {
+
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {
 		// No quota set

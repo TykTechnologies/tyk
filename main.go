@@ -1260,10 +1260,13 @@ func startDRL() {
 func DecideLeaderMechanism() GetLeaderStatusFunc {
 	switch config.Storage.Type {
 	case "redis":
-		// For redis we need to distribute write in order to retain consistency
-		return func() bool {return true}
+		// For redis we should distribute write in order to retain consistency
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("If using redis with distributed quota it is recommended to make all gateways leader")
+		return func() bool {return config.DQSetMaster}
 	default:
-		return func() bool {return true}
+		return func() bool {return config.DQSetMaster}
 	}
 }
 
