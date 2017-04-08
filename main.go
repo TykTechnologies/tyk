@@ -1245,17 +1245,20 @@ func startDRL() {
 	SetupDRL()
 	StartRateLimitNotifications()
 
-	// Start the distributed quota system
-	StartDQ(DecideLeaderMechanism())
+	if config.UseDistributedQuotaCounter {
+		// Start the distributed quota system
+		StartDQ(DecideLeaderMechanism())
+	}
 }
 
 // In case we want to use a channel or some other leadership checker
 func DecideLeaderMechanism() GetLeaderStatusFunc {
 	switch config.Storage.Type {
 	case "redis":
-		return GetLeaderStatusFromConf
+		// For redis we need to distribute write in order to retain consistency
+		return func() bool {return true}
 	default:
-		return GetLeaderStatusFromConf
+		return func() bool {return true}
 	}
 }
 
