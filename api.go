@@ -102,9 +102,29 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
-		for apiId := range newSession.AccessRights {
-			apiSpec := GetSpecForApi(apiId)
-			if apiSpec == nil {
+		for apiId, _ := range newSession.AccessRights {
+			thisAPISpec := GetSpecForApi(apiId)
+			if thisAPISpec != nil {
+
+				checkAndApplyTrialPeriod(keyName, apiId, &newSession)
+
+				// Lets reset keys if they are edited by admin
+				if !thisAPISpec.DontSetQuotasOnCreate {
+					// Reset quote by default
+					if !dontReset {
+						if config.UseDistributedQuotaCounter {
+							QuotaHandler.TagDelete(keyName)
+						}
+						thisAPISpec.SessionManager.ResetQuota(keyName, newSession)
+						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
+					}
+
+					err := thisAPISpec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(thisAPISpec, &newSession))
+					if err != nil {
+						return err
+					}
+				}
+			} else {
 				log.WithFields(logrus.Fields{
 					"prefix":      "api",
 					"key":         keyName,

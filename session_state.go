@@ -78,6 +78,13 @@ func (s *SessionState) IsExpired() bool {
 	return false
 }
 
+func (s *SessionState) IsQuotaExpired() bool {
+	if time.Now().After(time.Unix(s.QuotaRenews, 0)) {
+		return true
+	}
+	return false
+}
+
 func (s *SessionState) SetFirstSeenHash() {
 	encoded, err := msgpack.Marshal(s)
 	if err != nil {
