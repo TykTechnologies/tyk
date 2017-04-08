@@ -52,7 +52,19 @@ func DQFlusher(d map[string]*dq.Quota) error {
 			processedSpecs := map[SessionHandler]struct{}{}
 
 			// Let's go through all the API IDs in the metadata so we capture all the handlers
-			for _, aid := range v.Meta.([]interface{}) {
+			apis := v.Meta.(map[string]interface{})["Apis"]
+
+			// I hate this
+			var exp int64
+			switch v.Meta.(map[string]interface{})["QuotaRenewal"].(type) {
+			case int64:
+				exp = v.Meta.(map[string]interface{})["QuotaRenewal"].(int64)
+			case float64:
+				exp = int64(v.Meta.(map[string]interface{})["QuotaRenewal"].(float64))
+			}
+
+			expT := time.Unix(exp, 0)
+			for _, aid := range apis.([]interface{}) {
 				apiID := aid.(string)
 
 				// This will grab the session handler
@@ -72,7 +84,7 @@ func DQFlusher(d map[string]*dq.Quota) error {
 					// If it was found, lets process it for this handler
 					if f {
 						skip := false
-						if s.IsQuotaExpired() {
+						if time.Now().After(expT) {
 							QuotaHandler.TagDelete(k)
 							skip = true
 						}
@@ -92,7 +104,6 @@ func DQFlusher(d map[string]*dq.Quota) error {
 							// Only write on count difference
 							if qr != s.QuotaRemaining {
 								s.QuotaRemaining = qr
-								fmt.Println("DQ PURGE UPDATE")
 								spec.SessionManager.UpdateSession(k, s, GetLifetime(&dummyAPISpec, &s))
 								// Since we've written the token, we don't need to re-do it at the end of the middleware chain
 								s.SetFirstSeenHash()
@@ -151,6 +162,11 @@ func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState,
 		return false
 	}
 
+	// store the old expiry so we propagate the right value
+	md := map[string]interface{}{
+		"QuotaRenewal": currentSession.QuotaRenews,
+	}
+
 	// Handle renewal
 	RenewalDate := time.Unix(currentSession.QuotaRenews, 0)
 	if time.Now().After(RenewalDate) {
@@ -177,12 +193,14 @@ func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState,
 		i++
 	}
 
+	md["Apis"] = ar
+
 	used := int(currentSession.QuotaMax - currentSession.QuotaRemaining)
 
 	QuotaHandler.InitQuota(int(currentSession.QuotaMax),
 		used,
 		key,
-		ar)
+		md)
 
 
 	if QuotaHandler.IncrBy(key, 1) == dq.Quota_violated {
