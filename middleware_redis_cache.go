@@ -272,6 +272,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		log.Error("Could not create response object: ", err)
 	}
 
+
 	defer newRes.Body.Close()
 	for _, h := range hopHeaders {
 		newRes.Header.Del(h)

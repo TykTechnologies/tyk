@@ -232,6 +232,8 @@ type Config struct {
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	SetAsLeader 			  bool 					   `bson:"set_as_leader" json:"set_as_leader"`
 	UseDistributedQuotaCounter 	  bool 					   `bson:"use_distributed_counter" json:"use_distributed_counter"`
+	DistributedQuotaFlushIntervalInMS int 					   `bson:"distributed_quota_flush_interval_in_ms" json:"distributed_quota_flush_interval_in_ms"`
+	DQSetMaster 			  bool 					   `bson:"distributed_quota_set_master" json:"distributed_quota_set_master"`
 }
 
 type CertData struct {
