@@ -152,6 +152,11 @@ func (r *RedisClusterStorageManager) GetKey(keyName string) (string, error) {
 	return value, nil
 }
 
+func (r *RedisClusterStorageManager) GetKeyTTL(keyName string) (ttl int64, err error) {
+	r.ensureConnection()
+	return redis.Int64(GetRelevantClusterReference(r.IsCache).Do("TTL", r.fixKey(keyName)))
+}
+
 func (r *RedisClusterStorageManager) GetRawKey(keyName string) (string, error) {
 	r.ensureConnection()
 	value, err := redis.String(GetRelevantClusterReference(r.IsCache).Do("GET", keyName))
