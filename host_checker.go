@@ -40,7 +40,7 @@ type HostUptimeChecker struct {
 	pingCallback       func(HostHealthReport)
 	workerPoolSize     int
 	sampleTriggerLimit int
-	checkTimout        int
+	checkTimeout       int
 	HostList           map[string]HostData
 	unHealthyList      map[string]bool
 	pool               *tunny.WorkPool
@@ -55,13 +55,13 @@ type HostUptimeChecker struct {
 }
 
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
-	if h.checkTimout <= 5 {
-		return time.Duration(h.checkTimout) * time.Second
+	if h.checkTimeout <= 5 {
+		return time.Duration(h.checkTimeout) * time.Second
 	}
 
 	rand.Seed(time.Now().Unix())
-	min := h.checkTimout - 3
-	max := h.checkTimout + 3
+	min := h.checkTimeout - 3
+	max := h.checkTimeout + 3
 
 	dur := rand.Intn(max-min) + min
 
@@ -197,13 +197,13 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 		h.sampleTriggerLimit = defaultSampletTriggerLimit
 	}
 
-	h.checkTimout = timeout
+	h.checkTimeout = timeout
 	if timeout == 0 {
-		h.checkTimout = defaultTimeout
+		h.checkTimeout = defaultTimeout
 	}
 
 	log.Debug("[HOST CHECKER] Config:TriggerLimit: ", h.sampleTriggerLimit)
-	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimout)
+	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
 	var err error

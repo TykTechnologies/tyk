@@ -135,4 +135,12 @@ func TestHostChecker(t *testing.T) {
 	if host1 != host2 || host1 != testHttpAny {
 		t.Error("Should return only active host", host1, host2)
 	}
+
+	if GlobalHostChecker.checker.checkTimeout != 10 {
+		t.Error("Should set defaults", GlobalHostChecker.checker.checkTimeout)
+	}
+
+	if ttl, _ := GlobalHostChecker.store.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout+1 {
+		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
+	}
 }
