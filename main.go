@@ -1241,10 +1241,7 @@ func startDRL() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising distributed rate limiter")
-<<<<<<< HEAD
-	setupDRL()
-	startRateLimitNotifications()
-=======
+
 	SetupDRL()
 	StartRateLimitNotifications()
 
@@ -1260,7 +1257,6 @@ func DecideLeaderMechanism() GetLeaderStatusFunc {
 	default:
 		return GetLeaderStatusFromConf
 	}
->>>>>>> 68b5205... First integration, no renewals yet
 }
 
 func listen(l, controlListener net.Listener, err error) {
