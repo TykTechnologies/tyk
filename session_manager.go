@@ -118,12 +118,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 			currentSession.Allowance--
 		}
 
-<<<<<<< HEAD
-		if l.IsRedisQuotaExceeded(currentSession, key, store) {
-=======
-
 		if l.IsDistributedQuotaExceeded(currentSession, key) {
->>>>>>> 68b5205... First integration, no renewals yet
 			return false, 2
 		}
 
