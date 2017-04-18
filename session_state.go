@@ -2,15 +2,9 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
-<<<<<<< HEAD
-=======
-	"fmt"
-	"hash"
 	"time"
->>>>>>> 68b5205... First integration, no renewals yet
 )
 
 type HashType string
