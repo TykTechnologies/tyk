@@ -1247,8 +1247,8 @@ func startDRL() {
 		"prefix": "main",
 	}).Info("Initialising distributed rate limiter")
 
-	SetupDRL()
-	StartRateLimitNotifications()
+	setupDRL()
+	startRateLimitNotifications()
 
 	if config.UseDistributedQuotaCounter {
 		// Start the distributed quota system

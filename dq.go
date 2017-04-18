@@ -10,8 +10,8 @@ import (
 
 	"github.com/TykTechnologies/dq"
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/jeffail/tunny"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var DQFlusherPool *tunny.WorkPool = tunny.CreatePoolGeneric(10)
@@ -37,7 +37,7 @@ func DQErrorHandler(e error) {
 	}).Error(e)
 }
 
-var dummyAPISpec APISpec = APISpec{APIDefinition: &tykcommon.APIDefinition{SessionLifetime: 0}}
+var dummyAPISpec APISpec = APISpec{APIDefinition: &apidef.APIDefinition{SessionLifetime: 0}}
 
 func DQFlusher(d map[string]*dq.Quota) error {
 	for k, v := range d {
