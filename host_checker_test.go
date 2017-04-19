@@ -80,9 +80,6 @@ func TestHostChecker(t *testing.T) {
 
 	spec := createDefinitionFromString(specBuf.String())
 
-	// From tyk_reverse_proxy_clone.go#TykNewSingleHostReverseProxy
-	spec.RoundRobin = &RoundRobin{}
-
 	// From api_loader.go#processSpec
 	sl := apidef.NewHostListFromList(spec.Proxy.Targets)
 	spec.Proxy.StructuredTargetList = sl
