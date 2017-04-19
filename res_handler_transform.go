@@ -43,51 +43,52 @@ func (rt ResponseTransformMiddleware) New(c interface{}, spec *APISpec) (TykResp
 func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	_, versionPaths, _, _ := rt.Spec.GetVersionData(req)
 	found, meta := rt.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, TransformedResponse)
-	if found {
-		tmeta := meta.(*TransformSpec)
+	if !found {
+		return nil
+	}
+	tmeta := meta.(*TransformSpec)
 
-		// Read the body:
-		defer res.Body.Close()
-		body, err := ioutil.ReadAll(res.Body)
+	// Read the body:
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	// Put into an interface:
+	var bodyData interface{}
+	switch tmeta.TemplateMeta.TemplateData.Input {
+	case apidef.RequestXML:
+		mxj.XmlCharsetReader = WrappedCharsetReader
+		bodyData, err = mxj.NewMapXml(body) // unmarshal
 		if err != nil {
-			return err
-		}
-
-		// Put into an interface:
-		var bodyData interface{}
-		switch tmeta.TemplateMeta.TemplateData.Input {
-		case apidef.RequestXML:
-			mxj.XmlCharsetReader = WrappedCharsetReader
-			bodyData, err = mxj.NewMapXml(body) // unmarshal
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix":      "outbound-transform",
-					"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
-					"api_id":      rt.Spec.APIDefinition.APIID,
-					"path":        req.URL.Path,
-				}).Error("Error unmarshalling XML: ", err)
-			}
-		case apidef.RequestJSON:
-			json.Unmarshal(body, &bodyData)
-		default:
-			json.Unmarshal(body, &bodyData)
-		}
-
-		// Apply to template
-		var bodyBuffer bytes.Buffer
-		if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "outbound-transform",
 				"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
 				"api_id":      rt.Spec.APIDefinition.APIID,
 				"path":        req.URL.Path,
-			}).Error("Failed to apply template to request: ", err)
+			}).Error("Error unmarshalling XML: ", err)
 		}
-
-		res.ContentLength = int64(bodyBuffer.Len())
-		res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
-		res.Body = ioutil.NopCloser(&bodyBuffer)
+	case apidef.RequestJSON:
+		json.Unmarshal(body, &bodyData)
+	default:
+		json.Unmarshal(body, &bodyData)
 	}
+
+	// Apply to template
+	var bodyBuffer bytes.Buffer
+	if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix":      "outbound-transform",
+			"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
+			"api_id":      rt.Spec.APIDefinition.APIID,
+			"path":        req.URL.Path,
+		}).Error("Failed to apply template to request: ", err)
+	}
+
+	res.ContentLength = int64(bodyBuffer.Len())
+	res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
+	res.Body = ioutil.NopCloser(&bodyBuffer)
 
 	return nil
 }
