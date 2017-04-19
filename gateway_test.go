@@ -130,7 +130,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		panic(testServer.ListenAndServe())
 	}()
-	writeDefaultConf(&config)
+	writeDefaultConf("", &config)
 	config.Storage.Database = 1
 	if err := emptyRedis(); err != nil {
 		panic(err)
@@ -146,6 +146,7 @@ func TestMain(m *testing.M) {
 	config.EnableJSVM = true
 	config.Monitor.EnableTriggerMonitors = true
 	config.AnalyticsConfig.NormaliseUrls.Enabled = true
+	afterConfSetup(&config)
 	initialiseSystem(nil)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
