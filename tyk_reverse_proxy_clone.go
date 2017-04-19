@@ -150,9 +150,6 @@ func GetNextTarget(targetData *apidef.HostList, spec *APISpec, tryCount int) str
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
-	// initialise round robin
-	spec.RoundRobin = &RoundRobin{}
-
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")
 		if ServiceCache == nil {
