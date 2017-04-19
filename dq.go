@@ -2,16 +2,18 @@ package main
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk-cluster-framework/client"
-	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk-cluster-framework/client"
+	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
+
+	"github.com/jeffail/tunny"
+
 	"github.com/TykTechnologies/dq"
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/jeffail/tunny"
 )
 
 var DQFlusherPool *tunny.WorkPool = tunny.CreatePoolGeneric(10)

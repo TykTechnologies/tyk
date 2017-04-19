@@ -6,6 +6,10 @@ import (
 	"github.com/gorilla/context"
 	"github.com/Sirupsen/logrus"
 	"strconv"
+
+	"github.com/gorilla/context"
+
+	"github.com/TykTechnologies/logrus"
 )
 
 var sessionLimiter = SessionLimiter{}
