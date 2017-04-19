@@ -1259,9 +1259,9 @@ func DecideLeaderMechanism() GetLeaderStatusFunc {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("If using redis with distributed quota it is recommended to make all gateways leader")
-		return func() bool {return config.DQSetMaster}
+		return func() bool { return config.DQSetMaster }
 	default:
-		return func() bool {return config.DQSetMaster}
+		return func() bool { return config.DQSetMaster }
 	}
 }
 

@@ -118,7 +118,6 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 			currentSession.Allowance--
 		}
 
-
 		if config.UseDistributedQuotaCounter {
 			if l.IsDistributedQuotaExceeded(currentSession, key) {
 				return false, 2
