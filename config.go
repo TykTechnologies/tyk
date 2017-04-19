@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -279,7 +280,7 @@ func writeDefaultConf(conf *Config) {
 // LoadConfig will load the configuration file from filePath, if it can't open
 // the file for reading, it assumes there is no configuration file and will try to create
 // one on the default path (tyk.conf in the local directory)
-func loadConfig(filePath string, conf *Config) {
+func loadConfig(filePath string, conf *Config) error {
 	configuration, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		if !runningTests {
@@ -287,15 +288,15 @@ func loadConfig(filePath string, conf *Config) {
 			log.Info("Writing a default file to tyk.conf")
 			writeDefaultConf(conf)
 			log.Info("Loading default configuration...")
-			loadConfig("tyk.conf", conf)
+			return loadConfig("tyk.conf", conf)
 		}
 	} else {
 		if err := json.Unmarshal(configuration, &conf); err != nil {
-			log.Error("Couldn't unmarshal configuration: ", err)
+			return fmt.Errorf("couldn't unmarshal config: %v", err)
 		}
 
 		if err := envconfig.Process(envPrefix, conf); err != nil {
-			log.Error("Failed to process environment variables after file load: ", err)
+			return fmt.Errorf("failed to process config env vars: %v", err)
 		}
 	}
 
@@ -308,6 +309,7 @@ func loadConfig(filePath string, conf *Config) {
 	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
+	return nil
 }
 
 func (c *Config) loadIgnoredIPs() {

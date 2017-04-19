@@ -773,7 +773,7 @@ func setupLogger() {
 
 }
 
-func initialiseSystem(arguments map[string]interface{}) {
+func initialiseSystem(arguments map[string]interface{}) error {
 
 	// Enable command mode
 	for _, opt := range commandModeOptions {
@@ -809,7 +809,9 @@ func initialiseSystem(arguments map[string]interface{}) {
 		}).Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
-	loadConfig(filename, &config)
+	if err := loadConfig(filename, &config); err != nil {
+		return err
+	}
 
 	if config.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
@@ -855,6 +857,8 @@ func initialiseSystem(arguments map[string]interface{}) {
 	SetupInstrumentation(true)
 
 	go StartPeriodicStateBackup(&LE_MANAGER)
+
+	return nil
 }
 
 type AuditHostDetails struct {
@@ -982,7 +986,11 @@ func main() {
 	l, goAgainErr := goagain.Listener(onFork)
 	controlListener, goAgainErr := goagain.Listener(onFork)
 
-	initialiseSystem(arguments)
+	if err := initialiseSystem(arguments); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatalf("Error initialising system: %v", err)
+	}
 	start(arguments)
 
 	if goAgainErr != nil {
