@@ -282,6 +282,10 @@ func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) m
 	keys, _ := redis.Strings(sessionsInterface, err)
 	valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
 	values, err := redis.Strings(valueObj, err)
+	if err != nil {
+		log.Error("Error trying to get filtered client keys: ", err)
+		return nil
+	}
 
 	m := make(map[string]string)
 	for i, v := range keys {
@@ -302,6 +306,10 @@ func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
 	keys, _ := redis.Strings(sessionsInterface, err)
 	valueObj, err := GetRelevantClusterReference(r.IsCache).Do("MGET", sessionsInterface.([]interface{})...)
 	values, err := redis.Strings(valueObj, err)
+	if err != nil {
+		log.Error("Error trying to get all keys: ", err)
+		return nil
+	}
 
 	m := make(map[string]string)
 	for i, v := range keys {
