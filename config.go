@@ -244,27 +244,27 @@ const envPrefix = "TYK_GW"
 
 // writeDefaultConf will create a default configuration file and set the storage type to "memory"
 func writeDefaultConf(conf *Config) {
-	conf.ListenAddress = ""
-	conf.ListenPort = 8080
-	conf.Secret = "352d20ee67be67f6340b4c0605b044b7"
-	conf.TemplatePath = "templates"
-	conf.TykJSPath = "js/tyk.js"
-	conf.MiddlewarePath = "middleware"
-	conf.Storage.Type = "redis"
-	conf.AppPath = "apps/"
-	conf.Storage.Host = "localhost"
-	conf.Storage.Username = ""
-	conf.Storage.Password = ""
-	conf.Storage.Database = 0
-	conf.Storage.MaxIdle = 100
-	conf.Storage.Port = 6379
-	conf.EnableAnalytics = false
-	conf.HealthCheck.EnableHealthChecks = true
-	conf.HealthCheck.HealthCheckValueTimeout = 60
-	conf.AnalyticsConfig.IgnoredIPs = make([]string, 0)
-	conf.UseAsyncSessionWrite = false
-	conf.HideGeneratorHeader = false
-	conf.OauthRedirectUriSeparator = ""
+	*conf = Config{
+		ListenPort:     8080,
+		Secret:         "352d20ee67be67f6340b4c0605b044b7",
+		TemplatePath:   "templates",
+		TykJSPath:      "js/tyk.js",
+		MiddlewarePath: "middleware",
+		AppPath:        "apps/",
+		Storage: StorageOptionsConf{
+			Type:    "redis",
+			Host:    "localhost",
+			MaxIdle: 100,
+			Port:    6379,
+		},
+		HealthCheck: HealthCheckConfig{
+			EnableHealthChecks:      true,
+			HealthCheckValueTimeout: 60,
+		},
+		AnalyticsConfig: AnalyticsConfigConfig{
+			IgnoredIPs: make([]string, 0),
+		},
+	}
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		log.Error("Failed to process environment variables: ", err)
 	}
