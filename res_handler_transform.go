@@ -49,6 +49,9 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		// Read the body:
 		defer res.Body.Close()
 		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return err
+		}
 
 		// Put into an interface:
 		var bodyData interface{}

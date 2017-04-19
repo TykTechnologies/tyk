@@ -60,6 +60,9 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Read the body:
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, http.StatusBadRequest
+	}
 
 	// Put into an interface:
 	var bodyData interface{}
