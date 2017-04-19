@@ -51,7 +51,6 @@ var (
 	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
 	MonitoringHandler        TykEventHandler
 	RPCListener              = RPCStorageHandler{}
-	argumentsBackup          map[string]interface{}
 	DashService              DashboardServiceSender
 
 	ApiSpecRegister map[string]*APISpec
@@ -797,20 +796,21 @@ func initialiseSystem(arguments map[string]interface{}) error {
 		}).Debug("Enabling debug-level output")
 	}
 
-	filename := "/etc/tyk/tyk.conf"
 	if conf := arguments["--conf"]; conf != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debugf("Using %s for configuration", conf.(string))
-		filename = arguments["--conf"].(string)
+		confPaths = []string{conf.(string)}
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
-	if err := loadConfig(filename, &config); err != nil {
-		return err
+	if !runningTests {
+		if err := loadConfig(confPaths, &config); err != nil {
+			return err
+		}
 	}
 
 	if config.Storage.Type != "redis" {
@@ -911,7 +911,6 @@ func getCmdArguments() map[string]interface{} {
 		}).Warning("Error while parsing arguments: ", err)
 	}
 
-	argumentsBackup = arguments
 	return arguments
 }
 

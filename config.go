@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -243,8 +244,24 @@ type CertData struct {
 
 const envPrefix = "TYK_GW"
 
-// writeDefaultConf will create a default configuration file and set the storage type to "memory"
-func writeDefaultConf(conf *Config) {
+// confPaths is the series of paths to try to use as config files. The
+// first one to exist will be used. If none exists, a default config
+// will be written to the first path in the list.
+//
+// When --conf=foo is used, this will be replaced by []string{"foo"}.
+var confPaths = []string{
+	"tyk.conf",
+	// TODO: add ~/.config/tyk/tyk.conf here?
+	"/etc/tyk/tyk.conf",
+}
+
+// usedConfPath is the path to the config file that was read. If none
+// was found, it's the path to the default config file that was written.
+var usedConfPath string
+
+// writeDefaultConf will create a default configuration file and set the
+// storage type to "memory"
+func writeDefaultConf(path string, conf *Config) {
 	*conf = Config{
 		ListenPort:     8080,
 		Secret:         "352d20ee67be67f6340b4c0605b044b7",
@@ -269,37 +286,61 @@ func writeDefaultConf(conf *Config) {
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		log.Error("Failed to process environment variables: ", err)
 	}
+	if path == "" {
+		return
+	}
 	newConfig, err := json.MarshalIndent(conf, "", "    ")
 	if err != nil {
 		log.Error("Problem marshalling default configuration: ", err)
-	} else if !runningTests {
-		ioutil.WriteFile("tyk.conf", newConfig, 0644)
+	} else {
+		ioutil.WriteFile(path, newConfig, 0644)
 	}
 }
 
-// LoadConfig will load the configuration file from filePath, if it can't open
-// the file for reading, it assumes there is no configuration file and will try to create
-// one on the default path (tyk.conf in the local directory)
-func loadConfig(filePath string, conf *Config) error {
-	configuration, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		if !runningTests {
-			log.Error("Couldn't load configuration file: ", err)
-			log.Info("Writing a default file to tyk.conf")
-			writeDefaultConf(conf)
-			log.Info("Loading default configuration...")
-			return loadConfig("tyk.conf", conf)
+// LoadConfig will load a configuration file, trying each of the paths
+// given and using the first one that is a regular file and can be
+// opened.
+//
+// If none exists, a default config will be written to the first path in
+// the list.
+//
+// An error will be returned only if any of the paths existed but was
+// not a valid config file.
+func loadConfig(paths []string, conf *Config) error {
+	var bs []byte
+	for _, path := range paths {
+		var err error
+		bs, err = ioutil.ReadFile(path)
+		if err == nil {
+			usedConfPath = path
+			break
 		}
-	} else {
-		if err := json.Unmarshal(configuration, &conf); err != nil {
-			return fmt.Errorf("couldn't unmarshal config: %v", err)
+		if os.IsNotExist(err) {
+			continue
 		}
-
-		if err := envconfig.Process(envPrefix, conf); err != nil {
-			return fmt.Errorf("failed to process config env vars: %v", err)
-		}
+		return err
+	}
+	if bs == nil {
+		path := paths[0]
+		log.Warnf("No config file found, writing default to %s", path)
+		writeDefaultConf(path, conf)
+		log.Info("Loading default configuration...")
+		return loadConfig([]string{path}, conf)
+	}
+	if err := json.Unmarshal(bs, &conf); err != nil {
+		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
 
+	if err := envconfig.Process(envPrefix, conf); err != nil {
+		return fmt.Errorf("failed to process config env vars: %v", err)
+	}
+	afterConfSetup(conf)
+	return nil
+}
+
+// afterConfSetup takes care of non-sensical config values (such as zero
+// timeouts) and sets up a few globals that depend on the config.
+func afterConfSetup(conf *Config) {
 	if conf.SlaveOptions.CallTimeout == 0 {
 		conf.SlaveOptions.CallTimeout = 30
 	}
@@ -309,7 +350,6 @@ func loadConfig(filePath string, conf *Config) error {
 	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
-	return nil
 }
 
 func (c *Config) loadIgnoredIPs() {

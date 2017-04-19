@@ -41,22 +41,8 @@ func sanitizeConfig(mc MicroConfig) MicroConfig {
 }
 
 func getExistingConfig() (MicroConfig, error) {
-	value := argumentsBackup["--conf"]
 	microConfig := MicroConfig{}
-
-	filename := "tyk.conf"
-	if value != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Infof("Using %s for configuration", value.(string))
-		filename = argumentsBackup["--conf"].(string)
-	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Info("No configuration file defined, will try to use default (tyk.conf)")
-	}
-
-	dat, err := ioutil.ReadFile(filename)
+	dat, err := ioutil.ReadFile(usedConfPath)
 	if err != nil {
 		return microConfig, err
 	}
