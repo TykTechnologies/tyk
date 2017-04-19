@@ -228,9 +228,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Header.Add("Date", requestTime)
 
 	// Handle response middleware
-	responseHandler := ResponseChain{}
-
-	if err := responseHandler.Go(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &sessionState); err != nil {
+	if err := handleResponseChain(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &sessionState); err != nil {
 		log.Error("Response chain failed! ", err)
 	}
 

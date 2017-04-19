@@ -283,9 +283,8 @@ type ReverseProxy struct {
 	// If nil, the default configuration is used.
 	TLSClientConfig *tls.Config
 
-	TykAPISpec      *APISpec
-	ErrorHandler    ErrorHandler
-	ResponseHandler ResponseChain
+	TykAPISpec   *APISpec
+	ErrorHandler ErrorHandler
 }
 
 type TykTransporter struct {
@@ -611,7 +610,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if p.TykAPISpec.ResponseHandlersActive {
 		// Middleware chain handling here - very simple, but should do the trick
-		err := p.ResponseHandler.Go(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
+		err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
 		if err != nil {
 			log.Error("Response chain failed! ", err)
 		}

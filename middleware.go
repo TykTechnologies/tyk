@@ -147,9 +147,7 @@ func GetResponseProcessorByName(name string) (TykResponseHandler, error) {
 
 }
 
-type ResponseChain struct{}
-
-func (r ResponseChain) Go(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	for _, rh := range chain {
 		if err := rh.HandleResponse(rw, res, req, ses); err != nil {
 			return err
