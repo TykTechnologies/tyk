@@ -20,7 +20,6 @@ var HostCheckerClient = &http.Client{Timeout: 500 * time.Millisecond}
 
 type HostData struct {
 	CheckURL string
-	ID       string
 	Method   string
 	Headers  map[string]string
 	Body     string
@@ -95,26 +94,26 @@ func (h *HostUptimeChecker) HostReporter() {
 		select {
 		case okHost := <-h.okChan:
 			// Clear host from unhealthylist if it exists
-			if h.unHealthyList[okHost.ID] {
+			if h.unHealthyList[okHost.CheckURL] {
 				h.upCallback(okHost)
-				delete(h.unHealthyList, okHost.ID)
+				delete(h.unHealthyList, okHost.CheckURL)
 			}
 			go h.pingCallback(okHost)
 
 		case failedHost := <-h.errorChan:
 			newVal := 1
-			if count, found := h.sampleCache.Get(failedHost.ID); found {
+			if count, found := h.sampleCache.Get(failedHost.CheckURL); found {
 				newVal = count.(int) + 1
 			}
 
-			h.sampleCache.Set(failedHost.ID, newVal, cache.DefaultExpiration)
+			h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
 
 			if newVal >= h.sampleTriggerLimit {
 				log.Debug("[HOST CHECKER] [HOST WARNING]: ", failedHost.CheckURL)
 				// Reset the count
-				h.sampleCache.Set(failedHost.ID, 1, cache.DefaultExpiration)
+				h.sampleCache.Set(failedHost.CheckURL, 1, cache.DefaultExpiration)
 				// track it
-				h.unHealthyList[failedHost.ID] = true
+				h.unHealthyList[failedHost.CheckURL] = true
 				// Call the custom callback hook
 				go h.failureCallback(failedHost)
 			}
@@ -128,7 +127,7 @@ func (h *HostUptimeChecker) HostReporter() {
 }
 
 func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
-	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL, toCheck.ID)
+	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
 
 	t1 := time.Now()
 
