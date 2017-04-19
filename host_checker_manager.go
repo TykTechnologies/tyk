@@ -311,7 +311,6 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 
 	hostData = HostData{
 		CheckURL: checkObject.CheckURL,
-		ID:       checkObject.CheckURL,
 		MetaData: make(map[string]string),
 		Method:   checkObject.Method,
 		Headers:  checkObject.Headers,
