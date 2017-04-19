@@ -10,8 +10,8 @@ import (
 
 	"github.com/TykTechnologies/dq"
 	"github.com/TykTechnologies/logrus"
-	"github.com/jeffail/tunny"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/jeffail/tunny"
 )
 
 var DQFlusherPool *tunny.WorkPool = tunny.CreatePoolGeneric(10)
@@ -127,7 +127,7 @@ func DQFlusher(d map[string]*dq.Quota) error {
 
 func StartDQ(statusFunc GetLeaderStatusFunc) {
 	log.WithFields(logrus.Fields{
-		"prefix":      "DQuota",
+		"prefix": "DQuota",
 	}).Info("Using Distributed Quota")
 	p := strconv.Itoa(config.Storage.Port)
 	cs := fmt.Sprintf("redis://%v:%v", config.Storage.Host, p)
@@ -151,7 +151,7 @@ func StartDQ(statusFunc GetLeaderStatusFunc) {
 	}
 
 	// Give us time to catch up
-	time.Sleep(time.Millisecond*100)
+	time.Sleep(time.Millisecond * 100)
 }
 
 func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState, key string) bool {
@@ -201,7 +201,6 @@ func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState,
 		used,
 		key,
 		md)
-
 
 	if QuotaHandler.IncrBy(key, 1) == dq.Quota_violated {
 		return true

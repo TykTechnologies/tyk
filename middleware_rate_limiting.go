@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
-	"net/http"
-	"github.com/gorilla/context"
 	"github.com/TykTechnologies/logrus"
+	"github.com/gorilla/context"
+	"net/http"
 	"strconv"
 )
 
@@ -98,7 +98,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota)
-
 
 	// If either are disabled, or the session has been modified, save the write roundtrip
 	if k.Spec.DisableRateLimit == false || k.Spec.DisableQuota == false {
