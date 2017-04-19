@@ -102,7 +102,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
-		for apiId, _ := range newSession.AccessRights {
+		for apiId := range newSession.AccessRights {
 			apiSpec := GetSpecForApi(apiId)
 			if apiSpec != nil {
 
