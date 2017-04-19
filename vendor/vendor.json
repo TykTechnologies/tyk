@@ -297,12 +297,6 @@
 			"revisionTime": "2016-01-27T17:00:04Z"
 		},
 		{
-			"checksumSHA1": "076hAQdt7gF8W6O4yA/x0uNFEtc=",
-			"path": "github.com/rcrowley/goagain",
-			"revision": "f2f192b5d1a96e21dd4026ce67cda85e49659a48",
-			"revisionTime": "2014-04-24T17:03:47Z"
-		},
-		{
 			"checksumSHA1": "5qwv3yDROEz5ZV8HztOBmQxen8c=",
 			"path": "github.com/robertkrimen/otto",
 			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",

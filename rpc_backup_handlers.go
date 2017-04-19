@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/rcrowley/goagain"
 
 	"github.com/TykTechnologies/logrus"
 )
@@ -125,13 +124,11 @@ func doLoadWithBackup(specs []*APISpec) {
 	log.Warning("[RPC Backup] --> Ready to listen")
 	RPC_EmergencyModeLoaded = true
 
-	l, goAgainErr := goagain.Listener()
-	var err error
-	if l, err = generateListener("", 0); err != nil {
-		log.Info("Failed to generate listener!")
+	l, err := generateListener("", 0)
+	if err != nil {
+		log.Error("Failed to generate listener:", err)
 	}
-
-	listen(l, nil, goAgainErr)
+	listen(l, nil, nil)
 }
 
 // encrypt string to base64 crypto using AES
