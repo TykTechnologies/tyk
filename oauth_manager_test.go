@@ -333,8 +333,7 @@ func getAuthCode(t *testing.T) map[string]string {
 
 	response := map[string]string{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-	if err := json.Unmarshal(body, &response); err != nil {
-	}
+	_ = json.Unmarshal(body, &response)
 
 	return response
 }
@@ -368,8 +367,7 @@ func getToken(t *testing.T) tokenData {
 
 	response := tokenData{}
 	body, _ := ioutil.ReadAll(recorder.Body)
-	if err := json.Unmarshal(body, &response); err != nil {
-	}
+	_ = json.Unmarshal(body, &response)
 	return response
 }
 
