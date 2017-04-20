@@ -193,13 +193,6 @@ func setupGlobals() {
 
 }
 
-func waitForZeroConf() {
-	if config.DBAppConfOptions.ConnectionString == "" {
-		time.Sleep(1 * time.Second)
-		waitForZeroConf()
-	}
-}
-
 func buildConnStr(resource string) string {
 
 	if config.DBAppConfOptions.ConnectionString == "" && config.DisableDashboardZeroConf {
@@ -211,7 +204,9 @@ func buildConnStr(resource string) string {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Waiting for zeroconf signal...")
-		waitForZeroConf()
+		for config.DBAppConfOptions.ConnectionString == "" {
+			time.Sleep(1 * time.Second)
+		}
 	}
 
 	connStr := config.DBAppConfOptions.ConnectionString
