@@ -257,7 +257,6 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 	}
 
 	list := NodeResponseOK{}
-
 	if err := json.Unmarshal(retBody, &list); err != nil {
 		log.Error("Failed to decode body: ", err, "Response was: ", string(retBody))
 		log.Info("--> Retrying in 5s")
@@ -448,7 +447,6 @@ func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus
 }
 
 func (a *APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMeta, specType URLStatus) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -466,7 +464,6 @@ func (a *APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMet
 }
 
 func (a *APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -496,7 +493,6 @@ func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Templ
 }
 
 func (a *APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -544,7 +540,6 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMe
 }
 
 func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -566,7 +561,6 @@ func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInj
 }
 
 func (a *APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -583,7 +577,6 @@ func (a *APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTr
 }
 
 func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -601,7 +594,6 @@ func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutM
 }
 
 func (a *APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -619,7 +611,6 @@ func (a *APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestS
 }
 
 func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -686,7 +677,6 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circu
 }
 
 func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus) []URLSpec {
-
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -704,7 +694,6 @@ func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewri
 }
 
 func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
-
 	if !config.EnableJSVM {
 		return nil
 	}

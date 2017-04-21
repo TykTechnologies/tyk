@@ -612,16 +612,13 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
 		return createError("Request malformed"), 400
 	}
 
-	if apiID != "" {
-		if newDef.APIID != apiID {
-			log.Error("PUT operation on different APIIDs")
-			return createError("Request APIID does not match that in Definition! For Updtae operations these must match."), 400
-		}
+	if apiID != "" && newDef.APIID != apiID {
+		log.Error("PUT operation on different APIIDs")
+		return createError("Request APIID does not match that in Definition! For Updtae operations these must match."), 400
 	}
 
 	// Create a filename
-	defFilename := newDef.APIID + ".json"
-	defFilePath := filepath.Join(config.AppPath, defFilename)
+	defFilePath := filepath.Join(config.AppPath, newDef.APIID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err == nil {
@@ -663,8 +660,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) ([]byte, int) {
 
 func handleDeleteAPI(apiID string) ([]byte, int) {
 	// Generate a filename
-	defFilename := apiID + ".json"
-	defFilePath := filepath.Join(config.AppPath, defFilename)
+	defFilePath := filepath.Join(config.AppPath, apiID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -1149,7 +1145,6 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		doJSONWrite(w, 405, createError("Method not supported"))
 		return
 	}
-	responseObj := APIModifyKeySuccess{}
 
 	var newSession SessionState
 	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
@@ -1247,10 +1242,11 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	responseObj.Action = "create"
-	responseObj.Key = newKey
-	responseObj.Status = "ok"
-
+	responseObj := APIModifyKeySuccess{
+		Action: "create",
+		Key:    newKey,
+		Status: "ok",
+	}
 	responseMessage, err := json.Marshal(&responseObj)
 	if err != nil {
 		log.WithFields(logrus.Fields{

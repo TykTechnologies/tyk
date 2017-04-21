@@ -19,15 +19,11 @@ type HeaderInjector struct {
 }
 
 func (h HeaderInjector) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	handler := HeaderInjector{}
-	moduleConfig := HeaderInjectorOptions{}
-
-	if err := mapstructure.Decode(c, &moduleConfig); err != nil {
+	handler := HeaderInjector{Spec: spec}
+	if err := mapstructure.Decode(c, &handler.config); err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	handler.config = moduleConfig
-	handler.Spec = spec
 	return handler, nil
 }
 
@@ -36,7 +32,6 @@ func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respons
 
 	_, versionPaths, _, _ := h.Spec.GetVersionData(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HeaderInjectedResponse)
-
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
@@ -51,7 +46,6 @@ func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respons
 	for _, n := range h.config.RemoveHeaders {
 		res.Header.Del(n)
 	}
-
 	for h, v := range h.config.AddHeaders {
 		res.Header.Add(h, v)
 	}
