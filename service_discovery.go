@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lonelycode/gabs"
+	"github.com/Jeffail/gabs"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
