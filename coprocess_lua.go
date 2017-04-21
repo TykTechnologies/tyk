@@ -10,8 +10,6 @@ package main
 #include <stdlib.h>
 #include <string.h>
 
-#include "coprocess/sds/sds.h"
-
 #include "coprocess/api.h"
 
 #include "coprocess/lua/binding.h"

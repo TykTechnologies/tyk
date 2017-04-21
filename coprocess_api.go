@@ -6,8 +6,6 @@ package main
 /*
 #include <stdio.h>
 
-#include "coprocess/sds/sds.h"
-
 #include "coprocess/api.h"
 
 #ifdef ENABLE_PYTHON

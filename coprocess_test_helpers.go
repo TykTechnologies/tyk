@@ -9,8 +9,6 @@ package main
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "coprocess/sds/sds.h"
-
 #include "coprocess/api.h"
 
 void applyTestHooks();
