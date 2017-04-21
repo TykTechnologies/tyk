@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -210,7 +210,7 @@ func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool
 		Name:             s.Info.Title,
 		Active:           true,
 		UseKeylessAccess: true,
-		APIID:            uuid.NewUUID().String(),
+		APIID:            uuid.NewV4().String(),
 		OrgID:            orgId,
 	}
 	ad.VersionDefinition.Key = "version"

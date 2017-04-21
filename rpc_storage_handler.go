@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/lonelycode/go-uuid/uuid"
 	"github.com/lonelycode/gorpc"
 	"github.com/pmylund/go-cache"
+	"github.com/satori/go.uuid"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -106,7 +106,7 @@ type RPCStorageHandler struct {
 }
 
 func (r *RPCStorageHandler) Register() {
-	r.ID = uuid.NewUUID().String()
+	r.ID = uuid.NewV4().String()
 	myChan := make(chan int)
 	RPCCLientRWMutex.Lock()
 	RPCClients[r.ID] = myChan

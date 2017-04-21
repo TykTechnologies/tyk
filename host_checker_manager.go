@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/satori/go.uuid"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -86,7 +86,7 @@ func (hc *HostCheckerManager) Start() {
 }
 
 func (hc *HostCheckerManager) GenerateCheckerId() {
-	hc.Id = uuid.NewUUID().String()
+	hc.Id = uuid.NewV4().String()
 }
 
 func (hc *HostCheckerManager) CheckActivePollerLoop() {
