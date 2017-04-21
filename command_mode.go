@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -117,7 +117,7 @@ func createDefFromBluePrint(bp *BluePrintAST, orgID, upstreamURL string, asMock 
 		Name:             bp.Name,
 		Active:           true,
 		UseKeylessAccess: true,
-		APIID:            uuid.NewUUID().String(),
+		APIID:            uuid.NewV4().String(),
 		OrgID:            orgID,
 	}
 	ad.VersionDefinition.Key = "version"
