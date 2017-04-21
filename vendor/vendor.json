@@ -3,6 +3,14 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "9BfDgevpBgdiP4B6DT9SvcuVyLs=",
+			"path": "github.com/Jeffail/gabs",
+			"revision": "2a3aa15961d5fee6047b8151b67ac2f08ba2c48c",
+			"revisionTime": "2016-11-16T21:39:02Z",
+			"version": "1.0",
+			"versionExact": "1.0"
+		},
+		{
 			"checksumSHA1": "NRonvQTe073YVead6//CQ5oVgK4=",
 			"path": "github.com/Sirupsen/logrus",
 			"revision": "1deb2db2a6fff8a35532079061b903c3a25eed52",
@@ -205,12 +213,6 @@
 			"path": "github.com/kelseyhightower/envconfig",
 			"revision": "9aca109c9aec4633fced9717c4a09ecab3d33111",
 			"revisionTime": "2016-10-19T16:24:55Z"
-		},
-		{
-			"checksumSHA1": "ddGL0fynN++6sugzotwGg67UJJE=",
-			"path": "github.com/lonelycode/gabs",
-			"revision": "4f7cc4b25a3a81888aae8bde86460fcfd671cbae",
-			"revisionTime": "2015-04-30T20:25:13Z"
 		},
 		{
 			"checksumSHA1": "Zgi7LCXXiFQYL84rwInvfJHEOQM=",

@@ -7,7 +7,7 @@ https://godoc.org/github.com/Jeffail/gabs
 ##How to install:
 
 ```bash
-go get github.com/jeffail/gabs
+go get github.com/Jeffail/gabs
 ```
 
 ##How to use
@@ -17,7 +17,7 @@ go get github.com/jeffail/gabs
 ```go
 ...
 
-import "github.com/jeffail/gabs"
+import "github.com/Jeffail/gabs"
 
 jsonParsed, err := gabs.ParseJSON([]byte(`{
 	"outter":{
@@ -42,6 +42,31 @@ value, ok = jsonParsed.Search("outter", "inner", "value1").Data().(float64)
 
 value, ok = jsonParsed.Path("does.not.exist").Data().(float64)
 // value == 0.0, ok == false
+
+exists := jsonParsed.Exists("outter", "inner", "value1")
+// exists == true
+
+exists := jsonParsed.Exists("does", "not", "exist")
+// exists == false
+
+exists := jsonParsed.ExistsP("does.not.exist")
+// exists == false
+
+...
+```
+
+###Iterating objects
+
+```go
+...
+
+jsonParsed, _ := gabs.ParseJSON([]byte(`{"object":{ "first": 1, "second": 2, "third": 3 }}`))
+
+// S is shorthand for Search
+children, _ := jsonParsed.S("object").ChildrenMap()
+for key, child := range children {
+	fmt.Printf("key: %v, value: %v\n", key, child.Data().(string))
+}
 
 ...
 ```
@@ -165,6 +190,37 @@ Will print:
 {"foo":{"array":[10,20,30]}}
 ```
 
+Working with arrays by index:
+
+```go
+...
+
+jsonObj := gabs.New()
+
+// Create an array with the length of 3
+jsonObj.ArrayOfSize(3, "foo")
+
+jsonObj.S("foo").SetIndex("test1", 0)
+jsonObj.S("foo").SetIndex("test2", 1)
+
+// Create an embedded array with the length of 3
+jsonObj.S("foo").ArrayOfSizeI(3, 2)
+
+jsonObj.S("foo").Index(2).SetIndex(1, 0)
+jsonObj.S("foo").Index(2).SetIndex(2, 1)
+jsonObj.S("foo").Index(2).SetIndex(3, 2)
+
+fmt.Println(jsonObj.String())
+
+...
+```
+
+Will print:
+
+```
+{"foo":["test1","test2",[1,2,3]]}
+```
+
 ###Converting back to JSON
 
 This is the easiest part:
@@ -207,4 +263,22 @@ jsonOutput := jsonParsedObj.Search("outter").String()
 // Becomes `{"values":{"first":10,"second":11}}`
 
 ...
+```
+
+### Parsing Numbers
+
+Gabs uses the `json` package under the bonnet, which by default will parse all number values into `float64`. If you need to parse `Int` values then you should use a `json.Decoder` (https://golang.org/pkg/encoding/json/#Decoder):
+
+```go
+sample := []byte(`{"test":{"int":10, "float":6.66}}`)
+dec := json.NewDecoder(bytes.NewReader(sample))
+dec.UseNumber()
+
+val, err := gabs.ParseJSONDecoder(dec)
+if err != nil {
+    t.Errorf("Failed to parse: %v", err)
+    return
+}
+
+intValue, err := val.Path("test.int").Data().(json.Number).Int64()
 ```
