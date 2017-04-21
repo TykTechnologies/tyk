@@ -552,7 +552,6 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	}
 
 	theseClients := []osin.Client{}
-
 	for _, clientJSON := range clientJSON {
 		client := new(OAuthClient)
 		if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
@@ -770,7 +769,6 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 	// new interface means having to make this nested... ick.
 	accessData := osin.AccessData{}
 	accessData.Client = new(OAuthClient)
-
 	if err := json.Unmarshal([]byte(accessJSON), &accessData); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err)
 		log.Error("Decoding:", accessJSON)
@@ -837,7 +835,6 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, err
 
 	// new interface means having to make this nested... ick.
 	session := SessionState{}
-
 	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err)
 		log.Error("Decoding:", accessJSON)

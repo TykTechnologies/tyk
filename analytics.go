@@ -108,26 +108,18 @@ type NormaliseURLPatterns struct {
 	Custom []*regexp.Regexp
 }
 
-func initNormalisationPatterns() NormaliseURLPatterns {
-	thesePatterns := NormaliseURLPatterns{}
+func initNormalisationPatterns() (pats NormaliseURLPatterns) {
+	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
+	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
-	uuidPat := regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
-	numPat := regexp.MustCompile(`\/(\d+)`)
-
-	custPats := []*regexp.Regexp{}
 	for _, pattern := range config.AnalyticsConfig.NormaliseUrls.Custom {
 		if patRe, err := regexp.Compile(pattern); err != nil {
 			log.Error("failed to compile custom pattern: ", err)
 		} else {
-			custPats = append(custPats, patRe)
+			pats.Custom = append(pats.Custom, patRe)
 		}
 	}
-
-	thesePatterns.UUIDs = uuidPat
-	thesePatterns.IDs = numPat
-	thesePatterns.Custom = custPats
-
-	return thesePatterns
+	return
 }
 
 func (a *AnalyticsRecord) NormalisePath() {

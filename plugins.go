@@ -149,7 +149,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Decode the return object
 	newRequestData := VMReturnObject{}
-
 	if err := json.Unmarshal([]byte(returnDataStr), &newRequestData); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -290,11 +289,11 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("TykMakeHttpRequest", func(call otto.FunctionCall) otto.Value {
 
 		jsonHRO := call.Argument(0).String()
-		hro := TykJSHttpRequest{}
 		if jsonHRO == "undefined" {
 			// Nope, return nothing
 			return otto.Value{}
 		}
+		hro := TykJSHttpRequest{}
 		if err := json.Unmarshal([]byte(jsonHRO), &hro); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
