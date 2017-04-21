@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
