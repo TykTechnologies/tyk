@@ -1090,8 +1090,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 	whiteListStatus, wlOk := a.WhiteListEnabled[versionKey]
 
 	if !rxOk {
-		log.Error("no RX Paths found for version")
-		log.Error(versionKey)
+		log.Error("no RX Paths found for version ", versionKey)
 		return &version, versionRxPaths, versionWLStatus, VersionDoesNotExist
 	}
 

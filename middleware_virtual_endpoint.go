@@ -193,8 +193,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Decode the return object
 	newResponseData := VMResponseObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
-		log.Error("Failed to decode virtual endpoint response data on return from VM: ", err)
-		log.Error("--> Returned: ", returnDataStr)
+		log.Error("Failed to decode virtual endpoint response data on return from VM: ", err,
+			"; Returned: ", returnDataStr)
 		return nil
 	}
 

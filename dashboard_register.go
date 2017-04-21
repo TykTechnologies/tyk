@@ -94,8 +94,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	retBody, err := ioutil.ReadAll(response.Body)
 
 	if response.StatusCode != 200 {
-		log.Error("Failed to register node, retrying in 5s")
-		log.Error(" --> Response was: ", string(retBody))
+		log.Error("Failed to register node, retrying in 5s; Response was: ", string(retBody))
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
