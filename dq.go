@@ -12,7 +12,7 @@ import (
 	"github.com/jeffail/tunny"
 
 	"github.com/TykTechnologies/dq"
-	"github.com/TykTechnologies/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
