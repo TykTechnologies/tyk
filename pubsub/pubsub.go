@@ -9,22 +9,28 @@ import (
 	"github.com/TykTechnologies/tyk-cluster-framework/payloads"
 )
 
+// PSServer wraps a server instance
 type PSServer struct{
 	server server.Server
 }
 
+// PSClient wraps a client instance and keeps a register of message handlers to ensure
+// that if a master change occurs, and a new connection pool is created, the handlers
+// are transitioned ot the new connection
 type PSClient struct{
 	client client.Client
 	isConnected bool
 	handlerPool map[string]client.PayloadHandler
 }
 
+// NewPSClient will return a ready-made PSClient handle
 func NewPSClient() *PSClient {
 	pc := &PSClient{}
 	pc.handlerPool = make(map[string]client.PayloadHandler)
 	return pc
 }
 
+// NewPSServer will return a new PSServer isntacne that is ready for listening
 func NewPSServer(onPort string) (*PSServer, error) {
 	cs := fmt.Sprintf("mangos://127.0.0.1:%v", onPort)
 	s, err := server.NewServer(cs, encoding.JSON)
@@ -39,6 +45,8 @@ func NewPSServer(onPort string) (*PSServer, error) {
 	return &pss, nil
 }
 
+// Start will terminate any existing connections, and start a new client,
+// if there are already any message handlers that have been registered, it will re-create them.
 func (c *PSClient) Start(cs string) error {
 	if c.client != nil && c.isConnected {
 		err := c.Stop()
@@ -72,6 +80,7 @@ func (c *PSClient) Start(cs string) error {
 	return nil
 }
 
+// Stop will termiante a client conneciton
 func (c *PSClient) Stop() error {
 	err := c.client.Stop()
 	if err != nil {
@@ -81,6 +90,7 @@ func (c *PSClient) Stop() error {
 	return nil
 }
 
+// Subscribe wraps a the client subscribe interface, and keeps track of handlers and topics
 func (c *PSClient) Subscribe(topic string, handler client.PayloadHandler) error {
 	_, f := c.handlerPool[topic]
 	if f {
@@ -100,6 +110,7 @@ func (c *PSClient) Subscribe(topic string, handler client.PayloadHandler) error 
 	return nil
 }
 
+// Publish will publish a message to a topic
 func (c *PSClient) Publish(filter string, payload payloads.Payload) error {
 	if !c.isConnected || c.client == nil {
 		// TODO: should we queue them?
@@ -109,15 +120,17 @@ func (c *PSClient) Publish(filter string, payload payloads.Payload) error {
 	return c.client.Publish(filter, payload)
 }
 
-func OnLeaderChange(newLeader string) error {
-	return nil
+// Start will start a server
+func (s *PSServer) Start() error {
+	return s.server.Listen()
 }
 
-//func (s *PSServer) Start() error {
-//
-//}
-//
-//func (s *PSServer) Stop() error {
-//
-//}
+// Stop will stop the server
+func (s *PSServer) Stop() error {
+	return s.server.Stop()
+}
 
+// Publish wraps the publishing capability of the underlying server
+func (s *PSServer) Publish(topic string, payload payloads.Payload) error {
+	return s.server.Publish(topic, payload)
+}
