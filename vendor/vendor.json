@@ -61,6 +61,12 @@
 			"revisionTime": "2016-08-29T16:00:34Z"
 		},
 		{
+			"checksumSHA1": "C7gtyz3E3AqJVC3vGJP7v2Q33Hg=",
+			"path": "github.com/TykTechnologies/logrus",
+			"revision": "55ff0f4b9b3de929d99bad783723811ff7add9b6",
+			"revisionTime": "2016-12-01T17:12:39Z"
+		},
+		{
 			"checksumSHA1": "v64AG0uGiKryWV/kqq5360zw1ts=",
 			"path": "github.com/TykTechnologies/openid2go/openid",
 			"revision": "aab5ce1231ab090ca20af7b7b45a86ae34235eef",
