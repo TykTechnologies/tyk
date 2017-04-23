@@ -3,13 +3,10 @@ package main
 import (
 	"errors"
 	"net/http"
-	"github.com/gorilla/context"
-	"github.com/Sirupsen/logrus"
 	"strconv"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
-
-	"github.com/TykTechnologies/logrus"
 )
 
 var sessionLimiter = SessionLimiter{}
