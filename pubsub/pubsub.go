@@ -1,24 +1,24 @@
 package pubsub
 
 import (
-	"github.com/TykTechnologies/tyk-cluster-framework/client"
-	"github.com/TykTechnologies/tyk-cluster-framework/server"
-	"fmt"
-	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 	"errors"
+	"fmt"
+	"github.com/TykTechnologies/tyk-cluster-framework/client"
+	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 	"github.com/TykTechnologies/tyk-cluster-framework/payloads"
+	"github.com/TykTechnologies/tyk-cluster-framework/server"
 )
 
 // PSServer wraps a server instance
-type PSServer struct{
+type PSServer struct {
 	server server.Server
 }
 
 // PSClient wraps a client instance and keeps a register of message handlers to ensure
 // that if a master change occurs, and a new connection pool is created, the handlers
 // are transitioned ot the new connection
-type PSClient struct{
-	client client.Client
+type PSClient struct {
+	client      client.Client
 	isConnected bool
 	handlerPool map[string]client.PayloadHandler
 }
