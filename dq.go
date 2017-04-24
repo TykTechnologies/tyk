@@ -59,11 +59,11 @@ func dqFlusher(d map[string]*dq.Quota) error {
 
 			// I hate this
 			var exp int64
-			switch v.Meta.(map[string]interface{})["QuotaRenewal"].(type) {
+			switch x := v.Meta.(map[string]interface{})["QuotaRenewal"].(type) {
 			case int64:
-				exp = v.Meta.(map[string]interface{})["QuotaRenewal"].(int64)
+				exp = x
 			case float64:
-				exp = int64(v.Meta.(map[string]interface{})["QuotaRenewal"].(float64))
+				exp = int64(x)
 			}
 
 			expT := time.Unix(exp, 0)
