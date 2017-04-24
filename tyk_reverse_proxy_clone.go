@@ -418,10 +418,10 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
 		log.Debug("Setting timeout for outbound request to: ", timeOut)
-		transport.Dial = (&net.Dialer{
+		transport.DialContext = (&net.Dialer{
 			Timeout:   time.Duration(timeOut) * time.Second,
 			KeepAlive: 30 * time.Second,
-		}).Dial
+		}).DialContext
 		transport.SetTimeout(timeOut)
 
 	}
