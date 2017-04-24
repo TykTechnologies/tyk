@@ -769,7 +769,7 @@ func TestDistributedQuotaSingleNode(t *testing.T) {
 	config.UseDistributedQuotaCounter = true
 	config.DistributedQuotaFlushIntervalInMS = 100
 
-	StartDQ(DecideLeaderMechanism())
+	startDQ(decideLeaderMechanism())
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
