@@ -108,7 +108,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 			// Ensure quota and rate data for this session are recorded
 			k.doSessionWrite(r, authHeaderValue, &sessionState)
 		} else if sessionState.QuotaRenews != oldQuotaRenewal {
-				k.doSessionWrite(r, authHeaderValue, &sessionState)
+			k.doSessionWrite(r, authHeaderValue, &sessionState)
 		}
 
 	}
