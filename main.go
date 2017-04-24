@@ -1247,12 +1247,12 @@ func startDRL() {
 
 	if config.UseDistributedQuotaCounter {
 		// Start the distributed quota system
-		StartDQ(DecideLeaderMechanism())
+		startDQ(decideLeaderMechanism())
 	}
 }
 
 // In case we want to use a channel or some other leadership checker
-func DecideLeaderMechanism() GetLeaderStatusFunc {
+func decideLeaderMechanism() GetLeaderStatusFunc {
 	switch config.Storage.Type {
 	case "redis":
 		// For redis we should distribute write in order to retain consistency

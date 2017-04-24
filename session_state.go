@@ -80,10 +80,7 @@ func (s *SessionState) IsExpired() bool {
 }
 
 func (s *SessionState) IsQuotaExpired() bool {
-	if time.Now().After(time.Unix(s.QuotaRenews, 0)) {
-		return true
-	}
-	return false
+	return time.Now().After(time.Unix(s.QuotaRenews, 0))
 }
 
 func (s *SessionState) SetFirstSeenHash() {

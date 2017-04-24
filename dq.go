@@ -12,6 +12,7 @@ import (
 	"github.com/jeffail/tunny"
 
 	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/dq"
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -33,15 +34,15 @@ func getDQTopic() string {
 	return topic
 }
 
-func DQErrorHandler(e error) {
+func dqErrorHandler(e error) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main.DQ",
 	}).Error(e)
 }
 
-var dummyAPISpec APISpec = APISpec{APIDefinition: &apidef.APIDefinition{SessionLifetime: 0}}
+var dummyAPISpec = APISpec{APIDefinition: &apidef.APIDefinition{SessionLifetime: 0}}
 
-func DQFlusher(d map[string]*dq.Quota) error {
+func dqFlusher(d map[string]*dq.Quota) error {
 	for k, v := range d {
 		DQFlusherPool.SendWork(func() {
 			// Ignore deleted flags
@@ -78,47 +79,50 @@ func DQFlusher(d map[string]*dq.Quota) error {
 
 				// Have we processed on this handler before (many APIs may use the same handler)?
 				_, processedOnSH := processedSpecs[spec.SessionManager]
-				if !processedOnSH {
-					// This handler hasn't been used yet for the API
-					// Get the session data
-					s, f := spec.SessionManager.GetSessionDetail(k)
+				if processedOnSH {
+					continue
+				}
 
-					// If it was found, lets process it for this handler
-					if f {
-						skip := false
-						if time.Now().After(expT) {
-							QuotaHandler.TagDelete(k)
-							skip = true
-						}
+				// This handler hasn't been used yet for the API
+				// Get the session data
+				s, f := spec.SessionManager.GetSessionDetail(k)
 
-						if s.IsExpired() {
-							// Remove expired data too
-							QuotaHandler.TagDelete(k)
-							skip = true
-						}
+				// If it was found, lets process it for this handler
+				if !f {
+					// No longer in session store, delete
+					QuotaHandler.TagDelete(k)
+					continue
+				}
 
-						if !skip {
-							qr := int64(v.Max - v.Counter.Count())
-							if qr < 0 {
-								qr = 0
-							}
+				skip := false
+				if time.Now().After(expT) {
+					QuotaHandler.TagDelete(k)
+					skip = true
+				}
 
-							// Only write on count difference
-							if qr != s.QuotaRemaining {
-								s.QuotaRemaining = qr
-								spec.SessionManager.UpdateSession(k, s, GetLifetime(&dummyAPISpec, &s))
-								// Since we've written the token, we don't need to re-do it at the end of the middleware chain
-								s.SetFirstSeenHash()
-								// We've performed a write on this SH now, lets tag that so we don't do it again
-								processedSpecs[spec.SessionManager] = struct{}{}
-							}
-						}
+				if s.IsExpired() {
+					// Remove expired data too
+					QuotaHandler.TagDelete(k)
+					skip = true
+				}
 
-					} else {
-						// No longer in session store, delete
-						QuotaHandler.TagDelete(k)
+				if !skip {
+					qr := int64(v.Max - v.Counter.Count())
+					if qr < 0 {
+						qr = 0
+					}
+
+					// Only write on count difference
+					if qr != s.QuotaRemaining {
+						s.QuotaRemaining = qr
+						spec.SessionManager.UpdateSession(k, s, GetLifetime(&dummyAPISpec, &s))
+						// Since we've written the token, we don't need to re-do it at the end of the middleware chain
+						s.SetFirstSeenHash()
+						// We've performed a write on this SH now, lets tag that so we don't do it again
+						processedSpecs[spec.SessionManager] = struct{}{}
 					}
 				}
+
 			}
 		})
 	}
@@ -127,7 +131,7 @@ func DQFlusher(d map[string]*dq.Quota) error {
 
 }
 
-func StartDQ(statusFunc GetLeaderStatusFunc) {
+func startDQ(statusFunc GetLeaderStatusFunc) {
 	log.WithFields(logrus.Fields{
 		"prefix": "DQuota",
 	}).Info("Using Distributed Quota")
@@ -135,7 +139,7 @@ func StartDQ(statusFunc GetLeaderStatusFunc) {
 	cs := fmt.Sprintf("redis://%v:%v", config.Storage.Host, p)
 	c1, _ := client.NewClient(cs, encoding.JSON)
 
-	QuotaHandler = dq.NewDQ(DQFlusher, DQErrorHandler, NodeID)
+	QuotaHandler = dq.NewDQ(dqFlusher, dqErrorHandler, NodeID)
 	QuotaHandler.BroadcastWith(c1, time.Millisecond*100, getDQTopic())
 
 	// We always need a leader because otherwise we can;t persist data
@@ -204,9 +208,5 @@ func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState,
 		key,
 		md)
 
-	if QuotaHandler.IncrBy(key, 1) == dq.Quota_violated {
-		return true
-	}
-
-	return false
+	return QuotaHandler.IncrBy(key, 1) == dq.Quota_violated
 }

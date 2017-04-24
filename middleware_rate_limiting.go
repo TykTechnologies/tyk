@@ -107,12 +107,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		if config.UseDistributedQuotaCounter == false {
 			// Ensure quota and rate data for this session are recorded
 			k.doSessionWrite(r, authHeaderValue, &sessionState)
-		} else {
-			// For DRL Users, only write if there's been a change in the quota renewal
-			if sessionState.QuotaRenews != oldQuotaRenewal {
+		} else if sessionState.QuotaRenews != oldQuotaRenewal {
 				k.doSessionWrite(r, authHeaderValue, &sessionState)
-			}
 		}
+
 	}
 
 	log.Debug("SessionState: ", sessionState)
