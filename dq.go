@@ -11,8 +11,8 @@ import (
 
 	"github.com/jeffail/tunny"
 
-	"github.com/TykTechnologies/dq"
 	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/dq"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
