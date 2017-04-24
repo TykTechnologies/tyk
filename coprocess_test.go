@@ -24,7 +24,7 @@ import (
 const baseMiddlewarePath = "middleware/python"
 
 var (
-	CoProcessName     = "test"
+	CoProcessName     = apidef.MiddlewareDriver("test")
 	MessageType       = coprocess.ProtobufMessage
 	testDispatcher, _ = NewCoProcessDispatcher()
 )

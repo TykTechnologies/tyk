@@ -83,7 +83,7 @@ import (
 )
 
 // CoProcessName specifies the driver name.
-const CoProcessName = "lua"
+const CoProcessName = apidef.LuaDriver
 
 const (
 	// ModuleBasePath points to the Tyk modules path.
