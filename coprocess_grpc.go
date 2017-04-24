@@ -18,7 +18,7 @@ import (
 )
 
 // CoProcessName specifies the driver name.
-const CoProcessName = "grpc"
+const CoProcessName = apidef.GrpcDriver
 
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage
