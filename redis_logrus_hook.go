@@ -7,15 +7,22 @@ import (
 )
 
 type redisChannelHook struct {
-	Notifier  RedisNotificationHandler
+	Notifier  Notifier
 	formatter logrus.Formatter
 }
 
 func NewRedisHook() *redisChannelHook {
 	hook := &redisChannelHook{}
 	hook.formatter = new(logrus.JSONFormatter)
-	hook.Notifier = RedisNotificationHandler{}
-	hook.Notifier.Start()
+
+	if config.PubSubMasterConnectionString == "" {
+		// TODO: Deprecate this
+		legacyNotifier := &RedisNotificationHandler{}
+		legacyNotifier.Start()
+		hook.Notifier = legacyNotifier
+	} else {
+		hook.Notifier = &TCFNotifier{channel: UIChanName}
+	}
 
 	return hook
 }

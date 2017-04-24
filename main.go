@@ -45,7 +45,6 @@ var (
 	GlobalEventsJSVM         = &JSVM{}
 	memProfFile              *os.File
 	Policies                 = map[string]Policy{}
-	MainNotifier             = RedisNotifier{}
 	DefaultOrgStore          = DefaultSessionManager{}
 	DefaultQuotaStore        = DefaultSessionManager{}
 	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
@@ -54,6 +53,7 @@ var (
 	argumentsBackup          map[string]interface{}
 	DashService              DashboardServiceSender
 
+	MainNotifier    Notifier
 	ApiSpecRegister map[string]*APISpec
 	keyGen          = DefaultKeyGenerator{}
 
@@ -172,7 +172,11 @@ func setupGlobals() {
 	}).Debug("Notifier will not work in hybrid mode")
 	mainNotifierStore := RedisClusterStorageManager{}
 	mainNotifierStore.Connect()
-	MainNotifier = RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
+	if config.PubSubMasterConnectionString == "" {
+		MainNotifier = &RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
+	} else {
+		MainNotifier = &TCFNotifier{channel: RedisPubSubChannel}
+	}
 
 	if config.Monitor.EnableTriggerMonitors {
 		var err error
@@ -1121,7 +1125,12 @@ func start(arguments map[string]interface{}) {
 
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
-		go startPubSubLoop()
+		if config.PubSubMasterConnectionString == "" {
+			go startPubSubLoop()
+		} else {
+			// Use Mangos
+			startSubscription()
+		}
 	}
 
 	if config.SlaveOptions.UseRPC {

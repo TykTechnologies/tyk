@@ -27,6 +27,10 @@ type Notification struct {
 	Signature string              `json:"signature"`
 }
 
+type Notifier interface {
+	Notify(notification interface{}) bool
+}
+
 // RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
 	store   *RedisClusterStorageManager
@@ -34,7 +38,13 @@ type RedisNotifier struct {
 }
 
 // Notify will send a notification to a channel
-func (r *RedisNotifier) Notify(notification Notification) bool {
+func (r *RedisNotifier) Notify(n interface{}) bool {
+	notification, ok := n.(Notification)
+	if !ok {
+		log.Error("Notifier requires Notification type")
+		return false
+	}
+
 	toSend, err := json.Marshal(notification)
 	if err != nil {
 		log.Error("Problem marshalling notification: ", err)

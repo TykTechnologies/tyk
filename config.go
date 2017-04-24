@@ -233,6 +233,8 @@ type Config struct {
 	UseDistributedQuotaCounter        bool                                  `bson:"use_distributed_counter" json:"use_distributed_counter"`
 	DistributedQuotaFlushIntervalInMS int                                   `bson:"distributed_quota_flush_interval_in_ms" json:"distributed_quota_flush_interval_in_ms"`
 	DQSetMaster                       bool                                  `bson:"distributed_quota_set_master" json:"distributed_quota_set_master"`
+	PubSubServerPort                  string                                `bson:"pubsub_server_port" json:"pubsub_server_port"`
+	PubSubMasterConnectionString      string                                `bson:"pubsub_master_connectionstring" json:"pubsub_master_connectionstring"`
 }
 
 type CertData struct {
