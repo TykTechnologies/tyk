@@ -3,6 +3,7 @@ package pubsub
 import (
 	"errors"
 	"fmt"
+
 	"github.com/TykTechnologies/tyk-cluster-framework/client"
 	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 	"github.com/TykTechnologies/tyk-cluster-framework/payloads"

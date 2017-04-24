@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk-cluster-framework/payloads"
 )
 
