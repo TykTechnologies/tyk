@@ -9,6 +9,7 @@ import (
 )
 
 func startSubscription() {
+	log.Info("=== TCF Starting PubSub Subscription ===")
 	if PubSubClient == nil {
 		log.Info("Starting pub/sub client")
 		// TODO: This must be set dynamically
@@ -19,7 +20,7 @@ func startSubscription() {
 		handleNotificationEvent(payload, nil, nil)
 	}); err != nil {
 		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
+			"prefix": "tcf-pub-sub",
 			"err":    err,
 		}).Error("Connection to Master pub/sub failed, reconnect in 10s")
 
@@ -29,8 +30,12 @@ func startSubscription() {
 		}).Warning("Reconnecting")
 
 		// TODO: This must be set dynamically
-		PubSubClient.Start(config.PubSubMasterConnectionString)
+		err := PubSubClient.Start(config.PubSubMasterConnectionString)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+	log.Info("=== TCF: Ready ===")
 }
 
 func handleNotificationEvent(v payloads.Payload, handled func(NotificationCommand), reloaded func()) {
@@ -39,6 +44,8 @@ func handleNotificationEvent(v payloads.Payload, handled func(NotificationComman
 		log.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
+
+	log.Info("TCF Notification: ", notif)
 
 	// Add messages to ignore here
 	switch notif.Command {

@@ -52,6 +52,7 @@ func (c *PSClient) Start(cs string) error {
 	if c.client != nil && c.isConnected {
 		err := c.Stop()
 		if err != nil {
+			c.isConnected = false
 			return err
 		}
 	}
@@ -59,12 +60,14 @@ func (c *PSClient) Start(cs string) error {
 	// Create a new client from scratch because we might be reconnecting
 	mc, err := client.NewClient(cs, encoding.JSON)
 	if err != nil {
+		c.isConnected = false
 		return err
 	}
 
 	c.client = mc
 	err = c.client.Connect()
 	if err != nil {
+		c.isConnected = false
 		return err
 	}
 
@@ -72,8 +75,9 @@ func (c *PSClient) Start(cs string) error {
 
 	// Initialise the subscriptions in case we are reconnecting
 	for t, h := range c.handlerPool {
+		fmt.Printf("SUBSCRIBING TO: %v\n", t)
 		_, err := c.client.Subscribe(t, h)
-		if err == nil {
+		if err != nil {
 			return err
 		}
 	}
@@ -102,9 +106,11 @@ func (c *PSClient) Subscribe(topic string, handler client.PayloadHandler) error 
 	// Add it to our pool for later and do the sub
 	c.handlerPool[topic] = handler
 	if c.isConnected {
+		fmt.Printf("[DIRECT] SUBSCRIBING TO: %v\n", topic)
 		// We are connected, so we should now actually do the sub
 		_, err := c.client.Subscribe(topic, handler)
 		if err != nil {
+			fmt.Printf("[DIRECT] Error: %v", err)
 			return err
 		}
 	}
