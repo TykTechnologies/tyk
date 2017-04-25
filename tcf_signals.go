@@ -9,7 +9,6 @@ import (
 )
 
 func startSubscription() {
-	log.Info("=== TCF Starting PubSub Subscription ===")
 	if PubSubClient == nil {
 		log.Info("Starting pub/sub client")
 		// TODO: This must be set dynamically
@@ -35,7 +34,6 @@ func startSubscription() {
 			log.Fatal(err)
 		}
 	}
-	log.Info("=== TCF: Ready ===")
 }
 
 func handleNotificationEvent(v payloads.Payload, handled func(NotificationCommand), reloaded func()) {
@@ -44,8 +42,6 @@ func handleNotificationEvent(v payloads.Payload, handled func(NotificationComman
 		log.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
-
-	log.Info("TCF Notification: ", notif)
 
 	// Add messages to ignore here
 	switch notif.Command {
