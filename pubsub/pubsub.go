@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 	"github.com/TykTechnologies/tyk-cluster-framework/payloads"
 	"github.com/TykTechnologies/tyk-cluster-framework/server"
+	"time"
 )
 
 // PSServer wraps a server instance
@@ -19,6 +20,7 @@ type PSServer struct {
 // that if a master change occurs, and a new connection pool is created, the handlers
 // are transitioned ot the new connection
 type PSClient struct {
+	cs string
 	client      client.Client
 	isConnected bool
 	handlerPool map[string]client.PayloadHandler
@@ -46,9 +48,16 @@ func NewPSServer(onPort string) (*PSServer, error) {
 	return &pss, nil
 }
 
+func (c *PSClient) onDisconnect() error {
+	fmt.Println("Disconnect detected! reconnecting...")
+	time.Sleep(10 * time.Second)
+	return c.Start(c.cs)
+}
+
 // Start will terminate any existing connections, and start a new client,
 // if there are already any message handlers that have been registered, it will re-create them.
 func (c *PSClient) Start(cs string) error {
+	c.cs = cs
 	if c.client != nil && c.isConnected {
 		err := c.Stop()
 		if err != nil {
@@ -58,7 +67,7 @@ func (c *PSClient) Start(cs string) error {
 	}
 
 	// Create a new client from scratch because we might be reconnecting
-	mc, err := client.NewClient(cs, encoding.JSON)
+	mc, err := client.NewClient(c.cs, encoding.JSON)
 	if err != nil {
 		c.isConnected = false
 		return err
@@ -73,14 +82,15 @@ func (c *PSClient) Start(cs string) error {
 
 	c.isConnected = true
 
+	// TODO we may not need this
 	// Initialise the subscriptions in case we are reconnecting
-	for t, h := range c.handlerPool {
-		fmt.Printf("SUBSCRIBING TO: %v\n", t)
-		_, err := c.client.Subscribe(t, h)
-		if err != nil {
-			return err
-		}
-	}
+	//for t, h := range c.handlerPool {
+	//	fmt.Printf("SUBSCRIBING TO: %v\n", t)
+	//	_, err := c.client.Subscribe(t, h)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 
 	return nil
 }
