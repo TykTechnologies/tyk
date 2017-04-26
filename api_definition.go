@@ -161,7 +161,7 @@ func (a *APIDefinitionLoader) MakeSpec(appConfig *apidef.APIDefinition) *APISpec
 	// Create and init the virtual Machine
 	if config.EnableJSVM {
 		newAppSpec.JSVM = &JSVM{}
-		newAppSpec.JSVM.Init(config.TykJSPath)
+		newAppSpec.JSVM.Init()
 	}
 
 	// Set up Event Handlers

@@ -89,7 +89,7 @@ func doLoadWithBackup(specs []*APISpec) {
 	}
 
 	// Reset the JSVM
-	GlobalEventsJSVM.Init(config.TykJSPath)
+	GlobalEventsJSVM.Init()
 	log.Warning("[RPC Backup] --> Initialised JSVM")
 
 	newRouter := mux.NewRouter()

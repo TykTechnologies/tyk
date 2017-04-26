@@ -226,12 +226,12 @@ type JSVM struct {
 }
 
 // Init creates the JSVM with the core library (tyk.js)
-func (j *JSVM) Init(coreJS string) {
+func (j *JSVM) Init() {
 	vm := otto.New()
-	coreJs, _ := ioutil.ReadFile(config.TykJSPath)
 
 	// Init TykJS namespace, constructors etc.
-	vm.Run(coreJs)
+	jscore, _ := ioutil.ReadFile(config.TykJSPath)
+	vm.Run(jscore)
 
 	j.VM = vm
 
