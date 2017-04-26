@@ -140,7 +140,7 @@ func setupGlobals() {
 
 	// Set up global JSVM
 	if config.EnableJSVM {
-		GlobalEventsJSVM.Init(config.TykJSPath)
+		GlobalEventsJSVM.Init()
 	}
 
 	if config.CoProcessOptions.EnableCoProcess {
@@ -714,7 +714,7 @@ func doReload() {
 
 	// Reset the JSVM
 	if config.EnableJSVM {
-		GlobalEventsJSVM.Init(config.TykJSPath)
+		GlobalEventsJSVM.Init()
 	}
 
 	log.WithFields(logrus.Fields{
