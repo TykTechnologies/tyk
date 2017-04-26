@@ -25,6 +25,8 @@ services:
   - redis-server
 
 install:
+  - go get github.com/TykTechnologies/dq
+  - go get github.com/TykTechnologies/tyk-cluster-framework/...
   - go install ./...
 
 script:
