@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/context"
@@ -283,14 +282,6 @@ func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Respo
 	// Close connections
 	if config.CloseConnections {
 		res.Header.Set("Connection", "close")
-	}
-
-	// Add resource headers
-	if ses != nil {
-		// We have found a session, lets report back
-		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
-		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
-		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)
