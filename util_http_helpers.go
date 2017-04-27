@@ -79,8 +79,8 @@ func RecordDetail(r *http.Request) bool {
 	}
 
 	// We are, so get session data
-	ses, found := context.GetOk(r, OrgSessionContext)
-	if !found {
+	ses := context.Get(r, OrgSessionContext)
+	if ses == nil {
 		// no session found, use global config
 		return config.AnalyticsConfig.EnableDetailedRecording
 	}

@@ -58,8 +58,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	if !k.Spec.EnableContextVars {
 		return
 	}
-	cnt, contextFound := context.GetOk(r, ContextData)
-	if contextFound {
+	if cnt := context.Get(r, ContextData); cnt != nil {
 		// Key data
 		contextDataObject := cnt.(map[string]interface{})
 		contextDataObject["token"] = token
