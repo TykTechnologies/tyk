@@ -105,7 +105,6 @@ func dqFlusher(d map[string]*dq.Quota) error {
 					continue
 				}
 
-
 				qr := int64(v.Max - v.Counter.Count())
 				if qr < 0 {
 					qr = 0
@@ -120,7 +119,6 @@ func dqFlusher(d map[string]*dq.Quota) error {
 					// We've performed a write on this SH now, lets tag that so we don't do it again
 					processedSpecs[spec.SessionManager] = struct{}{}
 				}
-
 
 			}
 		})
@@ -144,7 +142,7 @@ func startDQ(statusFunc GetLeaderStatusFunc) {
 	}
 
 	QuotaHandler = dq.NewDQ(dqFlusher, dqErrorHandler, NodeID)
-	broadcastTimer := time.Millisecond*100
+	broadcastTimer := time.Millisecond * 100
 	QuotaHandler.BroadcastWith(c1, broadcastTimer, getDQTopic())
 
 	// We always need a leader because otherwise we can;t persist data
