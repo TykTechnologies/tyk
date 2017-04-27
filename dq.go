@@ -144,7 +144,8 @@ func startDQ(statusFunc GetLeaderStatusFunc) {
 	}
 
 	QuotaHandler = dq.NewDQ(dqFlusher, dqErrorHandler, NodeID)
-	QuotaHandler.BroadcastWith(c1, time.Millisecond*100, getDQTopic())
+	broadcastTimer := time.Millisecond*100
+	QuotaHandler.BroadcastWith(c1, broadcastTimer, getDQTopic())
 
 	// We always need a leader because otherwise we can;t persist data
 	QuotaHandler.SetLeader(statusFunc())
@@ -160,8 +161,8 @@ func startDQ(statusFunc GetLeaderStatusFunc) {
 		log.Fatal(err)
 	}
 
-	// Give us time to catch up
-	time.Sleep(time.Millisecond * 100)
+	// Give us time to catch with the cluster
+	time.Sleep(broadcastTimer)
 }
 
 func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState, key string) bool {
