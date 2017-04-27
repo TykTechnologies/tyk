@@ -94,7 +94,6 @@ func dqFlusher(d map[string]*dq.Quota) error {
 					continue
 				}
 
-				skip := false
 				if time.Now().After(expT) {
 					QuotaHandler.TagDelete(k)
 					continue
