@@ -116,6 +116,9 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 							QuotaHandler.TagDelete(keyName)
 						}
 						apiSpec.SessionManager.ResetQuota(keyName, newSession)
+
+						// Update the maximum
+						newSession.QuotaRemaining = newSession.QuotaMax
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 					}
 

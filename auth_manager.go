@@ -102,6 +102,9 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 	// Fix the raw key
 	go b.Store.DeleteRawKey(rawKey)
 	//go b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+	if config.UseDistributedQuotaCounter {
+		QuotaHandler.TagDelete(keyName)
+	}
 }
 
 // UpdateSession updates the session state in the storage engine
