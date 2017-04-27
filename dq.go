@@ -73,7 +73,7 @@ func dqFlusher(d map[string]*dq.Quota) error {
 				// This will grab the session handler
 				spec := GetSpecForApi(apiID)
 				if spec == nil {
-					log.Warning("Can't find back-end for this API, skippingc")
+					log.Warning("Can't find back-end for this API, skipping")
 					break
 				}
 
@@ -97,31 +97,31 @@ func dqFlusher(d map[string]*dq.Quota) error {
 				skip := false
 				if time.Now().After(expT) {
 					QuotaHandler.TagDelete(k)
-					skip = true
+					continue
 				}
 
 				if s.IsExpired() {
 					// Remove expired data too
 					QuotaHandler.TagDelete(k)
-					skip = true
+					continue
 				}
 
-				if !skip {
-					qr := int64(v.Max - v.Counter.Count())
-					if qr < 0 {
-						qr = 0
-					}
 
-					// Only write on count difference
-					if qr != s.QuotaRemaining {
-						s.QuotaRemaining = qr
-						spec.SessionManager.UpdateSession(k, s, GetLifetime(&dummyAPISpec, &s))
-						// Since we've written the token, we don't need to re-do it at the end of the middleware chain
-						s.SetFirstSeenHash()
-						// We've performed a write on this SH now, lets tag that so we don't do it again
-						processedSpecs[spec.SessionManager] = struct{}{}
-					}
+				qr := int64(v.Max - v.Counter.Count())
+				if qr < 0 {
+					qr = 0
 				}
+
+				// Only write on count difference
+				if qr != s.QuotaRemaining {
+					s.QuotaRemaining = qr
+					spec.SessionManager.UpdateSession(k, s, GetLifetime(&dummyAPISpec, &s))
+					// Since we've written the token, we don't need to re-do it at the end of the middleware chain
+					s.SetFirstSeenHash()
+					// We've performed a write on this SH now, lets tag that so we don't do it again
+					processedSpecs[spec.SessionManager] = struct{}{}
+				}
+
 
 			}
 		})
@@ -137,7 +137,12 @@ func startDQ(statusFunc GetLeaderStatusFunc) {
 	}).Info("Using Distributed Quota")
 	p := strconv.Itoa(config.Storage.Port)
 	cs := fmt.Sprintf("redis://%v:%v", config.Storage.Host, p)
-	c1, _ := client.NewClient(cs, encoding.JSON)
+	c1, err := client.NewClient(cs, encoding.JSON)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "DQuota",
+		}).Error("Failed to create distributed quota client: ", err)
+	}
 
 	QuotaHandler = dq.NewDQ(dqFlusher, dqErrorHandler, NodeID)
 	QuotaHandler.BroadcastWith(c1, time.Millisecond*100, getDQTopic())

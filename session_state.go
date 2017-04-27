@@ -73,10 +73,7 @@ type SessionState struct {
 var murmurHasher = murmur3.New32()
 
 func (s *SessionState) IsExpired() bool {
-	if time.Now().After(time.Unix(s.Expires, 0)) {
-		return true
-	}
-	return false
+	return time.Now().After(time.Unix(s.Expires, 0))
 }
 
 func (s *SessionState) IsQuotaExpired() bool {

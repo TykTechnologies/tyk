@@ -102,7 +102,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	// If either are disabled, or the session has been modified, save the write roundtrip
 	if k.Spec.DisableRateLimit == false || k.Spec.DisableQuota == false {
-		// If we are using the distributed counter, we don;t need to write data here,
+		// If we are using the distributed counter, we don't need to write data here,
 		// the flusher will take care of it
 		if config.UseDistributedQuotaCounter == false {
 			// Ensure quota and rate data for this session are recorded
