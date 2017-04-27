@@ -20,7 +20,7 @@ type PSServer struct {
 // that if a master change occurs, and a new connection pool is created, the handlers
 // are transitioned ot the new connection
 type PSClient struct {
-	cs string
+	cs          string
 	client      client.Client
 	isConnected bool
 	handlerPool map[string]client.PayloadHandler

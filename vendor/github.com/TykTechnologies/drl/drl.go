@@ -132,7 +132,7 @@ func (d *DRL) AddOrUpdateServer(s Server) error {
 			return errors.New("DRL has no information on current host, waiting...")
 		}
 	}
-	
+
 	if d.serverIndex != nil {
 		d.serverIndex[d.uniqueID(s)] = s
 	}

@@ -15,8 +15,8 @@ const RedisClusterDefaultTimeout = 1
 var log = logrus.New()
 
 type RedisCluster struct {
-	SeedHosts        ConcurrentMap //map[string]bool
-	Handles          ConcurrentMap // map[string]*RedisHandle
+	SeedHosts        ConcurrentMap      //map[string]bool
+	Handles          ConcurrentMap      // map[string]*RedisHandle
 	Slots            iMap.ConcurrentMap //map[uint16]string
 	RefreshTableASAP bool
 	SingleRedisMode  bool
@@ -33,8 +33,8 @@ func NewRedisCluster(seed_redii []map[string]string, poolConfig PoolConfig, debu
 	cluster := RedisCluster{
 		RefreshTableASAP: false,
 		SingleRedisMode:  !poolConfig.IsCluster,
-		SeedHosts:        NewCmap(), //make(map[string]bool),
-		Handles:          NewCmap(), //make(map[string]*RedisHandle),
+		SeedHosts:        NewCmap(),  //make(map[string]bool),
+		Handles:          NewCmap(),  //make(map[string]*RedisHandle),
 		Slots:            iMap.New(), // make(map[uint16]string),
 		poolConfig:       poolConfig,
 		Debug:            debug,

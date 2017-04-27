@@ -1,8 +1,8 @@
 package xmlpath
 
 import (
-	"golang.org/x/net/html"
 	"encoding/xml"
+	"golang.org/x/net/html"
 	"io"
 	"strings"
 )
