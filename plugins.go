@@ -141,10 +141,45 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
 	vm := d.Spec.JSVM.VM.Copy()
+	vm.Interrupt = make(chan func(), 1)
 	log.WithFields(logrus.Fields{
 		"prefix": "jsvm",
 	}).Debug("Running: ", middlewareClassname)
-	returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+	ret := make(chan otto.Value)
+	go func() {
+		defer func() {
+			// the VM executes the panic func that gets it
+			// to stop, so we must recover here to not crash
+			// the whole Go program.
+			recover()
+			// send a dummy value to the ret channel to
+			// signal that we died, since a panic will mean
+			// the regular send won't happen.
+			ret <- otto.Value{}
+		}()
+		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+		ret <- returnRaw
+	}()
+	var returnRaw otto.Value
+	t := time.NewTimer(d.Spec.JSVM.Timeout)
+	select {
+	case returnRaw = <-ret:
+		t.Stop()
+	case <-t.C:
+		t.Stop()
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
+		vm.Interrupt <- func() {
+			// only way to stop the VM is to send it a func
+			// that panics.
+			panic("stop")
+		}
+		// wait for the vm goroutine to die, ensuring that we
+		// have no goroutine leak.
+		<-ret
+		return nil, 200
+	}
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
@@ -222,10 +257,12 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 // --- Utility functions during startup to ensure a sane VM is present for each API Def ----
 
 type JSVM struct {
-	VM *otto.Otto
+	VM      *otto.Otto
+	Timeout time.Duration
 }
 
-// Init creates the JSVM with the core library (tyk.js)
+// Init creates the JSVM with the core library (tyk.js) and sets up a
+// default timeout.
 func (j *JSVM) Init() {
 	vm := otto.New()
 
@@ -237,6 +274,8 @@ func (j *JSVM) Init() {
 
 	// Add environment API
 	j.LoadTykJSApi()
+
+	j.Timeout = 5 * time.Second
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
