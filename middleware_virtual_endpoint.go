@@ -50,33 +50,35 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 		log.Error("No JSVM loaded, cannot init methods")
 		return
 	}
-	if meta != nil {
-		if meta.FunctionSourceType == "file" {
-			js, err := ioutil.ReadFile(meta.FunctionSourceURI)
-			if err != nil {
-				log.Error("Failed to load Endpoint JS: ", err)
-			} else {
-				// No error, load the JS into the VM
-				log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
-				j.VM.Run(js)
-			}
-		} else if meta.FunctionSourceType == "blob" {
-			if config.DisableVirtualPathBlobs {
-				log.Error("[JSVM] Blobs not allowerd on this node")
-				return
-			}
-
-			js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
-			if err != nil {
-				log.Error("Failed to load blob JS: ", err)
-			} else {
-				// No error, load the JS into the VM
-				log.Debug("Loading JS blob")
-				j.VM.Run(js)
-			}
+	if meta == nil {
+		return
+	}
+	switch meta.FunctionSourceType {
+	case "file":
+		js, err := ioutil.ReadFile(meta.FunctionSourceURI)
+		if err != nil {
+			log.Error("Failed to load Endpoint JS: ", err)
 		} else {
-			log.Error("Type must be either file or blob (base64)!")
+			// No error, load the JS into the VM
+			log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+			j.VM.Run(js)
 		}
+	case "blob":
+		if config.DisableVirtualPathBlobs {
+			log.Error("[JSVM] Blobs not allowerd on this node")
+			return
+		}
+
+		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
+		if err != nil {
+			log.Error("Failed to load blob JS: ", err)
+		} else {
+			// No error, load the JS into the VM
+			log.Debug("Loading JS blob")
+			j.VM.Run(js)
+		}
+	default:
+		log.Error("Type must be either file or blob (base64)!")
 	}
 }
 

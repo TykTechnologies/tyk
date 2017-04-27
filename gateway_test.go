@@ -253,7 +253,6 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 		handler := SuccessHandler{&tm}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
-		return
 	})
 }
 

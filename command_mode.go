@@ -98,7 +98,6 @@ func handleBluePrintMode(arguments map[string]interface{}) {
 	}
 
 	printDef(def)
-	return
 }
 
 func printDef(def *apidef.APIDefinition) {

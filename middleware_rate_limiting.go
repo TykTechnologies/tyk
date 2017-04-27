@@ -104,14 +104,15 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	if !forwardMessage {
 		// TODO Use an Enum!
-		if reason == 1 {
+		switch reason {
+		case 1:
 			return k.handleRateLimitFailure(r, authHeaderValue)
-		} else if reason == 2 {
+		case 2:
 			return k.handleQuotaFailure(r, authHeaderValue)
+		default:
+			// Other reason? Still not allowed
+			return errors.New("Access denied"), 403
 		}
-
-		// Other reason? Still not allowed
-		return errors.New("Access denied"), 403
 	}
 	// Run the trigger monitor
 	if config.Monitor.MonitorUserKeys {
