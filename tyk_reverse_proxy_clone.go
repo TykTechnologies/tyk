@@ -215,19 +215,16 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		switchTargets := false
 
 		if spec.URLRewriteEnabled {
-			urlRewriteContainsTarget, found := context.GetOk(req, RetainHost)
-			if found {
-				if urlRewriteContainsTarget.(bool) {
-					log.Debug("Detected host rewrite, overriding target")
-					tmpTarget, err := url.Parse(req.URL.String())
-					if err != nil {
-						log.Error("Failed to parse URL! Err: ", err)
-					} else {
-						newTarget = tmpTarget
-						switchTargets = true
-					}
-					context.Clear(req)
+			if context.Get(req, RetainHost) == true {
+				log.Debug("Detected host rewrite, overriding target")
+				tmpTarget, err := url.Parse(req.URL.String())
+				if err != nil {
+					log.Error("Failed to parse URL! Err: ", err)
+				} else {
+					newTarget = tmpTarget
+					switchTargets = true
 				}
+				context.Clear(req)
 			}
 		}
 
@@ -448,12 +445,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// We need to double set the context for the outbound request to reprocess the target
 	if p.TykAPISpec.URLRewriteEnabled {
-		urlRewriteContainsTarget, found := context.GetOk(req, RetainHost)
-		if found {
-			if urlRewriteContainsTarget.(bool) {
-				log.Debug("Detected host rewrite, notifying director")
-				context.Set(outreq, RetainHost, true)
-			}
+		if context.Get(req, RetainHost) == true {
+			log.Debug("Detected host rewrite, notifying director")
+			context.Set(outreq, RetainHost, true)
 		}
 	}
 
@@ -532,9 +526,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if err != nil {
 
 		var authHeaderValue string
-		contextAuthVal, authOk := context.GetOk(req, AuthHeaderValue)
-		if authOk {
-			authHeaderValue = contextAuthVal.(string)
+		if authVal := context.Get(req, AuthHeaderValue); authVal != nil {
+			authHeaderValue = authVal.(string)
 		}
 
 		var obfuscated string

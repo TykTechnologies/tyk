@@ -51,16 +51,15 @@ func (t *TransformHeaders) IsEnabledForSpec() bool {
 // if the key and value contain a tyk session variable reference, then it will try to inject the value
 func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Request) {
 	// Get session data
-	ses, found := context.GetOk(r, SessionData)
-	cnt, contextFound := context.GetOk(r, ContextData)
 	var sessionState SessionState
-	var contextData map[string]interface{}
-
-	if found {
+	ses := context.Get(r, SessionData)
+	if ses != nil {
 		sessionState = ses.(SessionState)
 	}
 
-	if contextFound {
+	var contextData map[string]interface{}
+	cnt := context.Get(r, ContextData)
+	if cnt != nil {
 		contextData = cnt.(map[string]interface{})
 	}
 
@@ -68,7 +67,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 	for nKey, nVal := range kv {
 		if strings.Contains(nVal, metaLabel) {
 			// Using meta_data key
-			if found {
+			if ses != nil {
 				metaKey := strings.Replace(nVal, metaLabel, "", 1)
 				if sessionState.MetaData != nil {
 					tempVal, ok := sessionState.MetaData.(map[string]interface{})[metaKey]
@@ -86,7 +85,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 
 		} else if strings.Contains(nVal, contextLabel) {
 			// Using context key
-			if contextFound {
+			if cnt != nil {
 				metaKey := strings.Replace(nVal, contextLabel, "", 1)
 				if contextData != nil {
 					tempVal, ok := contextData[metaKey]

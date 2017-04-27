@@ -421,8 +421,7 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 	if !k.Spec.EnableContextVars {
 		return
 	}
-	cnt, contextFound := context.GetOk(r, ContextData)
-	if contextFound {
+	if cnt := context.Get(r, ContextData); cnt != nil {
 		contextDataObject := cnt.(map[string]interface{})
 		claimPrefix := "jwt_claims_"
 

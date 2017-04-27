@@ -30,9 +30,8 @@ func (k *KeyExpired) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	sess, ok := context.GetOk(r, SessionData)
-
-	if !ok {
+	sess := context.Get(r, SessionData)
+	if sess == nil {
 		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 403
 	}
 

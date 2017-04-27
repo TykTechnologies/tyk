@@ -58,9 +58,7 @@ func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContex
 	if useContext {
 		log.Debug("Using context")
 		var contextData map[string]interface{}
-		cnt, contextFound := context.GetOk(r, ContextData)
-
-		if contextFound {
+		if cnt := context.Get(r, ContextData); cnt != nil {
 			contextData = cnt.(map[string]interface{})
 		}
 
@@ -70,19 +68,14 @@ func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContex
 			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
 			log.Debug("Replacing: ", v[0])
 
-			if contextFound {
-				if val, ok := contextData[contextKey]; ok {
-					newpath = strings.Replace(newpath, v[0], valToStr(val), -1)
-				}
-
+			if val, ok := contextData[contextKey]; ok {
+				newpath = strings.Replace(newpath, v[0], valToStr(val), -1)
 			}
-
 		}
 	}
 
 	// Meta data from the token
-	sess, sessFound := context.GetOk(r, SessionData)
-	if sessFound {
+	if sess := context.Get(r, SessionData); sess != nil {
 		sessionState := sess.(SessionState)
 
 		metaDollarMatch := regexp.MustCompile(`\$tyk_meta.(\w+)`)

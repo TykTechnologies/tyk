@@ -166,8 +166,7 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 		return
 	}
 	// Flatten claims and add to context
-	cnt, contextFound := context.GetOk(r, ContextData)
-	if contextFound {
+	if cnt := context.Get(r, ContextData); cnt != nil {
 		// Key data
 		contextDataObject := cnt.(map[string]interface{})
 		contextDataObject["token"] = token

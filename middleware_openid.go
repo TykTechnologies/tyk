@@ -233,8 +233,8 @@ func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
 		return
 	}
 	// Flatten claims and add to context
-	cnt, contextFound := context.GetOk(r, ContextData)
-	if !contextFound {
+	cnt := context.Get(r, ContextData)
+	if cnt == nil {
 		return
 	}
 	contextDataObject := cnt.(map[string]interface{})

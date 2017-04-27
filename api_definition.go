@@ -1051,9 +1051,8 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 	var versionWLStatus bool
 
 	// try the context first
-	aVersion, foundInContext := context.GetOk(r, VersionData)
-
-	if foundInContext {
+	aVersion := context.Get(r, VersionData)
+	if aVersion != nil {
 		version = aVersion.(apidef.VersionInfo)
 		versionKey = context.Get(r, VersionKeyContext).(string)
 	} else {
