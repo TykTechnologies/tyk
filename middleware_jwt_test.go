@@ -54,7 +54,7 @@ const jwtWithJWKDef = `{
 		"key": "version"
 	},
 	"enable_jwt": true,
-	"jwt_source": "http://keyserver.tyk.io/test_jwk.json",
+	"jwt_source": "` + testHttpJWK + `",
 	"jwt_signing_method": "RSA",
 	"jwt_identity_base_field": "user_id",
 	"jwt_policy_field_name": "policy_id",
