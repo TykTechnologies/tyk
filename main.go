@@ -263,7 +263,8 @@ func getPolicies() {
 		"prefix": "main",
 	}).Info("Loading policies")
 
-	if config.Policies.PolicySource == "service" {
+	switch config.Policies.PolicySource {
+	case "service":
 		if config.Policies.PolicyConnectionString != "" {
 			connStr := config.Policies.PolicyConnectionString
 			connStr = connStr + "/system/policies"
@@ -280,12 +281,12 @@ func getPolicies() {
 			}).Fatal("No connection string or node ID present. Failing.")
 		}
 
-	} else if config.Policies.PolicySource == "rpc" {
+	case "rpc":
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using Policies from RPC")
 		pols = LoadPoliciesFromRPC(config.SlaveOptions.RPCKey)
-	} else {
+	default:
 		// this is the only case now where we need a policy record name
 		if config.Policies.PolicyRecordName == "" {
 			log.WithFields(logrus.Fields{
@@ -298,7 +299,6 @@ func getPolicies() {
 
 	if len(pols) > 0 {
 		Policies = pols
-		return
 	}
 }
 

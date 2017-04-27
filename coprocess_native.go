@@ -33,9 +33,10 @@ import (
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 
 	var objectMsg []byte
-	if MessageType == coprocess.ProtobufMessage {
+	switch MessageType {
+	case coprocess.ProtobufMessage:
 		objectMsg, _ = proto.Marshal(object)
-	} else if MessageType == coprocess.JsonMessage {
+	case coprocess.JsonMessage:
 		objectMsg, _ = json.Marshal(object)
 	}
 
@@ -53,9 +54,10 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 
 	newObject := &coprocess.Object{}
 
-	if MessageType == coprocess.ProtobufMessage {
+	switch MessageType {
+	case coprocess.ProtobufMessage:
 		proto.Unmarshal(newObjectBytes, newObject)
-	} else if MessageType == coprocess.JsonMessage {
+	case coprocess.JsonMessage:
 		json.Unmarshal(newObjectBytes, newObject)
 	}
 
