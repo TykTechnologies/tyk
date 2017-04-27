@@ -18,6 +18,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
 	jsvm := &JSVM{}
 	jsvm.Init()
+	jsvm.Timeout = time.Millisecond
 
 	// this js plugin just loops forever, keeping Otto at 100% CPU
 	// usage and running forever.
