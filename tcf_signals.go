@@ -10,8 +10,6 @@ import (
 
 func startSubscription() {
 	if PubSubClient == nil {
-		log.Info("Starting pub/sub client")
-		// TODO: This must be set dynamically
 		StartGlobalClient(config.PubSubMasterConnectionString)
 	}
 
@@ -28,7 +26,6 @@ func startSubscription() {
 			"prefix": "pub-sub",
 		}).Warning("Reconnecting")
 
-		// TODO: This must be set dynamically
 		err := PubSubClient.Start(config.PubSubMasterConnectionString)
 		if err != nil {
 			log.Fatal(err)
