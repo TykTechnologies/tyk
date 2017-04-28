@@ -487,17 +487,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	var ip string
-	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-		// If we aren't the first proxy retain prior
-		// X-Forwarded-For information as a comma+space
-		// separated list and fold multiple headers into one.
-		if prior, ok := outreq.Header["X-Forwarded-For"]; ok {
-			clientIP = strings.Join(prior, ", ") + ", " + clientIP
-		}
-		outreq.Header.Set("X-Forwarded-For", clientIP)
-		ip = clientIP
-	}
+	addrs := requestAddrs(req)
+	outreq.Header.Set("X-Forwarded-For", addrs)
 
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
@@ -542,7 +533,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		log.WithFields(logrus.Fields{
 			"prefix":      "proxy",
-			"user_ip":     ip,
+			"user_ip":     addrs,
 			"server_name": outreq.Host,
 			"user_id":     obfuscated,
 			"user_name":   alias,
