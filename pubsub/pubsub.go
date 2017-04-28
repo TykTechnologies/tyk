@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	"time"
+
 	"github.com/TykTechnologies/tyk-cluster-framework/client"
 	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 	"github.com/TykTechnologies/tyk-cluster-framework/payloads"
 	"github.com/TykTechnologies/tyk-cluster-framework/server"
-	"time"
 )
 
 // PSServer wraps a server instance
