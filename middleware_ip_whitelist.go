@@ -53,8 +53,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 			allowedIP = net.ParseIP(ip)
 		}
 
-		splitIP := strings.Split(r.RemoteAddr, ":")
-		remoteIPString := splitIP[0]
+		remoteIPString := r.RemoteAddr
 
 		// If X-Forwarded-For is set, override remoteIPString
 		forwarded := r.Header.Get("X-Forwarded-For")
@@ -64,9 +63,9 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 			log.Info("X-Forwarded-For set, remote IP: ", remoteIPString)
 		}
 
-		if len(splitIP) > 2 {
-			// Might be an IPv6 address, don't mess with it
-			remoteIPString = r.RemoteAddr
+		splitIP := strings.Split(r.RemoteAddr, ":")
+		if len(splitIP) == 2 {
+			remoteIPString = splitIP[0]
 		}
 		remoteIP = net.ParseIP(remoteIPString)
 
