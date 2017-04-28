@@ -28,6 +28,17 @@ func GetIPFromRequest(r *http.Request) string {
 	return host
 }
 
+func requestAddrs(r *http.Request) string {
+	addrs := r.RemoteAddr
+	// If we aren't the first proxy retain prior
+	// X-Forwarded-For information as a comma+space
+	// separated list and fold multiple headers into one.
+	if prior, ok := r.Header["X-Forwarded-For"]; ok {
+		addrs = strings.Join(prior, ", ") + ", " + addrs
+	}
+	return addrs
+}
+
 func CopyHttpRequest(r *http.Request) *http.Request {
 	reqCopy := new(http.Request)
 	*reqCopy = *r

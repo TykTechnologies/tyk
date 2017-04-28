@@ -1203,7 +1203,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				"org_id":      newSession.OrgID,
 				"api_id":      "--",
 				"user_id":     "system",
-				"user_ip":     GetIPFromRequest(r),
+				"user_ip":     requestAddrs(r),
 				"path":        "--",
 				"server_name": "system",
 			}).Warning("No API Access Rights set on key session, adding key to all APIs.")
@@ -1230,7 +1230,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				"org_id":      newSession.OrgID,
 				"api_id":      "--",
 				"user_id":     "system",
-				"user_ip":     GetIPFromRequest(r),
+				"user_ip":     requestAddrs(r),
 				"path":        "--",
 				"server_name": "system",
 			}).Error("Master keys disallowed in configuration, key not added.")
@@ -1256,7 +1256,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			"org_id":      newSession.OrgID,
 			"api_id":      "--",
 			"user_id":     "system",
-			"user_ip":     GetIPFromRequest(r),
+			"user_ip":     requestAddrs(r),
 			"path":        "--",
 			"server_name": "system",
 		}).Error("System error, failed to generate key.")
@@ -1281,7 +1281,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		"api_id":      "--",
 		"org_id":      newSession.OrgID,
 		"user_id":     "system",
-		"user_ip":     GetIPFromRequest(r),
+		"user_ip":     requestAddrs(r),
 		"path":        "--",
 		"server_name": "system",
 	}).Info("Generated new key: (", ObfuscateKeyString(newKey), ")")
@@ -1787,7 +1787,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 			"err":         err,
 			"org_id":      orgid,
 			"user_id":     "system",
-			"user_ip":     GetIPFromRequest(r),
+			"user_ip":     requestAddrs(r),
 			"path":        "--",
 			"server_name": "system",
 		}).Error("Failed to delete cache: ", err)
@@ -1804,7 +1804,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 		"org_id":      orgid,
 		"api_id":      apiID,
 		"user_id":     "system",
-		"user_ip":     GetIPFromRequest(r),
+		"user_ip":     requestAddrs(r),
 		"path":        "--",
 		"server_name": "system",
 	}).Info("Cache invalidated successfully")
