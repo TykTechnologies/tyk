@@ -768,7 +768,6 @@ func TestDistributedQuotaSingleNode(t *testing.T) {
 	config.DQSetMaster = true
 	config.UseDistributedQuotaCounter = true
 	config.DistributedQuotaFlushIntervalInMS = 100
-
 	defer func(){
 		config.DQSetMaster = false
 		config.UseDistributedQuotaCounter = false
