@@ -190,7 +190,7 @@ func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	supportedDrivers := []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
 
 	for _, driver := range supportedDrivers {
-		if m.TykMiddleware.Spec.CustomMiddleware.Driver == driver && CoProcessName == string(driver) {
+		if m.TykMiddleware.Spec.CustomMiddleware.Driver == driver && CoProcessName == driver {
 			usesCoProcessMiddleware = true
 			break
 		}

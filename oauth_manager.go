@@ -157,8 +157,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 		// Extract client data and check
 		resp := o.Manager.HandleAuthorisation(r, false, "")
 		if resp.IsError {
-			log.Error("There was an error with the request")
-			log.Error(resp)
+			log.Error("There was an error with the request: ", resp)
 			// Something went wrong, write out the error details and kill the response
 			w.WriteHeader(resp.ErrorStatusCode)
 			responseMessage = createError(resp.StatusText)
@@ -552,7 +551,6 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	}
 
 	theseClients := []osin.Client{}
-
 	for _, clientJSON := range clientJSON {
 		client := new(OAuthClient)
 		if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
@@ -770,10 +768,9 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 	// new interface means having to make this nested... ick.
 	accessData := osin.AccessData{}
 	accessData.Client = new(OAuthClient)
-
 	if err := json.Unmarshal([]byte(accessJSON), &accessData); err != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err)
-		log.Error("Decoding:", accessJSON)
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
+			"; Decoding: ", accessJSON)
 		return nil, err
 	}
 
@@ -837,10 +834,9 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, err
 
 	// new interface means having to make this nested... ick.
 	session := SessionState{}
-
 	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
-		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err)
-		log.Error("Decoding:", accessJSON)
+		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
+			"; Decoding: ", accessJSON)
 		return nil, err
 	}
 

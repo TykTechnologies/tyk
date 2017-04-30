@@ -29,7 +29,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/gorpc"
-	osin "github.com/lonelycode/osin"
+	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"rsc.io/letsencrypt"
 

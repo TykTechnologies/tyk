@@ -182,7 +182,7 @@ import (
 )
 
 // CoProcessName declares the driver name.
-const CoProcessName = "python"
+const CoProcessName = apidef.PythonDriver
 
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage
