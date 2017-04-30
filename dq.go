@@ -27,7 +27,11 @@ func getDQTopic() string {
 	if config.DBAppConfOptions.NodeIsSegmented {
 		if len(config.DBAppConfOptions.Tags) > 0 {
 			tags := strings.Join(config.DBAppConfOptions.Tags, ".")
+<<<<<<< HEAD
 			topic += "." + tags
+=======
+			topic = topic + "." + tags
+>>>>>>> 0aa83273284dc7754eb1e00913df4b54c2a17439
 		}
 	}
 

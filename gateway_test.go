@@ -758,6 +758,7 @@ func TestDistributedQuotaSingleNode(t *testing.T) {
 	defer spec.SessionManager.ResetQuota(keyId, session)
 
 	recorder := httptest.NewRecorder()
+
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		t.Fatal(err)
