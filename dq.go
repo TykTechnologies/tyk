@@ -27,7 +27,7 @@ func getDQTopic() string {
 	if config.DBAppConfOptions.NodeIsSegmented {
 		if len(config.DBAppConfOptions.Tags) > 0 {
 			tags := strings.Join(config.DBAppConfOptions.Tags, ".")
-			topic = topic + "." + tags
+			topic += "." + tags
 		}
 	}
 
@@ -94,13 +94,7 @@ func dqFlusher(d map[string]*dq.Quota) error {
 					continue
 				}
 
-				if time.Now().After(expT) {
-					QuotaHandler.TagDelete(k)
-					continue
-				}
-
-				if s.IsExpired() {
-					// Remove expired data too
+				if !f || time.Now().After(expT) || s.IsExpired() {
 					QuotaHandler.TagDelete(k)
 					continue
 				}

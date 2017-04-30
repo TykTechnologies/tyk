@@ -758,8 +758,7 @@ func TestDistributedQuotaSingleNode(t *testing.T) {
 	defer spec.SessionManager.ResetQuota(keyId, session)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", param.Encode(), nil)
+	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -768,6 +767,12 @@ func TestDistributedQuotaSingleNode(t *testing.T) {
 	config.DQSetMaster = true
 	config.UseDistributedQuotaCounter = true
 	config.DistributedQuotaFlushIntervalInMS = 100
+
+	defer func(){
+		config.DQSetMaster = false
+		config.UseDistributedQuotaCounter = false
+		config.DistributedQuotaFlushIntervalInMS = 0
+	}()
 
 	startDQ(decideLeaderMechanism())
 
