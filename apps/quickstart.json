@@ -27,7 +27,7 @@
     },
     "proxy": {
         "listen_path": "/quickstart/",
-        "target_url": "http://httpbisdadsdn.org/",
+        "target_url": "http://httpbin.org/",
         "strip_listen_path": true
     },
     "do_not_track": true
