@@ -538,6 +538,13 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
+	hostname := config.HostName
+	if hostname != "" {
+		muxer = muxer.Host(hostname).Subrouter()
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("API hostname set: ", hostname)
+	}
 	ListenPathMap = cmap.New()
 	// load the APi defs
 	log.WithFields(logrus.Fields{
