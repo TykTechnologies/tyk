@@ -127,7 +127,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 
-				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(apiSpec, &newSession))
+				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, getLifetime(apiSpec, &newSession))
 				if err != nil {
 					return err
 				}
@@ -146,7 +146,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
 			checkAndApplyTrialPeriod(keyName, spec.APIID, &newSession)
-			err := spec.SessionManager.UpdateSession(keyName, newSession, GetLifetime(spec, &newSession))
+			err := spec.SessionManager.UpdateSession(keyName, newSession, getLifetime(spec, &newSession))
 			if err != nil {
 				return err
 			}
@@ -1175,7 +1175,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					apiSpec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(apiSpec, &newSession))
+				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, getLifetime(apiSpec, &newSession))
 				if err != nil {
 					responseMessage := createError("Failed to create key - " + err.Error())
 					doJSONWrite(w, 403, responseMessage)
@@ -1215,7 +1215,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					spec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := spec.SessionManager.UpdateSession(newKey, newSession, GetLifetime(spec, &newSession))
+				err := spec.SessionManager.UpdateSession(newKey, newSession, getLifetime(spec, &newSession))
 				if err != nil {
 					responseMessage := createError("Failed to create key - " + err.Error())
 					doJSONWrite(w, 403, responseMessage)
@@ -1815,7 +1815,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 func handleInvalidateAPICache(apiID string) error {
 	keyPrefix := "cache-" + strings.Replace(apiID, "/", "", -1)
 	matchPattern := keyPrefix + "*"
-	store := GetGlobalLocalCacheStorageHandler(keyPrefix, false)
+	store := getGlobalLocalCacheStorageHandler(keyPrefix, false)
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		return errors.New("scan/delete failed")

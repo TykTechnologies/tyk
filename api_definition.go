@@ -331,7 +331,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
 	//store.Disconnect()
 
 	if RPC_LoadCount > 0 {
-		SaveRPCDefinitionsBackup(apiCollection)
+		saveRPCDefinitionsBackup(apiCollection)
 	}
 
 	return a.processRPCDefinitions(apiCollection)
@@ -960,7 +960,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.Header.Get(a.APIDefinition.VersionDefinition.Key)
 
 	case "url-param":
-		tempRes := CopyRequest(r)
+		tempRes := copyRequest(r)
 		return tempRes.FormValue(a.APIDefinition.VersionDefinition.Key)
 
 	case "url":

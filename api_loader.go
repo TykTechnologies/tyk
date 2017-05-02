@@ -624,8 +624,8 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 
 	if config.SlaveOptions.UseRPC {
 		//log.Warning("TODO: PUT THE KEEPALIVE WATCHER BACK")
-		StartRPCKeepaliveWatcher(rpcAuthStore)
-		StartRPCKeepaliveWatcher(rpcOrgStore)
+		startRPCKeepaliveWatcher(rpcAuthStore)
+		startRPCKeepaliveWatcher(rpcOrgStore)
 	}
 
 }

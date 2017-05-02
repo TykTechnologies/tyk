@@ -89,7 +89,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.GetStore(), false, false)
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, sessionState, GetLifetime(k.Spec, &sessionState))
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, sessionState, getLifetime(k.Spec, &sessionState))
 
 	if !forwardMessage {
 		if reason == 2 {
@@ -191,7 +191,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	// We found a session, apply the quota limiter
 	isQuotaExceeded := k.sessionlimiter.IsRedisQuotaExceeded(&sessionState, k.Spec.OrgID, k.Spec.OrgSessionManager.GetStore())
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, sessionState, GetLifetime(k.Spec, &sessionState))
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, sessionState, getLifetime(k.Spec, &sessionState))
 
 	if isQuotaExceeded {
 		log.WithFields(logrus.Fields{

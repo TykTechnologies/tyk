@@ -59,7 +59,7 @@ var (
 var RPCCLientRWMutex = sync.RWMutex{}
 var RPCClients = map[string]chan int{}
 
-func RPCKeepAliveCheck(r *RPCStorageHandler) {
+func rpcKeepAliveCheck(r *RPCStorageHandler) {
 	// Only run when connected
 	if RPCClientIsConnected {
 		// Make sure the auth back end is still alive
@@ -153,7 +153,7 @@ func (r *RPCStorageHandler) Connect() bool {
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
 	RPCCLientSingleton.Conns = 50
 	RPCCLientSingleton.Start()
-	d := GetDispatcher()
+	d := getDispatcher()
 
 	if RPCFuncClientSingleton == nil {
 		RPCFuncClientSingleton = d.NewFuncClient(RPCCLientSingleton)
@@ -726,7 +726,7 @@ func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
 	return false
 }
 
-func GetDispatcher() *gorpc.Dispatcher {
+func getDispatcher() *gorpc.Dispatcher {
 	dispatch := gorpc.NewDispatcher()
 
 	dispatch.AddFunc("Login", func(clientAddr, userKey string) bool {

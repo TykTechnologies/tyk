@@ -26,7 +26,7 @@ func getTagListAsString() string {
 	return tagList
 }
 
-func SaveRPCDefinitionsBackup(list string) {
+func saveRPCDefinitionsBackup(list string) {
 	log.Info("Storing RPC backup")
 	tagList := getTagListAsString()
 

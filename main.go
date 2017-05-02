@@ -370,7 +370,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager
 	serverConfig.RedirectUriSeparator = config.OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
-	storageManager := GetGlobalStorageHandler(prefix, false)
+	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
 
@@ -767,7 +767,7 @@ func setupLogger() {
 	}
 
 	if config.UseRedisLog {
-		redisHook := NewRedisHook()
+		redisHook := newRedisHook()
 		log.Hooks.Add(redisHook)
 
 		log.WithFields(logrus.Fields{
@@ -917,7 +917,7 @@ func getCmdArguments() map[string]interface{} {
 
 var KeepaliveRunning bool
 
-func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
+func startRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 	if KeepaliveRunning {
 		return
 	}
@@ -928,7 +928,7 @@ func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 		}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 		for {
 			KeepaliveRunning = true
-			RPCKeepAliveCheck(engine)
+			rpcKeepAliveCheck(engine)
 			if engine == nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "RPC Conn Mgr",
@@ -947,15 +947,15 @@ func StartRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 	}()
 }
 
-func GetGlobalLocalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
+func getGlobalLocalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
 	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
-func GetGlobalLocalCacheStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
+func getGlobalLocalCacheStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
 	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys, IsCache: true}
 }
 
-func GetGlobalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
+func getGlobalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
 	if config.SlaveOptions.UseRPC {
 		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
 	}
@@ -1091,9 +1091,9 @@ func start(arguments map[string]interface{}) {
 			"prefix": "main",
 		}).Debug("Initialising default org store")
 		//DefaultOrgStore.Init(&RedisClusterStorageManager{KeyPrefix: "orgkey."})
-		DefaultOrgStore.Init(GetGlobalStorageHandler("orgkey.", false))
-		//DefaultQuotaStore.Init(GetGlobalStorageHandler(CloudHandler, "orgkey.", false))
-		DefaultQuotaStore.Init(GetGlobalStorageHandler("orgkey.", false))
+		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
+		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
+		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
 	if config.ControlAPIPort == 0 {

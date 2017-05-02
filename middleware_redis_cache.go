@@ -65,7 +65,7 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string)
 	return m.Spec.APIDefinition.APIID + keyName + reqChecksum
 }
 
-func GetIP(ip string) (string, error) {
+func getIP(ip string) (string, error) {
 	ipWithoutPort := strings.Split(ip, ":")
 
 	if len(ipWithoutPort) > 1 {
@@ -164,7 +164,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// No authentication data? use the IP.
 	if authVal == nil {
 		var err error
-		if authHeaderValue, err = GetIP(GetIPFromRequest(r)); err != nil {
+		if authHeaderValue, err = getIP(GetIPFromRequest(r)); err != nil {
 			log.Error(err)
 			return nil, 200
 		}

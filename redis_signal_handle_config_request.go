@@ -23,7 +23,7 @@ type ReturnConfigPayload struct {
 
 type MicroConfig map[string]interface{}
 
-func SanitizeConfig(mc MicroConfig) MicroConfig {
+func sanitizeConfig(mc MicroConfig) MicroConfig {
 
 	sanitzeFields := []string{
 		"secret",
@@ -40,7 +40,7 @@ func SanitizeConfig(mc MicroConfig) MicroConfig {
 	return mc
 }
 
-func GetExistingConfig() (MicroConfig, error) {
+func getExistingConfig() (MicroConfig, error) {
 	value := argumentsBackup["--conf"]
 	microConfig := MicroConfig{}
 
@@ -63,7 +63,7 @@ func GetExistingConfig() (MicroConfig, error) {
 	if err := json.Unmarshal(dat, &microConfig); err != nil {
 		return microConfig, err
 	}
-	return SanitizeConfig(microConfig), nil
+	return sanitizeConfig(microConfig), nil
 }
 
 func handleSendMiniConfig(payload string) {
@@ -85,7 +85,7 @@ func handleSendMiniConfig(payload string) {
 		return
 	}
 
-	config, err := GetExistingConfig()
+	config, err := getExistingConfig()
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",

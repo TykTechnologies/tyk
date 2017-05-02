@@ -235,7 +235,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the sesison data (if modified)
 	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
 		sessionState.MetaData = newRequestData.SessionMeta
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, GetLifetime(d.Spec, &sessionState))
+		d.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, getLifetime(d.Spec, &sessionState))
 	}
 
 	log.WithFields(logrus.Fields{

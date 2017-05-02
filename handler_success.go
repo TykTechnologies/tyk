@@ -141,7 +141,7 @@ func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 	session.Tags = policy.Tags
 
 	// Update the session in the session manager in case it gets called again
-	t.Spec.SessionManager.UpdateSession(key, *session, GetLifetime(t.Spec, session))
+	t.Spec.SessionManager.UpdateSession(key, *session, getLifetime(t.Spec, session))
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
@@ -187,10 +187,10 @@ func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		t.ApplyPolicyIfExists(key, &session)
 
-		log.Debug("Lifetime is: ", GetLifetime(t.Spec, &session))
+		log.Debug("Lifetime is: ", getLifetime(t.Spec, &session))
 		// Need to set this in order for the write to work!
 		session.LastUpdated = time.Now().String()
-		t.Spec.SessionManager.UpdateSession(key, session, GetLifetime(t.Spec, &session))
+		t.Spec.SessionManager.UpdateSession(key, session, getLifetime(t.Spec, &session))
 	}
 
 	return session, found

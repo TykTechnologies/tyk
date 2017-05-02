@@ -16,7 +16,7 @@ type ConfigPayload struct {
 	TimeStamp     int64
 }
 
-func BackupConfiguration() error {
+func backupConfiguration() error {
 	oldConfig, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func BackupConfiguration() error {
 	return nil
 }
 
-func WriteNewConfiguration(payload ConfigPayload) error {
+func writeNewConfiguration(payload ConfigPayload) error {
 	newConfig, err := json.MarshalIndent(payload.Configuration, "", "    ")
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func WriteNewConfiguration(payload ConfigPayload) error {
 	return nil
 }
 
-func GetExistingRawConfig() Config {
+func getExistingRawConfig() Config {
 	filename := "tyk.conf"
 	if conf := argumentsBackup["--conf"]; conf != nil {
 		log.WithFields(logrus.Fields{
@@ -76,7 +76,7 @@ func handleNewConfiguration(payload string) {
 
 	// We actually want to merge into the existing configuration
 	// so as not to lose data through automatic defaults
-	configPayload.Configuration = GetExistingRawConfig()
+	configPayload.Configuration = getExistingRawConfig()
 
 	err := json.Unmarshal([]byte(payload), &configPayload)
 	if err != nil {
@@ -101,14 +101,14 @@ func handleNewConfiguration(payload string) {
 		return
 	}
 
-	if err := BackupConfiguration(); err != nil {
+	if err := backupConfiguration(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Error("Failed to backup existing configuration: ", err)
 		return
 	}
 
-	if err := WriteNewConfiguration(configPayload); err != nil {
+	if err := writeNewConfiguration(configPayload); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Error("Failed to write new configuration: ", err)
@@ -119,10 +119,10 @@ func handleNewConfiguration(payload string) {
 		"prefix": "pub-sub",
 	}).Info("Initiating configuration reload")
 
-	ReloadConfiguration()
+	reloadConfiguration()
 }
 
-func ReloadConfiguration() {
+func reloadConfiguration() {
 	myPID := HostDetails.PID
 	if myPID == 0 {
 		log.Error("No PID found, cannot reload")

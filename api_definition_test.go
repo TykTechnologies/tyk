@@ -411,7 +411,7 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	RPCCLientSingleton.Conns = 1
 	RPCCLientSingleton.Start()
 	RPCClientIsConnected = true
-	RPCFuncClientSingleton = GetDispatcher().NewFuncClient(RPCCLientSingleton)
+	RPCFuncClientSingleton = getDispatcher().NewFuncClient(RPCCLientSingleton)
 
 	return server
 }
