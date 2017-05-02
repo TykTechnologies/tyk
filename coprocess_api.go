@@ -35,7 +35,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
 
-	storageHandler := GetGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
+	storageHandler := getGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
 	storageHandler.SetKey(key, value, ttl)
 }
 
@@ -44,7 +44,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
-	storageHandler := GetGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
+	storageHandler := getGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
 	// TODO: return error
 	val, _ := storageHandler.GetKey(key)
 	return C.CString(val)

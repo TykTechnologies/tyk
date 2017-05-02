@@ -199,7 +199,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		sessionState.Alias = clientID + ":" + user.ID
 
 		// Update the session in the session manager in case it gets called again
-		k.Spec.SessionManager.UpdateSession(sessionID, sessionState, GetLifetime(k.Spec, &sessionState))
+		k.Spec.SessionManager.UpdateSession(sessionID, sessionState, getLifetime(k.Spec, &sessionState))
 		log.Debug("Policy applied to key")
 
 	}

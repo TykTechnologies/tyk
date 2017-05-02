@@ -45,7 +45,7 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 
 // PostProcess sets context variables and updates the storage.
 func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, sessionID string) {
-	sessionLifetime := GetLifetime(e.Spec, &sessionState)
+	sessionLifetime := getLifetime(e.Spec, &sessionState)
 	e.Spec.SessionManager.UpdateSession(sessionID, sessionState, sessionLifetime)
 
 	context.Set(r, SessionData, sessionState)

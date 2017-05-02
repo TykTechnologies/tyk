@@ -365,7 +365,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				keyName := o.API.OrgID + username
 
 				log.Debug("Updating user:", keyName)
-				err := o.API.SessionManager.UpdateSession(keyName, *sessionState, GetLifetime(o.API, sessionState))
+				err := o.API.SessionManager.UpdateSession(keyName, *sessionState, getLifetime(o.API, sessionState))
 				if err != nil {
 					log.Error(err)
 				}

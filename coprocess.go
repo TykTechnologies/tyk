@@ -298,7 +298,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		returnedSessionState := TykSessionState(returnObject.Session)
 
 		if extractor == nil {
-			sessionLifetime := GetLifetime(m.Spec, &returnedSessionState)
+			sessionLifetime := getLifetime(m.Spec, &returnedSessionState)
 			// This API is not using the ID extractor, but we've got a session:
 			m.Spec.SessionManager.UpdateSession(authHeaderValue, returnedSessionState, sessionLifetime)
 			context.Set(r, SessionData, returnedSessionState)

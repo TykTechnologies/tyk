@@ -251,7 +251,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			sessionState.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again
-			k.Spec.SessionManager.UpdateSession(sessionID, sessionState, GetLifetime(k.Spec, &sessionState))
+			k.Spec.SessionManager.UpdateSession(sessionID, sessionState, getLifetime(k.Spec, &sessionState))
 			log.Debug("Policy applied to key")
 
 			switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
@@ -315,14 +315,14 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 	// Get the token
 	rawJWT := r.Header.Get(config.AuthHeaderName)
 	if config.UseParam {
-		tempRes := CopyRequest(r)
+		tempRes := copyRequest(r)
 
 		// Set hte header name
 		rawJWT = tempRes.FormValue(config.AuthHeaderName)
 	}
 
 	if config.UseCookie {
-		tempRes := CopyRequest(r)
+		tempRes := copyRequest(r)
 		authCookie, err := tempRes.Cookie(config.AuthHeaderName)
 		if err != nil {
 			rawJWT = ""

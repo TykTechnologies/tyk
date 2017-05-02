@@ -33,7 +33,7 @@ func (k *AuthKey) GetConfig() (interface{}, error) {
 
 func (k *AuthKey) IsEnabledForSpec() bool { return true }
 
-func CopyRequest(r *http.Request) *http.Request {
+func copyRequest(r *http.Request) *http.Request {
 	tempRes := new(http.Request)
 	*tempRes = *r
 
@@ -79,7 +79,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 			paramName = config.AuthHeaderName
 		}
 
-		tempRes = CopyRequest(r)
+		tempRes = copyRequest(r)
 		paramValue := tempRes.FormValue(paramName)
 
 		// Only use the paramValue if it has an actual value
@@ -94,7 +94,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 			cookieName = config.AuthHeaderName
 		}
 		if tempRes == nil {
-			tempRes = CopyRequest(r)
+			tempRes = copyRequest(r)
 		}
 
 		authCookie, err := tempRes.Cookie(cookieName)
