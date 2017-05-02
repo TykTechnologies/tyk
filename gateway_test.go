@@ -750,6 +750,50 @@ func TestQuota(t *testing.T) {
 	}
 }
 
+func TestDistributedQuotaSingleNode(t *testing.T) {
+	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
+	session := createQuotaSession()
+	keyId := testKey(t, "key")
+	spec.SessionManager.UpdateSession(keyId, session, 60)
+	defer spec.SessionManager.ResetQuota(keyId, session)
+
+	recorder := httptest.NewRecorder()
+	param := make(url.Values)
+	req, err := http.NewRequest("GET", param.Encode(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("authorization", keyId)
+
+	config.DQSetMaster = true
+	config.UseDistributedQuotaCounter = true
+	config.DistributedQuotaFlushIntervalInMS = 100
+
+	startDQ(decideLeaderMechanism())
+
+	chain := getChain(spec)
+	chain.ServeHTTP(recorder, req)
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code: \n", recorder.Code, " Header:", recorder.HeaderMap)
+	}
+
+	secondRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(secondRecorder, req)
+	thirdRecorder := httptest.NewRecorder()
+	chain.ServeHTTP(thirdRecorder, req)
+
+	if thirdRecorder.Code != 403 {
+		t.Error("Third request returned invalid code, should 403, got: \n", thirdRecorder.Code)
+	}
+
+	newAPIError := tykErrorResponse{}
+	json.Unmarshal(thirdRecorder.Body.Bytes(), &newAPIError)
+
+	if newAPIError.Error != "Quota exceeded" {
+		t.Error("Third request returned invalid message, got: \n", newAPIError.Error)
+	}
+}
+
 func TestWithAnalytics(t *testing.T) {
 	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createNonThrottledSession()
