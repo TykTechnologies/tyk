@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"strings"
+
+	"github.com/satori/go.uuid"
 )
 
 type MiddlewareContextVars struct {
@@ -59,6 +61,9 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 
 	// IP:Port
 	contextDataObject["remote_addr"] = copiedRequest.RemoteAddr
+
+	//Correlation ID
+	contextDataObject["request_id"] = uuid.NewV4().String()
 
 	ctxSetData(r, contextDataObject)
 

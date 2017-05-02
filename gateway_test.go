@@ -268,11 +268,13 @@ func getChain(spec *APISpec) http.Handler {
 	tykMiddleware := &TykMiddleware{spec, proxy}
 	chain := alice.New(
 		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
 		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
+		CreateMiddleware(&TransformHeaders{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
 
 	return chain
 }
