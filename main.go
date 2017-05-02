@@ -88,15 +88,6 @@ func displayConfig() {
 	}).Info("--> PID: ", HostDetails.PID)
 }
 
-func getHostName() string {
-	hName := config.HostName
-	if config.HostName == "" {
-		hName = ""
-	}
-
-	return hName
-}
-
 func pingTest(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello Tiki")
 }
@@ -104,14 +95,7 @@ func pingTest(w http.ResponseWriter, r *http.Request) {
 // Create all globals and init connection handlers
 func setupGlobals() {
 	mainRouter = mux.NewRouter()
-	if getHostName() != "" {
-		defaultRouter = mainRouter.Host(getHostName()).Subrouter()
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Hostname set: ", getHostName())
-	} else {
-		defaultRouter = mainRouter
-	}
+	defaultRouter = mainRouter
 
 	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
 		log.WithFields(logrus.Fields{
@@ -312,17 +296,22 @@ func getPolicies() {
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(Muxer *mux.Router) {
-	log.WithFields(logrus.Fields{
+	hostname := config.HostName
+	if config.ControlAPIHostname != "" {
+		hostname = config.ControlAPIHostname
+	}
+
+	ApiMuxer := Muxer
+	if hostname != "" {
+		ApiMuxer = Muxer.Host(hostname).Subrouter()
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Control API hostname set: ", hostname)
+	}
+
+    log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising Tyk REST API Endpoints")
-
-	var ApiMuxer *mux.Router
-	ApiMuxer = Muxer
-	if config.EnableAPISegregation {
-		if config.ControlAPIHostname != "" {
-			ApiMuxer = Muxer.Host(config.ControlAPIHostname).Subrouter()
-		}
-	}
 
 	// set up main API handlers
 	ApiMuxer.HandleFunc("/tyk/reload/group", CheckIsAPIOwner(InstrumentationMW(groupResetHandler)))
@@ -734,15 +723,8 @@ func doReload() {
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
 
-	var newMuxes *mux.Router
-	if getHostName() != "" {
-		newMuxes = newRouter.Host(getHostName()).Subrouter()
-	} else {
-		newMuxes = newRouter
-	}
-
-	loadAPIEndpoints(newMuxes)
-	loadApps(specs, newMuxes)
+	loadAPIEndpoints(newRouter)
+	loadApps(specs, newRouter)
 
 	newServeMux := http.NewServeMux()
 	newServeMux.Handle("/", mainRouter)

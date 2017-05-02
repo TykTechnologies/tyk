@@ -575,7 +575,15 @@ func processSpec(referenceSpec *APISpec,
 
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
-	ListenPathMap = cmap.New()
+	hostname := config.HostName
+	if hostname != "" {
+		Muxer = Muxer.Host(hostname).Subrouter()
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("API hostname set: ", hostname)
+	}
+
+    ListenPathMap = cmap.New()
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
