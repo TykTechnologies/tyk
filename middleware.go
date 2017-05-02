@@ -126,25 +126,22 @@ func CheckETEnabled(tykMwSuper *TykMiddleware) (used bool) {
 	return
 }
 
-var responseProcessors = map[string]TykResponseHandler{
-	"header_injector":         HeaderInjector{},
-	"response_body_transform": ResponseTransformMiddleware{},
-	"header_transform":        HeaderTransform{},
-}
-
 type TykResponseHandler interface {
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *SessionState) error
 	New(interface{}, *APISpec) (TykResponseHandler, error)
 }
 
 func GetResponseProcessorByName(name string) (TykResponseHandler, error) {
-	processor, ok := responseProcessors[name]
-	if !ok {
-		return nil, errors.New("Not found")
+	switch name {
+	case "header_injector":
+		return HeaderInjector{}, nil
+	case "response_body_transform":
+		return ResponseTransformMiddleware{}, nil
+	case "header_transform":
+		return HeaderTransform{}, nil
+	default:
+		return nil, errors.New("not found")
 	}
-
-	return processor, nil
-
 }
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
