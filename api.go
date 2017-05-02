@@ -202,19 +202,16 @@ func SetSessionPassword(session *SessionState) {
 	session.BasicAuthData.Password = string(newPass)
 }
 
-func GetKeyDetail(key string, APIID string) (SessionState, bool) {
-
-	thisSessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thisSpec := GetSpecForApi(APIID)
-		if thisSpec == nil {
-			log.Error("No API Spec found for this keyspace")
-			return SessionState{}, false
+func GetKeyDetail(key string, apiID string) (SessionState, bool) {
+	sessionManager := FallbackKeySesionManager
+	if apiID != "" {
+		spec := GetSpecForApi(apiID)
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		thisSessionManager = thisSpec.SessionManager
 	}
 
-	return thisSessionManager.GetSessionDetail(key)
+	return sessionManager.GetSessionDetail(key)
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
@@ -316,24 +313,21 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleGetDetail(sessionKey string, APIID string) ([]byte, int) {
+func handleGetDetail(sessionKey string, apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	var err error
 	code := 200
 
-	thisSessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
-		if thiSpec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+	sessionManager := FallbackKeySesionManager
+	if apiID != "" {
+		spec := GetSpecForApi(apiID)
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		thisSessionManager = thiSpec.SessionManager
 	}
 
-	thisSession, ok := thisSessionManager.GetSessionDetail(sessionKey)
+	thisSession, ok := sessionManager.GetSessionDetail(sessionKey)
 	if !ok {
 		success = false
 	} else {
@@ -370,7 +364,7 @@ type APIAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
+func handleGetAllKeys(filter string, apiID string) ([]byte, int) {
 	success := true
 	var responseMessage []byte
 	code := 200
@@ -386,18 +380,15 @@ func handleGetAllKeys(filter string, APIID string) ([]byte, int) {
 		return errJSON, 400
 	}
 
-	thisSessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
-		if thiSpec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+	sessionManager := FallbackKeySesionManager
+	if apiID != "" {
+		spec := GetSpecForApi(apiID)
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		thisSessionManager = thiSpec.SessionManager
 	}
 
-	sessions := thisSessionManager.GetSessions(filter)
+	sessions := sessionManager.GetSessions(filter)
 
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
@@ -441,11 +432,11 @@ type APIStatusMessage struct {
 	Message string `json:"message"`
 }
 
-func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
+func handleDeleteKey(keyName string, apiID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	if APIID == "-1" {
+	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
@@ -461,21 +452,18 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 		return responseMessage, 200
 	}
 
-	OrgID := ""
-	thisSessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
-		if thiSpec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+	orgID := ""
+	sessionManager := FallbackKeySesionManager
+	if apiID != "" {
+		spec := GetSpecForApi(apiID)
+		if spec != nil {
+			orgID = spec.OrgID
+			sessionManager = spec.SessionManager
 		}
-		OrgID = thiSpec.OrgID
-		thisSessionManager = thiSpec.SessionManager
 	}
 
-	thisSessionManager.RemoveSession(keyName)
-	thisSessionManager.ResetQuota(keyName, SessionState{})
+	sessionManager.RemoveSession(keyName)
+	sessionManager.ResetQuota(keyName, SessionState{})
 	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
@@ -496,7 +484,7 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 			Message:            "Key deleted.",
 			OriginatingRequest: "",
 		},
-		Org: OrgID,
+		Org: orgID,
 		Key: keyName,
 	})
 
@@ -509,11 +497,11 @@ func handleDeleteKey(keyName string, APIID string) ([]byte, int) {
 	return responseMessage, code
 }
 
-func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
+func handleDeleteHashedKey(keyName string, apiID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
-	if APIID == "-1" {
+	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
 		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
@@ -528,19 +516,16 @@ func handleDeleteHashedKey(keyName string, APIID string) ([]byte, int) {
 		return responseMessage, 200
 	}
 
-	thisSessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
-		if thiSpec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+	sessionManager := FallbackKeySesionManager
+	if apiID != "" {
+		spec := GetSpecForApi(apiID)
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		thisSessionManager = thiSpec.SessionManager
 	}
 
 	// This is so we bypass the hash function
-	sessStore := thisSessionManager.GetStore()
+	sessStore := sessionManager.GetStore()
 
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
@@ -890,23 +875,17 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	DoJSONWrite(w, code, responseMessage)
 }
 
-func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byte, int) {
-	var responseMessage []byte
-	var err error
-
-	thisSessionManager := FallbackKeySesionManager
-	if APIID != "" {
-		thiSpec := GetSpecForApi(APIID)
-		if thiSpec == nil {
-			notFound := APIStatusMessage{"error", "API not found"}
-			responseMessage, _ = json.Marshal(&notFound)
-			return responseMessage, 400
+func handleUpdateHashedKey(keyName, apiID, policyId string) ([]byte, int) {
+	sessionManager := FallbackKeySesionManager
+	if apiID != "" {
+		spec := GetSpecForApi(apiID)
+		if spec != nil {
+			sessionManager = spec.SessionManager
 		}
-		thisSessionManager = thiSpec.SessionManager
 	}
 
 	// This is so we bypass the hash function
-	sessStore := thisSessionManager.GetStore()
+	sessStore := sessionManager.GetStore()
 
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
@@ -921,7 +900,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Key not found"}
-		responseMessage, _ = json.Marshal(&notFound)
+        responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
@@ -936,7 +915,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Unmarshalling failed"}
-		responseMessage, _ = json.Marshal(&notFound)
+        responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
@@ -954,7 +933,7 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Marshalling failed"}
-		responseMessage, _ = json.Marshal(&notFound)
+        responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
@@ -968,14 +947,14 @@ func handleUpdateHashedKey(keyName string, APIID string, policyId string) ([]byt
 		}).Error("Failed to update hashed key.")
 
 		notFound := APIStatusMessage{"error", "Could not write key data"}
-		responseMessage, _ = json.Marshal(&notFound)
+        responseMessage, _ := json.Marshal(&notFound)
 		return responseMessage, 400
 	}
 
 	code := 200
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "updated"}
-	responseMessage, err = json.Marshal(&statusObj)
+    responseMessage, err := json.Marshal(&statusObj)
 
 	if err != nil {
 		log.Error("Marshalling failed: ", err)

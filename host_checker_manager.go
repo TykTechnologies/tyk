@@ -206,7 +206,7 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Update key: ", hc.getHostKey(report))
-	hc.store.SetKey(hc.getHostKey(report), "1", int64(config.UptimeTests.Config.TimeWait + 1))
+	hc.store.SetKey(hc.getHostKey(report), "1", int64(hc.checker.checkTimeout+1))
 
 	thisSpec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	if !found {
@@ -281,14 +281,10 @@ func (hc *HostCheckerManager) IsHostDown(thisUrl string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
-	_, fErr := hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
+	_, err = hc.store.GetKey(PoolerHostSentinelKeyPrefix + u.Host)
 
-	if fErr != nil {
-		// Found a key, the host is down
-		return true
-	}
-
-	return false
+	// Found a key, the host is down
+	return err == nil
 }
 
 func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostCheckObject, APIID string) (HostData, error) {
@@ -318,7 +314,6 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject tykcommon.HostChec
 
 	thisHostData = HostData{
 		CheckURL: checkObject.CheckURL,
-		ID:       checkObject.CheckURL,
 		MetaData: make(map[string]string),
 		Method:   checkObject.Method,
 		Headers:  checkObject.Headers,
@@ -498,6 +493,11 @@ func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) 
 }
 
 func InitHostCheckManager(store *RedisClusterStorageManager) {
+	// Already initialized
+	if GlobalHostChecker.Id != "" {
+		return
+	}
+
 	GlobalHostChecker = HostCheckerManager{}
 	GlobalHostChecker.Init(store)
 	GlobalHostChecker.Start()

@@ -19,7 +19,6 @@ var HostCheckerClient *http.Client = &http.Client{Timeout: 500 * time.Millisecon
 
 type HostData struct {
 	CheckURL string
-	ID       string
 	Method   string
 	Headers  map[string]string
 	Body     string
@@ -39,7 +38,7 @@ type HostUptimeChecker struct {
 	pingCallback       func(HostHealthReport)
 	workerPoolSize     int
 	sampleTriggerLimit int
-	checkTimout        int
+	checkTimeout       int
 	HostList           map[string]HostData
 	unHealthyList      map[string]bool
 	pool               *tunny.WorkPool
@@ -54,13 +53,13 @@ type HostUptimeChecker struct {
 }
 
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
-	if h.checkTimout <= 5 {
-		return time.Duration(h.checkTimout) * time.Second
+	if h.checkTimeout <= 5 {
+		return time.Duration(h.checkTimeout) * time.Second
 	}
 
 	rand.Seed(time.Now().Unix())
-	min := h.checkTimout - 3
-	max := h.checkTimout + 3
+	min := h.checkTimeout - 3
+	max := h.checkTimeout + 3
 
 	dur := rand.Intn(max-min) + min
 
@@ -97,33 +96,28 @@ func (h *HostUptimeChecker) HostReporter() {
 		select {
 		case okHost := <-h.okChan:
 			// Clear host from unhealthylist if it exists
-			found, _ := h.unHealthyList[okHost.ID]
-			if found {
+			if h.unHealthyList[okHost.CheckURL] {
 				h.upCallback(okHost)
-				delete(h.unHealthyList, okHost.ID)
+				delete(h.unHealthyList, okHost.CheckURL)
 			}
 			go h.pingCallback(okHost)
 
 		case failedHost := <-h.errorChan:
+			newVal := 1
+			if count, found := h.sampleCache.Get(failedHost.CheckURL); found {
+				newVal = count.(int) + 1
+			}
 
-			cachedHostCount, found := h.sampleCache.Get(failedHost.ID)
-			if !found {
-				go h.sampleCache.Set(failedHost.ID, 1, cache.DefaultExpiration)
+			h.sampleCache.Set(failedHost.CheckURL, newVal, cache.DefaultExpiration)
 
-			} else {
-				newVal := cachedHostCount.(int)
-				newVal += 1
-				go h.sampleCache.Set(failedHost.ID, newVal, cache.DefaultExpiration)
-
-				if newVal > h.sampleTriggerLimit {
-					log.Debug("[HOST CHECKER] [HOST WARNING]: ", failedHost.CheckURL)
-					// Reset the count
-					go h.sampleCache.Set(failedHost.ID, 1, cache.DefaultExpiration)
-					// track it
-					h.unHealthyList[failedHost.ID] = true
-					// Call the custom callback hook
-					go h.failureCallback(failedHost)
-				}
+			if newVal >= h.sampleTriggerLimit {
+				log.Debug("[HOST CHECKER] [HOST WARNING]: ", failedHost.CheckURL)
+				// Reset the count
+				h.sampleCache.Set(failedHost.CheckURL, 1, cache.DefaultExpiration)
+				// track it
+				h.unHealthyList[failedHost.CheckURL] = true
+				// Call the custom callback hook
+				go h.failureCallback(failedHost)
 			}
 			go h.pingCallback(failedHost)
 
@@ -135,7 +129,7 @@ func (h *HostUptimeChecker) HostReporter() {
 }
 
 func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
-	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL, toCheck.ID)
+	log.Debug("[HOST CHECKER] Checking: ", toCheck.CheckURL)
 
 	t1 := time.Now()
 
@@ -207,13 +201,13 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 		h.sampleTriggerLimit = defaultSampletTriggerLimit
 	}
 
-	h.checkTimout = timeout
+	h.checkTimeout = timeout
 	if timeout == 0 {
-		h.checkTimout = defaultTimeout
+		h.checkTimeout = defaultTimeout
 	}
 
 	log.Debug("[HOST CHECKER] Config:TriggerLimit: ", h.sampleTriggerLimit)
-	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimout)
+	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
 	var pErr error
@@ -245,11 +239,6 @@ func (h *HostUptimeChecker) Stop() {
 	h.stopPollingChan <- true
 	log.Info("[HOST CHECKER] Stopping poller")
 	h.pool.Close()
-}
-
-func (h *HostUptimeChecker) AddHost(hd HostData) {
-	h.HostList[hd.ID] = hd
-	log.Info("[HOST CHECKER] Tracking: ", hd.ID)
 }
 
 func (h *HostUptimeChecker) RemoveHost(name string) {
