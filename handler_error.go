@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"net"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -12,8 +11,6 @@ import (
 	"time"
 
 	"github.com/gorilla/context"
-
-	"github.com/Sirupsen/logrus"
 )
 
 const (
@@ -203,33 +200,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	// Close connections
 	if config.CloseConnections {
 		w.Header().Add("Connection", "close")
-	}
-
-	var obfuscated string
-
-	if len(keyName) > 4 {
-		obfuscated = "****" + keyName[len(keyName)-4:]
-	}
-
-	// TODO: what is this bit of code for?
-	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil {
-		// If we aren't the first proxy retain prior
-		// X-Forwarded-For information as a comma+space
-		// separated list and fold multiple headers into one.
-		if prior, ok := r.Header["X-Forwarded-For"]; ok {
-			clientIP = strings.Join(prior, ", ") + ", " + clientIP
-		}
-	} else {
-		log.WithFields(logrus.Fields{
-			"prefix":      "gateway",
-			"user_ip":     r.RemoteAddr,
-			"server_name": e.Spec.APIDefinition.Proxy.TargetURL,
-			"user_id":     obfuscated,
-			"org_id":      e.Spec.APIDefinition.OrgID,
-			"api_id":      e.Spec.APIDefinition.APIID,
-			"path":        r.URL.Path,
-		}).Error("request error: ", err)
 	}
 
 	if memProfFile != nil {
