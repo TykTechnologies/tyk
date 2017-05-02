@@ -63,7 +63,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 			log.Info("X-Forwarded-For set, remote IP: ", remoteIPString)
 		}
 
-		splitIP := strings.Split(r.RemoteAddr, ":")
+		splitIP := strings.Split(remoteIPString, ":")
 		if len(splitIP) == 2 {
 			remoteIPString = splitIP[0]
 		}
