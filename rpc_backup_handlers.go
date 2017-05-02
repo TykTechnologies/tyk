@@ -95,20 +95,13 @@ func doLoadWithBackup(specs []*APISpec) {
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
 
-	var newMuxes *mux.Router
-	if getHostName() != "" {
-		newMuxes = newRouter.Host(getHostName()).Subrouter()
-	} else {
-		newMuxes = newRouter
-	}
-
 	log.Warning("[RPC Backup] --> Set up routers")
 	log.Warning("[RPC Backup] --> Loading endpoints")
 
-	loadAPIEndpoints(newMuxes)
+	loadAPIEndpoints(newRouter)
 
 	log.Warning("[RPC Backup] --> Loading APIs")
-	loadApps(specs, newMuxes)
+	loadApps(specs, newRouter)
 	log.Warning("[RPC Backup] --> API Load Done")
 
 	newServeMux := http.NewServeMux()
