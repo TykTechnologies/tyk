@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -865,9 +866,19 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// resetHandler will try to queue a reload. If fn is nil and block=true
+// was in the URL parameters, it will block until the reload is done.
+// Otherwise, it won't block and fn will be called once the reload is
+// finished.
 func resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var wg sync.WaitGroup
+		if fn == nil && r.URL.Query().Get("block") == "true" {
+			wg.Add(1)
+			fn = wg.Done
+		}
 		obj, code := handleURLReload(fn)
+		wg.Wait()
 		doJSONWrite(w, code, obj)
 	}
 }

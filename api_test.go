@@ -514,6 +514,27 @@ func TestResetHandler(t *testing.T) {
 	apisMu.RUnlock()
 }
 
+func TestResetHandlerBlock(t *testing.T) {
+	apisByID = make(map[string]*APISpec)
+	loadSampleAPI(t, apiTestDef)
+
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/tyk/reload?block=true", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// have a tick ready for grabs
+	go func() { reloadTick <- time.Time{} }()
+	resetHandler(nil)(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Fatal("Hot reload failed, response code was: ", recorder.Code)
+	}
+	if len(apisByID) == 0 {
+		t.Fatal("Hot reload was triggered but no APIs were found.")
+	}
+}
+
 func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
