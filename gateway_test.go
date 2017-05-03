@@ -782,7 +782,6 @@ type tykHttpTest struct {
 	code         int
 	body         interface{}
 
-	afterFn        func()
 	adminAuth      bool
 	controlRequest bool
 }
@@ -879,10 +878,6 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			if resp.StatusCode != tc.code {
 				t.Errorf("[%d]%s%s %s Status %d, want %d", ti, tPrefix, tc.method, tc.path, resp.StatusCode, tc.code)
 			}
-
-			if tc.afterFn != nil {
-				tc.afterFn()
-			}
 		}
 
 		ln.Close()
@@ -922,10 +917,17 @@ func TestListener(t *testing.T) {
 		{method: "POST", path: "/tyk/apis", body: sampleAPI, adminAuth: true, code: 200},
 		// API definitions not reloaded yet
 		{method: "GET", path: "/sample", code: 404},
-		{method: "GET", path: "/tyk/reload/", adminAuth: true, code: 200, afterFn: func() { doReload() }},
+		{method: "GET", path: "/tyk/reload/?block=true", adminAuth: true, code: 200},
 		{method: "GET", path: "/sample", code: 200},
 	}
 
+	// have all needed reload ticks ready
+	go func() {
+		// two calls to testHttp, each loops over tests 4 times
+		for i := 0; i < 2*4; i++ {
+			reloadTick <- time.Time{}
+		}
+	}()
 	testHttp(t, tests, false)
 	doReload()
 	testHttp(t, tests, false)
