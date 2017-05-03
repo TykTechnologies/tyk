@@ -429,7 +429,6 @@ func NewString(ClassType, TagType, Tag uint8, Value, Description string) *Packet
 	return p
 }
 
-
 func (p *Packet) ValueString() string {
 	if str, ok := p.Value.(string); ok {
 		return str

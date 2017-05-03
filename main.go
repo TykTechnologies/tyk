@@ -45,7 +45,6 @@ var (
 	GlobalEventsJSVM         = &JSVM{}
 	memProfFile              *os.File
 	Policies                 = map[string]Policy{}
-	MainNotifier             = RedisNotifier{}
 	DefaultOrgStore          = DefaultSessionManager{}
 	DefaultQuotaStore        = DefaultSessionManager{}
 	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
@@ -54,6 +53,7 @@ var (
 	argumentsBackup          map[string]interface{}
 	DashService              DashboardServiceSender
 
+	MainNotifier    Notifier
 	ApiSpecRegister map[string]*APISpec
 	keyGen          = DefaultKeyGenerator{}
 
@@ -156,7 +156,11 @@ func setupGlobals() {
 	}).Debug("Notifier will not work in hybrid mode")
 	mainNotifierStore := RedisClusterStorageManager{}
 	mainNotifierStore.Connect()
-	MainNotifier = RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
+	if config.PubSubMasterConnectionString == "" {
+		MainNotifier = &RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
+	} else {
+		MainNotifier = &TCFNotifier{channel: RedisPubSubChannel}
+	}
 
 	if config.Monitor.EnableTriggerMonitors {
 		var err error
@@ -1102,7 +1106,12 @@ func start(arguments map[string]interface{}) {
 
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
-		go startPubSubLoop()
+		if config.PubSubMasterConnectionString == "" {
+			go startPubSubLoop()
+		} else {
+			// Use Mangos
+			startSubscription()
+		}
 	}
 
 	if config.SlaveOptions.UseRPC {
@@ -1222,8 +1231,28 @@ func startDRL() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising distributed rate limiter")
+
 	setupDRL()
 	startRateLimitNotifications()
+
+	if config.UseDistributedQuotaCounter {
+		// Start the distributed quota system
+		startDQ(decideLeaderMechanism())
+	}
+}
+
+// In case we want to use a channel or some other leadership checker
+func decideLeaderMechanism() GetLeaderStatusFunc {
+	switch config.Storage.Type {
+	case "redis":
+		// For redis we should distribute write in order to retain consistency
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("If using redis with distributed quota it is recommended to make all gateways leader")
+		return func() bool { return config.DQSetMaster }
+	default:
+		return func() bool { return config.DQSetMaster }
+	}
 }
 
 func listen(l, controlListener net.Listener, err error) {

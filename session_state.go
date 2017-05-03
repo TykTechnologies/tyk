@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -70,6 +71,14 @@ type SessionState struct {
 }
 
 var murmurHasher = murmur3.New32()
+
+func (s *SessionState) IsExpired() bool {
+	return time.Now().After(time.Unix(s.Expires, 0))
+}
+
+func (s *SessionState) IsQuotaExpired() bool {
+	return time.Now().After(time.Unix(s.QuotaRenews, 0))
+}
 
 func (s *SessionState) SetFirstSeenHash() {
 	encoded, err := msgpack.Marshal(s)

@@ -27,17 +27,17 @@ func (u *RedisNotificationHandler) Start() {
 	go u.StartUIPubSubConn()
 }
 
-func (u *RedisNotificationHandler) Notify(n InterfaceNotification) error {
+func (u *RedisNotificationHandler) Notify(n interface{}) bool {
 	jsonError, err := json.Marshal(n)
 	if err != nil {
-		return err
+		return false
 	}
 
 	if u.CacheStore != nil {
 		u.CacheStore.Publish(UIChanName, string(jsonError))
 	}
 
-	return nil
+	return true
 }
 
 func (u *RedisNotificationHandler) StartUIPubSubConn() {
