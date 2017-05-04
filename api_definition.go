@@ -960,7 +960,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.Header.Get(a.APIDefinition.VersionDefinition.Key)
 
 	case "url-param":
-		tempRes := copyRequest(r)
+		tempRes := CopyHttpRequest(r)
 		return tempRes.FormValue(a.APIDefinition.VersionDefinition.Key)
 
 	case "url":

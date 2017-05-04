@@ -315,14 +315,14 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 	// Get the token
 	rawJWT := r.Header.Get(config.AuthHeaderName)
 	if config.UseParam {
-		tempRes := copyRequest(r)
+		tempRes := CopyHttpRequest(r)
 
 		// Set hte header name
 		rawJWT = tempRes.FormValue(config.AuthHeaderName)
 	}
 
 	if config.UseCookie {
-		tempRes := copyRequest(r)
+		tempRes := CopyHttpRequest(r)
 		authCookie, err := tempRes.Cookie(config.AuthHeaderName)
 		if err != nil {
 			rawJWT = ""
