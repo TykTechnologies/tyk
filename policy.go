@@ -154,10 +154,8 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}).Info("Processing policy list")
 	for _, p := range list.Message {
 		id := p.MID.Hex()
-		if allowExplicit {
-			if p.ID != "" {
-				id = p.ID
-			}
+		if allowExplicit && p.ID != "" {
+			id = p.ID
 		}
 		p.ID = id
 		_, foundP := policies[id]
