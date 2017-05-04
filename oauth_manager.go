@@ -300,16 +300,14 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				var passMatch bool
 				if sessionState.BasicAuthData.Hash == HashBCrypt {
 					err := bcrypt.CompareHashAndPassword([]byte(sessionState.BasicAuthData.Password), []byte(password))
-
 					if err == nil {
 						passMatch = true
 					}
 				}
 
-				if sessionState.BasicAuthData.Hash == HashPlainText {
-					if sessionState.BasicAuthData.Password == password {
-						passMatch = true
-					}
+				if sessionState.BasicAuthData.Hash == HashPlainText &&
+					sessionState.BasicAuthData.Password == password {
+					passMatch = true
 				}
 
 				if passMatch {
@@ -336,15 +334,13 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		}
 
 		// Does the user have an old OAuth token for this client?
-		if sessionState != nil {
-			if sessionState.OauthKeys != nil {
-				log.Debug("There's keys here bill...")
-				oldToken, foundKey := sessionState.OauthKeys[ar.Client.GetId()]
-				if foundKey {
-					log.Info("Found old token, revoking: ", oldToken)
+		if sessionState != nil && sessionState.OauthKeys != nil {
+			log.Debug("There's keys here bill...")
+			oldToken, foundKey := sessionState.OauthKeys[ar.Client.GetId()]
+			if foundKey {
+				log.Info("Found old token, revoking: ", oldToken)
 
-					o.API.SessionManager.RemoveSession(oldToken)
-				}
+				o.API.SessionManager.RemoveSession(oldToken)
 			}
 		}
 
@@ -352,23 +348,21 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		o.OsinServer.FinishAccessRequest(resp, r, ar)
 
 		new_token, foundNewToken := resp.Output["access_token"]
-		if username != "" {
-			if foundNewToken {
-				log.Debug("Updating token data in key")
-				if sessionState.OauthKeys == nil {
-					sessionState.OauthKeys = make(map[string]string)
-				}
-				sessionState.OauthKeys[ar.Client.GetId()] = new_token.(string)
-				log.Debug("New token: ", new_token.(string))
-				log.Debug("Keys: ", sessionState.OauthKeys)
+		if username != "" && foundNewToken {
+			log.Debug("Updating token data in key")
+			if sessionState.OauthKeys == nil {
+				sessionState.OauthKeys = make(map[string]string)
+			}
+			sessionState.OauthKeys[ar.Client.GetId()] = new_token.(string)
+			log.Debug("New token: ", new_token.(string))
+			log.Debug("Keys: ", sessionState.OauthKeys)
 
-				keyName := o.API.OrgID + username
+			keyName := o.API.OrgID + username
 
-				log.Debug("Updating user:", keyName)
-				err := o.API.SessionManager.UpdateSession(keyName, *sessionState, getLifetime(o.API, sessionState))
-				if err != nil {
-					log.Error(err)
-				}
+			log.Debug("Updating user:", keyName)
+			err := o.API.SessionManager.UpdateSession(keyName, *sessionState, getLifetime(o.API, sessionState))
+			if err != nil {
+				log.Error(err)
 			}
 		}
 

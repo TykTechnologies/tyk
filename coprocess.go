@@ -242,10 +242,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if returnOverrides.ResponseCode != 0 {
 			if returnOverrides.ResponseError == "" {
 				return nil, returnOverrides.ResponseCode
-			} else {
-				err := errors.New(returnOverrides.ResponseError)
-				return err, returnOverrides.ResponseCode
 			}
+			err := errors.New(returnOverrides.ResponseError)
+			return err, returnOverrides.ResponseCode
 		}
 	}
 
