@@ -65,21 +65,6 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string)
 	return m.Spec.APIDefinition.APIID + keyName + reqChecksum
 }
 
-func getIP(ip string) (string, error) {
-	ipWithoutPort := strings.Split(ip, ":")
-
-	if len(ipWithoutPort) > 1 {
-		ip = ipWithoutPort[0]
-	} else {
-		if len(ipWithoutPort) == 1 {
-			return ip, nil
-		}
-		log.Warning(ipWithoutPort)
-		return ip, errors.New("IP Address malformed")
-	}
-	return ip, nil
-}
-
 func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {
 	timeNow := time.Now().Unix()
 	newTTL := timeNow + cacheTTL
@@ -163,11 +148,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// No authentication data? use the IP.
 	if authVal == nil {
-		var err error
-		if authHeaderValue, err = getIP(GetIPFromRequest(r)); err != nil {
-			log.Error(err)
-			return nil, 200
-		}
+		authHeaderValue = GetIPFromRequest(r)
 	} else {
 		authHeaderValue = authVal.(string)
 	}
