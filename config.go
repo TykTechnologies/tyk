@@ -231,6 +231,7 @@ type Config struct {
 	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
+	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 }
 
 type CertData struct {
