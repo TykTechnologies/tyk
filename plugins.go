@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -27,7 +28,7 @@ type MiniRequestObject struct {
 	Headers         map[string][]string
 	SetHeaders      map[string]string
 	DeleteHeaders   []string
-	Body            string
+	Body            []byte
 	URL             string
 	Params          map[string][]string
 	AddParams       map[string]string
@@ -90,7 +91,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		Headers:        r.Header,
 		SetHeaders:     make(map[string]string),
 		DeleteHeaders:  make([]string, 0),
-		Body:           string(originalBody),
+		Body:           originalBody,
 		URL:            r.URL.Path,
 		Params:         r.URL.Query(),
 		AddParams:      make(map[string]string),
@@ -182,7 +183,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
 	} else {
 		r.ContentLength = int64(len(newRequestData.Request.Body))
-		r.Body = ioutil.NopCloser(bytes.NewBufferString(newRequestData.Request.Body))
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(newRequestData.Request.Body))
 	}
 
 	r.URL.Path = newRequestData.Request.URL
@@ -319,10 +320,41 @@ func (j *JSVM) LoadTykJSApi() {
 		}).Info(call.Argument(0).String())
 		return otto.Value{}
 	})
-
 	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
 		j.RawLog.Print(call.Argument(0).String() + "\n")
 		return otto.Value{}
+	})
+
+	// these two needed for non-utf8 bodies
+	j.VM.Set("b64dec", func(call otto.FunctionCall) otto.Value {
+		in := call.Argument(0).String()
+		out, err := base64.StdEncoding.DecodeString(in)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Failed to base64 decode: ", err)
+			return otto.Value{}
+		}
+		returnVal, err := j.VM.ToValue(string(out))
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Failed to base64 decode: ", err)
+			return otto.Value{}
+		}
+		return returnVal
+	})
+	j.VM.Set("b64enc", func(call otto.FunctionCall) otto.Value {
+		in := []byte(call.Argument(0).String())
+		out := base64.StdEncoding.EncodeToString(in)
+		returnVal, err := j.VM.ToValue(out)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("[JSVM]: Failed to base64 encode: ", err)
+			return otto.Value{}
+		}
+		return returnVal
 	})
 
 	// Enable the creation of HTTP Requsts

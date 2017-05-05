@@ -17,6 +17,7 @@ TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessRequest = function(
 };
 
 TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessRequest = function(request, session, config) {
+    request.Body = b64dec(request.Body)
     var processed_request = this.ProcessRequest(request, session, config);
 
     if (!processed_request) {
@@ -26,6 +27,7 @@ TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessRequest = functio
     
     // Reset the headers object
     processed_request.Request.Headers = {}
+    processed_request.Request.Body = b64enc(processed_request.Request.Body)
 
     return JSON.stringify(processed_request)
 };
