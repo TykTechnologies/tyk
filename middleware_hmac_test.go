@@ -91,12 +91,8 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -136,12 +132,8 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -181,12 +173,8 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -226,12 +214,8 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -271,12 +255,8 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -316,12 +296,8 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -382,12 +358,8 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 

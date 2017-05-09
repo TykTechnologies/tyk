@@ -5,11 +5,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -148,13 +148,9 @@ func TestCoProcessMiddleware(t *testing.T) {
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", session, 60)
 
-	uri := "/headers"
-
 	recorder := httptest.NewRecorder()
 
-	param := make(url.Values)
-
-	req, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("GET", "/headers", strings.NewReader(""))
 	req.Header.Add("authorization", "abc")
 
 	if err != nil {
@@ -172,13 +168,9 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", session, 60)
 
-	uri := "/headers"
-
 	recorder := httptest.NewRecorder()
 
-	param := make(url.Values)
-
-	req, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("GET", "/headers", strings.NewReader(""))
 	req.Header.Add("authorization", "abc")
 	req.Header.Add("Deletethisheader", "value")
 
@@ -201,8 +193,8 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	recorder = httptest.NewRecorder()
 
-	uri = "/get?a=a_value&b=123&remove=3"
-	getReq, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
+	uri := "/get?a=a_value&b=123&remove=3"
+	getReq, err := http.NewRequest("GET", uri, strings.NewReader(""))
 	getReq.Header.Add("authorization", "abc")
 
 	if err != nil {
@@ -238,13 +230,9 @@ func TestCoProcessAuth(t *testing.T) {
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("abc", session, 60)
 
-	uri := "/headers"
-
 	recorder := httptest.NewRecorder()
 
-	param := make(url.Values)
-
-	req, err := http.NewRequest("GET", uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("GET", "/headers", strings.NewReader(""))
 	req.Header.Add("authorization", "abc")
 
 	if err != nil {

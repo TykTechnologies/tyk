@@ -112,13 +112,12 @@ func TestAuthCodeRedirect(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/authorize/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	if err != nil {
@@ -144,13 +143,12 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/authorize/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri2)
 	param.Set("client_id", authClientID)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	if err != nil {
@@ -176,13 +174,12 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/authorize/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri2)
 	param.Set("client_id", authClientID)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	if err != nil {
@@ -205,14 +202,13 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -236,14 +232,13 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -267,14 +262,13 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -317,14 +311,13 @@ func getAuthCode(t *testing.T) map[string]string {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, _ := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -351,14 +344,13 @@ func getToken(t *testing.T) tokenData {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("grant_type", "authorization_code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("code", authData["code"])
-	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, _ := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -377,14 +369,13 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("grant_type", "client_credentials")
 	param.Set("client_id", authClientID)
 	param.Set("client_secret", authClientSecret)
 
-	req, _ := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, _ := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -420,14 +411,13 @@ func TestClientAccessRequest(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("grant_type", "authorization_code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("code", authData["code"])
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -458,13 +448,12 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	// Step 2 - invalidate the refresh token
 
 	uri1 := "/tyk/oauth/refresh/" + tokenData.RefreshToken + "?"
-	method1 := "DELETE"
 
 	recorder := httptest.NewRecorder()
 	param1 := make(url.Values)
 	//MakeSampleAPI()
 	param1.Set("api_id", "999999")
-	req1, err1 := http.NewRequest(method1, uri1+param1.Encode(), nil)
+	req1, err1 := http.NewRequest("DELETE", uri1+param1.Encode(), nil)
 
 	if err1 != nil {
 		t.Fatal(err1)
@@ -493,14 +482,13 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	// Step 3 - try to refresh
 
 	uri := "/APIID/oauth/token/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("grant_type", "refresh_token")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -528,14 +516,13 @@ func TestClientRefreshRequest(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
-	method := "POST"
 
 	param := make(url.Values)
 	param.Set("grant_type", "refresh_token")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -563,7 +550,6 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	getOAuthChain(spec, testMuxer)
 
 	uri := "/APIID/oauth/token/"
-	method := "POST"
 
 	// req 1
 	param := make(url.Values)
@@ -571,7 +557,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
-	req, err := http.NewRequest(method, uri, bytes.NewBufferString(param.Encode()))
+	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -598,7 +584,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	param2.Set("redirect_uri", authRedirectUri)
 	param2.Set("client_id", authClientID)
 	param2.Set("refresh_token", token)
-	req2, err2 := http.NewRequest(method, uri, bytes.NewBufferString(param2.Encode()))
+	req2, err2 := http.NewRequest("POST", uri, bytes.NewBufferString(param2.Encode()))
 	req2.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 

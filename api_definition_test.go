@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -128,15 +127,11 @@ func createDefinitionFromString(defStr string) *APISpec {
 }
 
 func TestExpiredRequest(t *testing.T) {
-	uri := "/v1/bananaphone"
-	method := "GET"
-
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("version", "v1")
+	req, err := http.NewRequest("GET", "/v1/bananaphone", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(sampleDefiniton)
 
@@ -152,12 +147,7 @@ func TestExpiredRequest(t *testing.T) {
 }
 
 func TestNotVersioned(t *testing.T) {
-	uri := "v1/allowed/whitelist/literal"
-	method := "GET"
-
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-
+	req, err := http.NewRequest("GET", "v1/allowed/whitelist/literal", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,11 +169,7 @@ func TestNotVersioned(t *testing.T) {
 }
 
 func TestMissingVersion(t *testing.T) {
-	uri := "/v1/bananaphone"
-	method := "GET"
-
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/v1/bananaphone", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,11 +188,7 @@ func TestMissingVersion(t *testing.T) {
 }
 
 func TestWrongVersion(t *testing.T) {
-	uri := "/v1/bananaphone"
-	method := "GET"
-
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/v1/bananaphone", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,10 +208,7 @@ func TestWrongVersion(t *testing.T) {
 }
 
 func TestBlacklistLinks(t *testing.T) {
-	uri := "v1/disallowed/blacklist/literal"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "v1/disallowed/blacklist/literal", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,10 +226,7 @@ func TestBlacklistLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	uri = "v1/disallowed/blacklist/abacab12345"
-	method = "GET"
-	param = make(url.Values)
-	req, err = http.NewRequest(method, uri+param.Encode(), nil)
+	req, err = http.NewRequest("GET", "v1/disallowed/blacklist/abacab12345", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,10 +244,7 @@ func TestBlacklistLinks(t *testing.T) {
 }
 
 func TestWhiteLIstLinks(t *testing.T) {
-	uri := "v1/allowed/whitelist/literal"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "v1/allowed/whitelist/literal", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,10 +262,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	uri = "v1/allowed/whitelist/12345abans"
-	method = "GET"
-	param = make(url.Values)
-	req, err = http.NewRequest(method, uri+param.Encode(), nil)
+	req, err = http.NewRequest("GET", "v1/allowed/whitelist/12345abans", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,10 +280,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 }
 
 func TestWhiteListBlock(t *testing.T) {
-	uri := "v1/allowed/bananaphone"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "v1/allowed/bananaphone", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,10 +300,7 @@ func TestWhiteListBlock(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
-	uri := "/v1/ignored/noregex"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/v1/ignored/noregex", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,10 +320,7 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestBlacklistLinksMulti(t *testing.T) {
-	uri := "v1/disallowed/blacklist/literal"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "v1/disallowed/blacklist/literal", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -377,10 +338,7 @@ func TestBlacklistLinksMulti(t *testing.T) {
 		t.Error(status)
 	}
 
-	uri = "v1/disallowed/blacklist/abacab12345"
-	method = "GET"
-	param = make(url.Values)
-	req, err = http.NewRequest(method, uri+param.Encode(), nil)
+	req, err = http.NewRequest("GET", "v1/disallowed/blacklist/abacab12345", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

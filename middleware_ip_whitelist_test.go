@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 )
 
@@ -155,12 +154,9 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledFail)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234wer", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Add("authorization", "1234wer")
 
@@ -180,12 +176,9 @@ func TestIpMiddlewareIPPass(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Add("authorization", "gfgg1234")
 
@@ -205,12 +198,9 @@ func TestIpMiddlewareIPPassCIDR(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "127.0.0.2:80"
 	req.Header.Add("authorization", "gfgg1234")
 
@@ -230,12 +220,9 @@ func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "10.0.0.1:80"
 	req.Header.Add("authorization", "gfgg1234")
 
@@ -255,12 +242,9 @@ func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "10.0.0.1:80"
 	req.Header.Add("X-Forwarded-For", "127.0.0.1")
 	req.Header.Add("authorization", "gfgg1234")
@@ -281,12 +265,9 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionMissing)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234rtyrty", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("authorization", "1234rtyrty")
 
 	if err != nil {
@@ -305,12 +286,9 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionDisabled)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234iuouio", session, 60)
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("authorization", "1234iuouio")
 
 	if err != nil {

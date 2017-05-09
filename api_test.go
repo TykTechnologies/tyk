@@ -71,15 +71,11 @@ type testAPIDefinition struct {
 
 func TestHealthCheckEndpoint(t *testing.T) {
 	uri := "/tyk/health/?api_id=1"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-
 	makeSampleAPI(t, apiTestDef)
 
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +84,6 @@ func TestHealthCheckEndpoint(t *testing.T) {
 
 	var apiHealthValues HealthCheckValues
 	err = json.Unmarshal(recorder.Body.Bytes(), &apiHealthValues)
-
 	if err != nil {
 		t.Error("Could not unmarshal API Health check:\n", err, recorder.Body.String())
 	}
@@ -123,16 +118,14 @@ func TestApiHandler(t *testing.T) {
 	uris := []string{"/tyk/apis/", "/tyk/apis"}
 
 	for _, uri := range uris {
-		method := "GET"
 		sampleKey := createSampleSession()
 		body, _ := json.Marshal(&sampleKey)
 
 		recorder := httptest.NewRecorder()
-		param := make(url.Values)
 
 		makeSampleAPI(t, apiTestDef)
 
-		req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
+		req, err := http.NewRequest("GET", uri, bytes.NewReader(body))
 
 		if err != nil {
 			t.Fatal(err)
@@ -160,17 +153,14 @@ func TestApiHandler(t *testing.T) {
 
 func TestApiHandlerGetSingle(t *testing.T) {
 	uri := "/tyk/apis/1"
-	method := "GET"
 	sampleKey := createSampleSession()
 	body, _ := json.Marshal(&sampleKey)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
 
 	makeSampleAPI(t, apiTestDef)
 
-	req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
-
+	req, err := http.NewRequest("GET", uri, bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,13 +182,9 @@ func TestApiHandlerGetSingle(t *testing.T) {
 
 func TestApiHandlerPost(t *testing.T) {
 	uri := "/tyk/apis/1"
-	method := "POST"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
 
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(apiTestDef))
-
+	req, err := http.NewRequest("POST", uri, strings.NewReader(apiTestDef))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,16 +205,13 @@ func TestApiHandlerPost(t *testing.T) {
 
 func TestApiHandlerPostDbConfig(t *testing.T) {
 	uri := "/tyk/apis/1"
-	method := "POST"
 
 	config.UseDBAppConfigs = true
 	defer func() { config.UseDBAppConfigs = false }()
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
 
-	req, err := http.NewRequest(method, uri+param.Encode(), strings.NewReader(apiTestDef))
-
+	req, err := http.NewRequest("POST", uri, strings.NewReader(apiTestDef))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +271,6 @@ func TestApiHandlerMethodAPIID(t *testing.T) {
 func TestKeyHandlerNewKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		uri := "/tyk/keys/1234"
-		method := "POST"
 		sampleKey := createSampleSession()
 		body, _ := json.Marshal(&sampleKey)
 
@@ -299,7 +281,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
+		req, err := http.NewRequest("POST", uri+param.Encode(), bytes.NewReader(body))
 
 		if err != nil {
 			t.Fatal(err)
@@ -326,7 +308,6 @@ func TestKeyHandlerNewKey(t *testing.T) {
 func TestKeyHandlerUpdateKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		uri := "/tyk/keys/1234"
-		method := "PUT"
 		sampleKey := createSampleSession()
 		body, _ := json.Marshal(&sampleKey)
 
@@ -336,7 +317,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
+		req, err := http.NewRequest("PUT", uri+param.Encode(), bytes.NewReader(body))
 
 		if err != nil {
 			t.Fatal(err)
@@ -366,7 +347,6 @@ func TestKeyHandlerGetKey(t *testing.T) {
 		createKey()
 
 		uri := "/tyk/keys/1234"
-		method := "GET"
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -374,7 +354,7 @@ func TestKeyHandlerGetKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req, err := http.NewRequest(method, uri+"?"+param.Encode(), nil)
+		req, err := http.NewRequest("GET", uri+"?"+param.Encode(), nil)
 
 		if err != nil {
 			t.Fatal(err)
@@ -397,13 +377,11 @@ func TestKeyHandlerGetKey(t *testing.T) {
 
 func createKey() {
 	uri := "/tyk/keys/1234"
-	method := "POST"
 	sampleKey := createSampleSession()
 	body, _ := json.Marshal(&sampleKey)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, _ := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", uri, bytes.NewReader(body))
 
 	keyHandler(recorder, req)
 }
@@ -413,7 +391,6 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 		createKey()
 
 		uri := "/tyk/keys/1234?"
-		method := "DELETE"
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -421,7 +398,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req, err := http.NewRequest(method, uri+param.Encode(), nil)
+		req, err := http.NewRequest("DELETE", uri+param.Encode(), nil)
 
 		if err != nil {
 			t.Fatal(err)
@@ -450,7 +427,6 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		createKey()
 
 		uri := "/tyk/keys/create"
-		method := "POST"
 
 		sampleKey := createSampleSession()
 		body, _ := json.Marshal(&sampleKey)
@@ -461,8 +437,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req, err := http.NewRequest(method, uri+param.Encode(), bytes.NewReader(body))
-
+		req, err := http.NewRequest("POST", uri+param.Encode(), bytes.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -486,18 +461,14 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 }
 
 func TestAPIAuthFail(t *testing.T) {
-
 	uri := "/tyk/health/?api_id=1"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
-	req.Header.Add("x-tyk-authorization", "12345")
-
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("x-tyk-authorization", "12345")
 
 	makeSampleAPI(t, apiTestDef)
 	checkIsAPIOwner(healthCheckhandler)(recorder, req)
@@ -508,13 +479,10 @@ func TestAPIAuthFail(t *testing.T) {
 }
 
 func TestAPIAuthOk(t *testing.T) {
-
 	uri := "/tyk/health/?api_id=1"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri, nil)
 	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
 	if err != nil {
@@ -551,16 +519,12 @@ func TestGetOAuthClients(t *testing.T) {
 
 func TestResetHandler(t *testing.T) {
 	uri := "/tyk/reload/"
-
 	ApiSpecRegister = make(map[string]*APISpec)
 
 	makeSampleAPI(t, apiTestDef)
-
 	recorder := httptest.NewRecorder()
-	params := make(url.Values)
 
-	req, err := http.NewRequest("GET", uri+params.Encode(), nil)
-
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -614,13 +578,11 @@ func TestGroupResetHandler(t *testing.T) {
 	makeSampleAPI(t, apiTestDef)
 
 	recorder := httptest.NewRecorder()
-	params := make(url.Values)
 
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
-	req, err := http.NewRequest("GET", uri+params.Encode(), nil)
-
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

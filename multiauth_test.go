@@ -113,12 +113,9 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
@@ -152,12 +149,9 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
@@ -196,12 +190,9 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
@@ -235,12 +226,9 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", "WRONGTOKEN"))
 

@@ -588,13 +588,11 @@ func TestParambasedAuth(t *testing.T) {
 	form.Add("baz", "swoogetty")
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("POST", uri+param.Encode(), strings.NewReader(form.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
+	req, err := http.NewRequest("POST", uri, strings.NewReader(form.Encode()))
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -629,14 +627,12 @@ func TestVersioningRequestOK(t *testing.T) {
 	spec.SessionManager.UpdateSession("96869686969", session, 60)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", param.Encode(), nil)
-	req.Header.Add("authorization", "96869686969")
-	req.Header.Add("version", "v1")
-
+	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("authorization", "96869686969")
+	req.Header.Add("version", "v1")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -655,14 +651,12 @@ func TestVersioningRequestFail(t *testing.T) {
 	spec.SessionManager.UpdateSession("zz1234", session, 60)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", param.Encode(), nil)
-	req.Header.Add("authorization", "zz1234")
-	req.Header.Add("version", "v1")
-
+	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("authorization", "zz1234")
+	req.Header.Add("version", "v1")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -680,8 +674,7 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 	uri := "/v1/ignored/noregex"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri, nil)
 
 	// No auth information, it's an ignored path!
 	//	req.Header.Add("authorization", "1234")
@@ -708,14 +701,11 @@ func TestWhitelistRequestReply(t *testing.T) {
 	uri := "/v1/allowed/whitelist/reply/"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", uri+param.Encode(), nil)
-
-	req.Header.Add("authorization", keyId)
-
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("authorization", keyId)
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -735,8 +725,7 @@ func TestQuota(t *testing.T) {
 	defer spec.SessionManager.ResetQuota(keyId, session)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", param.Encode(), nil)
+	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -772,13 +761,11 @@ func TestWithAnalytics(t *testing.T) {
 	spec.SessionManager.UpdateSession("ert1234ert", session, 60)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", param.Encode(), nil)
-	req.Header.Add("authorization", "ert1234ert")
-
+	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("authorization", "ert1234ert")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -804,13 +791,11 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	spec.SessionManager.UpdateSession("fgh561234", session, 60)
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", param.Encode(), nil)
-	req.Header.Add("authorization", "dfgjg345316ertdg")
-
+	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("authorization", "dfgjg345316ertdg")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
