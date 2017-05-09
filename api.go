@@ -1822,3 +1822,17 @@ func handleInvalidateAPICache(apiID string) error {
 	}
 	return nil
 }
+
+func ctxGetData(r *http.Request) map[string]interface{} {
+	if v := context.Get(r, ContextData); v != nil {
+		return v.(map[string]interface{})
+	}
+	return nil
+}
+
+func ctxSetData(r *http.Request, m map[string]interface{}) {
+	if m == nil {
+		panic("setting a nil context ContextData")
+	}
+	context.Set(r, ContextData, m)
+}

@@ -57,11 +57,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 		sessionState = ses.(SessionState)
 	}
 
-	var contextData map[string]interface{}
-	cnt := context.Get(r, ContextData)
-	if cnt != nil {
-		contextData = cnt.(map[string]interface{})
-	}
+	contextData := ctxGetData(r)
 
 	// Iterate and manage key array injection
 	for nKey, nVal := range kv {
@@ -85,7 +81,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 
 		} else if strings.Contains(nVal, contextLabel) {
 			// Using context key
-			if cnt != nil {
+			if contextData != nil {
 				metaKey := strings.Replace(nVal, contextLabel, "", 1)
 				if contextData != nil {
 					tempVal, ok := contextData[metaKey]

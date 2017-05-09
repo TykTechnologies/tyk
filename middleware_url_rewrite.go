@@ -57,10 +57,7 @@ func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContex
 
 	if useContext {
 		log.Debug("Using context")
-		var contextData map[string]interface{}
-		if cnt := context.Get(r, ContextData); cnt != nil {
-			contextData = cnt.(map[string]interface{})
-		}
+		contextData := ctxGetData(r)
 
 		dollarMatch := regexp.MustCompile(`\$tyk_context.(\w+)`)
 		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)

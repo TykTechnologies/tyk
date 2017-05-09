@@ -233,21 +233,20 @@ func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
 		return
 	}
 	// Flatten claims and add to context
-	cnt := context.Get(r, ContextData)
+	cnt := ctxGetData(r)
 	if cnt == nil {
 		return
 	}
-	contextDataObject := cnt.(map[string]interface{})
 	claimPrefix := "jwt_claims_"
 
 	for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
 		claim := claimPrefix + claimName
-		contextDataObject[claim] = claimValue
+		cnt[claim] = claimValue
 	}
 
 	// Key data
 	authHeaderValue := context.Get(r, AuthHeaderValue)
-	contextDataObject["token"] = authHeaderValue
+	cnt["token"] = authHeaderValue
 
-	context.Set(r, ContextData, contextDataObject)
+	ctxSetData(r, cnt)
 }

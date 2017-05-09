@@ -421,20 +421,19 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 	if !k.Spec.EnableContextVars {
 		return
 	}
-	if cnt := context.Get(r, ContextData); cnt != nil {
-		contextDataObject := cnt.(map[string]interface{})
+	if cnt := ctxGetData(r); cnt != nil {
 		claimPrefix := "jwt_claims_"
 
 		for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
 			claim := claimPrefix + claimName
-			contextDataObject[claim] = claimValue
+			cnt[claim] = claimValue
 		}
 
 		// Key data
 		authHeaderValue := context.Get(r, AuthHeaderValue)
-		contextDataObject["token"] = authHeaderValue
+		cnt["token"] = authHeaderValue
 
-		context.Set(r, ContextData, contextDataObject)
+		ctxSetData(r, cnt)
 	}
 }
 
