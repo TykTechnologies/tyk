@@ -268,8 +268,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	req.Header.Add("authorization", tokenString)
 
 	if err != nil {
@@ -309,8 +308,7 @@ func TestJWTSessionRSA(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	req.Header.Add("authorization", tokenString)
 
 	if err != nil {
@@ -341,8 +339,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", "")
@@ -375,8 +372,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 
 	if err != nil {
 		t.Fatal("Problem generating the test token: ", err)
@@ -415,8 +411,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
@@ -459,8 +454,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
@@ -493,8 +487,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", "123")
@@ -537,8 +530,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
 	if err != nil {
@@ -578,8 +570,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer: "+tokenString)
 
@@ -638,8 +629,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
@@ -691,8 +681,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
@@ -744,8 +733,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
 
@@ -797,8 +785,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest("GET", "/jwt_test/?"+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
 

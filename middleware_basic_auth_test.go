@@ -89,12 +89,9 @@ func TestBasicAuthSession(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {
@@ -119,12 +116,9 @@ func TestBasicAuthBadFormatting(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, "-")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {
@@ -151,12 +145,9 @@ func TestBasicAuthBadData(t *testing.T) {
 
 	to_encode := "ldhflsdflksjfdlksjflksdjlskdjflkjsfd:::jhdsgfkjahsgdkhasdgjhgasdjhads:::aksdakjsdh:adskasdkjhasdkjhad-asdads"
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {
@@ -185,12 +176,9 @@ func TestBasicAuthBadOverFormatting(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password, "banana"}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {
@@ -218,12 +206,9 @@ func TestBasicAuthWrongUser(t *testing.T) {
 
 	to_encode := strings.Join([]string{"1234", password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {
@@ -253,12 +238,8 @@ func TestBasicMissingHeader(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("default4321", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -286,12 +267,9 @@ func TestBasicAuthWrongPassword(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, "WRONGPASSTEST"}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {

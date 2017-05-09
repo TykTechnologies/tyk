@@ -35,12 +35,9 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "GET"
 
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {
@@ -75,17 +72,12 @@ func TestValueExtractorFormSource(t *testing.T) {
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
-	uri := "/"
-	method := "POST"
-
 	authValue := "abc"
 
-	form := url.Values{}
-	form.Add("auth", authValue)
-
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest(method, uri, nil)
-	req.Form = form
+	req, err := http.NewRequest("POST", "/", nil)
+	req.Form = url.Values{}
+	req.Form.Add("auth", authValue)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
@@ -118,12 +110,8 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("default4321", session, 60)
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	// req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	if err != nil {
@@ -160,12 +148,8 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	fullHeaderValue := "token-12345"
 	matchedHeaderValue := []byte("12345")
 
-	uri := "/"
-	method := "GET"
-
 	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	req.Header.Add("Authorization", fullHeaderValue)
 
 	if err != nil {

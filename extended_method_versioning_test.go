@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"net/url"
 	"testing"
 )
 
@@ -243,9 +242,7 @@ const nonExpiringExtendedDefNoWhitelist = `{
 
 func TestExtendedBlacklistLinks(t *testing.T) {
 	uri := "v1/disallowed/blacklist/literal"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,9 +261,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	}
 
 	uri = "v1/disallowed/blacklist/abacab12345"
-	method = "GET"
-	param = make(url.Values)
-	req, err = http.NewRequest(method, uri+param.Encode(), nil)
+	req, err = http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,9 +279,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 
 	// Test with POST (it's a GET, should pass through)
 	uri = "v1/disallowed/blacklist/abacab12345"
-	method = "POST"
-	param = make(url.Values)
-	req, err = http.NewRequest(method, uri+param.Encode(), nil)
+	req, err = http.NewRequest("POST", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,9 +298,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 
 func TestExtendedWhiteLIstLinks(t *testing.T) {
 	uri := "v1/allowed/whitelist/literal"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,9 +317,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 	}
 
 	uri = "v1/allowed/whitelist/12345abans"
-	method = "GET"
-	param = make(url.Values)
-	req, err = http.NewRequest(method, uri+param.Encode(), nil)
+	req, err = http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,9 +336,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 
 func TestExtendedWhiteListBlock(t *testing.T) {
 	uri := "v1/allowed/bananaphone"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,9 +357,7 @@ func TestExtendedWhiteListBlock(t *testing.T) {
 
 func TestExtendedIgnored(t *testing.T) {
 	uri := "/v1/ignored/noregex"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,9 +378,7 @@ func TestExtendedIgnored(t *testing.T) {
 
 func TestExtendedWhiteListWithRedirectedReply(t *testing.T) {
 	uri := "v1/allowed/whitelist/reply/12345"
-	method := "GET"
-	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
