@@ -95,10 +95,9 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	if t.Spec.EnableContextVars {
-		contextData := context.Get(r, ContextData)
 		switch x := bodyData.(type) {
 		case map[string]interface{}:
-			x["_tyk_context"] = contextData
+			x["_tyk_context"] = ctxGetData(r)
 		}
 	}
 

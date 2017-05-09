@@ -166,11 +166,10 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 		return
 	}
 	// Flatten claims and add to context
-	if cnt := context.Get(r, ContextData); cnt != nil {
+	if cnt := ctxGetData(r); cnt != nil {
 		// Key data
-		contextDataObject := cnt.(map[string]interface{})
-		contextDataObject["token"] = token
-		context.Set(r, ContextData, contextDataObject)
+		cnt["token"] = token
+		ctxSetData(r, cnt)
 	}
 }
 

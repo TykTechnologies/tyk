@@ -3,8 +3,6 @@ package main
 import (
 	"net/http"
 	"strings"
-
-	"github.com/gorilla/context"
 )
 
 type MiddlewareContextVars struct {
@@ -62,7 +60,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 	// IP:Port
 	contextDataObject["remote_addr"] = copiedRequest.RemoteAddr
 
-	context.Set(r, ContextData, contextDataObject)
+	ctxSetData(r, contextDataObject)
 
 	return nil, 200
 }

@@ -698,3 +698,20 @@ func BenchmarkApiInsertReload(b *testing.B) {
 		loadApps(specs, newMuxes)
 	}
 }
+
+func TestContextData(t *testing.T) {
+	r := new(http.Request)
+	if ctxGetData(r) != nil {
+		t.Fatal("expected ctxGetData to return nil")
+	}
+	ctxSetData(r, map[string]interface{}{"foo": "bar"})
+	if ctxGetData(r) == nil {
+		t.Fatal("expected ctxGetData to return non-nil")
+	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected ctxSetData of zero val to panic")
+		}
+	}()
+	ctxSetData(r, nil)
+}
