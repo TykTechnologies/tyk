@@ -38,7 +38,7 @@ func (t *TransformMiddleware) GetConfig() (interface{}, error) {
 
 func (t *TransformMiddleware) IsEnabledForSpec() bool {
 	var used bool
-	for _, version := range t.TykMiddleware.Spec.VersionData.Versions {
+	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Transform) > 0 {
 			used = true
 			break
@@ -50,8 +50,8 @@ func (t *TransformMiddleware) IsEnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	_, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
-	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Transformed)
+	_, versionPaths, _, _ := t.Spec.GetVersionData(r)
+	found, meta := t.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Transformed)
 	if !found {
 		return nil, 200
 	}
@@ -66,7 +66,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Put into an interface:
 	var bodyData interface{}
-	switch tmeta.TemplateMeta.TemplateData.Input {
+	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
 		mxj.XmlCharsetReader = WrappedCharsetReader
 		var err error
@@ -86,7 +86,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		bodyData = make(map[string]interface{})
 	}
 
-	if tmeta.TemplateMeta.TemplateData.EnableSession {
+	if tmeta.TemplateData.EnableSession {
 		ses := context.Get(r, SessionData).(SessionState)
 		switch x := bodyData.(type) {
 		case map[string]interface{}:

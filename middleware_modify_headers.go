@@ -35,7 +35,7 @@ func (t *TransformHeaders) GetConfig() (interface{}, error) {
 
 func (t *TransformHeaders) IsEnabledForSpec() bool {
 	var used bool
-	for _, version := range t.TykMiddleware.Spec.VersionData.Versions {
+	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.TransformHeader) > 0 ||
 			len(version.GlobalHeaders) > 0 ||
 			len(version.GlobalHeadersRemove) > 0 {
@@ -125,7 +125,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	vInfo, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
+	vInfo, versionPaths, _, _ := t.Spec.GetVersionData(r)
 
 	// Manage global headers first - remove
 	for _, gdKey := range vInfo.GlobalHeadersRemove {
@@ -138,7 +138,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		t.iterateAddHeaders(vInfo.GlobalHeaders, r)
 	}
 
-	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, HeaderInjected)
+	found, meta := t.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, HeaderInjected)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {
