@@ -1241,10 +1241,11 @@ func generateListener(l net.Listener) (net.Listener, error) {
 		}
 
 		config := tls.Config{
-			Certificates:      certs,
-			NameToCertificate: certNameMap,
-			ServerName:        config.HttpServerOptions.ServerName,
-			MinVersion:        config.HttpServerOptions.MinVersion,
+			Certificates:       certs,
+			NameToCertificate:  certNameMap,
+			ServerName:         config.HttpServerOptions.ServerName,
+			MinVersion:         config.HttpServerOptions.MinVersion,
+			InsecureSkipVerify: config.HttpServerOptions.SSLInsecureSkipVerify,
 		}
 		return tls.Listen("tcp", targetPort, &config)
 
