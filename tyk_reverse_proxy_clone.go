@@ -300,6 +300,7 @@ var TykDefaultTransport = &TykTransporter{http.Transport{
 		KeepAlive: 30 * time.Second,
 	}).Dial,
 	TLSHandshakeTimeout: 10 * time.Second,
+	TLSClientConfig:     &tls.Config{},
 }}
 
 func cleanSlashes(a string) string {
@@ -409,6 +410,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := TykDefaultTransport
+	transport.TLSClientConfig.InsecureSkipVerify = config.ProxySSLInsecureSkipVerify
 
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {

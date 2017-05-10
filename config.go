@@ -108,17 +108,18 @@ type LocalSessionCacheConf struct {
 }
 
 type HttpServerOptionsConfig struct {
-	OverrideDefaults bool       `json:"override_defaults"`
-	ReadTimeout      int        `json:"read_timeout"`
-	WriteTimeout     int        `json:"write_timeout"`
-	UseSSL           bool       `json:"use_ssl"`
-	UseLE_SSL        bool       `json:"use_ssl_le"`
-	EnableWebSockets bool       `json:"enable_websockets"`
-	Certificates     []CertData `json:"certificates"`
-	ServerName       string     `json:"server_name"`
-	MinVersion       uint16     `json:"min_version"`
-	FlushInterval    int        `json:"flush_interval"`
-	SkipURLCleaning  bool       `json:"skip_url_cleaning"`
+	OverrideDefaults      bool       `json:"override_defaults"`
+	ReadTimeout           int        `json:"read_timeout"`
+	WriteTimeout          int        `json:"write_timeout"`
+	UseSSL                bool       `json:"use_ssl"`
+	UseLE_SSL             bool       `json:"use_ssl_le"`
+	SSLInsecureSkipVerify bool       `json:"ssl_insecure_skip_verify"`
+	EnableWebSockets      bool       `json:"enable_websockets"`
+	Certificates          []CertData `json:"certificates"`
+	ServerName            string     `json:"server_name"`
+	MinVersion            uint16     `json:"min_version"`
+	FlushInterval         int        `json:"flush_interval"`
+	SkipURLCleaning       bool       `json:"skip_url_cleaning"`
 }
 
 type AuthOverrideConf struct {
@@ -230,6 +231,7 @@ type Config struct {
 	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
+	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 }
 
 type CertData struct {
