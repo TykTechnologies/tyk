@@ -902,7 +902,7 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []UR
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
 		case Transformed:
-			if method == v.TransformAction.TemplateMeta.Method {
+			if method == v.TransformAction.Method {
 				return true, &v.TransformAction
 			}
 		case HeaderInjected:
@@ -914,7 +914,7 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []UR
 				return true, &v.InjectHeadersResponse
 			}
 		case TransformedResponse:
-			if method == v.TransformResponseAction.TemplateMeta.Method {
+			if method == v.TransformResponseAction.Method {
 				return true, &v.TransformResponseAction
 			}
 		case HardTimeout:

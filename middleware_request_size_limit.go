@@ -29,7 +29,7 @@ func (t *RequestSizeLimitMiddleware) GetConfig() (interface{}, error) {
 
 func (t *RequestSizeLimitMiddleware) IsEnabledForSpec() bool {
 	var used bool
-	for _, version := range t.TykMiddleware.Spec.VersionData.Versions {
+	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.SizeLimit) > 0 {
 			used = true
 			break
@@ -83,7 +83,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	log.Debug("Request size limiter active")
 
-	vInfo, versionPaths, _, _ := t.TykMiddleware.Spec.GetVersionData(r)
+	vInfo, versionPaths, _, _ := t.Spec.GetVersionData(r)
 
 	log.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
 	// Manage global headers first
@@ -102,7 +102,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	}
 
 	// If there's a potential match, try to match
-	found, meta := t.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestSizeLimit)
+	found, meta := t.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestSizeLimit)
 	if found {
 		log.Debug("Request size limit matched for this URL, checking...")
 		rmeta := meta.(*apidef.RequestSizeMeta)
