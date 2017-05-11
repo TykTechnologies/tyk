@@ -83,37 +83,32 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 			// Using context key
 			if contextData != nil {
 				metaKey := strings.Replace(nVal, contextLabel, "", 1)
-				if contextData != nil {
-					tempVal, ok := contextData[metaKey]
-					if ok {
-						switch x := tempVal.(type) {
-						case string:
-							nVal = x
-						case []string:
-							nVal = strings.Join(x, ",")
-							// Remove empty start
-							nVal = strings.TrimPrefix(nVal, ",")
-						case url.Values:
-							i := 0
-							nVal = ""
-							for key, val := range x {
-								nVal += key + ":" + strings.Join(val, ",")
-								if i < len(x)-1 {
-									nVal += ";"
-								}
-								i++
+				tempVal, ok := contextData[metaKey]
+				if ok {
+					switch x := tempVal.(type) {
+					case string:
+						nVal = x
+					case []string:
+						nVal = strings.Join(x, ",")
+						// Remove empty start
+						nVal = strings.TrimPrefix(nVal, ",")
+					case url.Values:
+						i := 0
+						nVal = ""
+						for key, val := range x {
+							nVal += key + ":" + strings.Join(val, ",")
+							if i < len(x)-1 {
+								nVal += ";"
 							}
-						default:
-							log.Error("Context variable type is not supported: ", reflect.TypeOf(x))
+							i++
 						}
-
-						r.Header.Add(nKey, nVal)
-					} else {
-						log.Warning("Context Data not found for key in map: ", metaKey)
+					default:
+						log.Error("Context variable type is not supported: ", reflect.TypeOf(x))
 					}
 
+					r.Header.Add(nKey, nVal)
 				} else {
-					log.Debug("Context data object is nil! Skipping.")
+					log.Warning("Context Data not found for key in map: ", metaKey)
 				}
 			}
 
