@@ -368,7 +368,7 @@ func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, er
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, RecordDetail(req))
+	return p.WrappedServeHTTP(rw, req, p.TykAPISpec.APIDefinition.CacheOptions.EnableCache)
 	// return nil
 }
 
