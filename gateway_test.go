@@ -847,11 +847,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			config.ControlAPIPort, _ = strconv.Atoi(port)
 		}
 
-		if m.overrideDefaults {
-			config.HttpServerOptions.OverrideDefaults = true
-		} else {
-			config.HttpServerOptions.OverrideDefaults = false
-		}
+		config.HttpServerOptions.OverrideDefaults = m.overrideDefaults
 
 		// Ensure that no local API's installed
 		os.RemoveAll(config.AppPath)

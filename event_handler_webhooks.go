@@ -102,8 +102,6 @@ func (w *WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 			defaultPath := filepath.Join(config.TemplatePath, "default_webhook.json")
 			webHookTemplate, _ = template.ParseFiles(defaultPath)
 			templateLoaded = true
-		} else {
-			templateLoaded = false
 		}
 	}
 
