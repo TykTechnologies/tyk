@@ -237,19 +237,18 @@ func swaggerLoadFile(filePath string) (*SwaggerAST, error) {
 	swagger, err := GetImporterForSource(SwaggerSource)
 	if err != nil {
 		log.Error("Couldn't get swagger importer: ", err)
-		return swagger.(*SwaggerAST), err
+		return nil, err
 	}
 
 	swaggerFileData, err := ioutil.ReadFile(filePath)
-
 	if err != nil {
 		log.Error("Couldn't load swagger file: ", err)
-		return swagger.(*SwaggerAST), err
+		return nil, err
 	}
 
 	if err := swagger.ReadString(string(swaggerFileData)); err != nil {
 		log.Error("Failed to decode object")
-		return swagger.(*SwaggerAST), err
+		return nil, err
 	}
 
 	return swagger.(*SwaggerAST), nil

@@ -66,20 +66,15 @@ func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err 
 func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValue string, err error) {
 	r.ParseForm()
 	if paramName == "" {
-		// No param name, error?
-		err = errors.New("No form param name set")
-		return formValue, err
+		return "", errors.New("no form param name set")
 	}
 
 	values := r.Form[paramName]
-
-	if len(values) > 0 {
-		formValue = strings.Join(values, "")
-	} else {
-		// Error, no value!
-		err = errors.New("No form value")
+	if len(values) == 0 {
+		return "", errors.New("no form value")
 	}
-	return formValue, err
+
+	return strings.Join(values, ""), nil
 }
 
 func (e *BaseExtractor) ExtractBody(r *http.Request) (bodyValue string, err error) {

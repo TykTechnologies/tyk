@@ -549,7 +549,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 		client := new(OAuthClient)
 		if err := json.Unmarshal([]byte(clientJSON), &client); err != nil {
 			log.Error("Couldn't unmarshal OAuth client object: ", err)
-			return theseClients, err
+			return nil, err
 		}
 		theseClients = append(theseClients, client)
 	}

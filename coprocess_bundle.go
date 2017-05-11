@@ -195,17 +195,14 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		err = errors.New("Unknown URL scheme")
 	}
 	if err != nil {
-		return Bundle{}, err
+		return bundle, err
 	}
 
 	bundleData, err := getter.Get()
 
-	bundle = Bundle{
-		Name: spec.CustomMiddlewareBundle,
-		Data: bundleData,
-		Spec: spec,
-	}
-
+	bundle.Name = spec.CustomMiddlewareBundle
+	bundle.Data = bundleData
+	bundle.Spec = spec
 	return bundle, err
 }
 

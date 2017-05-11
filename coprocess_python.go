@@ -236,23 +236,22 @@ func PythonLoadDispatcher() error {
 }
 
 // PythonNewDispatcher creates an instance of TykDispatcher.
-func PythonNewDispatcher(middlewarePath, eventHandlerPath string, bundlePaths []string) (dispatcher coprocess.Dispatcher, err error) {
+func PythonNewDispatcher(middlewarePath, eventHandlerPath string, bundlePaths []string) (coprocess.Dispatcher, error) {
 	CMiddlewarePath := C.CString(middlewarePath)
 	CEventHandlerPath := C.CString(eventHandlerPath)
 	CBundlePaths := C.CString(strings.Join(bundlePaths, ":"))
 
 	result := C.Python_NewDispatcher(CMiddlewarePath, CEventHandlerPath, CBundlePaths)
-
 	if result == -1 {
-		err = errors.New("Can't initialize a dispatcher")
-	} else {
-		dispatcher = &PythonDispatcher{}
+		return nil, errors.New("can't initialize a dispatcher")
 	}
+
+	dispatcher := &PythonDispatcher{}
 
 	C.free(unsafe.Pointer(CMiddlewarePath))
 	C.free(unsafe.Pointer(CEventHandlerPath))
 
-	return dispatcher, err
+	return dispatcher, nil
 }
 
 // PythonSetEnv sets PYTHONPATH, it's called before initializing the interpreter.

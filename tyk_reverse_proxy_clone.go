@@ -37,30 +37,30 @@ func GetURLFromService(spec *APISpec) (*apidef.HostList, error) {
 		sd := ServiceDiscovery{}
 		sd.New(&spec.Proxy.ServiceDiscovery)
 		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
-		if err == nil {
-			// Set the cached value
-			if data.Len() == 0 {
-				spec.HasRun = true
-				spec.ServiceRefreshInProgress = false
-				log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
-
-				if spec.LastGoodHostList == nil {
-					log.Warning("[PROXY][SD] Last good host list is nil, returning empty set.")
-					spec.LastGoodHostList = apidef.NewHostList()
-				}
-
-				return spec.LastGoodHostList, nil
-			}
-
-			ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
-			// Stash it too
-			spec.LastGoodHostList = data
+		if err != nil {
+			spec.ServiceRefreshInProgress = false
+			return nil, err
+		}
+		// Set the cached value
+		if data.Len() == 0 {
 			spec.HasRun = true
 			spec.ServiceRefreshInProgress = false
-			return data, err
+			log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
+
+			if spec.LastGoodHostList == nil {
+				log.Warning("[PROXY][SD] Last good host list is nil, returning empty set.")
+				spec.LastGoodHostList = apidef.NewHostList()
+			}
+
+			return spec.LastGoodHostList, nil
 		}
+
+		ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
+		// Stash it too
+		spec.LastGoodHostList = data
+		spec.HasRun = true
 		spec.ServiceRefreshInProgress = false
-		return nil, err
+		return data, nil
 	}
 
 	// First time? Refresh the cache and return that
