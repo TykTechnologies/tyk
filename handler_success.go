@@ -141,7 +141,7 @@ func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 	session.Tags = policy.Tags
 
 	// Update the session in the session manager in case it gets called again
-	t.Spec.SessionManager.UpdateSession(key, *session, getLifetime(t.Spec, session))
+	t.Spec.SessionManager.UpdateSession(key, session, getLifetime(t.Spec, session))
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
@@ -190,7 +190,7 @@ func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		log.Debug("Lifetime is: ", getLifetime(t.Spec, &session))
 		// Need to set this in order for the write to work!
 		session.LastUpdated = time.Now().String()
-		t.Spec.SessionManager.UpdateSession(key, session, getLifetime(t.Spec, &session))
+		t.Spec.SessionManager.UpdateSession(key, &session, getLifetime(t.Spec, &session))
 	}
 
 	return session, found
@@ -228,12 +228,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		oauthClientID := ""
 		tags := make([]string, 0)
 		var alias string
-		sessionState := context.Get(r, SessionData)
+		session := ctxGetSession(r)
 
-		if sessionState != nil {
-			oauthClientID = sessionState.(SessionState).OauthClientID
-			tags = sessionState.(SessionState).Tags
-			alias = sessionState.(SessionState).Alias
+		if session != nil {
+			oauthClientID = session.OauthClientID
+			tags = session.Tags
+			alias = session.Alias
 		}
 
 		rawRequest := ""

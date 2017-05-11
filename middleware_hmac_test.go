@@ -51,8 +51,8 @@ const hmacAuthDef = `{
 	}
 }`
 
-func createHMACAuthSession() SessionState {
-	var session SessionState
+func createHMACAuthSession() *SessionState {
+	session := new(SessionState)
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -64,7 +64,6 @@ func createHMACAuthSession() SessionState {
 	session.QuotaMax = -1
 	session.HMACEnabled = true
 	session.HmacSecret = "9879879878787878"
-
 	return session
 }
 

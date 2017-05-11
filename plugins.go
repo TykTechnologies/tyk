@@ -119,18 +119,16 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
-	sessionState := SessionState{}
+	session := new(SessionState)
 	authHeaderValue := ""
 
 	// Encode the session object (if not a pre-process)
-	if !d.Pre {
-		if d.UseSession {
-			sessionState = context.Get(r, SessionData).(SessionState)
-			authHeaderValue = context.Get(r, AuthHeaderValue).(string)
-		}
+	if !d.Pre && d.UseSession {
+		session = ctxGetSession(r)
+		authHeaderValue = context.Get(r, AuthHeaderValue).(string)
 	}
 
-	sessionAsJsonObj, err := json.Marshal(sessionState)
+	sessionAsJsonObj, err := json.Marshal(session)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -234,8 +232,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Save the sesison data (if modified)
 	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
-		sessionState.MetaData = mapStrsToIfaces(newRequestData.SessionMeta)
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, getLifetime(d.Spec, &sessionState))
+		session.MetaData = mapStrsToIfaces(newRequestData.SessionMeta)
+		d.Spec.SessionManager.UpdateSession(authHeaderValue, session, getLifetime(d.Spec, session))
 	}
 
 	log.WithFields(logrus.Fields{
@@ -247,7 +245,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		context.Set(r, SessionData, newRequestData.Session)
+		ctxSetSession(r, &newRequestData.Session)
 		context.Set(r, AuthHeaderValue, newRequestData.AuthValue)
 	}
 
@@ -440,7 +438,7 @@ func (j *JSVM) LoadTykJSApi() {
 			return otto.Value{}
 		}
 
-		doAddOrUpdate(apiKey, newSession, suppressReset == "1")
+		doAddOrUpdate(apiKey, &newSession, suppressReset == "1")
 
 		return otto.Value{}
 	})

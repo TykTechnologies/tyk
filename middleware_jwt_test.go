@@ -205,7 +205,8 @@ jQIDAQAB
 -----END PUBLIC KEY-----
 `
 
-func createJWTSession() (session SessionState) {
+func createJWTSession() *SessionState {
+	session := new(SessionState)
 	session.Rate = 1000000.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix() - 10
@@ -216,16 +217,16 @@ func createJWTSession() (session SessionState) {
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
 	session.JWTData.Secret = jwtSecret
-	return
+	return session
 }
 
-func createJWTSessionWithRSA() SessionState {
+func createJWTSessionWithRSA() *SessionState {
 	session := createJWTSession()
 	session.JWTData.Secret = jwtRSAPubKey
 	return session
 }
 
-func createJWTSessionWithRSAWithPolicy() SessionState {
+func createJWTSessionWithRSAWithPolicy() *SessionState {
 	session := createJWTSessionWithRSA()
 	session.ApplyPolicyID = "987654321"
 	return session

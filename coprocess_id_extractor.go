@@ -24,7 +24,7 @@ import (
 // IdExtractor is the base interface for an ID extractor.
 type IdExtractor interface {
 	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
-	PostProcess(*http.Request, SessionState, string)
+	PostProcess(*http.Request, *SessionState, string)
 	GenerateSessionID(string, *TykMiddleware) string
 }
 
@@ -44,11 +44,11 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 }
 
 // PostProcess sets context variables and updates the storage.
-func (e *BaseExtractor) PostProcess(r *http.Request, sessionState SessionState, sessionID string) {
-	sessionLifetime := getLifetime(e.Spec, &sessionState)
-	e.Spec.SessionManager.UpdateSession(sessionID, sessionState, sessionLifetime)
+func (e *BaseExtractor) PostProcess(r *http.Request, session *SessionState, sessionID string) {
+	sessionLifetime := getLifetime(e.Spec, session)
+	e.Spec.SessionManager.UpdateSession(sessionID, session, sessionLifetime)
 
-	context.Set(r, SessionData, sessionState)
+	ctxSetSession(r, session)
 	context.Set(r, AuthHeaderValue, sessionID)
 }
 
@@ -145,14 +145,14 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 	sessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
 
-	previousSessionState, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
+	previousSession, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
 
 	if keyExists {
-		lastUpdated, _ := strconv.Atoi(previousSessionState.LastUpdated)
+		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
 
-		deadlineTs := int64(lastUpdated) + previousSessionState.IdExtractorDeadline
+		deadlineTs := int64(lastUpdated) + previousSession.IdExtractorDeadline
 		if deadlineTs > time.Now().Unix() {
-			e.PostProcess(r, previousSessionState, sessionID)
+			e.PostProcess(r, &previousSession, sessionID)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -213,16 +213,16 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	SessionID = e.GenerateSessionID(regexOutput[config.RegexMatchIndex], e.TykMiddleware)
 
-	previousSessionState, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
 
-		lastUpdated, _ := strconv.Atoi(previousSessionState.LastUpdated)
+		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
 
-		deadlineTs := int64(lastUpdated) + previousSessionState.IdExtractorDeadline
+		deadlineTs := int64(lastUpdated) + previousSession.IdExtractorDeadline
 
 		if deadlineTs > time.Now().Unix() {
-			e.PostProcess(r, previousSessionState, SessionID)
+			e.PostProcess(r, &previousSession, SessionID)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -293,18 +293,16 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	SessionID = e.GenerateSessionID(output, e.TykMiddleware)
 
-	var keyExists bool
-	var previousSessionState SessionState
-	previousSessionState, keyExists = e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
 
-		lastUpdated, _ := strconv.Atoi(previousSessionState.LastUpdated)
+		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
 
-		deadlineTs := int64(lastUpdated) + previousSessionState.IdExtractorDeadline
+		deadlineTs := int64(lastUpdated) + previousSession.IdExtractorDeadline
 
 		if deadlineTs > time.Now().Unix() {
-			e.PostProcess(r, previousSessionState, SessionID)
+			e.PostProcess(r, &previousSession, SessionID)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}

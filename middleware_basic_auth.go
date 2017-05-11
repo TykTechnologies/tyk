@@ -88,7 +88,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Check if API key valid
 	keyName := k.TykMiddleware.Spec.OrgID + authValues[0]
-	sessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(keyName)
+	session, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(keyName)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -107,16 +107,16 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Ensure that the username and password match up
 	var passMatch bool
-	if sessionState.BasicAuthData.Hash == HashBCrypt {
-		err := bcrypt.CompareHashAndPassword([]byte(sessionState.BasicAuthData.Password), []byte(authValues[1]))
+	if session.BasicAuthData.Hash == HashBCrypt {
+		err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(authValues[1]))
 
 		if err == nil {
 			passMatch = true
 		}
 	}
 
-	if sessionState.BasicAuthData.Hash == HashPlainText {
-		if sessionState.BasicAuthData.Password == authValues[1] {
+	if session.BasicAuthData.Hash == HashPlainText {
+		if session.BasicAuthData.Password == authValues[1] {
 			passMatch = true
 		}
 	}
@@ -140,7 +140,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Set session state on context, we will need it later
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
-		context.Set(r, SessionData, sessionState)
+		ctxSetSession(r, &session)
 		context.Set(r, AuthHeaderValue, keyName)
 	}
 

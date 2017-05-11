@@ -25,12 +25,12 @@ type AuthorisationHandler interface {
 // SessionState objects, not identity
 type SessionHandler interface {
 	Init(store StorageHandler)
-	UpdateSession(keyName string, session SessionState, resetTTLTo int64) error
+	UpdateSession(keyName string, session *SessionState, resetTTLTo int64) error
 	RemoveSession(keyName string)
 	GetSessionDetail(keyName string) (SessionState, bool)
 	GetSessions(filter string) []string
 	GetStore() StorageHandler
-	ResetQuota(string, SessionState)
+	ResetQuota(string, *SessionState)
 }
 
 // DefaultAuthorisationManager implements AuthorisationHandler,
@@ -87,7 +87,7 @@ func (b *DefaultSessionManager) GetStore() StorageHandler {
 	return b.Store
 }
 
-func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState) {
+func (b *DefaultSessionManager) ResetQuota(keyName string, session *SessionState) {
 
 	rawKey := QuotaKeyPrefix + publicHash(keyName)
 	log.WithFields(logrus.Fields{
@@ -105,7 +105,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session SessionState)
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b *DefaultSessionManager) UpdateSession(keyName string, session SessionState, resetTTLTo int64) error {
+func (b *DefaultSessionManager) UpdateSession(keyName string, session *SessionState, resetTTLTo int64) error {
 	if !session.HasChanged() {
 		log.Debug("Session has not changed, not updating")
 		return nil

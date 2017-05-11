@@ -30,14 +30,12 @@ func (k *KeyExpired) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	sess := context.Get(r, SessionData)
-	if sess == nil {
+	session := ctxGetSession(r)
+	if session == nil {
 		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 403
 	}
 
-	sessionState := sess.(SessionState)
-
-	if sessionState.IsInactive {
+	if session.IsInactive {
 		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -59,7 +57,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		return errors.New("Key is inactive, please renew"), 403
 	}
 
-	keyExpired := k.Spec.AuthManager.IsKeyExpired(&sessionState)
+	keyExpired := k.Spec.AuthManager.IsKeyExpired(session)
 
 	if keyExpired {
 		authHeaderValue := context.Get(r, AuthHeaderValue).(string)

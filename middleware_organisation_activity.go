@@ -66,7 +66,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		return nil, 200
 	}
 
-	sessionState, found := k.GetOrgSession(k.Spec.OrgID)
+	session, found := k.GetOrgSession(k.Spec.OrgID)
 
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
@@ -74,7 +74,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	}
 
 	// Is it active?
-	if sessionState.IsInactive {
+	if session.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": GetIPFromRequest(r),
@@ -85,11 +85,11 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	}
 
 	// We found a session, apply the quota limiter
-	forwardMessage, reason := k.sessionlimiter.ForwardMessage(&sessionState,
+	forwardMessage, reason := k.sessionlimiter.ForwardMessage(&session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.GetStore(), false, false)
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, sessionState, getLifetime(k.Spec, &sessionState))
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, getLifetime(k.Spec, &session))
 
 	if !forwardMessage {
 		if reason == 2 {
@@ -113,11 +113,11 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 
 	if config.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
-		k.mon.Check(&sessionState, "")
+		k.mon.Check(&session, "")
 	}
 
 	// Lets keep a reference of the org
-	context.Set(r, OrgSessionContext, sessionState)
+	context.Set(r, OrgSessionContext, session)
 
 	// Request is valid, carry on
 	return nil, 200
@@ -167,7 +167,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *
 
 func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request) {
 
-	sessionState, found := k.GetOrgSession(k.Spec.OrgID)
+	session, found := k.GetOrgSession(k.Spec.OrgID)
 
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
@@ -176,7 +176,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	}
 
 	// Is it active?
-	if sessionState.IsInactive {
+	if session.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": GetIPFromRequest(r),
@@ -189,9 +189,9 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	}
 
 	// We found a session, apply the quota limiter
-	isQuotaExceeded := k.sessionlimiter.IsRedisQuotaExceeded(&sessionState, k.Spec.OrgID, k.Spec.OrgSessionManager.GetStore())
+	isQuotaExceeded := k.sessionlimiter.IsRedisQuotaExceeded(&session, k.Spec.OrgID, k.Spec.OrgSessionManager.GetStore())
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, sessionState, getLifetime(k.Spec, &sessionState))
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, getLifetime(k.Spec, &session))
 
 	if isQuotaExceeded {
 		log.WithFields(logrus.Fields{
@@ -213,7 +213,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 
 		if config.Monitor.MonitorOrgKeys {
 			// Run the trigger monitor
-			k.mon.Check(&sessionState, "")
+			k.mon.Check(&session, "")
 		}
 
 		return
@@ -221,11 +221,11 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 
 	if config.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
-		k.mon.Check(&sessionState, "")
+		k.mon.Check(&session, "")
 	}
 
 	// Lets keep a reference of the org
-	context.Set(r, OrgSessionContext, sessionState)
+	context.Set(r, OrgSessionContext, session)
 
 	orgChan <- true
 }

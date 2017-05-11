@@ -112,10 +112,9 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	// Encode the session object (if not a pre-process & not a custom key check):
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
-		session := context.Get(r, SessionData)
+		session := ctxGetSession(r)
 		if session != nil {
-			sessionState := session.(SessionState)
-			object.Session = ProtoSessionState(sessionState)
+			object.Session = ProtoSessionState(session)
 		}
 	}
 
@@ -294,17 +293,17 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			return errors.New("Key not authorised"), 403
 		}
 
-		returnedSessionState := TykSessionState(returnObject.Session)
+		returnedSession := TykSessionState(returnObject.Session)
 
 		if extractor == nil {
-			sessionLifetime := getLifetime(m.Spec, &returnedSessionState)
+			sessionLifetime := getLifetime(m.Spec, returnedSession)
 			// This API is not using the ID extractor, but we've got a session:
-			m.Spec.SessionManager.UpdateSession(authHeaderValue, returnedSessionState, sessionLifetime)
-			context.Set(r, SessionData, returnedSessionState)
+			m.Spec.SessionManager.UpdateSession(authHeaderValue, returnedSession, sessionLifetime)
+			ctxSetSession(r, returnedSession)
 			context.Set(r, AuthHeaderValue, authHeaderValue)
 		} else {
 			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
-			extractor.PostProcess(r, returnedSessionState, sessionID)
+			extractor.PostProcess(r, returnedSession, sessionID)
 		}
 	}
 

@@ -78,11 +78,11 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, authHeaderV
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	sessionState := context.Get(r, SessionData).(SessionState)
+	session := ctxGetSession(r)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 
 	storeRef := k.Spec.SessionManager.GetStore()
-	forwardMessage, reason := sessionLimiter.ForwardMessage(&sessionState,
+	forwardMessage, reason := sessionLimiter.ForwardMessage(session,
 		authHeaderValue,
 		storeRef,
 		!k.Spec.DisableRateLimit,
@@ -92,15 +92,15 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
 		// Ensure quota and rate data for this session are recorded
 		if !config.UseAsyncSessionWrite {
-			k.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, getLifetime(k.Spec, &sessionState))
-			context.Set(r, SessionData, sessionState)
+			k.Spec.SessionManager.UpdateSession(authHeaderValue, session, getLifetime(k.Spec, session))
+			ctxSetSession(r, session)
 		} else {
-			go k.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, getLifetime(k.Spec, &sessionState))
-			go context.Set(r, SessionData, sessionState)
+			go k.Spec.SessionManager.UpdateSession(authHeaderValue, session, getLifetime(k.Spec, session))
+			go ctxSetSession(r, session)
 		}
 	}
 
-	log.Debug("SessionState: ", sessionState)
+	log.Debug("SessionState: ", session)
 
 	if !forwardMessage {
 		// TODO Use an Enum!
@@ -116,7 +116,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if config.Monitor.MonitorUserKeys {
-		sessionMonitor.Check(&sessionState, authHeaderValue)
+		sessionMonitor.Check(session, authHeaderValue)
 	}
 
 	// Request is valid, carry on

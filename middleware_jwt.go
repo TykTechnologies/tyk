@@ -164,12 +164,12 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 
 	// Couldn't base64 decode the kid, so lets try it raw
 	log.Debug("Getting key: ", tykId)
-	sessionState, rawKeyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	session, rawKeyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !rawKeyExists {
 		log.Info("Not found!")
 		return nil, errors.New("token invalid, key not found")
 	}
-	return []byte(sessionState.JWTData.Secret), nil
+	return []byte(session.JWTData.Secret), nil
 }
 
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
@@ -190,17 +190,17 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 		}
 
 		// Check for a regular token that matches this client ID
-		clientsessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
+		clientSession, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
 		if !exists {
 			return "", false
 		}
 
-		if clientsessionState.ApplyPolicyID == "" {
+		if clientSession.ApplyPolicyID == "" {
 			return "", false
 		}
 
 		// Use the policy from the client ID
-		return clientsessionState.ApplyPolicyID, true
+		return clientSession.ApplyPolicyID, true
 	}
 
 	return "", false
@@ -229,11 +229,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	log.Debug("JWT Temporary session ID is: ", sessionID)
 
-	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
+	session, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
-		sessionState = SessionState{}
+		session = SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy := k.getBasePolicyID(token)
@@ -241,22 +241,22 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("Key not authorized: no matching policy found"), 403
 		}
 
-		newSessionState, err := generateSessionFromPolicy(basePolicyID,
+		newSession, err := generateSessionFromPolicy(basePolicyID,
 			k.TykMiddleware.Spec.APIDefinition.OrgID,
 			true)
 
 		if err == nil {
-			sessionState = newSessionState
-			sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
-			sessionState.Alias = baseFieldData
+			session = newSession
+			session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+			session.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again
-			k.Spec.SessionManager.UpdateSession(sessionID, sessionState, getLifetime(k.Spec, &sessionState))
+			k.Spec.SessionManager.UpdateSession(sessionID, &session, getLifetime(k.Spec, &session))
 			log.Debug("Policy applied to key")
 
 			switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 			case apidef.JWTClaim, apidef.UnsetAuth:
-				context.Set(r, SessionData, sessionState)
+				ctxSetSession(r, &session)
 				context.Set(r, AuthHeaderValue, sessionID)
 			}
 			k.setContextVars(r, token)
@@ -271,7 +271,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	log.Debug("Key found")
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		context.Set(r, SessionData, sessionState)
+		ctxSetSession(r, &session)
 		context.Set(r, AuthHeaderValue, sessionID)
 	}
 	k.setContextVars(r, token)
@@ -295,14 +295,14 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	log.Debug("Using raw key ID: ", tykId)
-	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	session, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
 	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), 403
 	}
 
 	log.Debug("Raw key ID found.")
-	context.Set(r, SessionData, sessionState)
+	ctxSetSession(r, &session)
 	context.Set(r, AuthHeaderValue, tykId)
 	k.setContextVars(r, token)
 	return nil, 200
@@ -439,9 +439,9 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 
 func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (SessionState, error) {
 	policy, ok := Policies[policyID]
-	sessionState := SessionState{}
+	session := SessionState{}
 	if !ok {
-		return sessionState, errors.New("Policy not found")
+		return session, errors.New("Policy not found")
 	}
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise youcould overwrite a session key with a policy from a different org!
@@ -449,28 +449,28 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (Session
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")
-			return sessionState, errors.New("Key not authorized: no matching policy")
+			return session, errors.New("Key not authorized: no matching policy")
 		}
 	} else {
 		// Org isn;t enforced, so lets use the policy baseline
 		orgID = policy.OrgID
 	}
 
-	sessionState.ApplyPolicyID = policyID
-	sessionState.OrgID = orgID
-	sessionState.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-	sessionState.Rate = policy.Rate
-	sessionState.Per = policy.Per
-	sessionState.QuotaMax = policy.QuotaMax
-	sessionState.QuotaRenewalRate = policy.QuotaRenewalRate
-	sessionState.AccessRights = policy.AccessRights
-	sessionState.HMACEnabled = policy.HMACEnabled
-	sessionState.IsInactive = policy.IsInactive
-	sessionState.Tags = policy.Tags
+	session.ApplyPolicyID = policyID
+	session.OrgID = orgID
+	session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+	session.Rate = policy.Rate
+	session.Per = policy.Per
+	session.QuotaMax = policy.QuotaMax
+	session.QuotaRenewalRate = policy.QuotaRenewalRate
+	session.AccessRights = policy.AccessRights
+	session.HMACEnabled = policy.HMACEnabled
+	session.IsInactive = policy.IsInactive
+	session.Tags = policy.Tags
 
 	if policy.KeyExpiresIn > 0 {
-		sessionState.Expires = time.Now().Unix() + policy.KeyExpiresIn
+		session.Expires = time.Now().Unix() + policy.KeyExpiresIn
 	}
 
-	return sessionState, nil
+	return session, nil
 }
