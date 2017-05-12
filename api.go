@@ -1863,3 +1863,25 @@ func ctxSetAuthToken(r *http.Request, t string) {
 	}
 	context.Set(r, AuthHeaderValue, t)
 }
+
+func ctxGetTrackedPath(r *http.Request) string {
+	if v := context.Get(r, TrackThisEndpoint); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+func ctxSetTrackedPath(r *http.Request, p string) {
+	if p == "" {
+		panic("setting a nil context TrackThisEndpoint")
+	}
+	context.Set(r, TrackThisEndpoint, p)
+}
+
+func ctxGetDoNotTrack(r *http.Request) bool {
+	return context.Get(r, DoNotTrackThisEndpoint) == true
+}
+
+func ctxSetDoNotTrack(r *http.Request, b bool) {
+	context.Set(r, DoNotTrackThisEndpoint, b)
+}

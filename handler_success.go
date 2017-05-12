@@ -245,17 +245,11 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 		}
 
-		trackThisEndpoint := context.Get(r, TrackThisEndpoint)
-		trackedPath := r.URL.Path
 		trackEP := false
-		if trackThisEndpoint != nil {
+		trackedPath := r.URL.Path
+		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
 			trackEP = true
-			trackedPath = trackThisEndpoint.(string)
-		}
-
-		if context.Get(r, DoNotTrackThisEndpoint) != nil {
-			trackEP = false
-			trackedPath = r.URL.Path
+			trackedPath = p
 		}
 
 		record := AnalyticsRecord{
