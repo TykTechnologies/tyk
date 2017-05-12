@@ -13,7 +13,6 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/gorilla/context"
 	"github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -1046,15 +1045,13 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 // request (currently only "header" is supported)
 func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
 	var version apidef.VersionInfo
-	var versionKey string
 	var versionRxPaths []URLSpec
 	var versionWLStatus bool
 
 	// try the context first
-	aVersion := context.Get(r, VersionData)
-	if aVersion != nil {
-		version = aVersion.(apidef.VersionInfo)
-		versionKey = context.Get(r, VersionKeyContext).(string)
+	versionKey := ctxGetVersionKey(r)
+	if v := ctxGetVersionInfo(r); v != nil {
+		version = *v
 	} else {
 		// Are we versioned?
 		if a.APIDefinition.VersionData.NotVersioned {
@@ -1080,8 +1077,8 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 		}
 
 		// Lets save this for the future
-		context.Set(r, VersionData, version)
-		context.Set(r, VersionKeyContext, versionKey)
+		ctxSetVersionInfo(r, &version)
+		ctxSetVersionKey(r, versionKey)
 	}
 
 	// Load path data and whitelist data for version
