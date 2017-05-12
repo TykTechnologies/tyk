@@ -81,7 +81,7 @@ func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContex
 			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
 			log.Debug("Replacing: ", v[0])
 
-			val, ok := sessionState.MetaData.(map[string]interface{})[contextKey]
+			val, ok := sessionState.MetaData[contextKey]
 			if ok {
 				newpath = strings.Replace(newpath, v[0], valToStr(val), -1)
 			}
