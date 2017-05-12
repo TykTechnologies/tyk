@@ -4,8 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gorilla/context"
-
 	"github.com/Sirupsen/logrus"
 )
 
@@ -34,7 +32,7 @@ func (a *AccessRightsCheck) IsEnabledForSpec() bool { return true }
 func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	accessingVersion := a.Spec.getVersionFromRequest(r)
 	session := ctxGetSession(r)
-	authHeaderValue := context.Get(r, AuthHeaderValue)
+	token := ctxGetAuthToken(r)
 
 	// If there's nothing in our profile, we let them through to the next phase
 	if len(session.AccessRights) > 0 {
@@ -44,7 +42,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			log.WithFields(logrus.Fields{
 				"path":      r.URL.Path,
 				"origin":    GetIPFromRequest(r),
-				"key":       authHeaderValue,
+				"key":       token,
 				"api_found": false,
 			}).Info("Attempted access to unauthorised API.")
 
@@ -70,7 +68,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			log.WithFields(logrus.Fields{
 				"path":          r.URL.Path,
 				"origin":        GetIPFromRequest(r),
-				"key":           authHeaderValue,
+				"key":           token,
 				"api_found":     true,
 				"version_found": false,
 			}).Info("Attempted access to unauthorised API version.")

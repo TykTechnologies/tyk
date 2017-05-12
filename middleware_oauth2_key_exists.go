@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -35,8 +34,8 @@ func (k *Oauth2KeyExists) IsEnabledForSpec() bool { return true }
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
 	// We're using OAuth, start checking for access keys
-	authHeaderValue := r.Header.Get("Authorization")
-	parts := strings.Split(authHeaderValue, " ")
+	token := r.Header.Get("Authorization")
+	parts := strings.Split(token, " ")
 	if len(parts) < 2 {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -77,7 +76,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.OAuthKey, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
-		context.Set(r, AuthHeaderValue, accessToken)
+		ctxSetAuthToken(r, accessToken)
 	}
 
 	// Request is valid, carry on

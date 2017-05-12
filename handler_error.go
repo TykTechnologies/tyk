@@ -79,18 +79,13 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		return
 	}
 
-	keyName := ""
 	// Track the key ID if it exists
-	authHeaderValue := context.Get(r, AuthHeaderValue)
+	token := ctxGetAuthToken(r)
 	var alias string
 
 	if config.StoreAnalytics(r) {
 
 		t := time.Now()
-
-		if authHeaderValue != nil {
-			keyName = authHeaderValue.(string)
-		}
 
 		version := e.Spec.getVersionFromRequest(r)
 		if version == "" {
@@ -151,7 +146,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			t.Year(),
 			t.Hour(),
 			errCode,
-			keyName,
+			token,
 			t,
 			version,
 			e.Spec.APIDefinition.Name,

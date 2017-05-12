@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -119,7 +118,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
-		context.Set(r, AuthHeaderValue, key)
+		ctxSetAuthToken(r, key)
 		k.setContextVars(r, key)
 	}
 
@@ -132,11 +131,11 @@ func stripBearer(token string) string {
 	return strings.TrimSpace(token)
 }
 
-func AuthFailed(m *TykMiddleware, r *http.Request, authHeaderValue string) {
+func AuthFailed(m *TykMiddleware, r *http.Request, token string) {
 	m.FireEvent(EventAuthFailure, EventAuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           GetIPFromRequest(r),
-		Key:              authHeaderValue,
+		Key:              token,
 	})
 }

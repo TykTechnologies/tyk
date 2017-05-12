@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -44,23 +43,23 @@ func (hm *HMACMiddleware) GetConfig() (interface{}, error) {
 }
 
 func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	authHeaderValue := r.Header.Get("Authorization")
-	if authHeaderValue == "" {
+	token := r.Header.Get("Authorization")
+	if token == "" {
 		return hm.authorizationError(r)
 	}
 
 	// Clean it
-	authHeaderValue = stripSignature(authHeaderValue)
+	token = stripSignature(token)
 
-	log.Debug(authHeaderValue)
+	log.Debug(token)
 
 	// Separate out the field values
-	fieldValues, err := getFieldValues(authHeaderValue)
+	fieldValues, err := getFieldValues(token)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 			"error":  err,
-			"header": authHeaderValue,
+			"header": token,
 		}).Error("Field extraction failed")
 		return hm.authorizationError(r)
 	}
@@ -131,7 +130,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	switch hm.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
-		context.Set(r, AuthHeaderValue, fieldValues.KeyID)
+		ctxSetAuthToken(r, fieldValues.KeyID)
 		hm.setContextVars(r, fieldValues.KeyID)
 	}
 
@@ -248,10 +247,10 @@ func getDateHeader(r *http.Request) (string, string) {
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {
-		authHeaderValue := r.Header.Get("Authorization")
+		token := r.Header.Get("Authorization")
 		log.WithFields(logrus.Fields{
 			"prefix":      "hmac",
-			"auth_header": authHeaderValue,
+			"auth_header": token,
 		}).Warning("Using auxiliary header for this request")
 		return strings.ToLower(altHeaderSpec), auxHeaderVal
 	}

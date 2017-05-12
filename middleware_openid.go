@@ -10,7 +10,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/context"
 
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -208,7 +207,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
-		context.Set(r, AuthHeaderValue, sessionID)
+		ctxSetAuthToken(r, sessionID)
 	}
 	k.setContextVars(r, token)
 
@@ -245,8 +244,7 @@ func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
 	}
 
 	// Key data
-	authHeaderValue := context.Get(r, AuthHeaderValue)
-	cnt["token"] = authHeaderValue
+	cnt["token"] = ctxGetAuthToken(r)
 
 	ctxSetData(r, cnt)
 }

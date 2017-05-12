@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -42,8 +41,8 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	authHeaderValue := r.Header.Get("Authorization")
-	if authHeaderValue == "" {
+	token := r.Header.Get("Authorization")
+	if token == "" {
 		// No header value, fail
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -53,7 +52,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return k.requestForBasicAuth(w, "Authorization field missing")
 	}
 
-	bits := strings.Split(authHeaderValue, " ")
+	bits := strings.Split(token, " ")
 	if len(bits) != 2 {
 		// Header malformed
 		log.WithFields(logrus.Fields{
@@ -97,7 +96,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with non-existent user.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, authHeaderValue)
+		AuthFailed(k.TykMiddleware, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
@@ -129,7 +128,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with existing user but failed password check.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, authHeaderValue)
+		AuthFailed(k.TykMiddleware, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
@@ -141,7 +140,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
-		context.Set(r, AuthHeaderValue, keyName)
+		ctxSetAuthToken(r, keyName)
 	}
 
 	// Request is valid, carry on

@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -173,12 +172,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	session := new(SessionState)
-	authHeaderValue := ""
+	token := ctxGetAuthToken(r)
 
 	// Encode the session object (if not a pre-process)
 	if vmeta.UseSession {
 		session = ctxGetSession(r)
-		authHeaderValue = context.Get(r, AuthHeaderValue).(string)
 	}
 
 	sessionAsJsonObj, err := json.Marshal(session)
@@ -203,7 +201,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
 		session.MetaData = newResponseData.SessionMeta
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, session, getLifetime(d.Spec, session))
+		d.Spec.SessionManager.UpdateSession(token, session, getLifetime(d.Spec, session))
 	}
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)

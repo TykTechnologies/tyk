@@ -13,7 +13,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -257,7 +256,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 			case apidef.JWTClaim, apidef.UnsetAuth:
 				ctxSetSession(r, &session)
-				context.Set(r, AuthHeaderValue, sessionID)
+				ctxSetAuthToken(r, sessionID)
 			}
 			k.setContextVars(r, token)
 			return nil, 200
@@ -272,7 +271,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
-		context.Set(r, AuthHeaderValue, sessionID)
+		ctxSetAuthToken(r, sessionID)
 	}
 	k.setContextVars(r, token)
 	return nil, 200
@@ -303,7 +302,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 	log.Debug("Raw key ID found.")
 	ctxSetSession(r, &session)
-	context.Set(r, AuthHeaderValue, tykId)
+	ctxSetAuthToken(r, tykId)
 	k.setContextVars(r, token)
 	return nil, 200
 }
@@ -431,8 +430,7 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 		}
 
 		// Key data
-		authHeaderValue := context.Get(r, AuthHeaderValue)
-		cnt["token"] = authHeaderValue
+		cnt["token"] = ctxGetAuthToken(r)
 
 		ctxSetData(r, cnt)
 	}

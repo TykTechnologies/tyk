@@ -3,7 +3,6 @@
 package main
 
 import (
-	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/Sirupsen/logrus"
@@ -266,7 +265,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	coProcessor.ObjectPostProcess(returnObject, r)
 
-	authHeaderValue := returnObject.Metadata["token"]
+	token := returnObject.Metadata["token"]
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
@@ -274,11 +273,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": GetIPFromRequest(r),
-			"key":    authHeaderValue,
+			"key":    token,
 		}).Info("Attempted access with invalid key.")
 
 		// Fire Authfailed Event
-		AuthFailed(m.TykMiddleware, r, authHeaderValue)
+		AuthFailed(m.TykMiddleware, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
@@ -298,9 +297,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if extractor == nil {
 			sessionLifetime := getLifetime(m.Spec, returnedSession)
 			// This API is not using the ID extractor, but we've got a session:
-			m.Spec.SessionManager.UpdateSession(authHeaderValue, returnedSession, sessionLifetime)
+			m.Spec.SessionManager.UpdateSession(token, returnedSession, sessionLifetime)
 			ctxSetSession(r, returnedSession)
-			context.Set(r, AuthHeaderValue, authHeaderValue)
+			ctxSetAuthToken(r, token)
 		} else {
 			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
 			extractor.PostProcess(r, returnedSession, sessionID)

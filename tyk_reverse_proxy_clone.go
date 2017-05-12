@@ -516,14 +516,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if err != nil {
 
-		var authHeaderValue string
-		if authVal := context.Get(req, AuthHeaderValue); authVal != nil {
-			authHeaderValue = authVal.(string)
-		}
+		token := ctxGetAuthToken(req)
 
 		var obfuscated string
-		if len(authHeaderValue) > 4 {
-			obfuscated = "****" + authHeaderValue[len(authHeaderValue)-4:]
+		if len(token) > 4 {
+			obfuscated = "****" + token[len(token)-4:]
 		}
 
 		var alias string

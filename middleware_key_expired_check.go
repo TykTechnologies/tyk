@@ -4,8 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gorilla/context"
-
 	"github.com/Sirupsen/logrus"
 )
 
@@ -35,12 +33,12 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 403
 	}
 
+	token := ctxGetAuthToken(r)
 	if session.IsInactive {
-		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": GetIPFromRequest(r),
-			"key":    authHeaderValue,
+			"key":    token,
 		}).Info("Attempted access from inactive key.")
 
 		// Fire a key expired event
@@ -48,7 +46,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           GetIPFromRequest(r),
-			Key:              authHeaderValue,
+			Key:              token,
 		})
 
 		// Report in health check
@@ -60,11 +58,10 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 	keyExpired := k.Spec.AuthManager.IsKeyExpired(session)
 
 	if keyExpired {
-		authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": GetIPFromRequest(r),
-			"key":    authHeaderValue,
+			"key":    token,
 		}).Info("Attempted access from expired key.")
 
 		// Fire a key expired event
@@ -72,7 +69,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
 			Path:             r.URL.Path,
 			Origin:           GetIPFromRequest(r),
-			Key:              authHeaderValue,
+			Key:              token,
 		})
 
 		// Report in health check

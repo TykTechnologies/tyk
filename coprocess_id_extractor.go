@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/xmlpath.v2"
 
@@ -49,7 +48,7 @@ func (e *BaseExtractor) PostProcess(r *http.Request, session *SessionState, sess
 	e.Spec.SessionManager.UpdateSession(sessionID, session, sessionLifetime)
 
 	ctxSetSession(r, session)
-	context.Set(r, AuthHeaderValue, sessionID)
+	ctxSetAuthToken(r, sessionID)
 }
 
 // ExtractHeader is used when a HeaderSource is specified.
