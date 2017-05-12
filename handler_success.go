@@ -212,11 +212,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		t := time.Now()
 
 		// Track the key ID if it exists
-		authHeaderValue := context.Get(r, AuthHeaderValue)
-		keyName := ""
-		if authHeaderValue != nil {
-			keyName = authHeaderValue.(string)
-		}
+		token := ctxGetAuthToken(r)
 
 		// Track version data
 		version := s.Spec.getVersionFromRequest(r)
@@ -273,7 +269,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			t.Year(),
 			t.Hour(),
 			code,
-			keyName,
+			token,
 			t,
 			version,
 			s.Spec.APIDefinition.Name,

@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
@@ -120,12 +119,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	session := new(SessionState)
-	authHeaderValue := ""
+	token := ctxGetAuthToken(r)
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
 		session = ctxGetSession(r)
-		authHeaderValue = context.Get(r, AuthHeaderValue).(string)
 	}
 
 	sessionAsJsonObj, err := json.Marshal(session)
@@ -233,7 +231,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the sesison data (if modified)
 	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
 		session.MetaData = newRequestData.SessionMeta
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, session, getLifetime(d.Spec, session))
+		d.Spec.SessionManager.UpdateSession(token, session, getLifetime(d.Spec, session))
 	}
 
 	log.WithFields(logrus.Fields{
@@ -246,7 +244,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	if d.Auth {
 		ctxSetSession(r, &newRequestData.Session)
-		context.Set(r, AuthHeaderValue, newRequestData.AuthValue)
+		ctxSetAuthToken(r, newRequestData.AuthValue)
 	}
 
 	return nil, 200

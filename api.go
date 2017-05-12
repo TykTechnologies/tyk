@@ -1849,3 +1849,17 @@ func ctxSetSession(r *http.Request, s *SessionState) {
 	}
 	context.Set(r, SessionData, s)
 }
+
+func ctxGetAuthToken(r *http.Request) string {
+	if v := context.Get(r, AuthHeaderValue); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+func ctxSetAuthToken(r *http.Request, t string) {
+	if t == "" {
+		panic("setting a nil context AuthHeaderValue")
+	}
+	context.Set(r, AuthHeaderValue, t)
+}

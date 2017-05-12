@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/gorilla/context"
-
 	"github.com/Sirupsen/logrus"
 )
 
@@ -31,7 +29,6 @@ func (m *GranularAccessMiddleware) IsEnabledForSpec() bool { return true }
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	session := ctxGetSession(r)
-	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 
 	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
 	if !foundAPI {
@@ -64,11 +61,12 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		}
 	}
 
+	token := ctxGetAuthToken(r)
 	// No paths matched, disallow
 	log.WithFields(logrus.Fields{
 		"path":      r.URL.Path,
 		"origin":    GetIPFromRequest(r),
-		"key":       authHeaderValue,
+		"key":       token,
 		"api_found": false,
 	}).Info("Attempted access to unauthorised endpoint (Granular).")
 

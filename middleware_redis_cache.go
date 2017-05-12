@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/gorilla/context"
 )
 
 const (
@@ -143,14 +141,11 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if stat != StatusCached {
 		return nil, 200
 	}
-	var authHeaderValue string
-	authVal := context.Get(r, AuthHeaderValue)
+	token := ctxGetAuthToken(r)
 
 	// No authentication data? use the IP.
-	if authVal == nil {
-		authHeaderValue = GetIPFromRequest(r)
-	} else {
-		authHeaderValue = authVal.(string)
+	if token == "" {
+		token = GetIPFromRequest(r)
 	}
 
 	var copiedRequest *http.Request
@@ -158,7 +153,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		copiedRequest = CopyHttpRequest(r)
 	}
 
-	key := m.CreateCheckSum(r, authHeaderValue)
+	key := m.CreateCheckSum(r, token)
 	retBlob, found := m.CacheStore.GetKey(key)
 	if found != nil {
 		log.Debug("Cache enabled, but record not found")
