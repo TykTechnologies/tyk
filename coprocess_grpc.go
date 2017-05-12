@@ -94,8 +94,9 @@ func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
 		}).Error(err)
+		return nil, err
 	}
-	return &GRPCDispatcher{}, err
+	return &GRPCDispatcher{}, nil
 }
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.

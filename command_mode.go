@@ -132,7 +132,6 @@ func createDefFromBluePrint(bp *BluePrintAST, orgID, upstreamURL string, asMock 
 	}
 
 	err = bp.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(bp.Name, " "))
-
 	return &ad, err
 }
 
@@ -140,37 +139,34 @@ func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
 	blueprint, err := GetImporterForSource(ApiaryBluePrint)
 	if err != nil {
 		log.Error("Couldn't get blueprint importer: ", err)
-		return blueprint.(*BluePrintAST), err
+		return nil, err
 	}
 
 	bluePrintFileData, err := ioutil.ReadFile(filePath)
-
 	if err != nil {
 		log.Error("Couldn't load blueprint file: ", err)
-		return blueprint.(*BluePrintAST), err
+		return nil, err
 	}
 
 	if err := blueprint.ReadString(string(bluePrintFileData)); err != nil {
 		log.Error("Failed to decode object")
-		return blueprint.(*BluePrintAST), err
+		return nil, err
 	}
 
 	return blueprint.(*BluePrintAST), nil
 }
 
 func apiDefLoadFile(filePath string) (*apidef.APIDefinition, error) {
-	def := &apidef.APIDefinition{}
-
 	defFileData, err := ioutil.ReadFile(filePath)
-
 	if err != nil {
 		log.Error("Couldn't load API Definition file: ", err)
-		return def, err
+		return nil, err
 	}
 
+	def := &apidef.APIDefinition{}
 	if err := json.Unmarshal(defFileData, &def); err != nil {
 		log.Error("Failed to unmarshal the JSON definition: ", err)
-		return def, err
+		return nil, err
 	}
 
 	return def, nil
