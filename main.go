@@ -292,9 +292,9 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	if config.ControlAPIHostname != "" {
 		hostname = config.ControlAPIHostname
 	}
-	apiMuxer := muxer
+	r := muxer.PathPrefix("/tyk").Subrouter()
 	if hostname != "" {
-		apiMuxer = muxer.Host(hostname).Subrouter()
+		r = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
@@ -304,27 +304,27 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}).Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	apiMuxer.HandleFunc("/tyk/reload/group", checkIsAPIOwner(InstrumentationMW(groupResetHandler)))
-	apiMuxer.HandleFunc("/tyk/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler(nil))))
+	r.HandleFunc("/reload/group", checkIsAPIOwner(InstrumentationMW(groupResetHandler)))
+	r.HandleFunc("/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler(nil))))
 
 	if !isRPCMode() {
-		apiMuxer.HandleFunc("/tyk/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler)))
-		apiMuxer.HandleFunc("/tyk/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
-		apiMuxer.HandleFunc("/tyk/keys/create", checkIsAPIOwner(InstrumentationMW(createKeyHandler)))
-		apiMuxer.HandleFunc("/tyk/apis", checkIsAPIOwner(InstrumentationMW(apiHandler)))
-		apiMuxer.HandleFunc("/tyk/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(apiHandler)))
-		apiMuxer.HandleFunc("/tyk/health/", checkIsAPIOwner(InstrumentationMW(healthCheckhandler)))
-		apiMuxer.HandleFunc("/tyk/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(createOauthClient)))
-		apiMuxer.HandleFunc("/tyk/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
-		apiMuxer.HandleFunc("/tyk/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
+		r.HandleFunc("/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler)))
+		r.HandleFunc("/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
+		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(createKeyHandler)))
+		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(apiHandler)))
+		r.HandleFunc("/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(apiHandler)))
+		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(healthCheckhandler)))
+		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(createOauthClient)))
+		r.HandleFunc("/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
+		r.HandleFunc("/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	apiMuxer.HandleFunc("/tyk/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(keyHandler)))
-	apiMuxer.HandleFunc("/tyk/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
+	r.HandleFunc("/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(keyHandler)))
+	r.HandleFunc("/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
