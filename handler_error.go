@@ -109,12 +109,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		oauthClientID := ""
 		tags := make([]string, 0)
-		sessionState := context.Get(r, SessionData)
+		session := ctxGetSession(r)
 
-		if sessionState != nil {
-			oauthClientID = sessionState.(SessionState).OauthClientID
-			alias = sessionState.(SessionState).Alias
-			tags = sessionState.(SessionState).Tags
+		if session != nil {
+			oauthClientID = session.OauthClientID
+			alias = session.Alias
+			tags = session.Tags
 		}
 
 		rawRequest := ""

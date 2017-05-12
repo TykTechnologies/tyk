@@ -175,14 +175,14 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 
 	log.Debug("Generated Session ID: ", sessionID)
 
-	sessionState, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
+	session, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
-		sessionState = SessionState{}
+		session = SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
-		newSessionState, err := generateSessionFromPolicy(policyID,
+		newSession, err := generateSessionFromPolicy(policyID,
 			k.TykMiddleware.Spec.APIDefinition.OrgID,
 			true)
 
@@ -194,12 +194,12 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 			return errors.New("Key not authorized: no matching policy"), 403
 		}
 
-		sessionState = newSessionState
-		sessionState.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
-		sessionState.Alias = clientID + ":" + user.ID
+		session = newSession
+		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
+		session.Alias = clientID + ":" + user.ID
 
 		// Update the session in the session manager in case it gets called again
-		k.Spec.SessionManager.UpdateSession(sessionID, sessionState, getLifetime(k.Spec, &sessionState))
+		k.Spec.SessionManager.UpdateSession(sessionID, &session, getLifetime(k.Spec, &session))
 		log.Debug("Policy applied to key")
 
 	}
@@ -207,7 +207,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	// 4. Set session state on context, we will need it later
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
-		context.Set(r, SessionData, sessionState)
+		ctxSetSession(r, &session)
 		context.Set(r, AuthHeaderValue, sessionID)
 	}
 	k.setContextVars(r, token)

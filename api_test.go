@@ -93,8 +93,8 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	}
 }
 
-func createSampleSession() SessionState {
-	return SessionState{
+func createSampleSession() *SessionState {
+	return &SessionState{
 		Rate:             5.0,
 		Allowance:        5.0,
 		LastCheck:        time.Now().Unix(),
@@ -119,7 +119,7 @@ func TestApiHandler(t *testing.T) {
 
 	for _, uri := range uris {
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(&sampleKey)
+		body, _ := json.Marshal(sampleKey)
 
 		recorder := httptest.NewRecorder()
 
@@ -154,7 +154,7 @@ func TestApiHandler(t *testing.T) {
 func TestApiHandlerGetSingle(t *testing.T) {
 	uri := "/tyk/apis/1"
 	sampleKey := createSampleSession()
-	body, _ := json.Marshal(&sampleKey)
+	body, _ := json.Marshal(sampleKey)
 
 	recorder := httptest.NewRecorder()
 
@@ -272,7 +272,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		uri := "/tyk/keys/1234"
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(&sampleKey)
+		body, _ := json.Marshal(sampleKey)
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -309,7 +309,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		uri := "/tyk/keys/1234"
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(&sampleKey)
+		body, _ := json.Marshal(sampleKey)
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -378,7 +378,7 @@ func TestKeyHandlerGetKey(t *testing.T) {
 func createKey() {
 	uri := "/tyk/keys/1234"
 	sampleKey := createSampleSession()
-	body, _ := json.Marshal(&sampleKey)
+	body, _ := json.Marshal(sampleKey)
 
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", uri, bytes.NewReader(body))
@@ -429,7 +429,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		uri := "/tyk/keys/create"
 
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(&sampleKey)
+		body, _ := json.Marshal(sampleKey)
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -714,4 +714,21 @@ func TestContextData(t *testing.T) {
 		}
 	}()
 	ctxSetData(r, nil)
+}
+
+func TestContextSession(t *testing.T) {
+	r := new(http.Request)
+	if ctxGetSession(r) != nil {
+		t.Fatal("expected ctxGetSession to return nil")
+	}
+	ctxSetSession(r, &SessionState{})
+	if ctxGetSession(r) == nil {
+		t.Fatal("expected ctxGetSession to return non-nil")
+	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected ctxSetSession of zero val to panic")
+		}
+	}()
+	ctxSetSession(r, nil)
 }

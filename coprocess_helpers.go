@@ -7,12 +7,10 @@ import (
 )
 
 // TykSessionState takes a coprocess.SessionState (as returned by the Protocol Buffer binding), and outputs a standard Tyk SessionState.
-func TykSessionState(sessionState *coprocess.SessionState) SessionState {
-	var session SessionState
+func TykSessionState(session *coprocess.SessionState) *SessionState {
+	accessDefinitions := make(map[string]AccessDefinition, len(session.AccessRights))
 
-	accessDefinitions := make(map[string]AccessDefinition, len(sessionState.AccessRights))
-
-	for key, protoAccessDefinition := range sessionState.AccessRights {
+	for key, protoAccessDefinition := range session.AccessRights {
 		allowedUrls := make([]AccessSpec, len(protoAccessDefinition.AllowedUrls))
 		for _, protoAllowedURL := range protoAccessDefinition.AllowedUrls {
 			allowedURL := AccessSpec{protoAllowedURL.Url, protoAllowedURL.Methods}
@@ -26,67 +24,65 @@ func TykSessionState(sessionState *coprocess.SessionState) SessionState {
 		Password string   `json:"password" msg:"password"`
 		Hash     HashType `json:"hash_type" msg:"hash_type"`
 	}
-	if sessionState.BasicAuthData != nil {
-		basicAuthData.Password = sessionState.BasicAuthData.Password
-		basicAuthData.Hash = HashType(sessionState.BasicAuthData.Hash)
+	if session.BasicAuthData != nil {
+		basicAuthData.Password = session.BasicAuthData.Password
+		basicAuthData.Hash = HashType(session.BasicAuthData.Hash)
 	}
 
 	var jwtData struct {
 		Secret string `json:"secret" msg:"secret"`
 	}
-	if sessionState.JwtData != nil {
-		jwtData.Secret = sessionState.JwtData.Secret
+	if session.JwtData != nil {
+		jwtData.Secret = session.JwtData.Secret
 	}
 
 	var monitor struct {
 		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
 	}
 
-	if sessionState.Monitor != nil {
-		monitor.TriggerLimits = sessionState.Monitor.TriggerLimits
+	if session.Monitor != nil {
+		monitor.TriggerLimits = session.Monitor.TriggerLimits
 	}
 
-	session = SessionState{
-		sessionState.LastCheck,
-		sessionState.Allowance,
-		sessionState.Rate,
-		sessionState.Per,
-		sessionState.Expires,
-		sessionState.QuotaMax,
-		sessionState.QuotaRenews,
-		sessionState.QuotaRemaining,
-		sessionState.QuotaRenewalRate,
+	return &SessionState{
+		session.LastCheck,
+		session.Allowance,
+		session.Rate,
+		session.Per,
+		session.Expires,
+		session.QuotaMax,
+		session.QuotaRenews,
+		session.QuotaRemaining,
+		session.QuotaRenewalRate,
 		accessDefinitions,
-		sessionState.OrgId,
-		sessionState.OauthClientId,
-		sessionState.OauthKeys,
+		session.OrgId,
+		session.OauthClientId,
+		session.OauthKeys,
 		basicAuthData,
 		jwtData,
-		sessionState.HmacEnabled,
-		sessionState.HmacSecret,
-		sessionState.IsInactive,
-		sessionState.ApplyPolicyId,
-		sessionState.DataExpires,
+		session.HmacEnabled,
+		session.HmacSecret,
+		session.IsInactive,
+		session.ApplyPolicyId,
+		session.DataExpires,
 		monitor,
-		sessionState.EnableDetailedRecording,
+		session.EnableDetailedRecording,
 		nil,
-		sessionState.Tags,
-		sessionState.Alias,
-		sessionState.LastUpdated,
-		sessionState.IdExtractorDeadline,
-		sessionState.SessionLifetime,
+		session.Tags,
+		session.Alias,
+		session.LastUpdated,
+		session.IdExtractorDeadline,
+		session.SessionLifetime,
 		"",
 	}
-
-	return session
 }
 
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
-func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
+func ProtoSessionState(session *SessionState) *coprocess.SessionState {
 
-	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(sessionState.AccessRights))
+	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
 
-	for key, accessDefinition := range sessionState.AccessRights {
+	for key, accessDefinition := range session.AccessRights {
 		var allowedUrls []*coprocess.AccessSpec
 		for _, allowedURL := range accessDefinition.AllowedURLs {
 			accessSpec := &coprocess.AccessSpec{
@@ -105,48 +101,46 @@ func ProtoSessionState(sessionState SessionState) *coprocess.SessionState {
 	}
 
 	basicAuthData := &coprocess.BasicAuthData{
-		Password: sessionState.BasicAuthData.Password,
-		Hash:     string(sessionState.BasicAuthData.Hash),
+		Password: session.BasicAuthData.Password,
+		Hash:     string(session.BasicAuthData.Hash),
 	}
 	jwtData := &coprocess.JWTData{
-		Secret: sessionState.JWTData.Secret,
+		Secret: session.JWTData.Secret,
 	}
 	monitor := &coprocess.Monitor{
-		TriggerLimits: sessionState.Monitor.TriggerLimits,
+		TriggerLimits: session.Monitor.TriggerLimits,
 	}
 
-	session := &coprocess.SessionState{
-		LastCheck:               sessionState.LastCheck,
-		Allowance:               sessionState.Allowance,
-		Rate:                    sessionState.Rate,
-		Per:                     sessionState.Per,
-		Expires:                 sessionState.Expires,
-		QuotaMax:                sessionState.QuotaMax,
-		QuotaRenews:             sessionState.QuotaRenews,
-		QuotaRemaining:          sessionState.QuotaRemaining,
-		QuotaRenewalRate:        sessionState.QuotaRenewalRate,
+	return &coprocess.SessionState{
+		LastCheck:               session.LastCheck,
+		Allowance:               session.Allowance,
+		Rate:                    session.Rate,
+		Per:                     session.Per,
+		Expires:                 session.Expires,
+		QuotaMax:                session.QuotaMax,
+		QuotaRenews:             session.QuotaRenews,
+		QuotaRemaining:          session.QuotaRemaining,
+		QuotaRenewalRate:        session.QuotaRenewalRate,
 		AccessRights:            accessDefinitions,
-		OrgId:                   sessionState.OrgID,
-		OauthClientId:           sessionState.OauthClientID,
-		OauthKeys:               sessionState.OauthKeys,
+		OrgId:                   session.OrgID,
+		OauthClientId:           session.OauthClientID,
+		OauthKeys:               session.OauthKeys,
 		BasicAuthData:           basicAuthData,
 		JwtData:                 jwtData,
-		HmacEnabled:             sessionState.HMACEnabled,
-		HmacSecret:              sessionState.HmacSecret,
-		IsInactive:              sessionState.IsInactive,
-		ApplyPolicyId:           sessionState.ApplyPolicyID,
-		DataExpires:             sessionState.DataExpires,
+		HmacEnabled:             session.HMACEnabled,
+		HmacSecret:              session.HmacSecret,
+		IsInactive:              session.IsInactive,
+		ApplyPolicyId:           session.ApplyPolicyID,
+		DataExpires:             session.DataExpires,
 		Monitor:                 monitor,
-		EnableDetailedRecording: sessionState.EnableDetailedRecording,
+		EnableDetailedRecording: session.EnableDetailedRecording,
 		Metadata:                "",
-		Tags:                    sessionState.Tags,
-		Alias:                   sessionState.Alias,
-		LastUpdated:             sessionState.LastUpdated,
-		IdExtractorDeadline:     sessionState.IdExtractorDeadline,
-		SessionLifetime:         sessionState.SessionLifetime,
+		Tags:                    session.Tags,
+		Alias:                   session.Alias,
+		LastUpdated:             session.LastUpdated,
+		IdExtractorDeadline:     session.IdExtractorDeadline,
+		SessionLifetime:         session.SessionLifetime,
 	}
-
-	return session
 }
 
 // ProtoMap is a helper function for maps with string slice values.

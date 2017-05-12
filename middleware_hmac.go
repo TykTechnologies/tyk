@@ -77,7 +77,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Get a session for the Key ID
-	secret, sessionState, err := hm.getSecretAndSessionForKeyID(fieldValues.KeyID)
+	secret, session, err := hm.getSecretAndSessionForKeyID(fieldValues.KeyID)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
@@ -130,7 +130,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Set session state on context, we will need it later
 	switch hm.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
-		context.Set(r, SessionData, sessionState)
+		ctxSetSession(r, &session)
 		context.Set(r, AuthHeaderValue, fieldValues.KeyID)
 		hm.setContextVars(r, fieldValues.KeyID)
 	}
@@ -227,20 +227,20 @@ type HMACFieldValues struct {
 }
 
 func (hm *HMACMiddleware) getSecretAndSessionForKeyID(keyId string) (string, SessionState, error) {
-	sessionState, keyExists := hm.TykMiddleware.CheckSessionAndIdentityForValidKey(keyId)
+	session, keyExists := hm.TykMiddleware.CheckSessionAndIdentityForValidKey(keyId)
 	if !keyExists {
-		return "", sessionState, errors.New("Key ID does not exist")
+		return "", session, errors.New("Key ID does not exist")
 	}
 
-	if sessionState.HmacSecret == "" || !sessionState.HMACEnabled {
+	if session.HmacSecret == "" || !session.HMACEnabled {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 		}).Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
 
-		return "", sessionState, errors.New("This key ID is invalid")
+		return "", session, errors.New("This key ID is invalid")
 	}
 
-	return sessionState.HmacSecret, sessionState, nil
+	return session.HmacSecret, session, nil
 }
 
 func getDateHeader(r *http.Request) (string, string) {

@@ -98,7 +98,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	key = stripBearer(key)
 
 	// Check if API key valid
-	sessionState, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(key)
+	session, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(key)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -118,7 +118,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	// Set session state on context, we will need it later
 	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		context.Set(r, SessionData, sessionState)
+		ctxSetSession(r, &session)
 		context.Set(r, AuthHeaderValue, key)
 		k.setContextVars(r, key)
 	}

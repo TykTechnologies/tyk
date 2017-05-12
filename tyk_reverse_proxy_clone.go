@@ -437,7 +437,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	transport := GetTransport(timeout, rw, req, p)
 
 	// Do this before we make a shallow copy
-	sessVal := context.Get(req, SessionData)
+	session := ctxGetSession(req)
 
 	outreq := new(http.Request)
 	logreq := new(http.Request)
@@ -527,8 +527,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 		var alias string
-		if sessVal != nil {
-			alias = sessVal.(SessionState).Alias
+		if session != nil {
+			alias = session.Alias
 		}
 
 		log.WithFields(logrus.Fields{
@@ -584,14 +584,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		inres.Body = ioutil.NopCloser(bodyBuffer2)
 	}
 
-	ses := SessionState{}
-	if sessVal != nil {
-		ses = sessVal.(SessionState)
+	ses := new(SessionState)
+	if session != nil {
+		ses = session
 	}
 
 	if p.TykAPISpec.ResponseHandlersActive {
 		// Middleware chain handling here - very simple, but should do the trick
-		err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, &ses)
+		err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
 		if err != nil {
 			log.Error("Response chain failed! ", err)
 		}
@@ -600,7 +600,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// We should at least copy the status code in
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
-	p.HandleResponse(rw, res, req, &ses)
+	p.HandleResponse(rw, res, req, ses)
 	return inres
 }
 

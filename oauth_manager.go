@@ -277,10 +277,10 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 // HandleAccess wraps an access request with osin's primitives
 func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	resp := o.OsinServer.NewResponse()
-	var sessionState *SessionState
 	var username string
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
+		var session *SessionState
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
@@ -293,20 +293,20 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			log.Debug("Getting: ", searchKey)
 
 			var err error
-			sessionState, err = o.OsinServer.Storage.GetUser(searchKey)
+			session, err = o.OsinServer.Storage.GetUser(searchKey)
 			if err != nil {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
 				var passMatch bool
-				if sessionState.BasicAuthData.Hash == HashBCrypt {
-					err := bcrypt.CompareHashAndPassword([]byte(sessionState.BasicAuthData.Password), []byte(password))
+				if session.BasicAuthData.Hash == HashBCrypt {
+					err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(password))
 					if err == nil {
 						passMatch = true
 					}
 				}
 
-				if sessionState.BasicAuthData.Hash == HashPlainText &&
-					sessionState.BasicAuthData.Password == password {
+				if session.BasicAuthData.Hash == HashPlainText &&
+					session.BasicAuthData.Password == password {
 					passMatch = true
 				}
 
@@ -314,18 +314,18 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 					log.Info("Here we are")
 					ar.Authorized = true
 					// not ideal, but we need to copy the session state across
-					pw := sessionState.BasicAuthData.Password
-					hs := sessionState.BasicAuthData.Hash
+					pw := session.BasicAuthData.Password
+					hs := session.BasicAuthData.Hash
 
-					sessionState.BasicAuthData.Password = ""
-					sessionState.BasicAuthData.Hash = ""
-					asString, _ := json.Marshal(sessionState)
+					session.BasicAuthData.Password = ""
+					session.BasicAuthData.Hash = ""
+					asString, _ := json.Marshal(session)
 					ar.UserData = string(asString)
 
-					sessionState.BasicAuthData.Password = pw
-					sessionState.BasicAuthData.Hash = hs
+					session.BasicAuthData.Password = pw
+					session.BasicAuthData.Hash = hs
 
-					//log.Warning("Old Keys: ", sessionState.OauthKeys)
+					//log.Warning("Old Keys: ", session.OauthKeys)
 				}
 			}
 		} else {
@@ -334,9 +334,9 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		}
 
 		// Does the user have an old OAuth token for this client?
-		if sessionState != nil && sessionState.OauthKeys != nil {
+		if session != nil && session.OauthKeys != nil {
 			log.Debug("There's keys here bill...")
-			oldToken, foundKey := sessionState.OauthKeys[ar.Client.GetId()]
+			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
 
@@ -350,17 +350,17 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		new_token, foundNewToken := resp.Output["access_token"]
 		if username != "" && foundNewToken {
 			log.Debug("Updating token data in key")
-			if sessionState.OauthKeys == nil {
-				sessionState.OauthKeys = make(map[string]string)
+			if session.OauthKeys == nil {
+				session.OauthKeys = make(map[string]string)
 			}
-			sessionState.OauthKeys[ar.Client.GetId()] = new_token.(string)
+			session.OauthKeys[ar.Client.GetId()] = new_token.(string)
 			log.Debug("New token: ", new_token.(string))
-			log.Debug("Keys: ", sessionState.OauthKeys)
+			log.Debug("Keys: ", session.OauthKeys)
 
 			keyName := o.API.OrgID + username
 
 			log.Debug("Updating user:", keyName)
-			err := o.API.SessionManager.UpdateSession(keyName, *sessionState, getLifetime(o.API, sessionState))
+			err := o.API.SessionManager.UpdateSession(keyName, session, getLifetime(o.API, session))
 			if err != nil {
 				log.Error(err)
 			}
@@ -694,7 +694,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, newSession, int64(accessData.ExpiresIn))
+	r.sessionManager.UpdateSession(accessData.AccessToken, &newSession, int64(accessData.ExpiresIn))
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {
@@ -837,9 +837,9 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, err
 	return &session, nil
 }
 
-func (r *RedisOsinStorageInterface) SetUser(username string, sessionState *SessionState, timeout int64) error {
+func (r *RedisOsinStorageInterface) SetUser(username string, session *SessionState, timeout int64) error {
 	key := username
-	authDataJSON, err := json.Marshal(sessionState)
+	authDataJSON, err := json.Marshal(session)
 	if err != nil {
 		return err
 	}

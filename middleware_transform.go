@@ -9,7 +9,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
-	"github.com/gorilla/context"
 	"golang.org/x/net/html/charset"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -87,10 +86,10 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	if tmeta.TemplateData.EnableSession {
-		ses := context.Get(r, SessionData).(SessionState)
+		session := ctxGetSession(r)
 		switch x := bodyData.(type) {
 		case map[string]interface{}:
-			x["_tyk_meta"] = ses.MetaData
+			x["_tyk_meta"] = session.MetaData
 		}
 	}
 

@@ -172,16 +172,16 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	sessionState := SessionState{}
+	session := new(SessionState)
 	authHeaderValue := ""
 
 	// Encode the session object (if not a pre-process)
 	if vmeta.UseSession {
-		sessionState = context.Get(r, SessionData).(SessionState)
+		session = ctxGetSession(r)
 		authHeaderValue = context.Get(r, AuthHeaderValue).(string)
 	}
 
-	sessionAsJsonObj, err := json.Marshal(sessionState)
+	sessionAsJsonObj, err := json.Marshal(session)
 	if err != nil {
 		log.Error("Failed to encode session for VM: ", err)
 		return nil
@@ -202,8 +202,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
-		sessionState.MetaData = mapStrsToIfaces(newResponseData.SessionMeta)
-		d.Spec.SessionManager.UpdateSession(authHeaderValue, sessionState, getLifetime(d.Spec, &sessionState))
+		session.MetaData = mapStrsToIfaces(newResponseData.SessionMeta)
+		d.Spec.SessionManager.UpdateSession(authHeaderValue, session, getLifetime(d.Spec, session))
 	}
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
@@ -230,7 +230,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Header.Add("Date", requestTime)
 
 	// Handle response middleware
-	if err := handleResponseChain(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, &sessionState); err != nil {
+	if err := handleResponseChain(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, session); err != nil {
 		log.Error("Response chain failed! ", err)
 	}
 
@@ -257,7 +257,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Body = ioutil.NopCloser(&bodyBuffer)
 	copiedRes.Body = ioutil.NopCloser(bodyBuffer2)
 
-	d.HandleResponse(w, newResponse, &sessionState)
+	d.HandleResponse(w, newResponse, session)
 
 	// Record analytics
 	go d.sh.RecordHit(r, 0, newResponse.StatusCode, copiedRequest, copiedResponse)

@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/gorilla/context"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -51,11 +49,7 @@ func (t *TransformHeaders) IsEnabledForSpec() bool {
 // if the key and value contain a tyk session variable reference, then it will try to inject the value
 func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Request) {
 	// Get session data
-	var sessionState SessionState
-	ses := context.Get(r, SessionData)
-	if ses != nil {
-		sessionState = ses.(SessionState)
-	}
+	session := ctxGetSession(r)
 
 	contextData := ctxGetData(r)
 
@@ -63,9 +57,9 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 	for nKey, nVal := range kv {
 		if strings.Contains(nVal, metaLabel) {
 			// Using meta_data key
-			if ses != nil {
+			if session != nil {
 				metaKey := strings.Replace(nVal, metaLabel, "", 1)
-				tempVal, ok := sessionState.MetaData[metaKey]
+				tempVal, ok := session.MetaData[metaKey]
 				if ok {
 					nVal = tempVal.(string)
 					r.Header.Add(nKey, nVal)

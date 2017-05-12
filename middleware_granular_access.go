@@ -30,10 +30,10 @@ func (m *GranularAccessMiddleware) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	sessionState := context.Get(r, SessionData).(SessionState)
+	session := ctxGetSession(r)
 	authHeaderValue := context.Get(r, AuthHeaderValue).(string)
 
-	sessionVersionData, foundAPI := sessionState.AccessRights[m.Spec.APIID]
+	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
 	if !foundAPI {
 		log.Debug("Version not found")
 		return nil, 200

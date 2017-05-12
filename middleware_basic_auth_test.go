@@ -47,8 +47,8 @@ const basicAuthDef = `{
 	}
 }`
 
-func createBasicAuthSession() SessionState {
-	var session SessionState
+func createBasicAuthSession() *SessionState {
+	session := new(SessionState)
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -59,7 +59,6 @@ func createBasicAuthSession() SessionState {
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
 	session.BasicAuthData.Password = "TEST"
-
 	return session
 }
 
