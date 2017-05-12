@@ -1885,3 +1885,31 @@ func ctxGetDoNotTrack(r *http.Request) bool {
 func ctxSetDoNotTrack(r *http.Request, b bool) {
 	context.Set(r, DoNotTrackThisEndpoint, b)
 }
+
+func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
+	if v := context.Get(r, VersionData); v != nil {
+		return v.(*apidef.VersionInfo)
+	}
+	return nil
+}
+
+func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
+	if v == nil {
+		panic("setting a nil context VersionData")
+	}
+	context.Set(r, VersionData, v)
+}
+
+func ctxGetVersionKey(r *http.Request) string {
+	if v := context.Get(r, VersionKeyContext); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+func ctxSetVersionKey(r *http.Request, k string) {
+	if k == "" {
+		panic("setting a nil context VersionKeyContext")
+	}
+	context.Set(r, VersionKeyContext, k)
+}
