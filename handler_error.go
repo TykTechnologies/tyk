@@ -122,17 +122,11 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
 		}
 
-		trackThisEndpoint := context.Get(r, TrackThisEndpoint)
-		trackedPath := r.URL.Path
 		trackEP := false
-		if trackThisEndpoint != nil {
+		trackedPath := r.URL.Path
+		if p := ctxGetTrackedPath(r); p != "" && !ctxGetDoNotTrack(r) {
 			trackEP = true
-			trackedPath = trackThisEndpoint.(string)
-		}
-
-		if context.Get(r, DoNotTrackThisEndpoint) != nil {
-			trackEP = false
-			trackedPath = r.URL.Path
+			trackedPath = p
 		}
 
 		record := AnalyticsRecord{
