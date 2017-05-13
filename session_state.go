@@ -58,13 +58,13 @@ type SessionState struct {
 	Monitor       struct {
 		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
 	} `json:"monitor" msg:"monitor"`
-	EnableDetailedRecording bool                   `json:"enable_detail_recording" msg:"enable_detail_recording"`
-	MetaData                map[string]interface{} `json:"meta_data" msg:"meta_data"`
-	Tags                    []string               `json:"tags" msg:"tags"`
-	Alias                   string                 `json:"alias" msg:"alias"`
-	LastUpdated             string                 `json:"last_updated" msg:"last_updated"`
-	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
-	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
+	EnableDetailedRecording bool              `json:"enable_detail_recording" msg:"enable_detail_recording"`
+	MetaData                map[string]string `json:"meta_data" msg:"meta_data"`
+	Tags                    []string          `json:"tags" msg:"tags"`
+	Alias                   string            `json:"alias" msg:"alias"`
+	LastUpdated             string            `json:"last_updated" msg:"last_updated"`
+	IdExtractorDeadline     int64             `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
+	SessionLifetime         int64             `bson:"session_lifetime" json:"session_lifetime"`
 
 	firstSeenHash string
 }

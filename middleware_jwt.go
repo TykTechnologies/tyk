@@ -247,7 +247,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		if err == nil {
 			session = newSession
-			session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+			session.MetaData = map[string]string{"TykJWTSessionID": sessionID}
 			session.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again

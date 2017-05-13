@@ -59,10 +59,9 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 			// Using meta_data key
 			if session != nil {
 				metaKey := strings.Replace(nVal, metaLabel, "", 1)
-				tempVal, ok := session.MetaData[metaKey]
+				metaVal, ok := session.MetaData[metaKey]
 				if ok {
-					nVal = tempVal.(string)
-					r.Header.Add(nKey, nVal)
+					r.Header.Add(nKey, metaVal)
 				} else {
 					log.Warning("Session Meta Data not found for key in map: ", metaKey)
 				}

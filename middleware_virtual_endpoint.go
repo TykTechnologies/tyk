@@ -202,7 +202,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
-		session.MetaData = mapStrsToIfaces(newResponseData.SessionMeta)
+		session.MetaData = newResponseData.SessionMeta
 		d.Spec.SessionManager.UpdateSession(authHeaderValue, session, getLifetime(d.Spec, session))
 	}
 
