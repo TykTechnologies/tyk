@@ -399,9 +399,10 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		byteArray, _ := handleGetDetail(apiKey, apiId)
+		obj, _ := handleGetDetail(apiKey, apiId)
+		bs, _ := json.Marshal(obj)
 
-		returnVal, err := j.VM.ToValue(string(byteArray))
+		returnVal, err := j.VM.ToValue(string(bs))
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",

@@ -66,8 +66,6 @@ var (
 	NodeID string
 
 	runningTests = false
-
-	systemError = []byte(`{"status": "system error, please contact administrator"}`)
 )
 
 const (
@@ -342,9 +340,7 @@ func checkIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
 			// Error
 			log.Warning("Attempted administrative access with invalid or missing key!")
 
-			responseMessage := createError("Forbidden")
-			w.WriteHeader(403)
-			w.Write(responseMessage)
+			doJSONWrite(w, 403, apiError("Forbidden"))
 			return
 		}
 

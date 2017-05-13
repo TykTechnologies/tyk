@@ -118,50 +118,39 @@ func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification
 
 // HandleGenerateAuthCodeData handles a resource provider approving an OAuth request from a client
 func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	var code int
-
-	if r.Method == "POST" {
-		// On AUTH grab session state data and add to UserData (not validated, not good!)
-		sessionStateJSONData := r.FormValue("key_rules")
-		if sessionStateJSONData == "" {
-			log.Warning("Authorise request is missing key_rules in params, policy will be required!")
-		}
-
-		// Handle the authorisation and write the JSON output to the resource provider
-		resp := o.Manager.HandleAuthorisation(r, true, sessionStateJSONData)
-		code = 200
-		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
-		if resp.IsError {
-			code = resp.ErrorStatusCode
-			log.Error("[OAuth] OAuth response marked as error: ", resp)
-		}
-
-	} else {
-		// Return Not supported message (and code)
-		code = 405
-		responseMessage = createError("Method not supported")
+	if r.Method != "POST" {
+		doJSONWrite(w, 405, apiError("Method not supported"))
+		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	// On AUTH grab session state data and add to UserData (not validated, not good!)
+	sessionStateJSONData := r.FormValue("key_rules")
+	if sessionStateJSONData == "" {
+		log.Warning("Authorise request is missing key_rules in params, policy will be required!")
+	}
+
+	// Handle the authorisation and write the JSON output to the resource provider
+	resp := o.Manager.HandleAuthorisation(r, true, sessionStateJSONData)
+	code := 200
+	msg, _ := o.generateOAuthOutputFromOsinResponse(resp)
+	if resp.IsError {
+		code = resp.ErrorStatusCode
+		log.Error("[OAuth] OAuth response marked as error: ", resp)
+	}
 	w.WriteHeader(code)
-	w.Write(responseMessage)
+	w.Write(msg)
 }
 
 // HandleAuthorizePassthrough handles a Client Auth request, first it checks if the client
 // is OK (otherwise it blocks the request), then it forwards on to the resource providers approval URI
 func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	var code int
-
 	if r.Method == "GET" || r.Method == "POST" {
 		// Extract client data and check
 		resp := o.Manager.HandleAuthorisation(r, false, "")
 		if resp.IsError {
 			log.Error("There was an error with the request: ", resp)
 			// Something went wrong, write out the error details and kill the response
-			w.WriteHeader(resp.ErrorStatusCode)
-			responseMessage = createError(resp.StatusText)
-			w.Write(responseMessage)
+			doJSONWrite(w, resp.ErrorStatusCode, apiError(resp.StatusText))
 			return
 		}
 		if r.Method == "GET" {
@@ -180,10 +169,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 		w.WriteHeader(307)
 	} else {
 		// Return Not supported message (and code)
-		code = 405
-		responseMessage = createError("Method not supported")
-		w.WriteHeader(code)
-		w.Write(responseMessage)
+		doJSONWrite(w, 405, apiError("Method not supported"))
 	}
 
 }
@@ -192,60 +178,54 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
-	var responseMessage []byte
-	var code int
-
-	if r.Method == "GET" || r.Method == "POST" {
-		// Handle response
-		resp := o.Manager.HandleAccess(r)
-		responseMessage, _ = o.generateOAuthOutputFromOsinResponse(resp)
-		if resp.IsError {
-			// Something went wrong, write out the error details and kill the response
-			w.WriteHeader(resp.ErrorStatusCode)
-			w.Write(responseMessage)
-			return
-		}
-
-		// Ping endpoint with o_auth key and auth_key
-		code = 200
-		code := r.FormValue("code")
-		oldRefreshToken := r.FormValue("refresh_token")
-		log.Debug("AUTH CODE: ", code)
-		newOauthToken := ""
-		if resp.Output["access_token"] != nil {
-			newOauthToken = resp.Output["access_token"].(string)
-		}
-		log.Debug("TOKEN: ", newOauthToken)
-		refreshToken := ""
-		if resp.Output["refresh_token"] != nil {
-			refreshToken = resp.Output["refresh_token"].(string)
-		}
-		log.Debug("REFRESH: ", refreshToken)
-		log.Debug("Old REFRESH: ", oldRefreshToken)
-
-		notificationType := newAccessToken
-		if oldRefreshToken != "" {
-			notificationType = refreshAccessToken
-		}
-
-		newNotification := NewOAuthNotification{
-			AuthCode:         code,
-			NewOAuthToken:    newOauthToken,
-			RefreshToken:     refreshToken,
-			OldRefreshToken:  oldRefreshToken,
-			NotificationType: notificationType,
-		}
-
-		o.notifyClientOfNewOauth(newNotification)
-
-	} else {
-		// Return Not supported message (and code)
-		code = 405
-		responseMessage = createError("Method not supported")
+	if r.Method != "GET" && r.Method != "POST" {
+		doJSONWrite(w, 405, apiError("Method not supported"))
+		return
 	}
 
-	w.WriteHeader(code)
-	w.Write(responseMessage)
+	// Handle response
+	resp := o.Manager.HandleAccess(r)
+	msg, _ := o.generateOAuthOutputFromOsinResponse(resp)
+	if resp.IsError {
+		// Something went wrong, write out the error details and kill the response
+		w.WriteHeader(resp.ErrorStatusCode)
+		w.Write(msg)
+		return
+	}
+
+	// Ping endpoint with o_auth key and auth_key
+	authCode := r.FormValue("code")
+	oldRefreshToken := r.FormValue("refresh_token")
+	log.Debug("AUTH CODE: ", authCode)
+	newOauthToken := ""
+	if resp.Output["access_token"] != nil {
+		newOauthToken = resp.Output["access_token"].(string)
+	}
+	log.Debug("TOKEN: ", newOauthToken)
+	refreshToken := ""
+	if resp.Output["refresh_token"] != nil {
+		refreshToken = resp.Output["refresh_token"].(string)
+	}
+	log.Debug("REFRESH: ", refreshToken)
+	log.Debug("Old REFRESH: ", oldRefreshToken)
+
+	notificationType := newAccessToken
+	if oldRefreshToken != "" {
+		notificationType = refreshAccessToken
+	}
+
+	newNotification := NewOAuthNotification{
+		AuthCode:         authCode,
+		NewOAuthToken:    newOauthToken,
+		RefreshToken:     refreshToken,
+		OldRefreshToken:  oldRefreshToken,
+		NotificationType: notificationType,
+	}
+
+	o.notifyClientOfNewOauth(newNotification)
+
+	w.WriteHeader(200)
+	w.Write(msg)
 }
 
 // OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
