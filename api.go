@@ -27,18 +27,18 @@ type APIModifyKeySuccess struct {
 	Action string `json:"action"`
 }
 
-// APIErrorMessage is an object that defines when a generic error occurred
-type APIErrorMessage struct {
-	Status string `json:"status"`
-	Error  string `json:"error"`
+// APIStatusMessage represents an API status message
+type APIStatusMessage struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }
 
-func apiOk(msg string) APIErrorMessage {
-	return APIErrorMessage{"ok", msg}
+func apiOk(msg string) APIStatusMessage {
+	return APIStatusMessage{"ok", msg}
 }
 
-func apiError(msg string) APIErrorMessage {
-	return APIErrorMessage{"error", msg}
+func apiError(msg string) APIStatusMessage {
+	return APIStatusMessage{"error", msg}
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
@@ -305,8 +305,7 @@ type APIAllKeys struct {
 
 func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	if config.HashKeys {
-		apiErr := apiError("Configuration is secured, key listings not available in hashed configurations")
-		return apiErr, 400
+		return apiError("Configuration is secured, key listings not available in hashed configurations"), 400
 	}
 
 	sessionManager := FallbackKeySesionManager
@@ -334,12 +333,6 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	}).Info("Retrieved key list.")
 
 	return sessionsObj, 200
-}
-
-// APIStatusMessage represents an API status message
-type APIStatusMessage struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
 }
 
 func handleDeleteKey(keyName, apiID string) (interface{}, int) {
@@ -480,7 +473,7 @@ func handleGetAPI(apiID string) (interface{}, int) {
 		"prefix": "api",
 		"apiID":  apiID,
 	}).Error("API doesn't exist.")
-	return APIStatusMessage{"error", "API not found"}, 404
+	return apiError("API not found"), 404
 }
 
 func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
@@ -581,21 +574,18 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debug("Updating existing API: ", apiID)
 			obj, code = handleAddOrUpdateApi(apiID, r)
 		} else {
-			code = 400
-			obj = apiError("Must specify an apiID to update")
+			obj, code = apiError("Must specify an apiID to update"), 400
 		}
 	case "DELETE":
 		if apiID != "" {
 			log.Debug("Deleting API definition for: ", apiID)
 			obj, code = handleDeleteAPI(apiID)
 		} else {
-			code = 400
-			obj = apiError("Must specify an apiID to delete")
+			obj, code = apiError("Must specify an apiID to delete"), 400
 		}
 	default:
 		// Return Not supported message (and code)
-		code = 405
-		obj = apiError("Method not supported")
+		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -632,8 +622,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		// Return Not supported message (and code)
-		code = 405
-		obj = apiError("Method not supported")
+		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -652,8 +641,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	var policRecord PolicyUpdateObj
 	if err := json.NewDecoder(r.Body).Decode(&policRecord); err != nil {
-		decodeFail := APIStatusMessage{"error", "Couldn't decode instruction"}
-		doJSONWrite(w, 400, decodeFail)
+		doJSONWrite(w, 400, apiError("Couldn't decode instruction"))
 		return
 	}
 
@@ -767,8 +755,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		// Return Not supported message (and code)
-		code = 405
-		obj = apiError("Method not supported")
+		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -833,19 +820,18 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 func handleGetOrgDetail(orgID string) (interface{}, int) {
 	spec := GetSpecForOrg(orgID)
 	if spec == nil {
-		return APIStatusMessage{"error", "Org not found"}, 400
+		return apiError("Org not found"), 400
 	}
 
 	session, ok := spec.OrgSessionManager.GetSessionDetail(orgID)
 	if !ok {
-		notFound := APIStatusMessage{"error", "Org not found"}
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"org":    orgID,
 			"status": "fail",
 			"err":    "not found",
 		}).Error("Failed retrieval of record for ORG ID.")
-		return notFound, 404
+		return apiError("Org not found"), 404
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -882,7 +868,7 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 			"err":    "not found",
 		}).Error("Failed to delete org key.")
 
-		return APIStatusMessage{"error", "Org not found"}, 400
+		return apiError("Org not found"), 400
 	}
 
 	spec.OrgSessionManager.RemoveSession(orgID)
@@ -914,8 +900,7 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 			"status": "fail",
 			"err":    "wrong method",
 		}).Error("Group reload failed.")
-		code = 405
-		obj = apiError("Method not supported")
+		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -929,8 +914,7 @@ func resetHandler(fn func()) http.HandlerFunc {
 		if r.Method == "GET" {
 			obj, code = handleURLReload(fn)
 		} else {
-			code = 405
-			obj = apiError("Method not supported")
+			obj, code = apiError("Method not supported"), 405
 		}
 
 		doJSONWrite(w, code, obj)
@@ -979,8 +963,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, getLifetime(apiSpec, newSession))
 				if err != nil {
-					obj := apiError("Failed to create key - " + err.Error())
-					doJSONWrite(w, 403, obj)
+					doJSONWrite(w, 403, apiError("Failed to create key - "+err.Error()))
 					return
 				}
 			} else {
@@ -990,8 +973,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				sessionManager.ResetQuota(newKey, newSession)
 				err := sessionManager.UpdateSession(newKey, newSession, -1)
 				if err != nil {
-					obj := apiError("Failed to create key - " + err.Error())
-					doJSONWrite(w, 403, obj)
+					doJSONWrite(w, 403, apiError("Failed to create key - "+err.Error()))
 					return
 				}
 			}
@@ -1019,8 +1001,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				err := spec.SessionManager.UpdateSession(newKey, newSession, getLifetime(spec, newSession))
 				if err != nil {
-					obj := apiError("Failed to create key - " + err.Error())
-					doJSONWrite(w, 403, obj)
+					doJSONWrite(w, 403, apiError("Failed to create key - "+err.Error()))
 					return
 				}
 			}
@@ -1037,8 +1018,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				"server_name": "system",
 			}).Error("Master keys disallowed in configuration, key not added.")
 
-			obj := apiError("Failed to create key, keys must have at least one Access Rights record set.")
-			doJSONWrite(w, 403, obj)
+			doJSONWrite(w, 403, apiError("Failed to create key, keys must have at least one Access Rights record set."))
 			return
 		}
 
@@ -1276,8 +1256,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 		obj, code = handleDeleteOAuthClient(keyName, apiID)
 	default:
 		// Return Not supported message (and code)
-		code = 405
-		obj = apiError("Method not supported")
+		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -1295,14 +1274,12 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 			"client": keyName,
 			"err":    "not found",
 		}).Error("Failed to retrieve OAuth client details")
-		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
-		return notFound, 404
+		return apiError("OAuth Client ID not found"), 404
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientNoPrefix(storageID)
 	if err != nil {
-		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
-		return notFound, 404
+		return apiError("OAuth Client ID not found"), 404
 	}
 	reportableClientData := NewClientRequest{
 		ClientID:          clientData.GetId(),
@@ -1335,8 +1312,7 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 			"err":    "not found",
 		}).Error("Failed to delete OAuth client")
 
-		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
-		return notFound, 400
+		return apiError("OAuth Client ID not found"), 400
 	}
 
 	err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, true)
@@ -1369,8 +1345,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
 
-		notFound := APIStatusMessage{"error", "OAuth Client ID not found"}
-		return notFound, 400
+		return apiError("OAuth Client ID not found"), 400
 	}
 
 	if apiSpec.OAuthManager == nil {
@@ -1381,8 +1356,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
 
-		notAvailable := APIStatusMessage{"error", "OAuth client list isn't available or hasn't been propagated yet."}
-		return notAvailable, 400
+		return apiError("OAuth client list isn't available or hasn't been propagated yet."), 400
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)
@@ -1394,8 +1368,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    err,
 		}).Error("Failed to report OAuth client list")
 
-		notFound := APIStatusMessage{"error", "OAuth slients not found"}
-		return notFound, 404
+		return apiError("OAuth slients not found"), 404
 	}
 	clients := []NewClientRequest{}
 	for _, osinClient := range clientData {
@@ -1444,8 +1417,7 @@ func UserRatesCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := ctxGetSession(r)
 		if session == nil {
-			apiErr := apiError("Health checks are not enabled for this node")
-			doJSONWrite(w, 405, apiErr)
+			doJSONWrite(w, 405, apiError("Health checks are not enabled for this node"))
 			return
 		}
 
@@ -1490,9 +1462,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	okMsg := APIStatusMessage{"ok", "cache invalidated"}
-
-	doJSONWrite(w, 200, okMsg)
+	doJSONWrite(w, 200, apiOk("cache invalidated"))
 }
 
 func handleInvalidateAPICache(apiID string) error {
