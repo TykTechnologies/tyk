@@ -676,7 +676,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 			"err":    err,
 		}).Error("Failed to update hashed key.")
 
-		return apiError("Key not found"), 400
+		return apiError("Key not found"), 404
 	}
 
 	sess := SessionState{}
@@ -820,7 +820,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 func handleGetOrgDetail(orgID string) (interface{}, int) {
 	spec := GetSpecForOrg(orgID)
 	if spec == nil {
-		return apiError("Org not found"), 400
+		return apiError("Org not found"), 404
 	}
 
 	session, ok := spec.OrgSessionManager.GetSessionDetail(orgID)
@@ -844,7 +844,7 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 func handleGetAllOrgKeys(filter, orgID string) (interface{}, int) {
 	spec := GetSpecForOrg(orgID)
 	if spec == nil {
-		return apiError("ORG not found"), 400
+		return apiError("ORG not found"), 404
 	}
 
 	sessions := spec.OrgSessionManager.GetSessions(filter)
@@ -868,7 +868,7 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 			"err":    "not found",
 		}).Error("Failed to delete org key.")
 
-		return apiError("Org not found"), 400
+		return apiError("Org not found"), 404
 	}
 
 	spec.OrgSessionManager.RemoveSession(orgID)
@@ -1176,7 +1176,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 			"err":    "API not found",
 		}).Error("Failed to invalidate refresh token")
 
-		doJSONWrite(w, 400, apiError("API for this refresh token not found"))
+		doJSONWrite(w, 404, apiError("API for this refresh token not found"))
 		return
 	}
 
@@ -1312,7 +1312,7 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 			"err":    "not found",
 		}).Error("Failed to delete OAuth client")
 
-		return apiError("OAuth Client ID not found"), 400
+		return apiError("OAuth Client ID not found"), 404
 	}
 
 	err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, true)
@@ -1345,7 +1345,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
 
-		return apiError("OAuth Client ID not found"), 400
+		return apiError("OAuth Client ID not found"), 404
 	}
 
 	if apiSpec.OAuthManager == nil {
@@ -1406,7 +1406,7 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	}
 	apiSpec := GetSpecForApi(apiID)
 	if apiSpec == nil {
-		doJSONWrite(w, 405, apiError("API ID not found"))
+		doJSONWrite(w, 404, apiError("API ID not found"))
 		return
 	}
 	health, _ := apiSpec.Health.GetApiHealthValues()
