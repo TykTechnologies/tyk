@@ -1396,12 +1396,12 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !config.HealthCheck.EnableHealthChecks {
-		doJSONWrite(w, 405, apiError("Health checks are not enabled for this node"))
+		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 		return
 	}
 	apiID := r.FormValue("api_id")
 	if apiID == "" {
-		doJSONWrite(w, 405, apiError("missing api_id parameter"))
+		doJSONWrite(w, 400, apiError("missing api_id parameter"))
 		return
 	}
 	apiSpec := GetSpecForApi(apiID)
@@ -1417,7 +1417,7 @@ func UserRatesCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := ctxGetSession(r)
 		if session == nil {
-			doJSONWrite(w, 405, apiError("Health checks are not enabled for this node"))
+			doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 			return
 		}
 
