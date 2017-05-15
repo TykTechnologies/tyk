@@ -35,22 +35,21 @@ var (
 )
 
 const (
-	// we need a static port so that the urls can be used in static
-	// test data and the requests aren't randomized for checksums
-	// port 16500 should be obscure and unused
+	// We need a static port so that the urls can be used in static
+	// test data, and to prevent the requests from being randomized
+	// for checksums. Port 16500 should be obscure and unused.
 	testHttpListen = "127.0.0.1:16500"
-	// accepts any http requests on /, only allows GET on /get, etc
-	// all return a JSON with request info
+	// Accepts any http requests on /, only allows GET on /get, etc.
+	// All return a JSON with request info.
 	testHttpAny  = "http://" + testHttpListen
 	testHttpGet  = testHttpAny + "/get"
 	testHttpPost = testHttpAny + "/post"
 	testHttpJWK  = testHttpAny + "/jwk.json"
 
-	// 16501 port should not be bind to anything, and can be used for testing failures
-	testHttpFailure     = "127.0.0.1:16501"
-	testHttpFailureAny  = "http://" + testHttpFailure
-	testHttpFailureGet  = testHttpFailureAny + "/get"
-	testHttpFailurePost = testHttpFailureAny + "/post"
+	// Nothing should be listening on port 16501 - useful for
+	// testing TCP and HTTP failures.
+	testHttpFailure    = "127.0.0.1:16501"
+	testHttpFailureAny = "http://" + testHttpFailure
 )
 
 type testHttpResponse struct {
