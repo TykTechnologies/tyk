@@ -75,17 +75,6 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 		return true
 	}
 
-	domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
-	val, listenPathExists := ListenPathMap.Get(domainHash)
-	if listenPathExists && val.(int) > 1 {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-			"org_id": referenceSpec.APIDefinition.OrgID,
-			"api_id": referenceSpec.APIDefinition.APIID,
-		}).Error("Listen path is a duplicate: ", domainHash)
-		return true
-	}
-
 	return false
 }
 
@@ -137,6 +126,35 @@ func processSpec(referenceSpec *APISpec,
 		}).Warning("Skipped!")
 		chainDef.Skip = true
 		return &chainDef
+	}
+
+	pathModified := false
+	for {
+		hash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
+		if v, e := ListenPathMap.Get(hash); !e || v.(int) < 2 {
+			// not a duplicate
+			break
+		}
+		if !pathModified {
+			prev := ApiSpecRegister[referenceSpec.APIID]
+			if prev != nil && prev.Proxy.ListenPath == referenceSpec.Proxy.ListenPath {
+				// if this APIID was already loaded and
+				// had this listen path, let it keep it.
+				break
+			}
+			referenceSpec.Proxy.ListenPath += "-" + referenceSpec.APIID
+			pathModified = true
+		} else {
+			// keep adding '_' chars
+			referenceSpec.Proxy.ListenPath += "_"
+		}
+	}
+	if pathModified {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+			"org_id": referenceSpec.APIDefinition.OrgID,
+			"api_id": referenceSpec.APIDefinition.APIID,
+		}).Error("Listen path collision, changed to ", referenceSpec.Proxy.ListenPath)
 	}
 
 	// Set up LB targets:
