@@ -58,12 +58,6 @@ func makeSampleAPI(t *testing.T, def string) *APISpec {
 	return spec
 }
 
-type apiSuccess struct {
-	Key    string `json:"key"`
-	Status string `json:"status"`
-	Action string `json:"action"`
-}
-
 type testAPIDefinition struct {
 	apidef.APIDefinition
 	ID string `json:"id"`
@@ -191,7 +185,7 @@ func TestApiHandlerPost(t *testing.T) {
 
 	apiHandler(recorder, req)
 
-	var success apiSuccess
+	var success APIModifyKeySuccess
 	err = json.Unmarshal(recorder.Body.Bytes(), &success)
 
 	if err != nil {
@@ -273,7 +267,7 @@ func TestApiHandlerPostDbConfig(t *testing.T) {
 
 	apiHandler(recorder, req)
 
-	var success apiSuccess
+	var success APIModifyKeySuccess
 	err = json.Unmarshal(recorder.Body.Bytes(), &success)
 
 	if err != nil {
@@ -344,7 +338,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 
 		keyHandler(recorder, req)
 
-		newSuccess := apiSuccess{}
+		newSuccess := APIModifyKeySuccess{}
 		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 		if err != nil {
@@ -380,7 +374,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 
 		keyHandler(recorder, req)
 
-		newSuccess := apiSuccess{}
+		newSuccess := APIModifyKeySuccess{}
 		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 		if err != nil {
@@ -461,7 +455,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 
 		keyHandler(recorder, req)
 
-		newSuccess := apiSuccess{}
+		newSuccess := APIModifyKeySuccess{}
 		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 		if err != nil {
@@ -499,7 +493,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 
 		createKeyHandler(recorder, req)
 
-		newSuccess := apiSuccess{}
+		newSuccess := APIModifyKeySuccess{}
 		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 		if err != nil {

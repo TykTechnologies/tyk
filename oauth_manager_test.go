@@ -463,7 +463,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 
 	testMuxer.ServeHTTP(recorder, req1)
 
-	newSuccess := apiSuccess{}
+	newSuccess := APIModifyKeySuccess{}
 	err := json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
 
 	if err != nil {
