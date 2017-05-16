@@ -203,6 +203,61 @@ func TestApiHandlerPost(t *testing.T) {
 	}
 }
 
+func TestApiHandlerPostDupPath(t *testing.T) {
+	specs := func() (res []*APISpec) {
+		for _, id := range []string{"2", "3"} {
+			def := strings.Replace(apiTestDef, `"1"`, `"`+id+`"`, 1)
+			res = append(res, createSpecTest(t, def))
+		}
+		return res
+	}
+	var s2, s3 *APISpec
+
+	// both dups added at the same time
+	ApiSpecRegister = nil
+	loadApps(specs(), discardMuxer)
+
+	s2 = ApiSpecRegister["2"]
+	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
+		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
+	}
+	s3 = ApiSpecRegister["3"]
+	if want, got := "/v1-3", s3.Proxy.ListenPath; want != got {
+		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
+	}
+
+	// one dup was there first, gets to keep its path. apiids are
+	// not used to mandate priority. survives multiple reloads too.
+	ApiSpecRegister = nil
+	loadApps(specs()[1:], discardMuxer)
+	loadApps(specs(), discardMuxer)
+	loadApps(specs(), discardMuxer)
+
+	s2 = ApiSpecRegister["2"]
+	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
+		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
+	}
+	s3 = ApiSpecRegister["3"]
+	if want, got := "/v1", s3.Proxy.ListenPath; want != got {
+		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
+	}
+
+	// both dups were there first, neither gets to keep its original
+	// path.
+	ApiSpecRegister = nil
+	loadApps(specs(), discardMuxer)
+	loadApps(specs(), discardMuxer)
+
+	s2 = ApiSpecRegister["2"]
+	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
+		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
+	}
+	s3 = ApiSpecRegister["3"]
+	if want, got := "/v1-3", s3.Proxy.ListenPath; want != got {
+		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
+	}
+}
+
 func TestApiHandlerPostDbConfig(t *testing.T) {
 	uri := "/tyk/apis/1"
 
