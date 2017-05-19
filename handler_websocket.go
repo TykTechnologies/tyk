@@ -98,9 +98,19 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	go cp(d, nc)
 	go cp(nc, d)
 
-	<-errc
+	for i := 0; i < 2; i++ {
+		cerr := <-errc
+		if cerr == nil {
+			continue
+		}
+		err = cerr
+		log.WithFields(logrus.Fields{
+			"path":   req.URL.Path,
+			"origin": GetIPFromRequest(req),
+		}).Errorf("Error transmitting request: %v", err)
+	}
 
-	return nil, nil
+	return nil, err
 }
 
 func IsWebsocket(req *http.Request) bool {
