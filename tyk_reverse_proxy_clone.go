@@ -534,8 +534,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"server_name": outreq.Host,
 			"user_id":     obfuscated,
 			"user_name":   alias,
-			"org_id":      p.TykAPISpec.APIDefinition.OrgID,
-			"api_id":      p.TykAPISpec.APIDefinition.APIID,
+			"org_id":      p.TykAPISpec.OrgID,
+			"api_id":      p.TykAPISpec.APIID,
 		}).Error("http: proxy error: ", err)
 
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {

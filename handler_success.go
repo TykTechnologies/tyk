@@ -88,7 +88,7 @@ func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 	}
 	// Check ownership, policy org owner must be the same as API,
 	// otherwise youcould overwrite a session key with a policy from a different org!
-	if policy.OrgID != t.Spec.APIDefinition.OrgID {
+	if policy.OrgID != t.Spec.OrgID {
 		log.Error("Attempting to apply policy from different organisation to key, skipping")
 		return
 	}
@@ -266,9 +266,9 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			token,
 			t,
 			version,
-			s.Spec.APIDefinition.Name,
-			s.Spec.APIDefinition.APIID,
-			s.Spec.APIDefinition.OrgID,
+			s.Spec.Name,
+			s.Spec.APIID,
+			s.Spec.OrgID,
 			oauthClientID,
 			timing,
 			rawRequest,
@@ -317,7 +317,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
 	// Make sure we get the correct target URL
-	if s.Spec.APIDefinition.Proxy.StripListenPath {
+	if s.Spec.Proxy.StripListenPath {
 		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 		log.Debug("Upstream Path is: ", r.URL.Path)
@@ -351,7 +351,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 // Spec states the path is Ignored Itwill also return a response object for the cache
 func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
 	// Make sure we get the correct target URL
-	if s.Spec.APIDefinition.Proxy.StripListenPath {
+	if s.Spec.Proxy.StripListenPath {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)
 	}
 

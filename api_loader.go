@@ -49,8 +49,8 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 	if referenceSpec.Proxy.ListenPath == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.APIDefinition.OrgID,
-			"api_id": referenceSpec.APIDefinition.APIID,
+			"org_id": referenceSpec.OrgID,
+			"api_id": referenceSpec.APIID,
 		}).Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
 		return true
 	}
@@ -58,18 +58,18 @@ func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
 	if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.APIDefinition.OrgID,
-			"api_id": referenceSpec.APIDefinition.APIID,
+			"org_id": referenceSpec.OrgID,
+			"api_id": referenceSpec.APIID,
 		}).Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
 		return true
 	}
 
-	_, err := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
+	_, err := url.Parse(referenceSpec.Proxy.TargetURL)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.APIDefinition.OrgID,
-			"api_id": referenceSpec.APIDefinition.APIID,
+			"org_id": referenceSpec.OrgID,
+			"api_id": referenceSpec.APIID,
 		}).Error("Couldn't parse target URL: ", err)
 		return true
 	}
@@ -94,7 +94,7 @@ func generateListenPathMap(apiSpecs []*APISpec) {
 			}
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 				"domain":   dN,
 			}).Info("Tracking hostname")
 		}
@@ -110,13 +110,13 @@ func processSpec(referenceSpec *APISpec,
 
 	log.WithFields(logrus.Fields{
 		"prefix":   "main",
-		"api_name": referenceSpec.APIDefinition.Name,
+		"api_name": referenceSpec.Name,
 	}).Info("Loading API")
 
 	if skipSpecBecauseInvalid(referenceSpec) {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.APIDefinition.Name,
+			"api_name": referenceSpec.Name,
 		}).Warning("Skipped!")
 		chainDef.Skip = true
 		return &chainDef
@@ -146,8 +146,8 @@ func processSpec(referenceSpec *APISpec,
 	if pathModified {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.APIDefinition.OrgID,
-			"api_id": referenceSpec.APIDefinition.APIID,
+			"org_id": referenceSpec.OrgID,
+			"api_id": referenceSpec.APIID,
 		}).Error("Listen path collision, changed to ", referenceSpec.Proxy.ListenPath)
 	}
 
@@ -203,7 +203,7 @@ func processSpec(referenceSpec *APISpec,
 	if config.EnableJSVM || EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.APIDefinition.Name,
+			"api_name": referenceSpec.Name,
 		}).Debug("Loading Middleware")
 
 		var mwPaths []string
@@ -244,14 +244,14 @@ func processSpec(referenceSpec *APISpec,
 	}
 
 	// Already vetted
-	remote, _ := url.Parse(referenceSpec.APIDefinition.Proxy.TargetURL)
+	remote, _ := url.Parse(referenceSpec.Proxy.TargetURL)
 
 	referenceSpec.target = remote
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.APIDefinition.Name,
+			"api_name": referenceSpec.Name,
 		}).Info("Multi target enabled")
 		proxy = &MultiTargetProxy{}
 	} else {
@@ -268,17 +268,17 @@ func processSpec(referenceSpec *APISpec,
 	CheckCBEnabled(tykMiddleware)
 	CheckETEnabled(tykMiddleware)
 
-	keyPrefix := "cache-" + referenceSpec.APIDefinition.APIID
+	keyPrefix := "cache-" + referenceSpec.APIID
 	cacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
 	cacheStore.Connect()
 
 	var chain http.Handler
 
-	if referenceSpec.APIDefinition.UseKeylessAccess {
+	if referenceSpec.UseKeylessAccess {
 		chainDef.Open = true
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.APIDefinition.Name,
+			"api_name": referenceSpec.Name,
 		}).Info("Checking security policy: Open")
 
 		// Add pre-process MW
@@ -300,13 +300,13 @@ func processSpec(referenceSpec *APISpec,
 		AppendMiddleware(&baseChainArray, &URLRewriteMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray, &TransformMethod{TykMiddleware: tykMiddleware}, tykMiddleware)
 
-		log.Debug(referenceSpec.APIDefinition.Name, " - CHAIN SIZE: ", len(baseChainArray))
+		log.Debug(referenceSpec.Name, " - CHAIN SIZE: ", len(baseChainArray))
 
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.APIDefinition.Name,
+					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Pre, obj.Name, mwDriver}, tykMiddleware)
 			} else {
@@ -320,7 +320,7 @@ func processSpec(referenceSpec *APISpec,
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.APIDefinition.Name,
+					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Post, obj.Name, mwDriver}, tykMiddleware)
 			} else {
@@ -351,7 +351,7 @@ func processSpec(referenceSpec *APISpec,
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.APIDefinition.Name,
+					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Pre, obj.Name, mwDriver}, tykMiddleware)
 			} else {
@@ -363,11 +363,11 @@ func processSpec(referenceSpec *APISpec,
 
 		// Select the keying method to use for setting session states
 		var authArray []alice.Constructor
-		if referenceSpec.APIDefinition.UseOauth2 {
+		if referenceSpec.UseOauth2 {
 			// Oauth2
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: OAuth")
 			authArray = append(authArray, CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware))
 
@@ -380,11 +380,11 @@ func processSpec(referenceSpec *APISpec,
 			useOttoAuth = mwDriver == apidef.OttoDriver && referenceSpec.EnableCoProcessAuth
 		}
 
-		if referenceSpec.APIDefinition.UseBasicAuth {
+		if referenceSpec.UseBasicAuth {
 			// Basic Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: Basic")
 			authArray = append(authArray, CreateMiddleware(&BasicAuthKeyIsValid{tykMiddleware}, tykMiddleware))
 		}
@@ -393,7 +393,7 @@ func processSpec(referenceSpec *APISpec,
 			// HMAC Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: HMAC")
 			authArray = append(authArray, CreateMiddleware(&HMACMiddleware{TykMiddleware: tykMiddleware}, tykMiddleware))
 		}
@@ -402,7 +402,7 @@ func processSpec(referenceSpec *APISpec,
 			// JWT Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: JWT")
 			authArray = append(authArray, CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware))
 		}
@@ -411,7 +411,7 @@ func processSpec(referenceSpec *APISpec,
 			// JWT Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: OpenID")
 
 			// initialise the OID configuration on this reference Spec
@@ -422,12 +422,12 @@ func processSpec(referenceSpec *APISpec,
 			// TODO: check if mwAuthCheckFunc is available/valid
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: CoProcess Plugin")
 
 			log.WithFields(logrus.Fields{
 				"prefix":   "coprocess",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 			if useCoProcessAuth {
@@ -444,11 +444,11 @@ func processSpec(referenceSpec *APISpec,
 			authArray = append(authArray, CreateDynamicAuthMiddleware(mwAuthCheckFunc.Name, tykMiddleware))
 		}
 
-		if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.APIDefinition.UseBasicAuth && !referenceSpec.APIDefinition.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
+		if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.UseBasicAuth && !referenceSpec.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
 			// Auth key
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: Token")
 			authArray = append(authArray, CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware))
 		}
@@ -458,7 +458,7 @@ func processSpec(referenceSpec *APISpec,
 		for _, obj := range mwPostAuthCheckFuncs {
 			log.WithFields(logrus.Fields{
 				"prefix":   "coprocess",
-				"api_name": referenceSpec.APIDefinition.Name,
+				"api_name": referenceSpec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver}, tykMiddleware)
 		}
@@ -481,7 +481,7 @@ func processSpec(referenceSpec *APISpec,
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.APIDefinition.Name,
+					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{tykMiddleware, coprocess.HookType_Post, obj.Name, mwDriver}, tykMiddleware)
 			} else {
@@ -491,7 +491,7 @@ func processSpec(referenceSpec *APISpec,
 
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.APIDefinition.Name,
+			"api_name": referenceSpec.Name,
 		}).Debug("Custom middleware completed processing")
 
 		// Use CreateMiddleware(&ModifiedMiddleware{tykMiddleware}, tykMiddleware)  to run custom middleware
@@ -519,7 +519,7 @@ func processSpec(referenceSpec *APISpec,
 		rateLimitPath := referenceSpec.Proxy.ListenPath + "tyk/rate-limits/"
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.APIDefinition.Name,
+			"api_name": referenceSpec.Name,
 		}).Debug("Rate limit endpoint is: ", rateLimitPath)
 		//subrouter.Handle(rateLimitPath, simpleChain)
 		chainDef.RateLimitPath = rateLimitPath
@@ -528,7 +528,7 @@ func processSpec(referenceSpec *APISpec,
 
 	log.WithFields(logrus.Fields{
 		"prefix":   "main",
-		"api_name": referenceSpec.APIDefinition.Name,
+		"api_name": referenceSpec.Name,
 	}).Debug("Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 	//subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 
@@ -582,7 +582,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 			if config.EnableCustomDomains && referenceSpec.Domain != "" {
 				log.WithFields(logrus.Fields{
 					"prefix":   "main",
-					"api_name": referenceSpec.APIDefinition.Name,
+					"api_name": referenceSpec.Name,
 					"domain":   referenceSpec.Domain,
 				}).Info("Custom Domain set.")
 				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
@@ -593,7 +593,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 		}(referenceSpec, i)
 
 		// TODO: This will not deal with skipped APis well
-		tmpSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
+		tmpSpecRegister[referenceSpec.APIID] = referenceSpec
 	}
 
 	for range apiSpecs {

@@ -73,8 +73,8 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "inbound-transform",
-				"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
-				"api_id":      t.Spec.APIDefinition.APIID,
+				"server_name": t.Spec.Proxy.TargetURL,
+				"api_id":      t.Spec.APIID,
 				"path":        r.URL.Path,
 			}).Error("Error unmarshalling XML: ", err)
 		}
@@ -105,8 +105,8 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "inbound-transform",
-			"server_name": t.Spec.APIDefinition.Proxy.TargetURL,
-			"api_id":      t.Spec.APIDefinition.APIID,
+			"server_name": t.Spec.Proxy.TargetURL,
+			"api_id":      t.Spec.APIID,
 			"path":        r.URL.Path,
 		}).Error("Failed to apply template to request: ", err)
 	}

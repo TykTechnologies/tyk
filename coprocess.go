@@ -167,7 +167,7 @@ func (m *CoProcessMiddleware) New() {}
 func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 	var moduleConfig CoProcessMiddlewareConfig
 
-	err := mapstructure.Decode(m.TykMiddleware.Spec.APIDefinition.RawData, &moduleConfig)
+	err := mapstructure.Decode(m.TykMiddleware.Spec.RawData, &moduleConfig)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",

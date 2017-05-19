@@ -47,7 +47,7 @@ func (k JWTMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config
 func (k *JWTMiddleware) GetConfig() (interface{}, error) {
-	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
+	return k.TykMiddleware.Spec.Auth, nil
 }
 
 func (k *JWTMiddleware) IsEnabledForSpec() bool { return true }
@@ -172,8 +172,8 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 }
 
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
-	if k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName != "" {
-		basePolicyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTPolicyFieldName].(string)
+	if k.TykMiddleware.Spec.JWTPolicyFieldName != "" {
+		basePolicyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.JWTPolicyFieldName].(string)
 		if !foundPolicy {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
@@ -181,8 +181,8 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 
 		return basePolicyID, true
 
-	} else if k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField != "" {
-		clientID, clientIDFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTClientIDBaseField].(string)
+	} else if k.TykMiddleware.Spec.JWTClientIDBaseField != "" {
+		clientID, clientIDFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
@@ -209,7 +209,7 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
 	log.Debug("JWT authority is centralised")
 	// Generate a virtual token
-	baseFieldData, baseFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.APIDefinition.JWTIdentityBaseField].(string)
+	baseFieldData, baseFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.JWTIdentityBaseField].(string)
 	if !baseFound {
 		log.Warning("Base Field not found, using SUB")
 		var found bool
@@ -241,7 +241,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		newSession, err := generateSessionFromPolicy(basePolicyID,
-			k.TykMiddleware.Spec.APIDefinition.OrgID,
+			k.TykMiddleware.Spec.OrgID,
 			true)
 
 		if err == nil {
@@ -308,7 +308,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	config := k.TykMiddleware.Spec.APIDefinition.Auth
+	config := k.TykMiddleware.Spec.Auth
 	var tykId string
 
 	// Get the token
@@ -393,7 +393,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		// Token is valid - let's move on
 
 		// Are we mapping to a central JWT Secret?
-		if k.TykMiddleware.Spec.APIDefinition.JWTSource != "" {
+		if k.TykMiddleware.Spec.JWTSource != "" {
 			return k.processCentralisedJWT(r, token)
 		}
 

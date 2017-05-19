@@ -94,7 +94,7 @@ func (d *VirtualEndpoint) New() {
 func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
 	var moduleConfig VirtualEndpointConfig
 
-	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &moduleConfig)
+	err := mapstructure.Decode(d.TykMiddleware.Spec.RawData, &moduleConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, err

@@ -60,7 +60,7 @@ func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string)
 	io.WriteString(h, "-")
 	io.WriteString(h, req.URL.String())
 	reqChecksum := hex.EncodeToString(h.Sum(nil))
-	return m.Spec.APIDefinition.APIID + keyName + reqChecksum
+	return m.Spec.APIID + keyName + reqChecksum
 }
 
 func (m *RedisCacheMiddleware) getTimeTTL(cacheTTL int64) string {
@@ -114,7 +114,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 
 	// Allow global cache disabe
-	if !m.Spec.APIDefinition.CacheOptions.EnableCache {
+	if !m.Spec.CacheOptions.EnableCache {
 		return nil, 200
 	}
 	// Only allow idempotent (safe) methods
@@ -125,7 +125,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	var stat RequestStatus
 	var isVirtual bool
 	// Lets see if we can throw a sledgehammer at this
-	if m.Spec.APIDefinition.CacheOptions.CacheAllSafeRequests {
+	if m.Spec.CacheOptions.CacheAllSafeRequests {
 		stat = StatusCached
 	} else {
 		// New request checker, more targeted, less likely to fail
@@ -172,7 +172,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		}
 
 		cacheThisRequest := true
-		cacheTTL := m.Spec.APIDefinition.CacheOptions.CacheTimeout
+		cacheTTL := m.Spec.CacheOptions.CacheTimeout
 
 		if reqVal == nil {
 			log.Warning("Upstream request must have failed, response is empty")
@@ -180,9 +180,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		}
 
 		// make sure the status codes match if specified
-		if len(m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes) > 0 {
+		if len(m.Spec.CacheOptions.CacheOnlyResponseCodes) > 0 {
 			foundCode := false
-			for _, code := range m.Spec.APIDefinition.CacheOptions.CacheOnlyResponseCodes {
+			for _, code := range m.Spec.CacheOptions.CacheOnlyResponseCodes {
 				if code == reqVal.StatusCode {
 					foundCode = true
 					break
@@ -194,7 +194,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		}
 
 		// Are we using upstream cache control?
-		if m.Spec.APIDefinition.CacheOptions.EnableUpstreamCacheControl {
+		if m.Spec.CacheOptions.EnableUpstreamCacheControl {
 			log.Debug("Upstream control enabled")
 			// Do we cache?
 			if reqVal.Header.Get(upstreamCacheHeader) == "" {
@@ -208,7 +208,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				cacheAsInt, err := strconv.Atoi(ttl)
 				if err != nil {
 					log.Error("Failed to decode TTL cache value: ", err)
-					cacheTTL = m.Spec.APIDefinition.CacheOptions.CacheTimeout
+					cacheTTL = m.Spec.CacheOptions.CacheTimeout
 				} else {
 					cacheTTL = int64(cacheAsInt)
 				}

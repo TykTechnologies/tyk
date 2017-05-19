@@ -464,7 +464,7 @@ func handleGetAPIList() (interface{}, int) {
 
 func handleGetAPI(apiID string) (interface{}, int) {
 	for _, apiSpec := range ApiSpecRegister {
-		if apiSpec.APIDefinition.APIID == apiID {
+		if apiSpec.APIID == apiID {
 			return apiSpec.APIDefinition, 200
 		}
 	}
