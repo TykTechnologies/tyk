@@ -92,7 +92,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			version = "Non Versioned"
 		}
 
-		if e.TykMiddleware.Spec.APIDefinition.Proxy.StripListenPath {
+		if e.TykMiddleware.Spec.Proxy.StripListenPath {
 			r.URL.Path = strings.Replace(r.URL.Path, e.TykMiddleware.Spec.Proxy.ListenPath, "", 1)
 		}
 
@@ -143,9 +143,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			token,
 			t,
 			version,
-			e.Spec.APIDefinition.Name,
-			e.Spec.APIDefinition.APIID,
-			e.Spec.APIDefinition.OrgID,
+			e.Spec.Name,
+			e.Spec.APIID,
+			e.Spec.OrgID,
 			oauthClientID,
 			0,
 			rawRequest,

@@ -433,23 +433,23 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	mwDriver := apidef.OttoDriver
 
 	// Set AuthCheck hook
-	if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Name != "" {
-		mwAuthCheckFunc = referenceSpec.APIDefinition.CustomMiddleware.AuthCheck
-		if referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Path != "" {
+	if referenceSpec.CustomMiddleware.AuthCheck.Name != "" {
+		mwAuthCheckFunc = referenceSpec.CustomMiddleware.AuthCheck
+		if referenceSpec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
-			mwPaths = append(mwPaths, referenceSpec.APIDefinition.CustomMiddleware.AuthCheck.Path)
+			mwPaths = append(mwPaths, referenceSpec.CustomMiddleware.AuthCheck.Path)
 		}
 	}
 
 	// Load from the configuration
-	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Pre {
+	for _, mwObj := range referenceSpec.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
-	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.Post {
+	for _, mwObj := range referenceSpec.CustomMiddleware.Post {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		log.WithFields(logrus.Fields{
@@ -469,7 +469,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 		{name: "post_auth", slice: &mwPostKeyAuthFuncs, session: true},
 		{name: "post", slice: &mwPostFuncs, session: true},
 	} {
-		dirPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIDefinition.APIID, folder.name)
+		dirPath := filepath.Join(config.MiddlewarePath, referenceSpec.APIID, folder.name)
 		files, _ := ioutil.ReadDir(dirPath)
 		for _, f := range files {
 			if strings.Contains(f.Name(), ".js") {
@@ -502,12 +502,12 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	}
 
 	// Set middleware driver, defaults to OttoDriver
-	if referenceSpec.APIDefinition.CustomMiddleware.Driver != "" {
-		mwDriver = referenceSpec.APIDefinition.CustomMiddleware.Driver
+	if referenceSpec.CustomMiddleware.Driver != "" {
+		mwDriver = referenceSpec.CustomMiddleware.Driver
 	}
 
 	// Load PostAuthCheck hooks
-	for _, mwObj := range referenceSpec.APIDefinition.CustomMiddleware.PostKeyAuth {
+	for _, mwObj := range referenceSpec.CustomMiddleware.PostKeyAuth {
 		if mwObj.Path != "" {
 			// Otto files are specified here
 			mwPaths = append(mwPaths, mwObj.Path)
@@ -521,8 +521,8 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 	// Create the response processors
 
-	responseChain := make([]TykResponseHandler, len(referenceSpec.APIDefinition.ResponseProcessors))
-	for i, processorDetail := range referenceSpec.APIDefinition.ResponseProcessors {
+	responseChain := make([]TykResponseHandler, len(referenceSpec.ResponseProcessors))
+	for i, processorDetail := range referenceSpec.ResponseProcessors {
 		processorType, err := GetResponseProcessorByName(processorDetail.Name)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -599,9 +599,9 @@ func notifyAPILoaded(spec *APISpec) {
 			"user_ip":     "--",
 			"server_name": "--",
 			"user_id":     "--",
-			"org_id":      spec.APIDefinition.OrgID,
-			"api_id":      spec.APIDefinition.APIID,
-		}).Info("Loaded: ", spec.APIDefinition.Name)
+			"org_id":      spec.OrgID,
+			"api_id":      spec.APIID,
+		}).Info("Loaded: ", spec.Name)
 	}
 
 }

@@ -182,7 +182,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		newSession, err := generateSessionFromPolicy(policyID,
-			k.TykMiddleware.Spec.APIDefinition.OrgID,
+			k.TykMiddleware.Spec.OrgID,
 			true)
 
 		if err != nil {

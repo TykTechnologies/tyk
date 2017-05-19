@@ -64,8 +64,8 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "outbound-transform",
-				"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
-				"api_id":      rt.Spec.APIDefinition.APIID,
+				"server_name": rt.Spec.Proxy.TargetURL,
+				"api_id":      rt.Spec.APIID,
 				"path":        req.URL.Path,
 			}).Error("Error unmarshalling XML: ", err)
 		}
@@ -80,8 +80,8 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "outbound-transform",
-			"server_name": rt.Spec.APIDefinition.Proxy.TargetURL,
-			"api_id":      rt.Spec.APIDefinition.APIID,
+			"server_name": rt.Spec.Proxy.TargetURL,
+			"api_id":      rt.Spec.APIID,
 			"path":        req.URL.Path,
 		}).Error("Failed to apply template to request: ", err)
 	}

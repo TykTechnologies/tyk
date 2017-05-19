@@ -97,7 +97,7 @@ func (b *Bundle) Verify() error {
 
 // AddToSpec attaches the custom middleware settings to an API definition.
 func (b *Bundle) AddToSpec() {
-	b.Spec.APIDefinition.CustomMiddleware = b.Manifest.CustomMiddleware
+	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
 	if GlobalDispatcher != nil {
 		GlobalDispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
@@ -349,10 +349,10 @@ func bundleError(spec *APISpec, err error, message string) {
 	log.WithFields(logrus.Fields{
 		"prefix":      "main",
 		"user_ip":     "-",
-		"server_name": spec.APIDefinition.Proxy.TargetURL,
+		"server_name": spec.Proxy.TargetURL,
 		"user_id":     "-",
-		"org_id":      spec.APIDefinition.OrgID,
-		"api_id":      spec.APIDefinition.APIID,
+		"org_id":      spec.OrgID,
+		"api_id":      spec.APIID,
 		"path":        "-",
 	}).Error(message, ": ", err)
 }

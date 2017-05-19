@@ -24,7 +24,7 @@ func (k *AuthKey) New() {}
 
 // GetConfig retrieves the configuration from the API config
 func (k *AuthKey) GetConfig() (interface{}, error) {
-	return k.TykMiddleware.Spec.APIDefinition.Auth, nil
+	return k.TykMiddleware.Spec.Auth, nil
 }
 
 func (k *AuthKey) IsEnabledForSpec() bool { return true }
@@ -44,7 +44,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	var tempRes *http.Request
 
-	config := k.TykMiddleware.Spec.APIDefinition.Auth
+	config := k.TykMiddleware.Spec.Auth
 
 	key := r.Header.Get(config.AuthHeaderName)
 
