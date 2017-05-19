@@ -395,12 +395,6 @@
 			"revisionTime": "2016-10-27T01:03:14Z"
 		},
 		{
-			"checksumSHA1": "KoefD9A3V8xGM+RpcQRyt5kK0XY=",
-			"path": "github.com/streamrail/concurrent-map",
-			"revision": "8bf1e9bacbf65b10c81d0f4314cf2b1ebef728b5",
-			"revisionTime": "2016-08-23T15:06:47Z"
-		},
-		{
 			"checksumSHA1": "ih4CCYD19rjjF9fjid+l7w/+cIg=",
 			"path": "github.com/wadey/gocovmerge",
 			"revision": "b5bfa59ec0adc420475f97f89b58045c721d761c",

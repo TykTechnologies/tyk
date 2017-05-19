@@ -9,7 +9,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/streamrail/concurrent-map"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -26,7 +25,7 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-var ListenPathMap cmap.ConcurrentMap
+var apiCountByListenHash map[string]int
 
 func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
@@ -86,13 +85,9 @@ func generateListenPathMap(apiSpecs []*APISpec) {
 	// We must track the hostname no matter what
 	for _, referenceSpec := range apiSpecs {
 		domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
-		val, ok := ListenPathMap.Get(domainHash)
-		if ok {
-			intVal := val.(int)
-			intVal++
-			ListenPathMap.Set(domainHash, intVal)
-		} else {
-			ListenPathMap.Set(domainHash, 1)
+		count := apiCountByListenHash[domainHash]
+		apiCountByListenHash[domainHash]++
+		if count == 0 {
 			dN := referenceSpec.Domain
 			if dN == "" {
 				dN = "(no host)"
@@ -102,7 +97,6 @@ func generateListenPathMap(apiSpecs []*APISpec) {
 				"api_name": referenceSpec.APIDefinition.Name,
 				"domain":   dN,
 			}).Info("Tracking hostname")
-
 		}
 	}
 }
@@ -131,7 +125,7 @@ func processSpec(referenceSpec *APISpec,
 	pathModified := false
 	for {
 		hash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
-		if v, e := ListenPathMap.Get(hash); !e || v.(int) < 2 {
+		if apiCountByListenHash[hash] < 2 {
 			// not a duplicate
 			break
 		}
@@ -563,7 +557,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("API hostname set: ", hostname)
 	}
-	ListenPathMap = cmap.New()
+	apiCountByListenHash = make(map[string]int, len(apiSpecs))
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
