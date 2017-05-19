@@ -129,32 +129,31 @@ static void Python_SetEnv(char* python_path) {
 static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* object) {
 	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
 
-	if( object->p_data == NULL ) {
-		return outputObject;
-	} else {
-
-		gilState = PyGILState_Ensure();
-		PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
-
-		PyObject *result = PyObject_CallObject( dispatcher_hook, args );
-
-		if( result == NULL ) {
-			PyErr_Print();
-		} else {
-			PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
-			char* output = PyBytes_AsString(new_object_msg_item);
-
-			PyObject* new_object_msg_length = PyTuple_GetItem( result, 1 );
-			int msg_length = PyLong_AsLong(new_object_msg_length);
-
-			outputObject->p_data = (void*)output;
-			outputObject->length = msg_length;
-		}
-
-		PyGILState_Release(gilState);
-
+	if (object->p_data == NULL) {
 		return outputObject;
 	}
+
+	gilState = PyGILState_Ensure();
+	PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
+
+	PyObject *result = PyObject_CallObject( dispatcher_hook, args );
+
+	if( result == NULL ) {
+		PyErr_Print();
+	} else {
+		PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
+		char* output = PyBytes_AsString(new_object_msg_item);
+
+		PyObject* new_object_msg_length = PyTuple_GetItem( result, 1 );
+		int msg_length = PyLong_AsLong(new_object_msg_length);
+
+		outputObject->p_data = (void*)output;
+		outputObject->length = msg_length;
+	}
+
+	PyGILState_Release(gilState);
+
+	return outputObject;
 }
 
 static void Python_DispatchEvent(char* event_json) {
