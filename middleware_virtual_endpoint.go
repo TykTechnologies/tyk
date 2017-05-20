@@ -94,7 +94,7 @@ func (d *VirtualEndpoint) New() {
 func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
 	var moduleConfig VirtualEndpointConfig
 
-	err := mapstructure.Decode(d.TykMiddleware.Spec.RawData, &moduleConfig)
+	err := mapstructure.Decode(d.Spec.RawData, &moduleConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -108,7 +108,7 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 		return false
 	}
 	used := false
-	for _, version := range d.TykMiddleware.Spec.VersionData.Versions {
+	for _, version := range d.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Virtual) > 0 {
 			used = true
 			break
@@ -118,8 +118,8 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 }
 
 func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
-	_, versionPaths, _, _ := d.TykMiddleware.Spec.GetVersionData(r)
-	found, meta := d.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+	_, versionPaths, _, _ := d.Spec.GetVersionData(r)
+	found, meta := d.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
 
 	if !found {
 		return nil
@@ -228,7 +228,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Header.Add("Date", requestTime)
 
 	// Handle response middleware
-	if err := handleResponseChain(d.TykMiddleware.Spec.ResponseChain, w, newResponse, r, session); err != nil {
+	if err := handleResponseChain(d.Spec.ResponseChain, w, newResponse, r, session); err != nil {
 		log.Error("Response chain failed! ", err)
 	}
 

@@ -27,13 +27,13 @@ func (a *TrackEndpointMiddleware) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (a *TrackEndpointMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	_, versionPaths, _, _ := a.TykMiddleware.Spec.GetVersionData(r)
-	foundTracked, metaTrack := a.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestTracked)
+	_, versionPaths, _, _ := a.Spec.GetVersionData(r)
+	foundTracked, metaTrack := a.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestTracked)
 	if foundTracked {
 		ctxSetTrackedPath(r, metaTrack.(*apidef.TrackEndpointMeta).Path)
 	}
 
-	foundDnTrack, _ := a.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestNotTracked)
+	foundDnTrack, _ := a.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestNotTracked)
 	if foundDnTrack {
 		ctxSetDoNotTrack(r, true)
 	}

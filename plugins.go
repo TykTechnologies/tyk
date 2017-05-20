@@ -71,7 +71,7 @@ func (d *DynamicMiddleware) IsEnabledForSpec() bool { return true }
 func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
 	var moduleConfig DynamicMiddlewareConfig
 
-	err := mapstructure.Decode(d.TykMiddleware.Spec.RawData, &moduleConfig)
+	err := mapstructure.Decode(d.Spec.RawData, &moduleConfig)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",

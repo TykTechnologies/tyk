@@ -31,7 +31,7 @@ func (m *modifiedMiddleware) New() {}
 func (m *modifiedMiddleware) GetConfig() (interface{}, error) {
 	var conf modifiedMiddlewareConfig
 
-	err := mapstructure.Decode(m.TykMiddleware.Spec.RawData, &conf)
+	err := mapstructure.Decode(m.Spec.RawData, &conf)
 	if err != nil {
 		return nil, err
 	}

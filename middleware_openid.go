@@ -48,8 +48,8 @@ func (k *OpenIDMW) IsEnabledForSpec() bool { return true }
 
 func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 	providers := []openid.Provider{}
-	log.Debug("Setting up providers: ", k.TykMiddleware.Spec.OpenIDOptions.Providers)
-	for _, provider := range k.TykMiddleware.Spec.OpenIDOptions.Providers {
+	log.Debug("Setting up providers: ", k.Spec.OpenIDOptions.Providers)
+	for _, provider := range k.Spec.OpenIDOptions.Providers {
 		iss := provider.Issuer
 		log.Debug("Setting up Issuer: ", iss)
 		providerClientArray := make([]string, len(provider.ClientIDs))
@@ -165,16 +165,16 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 
 	data := []byte(user.ID)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.TykMiddleware.Spec.OrgID + tokenID
+	sessionID := k.Spec.OrgID + tokenID
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
 		log.Debug("Client ID:", clientID)
-		sessionID = k.TykMiddleware.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(clientID))) + tokenID
+		sessionID = k.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(clientID))) + tokenID
 	}
 
 	log.Debug("Generated Session ID: ", sessionID)
 
-	session, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
+	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
@@ -182,7 +182,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		newSession, err := generateSessionFromPolicy(policyID,
-			k.TykMiddleware.Spec.OrgID,
+			k.Spec.OrgID,
 			true)
 
 		if err != nil {
@@ -204,7 +204,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 	}
 
 	// 4. Set session state on context, we will need it later
-	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, sessionID)

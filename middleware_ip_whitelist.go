@@ -24,11 +24,11 @@ func (i *IPWhiteListMiddleware) GetConfig() (interface{}, error) {
 }
 
 func (i *IPWhiteListMiddleware) IsEnabledForSpec() bool {
-	if !i.TykMiddleware.Spec.EnableIpWhiteListing {
+	if !i.Spec.EnableIpWhiteListing {
 		return false
 	}
 
-	if len(i.TykMiddleware.Spec.AllowedIPs) == 0 {
+	if len(i.Spec.AllowedIPs) == 0 {
 		return false
 	}
 
@@ -38,14 +38,14 @@ func (i *IPWhiteListMiddleware) IsEnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Disabled, pass through
-	if !i.TykMiddleware.Spec.EnableIpWhiteListing {
+	if !i.Spec.EnableIpWhiteListing {
 		return nil, 200
 	}
 
 	remoteIP := net.ParseIP(GetIPFromRequest(r))
 
 	// Enabled, check incoming IP address
-	for _, ip := range i.TykMiddleware.Spec.AllowedIPs {
+	for _, ip := range i.Spec.AllowedIPs {
 		// Might be CIDR, try this one first then fallback to IP parsing later
 		allowedIP, allowedNet, err := net.ParseCIDR(ip)
 		if err != nil {

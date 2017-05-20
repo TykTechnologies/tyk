@@ -92,8 +92,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			version = "Non Versioned"
 		}
 
-		if e.TykMiddleware.Spec.Proxy.StripListenPath {
-			r.URL.Path = strings.Replace(r.URL.Path, e.TykMiddleware.Spec.Proxy.ListenPath, "", 1)
+		if e.Spec.Proxy.StripListenPath {
+			r.URL.Path = strings.Replace(r.URL.Path, e.Spec.Proxy.ListenPath, "", 1)
 		}
 
 		// This is an odd bugfix, will need further testing

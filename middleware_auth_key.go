@@ -24,7 +24,7 @@ func (k *AuthKey) New() {}
 
 // GetConfig retrieves the configuration from the API config
 func (k *AuthKey) GetConfig() (interface{}, error) {
-	return k.TykMiddleware.Spec.Auth, nil
+	return k.Spec.Auth, nil
 }
 
 func (k *AuthKey) IsEnabledForSpec() bool { return true }
@@ -44,7 +44,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	var tempRes *http.Request
 
-	config := k.TykMiddleware.Spec.Auth
+	config := k.Spec.Auth
 
 	key := r.Header.Get(config.AuthHeaderName)
 
@@ -97,7 +97,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	key = stripBearer(key)
 
 	// Check if API key valid
-	session, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(key)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(key)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -115,7 +115,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configu
 	}
 
 	// Set session state on context, we will need it later
-	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, key)

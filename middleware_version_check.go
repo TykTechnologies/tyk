@@ -44,10 +44,10 @@ func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	// Check versioning, blacklist, whitelist and ignored status
-	requestValid, stat, meta := v.TykMiddleware.Spec.IsRequestValid(r)
+	requestValid, stat, meta := v.Spec.IsRequestValid(r)
 	if !requestValid {
 		// Fire a versioning failure event
-		v.TykMiddleware.FireEvent(EventVersionFailure, EventVersionFailureMeta{
+		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           GetIPFromRequest(r),

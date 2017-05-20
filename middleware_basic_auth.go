@@ -33,7 +33,7 @@ func (k *BasicAuthKeyIsValid) IsEnabledForSpec() bool { return true }
 
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
 func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {
-	authReply := "Basic realm=\"" + k.TykMiddleware.Spec.Name + "\""
+	authReply := "Basic realm=\"" + k.Spec.Name + "\""
 
 	w.Header().Add("WWW-Authenticate", authReply)
 	return errors.New(msg), 401
@@ -86,8 +86,8 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Check if API key valid
-	keyName := k.TykMiddleware.Spec.OrgID + authValues[0]
-	session, keyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(keyName)
+	keyName := k.Spec.OrgID + authValues[0]
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName)
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
@@ -137,7 +137,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Set session state on context, we will need it later
-	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, keyName)
