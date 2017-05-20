@@ -40,7 +40,7 @@ func (m *RedisCacheMiddleware) New() {
 
 func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
 	var used bool
-	for _, version := range m.TykMiddleware.Spec.VersionData.Versions {
+	for _, version := range m.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Cached) > 0 {
 			used = true
 		}
@@ -129,9 +129,9 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		stat = StatusCached
 	} else {
 		// New request checker, more targeted, less likely to fail
-		_, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
-		found, _ := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
-		isVirtual, _ = m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+		_, versionPaths, _, _ := m.Spec.GetVersionData(r)
+		found, _ := m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
+		isVirtual, _ = m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
 		if found {
 			stat = StatusCached
 		}

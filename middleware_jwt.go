@@ -47,7 +47,7 @@ func (k JWTMiddleware) New() {}
 
 // GetConfig retrieves the configuration from the API config
 func (k *JWTMiddleware) GetConfig() (interface{}, error) {
-	return k.TykMiddleware.Spec.Auth, nil
+	return k.Spec.Auth, nil
 }
 
 func (k *JWTMiddleware) IsEnabledForSpec() bool { return true }
@@ -60,7 +60,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 	}
 
 	var jwkSet JWKs
-	cachedJWK, found := JWKCache.Get(k.TykMiddleware.Spec.APIID)
+	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
 	if !found {
 		// Get the JWK
 		log.Debug("Pulling JWK")
@@ -85,7 +85,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 
 		// Cache it
 		log.Debug("Caching JWK")
-		JWKCache.Set(k.TykMiddleware.Spec.APIID, jwkSet, cache.DefaultExpiration)
+		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(JWKs)
 	}
@@ -132,13 +132,13 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 }
 
 func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
-	config := k.TykMiddleware.Spec.APIDefinition
+	config := k.Spec.APIDefinition
 	// Check for central JWT source
 	if config.JWTSource != "" {
 
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
-			secret, err := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.TykMiddleware.Spec.JWTSigningMethod)
+			secret, err := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.Spec.JWTSigningMethod)
 			if err != nil {
 				return nil, err
 			}
@@ -163,7 +163,7 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 
 	// Couldn't base64 decode the kid, so lets try it raw
 	log.Debug("Getting key: ", tykId)
-	session, rawKeyExists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId)
 	if !rawKeyExists {
 		log.Info("Not found!")
 		return nil, errors.New("token invalid, key not found")
@@ -172,8 +172,8 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 }
 
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
-	if k.TykMiddleware.Spec.JWTPolicyFieldName != "" {
-		basePolicyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.JWTPolicyFieldName].(string)
+	if k.Spec.JWTPolicyFieldName != "" {
+		basePolicyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.Spec.JWTPolicyFieldName].(string)
 		if !foundPolicy {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
@@ -181,15 +181,15 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 
 		return basePolicyID, true
 
-	} else if k.TykMiddleware.Spec.JWTClientIDBaseField != "" {
-		clientID, clientIDFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.JWTClientIDBaseField].(string)
+	} else if k.Spec.JWTClientIDBaseField != "" {
+		clientID, clientIDFound := token.Claims.(jwt.MapClaims)[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
 			log.Error("Could not identify a policy to apply to this token from field!")
 			return "", false
 		}
 
 		// Check for a regular token that matches this client ID
-		clientSession, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(clientID)
+		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID)
 		if !exists {
 			return "", false
 		}
@@ -209,7 +209,7 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
 	log.Debug("JWT authority is centralised")
 	// Generate a virtual token
-	baseFieldData, baseFound := token.Claims.(jwt.MapClaims)[k.TykMiddleware.Spec.JWTIdentityBaseField].(string)
+	baseFieldData, baseFound := token.Claims.(jwt.MapClaims)[k.Spec.JWTIdentityBaseField].(string)
 	if !baseFound {
 		log.Warning("Base Field not found, using SUB")
 		var found bool
@@ -224,11 +224,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	log.Debug("Base Field ID set to: ", baseFieldData)
 	data := []byte(baseFieldData)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.TykMiddleware.Spec.OrgID + tokenID
+	sessionID := k.Spec.OrgID + tokenID
 
 	log.Debug("JWT Temporary session ID is: ", sessionID)
 
-	session, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
+	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
@@ -241,7 +241,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		newSession, err := generateSessionFromPolicy(basePolicyID,
-			k.TykMiddleware.Spec.OrgID,
+			k.Spec.OrgID,
 			true)
 
 		if err == nil {
@@ -253,7 +253,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			k.Spec.SessionManager.UpdateSession(sessionID, &session, getLifetime(k.Spec, &session))
 			log.Debug("Policy applied to key")
 
-			switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+			switch k.Spec.BaseIdentityProvidedBy {
 			case apidef.JWTClaim, apidef.UnsetAuth:
 				ctxSetSession(r, &session)
 				ctxSetAuthToken(r, sessionID)
@@ -268,7 +268,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	log.Debug("Key found")
-	switch k.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, sessionID)
@@ -294,7 +294,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	log.Debug("Using raw key ID: ", tykId)
-	session, exists := k.TykMiddleware.CheckSessionAndIdentityForValidKey(tykId)
+	session, exists := k.CheckSessionAndIdentityForValidKey(tykId)
 	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), 403
@@ -308,7 +308,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	config := k.TykMiddleware.Spec.Auth
+	config := k.Spec.Auth
 	var tykId string
 
 	// Get the token
@@ -351,7 +351,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 	// Verify the token
 	token, err := jwt.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
-		switch k.TykMiddleware.Spec.JWTSigningMethod {
+		switch k.Spec.JWTSigningMethod {
 		case "hmac":
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
@@ -377,7 +377,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 			return nil, err
 		}
 
-		if k.TykMiddleware.Spec.JWTSigningMethod == "rsa" {
+		if k.Spec.JWTSigningMethod == "rsa" {
 			asRSA, err := jwt.ParseRSAPublicKeyFromPEM(val)
 			if err != nil {
 				log.Error("Failed to deccode JWT to RSA type")
@@ -393,7 +393,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, c
 		// Token is valid - let's move on
 
 		// Are we mapping to a central JWT Secret?
-		if k.TykMiddleware.Spec.JWTSource != "" {
+		if k.Spec.JWTSource != "" {
 			return k.processCentralisedJWT(r, token)
 		}
 

@@ -130,10 +130,10 @@ func (m *URLRewriteMiddleware) New() {}
 
 func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
 	var used bool
-	for _, version := range m.TykMiddleware.Spec.VersionData.Versions {
+	for _, version := range m.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.URLRewrite) > 0 {
 			used = true
-			m.TykMiddleware.Spec.URLRewriteEnabled = true
+			m.Spec.URLRewriteEnabled = true
 			break
 		}
 	}
@@ -159,8 +159,8 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	_, versionPaths, _, _ := m.TykMiddleware.Spec.GetVersionData(r)
-	found, meta := m.TykMiddleware.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
+	_, versionPaths, _, _ := m.Spec.GetVersionData(r)
+	found, meta := m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
 	if found {
 		log.Debug("Rewriter active")
 		umeta := meta.(*apidef.URLRewriteMeta)

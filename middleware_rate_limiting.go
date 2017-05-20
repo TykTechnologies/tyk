@@ -29,7 +29,7 @@ func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
 }
 
 func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
-	return !k.TykMiddleware.Spec.DisableRateLimit || !k.TykMiddleware.Spec.DisableQuota
+	return !k.Spec.DisableRateLimit || !k.Spec.DisableQuota
 }
 
 func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token string) (error, int) {
@@ -40,7 +40,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 	}).Info("Key rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
-	k.TykMiddleware.FireEvent(EventRateLimitExceeded, EventRateLimitExceededMeta{
+	k.FireEvent(EventRateLimitExceeded, EventRateLimitExceededMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           GetIPFromRequest(r),
@@ -61,7 +61,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	}).Info("Key quota limit exceeded.")
 
 	// Fire a quota exceeded event
-	k.TykMiddleware.FireEvent(EventQuotaExceeded, EventQuotaExceededMeta{
+	k.FireEvent(EventQuotaExceeded, EventQuotaExceededMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           GetIPFromRequest(r),

@@ -104,8 +104,8 @@ func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
 	// Append spec data:
 	if c.Middleware != nil {
 		object.Spec = map[string]string{
-			"OrgID": c.Middleware.TykMiddleware.Spec.OrgID,
-			"APIID": c.Middleware.TykMiddleware.Spec.APIID,
+			"OrgID": c.Middleware.Spec.OrgID,
+			"APIID": c.Middleware.Spec.APIID,
 		}
 	}
 
@@ -167,7 +167,7 @@ func (m *CoProcessMiddleware) New() {}
 func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
 	var moduleConfig CoProcessMiddlewareConfig
 
-	err := mapstructure.Decode(m.TykMiddleware.Spec.RawData, &moduleConfig)
+	err := mapstructure.Decode(m.Spec.RawData, &moduleConfig)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -188,7 +188,7 @@ func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	supportedDrivers := []apidef.MiddlewareDriver{apidef.PythonDriver, apidef.LuaDriver, apidef.GrpcDriver}
 
 	for _, driver := range supportedDrivers {
-		if m.TykMiddleware.Spec.CustomMiddleware.Driver == driver && CoProcessName == driver {
+		if m.Spec.CustomMiddleware.Driver == driver && CoProcessName == driver {
 			usesCoProcessMiddleware = true
 			break
 		}
@@ -207,10 +207,10 @@ func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
 	}
 
-	if !usesCoProcessMiddleware && m.TykMiddleware.Spec.CustomMiddleware.Driver != "" {
+	if !usesCoProcessMiddleware && m.Spec.CustomMiddleware.Driver != "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
-		}).Error("CP Driver not supported: ", m.TykMiddleware.Spec.CustomMiddleware.Driver)
+		}).Error("CP Driver not supported: ", m.Spec.CustomMiddleware.Driver)
 	}
 
 	return false
@@ -227,8 +227,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	var extractor IdExtractor
-	if m.TykMiddleware.Spec.EnableCoProcessAuth && m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
-		extractor = m.TykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	if m.Spec.EnableCoProcessAuth && m.Spec.CustomMiddleware.IdExtractor.Extractor != nil {
+		extractor = m.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 	}
 
 	var returnOverrides ReturnOverrides
@@ -286,7 +286,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Is this a CP authentication middleware?
-	if m.TykMiddleware.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
+	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
 		// The CP middleware didn't setup a session:
 		if returnObject.Session == nil {
 			return errors.New("Key not authorised"), 403

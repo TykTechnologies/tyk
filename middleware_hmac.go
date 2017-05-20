@@ -127,7 +127,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Set session state on context, we will need it later
-	switch hm.TykMiddleware.Spec.BaseIdentityProvidedBy {
+	switch hm.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, fieldValues.KeyID)
@@ -204,11 +204,11 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 
 	in_ms := diff / 1000000
 
-	if hm.TykMiddleware.Spec.HmacAllowedClockSkew <= 0 {
+	if hm.Spec.HmacAllowedClockSkew <= 0 {
 		return true
 	}
 
-	if math.Abs(float64(in_ms)) > hm.TykMiddleware.Spec.HmacAllowedClockSkew {
+	if math.Abs(float64(in_ms)) > hm.Spec.HmacAllowedClockSkew {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
 		}).Debug("Difference is: ", math.Abs(float64(in_ms)))
@@ -226,7 +226,7 @@ type HMACFieldValues struct {
 }
 
 func (hm *HMACMiddleware) getSecretAndSessionForKeyID(keyId string) (string, SessionState, error) {
-	session, keyExists := hm.TykMiddleware.CheckSessionAndIdentityForValidKey(keyId)
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
 	}
