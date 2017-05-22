@@ -171,6 +171,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"unsafe"
 
@@ -212,8 +213,11 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
-	CBundlePath := C.CString(basePath)
-	C.Python_HandleMiddlewareCache(CBundlePath)
+	go func() {
+		runtime.LockOSThread()
+		CBundlePath := C.CString(basePath)
+		C.Python_HandleMiddlewareCache(CBundlePath)
+	}()
 }
 
 // PythonInit initializes the Python interpreter.
