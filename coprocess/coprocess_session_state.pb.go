@@ -23,6 +23,20 @@ func (m *AccessSpec) String() string            { return proto.CompactTextString
 func (*AccessSpec) ProtoMessage()               {}
 func (*AccessSpec) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
+func (m *AccessSpec) GetUrl() string {
+	if m != nil {
+		return m.Url
+	}
+	return ""
+}
+
+func (m *AccessSpec) GetMethods() []string {
+	if m != nil {
+		return m.Methods
+	}
+	return nil
+}
+
 type AccessDefinition struct {
 	ApiName     string        `protobuf:"bytes,1,opt,name=api_name,json=apiName" json:"api_name,omitempty"`
 	ApiId       string        `protobuf:"bytes,2,opt,name=api_id,json=apiId" json:"api_id,omitempty"`
@@ -34,6 +48,27 @@ func (m *AccessDefinition) Reset()                    { *m = AccessDefinition{} 
 func (m *AccessDefinition) String() string            { return proto.CompactTextString(m) }
 func (*AccessDefinition) ProtoMessage()               {}
 func (*AccessDefinition) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
+
+func (m *AccessDefinition) GetApiName() string {
+	if m != nil {
+		return m.ApiName
+	}
+	return ""
+}
+
+func (m *AccessDefinition) GetApiId() string {
+	if m != nil {
+		return m.ApiId
+	}
+	return ""
+}
+
+func (m *AccessDefinition) GetVersions() []string {
+	if m != nil {
+		return m.Versions
+	}
+	return nil
+}
 
 func (m *AccessDefinition) GetAllowedUrls() []*AccessSpec {
 	if m != nil {
@@ -52,6 +87,20 @@ func (m *BasicAuthData) String() string            { return proto.CompactTextStr
 func (*BasicAuthData) ProtoMessage()               {}
 func (*BasicAuthData) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{2} }
 
+func (m *BasicAuthData) GetPassword() string {
+	if m != nil {
+		return m.Password
+	}
+	return ""
+}
+
+func (m *BasicAuthData) GetHash() string {
+	if m != nil {
+		return m.Hash
+	}
+	return ""
+}
+
 type JWTData struct {
 	Secret string `protobuf:"bytes,1,opt,name=secret" json:"secret,omitempty"`
 }
@@ -61,6 +110,13 @@ func (m *JWTData) String() string            { return proto.CompactTextString(m)
 func (*JWTData) ProtoMessage()               {}
 func (*JWTData) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{3} }
 
+func (m *JWTData) GetSecret() string {
+	if m != nil {
+		return m.Secret
+	}
+	return ""
+}
+
 type Monitor struct {
 	TriggerLimits []float64 `protobuf:"fixed64,1,rep,packed,name=trigger_limits,json=triggerLimits" json:"trigger_limits,omitempty"`
 }
@@ -69,6 +125,13 @@ func (m *Monitor) Reset()                    { *m = Monitor{} }
 func (m *Monitor) String() string            { return proto.CompactTextString(m) }
 func (*Monitor) ProtoMessage()               {}
 func (*Monitor) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{4} }
+
+func (m *Monitor) GetTriggerLimits() []float64 {
+	if m != nil {
+		return m.TriggerLimits
+	}
+	return nil
+}
 
 type SessionState struct {
 	LastCheck               int64                        `protobuf:"varint,1,opt,name=last_check,json=lastCheck" json:"last_check,omitempty"`
@@ -106,11 +169,88 @@ func (m *SessionState) String() string            { return proto.CompactTextStri
 func (*SessionState) ProtoMessage()               {}
 func (*SessionState) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{5} }
 
+func (m *SessionState) GetLastCheck() int64 {
+	if m != nil {
+		return m.LastCheck
+	}
+	return 0
+}
+
+func (m *SessionState) GetAllowance() float64 {
+	if m != nil {
+		return m.Allowance
+	}
+	return 0
+}
+
+func (m *SessionState) GetRate() float64 {
+	if m != nil {
+		return m.Rate
+	}
+	return 0
+}
+
+func (m *SessionState) GetPer() float64 {
+	if m != nil {
+		return m.Per
+	}
+	return 0
+}
+
+func (m *SessionState) GetExpires() int64 {
+	if m != nil {
+		return m.Expires
+	}
+	return 0
+}
+
+func (m *SessionState) GetQuotaMax() int64 {
+	if m != nil {
+		return m.QuotaMax
+	}
+	return 0
+}
+
+func (m *SessionState) GetQuotaRenews() int64 {
+	if m != nil {
+		return m.QuotaRenews
+	}
+	return 0
+}
+
+func (m *SessionState) GetQuotaRemaining() int64 {
+	if m != nil {
+		return m.QuotaRemaining
+	}
+	return 0
+}
+
+func (m *SessionState) GetQuotaRenewalRate() int64 {
+	if m != nil {
+		return m.QuotaRenewalRate
+	}
+	return 0
+}
+
 func (m *SessionState) GetAccessRights() map[string]*AccessDefinition {
 	if m != nil {
 		return m.AccessRights
 	}
 	return nil
+}
+
+func (m *SessionState) GetOrgId() string {
+	if m != nil {
+		return m.OrgId
+	}
+	return ""
+}
+
+func (m *SessionState) GetOauthClientId() string {
+	if m != nil {
+		return m.OauthClientId
+	}
+	return ""
 }
 
 func (m *SessionState) GetOauthKeys() map[string]string {
@@ -134,11 +274,95 @@ func (m *SessionState) GetJwtData() *JWTData {
 	return nil
 }
 
+func (m *SessionState) GetHmacEnabled() bool {
+	if m != nil {
+		return m.HmacEnabled
+	}
+	return false
+}
+
+func (m *SessionState) GetHmacSecret() string {
+	if m != nil {
+		return m.HmacSecret
+	}
+	return ""
+}
+
+func (m *SessionState) GetIsInactive() bool {
+	if m != nil {
+		return m.IsInactive
+	}
+	return false
+}
+
+func (m *SessionState) GetApplyPolicyId() string {
+	if m != nil {
+		return m.ApplyPolicyId
+	}
+	return ""
+}
+
+func (m *SessionState) GetDataExpires() int64 {
+	if m != nil {
+		return m.DataExpires
+	}
+	return 0
+}
+
 func (m *SessionState) GetMonitor() *Monitor {
 	if m != nil {
 		return m.Monitor
 	}
 	return nil
+}
+
+func (m *SessionState) GetEnableDetailedRecording() bool {
+	if m != nil {
+		return m.EnableDetailedRecording
+	}
+	return false
+}
+
+func (m *SessionState) GetMetadata() string {
+	if m != nil {
+		return m.Metadata
+	}
+	return ""
+}
+
+func (m *SessionState) GetTags() []string {
+	if m != nil {
+		return m.Tags
+	}
+	return nil
+}
+
+func (m *SessionState) GetAlias() string {
+	if m != nil {
+		return m.Alias
+	}
+	return ""
+}
+
+func (m *SessionState) GetLastUpdated() string {
+	if m != nil {
+		return m.LastUpdated
+	}
+	return ""
+}
+
+func (m *SessionState) GetIdExtractorDeadline() int64 {
+	if m != nil {
+		return m.IdExtractorDeadline
+	}
+	return 0
+}
+
+func (m *SessionState) GetSessionLifetime() int64 {
+	if m != nil {
+		return m.SessionLifetime
+	}
+	return 0
 }
 
 func init() {
