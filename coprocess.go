@@ -67,24 +67,32 @@ type CoProcessor struct {
 
 // GetObjectFromRequest constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
-
-	defer r.Body.Close()
-	originalBody, _ := ioutil.ReadAll(r.Body)
+	var body string
+	if r.Body == nil {
+		body = ""
+	} else {
+		defer r.Body.Close()
+		originalBody, _ := ioutil.ReadAll(r.Body)
+		body = string(originalBody)
+	}
 
 	var object *coprocess.Object
 	var miniRequestObject *coprocess.MiniRequestObject
 
 	miniRequestObject = &coprocess.MiniRequestObject{
-		Headers:         ProtoMap(r.Header),
-		SetHeaders:      make(map[string]string, 0),
-		DeleteHeaders:   make([]string, 0),
-		Body:            string(originalBody),
-		Url:             r.URL.Path,
-		Params:          ProtoMap(r.URL.Query()),
-		AddParams:       make(map[string]string),
-		ExtendedParams:  ProtoMap(nil),
-		DeleteParams:    make([]string, 0),
-		ReturnOverrides: &coprocess.ReturnOverrides{-1, ""},
+		Headers:        ProtoMap(r.Header),
+		SetHeaders:     make(map[string]string),
+		DeleteHeaders:  make([]string, 0),
+		Body:           body,
+		Url:            r.URL.Path,
+		Params:         ProtoMap(r.URL.Query()),
+		AddParams:      make(map[string]string),
+		ExtendedParams: ProtoMap(nil),
+		DeleteParams:   make([]string, 0),
+		ReturnOverrides: &coprocess.ReturnOverrides{
+			ResponseCode:  -1,
+			ResponseError: "",
+		},
 	}
 
 	object = &coprocess.Object{
@@ -289,6 +297,15 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
 
 		return errors.New("Key not authorised"), int(returnObject.Request.ReturnOverrides.ResponseCode)
+	}
+
+	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {
+		for h, v := range returnObject.Request.ReturnOverrides.Headers {
+			w.Header().Set(h, v)
+		}
+		w.WriteHeader(int(returnObject.Request.ReturnOverrides.ResponseCode))
+		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseError))
+		return nil, 666
 	}
 
 	// Is this a CP authentication middleware?
