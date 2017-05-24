@@ -19,12 +19,49 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_return_overrides.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_pb=_b('\n coprocess_return_overrides.proto\x12\tcoprocess\"@\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\tb\x06proto3')
+  serialized_pb=_b('\n coprocess_return_overrides.proto\x12\tcoprocess\"\xaa\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
+
+_RETURNOVERRIDES_HEADERSENTRY = _descriptor.Descriptor(
+  name='HeadersEntry',
+  full_name='coprocess.ReturnOverrides.HeadersEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='coprocess.ReturnOverrides.HeadersEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='coprocess.ReturnOverrides.HeadersEntry.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=_descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001')),
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=172,
+  serialized_end=218,
+)
 
 _RETURNOVERRIDES = _descriptor.Descriptor(
   name='ReturnOverrides',
@@ -47,10 +84,17 @@ _RETURNOVERRIDES = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='headers', full_name='coprocess.ReturnOverrides.headers', index=2,
+      number=3, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
-  nested_types=[],
+  nested_types=[_RETURNOVERRIDES_HEADERSENTRY, ],
   enum_types=[
   ],
   options=None,
@@ -59,18 +103,30 @@ _RETURNOVERRIDES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=47,
-  serialized_end=111,
+  serialized_start=48,
+  serialized_end=218,
 )
 
+_RETURNOVERRIDES_HEADERSENTRY.containing_type = _RETURNOVERRIDES
+_RETURNOVERRIDES.fields_by_name['headers'].message_type = _RETURNOVERRIDES_HEADERSENTRY
 DESCRIPTOR.message_types_by_name['ReturnOverrides'] = _RETURNOVERRIDES
 
 ReturnOverrides = _reflection.GeneratedProtocolMessageType('ReturnOverrides', (_message.Message,), dict(
+
+  HeadersEntry = _reflection.GeneratedProtocolMessageType('HeadersEntry', (_message.Message,), dict(
+    DESCRIPTOR = _RETURNOVERRIDES_HEADERSENTRY,
+    __module__ = 'coprocess_return_overrides_pb2'
+    # @@protoc_insertion_point(class_scope:coprocess.ReturnOverrides.HeadersEntry)
+    ))
+  ,
   DESCRIPTOR = _RETURNOVERRIDES,
   __module__ = 'coprocess_return_overrides_pb2'
   # @@protoc_insertion_point(class_scope:coprocess.ReturnOverrides)
   ))
 _sym_db.RegisterMessage(ReturnOverrides)
+_sym_db.RegisterMessage(ReturnOverrides.HeadersEntry)
 
 
+_RETURNOVERRIDES_HEADERSENTRY.has_options = True
+_RETURNOVERRIDES_HEADERSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
 # @@protoc_insertion_point(module_scope)

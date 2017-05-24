@@ -82,6 +82,13 @@ func (m *StringSlice) String() string            { return proto.CompactTextStrin
 func (*StringSlice) ProtoMessage()               {}
 func (*StringSlice) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
+func (m *StringSlice) GetItems() []string {
+	if m != nil {
+		return m.Items
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*StringSlice)(nil), "coprocess.StringSlice")
 	proto.RegisterEnum("coprocess.HookType", HookType_name, HookType_value)

@@ -45,6 +45,27 @@ func (m *MiniRequestObject) GetSetHeaders() map[string]string {
 	return nil
 }
 
+func (m *MiniRequestObject) GetDeleteHeaders() []string {
+	if m != nil {
+		return m.DeleteHeaders
+	}
+	return nil
+}
+
+func (m *MiniRequestObject) GetBody() string {
+	if m != nil {
+		return m.Body
+	}
+	return ""
+}
+
+func (m *MiniRequestObject) GetUrl() string {
+	if m != nil {
+		return m.Url
+	}
+	return ""
+}
+
 func (m *MiniRequestObject) GetParams() map[string]string {
 	if m != nil {
 		return m.Params
@@ -62,6 +83,13 @@ func (m *MiniRequestObject) GetAddParams() map[string]string {
 func (m *MiniRequestObject) GetExtendedParams() map[string]string {
 	if m != nil {
 		return m.ExtendedParams
+	}
+	return nil
+}
+
+func (m *MiniRequestObject) GetDeleteParams() []string {
+	if m != nil {
+		return m.DeleteParams
 	}
 	return nil
 }

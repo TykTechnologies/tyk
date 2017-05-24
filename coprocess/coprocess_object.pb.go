@@ -32,6 +32,20 @@ func (m *Object) String() string            { return proto.CompactTextString(m) 
 func (*Object) ProtoMessage()               {}
 func (*Object) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
 
+func (m *Object) GetHookType() HookType {
+	if m != nil {
+		return m.HookType
+	}
+	return HookType_Unknown
+}
+
+func (m *Object) GetHookName() string {
+	if m != nil {
+		return m.HookName
+	}
+	return ""
+}
+
 func (m *Object) GetRequest() *MiniRequestObject {
 	if m != nil {
 		return m.Request
@@ -68,6 +82,13 @@ func (m *Event) Reset()                    { *m = Event{} }
 func (m *Event) String() string            { return proto.CompactTextString(m) }
 func (*Event) ProtoMessage()               {}
 func (*Event) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
+
+func (m *Event) GetPayload() string {
+	if m != nil {
+		return m.Payload
+	}
+	return ""
+}
 
 type EventReply struct {
 }
