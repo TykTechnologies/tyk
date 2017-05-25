@@ -66,7 +66,8 @@ func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContex
 			log.Debug("Replacing: ", v[0])
 
 			if val, ok := contextData[contextKey]; ok {
-				newpath = strings.Replace(newpath, v[0], valToStr(val), -1)
+				newpath = strings.Replace(newpath, v[0],
+					url.QueryEscape(valToStr(val)), -1)
 			}
 		}
 	}
@@ -82,7 +83,8 @@ func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContex
 
 			val, ok := session.MetaData[contextKey]
 			if ok {
-				newpath = strings.Replace(newpath, v[0], valToStr(val), -1)
+				newpath = strings.Replace(newpath, v[0],
+					url.QueryEscape(valToStr(val)), -1)
 			}
 
 		}
@@ -112,7 +114,7 @@ func valToStr(v interface{}) string {
 	default:
 		log.Error("Context variable type is not supported: ", reflect.TypeOf(v))
 	}
-	return url.QueryEscape(s)
+	return s
 }
 
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution

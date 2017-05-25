@@ -2,8 +2,6 @@ package main
 
 import (
 	"net/http"
-	"net/url"
-	"reflect"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -71,30 +69,9 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 			// Using context key
 			if contextData != nil {
 				metaKey := strings.Replace(nVal, contextLabel, "", 1)
-				tempVal, ok := contextData[metaKey]
+				val, ok := contextData[metaKey]
 				if ok {
-					switch x := tempVal.(type) {
-					case string:
-						nVal = x
-					case []string:
-						nVal = strings.Join(x, ",")
-						// Remove empty start
-						nVal = strings.TrimPrefix(nVal, ",")
-					case url.Values:
-						i := 0
-						nVal = ""
-						for key, val := range x {
-							nVal += key + ":" + strings.Join(val, ",")
-							if i < len(x)-1 {
-								nVal += ";"
-							}
-							i++
-						}
-					default:
-						log.Error("Context variable type is not supported: ", reflect.TypeOf(x))
-					}
-
-					r.Header.Add(nKey, nVal)
+					r.Header.Add(nKey, valToStr(val))
 				} else {
 					log.Warning("Context Data not found for key in map: ", metaKey)
 				}
