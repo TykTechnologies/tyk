@@ -90,14 +90,7 @@ func (hc *HostCheckerManager) GenerateCheckerId() {
 }
 
 func (hc *HostCheckerManager) CheckActivePollerLoop() {
-	for {
-		if hc.stopLoop {
-			log.WithFields(logrus.Fields{
-				"prefix": "host-check-mgr",
-			}).Debug("Stopping uptime tests")
-			break
-		}
-
+	for !hc.stopLoop {
 		// If I'm polling, lets start the loop
 		if hc.AmIPolling() {
 			if !hc.pollerStarted {
@@ -119,6 +112,9 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 
 		time.Sleep(10 * time.Second)
 	}
+	log.WithFields(logrus.Fields{
+		"prefix": "host-check-mgr",
+	}).Debug("Stopping uptime tests")
 }
 
 func (hc *HostCheckerManager) UptimePurgeLoop() {}

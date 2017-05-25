@@ -624,8 +624,7 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circu
 		events := newSpec.CircuitBreaker.CB.Subscribe()
 		go func(path string, spec *APISpec, breakerPtr *circuit.Breaker) {
 			timerActive := false
-			for {
-				e := <-events
+			for e := range events {
 				switch e {
 				case circuit.BreakerTripped:
 					log.Warning("[PROXY] [CIRCUIT BREKER] Breaker tripped for path: ", path)
