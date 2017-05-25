@@ -39,22 +39,22 @@ import (
 
 var (
 	log                      = logger.Get()
-	config                   = Config{}
-	templates                = &template.Template{}
-	analytics                = RedisAnalyticsHandler{}
-	GlobalEventsJSVM         = &JSVM{}
+	config                   Config
+	templates                *template.Template
+	analytics                RedisAnalyticsHandler
+	GlobalEventsJSVM         JSVM
 	memProfFile              *os.File
 	Policies                 = map[string]Policy{}
-	MainNotifier             = RedisNotifier{}
-	DefaultOrgStore          = DefaultSessionManager{}
-	DefaultQuotaStore        = DefaultSessionManager{}
+	MainNotifier             RedisNotifier
+	DefaultOrgStore          DefaultSessionManager
+	DefaultQuotaStore        DefaultSessionManager
 	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
 	MonitoringHandler        TykEventHandler
-	RPCListener              = RPCStorageHandler{}
+	RPCListener              RPCStorageHandler
 	DashService              DashboardServiceSender
 
 	ApiSpecRegister map[string]*APISpec
-	keyGen          = DefaultKeyGenerator{}
+	keyGen          DefaultKeyGenerator
 
 	mainRouter    *mux.Router
 	defaultRouter *mux.Router
@@ -65,11 +65,6 @@ var (
 	NodeID string
 
 	runningTests = false
-)
-
-const (
-	// Generic system error
-	oauthPrefix = "oauth-data."
 )
 
 // Display configuration options
@@ -349,7 +344,7 @@ func checkIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
 }
 
 func generateOAuthPrefix(apiID string) string {
-	return oauthPrefix + apiID + "."
+	return "oauth-data." + apiID + "."
 }
 
 // Create API-specific OAuth handlers and respective auth servers

@@ -11,9 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const (
-	SwaggerSource APIImporterSource = "swagger"
-)
+const SwaggerSource APIImporterSource = "swagger"
 
 type DefinitionObjectFormatAST struct {
 	Format string `json:"format"`

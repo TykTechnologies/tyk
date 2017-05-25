@@ -10,9 +10,7 @@ import (
 
 type APIImporterSource string
 
-const (
-	ApiaryBluePrint APIImporterSource = "blueprint"
-)
+const ApiaryBluePrint APIImporterSource = "blueprint"
 
 type APIImporter interface {
 	ReadString(string) error

@@ -16,9 +16,7 @@ import (
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
-const (
-	EH_LogHandler apidef.TykEventHandlerName = "eh_log_handler"
-)
+const EH_LogHandler apidef.TykEventHandlerName = "eh_log_handler"
 
 // Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
