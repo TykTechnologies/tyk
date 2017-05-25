@@ -124,8 +124,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 }
 
 func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
-	for {
-		isActive := <-orgChan
+	for isActive := range orgChan {
 		log.Debug("Chan got:", isActive)
 		orgActiveMap.Lock()
 		orgActiveMap.OrgMap[orgId] = isActive
