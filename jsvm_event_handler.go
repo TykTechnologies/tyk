@@ -6,9 +6,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const (
-	EH_JSVMHandler apidef.TykEventHandlerName = "eh_dynamic_handler"
-)
+const EH_JSVMHandler apidef.TykEventHandlerName = "eh_dynamic_handler"
 
 type JSVMContextGlobal struct {
 	APIID string
