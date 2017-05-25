@@ -727,20 +727,16 @@ const apiBenchDef = `{
 	}
 }`
 
-func BenchmarkApiInsertReload(b *testing.B) {
-	redisStore := &RedisClusterStorageManager{KeyPrefix: "apikey."}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: "orgKey."}
-
+func BenchmarkApiReload(b *testing.B) {
 	specs := make([]*APISpec, 1000)
 	for i := range specs {
 		id := strconv.Itoa(i + 1)
 		def := strings.Replace(apiBenchDef, "REPLACE", id, -1)
 		spec := createDefinitionFromString(def)
-		spec.Init(redisStore, redisStore, healthStore, orgStore)
 		specs[i] = spec
 	}
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		newMuxes := mux.NewRouter()
 		loadAPIEndpoints(newMuxes)
