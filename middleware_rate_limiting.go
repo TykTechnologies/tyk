@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -74,30 +75,48 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	return errors.New("Quota exceeded"), 403
 }
 
+func (k *RateLimitAndQuotaCheck) doSessionWrite(r *http.Request, token string, session *SessionState) {
+	if !config.UseAsyncSessionWrite {
+		k.Spec.SessionManager.UpdateSession(token, session, getLifetime(k.Spec, session))
+	} else {
+		go k.Spec.SessionManager.UpdateSession(token, session, getLifetime(k.Spec, session))
+	}
+	ctxSetSession(r, session)
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
 	storeRef := k.Spec.SessionManager.GetStore()
+	oldQuotaRenewal := session.QuotaRenews
 	forwardMessage, reason := sessionLimiter.ForwardMessage(session,
 		token,
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota)
 
-	// If either are disabled, save the write roundtrip
+	// If either are disabled, or the session has been modified, save the write roundtrip
 	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
-		// Ensure quota and rate data for this session are recorded
-		if config.UseAsyncSessionWrite {
-			go k.Spec.SessionManager.UpdateSession(token, session, getLifetime(k.Spec, session))
-		} else {
-			k.Spec.SessionManager.UpdateSession(token, session, getLifetime(k.Spec, session))
+		// If we are using the distributed counter, we don't need to write data here,
+		// the flusher will take care of it
+		if config.UseDistributedQuotaCounter == false {
+			// Ensure quota and rate data for this session are recorded
+			k.doSessionWrite(r, token, session)
+		} else if session.QuotaRenews != oldQuotaRenewal {
+			k.doSessionWrite(r, token, session)
 		}
-		ctxSetSession(r, session)
 	}
 
 	log.Debug("SessionState: ", session)
+
+	if k.Spec.DisableQuota == false {
+		// Add resource headers
+		w.Header().Add("X-RateLimit-Limit", strconv.Itoa(int(session.QuotaMax)))
+		w.Header().Add("X-RateLimit-Remaining", strconv.Itoa(int(session.QuotaRemaining)))
+		w.Header().Add("X-RateLimit-Reset", strconv.Itoa(int(session.QuotaRenews)))
+	}
 
 	if !forwardMessage {
 		// TODO Use an Enum!
