@@ -989,14 +989,14 @@ func main() {
 
 	if goAgainErr != nil {
 		var err error
-		if l, err = generateListener("", 0); err != nil {
+		if l, err = generateListener(0); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Fatalf("Error starting listener: %s", err)
 		}
 
 		if config.ControlAPIPort > 0 {
-			if controlListener, err = generateListener("", config.ControlAPIPort); err != nil {
+			if controlListener, err = generateListener(config.ControlAPIPort); err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "main",
 				}).Fatalf("Error starting control API listener: %s", err)
@@ -1123,10 +1123,8 @@ func start(arguments map[string]interface{}) {
 	go reloadLoop(time.Tick(time.Second))
 }
 
-func generateListener(listenAddress string, listenPort int) (net.Listener, error) {
-	if listenAddress == "" {
-		listenAddress = config.ListenAddress
-	}
+func generateListener(listenPort int) (net.Listener, error) {
+	listenAddress := config.ListenAddress
 	if listenPort == 0 {
 		listenPort = config.ListenPort
 	}

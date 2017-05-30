@@ -117,7 +117,7 @@ func doLoadWithBackup(specs []*APISpec) {
 	log.Warning("[RPC Backup] --> Ready to listen")
 	RPC_EmergencyModeLoaded = true
 
-	l, err := generateListener("", 0)
+	l, err := generateListener(0)
 	if err != nil {
 		log.Error("Failed to generate listener:", err)
 	}
