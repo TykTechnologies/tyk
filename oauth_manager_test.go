@@ -472,7 +472,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	} else {
 		if newSuccess.Status != "ok" {
 			t.Error("key not deleted, status error:\n", recorder.Body.String())
-			t.Error(ApiSpecRegister)
+			t.Error(apisByID)
 		}
 		if newSuccess.Action != "deleted" {
 			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())

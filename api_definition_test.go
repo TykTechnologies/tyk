@@ -439,7 +439,7 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ApiSpecRegister = make(map[string]*APISpec)
+	apisByID = make(map[string]*APISpec)
 
 	config.UseDBAppConfigs = true
 	config.AllowInsecureConfigs = true
@@ -469,8 +469,8 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
-	if len(ApiSpecRegister) != 1 {
-		t.Error("Should return array with one spec", ApiSpecRegister)
+	if len(apisByID) != 1 {
+		t.Error("Should return array with one spec", apisByID)
 	}
 }
 

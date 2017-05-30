@@ -53,8 +53,8 @@ var (
 	RPCListener              RPCStorageHandler
 	DashService              DashboardServiceSender
 
-	ApiSpecRegister map[string]*APISpec
-	keyGen          DefaultKeyGenerator
+	apisByID map[string]*APISpec
+	keyGen   DefaultKeyGenerator
 
 	mainRouter    *mux.Router
 	defaultRouter *mux.Router
