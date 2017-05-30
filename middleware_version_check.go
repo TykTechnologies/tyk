@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -61,6 +62,10 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 	if stat == StatusRedirectFlowByReply {
 		v.DoMockReply(w, meta)
 		return nil, 666
+	}
+
+	if expTime, _ := meta.(*time.Time); expTime != nil {
+		w.Header().Set("x-tyk-api-expires", expTime.Format(time.RFC1123))
 	}
 
 	if stat == StatusOkAndIgnore {
