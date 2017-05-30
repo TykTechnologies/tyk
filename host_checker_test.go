@@ -93,10 +93,10 @@ func TestHostChecker(t *testing.T) {
 		"HostDown": {&testEventHandler{cb}},
 	}
 
-	ApiSpecRegister = map[string]*APISpec{spec.APIID: spec}
+	apisByID = map[string]*APISpec{spec.APIID: spec}
 	GlobalHostChecker.checker.sampleTriggerLimit = 1
 	defer func() {
-		ApiSpecRegister = make(map[string]*APISpec)
+		apisByID = make(map[string]*APISpec)
 		GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
 	}()
 
