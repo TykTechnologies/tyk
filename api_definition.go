@@ -981,27 +981,30 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	return ""
 }
 
-// IsThisAPIVersionExpired checks if an API version (during a proxied request) is expired
-func (a *APISpec) IsThisAPIVersionExpired(versionDef *apidef.VersionInfo) bool {
+// IsThisAPIVersionExpired checks if an API version (during a proxied
+// request) is expired. If it isn't and the configured time was valid,
+// it also returns the expiration time.
+func (a *APISpec) IsThisAPIVersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Time) {
 	// Never expires
 	if versionDef.Expires == "" || versionDef.Expires == "-1" {
-		return false
+		return false, nil
 	}
 
 	// otherwise - calculate the time
 	t, err := time.Parse("2006-01-02 15:04", versionDef.Expires)
 	if err != nil {
 		log.Error("Could not parse expiry date for API, dissallow: ", err)
-		return true
+		return true, nil
 	}
 
 	// It's in the past, expire
 	// It's in the future, keep going
-	return time.Since(t) >= 0
+	return time.Since(t) >= 0, &t
 }
 
-// IsRequestValid will check if an incoming request has valid version data and return a RequestStatus that
-// describes the status of the request
+// IsRequestValid will check if an incoming request has valid version
+// data and return a RequestStatus that describes the status of the
+// request
 func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
 	versionMetaData, versionPaths, whiteListStatus, stat := a.GetVersionData(r)
 
@@ -1011,8 +1014,12 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 	}
 
 	// Is the API version expired?
-	if a.IsThisAPIVersionExpired(versionMetaData) {
-		// Expired - fail
+	// TODO: Don't abuse the interface{} return value for both
+	// *apidef.EndpointMethodMeta and *time.Time. Probably need to
+	// redesign or entirely remove IsRequestValid. See discussion on
+	// https://github.com/TykTechnologies/tyk/pull/776
+	expired, expTime := a.IsThisAPIVersionExpired(versionMetaData)
+	if expired {
 		return false, VersionExpired, nil
 	}
 
@@ -1021,21 +1028,21 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 
 	switch requestStatus {
 	case EndPointNotAllowed:
-		return false, EndPointNotAllowed, meta
+		return false, EndPointNotAllowed, expTime
 	case StatusOkAndIgnore:
-		return true, StatusOkAndIgnore, meta
+		return true, StatusOkAndIgnore, expTime
 	case StatusRedirectFlowByReply:
 		return true, StatusRedirectFlowByReply, meta
 	case StatusCached:
-		return true, StatusCached, meta
+		return true, StatusCached, expTime
 	case StatusTransform:
-		return true, StatusTransform, meta
+		return true, StatusTransform, expTime
 	case StatusHeaderInjected:
-		return true, StatusHeaderInjected, meta
+		return true, StatusHeaderInjected, expTime
 	case StatusMethodTransformed:
-		return true, StatusMethodTransformed, meta
+		return true, StatusMethodTransformed, expTime
 	default:
-		return true, StatusOk, meta
+		return true, StatusOk, expTime
 	}
 
 }
