@@ -151,6 +151,14 @@ func applyTestHooks(objectPtr unsafe.Pointer) {
 			ResponseCode:  403,
 			ResponseError: "Key not authorised",
 		}
+	case "hook_test_return_overrides":
+		object.Request.ReturnOverrides = &coprocess.ReturnOverrides{
+			Headers: map[string]string{
+				"header": "value",
+			},
+			ResponseCode:  200,
+			ResponseError: "body",
+		}
 	case "hook_test_bad_auth_using_id_extractor":
 	case "hook_test_bad_auth_cp_error":
 	case "hook_test_successful_auth":
