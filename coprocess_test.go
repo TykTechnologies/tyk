@@ -247,6 +247,30 @@ func TestCoProcessAuth(t *testing.T) {
 	<-CoProcessDispatchEvent
 }
 
+func TestCoProcessReturnOverrides(t *testing.T) {
+	spec := createSpecTest(t, basicCoProcessDef)
+	chain := buildCoProcessChain(spec, "hook_test_return_overrides", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("abc", session, 60)
+
+	recorder := httptest.NewRecorder()
+
+	req, err := http.NewRequest("GET", "/headers", nil)
+	req.Header.Add("authorization", "abc")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	chain.ServeHTTP(recorder, req)
+	if recorder.Code != 200 || recorder.Body.String() != "body" {
+		t.Fatal("ReturnOverrides HTTP response is invalid")
+	}
+	headerValue := recorder.Header().Get("header")
+	if headerValue != "value" {
+		t.Fatal("ReturnOverrides HTTP header is not present")
+	}
+}
+
 const basicCoProcessDef = `{
 	"api_id": "1",
 	"org_id": "default",
