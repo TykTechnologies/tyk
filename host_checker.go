@@ -16,7 +16,11 @@ const (
 	defaultSampletTriggerLimit = 3
 )
 
-var HostCheckerClient = &http.Client{Timeout: 500 * time.Millisecond}
+var (
+	HostCheckerClient = &http.Client{Timeout: 500 * time.Millisecond}
+
+	hostCheckTicker = make(chan struct{})
+)
 
 type HostData struct {
 	CheckURL string
@@ -84,7 +88,11 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 			}
 		}
 
-		time.Sleep(h.getStaggeredTime())
+		if runningTests {
+			<-hostCheckTicker
+		} else {
+			time.Sleep(h.getStaggeredTime())
+		}
 	}
 	log.Info("[HOST CHECKER] Checker stopped")
 }

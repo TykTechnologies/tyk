@@ -78,6 +78,8 @@ func TestHostChecker(t *testing.T) {
 	spec.Proxy.StructuredTargetList = sl
 
 	var wg sync.WaitGroup
+	// Should receive one HostDown event
+	wg.Add(1)
 	cb := func(em EventMessage) {
 		wg.Done()
 	}
@@ -102,13 +104,7 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should update host checker check list")
 	}
 
-	// Should receive one HostDown event
-	wg.Add(1)
-	for _, hostData := range GlobalHostChecker.checker.newList {
-		// By default host check should fail > 3 times in row
-		GlobalHostChecker.checker.CheckHost(hostData)
-	}
-
+	hostCheckTicker <- struct{}{}
 	wg.Wait()
 
 	if GlobalHostChecker.IsHostDown(testHttpAny) {
@@ -126,7 +122,7 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should return only active host", host1, host2)
 	}
 
-	if GlobalHostChecker.checker.checkTimeout != 10 {
+	if GlobalHostChecker.checker.checkTimeout != defaultTimeout {
 		t.Error("Should set defaults", GlobalHostChecker.checker.checkTimeout)
 	}
 
