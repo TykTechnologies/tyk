@@ -737,7 +737,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = handleGetOrgDetail(keyName)
 		} else {
 			// Return list of keys
-			obj, code = handleGetAllOrgKeys(filter, "")
+			obj, code = handleGetAllOrgKeys(filter)
 		}
 
 	case "DELETE":
@@ -832,8 +832,8 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 	return session, 200
 }
 
-func handleGetAllOrgKeys(filter, orgID string) (interface{}, int) {
-	spec := GetSpecForOrg(orgID)
+func handleGetAllOrgKeys(filter string) (interface{}, int) {
+	spec := GetSpecForOrg("")
 	if spec == nil {
 		return apiError("ORG not found"), 404
 	}
