@@ -66,15 +66,20 @@ type CoProcessor struct {
 
 // GetObjectFromRequest constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
-
-	defer r.Body.Close()
-	originalBody, _ := ioutil.ReadAll(r.Body)
+	var body string
+	if r.Body == nil {
+		body = ""
+	} else {
+		defer r.Body.Close()
+		originalBody, _ := ioutil.ReadAll(r.Body)
+		body = string(originalBody)
+	}
 
 	miniRequestObject := &coprocess.MiniRequestObject{
 		Headers:        ProtoMap(r.Header),
 		SetHeaders:     make(map[string]string),
 		DeleteHeaders:  make([]string, 0),
-		Body:           string(originalBody),
+		Body:           body,
 		Url:            r.URL.Path,
 		Params:         ProtoMap(r.URL.Query()),
 		AddParams:      make(map[string]string),
