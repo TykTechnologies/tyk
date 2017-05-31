@@ -35,8 +35,8 @@ type Policy struct {
 }
 
 type DBAccessDefinition struct {
-	APIName     string       `json:"apiname"`
-	APIID       string       `json:"apiid"`
+	APIName     string       `json:"api_name"`
+	APIID       string       `json:"api_id"`
 	Versions    []string     `json:"versions"`
 	AllowedURLs []AccessSpec `bson:"allowed_urls"  json:"allowed_urls"` // mapped string MUST be a valid regex
 }
