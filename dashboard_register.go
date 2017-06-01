@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -83,28 +82,21 @@ func (h *HTTPDashboardHandler) Register() error {
 	c := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	response, err := c.Do(newRequest)
+	resp, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Request failed: ", err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
-
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
-
-	if response.StatusCode != 200 {
-		log.Error("Failed to register node, retrying in 5s; Response was: ", string(retBody))
+	if resp.StatusCode != 200 {
+		log.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
 
-	if err != nil {
-		return err
-	}
-
+	defer resp.Body.Close()
 	val := NodeResponseOK{}
-	if err := json.Unmarshal(retBody, &val); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		log.Error("Failed to decode body: ", err)
 		return err
 	}
@@ -167,20 +159,14 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint, secret string) error {
 	c := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	response, err := c.Do(newRequest)
-	if err != nil || response.StatusCode != 200 {
+	resp, err := c.Do(newRequest)
+	if err != nil || resp.StatusCode != 200 {
 		return errors.New("dashboard is down? Heartbeat is failing")
 	}
 
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
-
-	if err != nil {
-		return err
-	}
-
+	defer resp.Body.Close()
 	val := NodeResponseOK{}
-	if err := json.Unmarshal(retBody, &val); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		log.Error("Failed to decode body: ", err)
 		return err
 	}
@@ -215,26 +201,20 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	c := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	response, err := c.Do(newRequest)
+	resp, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Dashboard is down? Failed fo de-register: ", err)
 		return err
 	}
 
-	if response.StatusCode != 200 {
-		log.Error("Dashboard is down? Failed fo de-register, incorrect status: ", response.StatusCode)
+	if resp.StatusCode != 200 {
+		log.Error("Dashboard is down? Failed fo de-register, incorrect status: ", resp.StatusCode)
 		return errors.New("Incorrect status code")
 	}
 
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
-
-	if err != nil {
-		return err
-	}
-
+	defer resp.Body.Close()
 	val := NodeResponseOK{}
-	if err := json.Unmarshal(retBody, &val); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		log.Error("Failed to decode body: ", err)
 		return err
 	}
