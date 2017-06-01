@@ -47,14 +47,8 @@ const contextVarsMiddlewareDefinition = `{
 	"enable_context_vars": true
 }`
 
-func createContextVarsSampleAPI(t *testing.T, apiTestDef string) *APISpec {
-	spec := createSpecTest(t, apiTestDef)
-	loadApps([]*APISpec{spec}, discardMuxer)
-	return spec
-}
-
 func TestContextVarsMiddleware(t *testing.T) {
-	spec := createContextVarsSampleAPI(t, contextVarsMiddlewareDefinition)
+	spec := createSpecTest(t, contextVarsMiddlewareDefinition)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234wer", session, 60)
 	uri := "/test/this/path"

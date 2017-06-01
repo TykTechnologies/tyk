@@ -52,10 +52,9 @@ const apiTestDef = `{
 	}
 }`
 
-func makeSampleAPI(t *testing.T, def string) *APISpec {
+func loadSampleAPI(t *testing.T, def string) {
 	spec := createSpecTest(t, def)
 	loadApps([]*APISpec{spec}, discardMuxer)
-	return spec
 }
 
 type testAPIDefinition struct {
@@ -67,7 +66,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	uri := "/tyk/health/?api_id=1"
 
 	recorder := httptest.NewRecorder()
-	makeSampleAPI(t, apiTestDef)
+	loadSampleAPI(t, apiTestDef)
 
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
@@ -117,7 +116,7 @@ func TestApiHandler(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 
-		makeSampleAPI(t, apiTestDef)
+		loadSampleAPI(t, apiTestDef)
 
 		req, err := http.NewRequest("GET", uri, bytes.NewReader(body))
 
@@ -152,7 +151,7 @@ func TestApiHandlerGetSingle(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	makeSampleAPI(t, apiTestDef)
+	loadSampleAPI(t, apiTestDef)
 
 	req, err := http.NewRequest("GET", uri, bytes.NewReader(body))
 	if err != nil {
@@ -326,7 +325,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
 
-		makeSampleAPI(t, apiTestDef)
+		loadSampleAPI(t, apiTestDef)
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
@@ -362,7 +361,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
-		makeSampleAPI(t, apiTestDef)
+		loadSampleAPI(t, apiTestDef)
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
@@ -392,7 +391,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 
 func TestKeyHandlerGetKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
-		makeSampleAPI(t, apiTestDef)
+		loadSampleAPI(t, apiTestDef)
 		createKey()
 
 		uri := "/tyk/keys/1234"
@@ -443,7 +442,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
-		makeSampleAPI(t, apiTestDef)
+		loadSampleAPI(t, apiTestDef)
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
@@ -482,7 +481,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
-		makeSampleAPI(t, apiTestDef)
+		loadSampleAPI(t, apiTestDef)
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
@@ -519,7 +518,7 @@ func TestAPIAuthFail(t *testing.T) {
 	}
 	req.Header.Add("x-tyk-authorization", "12345")
 
-	makeSampleAPI(t, apiTestDef)
+	loadSampleAPI(t, apiTestDef)
 	checkIsAPIOwner(healthCheckhandler)(recorder, req)
 
 	if recorder.Code == 200 {
@@ -538,7 +537,7 @@ func TestAPIAuthOk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	makeSampleAPI(t, apiTestDef)
+	loadSampleAPI(t, apiTestDef)
 	checkIsAPIOwner(healthCheckhandler)(recorder, req)
 
 	if recorder.Code != 200 {
@@ -570,7 +569,7 @@ func TestResetHandler(t *testing.T) {
 	uri := "/tyk/reload/"
 	apisByID = make(map[string]*APISpec)
 
-	makeSampleAPI(t, apiTestDef)
+	loadSampleAPI(t, apiTestDef)
 	recorder := httptest.NewRecorder()
 
 	req, err := http.NewRequest("GET", uri, nil)
@@ -624,7 +623,7 @@ func TestGroupResetHandler(t *testing.T) {
 
 	apisByID = make(map[string]*APISpec)
 
-	makeSampleAPI(t, apiTestDef)
+	loadSampleAPI(t, apiTestDef)
 
 	recorder := httptest.NewRecorder()
 

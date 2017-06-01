@@ -100,12 +100,6 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	muxer.Handle(spec.Proxy.ListenPath, chain)
 }
 
-func makeOAuthAPI(t *testing.T) *APISpec {
-	spec := createSpecTest(t, oauthDefinition)
-	loadApps([]*APISpec{spec}, discardMuxer)
-	return spec
-}
-
 func TestAuthCodeRedirect(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
@@ -441,7 +435,8 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	// Step 1 create token
 	tokenData := getToken(t)
 
-	spec := makeOAuthAPI(t)
+	spec := createSpecTest(t, oauthDefinition)
+	loadApps([]*APISpec{spec}, discardMuxer)
 	testMuxer := mux.NewRouter()
 	getOAuthChain(spec, testMuxer)
 
