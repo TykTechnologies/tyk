@@ -243,7 +243,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		return
 	}
 
-	if !ok.(bool) {
+	if ok == false {
 		log.Error("RPC Login incorrect")
 		r.ReAttemptLogin(errors.New("Login incorrect"))
 		return
@@ -272,7 +272,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 
-	if !ok.(bool) {
+	if ok == false {
 		log.Error("RPC Login incorrect")
 		r.ReAttemptLogin(errors.New("Login incorrect"))
 		return
@@ -645,7 +645,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		}
 	} else {
 		log.Debug("[RPC STORE] CheckReload: Received response")
-		if reload.(bool) {
+		if reload == true {
 			// Do the reload!
 			log.Warning("[RPC STORE] Received Reload instruction!")
 			go signalGroupReload()

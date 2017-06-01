@@ -108,23 +108,24 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	log.Debug("Searching KV for: ", searchStr)
 	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
 	log.Debug("Found: ", vals)
-	if len(vals) > 0 {
-		var runningTotal int
-		for _, v := range vals {
-			log.Debug("V is: ", string(v.([]byte)))
-			splitValues := strings.Split(string(v.([]byte)), ".")
-			if len(splitValues) > 1 {
-				vInt, err := strconv.Atoi(splitValues[1])
-				if err != nil {
-					log.Error("Couldn't convert tracked latency value to Int, vl is: ", err)
-				} else {
-					runningTotal += vInt
-				}
-			}
-
-		}
-		values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(vals)))
+	if len(vals) == 0 {
+		return values, nil
 	}
+	var runningTotal int
+	for _, v := range vals {
+		s := string(v.([]byte))
+		log.Debug("V is: ", s)
+		splitValues := strings.Split(s, ".")
+		if len(splitValues) > 1 {
+			vInt, err := strconv.Atoi(splitValues[1])
+			if err != nil {
+				log.Error("Couldn't convert tracked latency value to Int, vl is: ", err)
+			} else {
+				runningTotal += vInt
+			}
+		}
 
+	}
+	values.AvgUpstreamLatency = roundValue(float64(runningTotal / len(vals)))
 	return values, nil
 }
