@@ -172,92 +172,38 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	}
 }
 
-func TestIpMiddlewareIPPass(t *testing.T) {
+func TestIPMiddlewarePass(t *testing.T) {
 	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
+	for _, tc := range []struct {
+		remote, forwarded string
+		wantCode          int
+	}{
+		{"127.0.0.1:80", "", 200},         // remote exact match
+		{"127.0.0.2:80", "", 200},         // remote CIDR match
+		{"10.0.0.1:80", "", 403},          // no match
+		{"10.0.0.1:80", "127.0.0.1", 200}, // forwarded exact match
+		{"10.0.0.1:80", "127.0.0.2", 200}, // forwarded CIDR match
+	} {
 
-	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "127.0.0.1:80"
-	req.Header.Add("authorization", "gfgg1234")
+		rec := httptest.NewRecorder()
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.RemoteAddr = tc.remote
+		req.Header.Add("authorization", "gfgg1234")
+		if tc.forwarded != "" {
+			req.Header.Add("X-Forwarded-For", tc.forwarded)
+		}
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	chain := getChain(spec)
-	chain.ServeHTTP(recorder, req)
-
-	if recorder.Code != 200 {
-		t.Error("Invalid response code, should be 200:  \n", recorder.Code, recorder.Body, req.RemoteAddr)
-	}
-}
-
-func TestIpMiddlewareIPPassCIDR(t *testing.T) {
-	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
-	session := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
-
-	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "127.0.0.2:80"
-	req.Header.Add("authorization", "gfgg1234")
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	chain := getChain(spec)
-	chain.ServeHTTP(recorder, req)
-
-	if recorder.Code != 200 {
-		t.Error("Invalid response code, should be 200:  \n", recorder.Code, recorder.Body, req.RemoteAddr)
-	}
-}
-
-func TestIPMiddlewareIPFailXForwardedFor(t *testing.T) {
-	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
-	session := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
-
-	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "10.0.0.1:80"
-	req.Header.Add("authorization", "gfgg1234")
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	chain := getChain(spec)
-	chain.ServeHTTP(recorder, req)
-
-	if recorder.Code != 403 {
-		t.Error("Invalid response code, should be 403:  \n", recorder.Code, recorder.Body, req.RemoteAddr)
-	}
-}
-
-func TestIPMiddlewareIPPassXForwardedFor(t *testing.T) {
-	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
-	session := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
-
-	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "10.0.0.1:80"
-	req.Header.Add("X-Forwarded-For", "127.0.0.1")
-	req.Header.Add("authorization", "gfgg1234")
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	chain := getChain(spec)
-	chain.ServeHTTP(recorder, req)
-
-	if recorder.Code != 200 {
-		t.Error("Invalid response code, should be 200:  \n", recorder.Code, recorder.Body, req.RemoteAddr)
+		chain := getChain(spec)
+		chain.ServeHTTP(rec, req)
+		if rec.Code != tc.wantCode {
+			t.Errorf("Response code %d should be %d\n%q %q\n%s",
+				rec.Code, tc.wantCode, tc.remote, tc.forwarded, rec.Body.String())
+		}
 	}
 }
 
