@@ -1050,7 +1050,7 @@ func main() {
 }
 
 func start(arguments map[string]interface{}) {
-	if do, _ := arguments["--memprofile"].(bool); do {
+	if arguments["--memprofile"] == true {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Memory profiling active")
@@ -1060,7 +1060,7 @@ func start(arguments map[string]interface{}) {
 		}
 		defer memProfFile.Close()
 	}
-	if do, _ := arguments["--cpuprofile"].(bool); do {
+	if arguments["--cpuprofile"] == true {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Cpu profiling active")
@@ -1071,7 +1071,7 @@ func start(arguments map[string]interface{}) {
 		pprof.StartCPUProfile(cpuProfFile)
 		defer pprof.StopCPUProfile()
 	}
-	if do, _ := arguments["--httpprofile"].(bool); do {
+	if arguments["--httpprofile"] == true {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Adding pprof endpoints")
