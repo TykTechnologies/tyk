@@ -144,14 +144,8 @@ const ipMiddlewareTestDefinitionMissing = `{
 	}
 }`
 
-func createIPSampleAPI(t *testing.T, apiTestDef string) *APISpec {
-	spec := createSpecTest(t, apiTestDef)
-	loadApps([]*APISpec{spec}, discardMuxer)
-	return spec
-}
-
 func TestIpMiddlewareIPFail(t *testing.T) {
-	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledFail)
+	spec := createSpecTest(t, ipMiddlewareTestDefinitionEnabledFail)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234wer", session, 60)
 
@@ -173,7 +167,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 }
 
 func TestIPMiddlewarePass(t *testing.T) {
-	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionEnabledPass)
+	spec := createSpecTest(t, ipMiddlewareTestDefinitionEnabledPass)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("gfgg1234", session, 60)
 	for _, tc := range []struct {
@@ -208,7 +202,7 @@ func TestIPMiddlewarePass(t *testing.T) {
 }
 
 func TestIpMiddlewareIPMissing(t *testing.T) {
-	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionMissing)
+	spec := createSpecTest(t, ipMiddlewareTestDefinitionMissing)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234rtyrty", session, 60)
 
@@ -229,7 +223,7 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 }
 
 func TestIpMiddlewareIPDisabled(t *testing.T) {
-	spec := createIPSampleAPI(t, ipMiddlewareTestDefinitionDisabled)
+	spec := createSpecTest(t, ipMiddlewareTestDefinitionDisabled)
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234iuouio", session, 60)
 
