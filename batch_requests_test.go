@@ -7,13 +7,8 @@ import (
 )
 
 const batchTestDef = `{
-	"name": "Tyk Test API",
 	"api_id": "987999",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
@@ -21,24 +16,13 @@ const batchTestDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"expires": "3000-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"black_list": [],
-					"white_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
-	"event_handlers": {
-		"events": {}
-	},
 	"proxy": {
 		"listen_path": "/v1/",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	},
 	"enable_batch_request_support": true
 }`
@@ -51,19 +35,15 @@ const testBatchRequest = `{
 			"test-header-1": "test-1",
 			"test-header-2": "test-2"
 		},
-		"body": "",
 		"relative_url": "get/?param1=this"
 	},
 	{
 		"method": "POST",
-		"headers": {},
 		"body": "TEST BODY",
 		"relative_url": "post/"
 	},
 	{
 		"method": "PUT",
-		"headers": {},
-		"body": "",
 		"relative_url": "put/"
 	}
 	],

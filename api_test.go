@@ -19,8 +19,6 @@ import (
 )
 
 const apiTestDef = `{
-	"id": "507f1f77bcf86cd799439011",
-	"name": "Tyk Test API ONE",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -34,21 +32,13 @@ const apiTestDef = `{
 		"not_versioned": false,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"expires": "3006-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
@@ -700,7 +690,6 @@ func TestHotReloadMany(t *testing.T) {
 }
 
 const apiBenchDef = `{
-	"name": "Bench API",
 	"api_id": "REPLACE",
 	"org_id": "default",
 	"definition": {
@@ -714,15 +703,13 @@ const apiBenchDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/listen-REPLACE",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 

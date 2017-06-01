@@ -174,13 +174,8 @@ func computeSessionID(input []byte, tykMiddleware *TykMiddleware) (sessionID str
 }
 
 const idExtractorCoProcessDef = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
@@ -188,14 +183,7 @@ const idExtractorCoProcessDef = `{
 		"not_versioned": true,
 		"versions": {
 			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "v1"
 			}
 		}
 	},
@@ -229,19 +217,13 @@ const idExtractorCoProcessDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://httpbin.org",
-		"strip_listen_path": false
+		"target_url": "http://httpbin.org"
 	}
 }`
 
 const valueExtractorFormSource = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
@@ -249,14 +231,7 @@ const valueExtractorFormSource = `{
 		"not_versioned": true,
 		"versions": {
 			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "v1"
 			}
 		}
 	},
@@ -290,19 +265,13 @@ const valueExtractorFormSource = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://httpbin.org",
-		"strip_listen_path": false
+		"target_url": "http://httpbin.org"
 	}
 }`
 
 const regexExtractorDef = `{
-	"name": "Tyk Test API - ValueExtractor/XPath",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
@@ -310,14 +279,7 @@ const regexExtractorDef = `{
 		"not_versioned": true,
 		"versions": {
 			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "v1"
 			}
 		}
 	},
@@ -347,7 +309,6 @@ const regexExtractorDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "http://httpbin.org",
-		"strip_listen_path": false
+		"target_url": "http://httpbin.org"
 	}
 }`

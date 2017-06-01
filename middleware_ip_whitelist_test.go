@@ -7,140 +7,64 @@ import (
 )
 
 const ipMiddlewareTestDefinitionEnabledFail = `{
-	"name": "Tyk Test API - IPCONF Fail",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
-			}
-		}
+		"versions": {"v1": { "name": "v1" }}
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	},
 	"enable_ip_whitelisting": true,
 	"allowed_ips": ["12.12.12.12"]
 }`
 
 const ipMiddlewareTestDefinitionEnabledPass = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
-			}
-		}
+		"versions": {"v1": { "name": "v1" }}
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	},
 	"enable_ip_whitelisting": true,
 	"allowed_ips": ["127.0.0.1", "127.0.0.1/24"]
 }`
 
 const ipMiddlewareTestDefinitionDisabled = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
-			}
-		}
+		"versions": {"v1": { "name": "v1" }}
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	},
 	"enable_ip_whitelisting": false,
 	"allowed_ips": []
 }`
 
 const ipMiddlewareTestDefinitionMissing = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
-			}
-		}
+		"versions": {"v1": { "name": "v1" }}
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 

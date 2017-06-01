@@ -20,7 +20,6 @@ func createAuthKeyAuthSession() *SessionState {
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
 	session.Per = 1.0
-	session.Expires = 0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
@@ -71,14 +70,8 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 }
 
 const authKeyDef = `{
-	"name": "Tyk Auth Key Test",
 	"api_id": "31",
 	"org_id": "default",
-	"use_keyless": false,
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
@@ -86,21 +79,13 @@ const authKeyDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
@@ -128,14 +113,8 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 }
 
 const multiAuthBackwardsCompatible = `{
-	"name": "Tyk Auth Key Test",
 	"api_id": "31",
 	"org_id": "default",
-	"use_keyless": false,
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "token",
 		"use_param": true
@@ -144,21 +123,13 @@ const multiAuthBackwardsCompatible = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
@@ -229,14 +200,8 @@ func TestMultiAuthSession(t *testing.T) {
 }
 
 const multiAuthDef = `{
-	"name": "Tyk Auth Key Test",
 	"api_id": "31",
 	"org_id": "default",
-	"use_keyless": false,
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization",
 		"param_name": "token",
@@ -246,20 +211,12 @@ const multiAuthDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/auth_key_test/",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`

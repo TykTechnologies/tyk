@@ -8,7 +8,6 @@ import (
 )
 
 const contextVarsMiddlewareDefinition = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -23,13 +22,6 @@ const contextVarsMiddlewareDefinition = `{
 		"versions": {
 			"v1": {
 				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				},
 				"global_headers":{
 					"X-Static": "foo",
 					"X-Request-ID":"$tyk_context.request_id",
@@ -41,8 +33,7 @@ const contextVarsMiddlewareDefinition = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	},
 	"enable_context_vars": true
 }`

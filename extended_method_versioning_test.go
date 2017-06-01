@@ -6,7 +6,6 @@ import (
 )
 
 const nonExpiringExtendedDef = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -21,12 +20,6 @@ const nonExpiringExtendedDef = `{
 		"versions": {
 			"v1": {
 				"name": "v1",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				},
 				"use_extended_paths": true,
 				"extended_paths": {
 					"ignored": [
@@ -36,7 +29,6 @@ const nonExpiringExtendedDef = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -50,7 +42,6 @@ const nonExpiringExtendedDef = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -66,7 +57,6 @@ const nonExpiringExtendedDef = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -94,7 +84,6 @@ const nonExpiringExtendedDef = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -110,7 +99,6 @@ const nonExpiringExtendedDef = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -124,7 +112,6 @@ const nonExpiringExtendedDef = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -139,13 +126,11 @@ const nonExpiringExtendedDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const nonExpiringExtendedDefNoWhitelist = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -160,12 +145,6 @@ const nonExpiringExtendedDefNoWhitelist = `{
 		"versions": {
 			"v1": {
 				"name": "v1",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				},
 				"use_extended_paths": true,
 				"extended_paths": {
 					"ignored": [
@@ -175,7 +154,6 @@ const nonExpiringExtendedDefNoWhitelist = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -189,7 +167,6 @@ const nonExpiringExtendedDefNoWhitelist = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -198,7 +175,6 @@ const nonExpiringExtendedDefNoWhitelist = `{
 							}
 						}
 					],
-					"white_list": [],
 					"black_list": [
 						{
 							"path": "v1/disallowed/blacklist/literal",
@@ -206,7 +182,6 @@ const nonExpiringExtendedDefNoWhitelist = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -220,7 +195,6 @@ const nonExpiringExtendedDefNoWhitelist = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -235,8 +209,7 @@ const nonExpiringExtendedDefNoWhitelist = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 

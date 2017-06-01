@@ -248,13 +248,8 @@ func TestCoProcessAuth(t *testing.T) {
 }
 
 const basicCoProcessDef = `{
-	"name": "Tyk Test API - IPCONF Fail",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
@@ -262,14 +257,7 @@ const basicCoProcessDef = `{
 		"not_versioned": true,
 		"versions": {
 			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "v1"
 			}
 		}
 	},
@@ -288,44 +276,29 @@ const basicCoProcessDef = `{
 	"custom_middleware": {
 		"pre": [
 		{
-			"name": "MyPreMiddleware",
-			"require_session": false
+			"name": "MyPreMiddleware"
 		}
 		],
 		"driver": "python"
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpGet + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpGet + `"
 	}
 }`
 
 const protectedCoProcessDef = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
 	"enable_coprocess_auth": true,
-	"use_keyless": false,
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
 			"v1": {
-				"name": "v1",
-				"expires": "2100-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "v1"
 			}
 		}
 	},
@@ -349,7 +322,6 @@ const protectedCoProcessDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpGet + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpGet + `"
 	}
 }`
