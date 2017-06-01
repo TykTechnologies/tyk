@@ -12,7 +12,6 @@ import (
 )
 
 const sampleDefiniton = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -28,7 +27,6 @@ const sampleDefiniton = `{
 			"v1": {
 				"name": "v1",
 				"expires": "2006-01-02 15:04",
-				"use_extended_paths": true,
 				"paths": {
 					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
 					"white_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"],
@@ -39,13 +37,11 @@ const sampleDefiniton = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const nonExpiringDef = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -71,13 +67,11 @@ const nonExpiringDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const nonExpiringMultiDef = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -104,7 +98,6 @@ const nonExpiringMultiDef = `{
 				"expires": "3000-01-02 15:04",
 				"paths": {
 					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": [],
 					"black_list": ["v1/disallowed/blacklist/literal"]
 				}
 			}
@@ -112,8 +105,7 @@ const nonExpiringMultiDef = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 

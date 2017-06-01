@@ -27,10 +27,8 @@ const (
 const keyRules = `{
 	"last_check": 1402492859,
 	"org_id": "53ac07777cbb8c2d53000002",
-	"allowance": 0,
 	"rate": 1,
 	"per": 1,
-	"expires": 0,
 	"quota_max": -1,
 	"quota_renews": 1399567002,
 	"quota_remaining": 10,
@@ -38,13 +36,8 @@ const keyRules = `{
 }`
 
 const oauthDefinition = `{
-	"name": "OAUTH Test API",
 	"api_id": "999999",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"auth_header_name": "authorization"
 	},
@@ -69,16 +62,13 @@ const oauthDefinition = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04"
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/APIID/",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 

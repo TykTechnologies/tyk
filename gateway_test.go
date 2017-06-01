@@ -180,7 +180,6 @@ func createNonThrottledSession() *SessionState {
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
 	session.Per = 1.0
-	session.Expires = 0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
@@ -195,7 +194,6 @@ func createQuotaSession() *SessionState {
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
 	session.Per = 1.0
-	session.Expires = 0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 2
@@ -280,7 +278,6 @@ func getChain(spec *APISpec) http.Handler {
 }
 
 const nonExpiringDefNoWhiteList = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -295,12 +292,7 @@ const nonExpiringDefNoWhiteList = `{
 		"versions": {
 			"v1": {
 				"name": "v1",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"black_list": [],
-					"white_list": []
-				}
+				"expires": "3000-01-02 15:04"
 			}
 		}
 	},
@@ -328,13 +320,11 @@ const nonExpiringDefNoWhiteList = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const versionedDefinition = `{
-	"name": "Tyk Test API",
 	"api_id": "9991",
 	"org_id": "default",
 	"definition": {
@@ -348,14 +338,7 @@ const versionedDefinition = `{
 		"not_versioned": false,
 		"versions": {
 			"v1": {
-				"name": "v1",
-				"expires": "3000-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"black_list": [],
-					"white_list": []
-				}
+				"name": "v1"
 			}
 		}
 	},
@@ -383,19 +366,13 @@ const versionedDefinition = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const pathBasedDefinition = `{
-	"name": "Tyk Test API",
 	"api_id": "9992",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"auth": {
 		"use_param": true,
 		"auth_header_name": "authorization"
@@ -404,27 +381,17 @@ const pathBasedDefinition = `{
 		"not_versioned": true,
 		"versions": {
 			"default": {
-				"name": "default",
-				"expires": "3000-01-02 15:04",
-				"use_extended_paths": true,
-				"paths": {
-					"ignored": [],
-					"black_list": [],
-					"white_list": []
-				}
+				"name": "default"
 			}
 		}
 	},
-	"event_handlers": {},
 	"proxy": {
 		"listen_path": "/pathBased/",
-		"target_url": "` + testHttpGet + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpGet + `"
 	}
 }`
 
 const extendedPathGatewaySetup = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
 	"definition": {
@@ -439,12 +406,6 @@ const extendedPathGatewaySetup = `{
 		"versions": {
 			"Default": {
 				"name": "Default",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				},
 				"use_extended_paths": true,
 				"extended_paths": {
 					"ignored": [
@@ -454,7 +415,6 @@ const extendedPathGatewaySetup = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -468,7 +428,6 @@ const extendedPathGatewaySetup = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -484,7 +443,6 @@ const extendedPathGatewaySetup = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -512,7 +470,6 @@ const extendedPathGatewaySetup = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -528,21 +485,6 @@ const extendedPathGatewaySetup = `{
 								"GET": {
 									"action": "no_action",
 									"code": 200,
-									"data": "",
-									"headers": {
-										"x-tyk-override-test": "tyk-override",
-										"x-tyk-override-test-2": "tyk-override-2"
-									}
-								}
-							}
-						},
-						{
-							"path": "v1/disallowed/blacklist/{id}",
-							"method_actions": {
-								"GET": {
-									"action": "no_action",
-									"code": 200,
-									"data": "",
 									"headers": {
 										"x-tyk-override-test": "tyk-override",
 										"x-tyk-override-test-2": "tyk-override-2"
@@ -557,8 +499,7 @@ const extendedPathGatewaySetup = `{
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": false
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
@@ -933,7 +874,6 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 }
 
 const sampleAPI = `{
-	"name": "API",
 	"slug": "api",
 	"api_id": "test",
 	"use_keyless": true,
@@ -941,15 +881,13 @@ const sampleAPI = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"expires": "3000-01-02 15:04"
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/",
-		"target_url": "http://127.0.0.1:16500",
-		"strip_listen_path": true
+		"target_url": "http://127.0.0.1:16500"
 	},
 	"active": true
 }`

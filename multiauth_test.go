@@ -14,13 +14,8 @@ import (
 )
 
 const multiAuthDev = `{
-	"name": "Tyk Test API",
 	"api_id": "55",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"use_basic_auth": true,
 	"use_standard_auth": true,
 	"base_identity_provided_by": "auth_token",
@@ -31,21 +26,13 @@ const multiAuthDev = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
@@ -55,7 +42,6 @@ func createMultiAuthKeyAuthSession() *SessionState {
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
 	session.Per = 1.0
-	session.Expires = 0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 900
@@ -70,7 +56,6 @@ func createMultiBasicAuthSession() *SessionState {
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
 	session.Per = 1.0
-	session.Expires = 0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1

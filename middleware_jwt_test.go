@@ -12,13 +12,8 @@ import (
 )
 
 const jwtDef = `{
-	"name": "Tyk JWT API",
 	"api_id": "76",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"enable_jwt": true,
 	"auth": {
 		"auth_header_name": "authorization"
@@ -27,32 +22,19 @@ const jwtDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const jwtWithJWKDef = `{
-	"name": "Tyk JWT With JWK API",
 	"api_id": "76",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"enable_jwt": true,
 	"jwt_source": "` + testHttpJWK + `",
 	"jwt_signing_method": "RSA",
@@ -65,32 +47,19 @@ const jwtWithJWKDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const jwtWithCentralDef = `{
-	"name": "Tyk JWT With JWK API",
 	"api_id": "76",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"enable_jwt": true,
 	"jwt_source": "Ci0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tCk1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBeXFaNHJ3S0Y4cUNFeFM3a3BZNGMKbkphLzM3Rk1rSk5rYWxaM091c2xMQjBvUkw4VDRjOTRrZEY0YWVOelNGa1NlMm45OUlCSTZTc2w3OXZiZk1aYgordDA2TDBROTRrKy9QMzd4NysvUkpaaWZmNHkxVkdqcm5ybk1JMml1OWw0aUJCUll6Tm1HNmVibHJvRU1NV2xnCms1dHlzSGd4QjU5Q1NOSWNEOWdxazFoeDRuL0ZnT212S3NmUWdXSE5sUFNEVFJjV0dXR2hCMi9YZ05WWUcycE8KbFF4QVBxTGhCSGVxR1RYQmJQZkdGOWNIeml4cHNQcjZHdGJ6UHdoc1EvOGJQeG9KN2hkZm4rcnp6dGtzM2Q2KwpIV1VSY3lOVExSZTBtalhqamVlOVo2K2daK0grZlM0cG5QOXRxVDdJZ1U2ZVBVV1Rwam9pUHRMZXhnc0FhL2N0CmpRSURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=",
 	"jwt_signing_method": "RSA",
@@ -103,32 +72,19 @@ const jwtWithCentralDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
 const jwtWithCentralDefNoPolicyBaseField = `{
-	"name": "Tyk JWT With JWK API",
 	"api_id": "76",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"enable_jwt": true,
 	"jwt_source": "Ci0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tCk1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBeXFaNHJ3S0Y4cUNFeFM3a3BZNGMKbkphLzM3Rk1rSk5rYWxaM091c2xMQjBvUkw4VDRjOTRrZEY0YWVOelNGa1NlMm45OUlCSTZTc2w3OXZiZk1aYgordDA2TDBROTRrKy9QMzd4NysvUkpaaWZmNHkxVkdqcm5ybk1JMml1OWw0aUJCUll6Tm1HNmVibHJvRU1NV2xnCms1dHlzSGd4QjU5Q1NOSWNEOWdxazFoeDRuL0ZnT212S3NmUWdXSE5sUFNEVFJjV0dXR2hCMi9YZ05WWUcycE8KbFF4QVBxTGhCSGVxR1RYQmJQZkdGOWNIeml4cHNQcjZHdGJ6UHdoc1EvOGJQeG9KN2hkZm4rcnp6dGtzM2Q2KwpIV1VSY3lOVExSZTBtalhqamVlOVo2K2daK0grZlM0cG5QOXRxVDdJZ1U2ZVBVV1Rwam9pUHRMZXhnc0FhL2N0CmpRSURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=",
 	"jwt_signing_method": "RSA",
@@ -141,21 +97,13 @@ const jwtWithCentralDefNoPolicyBaseField = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/jwt_test",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
@@ -211,7 +159,6 @@ func createJWTSession() *SessionState {
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix() - 10
 	session.Per = 1.0
-	session.Expires = 0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1

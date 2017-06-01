@@ -14,13 +14,8 @@ import (
 )
 
 const basicAuthDef = `{
-	"name": "Tyk Test API",
 	"api_id": "1",
 	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
 	"use_basic_auth": true,
 	"auth": {
 		"auth_header_name": "authorization"
@@ -29,21 +24,13 @@ const basicAuthDef = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"use_extended_paths": true,
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": [],
-					"white_list": [],
-					"black_list": []
-				}
+				"name": "Default"
 			}
 		}
 	},
 	"proxy": {
 		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `",
-		"strip_listen_path": true
+		"target_url": "` + testHttpAny + `"
 	}
 }`
 
@@ -53,7 +40,6 @@ func createBasicAuthSession() *SessionState {
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
 	session.Per = 1.0
-	session.Expires = 0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix() + 20
 	session.QuotaRemaining = 1

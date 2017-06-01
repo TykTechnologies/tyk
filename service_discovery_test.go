@@ -10,8 +10,6 @@ const consul = `
 	"Address": "10.1.10.12",
 	"ServiceID": "redis",
 	"ServiceName": "redis",
-	"ServiceTags": null,
-	"ServiceAddress": "",
 	"ServicePort": 8000
 },
 {
@@ -19,8 +17,6 @@ const consul = `
 	"Address": "10.1.10.13",
 	"ServiceID": "redis",
 	"ServiceName": "redis",
-	"ServiceTags": null,
-	"ServiceAddress": "",
 	"ServicePort": 8000
 }]
 `
@@ -52,7 +48,6 @@ const eureka_real = `{
 				"durationInSecs": 10,
 				"registrationTimestamp": 1460471383902,
 				"lastRenewalTimestamp": 1460471403565,
-				"evictionTimestamp": 0,
 				"serviceUpTimestamp": 1460471383340
 			},
 			"metadata": {
@@ -64,7 +59,6 @@ const eureka_real = `{
 			"statusPageUrl": "http:\/\/ip-172-31-57-136:60565\/info",
 			"healthCheckUrl": "http:\/\/ip-172-31-57-136:60565\/health",
 			"vipAddress": "route",
-			"isCoordinatingDiscoveryServer": false,
 			"lastUpdatedTimestamp": 1460471383902,
 			"lastDirtyTimestamp": 1460471429751,
 			"actionType": "ADDED"
@@ -92,7 +86,6 @@ const eureka_real = `{
 				"durationInSecs": 10,
 				"registrationTimestamp": 1460471387114,
 				"lastRenewalTimestamp": 1460471407062,
-				"evictionTimestamp": 0,
 				"serviceUpTimestamp": 1460471386750
 			},
 			"metadata": {
@@ -104,7 +97,6 @@ const eureka_real = `{
 			"statusPageUrl": "http:\/\/ip-172-31-13-37:50045\/info",
 			"healthCheckUrl": "http:\/\/ip-172-31-13-37:50045\/health",
 			"vipAddress": "route",
-			"isCoordinatingDiscoveryServer": false,
 			"lastUpdatedTimestamp": 1460471387114,
 			"lastDirtyTimestamp": 1460471360189,
 			"actionType": "ADDED"
@@ -156,7 +148,6 @@ const mesosphere = `{
 	"tasks": [{
 		"id": "myservice.7fc21d4c-eabb-11e5-b381-066c48d09c8f",
 		"host": "httpbin.org",
-		"ipAddresses": [],
 		"ports": [80],
 		"startedAt": "2016-03-15T14:37:55.941Z",
 		"stagedAt": "2016-03-15T14:37:52.792Z",

@@ -10,7 +10,6 @@ import (
 )
 
 const sampleUptimeTestAPI = `{
-	"name": "API",
 	"slug": "api",
 	"api_id": "test",
 	"use_keyless": true,
@@ -18,8 +17,7 @@ const sampleUptimeTestAPI = `{
 		"not_versioned": true,
 		"versions": {
 			"Default": {
-				"name": "Default",
-				"expires": "3000-01-02 15:04"
+				"name": "Default"
 			}
 		}
 	},
@@ -27,15 +25,11 @@ const sampleUptimeTestAPI = `{
 		"check_list": [
 			{
 				"url": "{{.ActiveHost}}/get",
-				"method": "GET",
-				"headers": {},
-				"body": ""
+				"method": "GET"
 			},
 			{
 				"url": "{{.InactiveHost}}/get",
-				"method": "GET",
-				"headers": {},
-				"body": ""
+				"method": "GET"
 			}
 		]
 	},
@@ -46,8 +40,7 @@ const sampleUptimeTestAPI = `{
 		"target_list": [
 			"{{.ActiveHost}}",
 			"{{.InactiveHost}}"
-		],
-		"strip_listen_path": true
+		]
 	},
 	"active": true
 }`
