@@ -173,6 +173,7 @@ import (
 	"path"
 	"strings"
 	"unsafe"
+    "runtime"
 
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -218,10 +219,11 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d* PythonDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
-	var CBundlePath *C.char
-	CBundlePath = C.CString(basePath)
-	C.Python_HandleMiddlewareCache(CBundlePath)
-	return
+	go func() {
+		runtime.LockOSThread()
+		CBundlePath := C.CString(basePath)
+		C.Python_HandleMiddlewareCache(CBundlePath)
+	}()
 }
 
 // PythonInit initializes the Python interpreter.
