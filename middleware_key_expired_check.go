@@ -30,7 +30,7 @@ func (k *KeyExpired) IsEnabledForSpec() bool { return true }
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	session := ctxGetSession(r)
 	if session == nil {
-		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 403
+		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 400
 	}
 
 	token := ctxGetAuthToken(r)
@@ -75,7 +75,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, conf
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
 
-		return errors.New("Key has expired, please renew"), 403
+		return errors.New("Key has expired, please renew"), 401
 	}
 
 	return nil, 200

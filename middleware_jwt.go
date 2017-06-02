@@ -290,7 +290,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 	if !found {
 		k.reportLoginFailure(tykId, r)
-		return errors.New("Key id not found"), 403
+		return errors.New("Key id not found"), 404
 	}
 
 	log.Debug("Using raw key ID: ", tykId)

@@ -954,7 +954,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, getLifetime(apiSpec, newSession))
 				if err != nil {
-					doJSONWrite(w, 403, apiError("Failed to create key - "+err.Error()))
+					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
 				}
 			} else {
@@ -964,7 +964,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				sessionManager.ResetQuota(newKey, newSession)
 				err := sessionManager.UpdateSession(newKey, newSession, -1)
 				if err != nil {
-					doJSONWrite(w, 403, apiError("Failed to create key - "+err.Error()))
+					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
 				}
 			}
@@ -992,7 +992,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				err := spec.SessionManager.UpdateSession(newKey, newSession, getLifetime(spec, newSession))
 				if err != nil {
-					doJSONWrite(w, 403, apiError("Failed to create key - "+err.Error()))
+					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
 				}
 			}
@@ -1009,7 +1009,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				"server_name": "system",
 			}).Error("Master keys disallowed in configuration, key not added.")
 
-			doJSONWrite(w, 403, apiError("Failed to create key, keys must have at least one Access Rights record set."))
+			doJSONWrite(w, 400, apiError("Failed to create key, keys must have at least one Access Rights record set."))
 			return
 		}
 
