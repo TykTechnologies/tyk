@@ -61,7 +61,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 	// We handle redirects before ignores in case we aren't using a whitelist
 	if stat == StatusRedirectFlowByReply {
 		v.DoMockReply(w, meta)
-		return nil, 666
+		return nil, mwStatusRespond
 	}
 
 	if expTime, _ := meta.(*time.Time); expTime != nil {
@@ -70,7 +70,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, co
 
 	if stat == StatusOkAndIgnore {
 		v.sh.ServeHTTP(w, r)
-		return nil, 666
+		return nil, mwStatusRespond
 	}
 
 	return nil, 200

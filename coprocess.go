@@ -296,7 +296,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 		w.WriteHeader(int(returnObject.Request.ReturnOverrides.ResponseCode))
 		w.Write([]byte(returnObject.Request.ReturnOverrides.ResponseError))
-		return nil, 666
+		return nil, mwStatusRespond
 	}
 
 	// Is this a CP authentication middleware?
