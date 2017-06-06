@@ -21,6 +21,7 @@ export MYAPP_USER=Kelsey
 export MYAPP_RATE="0.5"
 export MYAPP_TIMEOUT="3m"
 export MYAPP_USERS="rob,ken,robert"
+export MYAPP_COLORCODES="red:1,green:2,blue:3"
 ```
 
 Write some code:
@@ -37,12 +38,13 @@ import (
 )
 
 type Specification struct {
-    Debug   bool
-    Port    int
-    User    string
-    Users   []string
-    Rate    float32
-    Timeout time.Duration
+    Debug       bool
+    Port        int
+    User        string
+    Users       []string
+    Rate        float32
+    Timeout     time.Duration
+    ColorCodes  map[string]int
 }
 
 func main() {
@@ -61,6 +63,11 @@ func main() {
     for _, u := range s.Users {
         fmt.Printf("  %s\n", u)
     }
+
+    fmt.Println("Color codes:")
+    for k, v := range s.ColorCodes {
+        fmt.Printf("  %s: %d\n", k, v)
+    }
 }
 ```
 
@@ -76,6 +83,10 @@ Users:
   rob
   ken
   robert
+Color codes:
+  red: 1
+  green: 2
+  blue: 3
 ```
 
 ## Struct Tag Support
@@ -87,20 +98,30 @@ For example, consider the following struct:
 
 ```Go
 type Specification struct {
-    MultiWordVar string `envconfig:"multi_word_var"`
-    DefaultVar   string `default:"foobar"`
-    RequiredVar  string `required:"true"`
-    IgnoredVar   string `ignored:"true"`
+    ManualOverride1 string `envconfig:"manual_override_1"`
+    DefaultVar      string `default:"foobar"`
+    RequiredVar     string `required:"true"`
+    IgnoredVar      string `ignored:"true"`
+    AutoSplitVar    string `split_words:"true"`
 }
 ```
 
-Envconfig will process value for `MultiWordVar` by populating it with the
-value for `MYAPP_MULTI_WORD_VAR`.
+Envconfig has automatic support for CamelCased struct elements when the
+`split_words:"true"` tag is supplied. Without this tag, `AutoSplitVar` above
+would look for an environment variable called `MYAPP_AUTOSPLITVAR`. With the
+setting applied it will look for `MYAPP_AUTO_SPLIT_VAR`. Note that numbers
+will get globbed into the previous word. If the setting does not do the
+right thing, you may use a manual override.
+
+Envconfig will process value for `ManualOverride1` by populating it with the
+value for `MYAPP_MANUAL_OVERRIDE_1`. Without this struct tag, it would have
+instead looked up `MYAPP_MANUALOVERRIDE1`. With the `split_words:"true"` tag
+it would have looked up `MYAPP_MANUAL_OVERRIDE1`.
 
 ```Bash
-export MYAPP_MULTI_WORD_VAR="this will be the value"
+export MYAPP_MANUAL_OVERRIDE_1="this will be the value"
 
-# export MYAPP_MULTIWORDVAR="and this will not"
+# export MYAPP_MANUALOVERRIDE1="and this will not"
 ```
 
 If envconfig can't find an environment variable value for `MYAPP_DEFAULTVAR`,
@@ -135,6 +156,8 @@ envconfig supports supports these struct field types:
   * int8, int16, int32, int64
   * bool
   * float32, float64
+  * slices of any supported type
+  * maps (keys and values of any supported type)
   * [encoding.TextUnmarshaler](https://golang.org/pkg/encoding/#TextUnmarshaler)
 
 Embedded structs using these fields are also supported.

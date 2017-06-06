@@ -209,10 +209,12 @@
 			"revisionTime": "2016-09-10T10:38:22Z"
 		},
 		{
-			"checksumSHA1": "6I9mImOHbYFvZm9pdOsQVO6yEcI=",
+			"checksumSHA1": "4szkOYHAJsnVGtjdfE41n8x+iuE=",
 			"path": "github.com/kelseyhightower/envconfig",
-			"revision": "9aca109c9aec4633fced9717c4a09ecab3d33111",
-			"revisionTime": "2016-10-19T16:24:55Z"
+			"revision": "f611eb38b3875cc3bd991ca91c51d06446afa14c",
+			"revisionTime": "2017-01-24T16:28:13Z",
+			"version": "v1.3.0",
+			"versionExact": "v1.3.0"
 		},
 		{
 			"checksumSHA1": "Zgi7LCXXiFQYL84rwInvfJHEOQM=",
