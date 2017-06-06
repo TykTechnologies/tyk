@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -43,18 +44,31 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("envconfig.Process: assigning %[1]s to %[2]s: converting '%[3]s' to type %[4]s. details: %[5]s", e.KeyName, e.FieldName, e.Value, e.TypeName, e.Err)
 }
 
-// Process populates the specified struct based on environment variables
-func Process(prefix string, spec interface{}) error {
+// varInfo maintains information about the configuration variable
+type varInfo struct {
+	Name  string
+	Alt   string
+	Key   string
+	Field reflect.Value
+	Tags  reflect.StructTag
+}
+
+// GatherInfo gathers information about the specified struct
+func gatherInfo(prefix string, spec interface{}) ([]varInfo, error) {
+	expr := regexp.MustCompile("([^A-Z]+|[A-Z][^A-Z]+|[A-Z]+)")
 	s := reflect.ValueOf(spec)
 
 	if s.Kind() != reflect.Ptr {
-		return ErrInvalidSpecification
+		return nil, ErrInvalidSpecification
 	}
 	s = s.Elem()
 	if s.Kind() != reflect.Struct {
-		return ErrInvalidSpecification
+		return nil, ErrInvalidSpecification
 	}
 	typeOfSpec := s.Type()
+
+	// over allocate an info array, we will extend if needed later
+	infos := make([]varInfo, 0, s.NumField())
 	for i := 0; i < s.NumField(); i++ {
 		f := s.Field(i)
 		ftype := typeOfSpec.Field(i)
@@ -74,71 +88,101 @@ func Process(prefix string, spec interface{}) error {
 			f = f.Elem()
 		}
 
-		alt := ftype.Tag.Get("envconfig")
-		fieldName := ftype.Name
-		if alt != "" {
-			fieldName = alt
+		// Capture information about the config variable
+		info := varInfo{
+			Name:  ftype.Name,
+			Field: f,
+			Tags:  ftype.Tag,
+			Alt:   strings.ToUpper(ftype.Tag.Get("envconfig")),
 		}
 
-		key := fieldName
-		if prefix != "" {
-			key = fmt.Sprintf("%s_%s", prefix, key)
+		// Default to the field name as the env var name (will be upcased)
+		info.Key = info.Name
+
+		// Best effort to un-pick camel casing as separate words
+		if ftype.Tag.Get("split_words") == "true" {
+			words := expr.FindAllStringSubmatch(ftype.Name, -1)
+			if len(words) > 0 {
+				var name []string
+				for _, words := range words {
+					name = append(name, words[0])
+				}
+
+				info.Key = strings.Join(name, "_")
+			}
 		}
-		key = strings.ToUpper(key)
+		if info.Alt != "" {
+			info.Key = info.Alt
+		}
+		if prefix != "" {
+			info.Key = fmt.Sprintf("%s_%s", prefix, info.Key)
+		}
+		info.Key = strings.ToUpper(info.Key)
+		infos = append(infos, info)
 
 		if f.Kind() == reflect.Struct {
 			// honor Decode if present
 			if decoderFrom(f) == nil && setterFrom(f) == nil && textUnmarshaler(f) == nil {
 				innerPrefix := prefix
 				if !ftype.Anonymous {
-					innerPrefix = key
+					innerPrefix = info.Key
 				}
 
 				embeddedPtr := f.Addr().Interface()
-				if err := Process(innerPrefix, embeddedPtr); err != nil {
-					return err
+				embeddedInfos, err := gatherInfo(innerPrefix, embeddedPtr)
+				if err != nil {
+					return nil, err
 				}
-				f.Set(reflect.ValueOf(embeddedPtr).Elem())
+				infos = append(infos[:len(infos)-1], embeddedInfos...)
 
 				continue
 			}
 		}
+	}
+	return infos, nil
+}
+
+// Process populates the specified struct based on environment variables
+func Process(prefix string, spec interface{}) error {
+	infos, err := gatherInfo(prefix, spec)
+
+	for _, info := range infos {
 
 		// `os.Getenv` cannot differentiate between an explicitly set empty value
 		// and an unset value. `os.LookupEnv` is preferred to `syscall.Getenv`,
 		// but it is only available in go1.5 or newer. We're using Go build tags
 		// here to use os.LookupEnv for >=go1.5
-		value, ok := lookupEnv(key)
-		if !ok && alt != "" {
-			key := strings.ToUpper(fieldName)
-			value, ok = lookupEnv(key)
+		value, ok := lookupEnv(info.Key)
+		if !ok && info.Alt != "" {
+			value, ok = lookupEnv(info.Alt)
 		}
 
-		def := ftype.Tag.Get("default")
+		def := info.Tags.Get("default")
 		if def != "" && !ok {
 			value = def
 		}
 
-		req := ftype.Tag.Get("required")
+		req := info.Tags.Get("required")
 		if !ok && def == "" {
 			if req == "true" {
-				return fmt.Errorf("required key %s missing value", key)
+				return fmt.Errorf("required key %s missing value", info.Key)
 			}
 			continue
 		}
 
-		err := processField(value, f)
+		err := processField(value, info.Field)
 		if err != nil {
 			return &ParseError{
-				KeyName:   key,
-				FieldName: fieldName,
-				TypeName:  f.Type().String(),
+				KeyName:   info.Key,
+				FieldName: info.Name,
+				TypeName:  info.Field.Type().String(),
 				Value:     value,
 				Err:       err,
 			}
 		}
 	}
-	return nil
+
+	return err
 }
 
 // MustProcess is the same as Process but panics if an error occurs
@@ -221,6 +265,27 @@ func processField(value string, field reflect.Value) error {
 			}
 		}
 		field.Set(sl)
+	case reflect.Map:
+		pairs := strings.Split(value, ",")
+		mp := reflect.MakeMap(typ)
+		for _, pair := range pairs {
+			kvpair := strings.Split(pair, ":")
+			if len(kvpair) != 2 {
+				return fmt.Errorf("invalid map item: %q", pair)
+			}
+			k := reflect.New(typ.Key()).Elem()
+			err := processField(kvpair[0], k)
+			if err != nil {
+				return err
+			}
+			v := reflect.New(typ.Elem()).Elem()
+			err = processField(kvpair[1], v)
+			if err != nil {
+				return err
+			}
+			mp.SetMapIndex(k, v)
+		}
+		field.Set(mp)
 	}
 
 	return nil
