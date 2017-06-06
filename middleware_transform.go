@@ -28,15 +28,12 @@ func (t *TransformMiddleware) GetName() string {
 }
 
 func (t *TransformMiddleware) IsEnabledForSpec() bool {
-	var used bool
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Transform) > 0 {
-			used = true
-			break
+			return true
 		}
 	}
-
-	return used
+	return false
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

@@ -22,17 +22,14 @@ func (t *TransformHeaders) GetName() string {
 }
 
 func (t *TransformHeaders) IsEnabledForSpec() bool {
-	var used bool
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.TransformHeader) > 0 ||
 			len(version.GlobalHeaders) > 0 ||
 			len(version.GlobalHeadersRemove) > 0 {
-			used = true
-			break
+			return true
 		}
 	}
-
-	return used
+	return false
 }
 
 // iterateAddHeaders is a helper functino that will iterate of a map and inject the key and value as a header in the request.

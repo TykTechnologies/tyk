@@ -88,14 +88,12 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 	if !config.EnableJSVM {
 		return false
 	}
-	used := false
 	for _, version := range d.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Virtual) > 0 {
-			used = true
-			break
+			return true
 		}
 	}
-	return used
+	return false
 }
 
 func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {

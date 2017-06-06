@@ -98,24 +98,24 @@ func AppendMiddleware(chain *[]alice.Constructor, mw TykMiddlewareImplementation
 	}
 }
 
-func CheckCBEnabled(tykMwSuper *TykMiddleware) (used bool) {
+func CheckCBEnabled(tykMwSuper *TykMiddleware) bool {
 	for _, v := range tykMwSuper.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
-			used = true
 			tykMwSuper.Spec.CircuitBreakerEnabled = true
+			return true
 		}
 	}
-	return
+	return false
 }
 
-func CheckETEnabled(tykMwSuper *TykMiddleware) (used bool) {
+func CheckETEnabled(tykMwSuper *TykMiddleware) bool {
 	for _, v := range tykMwSuper.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.HardTimeouts) > 0 {
-			used = true
 			tykMwSuper.Spec.EnforcedTimeoutEnabled = true
+			return true
 		}
 	}
-	return
+	return false
 }
 
 type TykResponseHandler interface {
