@@ -29,7 +29,6 @@ const apiTestDef = `{
 		"auth_header_name": "authorization"
 	},
 	"version_data": {
-		"not_versioned": false,
 		"versions": {
 			"Default": {
 				"name": "Default"
@@ -82,7 +81,6 @@ func createSampleSession() *SessionState {
 		Allowance:        5.0,
 		LastCheck:        time.Now().Unix(),
 		Per:              8.0,
-		Expires:          0,
 		QuotaRenewalRate: 300, // 5 minutes
 		QuotaRenews:      time.Now().Unix(),
 		QuotaRemaining:   10,

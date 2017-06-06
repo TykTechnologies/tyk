@@ -200,12 +200,9 @@ const idExtractorCoProcessDef = `{
 		}
 	},
 	"custom_middleware": {
-		"pre": [
-		{
-			"name": "MyPreMiddleware",
-			"require_session": false
-		}
-		],
+		"pre": [{
+			"name": "MyPreMiddleware"
+		}],
 		"id_extractor": {
 			"extract_from": "header",
 			"extract_with": "value",
@@ -248,12 +245,9 @@ const valueExtractorFormSource = `{
 		}
 	},
 	"custom_middleware": {
-		"pre": [
-		{
-			"name": "MyPreMiddleware",
-			"require_session": false
-		}
-		],
+		"pre": [{
+			"name": "MyPreMiddleware"
+		}],
 		"id_extractor": {
 			"extract_from": "form",
 			"extract_with": "value",
