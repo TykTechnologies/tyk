@@ -36,14 +36,12 @@ func (m *RedisCacheMiddleware) New() {
 }
 
 func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
-	var used bool
 	for _, version := range m.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Cached) > 0 {
-			used = true
+			return true
 		}
 	}
-
-	return used
+	return false
 }
 
 func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {

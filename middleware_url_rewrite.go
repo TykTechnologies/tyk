@@ -128,16 +128,13 @@ func (m *URLRewriteMiddleware) GetName() string {
 }
 
 func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
-	var used bool
 	for _, version := range m.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.URLRewrite) > 0 {
-			used = true
 			m.Spec.URLRewriteEnabled = true
-			break
+			return true
 		}
 	}
-
-	return used
+	return false
 }
 
 func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {
