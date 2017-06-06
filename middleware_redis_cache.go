@@ -225,7 +225,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			go m.CacheStore.SetKey(key, toStore, cacheTTL)
 
 		}
-		return nil, 666
+		return nil, mwStatusRespond
 
 	}
 
@@ -272,5 +272,5 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	// Stop any further execution
-	return nil, 666
+	return nil, mwStatusRespond
 }

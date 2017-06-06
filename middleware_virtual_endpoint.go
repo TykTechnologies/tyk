@@ -273,7 +273,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, 200
 	}
 
-	return nil, 666
+	return nil, mwStatusRespond
 }
 
 func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {

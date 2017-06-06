@@ -11,6 +11,8 @@ import (
 	"github.com/paulbellamy/ratecounter"
 )
 
+const mwStatusRespond = 666
+
 var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddlewareImplementation interface {
@@ -77,18 +79,8 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 				return
 			}
 
-			// Special code, stops execution
-			if errCode == 1666 {
-				// Stop
-				log.Info("[Middleware] Received stop code")
-				meta["stopped"] = "1"
-				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
-				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
-				return
-			}
-
 			// Special code, bypasses all other execution
-			if errCode != 666 {
+			if errCode != mwStatusRespond {
 				// No error, carry on...
 				meta["bypass"] = "1"
 				h.ServeHTTP(w, r)
