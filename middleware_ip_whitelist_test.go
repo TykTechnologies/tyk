@@ -49,9 +49,7 @@ const ipMiddlewareTestDefinitionDisabled = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	},
-	"enable_ip_whitelisting": false,
-	"allowed_ips": []
+	}
 }`
 
 const ipMiddlewareTestDefinitionMissing = `{

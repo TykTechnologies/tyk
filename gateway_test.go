@@ -335,7 +335,6 @@ const versionedDefinition = `{
 		"auth_header_name": "authorization"
 	},
 	"version_data": {
-		"not_versioned": false,
 		"versions": {
 			"v1": {
 				"name": "v1"
