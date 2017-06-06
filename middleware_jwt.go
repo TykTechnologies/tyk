@@ -43,15 +43,6 @@ type JWKs struct {
 	Keys []JWK `json:"keys"`
 }
 
-func (k JWTMiddleware) New() {}
-
-// GetConfig retrieves the configuration from the API config
-func (k *JWTMiddleware) GetConfig() (interface{}, error) {
-	return k.Spec.Auth, nil
-}
-
-func (k *JWTMiddleware) IsEnabledForSpec() bool { return true }
-
 func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, error) {
 	// Implement a cache
 	if JWKCache == nil {

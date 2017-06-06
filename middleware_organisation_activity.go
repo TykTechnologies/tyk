@@ -46,11 +46,6 @@ func (k *OrganizationMonitor) IsEnabledForSpec() bool {
 	return config.EnforceOrgQuotas
 }
 
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (k *OrganizationMonitor) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	if config.ExperimentalProcessOrgOffThread {
 		return k.ProcessRequestOffThread(w, r, configuration)

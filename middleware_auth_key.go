@@ -20,15 +20,6 @@ func (k *AuthKey) GetName() string {
 	return "AuthKey"
 }
 
-func (k *AuthKey) New() {}
-
-// GetConfig retrieves the configuration from the API config
-func (k *AuthKey) GetConfig() (interface{}, error) {
-	return k.Spec.Auth, nil
-}
-
-func (k *AuthKey) IsEnabledForSpec() bool { return true }
-
 func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	// Flatten claims and add to context
 	if !k.Spec.EnableContextVars {

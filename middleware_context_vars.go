@@ -11,19 +11,8 @@ type MiddlewareContextVars struct {
 	*TykMiddleware
 }
 
-type MiddlewareContextVarsConfig struct{}
-
-// New lets you do any initialisations for the object can be done here
-func (m *MiddlewareContextVars) New() {}
-
 func (m *MiddlewareContextVars) GetName() string {
 	return "MiddlewareContextVars"
-}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *MiddlewareContextVars) GetConfig() (interface{}, error) {
-	var moduleConfig MiddlewareContextVarsConfig
-	return moduleConfig, nil
 }
 
 func (m *MiddlewareContextVars) IsEnabledForSpec() bool {

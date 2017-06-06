@@ -15,14 +15,6 @@ func (i *IPWhiteListMiddleware) GetName() string {
 	return "IPWhiteListMiddleware"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (i *IPWhiteListMiddleware) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (i *IPWhiteListMiddleware) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
 func (i *IPWhiteListMiddleware) IsEnabledForSpec() bool {
 	if !i.Spec.EnableIpWhiteListing {
 		return false

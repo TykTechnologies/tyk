@@ -18,16 +18,6 @@ func (a *AccessRightsCheck) GetName() string {
 	return "AccessRightsCheck"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (a *AccessRightsCheck) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (a *AccessRightsCheck) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
-func (a *AccessRightsCheck) IsEnabledForSpec() bool { return true }
-
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	accessingVersion := a.Spec.getVersionFromRequest(r)

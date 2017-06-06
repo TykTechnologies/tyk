@@ -21,16 +21,6 @@ func (k *BasicAuthKeyIsValid) GetName() string {
 	return "BasicAuthKeyIsValid"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (k *BasicAuthKeyIsValid) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (k *BasicAuthKeyIsValid) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
-func (k *BasicAuthKeyIsValid) IsEnabledForSpec() bool { return true }
-
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
 func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {
 	authReply := "Basic realm=\"" + k.Spec.Name + "\""

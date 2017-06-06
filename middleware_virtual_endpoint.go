@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -81,26 +79,9 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	}
 }
 
-type VirtualEndpointConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
-
 // New lets you do any initialisations for the object can be done here
 func (d *VirtualEndpoint) New() {
 	d.sh = SuccessHandler{d.TykMiddleware}
-}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
-	var moduleConfig VirtualEndpointConfig
-
-	err := mapstructure.Decode(d.Spec.RawData, &moduleConfig)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	return moduleConfig, nil
 }
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {

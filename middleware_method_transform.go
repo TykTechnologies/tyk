@@ -17,14 +17,6 @@ func (t *TransformMethod) GetName() string {
 	return "TransformMethod"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (t *TransformMethod) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (t *TransformMethod) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
 func (t *TransformMethod) IsEnabledForSpec() bool {
 	var used bool
 	for _, version := range t.Spec.VersionData.Versions {

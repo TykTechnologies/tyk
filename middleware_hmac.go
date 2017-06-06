@@ -30,16 +30,8 @@ func (hm *HMACMiddleware) GetName() string {
 	return "HMAC"
 }
 
-// New lets you do any initializations for the object can be done here
 func (hm *HMACMiddleware) New() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
-}
-
-func (hm *HMACMiddleware) IsEnabledForSpec() bool { return true }
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (hm *HMACMiddleware) GetConfig() (interface{}, error) {
-	return nil, nil
 }
 
 func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {

@@ -44,8 +44,6 @@ func (k *OpenIDMW) New() {
 	}
 }
 
-func (k *OpenIDMW) IsEnabledForSpec() bool { return true }
-
 func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 	providers := []openid.Provider{}
 	log.Debug("Setting up providers: ", k.Spec.OpenIDOptions.Providers)
@@ -93,11 +91,6 @@ func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Req
 		"prefix": OIDPREFIX,
 	}).Warning("JWT Invalid: ", e)
 	return true
-}
-
-// GetConfig retrieves the configuration from the API config
-func (k *OpenIDMW) GetConfig() (interface{}, error) {
-	return nil, nil
 }
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {

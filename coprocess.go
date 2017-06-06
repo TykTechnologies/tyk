@@ -3,8 +3,6 @@
 package main
 
 import (
-	"github.com/mitchellh/mapstructure"
-
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -158,29 +156,6 @@ func CoProcessInit() error {
 		EnableCoProcess = true
 	}
 	return err
-}
-
-// CoProcessMiddlewareConfig holds the middleware configuration.
-type CoProcessMiddlewareConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
-
-// New lets you do any initialisations for the object can be done here
-func (m *CoProcessMiddleware) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
-	var moduleConfig CoProcessMiddlewareConfig
-
-	err := mapstructure.Decode(m.Spec.RawData, &moduleConfig)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "jsvm",
-		}).Error(err)
-		return nil, err
-	}
-
-	return moduleConfig, nil
 }
 
 // IsEnabledForSpec checks if this middleware should be enabled for a given API.

@@ -62,11 +62,6 @@ func (d *DynamicMiddleware) GetName() string {
 	return "DynamicMiddleware"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (d *DynamicMiddleware) New() {}
-
-func (d *DynamicMiddleware) IsEnabledForSpec() bool { return true }
-
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
 	var moduleConfig DynamicMiddlewareConfig

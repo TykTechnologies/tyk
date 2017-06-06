@@ -23,13 +23,6 @@ func (v *VersionCheck) GetName() string {
 	return "VersionCheck"
 }
 
-// GetConfig retrieves the configuration from the API config
-func (v *VersionCheck) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
-func (v *VersionCheck) IsEnabledForSpec() bool { return true }
-
 func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta interface{}) {
 	// Reply with some alternate data
 	emeta := meta.(*apidef.EndpointMethodMeta)

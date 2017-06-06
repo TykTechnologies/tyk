@@ -27,14 +27,6 @@ func (t *TransformMiddleware) GetName() string {
 	return "TransformMiddleware"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (t *TransformMiddleware) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (t *TransformMiddleware) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
 func (t *TransformMiddleware) IsEnabledForSpec() bool {
 	var used bool
 	for _, version := range t.Spec.VersionData.Versions {
