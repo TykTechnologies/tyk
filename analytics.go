@@ -123,18 +123,15 @@ func initNormalisationPatterns() (pats NormaliseURLPatterns) {
 }
 
 func (a *AnalyticsRecord) NormalisePath() {
-	if config.AnalyticsConfig.NormaliseUrls.Enabled {
-		if config.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-			a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
-		}
-		if config.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-			a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
-		}
-		for _, r := range config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom {
-			a.Path = r.ReplaceAllString(a.Path, "{var}")
-		}
+	if config.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+		a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
 	}
-
+	if config.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+		a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
+	}
+	for _, r := range config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom {
+		a.Path = r.ReplaceAllString(a.Path, "{var}")
+	}
 }
 
 func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
