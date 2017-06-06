@@ -16,19 +16,9 @@ type Oauth2KeyExists struct {
 	*TykMiddleware
 }
 
-// New lets you do any initialisations for the object can be done here
-func (k *Oauth2KeyExists) New() {}
-
 func (k *Oauth2KeyExists) GetName() string {
 	return "Oauth2KeyExists"
 }
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (k *Oauth2KeyExists) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
-func (k *Oauth2KeyExists) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {

@@ -45,6 +45,14 @@ type TykMiddleware struct {
 	Proxy ReturningHttpHandler
 }
 
+func (t *TykMiddleware) New() {}
+func (t *TykMiddleware) IsEnabledForSpec() bool {
+	return true
+}
+func (t *TykMiddleware) GetConfig() (interface{}, error) {
+	return nil, nil
+}
+
 func (t *TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.GetSessionDetail(key)

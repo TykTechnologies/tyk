@@ -13,18 +13,9 @@ type GranularAccessMiddleware struct {
 	*TykMiddleware
 }
 
-func (m *GranularAccessMiddleware) New() {}
-
 func (m *GranularAccessMiddleware) GetName() string {
 	return "GranularAccessMiddleware"
 }
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *GranularAccessMiddleware) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
-func (m *GranularAccessMiddleware) IsEnabledForSpec() bool { return true }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {

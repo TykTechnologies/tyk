@@ -20,14 +20,6 @@ func (k *RateLimitAndQuotaCheck) GetName() string {
 	return "RateLimitAndQuotaCheck"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (k *RateLimitAndQuotaCheck) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (k *RateLimitAndQuotaCheck) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
 func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
 	return !k.Spec.DisableRateLimit || !k.Spec.DisableQuota
 }

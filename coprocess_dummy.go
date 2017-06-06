@@ -38,11 +38,7 @@ func (m *CoProcessMiddleware) GetName() string {
 	return "CoProcessMiddlewareDummy"
 }
 
-func (m *CoProcessMiddleware) New()                   {}
 func (m *CoProcessMiddleware) IsEnabledForSpec() bool { return false }
-func (m *CoProcessMiddleware) GetConfig() (interface{}, error) {
-	return nil, nil
-}
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
 	return nil, 200
 }

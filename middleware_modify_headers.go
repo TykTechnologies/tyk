@@ -21,14 +21,6 @@ func (t *TransformHeaders) GetName() string {
 	return "TransformHeaders"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (t *TransformHeaders) New() {}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (t *TransformHeaders) GetConfig() (interface{}, error) {
-	return nil, nil
-}
-
 func (t *TransformHeaders) IsEnabledForSpec() bool {
 	var used bool
 	for _, version := range t.Spec.VersionData.Versions {

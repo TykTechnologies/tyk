@@ -30,9 +30,6 @@ func (m *RedisCacheMiddleware) GetName() string {
 	return "RedisCacheMiddleware"
 }
 
-type RedisCacheMiddlewareConfig struct {
-}
-
 // New lets you do any initialisations for the object can be done here
 func (m *RedisCacheMiddleware) New() {
 	m.sh = SuccessHandler{m.TykMiddleware}
@@ -47,11 +44,6 @@ func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
 	}
 
 	return used
-}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *RedisCacheMiddleware) GetConfig() (interface{}, error) {
-	return RedisCacheMiddlewareConfig{}, nil
 }
 
 func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {

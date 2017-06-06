@@ -127,9 +127,6 @@ func (m *URLRewriteMiddleware) GetName() string {
 	return "URLRewriteMiddleware"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (m *URLRewriteMiddleware) New() {}
-
 func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
 	var used bool
 	for _, version := range m.Spec.VersionData.Versions {
@@ -143,9 +140,7 @@ func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
 	return used
 }
 
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {
-	log.Debug("URL Rewrite enabled")
 	m.Rewriter = &URLRewriter{}
 	return nil, nil
 }

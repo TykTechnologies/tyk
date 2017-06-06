@@ -15,16 +15,8 @@ type RequestSizeLimitMiddleware struct {
 	*TykMiddleware
 }
 
-// New lets you do any initialisations for the object can be done here
-func (t *RequestSizeLimitMiddleware) New() {}
-
 func (t *RequestSizeLimitMiddleware) GetName() string {
 	return "RequestSizeLimitMiddleware"
-}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (t *RequestSizeLimitMiddleware) GetConfig() (interface{}, error) {
-	return nil, nil
 }
 
 func (t *RequestSizeLimitMiddleware) IsEnabledForSpec() bool {
