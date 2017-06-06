@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -28,34 +27,17 @@ type DBAppConfOptionsConfig struct {
 	Tags             []string `json:"tags"`
 }
 
-type EnvMapString map[string]string
-
-func (e *EnvMapString) Decode(value string) error {
-	units := strings.Split(value, ",")
-	m := make(map[string]string)
-	for _, unit := range units {
-		kvArr := strings.Split(unit, ":")
-		if len(kvArr) > 1 {
-			m[kvArr[0]] = kvArr[1]
-		}
-	}
-
-	*e = m
-
-	return nil
-}
-
 type StorageOptionsConf struct {
-	Type          string       `json:"type"`
-	Host          string       `json:"host"`
-	Port          int          `json:"port"`
-	Hosts         EnvMapString `json:"hosts"`
-	Username      string       `json:"username"`
-	Password      string       `json:"password"`
-	Database      int          `json:"database"`
-	MaxIdle       int          `json:"optimisation_max_idle"`
-	MaxActive     int          `json:"optimisation_max_active"`
-	EnableCluster bool         `json:"enable_cluster"`
+	Type          string            `json:"type"`
+	Host          string            `json:"host"`
+	Port          int               `json:"port"`
+	Hosts         map[string]string `json:"hosts"`
+	Username      string            `json:"username"`
+	Password      string            `json:"password"`
+	Database      int               `json:"database"`
+	MaxIdle       int               `json:"optimisation_max_idle"`
+	MaxActive     int               `json:"optimisation_max_active"`
+	EnableCluster bool              `json:"enable_cluster"`
 }
 
 type NormalisedURLConfig struct {
