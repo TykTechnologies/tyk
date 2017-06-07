@@ -157,6 +157,7 @@ func TestMain(m *testing.M) {
 	}
 
 	go reloadLoop(reloadTick)
+	go reloadQueueLoop()
 
 	go func() {
 		// simulate reloads in the background, i.e. writes to
@@ -989,9 +990,16 @@ func TestListenPathTykPrefix(t *testing.T) {
 	tests := []tykHttpTest{
 		{method: "POST", path: "/tyk/apis", body: apiWithTykListenPathPrefix, adminAuth: true, code: 200},
 		{method: "GET", path: "/tyk-foo/", code: 404},
-		{method: "GET", path: "/tyk/reload/", adminAuth: true, code: 200, afterFn: func() { doReload() }},
+		{method: "GET", path: "/tyk/reload/?block=true", adminAuth: true, code: 200},
 		{method: "GET", path: "/tyk-foo/", code: 200},
 	}
+	// have all needed reload ticks ready
+	go func() {
+		// one call to testHttp, each loops over tests 4 times
+		for i := 0; i < 1*4; i++ {
+			reloadTick <- time.Time{}
+		}
+	}()
 	testHttp(t, tests, false)
 }
 

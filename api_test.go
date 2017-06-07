@@ -599,10 +599,8 @@ func TestGroupResetHandler(t *testing.T) {
 func TestHotReloadSingle(t *testing.T) {
 	oldRouter := mainRouter
 	var wg sync.WaitGroup
-	if !reloadURLStructure(wg.Done) {
-		t.Fatal("reload wasn't queued")
-	}
 	wg.Add(1)
+	reloadURLStructure(wg.Done)
 	reloadTick <- time.Time{}
 	wg.Wait()
 	if mainRouter == oldRouter {
@@ -611,36 +609,27 @@ func TestHotReloadSingle(t *testing.T) {
 }
 
 func TestHotReloadMany(t *testing.T) {
-	done := 0
 	var wg sync.WaitGroup
+	wg.Add(25)
 	// Spike of 25 reloads all at once, not giving any time for the
 	// reload worker to pick up any of them. A single one is queued
 	// and waits.
+	// We get a callback for all of them, so 25 wg.Done calls.
 	for i := 0; i < 25; i++ {
-		if reloadURLStructure(wg.Done) {
-			wg.Add(1)
-			done++
-		}
-	}
-	if want := 1; done != want {
-		t.Fatalf("wanted actual reloads to be %d, was %d", want, done)
+		reloadURLStructure(wg.Done)
 	}
 	// pick it up and finish it
 	reloadTick <- time.Time{}
 	wg.Wait()
+
 	// 5 reloads, but this time slower - the reload worker has time
 	// to do all of them.
 	for i := 0; i < 5; i++ {
-		if reloadURLStructure(wg.Done) {
-			wg.Add(1)
-			done++
-		}
+		wg.Add(1)
+		reloadURLStructure(wg.Done)
 		// pick it up and finish it
 		reloadTick <- time.Time{}
 		wg.Wait()
-	}
-	if want := 6; done != want {
-		t.Fatalf("wanted actual reloads to be %d, was %d", want, done)
 	}
 }
 
