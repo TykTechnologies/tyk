@@ -413,9 +413,6 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 		}
 	}
 	handleRedisEvent(msg, handled, wg.Done)
-	if len(reloadChan) != 1 {
-		t.Fatal("Should trigger reload")
-	}
 
 	// Since we already know that reload is queued
 	reloadTick <- time.Time{}

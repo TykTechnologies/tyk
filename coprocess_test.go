@@ -77,9 +77,7 @@ func TestCoProcessReload(t *testing.T) {
 	testDispatcher.reloaded = false
 	var wg sync.WaitGroup
 	wg.Add(1)
-	if !reloadURLStructure(wg.Done) {
-		t.Fatal("reload wasn't queued")
-	}
+	reloadURLStructure(wg.Done)
 	reloadTick <- time.Time{}
 	wg.Wait()
 	if !testDispatcher.reloaded {

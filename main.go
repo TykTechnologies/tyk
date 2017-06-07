@@ -607,41 +607,69 @@ func doReload() {
 	RPC_EmergencyMode = false
 }
 
-// reloadChan is a queue for incoming reload requests. At most, we want
-// to have one reload running and one queued. If one is already queued,
-// any reload requests should do nothing as a reload is already going to
-// start at some point. Hence, buffer of size 1.
-// If the queued func is non-nil, it is called once the reload is done.
-var reloadChan = make(chan func(), 1)
+// startReloadChan and reloadDoneChan are used by the two reload loops
+// running in separate goroutines to talk. reloadQueueLoop will use
+// startReloadChan to signal to reloadLoop to start a reload, and
+// reloadLoop will use reloadDoneChan to signal back that it's done with
+// the reload. Buffered simply to not make the goroutines block each
+// other.
+var startReloadChan = make(chan struct{}, 1)
+var reloadDoneChan = make(chan struct{}, 1)
 
 func reloadLoop(tick <-chan time.Time) {
 	<-tick
-	for fn := range reloadChan {
+	for range startReloadChan {
 		log.Info("Initiating reload")
 		doReload()
 		log.Info("Initiating coprocess reload")
 		doCoprocessReload()
 
-		if fn != nil {
-			fn()
-		}
+		reloadDoneChan <- struct{}{}
 		<-tick
 	}
 }
 
-// reloadURLStructure will create a new muxer, reload all the app configs for an
-// instance and then replace the DefaultServeMux with the new one, this enables a
-// reconfiguration to take place without stopping any requests from being handled.
-// It returns true if it was queued, or false if it wasn't.
-func reloadURLStructure(fn func()) bool {
-	select {
-	case reloadChan <- fn:
-		log.Info("Reload queued")
-		return true
-	default:
-		log.Info("Reload already queued")
-		return false
+// reloadQueue is used by reloadURLStructure to queue a reload. It's not
+// buffered, as reloadQueueLoop should pick these up immediately.
+var reloadQueue = make(chan func())
+
+func reloadQueueLoop() {
+	reloading := false
+	var fns []func()
+	for {
+		select {
+		case <-reloadDoneChan:
+			for _, fn := range fns {
+				fn()
+			}
+			fns = fns[:0]
+			reloading = false
+		case fn := <-reloadQueue:
+			if fn != nil {
+				fns = append(fns, fn)
+			}
+			if !reloading {
+				log.Info("Reload queued")
+				startReloadChan <- struct{}{}
+				reloading = true
+			} else {
+				log.Info("Reload already queued")
+			}
+		}
 	}
+}
+
+// reloadURLStructure will queue an API reload. The reload will
+// eventually create a new muxer, reload all the app configs for an
+// instance and then replace the DefaultServeMux with the new one. This
+// enables a reconfiguration to take place without stopping any requests
+// from being handled.
+//
+// done will be called when the reload is finished. Note that if a
+// reload is already queued, another won't be queued, but done will
+// still be called when said queued reload is finished.
+func reloadURLStructure(done func()) {
+	reloadQueue <- done
 }
 
 func setupLogger() {
@@ -1092,6 +1120,7 @@ func start(arguments map[string]interface{}) {
 	// 1s is the minimum amount of time between hot reloads. The
 	// interval counts from the start of one reload to the next.
 	go reloadLoop(time.Tick(time.Second))
+	go reloadQueueLoop()
 }
 
 func generateListener(listenPort int) (net.Listener, error) {
