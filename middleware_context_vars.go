@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/context"
+    "github.com/lonelycode/go-uuid/uuid"
 )
 
 type MiddlewareContextVars struct {
@@ -65,6 +66,9 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 
 		// IP:Port
 		contextDataObject["remote_addr"] = copiedRequest.RemoteAddr
+
+	    //Correlation ID
+	    contextDataObject["request_id"] = uuid.NewUUID().String()
 	}
 
 	context.Set(r, ContextData, contextDataObject)
