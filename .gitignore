@@ -44,6 +44,7 @@ tyk_elasticache.conf
 /tyk
 logs/
 *.mprof
+*.cov
 /apps/test.json
 logs
 lint_results.txt
