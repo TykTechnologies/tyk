@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -309,9 +308,7 @@ func getAuthCode(t *testing.T) map[string]string {
 	testMuxer.ServeHTTP(recorder, req)
 
 	response := map[string]string{}
-	body, _ := ioutil.ReadAll(recorder.Body)
-	_ = json.Unmarshal(body, &response)
-
+	json.NewDecoder(recorder.Body).Decode(&response)
 	return response
 }
 
@@ -342,8 +339,7 @@ func getToken(t *testing.T) tokenData {
 	testMuxer.ServeHTTP(recorder, req)
 
 	response := tokenData{}
-	body, _ := ioutil.ReadAll(recorder.Body)
-	_ = json.Unmarshal(body, &response)
+	json.NewDecoder(recorder.Body).Decode(&response)
 	return response
 }
 
@@ -367,10 +363,7 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 	testMuxer.ServeHTTP(recorder, req)
 
 	response := tokenData{}
-	body, _ := ioutil.ReadAll(recorder.Body)
-	if err := json.Unmarshal(body, &response); err != nil {
-		t.Fatal(err)
-	}
+	json.NewDecoder(recorder.Body).Decode(&response)
 
 	if recorder.Code != 200 {
 		t.Error("Response code should have 200 error but is: ", recorder.Code)
@@ -449,19 +442,14 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	testMuxer.ServeHTTP(recorder, req1)
 
 	newSuccess := APIModifyKeySuccess{}
-	err := json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
+	json.NewDecoder(recorder.Body).Decode(&newSuccess)
 
-	if err != nil {
-		t.Error("Could not unmarshal success message:\n", err)
-		t.Error(recorder.Body.String())
-	} else {
-		if newSuccess.Status != "ok" {
-			t.Error("key not deleted, status error:\n", recorder.Body.String())
-			t.Error(apisByID)
-		}
-		if newSuccess.Action != "deleted" {
-			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
-		}
+	if newSuccess.Status != "ok" {
+		t.Error("key not deleted, status error:\n", recorder.Body.String())
+		t.Error(apisByID)
+	}
+	if newSuccess.Action != "deleted" {
+		t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
 	}
 
 	// Step 3 - try to refresh
@@ -555,10 +543,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 
 	responseData := make(map[string]interface{})
 
-	body, _ := ioutil.ReadAll(recorder.Body)
-	if err := json.Unmarshal(body, &responseData); err != nil {
-		t.Fatal("Decode failed:", err)
-	}
+	json.NewDecoder(recorder.Body).Decode(&responseData)
 	token, ok := responseData["refresh_token"].(string)
 	if !ok {
 		t.Fatal("No refresh token found")

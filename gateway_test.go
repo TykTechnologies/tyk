@@ -657,10 +657,9 @@ func TestWhitelistRequestReply(t *testing.T) {
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
 
-	contents, _ := ioutil.ReadAll(recorder.Body)
-
-	if string(contents) != "flump" {
-		t.Error("Request body is incorrect! Is: ", string(contents))
+	body := recorder.Body.String()
+	if body != "flump" {
+		t.Error("Request body is incorrect! Is: ", body)
 	}
 }
 
