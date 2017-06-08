@@ -63,13 +63,6 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	}
 
 	healthCheckhandler(recorder, req)
-
-	var apiHealthValues HealthCheckValues
-	err = json.Unmarshal(recorder.Body.Bytes(), &apiHealthValues)
-	if err != nil {
-		t.Error("Could not unmarshal API Health check:\n", err, recorder.Body.String())
-	}
-
 	if recorder.Code != 200 {
 		t.Error("Recorder should return 200 for health check")
 	}
@@ -107,7 +100,6 @@ func TestApiHandler(t *testing.T) {
 		loadSampleAPI(t, apiTestDef)
 
 		req, err := http.NewRequest("GET", uri, bytes.NewReader(body))
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,18 +108,12 @@ func TestApiHandler(t *testing.T) {
 
 		// We can't deserialize BSON ObjectID's if they are not in th test base!
 		var apiList []testAPIDefinition
-		err = json.Unmarshal(recorder.Body.Bytes(), &apiList)
+		json.NewDecoder(recorder.Body).Decode(&apiList)
 
-		if err != nil {
-			t.Error("Could not unmarshal API List:\n", err, recorder.Body.String(), uri)
-		} else {
-			if len(apiList) != 1 {
-				t.Error("API's not returned, len was: \n", len(apiList), recorder.Body.String(), uri)
-			} else {
-				if apiList[0].APIID != "1" {
-					t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String(), uri)
-				}
-			}
+		if len(apiList) != 1 {
+			t.Error("API's not returned, len was: \n", len(apiList), recorder.Body.String(), uri)
+		} else if apiList[0].APIID != "1" {
+			t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String(), uri)
 		}
 	}
 }
@@ -150,14 +136,10 @@ func TestApiHandlerGetSingle(t *testing.T) {
 
 	// We can't deserialize BSON ObjectID's if they are not in th test base!
 	var apiDef testAPIDefinition
-	err = json.Unmarshal(recorder.Body.Bytes(), &apiDef)
+	json.NewDecoder(recorder.Body).Decode(&apiDef)
 
-	if err != nil {
-		t.Error("Could not unmarshal API Definition:\n", err, recorder.Body.String())
-	} else {
-		if apiDef.APIID != "1" {
-			t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
-		}
+	if apiDef.APIID != "1" {
+		t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
 	}
 }
 
@@ -173,14 +155,10 @@ func TestApiHandlerPost(t *testing.T) {
 	apiHandler(recorder, req)
 
 	var success APIModifyKeySuccess
-	err = json.Unmarshal(recorder.Body.Bytes(), &success)
+	json.NewDecoder(recorder.Body).Decode(&success)
 
-	if err != nil {
-		t.Error("Could not unmarshal POST result:\n", err, recorder.Body.String())
-	} else {
-		if success.Status != "ok" {
-			t.Error("Response is incorrect - not success :\n", recorder.Body.String())
-		}
+	if success.Status != "ok" {
+		t.Error("Response is incorrect - not success :\n", recorder.Body.String())
 	}
 }
 
@@ -255,14 +233,9 @@ func TestApiHandlerPostDbConfig(t *testing.T) {
 	apiHandler(recorder, req)
 
 	var success APIModifyKeySuccess
-	err = json.Unmarshal(recorder.Body.Bytes(), &success)
-
-	if err != nil {
-		t.Error("Could not unmarshal POST result:\n", err, recorder.Body.String())
-	} else {
-		if success.Status == "ok" {
-			t.Error("Response is incorrect - expected error due to use_db_app_config :\n", recorder.Body.String())
-		}
+	json.NewDecoder(recorder.Body).Decode(&success)
+	if success.Status == "ok" {
+		t.Error("Response is incorrect - expected error due to use_db_app_config :\n", recorder.Body.String())
 	}
 }
 
@@ -326,17 +299,12 @@ func TestKeyHandlerNewKey(t *testing.T) {
 		keyHandler(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
-		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
-
-		if err != nil {
-			t.Error("Could not unmarshal success message:\n", err)
-		} else {
-			if newSuccess.Status != "ok" {
-				t.Error("key not created, status error:\n", recorder.Body.String())
-			}
-			if newSuccess.Action != "added" {
-				t.Error("Response is incorrect - action is not 'added' :\n", recorder.Body.String())
-			}
+		json.NewDecoder(recorder.Body).Decode(&newSuccess)
+		if newSuccess.Status != "ok" {
+			t.Error("key not created, status error:\n", recorder.Body.String())
+		}
+		if newSuccess.Action != "added" {
+			t.Error("Response is incorrect - action is not 'added' :\n", recorder.Body.String())
 		}
 	}
 }
@@ -362,17 +330,12 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 		keyHandler(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
-		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
-
-		if err != nil {
-			t.Error("Could not unmarshal success message:\n", err)
-		} else {
-			if newSuccess.Status != "ok" {
-				t.Error("key not created, status error:\n", recorder.Body.String())
-			}
-			if newSuccess.Action != "modified" {
-				t.Error("Response is incorrect - action is not 'modified' :\n", recorder.Body.String())
-			}
+		json.NewDecoder(recorder.Body).Decode(&newSuccess)
+		if newSuccess.Status != "ok" {
+			t.Error("key not created, status error:\n", recorder.Body.String())
+		}
+		if newSuccess.Action != "modified" {
+			t.Error("Response is incorrect - action is not 'modified' :\n", recorder.Body.String())
 		}
 	}
 }
@@ -397,16 +360,8 @@ func TestKeyHandlerGetKey(t *testing.T) {
 		}
 
 		keyHandler(recorder, req)
-
-		newSuccess := make(map[string]interface{})
-		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
-
-		if err != nil {
-			t.Error("Could not unmarshal success message:\n", err)
-		} else {
-			if recorder.Code != 200 {
-				t.Error("key not requested, status error:\n", recorder.Body.String())
-			}
+		if recorder.Code != 200 {
+			t.Error("key not requested, status error:\n", recorder.Body.String())
 		}
 	}
 }
@@ -443,17 +398,13 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 		keyHandler(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
-		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
+		json.NewDecoder(recorder.Body).Decode(&newSuccess)
 
-		if err != nil {
-			t.Error("Could not unmarshal success message:\n", err)
-		} else {
-			if newSuccess.Status != "ok" {
-				t.Error("key not deleted, status error:\n", recorder.Body.String())
-			}
-			if newSuccess.Action != "deleted" {
-				t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
-			}
+		if newSuccess.Status != "ok" {
+			t.Error("key not deleted, status error:\n", recorder.Body.String())
+		}
+		if newSuccess.Action != "deleted" {
+			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
 		}
 	}
 }
@@ -481,17 +432,13 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		createKeyHandler(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
-		err = json.Unmarshal(recorder.Body.Bytes(), &newSuccess)
+		json.NewDecoder(recorder.Body).Decode(&newSuccess)
 
-		if err != nil {
-			t.Error("Could not unmarshal success message:\n", err)
-		} else {
-			if newSuccess.Status != "ok" {
-				t.Error("key not created, status error:\n", recorder.Body.String())
-			}
-			if newSuccess.Action != "create" {
-				t.Error("Response is incorrect - action is not 'create' :\n", recorder.Body.String())
-			}
+		if newSuccess.Status != "ok" {
+			t.Error("key not created, status error:\n", recorder.Body.String())
+		}
+		if newSuccess.Action != "create" {
+			t.Error("Response is incorrect - action is not 'create' :\n", recorder.Body.String())
 		}
 	}
 }

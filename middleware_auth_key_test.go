@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -65,7 +64,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
-		t.Error(ioutil.ReadAll(recorder.Body))
+		t.Error(recorder.Body.String())
 	}
 }
 
@@ -108,7 +107,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
-		t.Error(ioutil.ReadAll(recorder.Body))
+		t.Error(recorder.Body.String())
 	}
 }
 
@@ -154,7 +153,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("First request failed with non-200 code, should have gone through!: \n", recorder.Code)
-		t.Error(ioutil.ReadAll(recorder.Body))
+		t.Error(recorder.Body.String())
 	}
 
 	// Set the header
@@ -168,7 +167,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Second request failed with non-200 code, should have gone through!: \n", recorder.Code)
-		t.Error(ioutil.ReadAll(recorder.Body))
+		t.Error(recorder.Body.String())
 	}
 
 	// Set the cookie
@@ -182,7 +181,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Third request failed with non-200 code, should have gone through!: \n", recorder.Code)
-		t.Error(ioutil.ReadAll(recorder.Body))
+		t.Error(recorder.Body.String())
 	}
 
 	// No header, param or cookie
@@ -195,7 +194,7 @@ func TestMultiAuthSession(t *testing.T) {
 
 	if recorder.Code == 200 {
 		t.Error("Request returned 200 code, should NOT have gone through!: \n", recorder.Code)
-		t.Error(ioutil.ReadAll(recorder.Body))
+		t.Error(recorder.Body.String())
 	}
 }
 
