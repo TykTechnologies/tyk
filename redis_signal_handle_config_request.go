@@ -17,13 +17,11 @@ type GetConfigPayload struct {
 type ReturnConfigPayload struct {
 	FromHostname  string
 	FromNodeID    string
-	Configuration MicroConfig
+	Configuration map[string]interface{}
 	TimeStamp     int64
 }
 
-type MicroConfig map[string]interface{}
-
-func sanitizeConfig(mc MicroConfig) MicroConfig {
+func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 
 	sanitzeFields := []string{
 		"secret",
@@ -40,8 +38,8 @@ func sanitizeConfig(mc MicroConfig) MicroConfig {
 	return mc
 }
 
-func getExistingConfig() (MicroConfig, error) {
-	microConfig := MicroConfig{}
+func getExistingConfig() (map[string]interface{}, error) {
+	var microConfig map[string]interface{}
 	dat, err := ioutil.ReadFile(usedConfPath)
 	if err != nil {
 		return microConfig, err
