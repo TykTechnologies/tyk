@@ -103,8 +103,9 @@ func TestApiHandler(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-		apiHandler(recorder, req)
+		mainRouter.ServeHTTP(recorder, req)
 
 		// We can't deserialize BSON ObjectID's if they are not in th test base!
 		var apiList []testAPIDefinition
@@ -131,8 +132,9 @@ func TestApiHandlerGetSingle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-	apiHandler(recorder, req)
+	mainRouter.ServeHTTP(recorder, req)
 
 	// We can't deserialize BSON ObjectID's if they are not in th test base!
 	var apiDef testAPIDefinition
@@ -151,8 +153,9 @@ func TestApiHandlerPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-	apiHandler(recorder, req)
+	mainRouter.ServeHTTP(recorder, req)
 
 	var success APIModifyKeySuccess
 	json.NewDecoder(recorder.Body).Decode(&success)
@@ -229,8 +232,9 @@ func TestApiHandlerPostDbConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-	apiHandler(recorder, req)
+	mainRouter.ServeHTTP(recorder, req)
 
 	var success APIModifyKeySuccess
 	json.NewDecoder(recorder.Body).Decode(&success)
@@ -261,18 +265,19 @@ func TestApiHandlerMethodAPIID(t *testing.T) {
 		{"PUT", "/mismatch", 400},
 	}
 	for _, tc := range tests {
-		rec := httptest.NewRecorder()
+		recorder := httptest.NewRecorder()
 		url := base + tc.path
 		req, err := http.NewRequest(tc.method, url,
 			strings.NewReader(apiTestDef))
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-		apiHandler(rec, req)
-		if tc.code != rec.Code {
+		mainRouter.ServeHTTP(recorder, req)
+		if tc.code != recorder.Code {
 			t.Errorf("%s %s got %d, want %d", tc.method, url,
-				rec.Code, tc.code)
+				recorder.Code, tc.code)
 		}
 	}
 }
@@ -295,8 +300,9 @@ func TestKeyHandlerNewKey(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-		keyHandler(recorder, req)
+		mainRouter.ServeHTTP(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
@@ -322,12 +328,12 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 			param.Set("api_id", api_id)
 		}
 		req, err := http.NewRequest("PUT", uri+param.Encode(), bytes.NewReader(body))
-
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-		keyHandler(recorder, req)
+		mainRouter.ServeHTTP(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
@@ -354,12 +360,13 @@ func TestKeyHandlerGetKey(t *testing.T) {
 			param.Set("api_id", api_id)
 		}
 		req, err := http.NewRequest("GET", uri+"?"+param.Encode(), nil)
-
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-		keyHandler(recorder, req)
+		mainRouter.ServeHTTP(recorder, req)
+
 		if recorder.Code != 200 {
 			t.Error("key not requested, status error:\n", recorder.Body.String())
 		}
@@ -373,8 +380,9 @@ func createKey() {
 
 	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", uri, bytes.NewReader(body))
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-	keyHandler(recorder, req)
+	mainRouter.ServeHTTP(recorder, req)
 }
 
 func TestKeyHandlerDeleteKey(t *testing.T) {
@@ -390,12 +398,12 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 			param.Set("api_id", api_id)
 		}
 		req, err := http.NewRequest("DELETE", uri+param.Encode(), nil)
-
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-		keyHandler(recorder, req)
+		mainRouter.ServeHTTP(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
@@ -428,8 +436,9 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-		createKeyHandler(recorder, req)
+		mainRouter.ServeHTTP(recorder, req)
 
 		newSuccess := APIModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
@@ -437,7 +446,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		if newSuccess.Status != "ok" {
 			t.Error("key not created, status error:\n", recorder.Body.String())
 		}
-		if newSuccess.Action != "create" {
+		if newSuccess.Action != "added" {
 			t.Error("Response is incorrect - action is not 'create' :\n", recorder.Body.String())
 		}
 	}
@@ -445,6 +454,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 
 func TestAPIAuthFail(t *testing.T) {
 	uri := "/tyk/health/?api_id=1"
+	loadSampleAPI(t, apiTestDef)
 
 	recorder := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", uri, nil)
@@ -453,8 +463,7 @@ func TestAPIAuthFail(t *testing.T) {
 	}
 	req.Header.Add("x-tyk-authorization", "12345")
 
-	loadSampleAPI(t, apiTestDef)
-	checkIsAPIOwner(healthCheckhandler)(recorder, req)
+	mainRouter.ServeHTTP(recorder, req)
 
 	if recorder.Code == 200 {
 		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
@@ -473,7 +482,7 @@ func TestAPIAuthOk(t *testing.T) {
 	}
 
 	loadSampleAPI(t, apiTestDef)
-	checkIsAPIOwner(healthCheckhandler)(recorder, req)
+	mainRouter.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
@@ -501,13 +510,12 @@ func TestGetOAuthClients(t *testing.T) {
 }
 
 func TestResetHandler(t *testing.T) {
-	uri := "/tyk/reload/"
 	apisByID = make(map[string]*APISpec)
 
 	loadSampleAPI(t, apiTestDef)
 	recorder := httptest.NewRecorder()
 
-	req, err := http.NewRequest("GET", uri, nil)
+	req, err := http.NewRequest("GET", "/tyk/reload", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,8 +577,9 @@ func TestGroupResetHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-	groupResetHandler(recorder, req)
+	mainRouter.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
