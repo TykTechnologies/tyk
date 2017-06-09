@@ -53,7 +53,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Put into an interface:
-	var bodyData interface{}
+	bodyData := make(map[string]interface{})
 	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
 		mxj.XmlCharsetReader = WrappedCharsetReader
@@ -69,24 +69,15 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 	case apidef.RequestJSON:
 		json.Unmarshal(body, &bodyData)
-	default:
-		// unset, assume an open field
-		bodyData = make(map[string]interface{})
 	}
 
 	if tmeta.TemplateData.EnableSession {
 		session := ctxGetSession(r)
-		switch x := bodyData.(type) {
-		case map[string]interface{}:
-			x["_tyk_meta"] = session.MetaData
-		}
+		bodyData["_tyk_meta"] = session.MetaData
 	}
 
 	if t.Spec.EnableContextVars {
-		switch x := bodyData.(type) {
-		case map[string]interface{}:
-			x["_tyk_context"] = ctxGetData(r)
-		}
+		bodyData["_tyk_context"] = ctxGetData(r)
 	}
 
 	// Apply to template

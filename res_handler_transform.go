@@ -56,7 +56,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 
 	// Put into an interface:
-	var bodyData interface{}
+	var bodyData map[string]interface{}
 	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
 		mxj.XmlCharsetReader = WrappedCharsetReader
@@ -69,9 +69,7 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 				"path":        req.URL.Path,
 			}).Error("Error unmarshalling XML: ", err)
 		}
-	case apidef.RequestJSON:
-		json.Unmarshal(body, &bodyData)
-	default:
+	default: // apidef.RequestJSON
 		json.Unmarshal(body, &bodyData)
 	}
 
