@@ -1016,7 +1016,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	obj := APIModifyKeySuccess{
-		Action: "create",
+		Action: "added",
 		Key:    newKey,
 		Status: "ok",
 	}
