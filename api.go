@@ -561,22 +561,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Creating new definition file")
 		obj, code = handleAddOrUpdateApi(apiID, r)
 	case "PUT":
-		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r)
-		} else {
-			obj, code = apiError("Must specify an apiID to update"), 400
-		}
+		log.Debug("Updating existing API: ", apiID)
+		obj, code = handleAddOrUpdateApi(apiID, r)
 	case "DELETE":
-		if apiID != "" {
-			log.Debug("Deleting API definition for: ", apiID)
-			obj, code = handleDeleteAPI(apiID)
-		} else {
-			obj, code = apiError("Must specify an apiID to delete"), 400
-		}
-	default:
-		// Return Not supported message (and code)
-		obj, code = apiError("Method not supported"), 405
+		log.Debug("Deleting API definition for: ", apiID)
+		obj, code = handleDeleteAPI(apiID)
 	}
 
 	doJSONWrite(w, code, obj)

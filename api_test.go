@@ -256,9 +256,9 @@ func TestApiHandlerMethodAPIID(t *testing.T) {
 		{"POST", "/1", 200},
 		// DELETE and PUT must use one
 		{"DELETE", "/1", 200},
-		{"DELETE", "/", 400},
+		{"DELETE", "/", 404},
 		{"PUT", "/1", 200},
-		{"PUT", "/", 400},
+		{"PUT", "/", 404},
 
 		// apiid mismatch
 		{"POST", "/mismatch", 400},

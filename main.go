@@ -303,8 +303,11 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler))).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(policyUpdateHandler))).Methods("POST")
 		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(createKeyHandler))).Methods("POST")
-		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(apiHandler)))
-		r.HandleFunc("/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(apiHandler)))
+		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(apiHandler))).Methods("GET", "POST")
+		// TODO: why do we need to set routes for both /apis and
+		// /apis/?
+		r.HandleFunc("/apis/", checkIsAPIOwner(InstrumentationMW(apiHandler))).Methods("GET", "POST")
+		r.HandleFunc("/apis/{rest:.+}", checkIsAPIOwner(InstrumentationMW(apiHandler))).Methods("GET", "POST", "PUT", "DELETE")
 		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(healthCheckhandler))).Methods("GET")
 		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(createOauthClient))).Methods("POST")
 		r.HandleFunc("/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateOauthRefresh))).Methods("DELETE")
