@@ -417,6 +417,20 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 	}
 }
 
+func TestMethodNotSupported(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest("POST", "/reload", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+
+	mainRouter.ServeHTTP(recorder, req)
+	if recorder.Code != 404 {
+		t.Fatal(`Wanted response to be 404 since the wrong method was used`)
+	}
+}
+
 func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		createKey()

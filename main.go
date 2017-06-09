@@ -296,27 +296,27 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}).Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	r.HandleFunc("/reload/group", checkIsAPIOwner(InstrumentationMW(groupResetHandler)))
-	r.HandleFunc("/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler(nil))))
+	r.HandleFunc("/reload/group", checkIsAPIOwner(InstrumentationMW(groupResetHandler))).Methods("GET")
+	r.HandleFunc("/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler(nil)))).Methods("GET")
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler)))
-		r.HandleFunc("/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
-		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(createKeyHandler)))
+		r.HandleFunc("/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler))).Methods("POST", "PUT", "GET", "DELETE")
+		r.HandleFunc("/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(policyUpdateHandler))).Methods("POST")
+		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(createKeyHandler))).Methods("POST")
 		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(apiHandler)))
 		r.HandleFunc("/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(apiHandler)))
-		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(healthCheckhandler)))
-		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(createOauthClient)))
-		r.HandleFunc("/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
-		r.HandleFunc("/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
+		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(healthCheckhandler))).Methods("GET")
+		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(createOauthClient))).Methods("POST")
+		r.HandleFunc("/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateOauthRefresh))).Methods("DELETE")
+		r.HandleFunc("/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateCacheHandler))).Methods("DELETE")
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(keyHandler)))
-	r.HandleFunc("/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
+	r.HandleFunc("/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(keyHandler))).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(oAuthClientHandler))).Methods("GET", "DELETE")
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
