@@ -767,7 +767,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 type tykHttpTest struct {
 	method, path string
 	code         int
-	data         string
+	body         interface{}
 
 	afterFn        func()
 	adminAuth      bool
@@ -844,16 +844,10 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 				baseUrl = "http://" + cln.Addr().String()
 			}
 
-			var bodyReader io.Reader
-
-			if tc.data != "" {
-				bodyReader = strings.NewReader(tc.data)
-			}
-
-			req := testReq(t, tc.method, baseUrl+tc.path, bodyReader)
+			req := testReq(t, tc.method, baseUrl+tc.path, tc.body)
 
 			if tc.adminAuth {
-				req.Header.Add("X-Tyk-Authorization", config.Secret)
+				req = withAuth(req)
 			}
 
 			resp, _ := client.Do(req)
@@ -901,7 +895,7 @@ func TestListener(t *testing.T) {
 		{method: "GET", path: "/tyk/apis/", adminAuth: true, code: 200},
 		{method: "GET", path: "/tyk/apis", code: 403},
 		{method: "GET", path: "/tyk/apis", adminAuth: true, code: 200},
-		{method: "POST", path: "/tyk/apis", data: sampleAPI, adminAuth: true, code: 200},
+		{method: "POST", path: "/tyk/apis", body: sampleAPI, adminAuth: true, code: 200},
 		// API definitions not reloaded yet
 		{method: "GET", path: "/", code: 404},
 		{method: "GET", path: "/tyk/reload/", adminAuth: true, code: 200, afterFn: func() { doReload() }},
