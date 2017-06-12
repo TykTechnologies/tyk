@@ -534,8 +534,12 @@ func testReq(t *testing.T, method, urlStr string, body interface{}) *http.Reques
 	case io.Reader:
 		bodyReader = x
 	case nil:
-	default:
-		t.Fatalf("unhandled request body type: %T", x)
+	default: // JSON objects (structs)
+		bs, err := json.Marshal(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bodyReader = bytes.NewReader(bs)
 	}
 	req, err := http.NewRequest(method, urlStr, bodyReader)
 	if err != nil {
