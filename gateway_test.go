@@ -548,6 +548,12 @@ func testReq(t *testing.T, method, urlStr string, body interface{}) *http.Reques
 	return req
 }
 
+func withAuth(r *http.Request) *http.Request {
+	// This is the default config secret
+	r.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+	return r
+}
+
 func TestParambasedAuth(t *testing.T) {
 	spec := createSpecTest(t, pathBasedDefinition)
 	session := createParamAuthSession()
