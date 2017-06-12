@@ -1,8 +1,6 @@
 package main
 
 import (
-	"net/http"
-	"strings"
 	"testing"
 )
 
@@ -55,10 +53,10 @@ func TestBatchSuccess(t *testing.T) {
 
 	batchHandler := BatchRequestHandler{API: spec}
 
-	r, _ := http.NewRequest("POST", "/vi/tyk/batch/", strings.NewReader(testBatchRequest))
+	req := testReq(t, "POST", "/vi/tyk/batch/", testBatchRequest)
 
 	// Test decode
-	batchRequest, err := batchHandler.DecodeBatchRequest(r)
+	batchRequest, err := batchHandler.DecodeBatchRequest(req)
 	if err != nil {
 		t.Error("Decode batch request body failed: ", err)
 	}
@@ -97,9 +95,9 @@ func TestMakeSyncRequest(t *testing.T) {
 	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
-	request, _ := http.NewRequest("GET", testHttpGet, nil)
+	req := testReq(t, "GET", testHttpGet, nil)
 
-	replyUnit := batchHandler.doSyncRequest(request, relURL)
+	replyUnit := batchHandler.doSyncRequest(req, relURL)
 
 	if replyUnit.RelativeURL != relURL {
 		t.Error("Relativce URL in reply is wrong")
@@ -117,10 +115,10 @@ func TestMakeASyncRequest(t *testing.T) {
 	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
-	request, _ := http.NewRequest("GET", testHttpGet, nil)
+	req := testReq(t, "GET", testHttpGet, nil)
 
 	replies := make(chan BatchReplyUnit)
-	go batchHandler.doAsyncRequest(request, relURL, replies)
+	go batchHandler.doAsyncRequest(req, relURL, replies)
 	replyUnit := BatchReplyUnit{}
 	replyUnit = <-replies
 

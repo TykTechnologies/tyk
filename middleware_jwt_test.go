@@ -216,12 +216,8 @@ func TestJWTSessionHMAC(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	req.Header.Add("authorization", tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -256,12 +252,8 @@ func TestJWTSessionRSA(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	req.Header.Add("authorization", tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -287,14 +279,10 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", "")
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -320,11 +308,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
+	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -359,14 +343,10 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -402,14 +382,10 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -435,14 +411,10 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
 	req.Header.Add("authorization", "123")
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -478,12 +450,8 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	req.Header.Add("authorization", "Bearer "+tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -518,13 +486,9 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer: "+tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -577,13 +541,9 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -629,13 +589,9 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -681,13 +637,9 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -733,13 +685,9 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/jwt_test/", nil)
+	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
 	req.Header.Add("authorization", "Bearer "+tokenString)
-
-	if err != nil {
-		t.Fatal("Problem generating the test token: ", err)
-	}
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)

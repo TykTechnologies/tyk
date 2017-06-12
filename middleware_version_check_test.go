@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
 )
@@ -14,10 +13,7 @@ func TestVersionMwExpiresHeader(t *testing.T) {
 	spec.SessionManager.UpdateSession("1234xyz", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/v1/ignored/noregex", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "/v1/ignored/noregex", nil)
 	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Add("authorization", "1234xyz")
 	req.Header.Add("version", "v1")

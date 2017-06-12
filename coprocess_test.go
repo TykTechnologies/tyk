@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -150,12 +149,8 @@ func TestCoProcessMiddleware(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	req, err := http.NewRequest("GET", "/headers", strings.NewReader(""))
+	req := testReq(t, "GET", "/headers", "")
 	req.Header.Add("authorization", "abc")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain.ServeHTTP(recorder, req)
 }
@@ -170,18 +165,14 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	req, err := http.NewRequest("GET", "/headers", strings.NewReader(""))
+	req := testReq(t, "GET", "/headers", "")
 	req.Header.Add("authorization", "abc")
 	req.Header.Add("Deletethisheader", "value")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain.ServeHTTP(recorder, req)
 
 	resp := testHttpResponse{}
-	if err = json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
 	if resp.Headers["Test"] != "value" {
@@ -194,14 +185,10 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	recorder = httptest.NewRecorder()
 
 	uri := "/get?a=a_value&b=123&remove=3"
-	getReq, err := http.NewRequest("GET", uri, strings.NewReader(""))
-	getReq.Header.Add("authorization", "abc")
+	req = testReq(t, "GET", uri, "")
+	req.Header.Add("authorization", "abc")
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	chain.ServeHTTP(recorder, getReq)
+	chain.ServeHTTP(recorder, req)
 
 	resp = testHttpResponse{}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
@@ -232,12 +219,8 @@ func TestCoProcessAuth(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	req, err := http.NewRequest("GET", "/headers", strings.NewReader(""))
+	req := testReq(t, "GET", "/headers", "")
 	req.Header.Add("authorization", "abc")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain.ServeHTTP(recorder, req)
 
@@ -255,12 +238,8 @@ func TestCoProcessReturnOverrides(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	req, err := http.NewRequest("GET", "/headers", nil)
+	req := testReq(t, "GET", "/headers", nil)
 	req.Header.Add("authorization", "abc")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 	chain.ServeHTTP(recorder, req)
 	if recorder.Code != 200 || recorder.Body.String() != "body" {
 		t.Fatal("ReturnOverrides HTTP response is invalid")

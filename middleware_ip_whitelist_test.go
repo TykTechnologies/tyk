@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
 )
@@ -72,13 +71,9 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	spec.SessionManager.UpdateSession("1234wer", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Add("authorization", "1234wer")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -104,10 +99,7 @@ func TestIPMiddlewarePass(t *testing.T) {
 	} {
 
 		rec := httptest.NewRecorder()
-		req, err := http.NewRequest("GET", "/", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		req := testReq(t, "GET", "/", nil)
 		req.RemoteAddr = tc.remote
 		req.Header.Add("authorization", "gfgg1234")
 		if tc.forwarded != "" {
@@ -129,12 +121,8 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 	spec.SessionManager.UpdateSession("1234rtyrty", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("authorization", "1234rtyrty")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -150,12 +138,8 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 	spec.SessionManager.UpdateSession("1234iuouio", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("authorization", "1234iuouio")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
