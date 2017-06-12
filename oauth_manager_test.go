@@ -177,8 +177,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+	req := withAuth(testReq(t, "POST", uri, param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	recorder := httptest.NewRecorder()
@@ -203,8 +202,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+	req := withAuth(testReq(t, "POST", uri, param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	recorder := httptest.NewRecorder()
@@ -229,8 +227,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+	req := withAuth(testReq(t, "POST", uri, param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	recorder := httptest.NewRecorder()
@@ -274,8 +271,7 @@ func getAuthCode(t *testing.T) map[string]string {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+	req := withAuth(testReq(t, "POST", uri, param.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	recorder := httptest.NewRecorder()
@@ -401,9 +397,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	param1 := make(url.Values)
 	//MakeSampleAPI()
 	param1.Set("api_id", "999999")
-	req := testReq(t, "DELETE", uri1+param1.Encode(), nil)
-
-	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+	req := withAuth(testReq(t, "DELETE", uri1+param1.Encode(), nil))
 
 	testMuxer.ServeHTTP(recorder, req)
 
