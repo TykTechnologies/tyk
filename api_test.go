@@ -89,13 +89,11 @@ func TestApiHandler(t *testing.T) {
 
 	for _, uri := range uris {
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(sampleKey)
-
 		recorder := httptest.NewRecorder()
 
 		loadSampleAPI(t, apiTestDef)
 
-		req := testReq(t, "GET", uri, body)
+		req := testReq(t, "GET", uri, sampleKey)
 		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
 		mainRouter.ServeHTTP(recorder, req)
@@ -115,13 +113,12 @@ func TestApiHandler(t *testing.T) {
 func TestApiHandlerGetSingle(t *testing.T) {
 	uri := "/tyk/apis/1"
 	sampleKey := createSampleSession()
-	body, _ := json.Marshal(sampleKey)
 
 	recorder := httptest.NewRecorder()
 
 	loadSampleAPI(t, apiTestDef)
 
-	req := testReq(t, "GET", uri, body)
+	req := testReq(t, "GET", uri, sampleKey)
 	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
 	mainRouter.ServeHTTP(recorder, req)
@@ -266,7 +263,6 @@ func TestKeyHandlerNewKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		uri := "/tyk/keys/1234"
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(sampleKey)
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -275,7 +271,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req := testReq(t, "POST", uri+param.Encode(), body)
+		req := testReq(t, "POST", uri+param.Encode(), sampleKey)
 		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
 		mainRouter.ServeHTTP(recorder, req)
@@ -295,7 +291,6 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		uri := "/tyk/keys/1234"
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(sampleKey)
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -303,7 +298,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req := testReq(t, "PUT", uri+param.Encode(), body)
+		req := testReq(t, "PUT", uri+param.Encode(), sampleKey)
 		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
 		mainRouter.ServeHTTP(recorder, req)
@@ -346,10 +341,9 @@ func TestKeyHandlerGetKey(t *testing.T) {
 func createKey(t *testing.T) {
 	uri := "/tyk/keys/1234"
 	sampleKey := createSampleSession()
-	body, _ := json.Marshal(sampleKey)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "POST", uri, body)
+	req := testReq(t, "POST", uri, sampleKey)
 	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
 	mainRouter.ServeHTTP(recorder, req)
@@ -391,7 +385,6 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		uri := "/tyk/keys/create"
 
 		sampleKey := createSampleSession()
-		body, _ := json.Marshal(sampleKey)
 
 		recorder := httptest.NewRecorder()
 		param := make(url.Values)
@@ -399,7 +392,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 		if api_id != "" {
 			param.Set("api_id", api_id)
 		}
-		req := testReq(t, "POST", uri+param.Encode(), body)
+		req := testReq(t, "POST", uri+param.Encode(), sampleKey)
 		req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
 		mainRouter.ServeHTTP(recorder, req)
