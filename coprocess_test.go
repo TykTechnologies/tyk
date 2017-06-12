@@ -149,7 +149,7 @@ func TestCoProcessMiddleware(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", "")
+	req := testReq(t, "GET", "/headers", nil)
 	req.Header.Add("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
@@ -165,7 +165,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", "")
+	req := testReq(t, "GET", "/headers", nil)
 	req.Header.Add("authorization", "abc")
 	req.Header.Add("Deletethisheader", "value")
 
@@ -185,7 +185,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	recorder = httptest.NewRecorder()
 
 	uri := "/get?a=a_value&b=123&remove=3"
-	req = testReq(t, "GET", uri, "")
+	req = testReq(t, "GET", uri, nil)
 	req.Header.Add("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
@@ -219,7 +219,7 @@ func TestCoProcessAuth(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	req := testReq(t, "GET", "/headers", "")
+	req := testReq(t, "GET", "/headers", nil)
 	req.Header.Add("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
