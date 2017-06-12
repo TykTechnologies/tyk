@@ -102,13 +102,9 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -138,13 +134,9 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -179,13 +171,9 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -215,13 +203,9 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", "WRONGTOKEN"))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

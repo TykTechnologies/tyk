@@ -5,9 +5,7 @@ package main
 */
 
 import (
-	"bytes"
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -100,12 +98,8 @@ func TestAuthCodeRedirect(t *testing.T) {
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -131,12 +125,8 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri2)
 	param.Set("client_id", authClientID)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -162,12 +152,8 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri2)
 	param.Set("client_id", authClientID)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -191,13 +177,9 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -221,13 +203,9 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -251,13 +229,9 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -300,7 +274,7 @@ func getAuthCode(t *testing.T) map[string]string {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req, _ := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -331,7 +305,7 @@ func getToken(t *testing.T) tokenData {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("code", authData["code"])
-	req, _ := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -355,7 +329,7 @@ func TestOAuthClientCredsGrant(t *testing.T) {
 	param.Set("client_id", authClientID)
 	param.Set("client_secret", authClientSecret)
 
-	req, _ := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -394,13 +368,9 @@ func TestClientAccessRequest(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("code", authData["code"])
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -431,15 +401,11 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	param1 := make(url.Values)
 	//MakeSampleAPI()
 	param1.Set("api_id", "999999")
-	req1, err1 := http.NewRequest("DELETE", uri1+param1.Encode(), nil)
+	req := testReq(t, "DELETE", uri1+param1.Encode(), nil)
 
-	if err1 != nil {
-		t.Fatal(err1)
-	}
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
 
-	req1.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
-
-	testMuxer.ServeHTTP(recorder, req1)
+	testMuxer.ServeHTTP(recorder, req)
 
 	newSuccess := APIModifyKeySuccess{}
 	json.NewDecoder(recorder.Body).Decode(&newSuccess)
@@ -461,13 +427,9 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req = testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder = httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -495,13 +457,9 @@ func TestClientRefreshRequest(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -530,13 +488,9 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("refresh_token", tokenData.RefreshToken)
-	req, err := http.NewRequest("POST", uri, bytes.NewBufferString(param.Encode()))
+	req := testReq(t, "POST", uri, param.Encode())
 	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	recorder := httptest.NewRecorder()
 	testMuxer.ServeHTTP(recorder, req)
@@ -554,21 +508,17 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 	param2.Set("redirect_uri", authRedirectUri)
 	param2.Set("client_id", authClientID)
 	param2.Set("refresh_token", token)
-	req2, err2 := http.NewRequest("POST", uri, bytes.NewBufferString(param2.Encode()))
-	req2.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	if err2 != nil {
-		t.Fatal(err2)
-	}
+	req = testReq(t, "POST", uri, param2.Encode())
+	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	recorder2 := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder2, req2)
+	testMuxer.ServeHTTP(recorder2, req)
 
 	if recorder2.Code != 200 {
 		t.Error("Response code should have been 200 but is: ", recorder2.Code)
 		t.Error(recorder2.Body)
-		t.Error(req2.Body)
+		t.Error(req.Body)
 	}
 
 }

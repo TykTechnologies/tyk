@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"testing"
 )
 
@@ -213,10 +212,7 @@ const nonExpiringExtendedDefNoWhitelist = `{
 
 func TestExtendedBlacklistLinks(t *testing.T) {
 	uri := "v1/disallowed/blacklist/literal"
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", uri, nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringExtendedDefNoWhitelist)
@@ -232,10 +228,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	}
 
 	uri = "v1/disallowed/blacklist/abacab12345"
-	req, err = http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req = testReq(t, "GET", uri, nil)
 	req.Header.Add("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
@@ -250,10 +243,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 
 	// Test with POST (it's a GET, should pass through)
 	uri = "v1/disallowed/blacklist/abacab12345"
-	req, err = http.NewRequest("POST", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req = testReq(t, "POST", uri, nil)
 	req.Header.Add("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
@@ -269,10 +259,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 
 func TestExtendedWhiteLIstLinks(t *testing.T) {
 	uri := "v1/allowed/whitelist/literal"
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", uri, nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)
@@ -288,10 +275,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 	}
 
 	uri = "v1/allowed/whitelist/12345abans"
-	req, err = http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req = testReq(t, "GET", uri, nil)
 	req.Header.Add("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
@@ -307,10 +291,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 
 func TestExtendedWhiteListBlock(t *testing.T) {
 	uri := "v1/allowed/bananaphone"
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", uri, nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)
@@ -328,10 +309,7 @@ func TestExtendedWhiteListBlock(t *testing.T) {
 
 func TestExtendedIgnored(t *testing.T) {
 	uri := "/v1/ignored/noregex"
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", uri, nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)
@@ -349,10 +327,7 @@ func TestExtendedIgnored(t *testing.T) {
 
 func TestExtendedWhiteListWithRedirectedReply(t *testing.T) {
 	uri := "v1/allowed/whitelist/reply/12345"
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", uri, nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)

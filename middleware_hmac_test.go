@@ -77,7 +77,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -98,10 +98,6 @@ func TestHMACAuthSessionPass(t *testing.T) {
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
@@ -118,7 +114,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -139,10 +135,6 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
@@ -159,7 +151,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -180,10 +172,6 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
@@ -200,7 +188,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -221,10 +209,6 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
@@ -241,7 +225,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -262,10 +246,6 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha256\", signature=\"%s\"", encodedString))
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
@@ -282,7 +262,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -307,10 +287,6 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	encodedString := url.QueryEscape(sigString)
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", encodedString))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -344,7 +320,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	spec.SessionManager.UpdateSession("9876", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
 
@@ -372,10 +348,6 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	newEncodedSignature := replaceUpperCase(encodedString, upperCaseList)
 
 	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", newEncodedSignature))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

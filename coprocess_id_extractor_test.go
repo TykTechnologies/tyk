@@ -7,7 +7,6 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -37,12 +36,8 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -75,15 +70,11 @@ func TestValueExtractorFormSource(t *testing.T) {
 	authValue := "abc"
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("POST", "/", nil)
+	req := testReq(t, "POST", "/", nil)
 	req.Form = url.Values{}
 	req.Form.Add("auth", authValue)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -111,12 +102,8 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	// req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -149,12 +136,8 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	matchedHeaderValue := []byte("12345")
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fullHeaderValue)
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

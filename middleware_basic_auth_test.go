@@ -76,12 +76,8 @@ func TestBasicAuthSession(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -103,12 +99,8 @@ func TestBasicAuthBadFormatting(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -132,12 +124,8 @@ func TestBasicAuthBadData(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -163,12 +151,8 @@ func TestBasicAuthBadOverFormatting(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -193,12 +177,8 @@ func TestBasicAuthWrongUser(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -224,11 +204,7 @@ func TestBasicMissingHeader(t *testing.T) {
 	spec.SessionManager.UpdateSession("default4321", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "/", nil)
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -254,12 +230,8 @@ func TestBasicAuthWrongPassword(t *testing.T) {
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

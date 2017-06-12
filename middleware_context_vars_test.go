@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -47,13 +46,9 @@ func TestContextVarsMiddleware(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	param := make(url.Values)
-	req, err := http.NewRequest(method, uri+param.Encode(), nil)
+	req := testReq(t, method, uri+param.Encode(), nil)
 	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Add("authorization", "1234wer")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -523,6 +524,26 @@ func testKey(t *testing.T, name string) string {
 	return fmt.Sprintf("%s-%s", testName(t), name)
 }
 
+func testReq(t *testing.T, method, urlStr string, body interface{}) *http.Request {
+	var bodyReader io.Reader
+	switch x := body.(type) {
+	case []byte:
+		bodyReader = bytes.NewReader(x)
+	case string:
+		bodyReader = strings.NewReader(x)
+	case io.Reader:
+		bodyReader = x
+	case nil:
+	default:
+		t.Fatalf("unhandled request body type: %T", x)
+	}
+	req, err := http.NewRequest(method, urlStr, bodyReader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return req
+}
+
 func TestParambasedAuth(t *testing.T) {
 	spec := createSpecTest(t, pathBasedDefinition)
 	session := createParamAuthSession()
@@ -535,10 +556,7 @@ func TestParambasedAuth(t *testing.T) {
 	form.Add("baz", "swoogetty")
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("POST", uri, strings.NewReader(form.Encode()))
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "POST", uri, form.Encode())
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	chain := getChain(spec)
@@ -574,10 +592,7 @@ func TestVersioningRequestOK(t *testing.T) {
 	spec.SessionManager.UpdateSession("96869686969", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "", nil)
 	req.Header.Add("authorization", "96869686969")
 	req.Header.Add("version", "v1")
 
@@ -598,10 +613,7 @@ func TestVersioningRequestFail(t *testing.T) {
 	spec.SessionManager.UpdateSession("zz1234", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "", nil)
 	req.Header.Add("authorization", "zz1234")
 	req.Header.Add("version", "v1")
 
@@ -621,14 +633,8 @@ func TestIgnoredPathRequestOK(t *testing.T) {
 	uri := "/v1/ignored/noregex"
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", uri, nil)
-
+	req := testReq(t, "GET", uri, nil)
 	// No auth information, it's an ignored path!
-	//	req.Header.Add("authorization", "1234")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -648,10 +654,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 	uri := "/v1/allowed/whitelist/reply/"
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", uri, nil)
 	req.Header.Add("authorization", keyId)
 
 	chain := getChain(spec)
@@ -671,10 +674,7 @@ func TestQuota(t *testing.T) {
 	defer spec.SessionManager.ResetQuota(keyId, session)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "", nil)
 	req.Header.Add("authorization", keyId)
 
 	chain := getChain(spec)
@@ -707,10 +707,7 @@ func TestWithAnalytics(t *testing.T) {
 	spec.SessionManager.UpdateSession("ert1234ert", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "", nil)
 	req.Header.Add("authorization", "ert1234ert")
 
 	chain := getChain(spec)
@@ -737,10 +734,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	spec.SessionManager.UpdateSession("fgh561234", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "", nil)
 	req.Header.Add("authorization", "dfgjg345316ertdg")
 
 	chain := getChain(spec)
@@ -846,7 +840,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 				bodyReader = strings.NewReader(tc.data)
 			}
 
-			req, _ := http.NewRequest(tc.method, baseUrl+tc.path, bodyReader)
+			req := testReq(t, tc.method, baseUrl+tc.path, bodyReader)
 
 			if tc.adminAuth {
 				req.Header.Add("X-Tyk-Authorization", config.Secret)

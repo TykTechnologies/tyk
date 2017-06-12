@@ -116,10 +116,7 @@ func createDefinitionFromString(defStr string) *APISpec {
 }
 
 func TestExpiredRequest(t *testing.T) {
-	req, err := http.NewRequest("GET", "/v1/bananaphone", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "/v1/bananaphone", nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(sampleDefiniton)
@@ -136,10 +133,7 @@ func TestExpiredRequest(t *testing.T) {
 }
 
 func TestNotVersioned(t *testing.T) {
-	req, err := http.NewRequest("GET", "v1/allowed/whitelist/literal", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "v1/allowed/whitelist/literal", nil)
 
 	spec := createDefinitionFromString(nonExpiringDef)
 	spec.VersionData.NotVersioned = true
@@ -158,10 +152,7 @@ func TestNotVersioned(t *testing.T) {
 }
 
 func TestMissingVersion(t *testing.T) {
-	req, err := http.NewRequest("GET", "/v1/bananaphone", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "/v1/bananaphone", nil)
 
 	spec := createDefinitionFromString(sampleDefiniton)
 
@@ -177,10 +168,7 @@ func TestMissingVersion(t *testing.T) {
 }
 
 func TestWrongVersion(t *testing.T) {
-	req, err := http.NewRequest("GET", "/v1/bananaphone", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "/v1/bananaphone", nil)
 	req.Header.Add("version", "v2")
 
 	spec := createDefinitionFromString(sampleDefiniton)
@@ -197,10 +185,7 @@ func TestWrongVersion(t *testing.T) {
 }
 
 func TestBlacklistLinks(t *testing.T) {
-	req, err := http.NewRequest("GET", "v1/disallowed/blacklist/literal", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "v1/disallowed/blacklist/literal", nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
@@ -215,10 +200,7 @@ func TestBlacklistLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	req, err = http.NewRequest("GET", "v1/disallowed/blacklist/abacab12345", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req = testReq(t, "GET", "v1/disallowed/blacklist/abacab12345", nil)
 	req.Header.Add("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
@@ -233,10 +215,7 @@ func TestBlacklistLinks(t *testing.T) {
 }
 
 func TestWhiteLIstLinks(t *testing.T) {
-	req, err := http.NewRequest("GET", "v1/allowed/whitelist/literal", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "v1/allowed/whitelist/literal", nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
@@ -251,10 +230,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	req, err = http.NewRequest("GET", "v1/allowed/whitelist/12345abans", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req = testReq(t, "GET", "v1/allowed/whitelist/12345abans", nil)
 	req.Header.Add("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
@@ -269,10 +245,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 }
 
 func TestWhiteListBlock(t *testing.T) {
-	req, err := http.NewRequest("GET", "v1/allowed/bananaphone", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "v1/allowed/bananaphone", nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
@@ -289,10 +262,7 @@ func TestWhiteListBlock(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
-	req, err := http.NewRequest("GET", "/v1/ignored/noregex", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "/v1/ignored/noregex", nil)
 	req.Header.Add("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
@@ -309,10 +279,7 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestBlacklistLinksMulti(t *testing.T) {
-	req, err := http.NewRequest("GET", "v1/disallowed/blacklist/literal", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req := testReq(t, "GET", "v1/disallowed/blacklist/literal", nil)
 	req.Header.Add("version", "v2")
 
 	spec := createDefinitionFromString(nonExpiringMultiDef)
@@ -327,10 +294,7 @@ func TestBlacklistLinksMulti(t *testing.T) {
 		t.Error(status)
 	}
 
-	req, err = http.NewRequest("GET", "v1/disallowed/blacklist/abacab12345", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req = testReq(t, "GET", "v1/disallowed/blacklist/abacab12345", nil)
 	req.Header.Add("version", "v2")
 
 	ok, status, _ = spec.IsRequestValid(req)
