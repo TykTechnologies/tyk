@@ -77,7 +77,7 @@ func TestBasicAuthSession(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -100,7 +100,7 @@ func TestBasicAuthBadFormatting(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -125,7 +125,7 @@ func TestBasicAuthBadData(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -152,7 +152,7 @@ func TestBasicAuthBadOverFormatting(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -178,7 +178,7 @@ func TestBasicAuthWrongUser(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -231,7 +231,7 @@ func TestBasicAuthWrongPassword(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

@@ -217,11 +217,11 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", secret)
+	newRequest.Header.Set("authorization", secret)
 	log.Debug("Using: NodeID: ", NodeID)
-	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+	newRequest.Header.Set("x-tyk-nodeid", NodeID)
 
-	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
 		Timeout: 120 * time.Second,

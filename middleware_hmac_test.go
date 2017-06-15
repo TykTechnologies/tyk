@@ -85,7 +85,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 
 	// Prep the signature string
 	tim := time.Now().Format(refDate)
-	req.Header.Add("Date", tim)
+	req.Header.Set("Date", tim)
 	signatureString := strings.ToLower("Date") + ": " + tim
 
 	// Encode it
@@ -96,7 +96,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -122,7 +122,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 
 	// Prep the signature string
 	tim := time.Now().Format(refDate)
-	req.Header.Add("x-aux-date", tim)
+	req.Header.Set("x-aux-date", tim)
 	signatureString := strings.ToLower("x-aux-date") + ": " + tim
 
 	// Encode it
@@ -133,7 +133,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -159,7 +159,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 
 	// Prep the signature string
 	tim := time.Now().Format(refDate)
-	req.Header.Add("Date", tim)
+	req.Header.Set("Date", tim)
 	signatureString := strings.ToLower("Date") + ":" + tim
 
 	// Encode it
@@ -170,7 +170,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -196,7 +196,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 
 	// Prep the signature string
 	tim := time.Now().Format(refDate)
-	req.Header.Add("Date", tim)
+	req.Header.Set("Date", tim)
 	signatureString := strings.ToLower("Date") + ":" + tim
 
 	// Encode it
@@ -207,7 +207,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"98765\",algorithm=\"hmac-sha1\",signature=\"%s\"", encodedString))
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -233,7 +233,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 
 	// Prep the signature string
 	tim := time.Now().Format(refDate)
-	req.Header.Add("Date", tim)
+	req.Header.Set("Date", tim)
 	signatureString := strings.ToLower("Date") + ":" + tim
 
 	// Encode it
@@ -244,7 +244,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha256\", signature=\"%s\"", encodedString))
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyID=\"98765\", algorithm=\"hmac-sha256\", signature=\"%s\"", encodedString))
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -270,9 +270,9 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 
 	// Prep the signature string
 	tim := time.Now().Format(refDate)
-	req.Header.Add("Date", tim)
-	req.Header.Add("X-Test-1", "hello")
-	req.Header.Add("X-Test-2", "world")
+	req.Header.Set("Date", tim)
+	req.Header.Set("X-Test-1", "hello")
+	req.Header.Set("X-Test-2", "world")
 	signatureString := strings.ToLower("(request-target): ") + "get /\n"
 	signatureString += strings.ToLower("Date") + ": " + tim + "\n"
 	signatureString += strings.ToLower("X-Test-1") + ": " + "hello" + "\n"
@@ -286,7 +286,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", encodedString))
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", encodedString))
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -328,9 +328,9 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 
 	// Prep the signature string
 	tim := time.Now().Format(refDate)
-	req.Header.Add("Date", tim)
-	req.Header.Add("X-Test-1", "hello?")
-	req.Header.Add("X-Test-2", "world£")
+	req.Header.Set("Date", tim)
+	req.Header.Set("X-Test-1", "hello?")
+	req.Header.Set("X-Test-2", "world£")
 	signatureString := strings.ToLower("(request-target): ") + "get /\n"
 	signatureString += strings.ToLower("Date") + ": " + tim + "\n"
 	signatureString += strings.ToLower("X-Test-1") + ": " + "hello?" + "\n"
@@ -347,7 +347,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	_, upperCaseList := getUpperCaseEscaped(encodedString)
 	newEncodedSignature := replaceUpperCase(encodedString, upperCaseList)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", newEncodedSignature))
+	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", newEncodedSignature))
 
 	chain := getHMACAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

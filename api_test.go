@@ -404,7 +404,7 @@ func TestAPIAuthFail(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", uri, nil)
-	req.Header.Add("x-tyk-authorization", "12345")
+	req.Header.Set("x-tyk-authorization", "12345")
 
 	mainRouter.ServeHTTP(recorder, req)
 

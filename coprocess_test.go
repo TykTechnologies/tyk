@@ -150,7 +150,7 @@ func TestCoProcessMiddleware(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	req := testReq(t, "GET", "/headers", nil)
-	req.Header.Add("authorization", "abc")
+	req.Header.Set("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
 }
@@ -166,8 +166,8 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	req := testReq(t, "GET", "/headers", nil)
-	req.Header.Add("authorization", "abc")
-	req.Header.Add("Deletethisheader", "value")
+	req.Header.Set("authorization", "abc")
+	req.Header.Set("Deletethisheader", "value")
 
 	chain.ServeHTTP(recorder, req)
 
@@ -186,7 +186,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 
 	uri := "/get?a=a_value&b=123&remove=3"
 	req = testReq(t, "GET", uri, nil)
-	req.Header.Add("authorization", "abc")
+	req.Header.Set("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
 
@@ -220,7 +220,7 @@ func TestCoProcessAuth(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	req := testReq(t, "GET", "/headers", nil)
-	req.Header.Add("authorization", "abc")
+	req.Header.Set("authorization", "abc")
 
 	chain.ServeHTTP(recorder, req)
 
@@ -239,7 +239,7 @@ func TestCoProcessReturnOverrides(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	req := testReq(t, "GET", "/headers", nil)
-	req.Header.Add("authorization", "abc")
+	req.Header.Set("authorization", "abc")
 	chain.ServeHTTP(recorder, req)
 	if recorder.Code != 200 || recorder.Body.String() != "body" {
 		t.Fatal("ReturnOverrides HTTP response is invalid")

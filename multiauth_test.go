@@ -103,8 +103,8 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -135,8 +135,8 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -172,8 +172,8 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -204,8 +204,8 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
-	req.Header.Add("x-standard-auth", fmt.Sprintf("Bearer %s", "WRONGTOKEN"))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", "WRONGTOKEN"))
 
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

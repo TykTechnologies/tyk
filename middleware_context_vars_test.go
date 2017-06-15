@@ -48,7 +48,7 @@ func TestContextVarsMiddleware(t *testing.T) {
 	param := make(url.Values)
 	req := testReq(t, method, uri+param.Encode(), nil)
 	req.RemoteAddr = "127.0.0.1:80"
-	req.Header.Add("authorization", "1234wer")
+	req.Header.Set("authorization", "1234wer")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)

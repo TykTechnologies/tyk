@@ -112,7 +112,7 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 
 		// Add headers
 		for k, v := range requestDef.Headers {
-			request.Header.Add(k, v)
+			request.Header.Set(k, v)
 		}
 
 		requestSet = append(requestSet, request)

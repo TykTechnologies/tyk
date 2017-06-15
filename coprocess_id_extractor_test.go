@@ -37,7 +37,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -73,8 +73,8 @@ func TestValueExtractorFormSource(t *testing.T) {
 	req := testReq(t, "POST", "/", nil)
 	req.Form = url.Values{}
 	req.Form.Add("auth", authValue)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -103,7 +103,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	// req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encodedPass))
+	// req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -137,7 +137,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("Authorization", fullHeaderValue)
+	req.Header.Set("Authorization", fullHeaderValue)
 
 	chain := getBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)

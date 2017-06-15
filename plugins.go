@@ -358,7 +358,7 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		for k, v := range hro.Headers {
-			r.Header.Add(k, v)
+			r.Header.Set(k, v)
 		}
 		r.Close = true
 		resp, err := client.Do(r)

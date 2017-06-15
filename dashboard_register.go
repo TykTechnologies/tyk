@@ -76,8 +76,8 @@ func (h *HTTPDashboardHandler) Register() error {
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", secret)
-	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
+	newRequest.Header.Set("authorization", secret)
+	newRequest.Header.Set("x-tyk-hostname", HostDetails.Hostname)
 
 	c := &http.Client{
 		Timeout: 5 * time.Second,
@@ -148,13 +148,13 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint, secret string) error {
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", secret)
-	newRequest.Header.Add("x-tyk-nodeid", NodeID)
-	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
+	newRequest.Header.Set("authorization", secret)
+	newRequest.Header.Set("x-tyk-nodeid", NodeID)
+	newRequest.Header.Set("x-tyk-hostname", HostDetails.Hostname)
 
 	log.Debug("Sending Heartbeat as: ", NodeID)
 
-	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
 		Timeout: 5 * time.Second,
@@ -190,13 +190,13 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", secret)
-	newRequest.Header.Add("x-tyk-nodeid", NodeID)
-	newRequest.Header.Add("x-tyk-hostname", HostDetails.Hostname)
+	newRequest.Header.Set("authorization", secret)
+	newRequest.Header.Set("x-tyk-nodeid", NodeID)
+	newRequest.Header.Set("x-tyk-hostname", HostDetails.Hostname)
 
 	log.Info("De-registering: ", NodeID)
 
-	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 
 	c := &http.Client{
 		Timeout: 5 * time.Second,
