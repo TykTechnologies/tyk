@@ -561,22 +561,11 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Creating new definition file")
 		obj, code = handleAddOrUpdateApi(apiID, r)
 	case "PUT":
-		if apiID != "" {
-			log.Debug("Updating existing API: ", apiID)
-			obj, code = handleAddOrUpdateApi(apiID, r)
-		} else {
-			obj, code = apiError("Must specify an apiID to update"), 400
-		}
+		log.Debug("Updating existing API: ", apiID)
+		obj, code = handleAddOrUpdateApi(apiID, r)
 	case "DELETE":
-		if apiID != "" {
-			log.Debug("Deleting API definition for: ", apiID)
-			obj, code = handleDeleteAPI(apiID)
-		} else {
-			obj, code = apiError("Must specify an apiID to delete"), 400
-		}
-	default:
-		// Return Not supported message (and code)
-		obj, code = apiError("Method not supported"), 405
+		log.Debug("Deleting API definition for: ", apiID)
+		obj, code = handleDeleteAPI(apiID)
 	}
 
 	doJSONWrite(w, code, obj)
@@ -610,10 +599,6 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			obj, code = handleDeleteHashedKey(keyName, apiID)
 		}
-
-	default:
-		// Return Not supported message (and code)
-		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -625,10 +610,6 @@ type PolicyUpdateObj struct {
 
 func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Warning("Hashed key change request detected!")
-	if r.Method != "POST" {
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
 
 	var policRecord PolicyUpdateObj
 	if err := json.NewDecoder(r.Body).Decode(&policRecord); err != nil {
@@ -743,10 +724,6 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		// Remove a key
 		obj, code = handleDeleteOrgKey(keyName)
-
-	default:
-		// Return Not supported message (and code)
-		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -874,55 +851,23 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 }
 
 func groupResetHandler(w http.ResponseWriter, r *http.Request) {
-	var obj interface{}
-	var code int
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"status": "ok",
+	}).Info("Group reload accepted.")
 
-	if r.Method == "GET" {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"status": "ok",
-		}).Info("Group reload accepted.")
-
-		obj, code = signalGroupReload()
-
-	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"status": "fail",
-			"err":    "wrong method",
-		}).Error("Group reload failed.")
-		obj, code = apiError("Method not supported"), 405
-	}
-
+	obj, code := signalGroupReload()
 	doJSONWrite(w, code, obj)
 }
 
 func resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var obj interface{}
-		var code int
-
-		if r.Method == "GET" {
-			obj, code = handleURLReload(fn)
-		} else {
-			obj, code = apiError("Method not supported"), 405
-		}
-
+		obj, code := handleURLReload(fn)
 		doJSONWrite(w, code, obj)
 	}
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"status": "fail",
-			"method": r.Method,
-		}).Warning("Attempted to create key with wrong HTTP method.")
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
-
 	newSession := new(SessionState)
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1059,11 +1004,6 @@ func createOauthClientStorageID(clientID string) string {
 }
 
 func createOauthClient(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != "POST" {
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
 	var newOauthClient NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1143,10 +1083,6 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "DELETE" {
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
 	apiID := r.FormValue("api_id")
 	if apiID == "" {
 		doJSONWrite(w, 400, apiError("Missing parameter api_id"))
@@ -1245,9 +1181,6 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		// Remove a key
 		obj, code = handleDeleteOAuthClient(keyName, apiID)
-	default:
-		// Return Not supported message (and code)
-		obj, code = apiError("Method not supported"), 405
 	}
 
 	doJSONWrite(w, code, obj)
@@ -1382,10 +1315,6 @@ func getOauthClients(apiID string) (interface{}, int) {
 }
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
 	if !config.HealthCheck.EnableHealthChecks {
 		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 		return
@@ -1424,10 +1353,6 @@ func UserRatesCheck() http.HandlerFunc {
 }
 
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "DELETE" {
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
 	apiID := r.URL.Path[len("/tyk/cache/"):]
 
 	spec := apisByID[apiID]

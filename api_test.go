@@ -233,9 +233,9 @@ func TestApiHandlerMethodAPIID(t *testing.T) {
 		{"POST", "/1", 200},
 		// DELETE and PUT must use one
 		{"DELETE", "/1", 200},
-		{"DELETE", "/", 400},
+		{"DELETE", "/", 404},
 		{"PUT", "/1", 200},
-		{"PUT", "/", 400},
+		{"PUT", "/", 404},
 
 		// apiid mismatch
 		{"POST", "/mismatch", 400},
@@ -365,6 +365,20 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 		if newSuccess.Action != "deleted" {
 			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
 		}
+	}
+}
+
+func TestMethodNotSupported(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest("POST", "/reload", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("x-tyk-authorization", "352d20ee67be67f6340b4c0605b044b7")
+
+	mainRouter.ServeHTTP(recorder, req)
+	if recorder.Code != 404 {
+		t.Fatal(`Wanted response to be 404 since the wrong method was used`)
 	}
 }
 
