@@ -136,17 +136,15 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	log.WithFields(logrus.Fields{
 		"prefix": "jsvm",
 	}).Debug("Running: ", middlewareClassname)
-	ret := make(chan otto.Value)
+	// buffered, leaving no chance of a goroutine leak since the
+	// spawned goroutine will send 0 or 1 values.
+	ret := make(chan otto.Value, 1)
 	go func() {
 		defer func() {
 			// the VM executes the panic func that gets it
 			// to stop, so we must recover here to not crash
 			// the whole Go program.
 			recover()
-			// send a dummy value to the ret channel to
-			// signal that we died, since a panic will mean
-			// the regular send won't happen.
-			ret <- otto.Value{}
 		}()
 		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
 		ret <- returnRaw
@@ -166,9 +164,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// that panics.
 			panic("stop")
 		}
-		// wait for the vm goroutine to die, ensuring that we
-		// have no goroutine leak.
-		<-ret
 		return nil, 200
 	}
 	returnDataStr, _ := returnRaw.ToString()
