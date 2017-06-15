@@ -93,10 +93,10 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 		log.Error("Failed to create request: ", err)
 	}
 
-	newRequest.Header.Add("authorization", secret)
-	newRequest.Header.Add("x-tyk-nodeid", NodeID)
+	newRequest.Header.Set("authorization", secret)
+	newRequest.Header.Set("x-tyk-nodeid", NodeID)
 
-	newRequest.Header.Add("x-tyk-nonce", ServiceNonce)
+	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",

@@ -192,10 +192,10 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 		return nil, err
 	}
 
-	req.Header.Add("User-Agent", "Tyk-Hookshot")
+	req.Header.Set("User-Agent", "Tyk-Hookshot")
 
 	for key, val := range w.conf.HeaderList {
-		req.Header.Add(key, val)
+		req.Header.Set(key, val)
 	}
 
 	return req, nil

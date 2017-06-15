@@ -616,9 +616,9 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
-		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
-		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
-		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
+		res.Header.Set("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
+		res.Header.Set("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
+		res.Header.Set("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)

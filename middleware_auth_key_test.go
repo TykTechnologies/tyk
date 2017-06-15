@@ -52,7 +52,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/auth_key_test/", nil)
 
-	req.Header.Add("authorization", "Bearer "+customToken)
+	req.Header.Set("authorization", "Bearer "+customToken)
 
 	chain := getAuthKeyChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -145,7 +145,7 @@ func TestMultiAuthSession(t *testing.T) {
 	// Set the header
 	recorder = httptest.NewRecorder()
 	req = testReq(t, "GET", "/auth_key_test/?token=", nil)
-	req.Header.Add("authorization", customToken)
+	req.Header.Set("authorization", customToken)
 
 	chain.ServeHTTP(recorder, req)
 

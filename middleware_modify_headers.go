@@ -48,7 +48,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 				metaKey := strings.Replace(nVal, metaLabel, "", 1)
 				metaVal, ok := session.MetaData[metaKey]
 				if ok {
-					r.Header.Add(nKey, metaVal)
+					r.Header.Set(nKey, metaVal)
 				} else {
 					log.Warning("Session Meta Data not found for key in map: ", metaKey)
 				}
@@ -60,14 +60,14 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 				metaKey := strings.Replace(nVal, contextLabel, "", 1)
 				val, ok := contextData[metaKey]
 				if ok {
-					r.Header.Add(nKey, valToStr(val))
+					r.Header.Set(nKey, valToStr(val))
 				} else {
 					log.Warning("Context Data not found for key in map: ", metaKey)
 				}
 			}
 
 		} else {
-			r.Header.Add(nKey, nVal)
+			r.Header.Set(nKey, nVal)
 		}
 	}
 }

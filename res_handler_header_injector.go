@@ -38,7 +38,7 @@ func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respons
 			res.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			res.Header.Add(nKey, nVal)
+			res.Header.Set(nKey, nVal)
 		}
 	}
 
@@ -47,7 +47,7 @@ func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respons
 		res.Header.Del(n)
 	}
 	for h, v := range h.config.AddHeaders {
-		res.Header.Add(h, v)
+		res.Header.Set(h, v)
 	}
 
 	return nil

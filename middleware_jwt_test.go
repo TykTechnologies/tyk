@@ -217,7 +217,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
-	req.Header.Add("authorization", tokenString)
+	req.Header.Set("authorization", tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -253,7 +253,7 @@ func TestJWTSessionRSA(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
-	req.Header.Add("authorization", tokenString)
+	req.Header.Set("authorization", tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -282,7 +282,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
-	req.Header.Add("authorization", "")
+	req.Header.Set("authorization", "")
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -346,7 +346,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
-	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
+	req.Header.Set("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -385,7 +385,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
-	req.Header.Add("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
+	req.Header.Set("authorization", tokenString+"ajhdkjhsdfkjashdkajshdkajhsdkajhsd")
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -414,7 +414,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	req := testReq(t, "GET", "/jwt_test/", nil)
 
 	// Make it empty
-	req.Header.Add("authorization", "123")
+	req.Header.Set("authorization", "123")
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -451,7 +451,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
-	req.Header.Add("authorization", "Bearer "+tokenString)
+	req.Header.Set("authorization", "Bearer "+tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -488,7 +488,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
-	req.Header.Add("authorization", "Bearer: "+tokenString)
+	req.Header.Set("authorization", "Bearer: "+tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -543,7 +543,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
-	req.Header.Add("authorization", "Bearer "+tokenString)
+	req.Header.Set("authorization", "Bearer "+tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -591,7 +591,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
-	req.Header.Add("authorization", "Bearer "+tokenString)
+	req.Header.Set("authorization", "Bearer "+tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -639,7 +639,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
-	req.Header.Add("authorization", "Bearer "+tokenString)
+	req.Header.Set("authorization", "Bearer "+tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -687,7 +687,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
-	req.Header.Add("authorization", "Bearer "+tokenString)
+	req.Header.Set("authorization", "Bearer "+tokenString)
 
 	chain := getJWTChain(spec)
 	chain.ServeHTTP(recorder, req)

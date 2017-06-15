@@ -15,8 +15,8 @@ func TestVersionMwExpiresHeader(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/v1/ignored/noregex", nil)
 	req.RemoteAddr = "127.0.0.1:80"
-	req.Header.Add("authorization", "1234xyz")
-	req.Header.Add("version", "v1")
+	req.Header.Set("authorization", "1234xyz")
+	req.Header.Set("version", "v1")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)

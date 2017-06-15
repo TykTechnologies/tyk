@@ -567,7 +567,7 @@ func TestParambasedAuth(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "POST", uri, form.Encode())
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -603,8 +603,8 @@ func TestVersioningRequestOK(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "", nil)
-	req.Header.Add("authorization", "96869686969")
-	req.Header.Add("version", "v1")
+	req.Header.Set("authorization", "96869686969")
+	req.Header.Set("version", "v1")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -624,8 +624,8 @@ func TestVersioningRequestFail(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "", nil)
-	req.Header.Add("authorization", "zz1234")
-	req.Header.Add("version", "v1")
+	req.Header.Set("authorization", "zz1234")
+	req.Header.Set("version", "v1")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -665,7 +665,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", uri, nil)
-	req.Header.Add("authorization", keyId)
+	req.Header.Set("authorization", keyId)
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -685,7 +685,7 @@ func TestQuota(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "", nil)
-	req.Header.Add("authorization", keyId)
+	req.Header.Set("authorization", keyId)
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -718,7 +718,7 @@ func TestWithAnalytics(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "", nil)
-	req.Header.Add("authorization", "ert1234ert")
+	req.Header.Set("authorization", "ert1234ert")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -745,7 +745,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "", nil)
-	req.Header.Add("authorization", "dfgjg345316ertdg")
+	req.Header.Set("authorization", "dfgjg345316ertdg")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)

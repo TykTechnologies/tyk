@@ -73,7 +73,7 @@ func TestIpMiddlewareIPFail(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
 	req.RemoteAddr = "127.0.0.1:80"
-	req.Header.Add("authorization", "1234wer")
+	req.Header.Set("authorization", "1234wer")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -101,9 +101,9 @@ func TestIPMiddlewarePass(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := testReq(t, "GET", "/", nil)
 		req.RemoteAddr = tc.remote
-		req.Header.Add("authorization", "gfgg1234")
+		req.Header.Set("authorization", "gfgg1234")
 		if tc.forwarded != "" {
-			req.Header.Add("X-Forwarded-For", tc.forwarded)
+			req.Header.Set("X-Forwarded-For", tc.forwarded)
 		}
 
 		chain := getChain(spec)
@@ -122,7 +122,7 @@ func TestIpMiddlewareIPMissing(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("authorization", "1234rtyrty")
+	req.Header.Set("authorization", "1234rtyrty")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -139,7 +139,7 @@ func TestIpMiddlewareIPDisabled(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
-	req.Header.Add("authorization", "1234iuouio")
+	req.Header.Set("authorization", "1234iuouio")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)

@@ -194,7 +194,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	requestTime := time.Now().UTC().Format(http.TimeFormat)
 
 	for header, value := range newResponseData.Response.Headers {
-		newResponse.Header.Add(header, value)
+		newResponse.Header.Set(header, value)
 	}
 
 	newResponse.ContentLength = int64(len(responseMessage))
@@ -203,8 +203,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Proto = "HTTP/1.0"
 	newResponse.ProtoMajor = 1
 	newResponse.ProtoMinor = 0
-	newResponse.Header.Add("Server", "tyk")
-	newResponse.Header.Add("Date", requestTime)
+	newResponse.Header.Set("Server", "tyk")
+	newResponse.Header.Set("Date", requestTime)
 
 	// Handle response middleware
 	if err := handleResponseChain(d.Spec.ResponseChain, w, newResponse, r, session); err != nil {
@@ -267,9 +267,9 @@ func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Respo
 	// Add resource headers
 	if ses != nil {
 		// We have found a session, lets report back
-		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
-		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
-		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
+		res.Header.Set("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
+		res.Header.Set("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
+		res.Header.Set("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)

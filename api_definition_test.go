@@ -117,7 +117,7 @@ func createDefinitionFromString(defStr string) *APISpec {
 
 func TestExpiredRequest(t *testing.T) {
 	req := testReq(t, "GET", "/v1/bananaphone", nil)
-	req.Header.Add("version", "v1")
+	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(sampleDefiniton)
 
@@ -169,7 +169,7 @@ func TestMissingVersion(t *testing.T) {
 
 func TestWrongVersion(t *testing.T) {
 	req := testReq(t, "GET", "/v1/bananaphone", nil)
-	req.Header.Add("version", "v2")
+	req.Header.Set("version", "v2")
 
 	spec := createDefinitionFromString(sampleDefiniton)
 
@@ -186,7 +186,7 @@ func TestWrongVersion(t *testing.T) {
 
 func TestBlacklistLinks(t *testing.T) {
 	req := testReq(t, "GET", "v1/disallowed/blacklist/literal", nil)
-	req.Header.Add("version", "v1")
+	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
 
@@ -201,7 +201,7 @@ func TestBlacklistLinks(t *testing.T) {
 	}
 
 	req = testReq(t, "GET", "v1/disallowed/blacklist/abacab12345", nil)
-	req.Header.Add("version", "v1")
+	req.Header.Set("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
 	if ok {
@@ -216,7 +216,7 @@ func TestBlacklistLinks(t *testing.T) {
 
 func TestWhiteLIstLinks(t *testing.T) {
 	req := testReq(t, "GET", "v1/allowed/whitelist/literal", nil)
-	req.Header.Add("version", "v1")
+	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
 
@@ -231,7 +231,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 	}
 
 	req = testReq(t, "GET", "v1/allowed/whitelist/12345abans", nil)
-	req.Header.Add("version", "v1")
+	req.Header.Set("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
 	if !ok {
@@ -246,7 +246,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 
 func TestWhiteListBlock(t *testing.T) {
 	req := testReq(t, "GET", "v1/allowed/bananaphone", nil)
-	req.Header.Add("version", "v1")
+	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
 
@@ -263,7 +263,7 @@ func TestWhiteListBlock(t *testing.T) {
 
 func TestIgnored(t *testing.T) {
 	req := testReq(t, "GET", "/v1/ignored/noregex", nil)
-	req.Header.Add("version", "v1")
+	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
 
@@ -280,7 +280,7 @@ func TestIgnored(t *testing.T) {
 
 func TestBlacklistLinksMulti(t *testing.T) {
 	req := testReq(t, "GET", "v1/disallowed/blacklist/literal", nil)
-	req.Header.Add("version", "v2")
+	req.Header.Set("version", "v2")
 
 	spec := createDefinitionFromString(nonExpiringMultiDef)
 
@@ -295,7 +295,7 @@ func TestBlacklistLinksMulti(t *testing.T) {
 	}
 
 	req = testReq(t, "GET", "v1/disallowed/blacklist/abacab12345", nil)
-	req.Header.Add("version", "v2")
+	req.Header.Set("version", "v2")
 
 	ok, status, _ = spec.IsRequestValid(req)
 	if !ok {
