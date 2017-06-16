@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/context"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -147,7 +145,7 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 	newAsURL, _ := url.Parse(newTarget)
 	if oldAsURL.Host != newAsURL.Host {
 		log.Debug("Detected a host rewrite in pattern!")
-		context.Set(r, RetainHost, true)
+		setCtxValue(r, RetainHost, true)
 	}
 }
 

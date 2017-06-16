@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -1410,8 +1410,22 @@ func handleInvalidateAPICache(apiID string) error {
 	return nil
 }
 
+// TODO: Don't modify http.Request values in-place. We must right now
+// because our middleware design doesn't pass around http.Request
+// pointers, so we have no way to modify the pointer in a middleware.
+//
+// If we ever redesign middlewares - or if we find another workaround -
+// revisit this.
+func setContext(r *http.Request, ctx context.Context) {
+	r2 := r.WithContext(ctx)
+	*r = *r2
+}
+func setCtxValue(r *http.Request, key, val interface{}) {
+	setContext(r, context.WithValue(r.Context(), key, val))
+}
+
 func ctxGetData(r *http.Request) map[string]interface{} {
-	if v := context.Get(r, ContextData); v != nil {
+	if v := r.Context().Value(ContextData); v != nil {
 		return v.(map[string]interface{})
 	}
 	return nil
@@ -1421,11 +1435,11 @@ func ctxSetData(r *http.Request, m map[string]interface{}) {
 	if m == nil {
 		panic("setting a nil context ContextData")
 	}
-	context.Set(r, ContextData, m)
+	setCtxValue(r, ContextData, m)
 }
 
 func ctxGetSession(r *http.Request) *SessionState {
-	if v := context.Get(r, SessionData); v != nil {
+	if v := r.Context().Value(SessionData); v != nil {
 		return v.(*SessionState)
 	}
 	return nil
@@ -1435,11 +1449,11 @@ func ctxSetSession(r *http.Request, s *SessionState) {
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
-	context.Set(r, SessionData, s)
+	setCtxValue(r, SessionData, s)
 }
 
 func ctxGetAuthToken(r *http.Request) string {
-	if v := context.Get(r, AuthHeaderValue); v != nil {
+	if v := r.Context().Value(AuthHeaderValue); v != nil {
 		return v.(string)
 	}
 	return ""
@@ -1449,11 +1463,11 @@ func ctxSetAuthToken(r *http.Request, t string) {
 	if t == "" {
 		panic("setting a nil context AuthHeaderValue")
 	}
-	context.Set(r, AuthHeaderValue, t)
+	setCtxValue(r, AuthHeaderValue, t)
 }
 
 func ctxGetTrackedPath(r *http.Request) string {
-	if v := context.Get(r, TrackThisEndpoint); v != nil {
+	if v := r.Context().Value(TrackThisEndpoint); v != nil {
 		return v.(string)
 	}
 	return ""
@@ -1463,19 +1477,19 @@ func ctxSetTrackedPath(r *http.Request, p string) {
 	if p == "" {
 		panic("setting a nil context TrackThisEndpoint")
 	}
-	context.Set(r, TrackThisEndpoint, p)
+	setCtxValue(r, TrackThisEndpoint, p)
 }
 
 func ctxGetDoNotTrack(r *http.Request) bool {
-	return context.Get(r, DoNotTrackThisEndpoint) == true
+	return r.Context().Value(DoNotTrackThisEndpoint) == true
 }
 
 func ctxSetDoNotTrack(r *http.Request, b bool) {
-	context.Set(r, DoNotTrackThisEndpoint, b)
+	setCtxValue(r, DoNotTrackThisEndpoint, b)
 }
 
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
-	if v := context.Get(r, VersionData); v != nil {
+	if v := r.Context().Value(VersionData); v != nil {
 		return v.(*apidef.VersionInfo)
 	}
 	return nil
@@ -1485,11 +1499,11 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	if v == nil {
 		panic("setting a nil context VersionData")
 	}
-	context.Set(r, VersionData, v)
+	setCtxValue(r, VersionData, v)
 }
 
 func ctxGetVersionKey(r *http.Request) string {
-	if v := context.Get(r, VersionKeyContext); v != nil {
+	if v := r.Context().Value(VersionKeyContext); v != nil {
 		return v.(string)
 	}
 	return ""
@@ -1499,5 +1513,5 @@ func ctxSetVersionKey(r *http.Request, k string) {
 	if k == "" {
 		panic("setting a nil context VersionKeyContext")
 	}
-	context.Set(r, VersionKeyContext, k)
+	setCtxValue(r, VersionKeyContext, k)
 }

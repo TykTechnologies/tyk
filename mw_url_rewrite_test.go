@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http/httptest"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -60,7 +61,8 @@ func TestRewriter(t *testing.T) {
 				MatchPattern: tc.pattern,
 				RewriteTo:    tc.to,
 			}
-			got, err := rw.Rewrite(&testConf, tc.in, false, nil)
+			r := httptest.NewRequest("GET", "/", nil)
+			got, err := rw.Rewrite(&testConf, tc.in, false, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}

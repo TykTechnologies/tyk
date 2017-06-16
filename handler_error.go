@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/gorilla/context"
 )
 
 const (
@@ -75,7 +73,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	if e.Spec.DoNotTrack {
-		context.Clear(r)
 		return
 	}
 
@@ -194,7 +191,4 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)
 	}
-
-	// Clean up
-	context.Clear(r)
 }

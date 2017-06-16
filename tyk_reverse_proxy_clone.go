@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"io"
 	"io/ioutil"
@@ -21,7 +22,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -214,7 +214,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		var newTarget *url.URL
 		switchTargets := false
 
-		if spec.URLRewriteEnabled && context.Get(req, RetainHost) == true {
+		if spec.URLRewriteEnabled && req.Context().Value(RetainHost) == true {
 			log.Debug("Detected host rewrite, overriding target")
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
@@ -223,7 +223,6 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 				newTarget = tmpTarget
 				switchTargets = true
 			}
-			context.Clear(req)
 		}
 
 		// No override, and no load balancing? Use the existing target
@@ -441,18 +440,22 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	outreq := new(http.Request)
 	logreq := new(http.Request)
+
+	*outreq = *req // includes shallow copies of maps, but okay
+	*logreq = *req
+	// remove context data from the copies
+	setContext(outreq, context.Background())
+	setContext(logreq, context.Background())
+
 	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
 	if p.TykAPISpec.URLRewriteEnabled {
-		if context.Get(req, RetainHost) == true {
+		if req.Context().Value(RetainHost) == true {
 			log.Debug("Detected host rewrite, notifying director")
-			context.Set(outreq, RetainHost, true)
+			setCtxValue(outreq, RetainHost, true)
 		}
 	}
-
-	*outreq = *req // includes shallow copies of maps, but okay
-	*logreq = *req
 
 	p.Director(outreq)
 

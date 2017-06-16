@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/context"
 	"github.com/pmylund/go-cache"
 )
 
@@ -315,8 +314,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)
 	}
-
-	context.Clear(r)
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's
