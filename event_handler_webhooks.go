@@ -42,7 +42,7 @@ type WebHookHandlerConf struct {
 type WebHookHandler struct {
 	conf     WebHookHandlerConf
 	template *template.Template
-	store    *RedisClusterStorageManager
+	store    StorageHandler
 }
 
 // Not Pretty, but will avoi dmillions of connections
