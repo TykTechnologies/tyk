@@ -31,6 +31,8 @@ type StorageHandler interface {
 	SetRollingWindowPipeline(string, int64, string) (int, []interface{})
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
+	AppendToSet(string, string)
+	GetAndDeleteSet(string) []interface{}
 	RemoveFromSet(string, string)
 	DeleteScanMatch(string) bool
 }

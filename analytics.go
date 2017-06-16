@@ -151,7 +151,7 @@ var AnalyticsPool *tunny.WorkPool
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store   *RedisClusterStorageManager
+	Store   StorageHandler
 	Clean   Purger
 	GeoIPDB *maxminddb.Reader
 }

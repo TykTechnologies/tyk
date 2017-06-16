@@ -17,7 +17,7 @@ type Purger interface {
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type RPCPurger struct {
-	Store *RedisClusterStorageManager
+	Store StorageHandler
 }
 
 // Connect Connects to RPC

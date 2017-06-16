@@ -18,7 +18,7 @@ var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
 	Id                string
-	store             *RedisClusterStorageManager
+	store             StorageHandler
 	checker           *HostUptimeChecker
 	stopLoop          bool
 	pollerStarted     bool
@@ -67,7 +67,7 @@ const (
 	UptimeAnalytics_KEYNAME = "tyk-uptime-analytics"
 )
 
-func (hc *HostCheckerManager) Init(store *RedisClusterStorageManager) {
+func (hc *HostCheckerManager) Init(store StorageHandler) {
 	hc.store = store
 	hc.unhealthyHostList = make(map[string]bool)
 	hc.resetsInitiated = make(map[string]bool)
@@ -483,7 +483,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func InitHostCheckManager(store *RedisClusterStorageManager) {
+func InitHostCheckManager(store StorageHandler) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return
