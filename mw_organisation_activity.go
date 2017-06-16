@@ -6,8 +6,6 @@ import (
 
 	"errors"
 
-	"github.com/gorilla/context"
-
 	"github.com/Sirupsen/logrus"
 )
 
@@ -112,7 +110,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	}
 
 	// Lets keep a reference of the org
-	context.Set(r, OrgSessionContext, session)
+	setCtxValue(r, OrgSessionContext, session)
 
 	// Request is valid, carry on
 	return nil, 200
@@ -219,7 +217,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	}
 
 	// Lets keep a reference of the org
-	context.Set(r, OrgSessionContext, session)
+	setCtxValue(r, OrgSessionContext, session)
 
 	orgChan <- true
 }
