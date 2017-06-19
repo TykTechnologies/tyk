@@ -32,7 +32,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	}
 }
 
-func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	var tempRes *http.Request
 
 	config := k.Spec.Auth

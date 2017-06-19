@@ -93,7 +93,7 @@ func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Req
 	return true
 }
 
-func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// 1. Validate the JWT
 	user, token, halt := openid.AuthenticateOIDWithUser(k.providerConfiguration, w, r)
 

@@ -34,7 +34,7 @@ func (hm *HMACMiddleware) New() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 
-func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		return hm.authorizationError(r)

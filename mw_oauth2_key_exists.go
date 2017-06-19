@@ -21,7 +21,7 @@ func (k *Oauth2KeyExists) GetName() string {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	// We're using OAuth, start checking for access keys
 	token := r.Header.Get("Authorization")
