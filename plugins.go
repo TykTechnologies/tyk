@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
@@ -54,27 +53,8 @@ type DynamicMiddleware struct {
 	Auth                bool
 }
 
-type DynamicMiddlewareConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
-
 func (d *DynamicMiddleware) GetName() string {
 	return "DynamicMiddleware"
-}
-
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
-	var moduleConfig DynamicMiddlewareConfig
-
-	err := mapstructure.Decode(d.Spec.RawData, &moduleConfig)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "jsvm",
-		}).Error(err)
-		return nil, err
-	}
-
-	return moduleConfig, nil
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
