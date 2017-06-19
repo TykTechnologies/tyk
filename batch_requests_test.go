@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"testing"
 )
 
@@ -95,7 +96,10 @@ func TestMakeSyncRequest(t *testing.T) {
 	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
-	req := testReq(t, "GET", testHttpGet, nil)
+	req, err := http.NewRequest("GET", testHttpGet, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	replyUnit := batchHandler.doSyncRequest(req, relURL)
 
@@ -115,7 +119,10 @@ func TestMakeASyncRequest(t *testing.T) {
 	batchHandler := BatchRequestHandler{API: spec}
 
 	relURL := "/"
-	req := testReq(t, "GET", testHttpGet, nil)
+	req, err := http.NewRequest("GET", testHttpGet, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	replies := make(chan BatchReplyUnit)
 	go batchHandler.doAsyncRequest(req, relURL, replies)
