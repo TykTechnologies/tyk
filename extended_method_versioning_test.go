@@ -50,7 +50,7 @@ const nonExpiringExtendedDef = `{
 					],
 					"white_list": [
 						{
-							"path": "v1/allowed/whitelist/literal",
+							"path": "/v1/allowed/whitelist/literal",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -63,7 +63,7 @@ const nonExpiringExtendedDef = `{
 							}
 						},
 						{
-							"path": "v1/allowed/whitelist/reply/{id}",
+							"path": "/v1/allowed/whitelist/reply/{id}",
 							"method_actions": {
 								"GET": {
 									"action": "reply",
@@ -77,7 +77,7 @@ const nonExpiringExtendedDef = `{
 							}
 						},
 						{
-							"path": "v1/allowed/whitelist/{id}",
+							"path": "/v1/allowed/whitelist/{id}",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -92,7 +92,7 @@ const nonExpiringExtendedDef = `{
 					],
 					"black_list": [
 						{
-							"path": "v1/disallowed/blacklist/literal",
+							"path": "/v1/disallowed/blacklist/literal",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -105,7 +105,7 @@ const nonExpiringExtendedDef = `{
 							}
 						},
 						{
-							"path": "v1/disallowed/blacklist/{id}",
+							"path": "/v1/disallowed/blacklist/{id}",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -174,7 +174,7 @@ const nonExpiringExtendedDefNoWhitelist = `{
 					],
 					"black_list": [
 						{
-							"path": "v1/disallowed/blacklist/literal",
+							"path": "/v1/disallowed/blacklist/literal",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -187,7 +187,7 @@ const nonExpiringExtendedDefNoWhitelist = `{
 							}
 						},
 						{
-							"path": "v1/disallowed/blacklist/{id}",
+							"path": "/v1/disallowed/blacklist/{id}",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -211,7 +211,7 @@ const nonExpiringExtendedDefNoWhitelist = `{
 }`
 
 func TestExtendedBlacklistLinks(t *testing.T) {
-	uri := "v1/disallowed/blacklist/literal"
+	uri := "/v1/disallowed/blacklist/literal"
 	req := testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 
@@ -227,7 +227,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	uri = "v1/disallowed/blacklist/abacab12345"
+	uri = "/v1/disallowed/blacklist/abacab12345"
 	req = testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 
@@ -242,7 +242,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	}
 
 	// Test with POST (it's a GET, should pass through)
-	uri = "v1/disallowed/blacklist/abacab12345"
+	uri = "/v1/disallowed/blacklist/abacab12345"
 	req = testReq(t, "POST", uri, nil)
 	req.Header.Set("version", "v1")
 
@@ -258,7 +258,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 }
 
 func TestExtendedWhiteLIstLinks(t *testing.T) {
-	uri := "v1/allowed/whitelist/literal"
+	uri := "/v1/allowed/whitelist/literal"
 	req := testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 
@@ -274,7 +274,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	uri = "v1/allowed/whitelist/12345abans"
+	uri = "/v1/allowed/whitelist/12345abans"
 	req = testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 
@@ -290,7 +290,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 }
 
 func TestExtendedWhiteListBlock(t *testing.T) {
-	uri := "v1/allowed/bananaphone"
+	uri := "/v1/allowed/bananaphone"
 	req := testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 
@@ -326,7 +326,7 @@ func TestExtendedIgnored(t *testing.T) {
 }
 
 func TestExtendedWhiteListWithRedirectedReply(t *testing.T) {
-	uri := "v1/allowed/whitelist/reply/12345"
+	uri := "/v1/allowed/whitelist/reply/12345"
 	req := testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 

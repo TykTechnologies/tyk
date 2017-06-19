@@ -438,7 +438,7 @@ const extendedPathGatewaySetup = `{
 					],
 					"white_list": [
 						{
-							"path": "v1/allowed/whitelist/literal",
+							"path": "/v1/allowed/whitelist/literal",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -451,7 +451,7 @@ const extendedPathGatewaySetup = `{
 							}
 						},
 						{
-							"path": "v1/allowed/whitelist/reply/{id}",
+							"path": "/v1/allowed/whitelist/reply/{id}",
 							"method_actions": {
 								"GET": {
 									"action": "reply",
@@ -465,7 +465,7 @@ const extendedPathGatewaySetup = `{
 							}
 						},
 						{
-							"path": "v1/allowed/whitelist/{id}",
+							"path": "/v1/allowed/whitelist/{id}",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -480,7 +480,7 @@ const extendedPathGatewaySetup = `{
 					],
 					"black_list": [
 						{
-							"path": "v1/disallowed/blacklist/literal",
+							"path": "/v1/disallowed/blacklist/literal",
 							"method_actions": {
 								"GET": {
 									"action": "no_action",
@@ -524,28 +524,27 @@ func testKey(t *testing.T, name string) string {
 	return fmt.Sprintf("%s-%s", testName(t), name)
 }
 
-func testReq(t *testing.T, method, urlStr string, body interface{}) *http.Request {
-	var bodyReader io.Reader
+func testReqBody(t *testing.T, body interface{}) io.Reader {
 	switch x := body.(type) {
 	case []byte:
-		bodyReader = bytes.NewReader(x)
+		return bytes.NewReader(x)
 	case string:
-		bodyReader = strings.NewReader(x)
+		return strings.NewReader(x)
 	case io.Reader:
-		bodyReader = x
+		return x
 	case nil:
+		return nil
 	default: // JSON objects (structs)
 		bs, err := json.Marshal(x)
 		if err != nil {
 			t.Fatal(err)
 		}
-		bodyReader = bytes.NewReader(bs)
+		return bytes.NewReader(bs)
 	}
-	req, err := http.NewRequest(method, urlStr, bodyReader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return req
+}
+
+func testReq(t *testing.T, method, urlStr string, body interface{}) *http.Request {
+	return httptest.NewRequest(method, urlStr, testReqBody(t, body))
 }
 
 func withAuth(r *http.Request) *http.Request {
@@ -602,7 +601,7 @@ func TestVersioningRequestOK(t *testing.T) {
 	spec.SessionManager.UpdateSession("96869686969", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("authorization", "96869686969")
 	req.Header.Set("version", "v1")
 
@@ -623,7 +622,7 @@ func TestVersioningRequestFail(t *testing.T) {
 	spec.SessionManager.UpdateSession("zz1234", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("authorization", "zz1234")
 	req.Header.Set("version", "v1")
 
@@ -684,7 +683,7 @@ func TestQuota(t *testing.T) {
 	defer spec.SessionManager.ResetQuota(keyId, session)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("authorization", keyId)
 
 	chain := getChain(spec)
@@ -717,7 +716,7 @@ func TestWithAnalytics(t *testing.T) {
 	spec.SessionManager.UpdateSession("ert1234ert", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("authorization", "ert1234ert")
 
 	chain := getChain(spec)
@@ -744,7 +743,7 @@ func TestWithAnalyticsErrorResponse(t *testing.T) {
 	spec.SessionManager.UpdateSession("fgh561234", session, 60)
 
 	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", "", nil)
+	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("authorization", "dfgjg345316ertdg")
 
 	chain := getChain(spec)
@@ -844,13 +843,22 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 				baseUrl = "http://" + cln.Addr().String()
 			}
 
-			req := testReq(t, tc.method, baseUrl+tc.path, tc.body)
+			bodyReader := testReqBody(t, tc.body)
+			req, err := http.NewRequest(tc.method, baseUrl+tc.path, bodyReader)
+			if err != nil {
+				t.Error(err)
+				continue
+			}
 
 			if tc.adminAuth {
 				req = withAuth(req)
 			}
 
-			resp, _ := client.Do(req)
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Error(err)
+				continue
+			}
 
 			if resp.StatusCode != tc.code {
 				t.Errorf("[%d]%s%s %s Status %d, want %d", ti, tPrefix, tc.method, tc.path, resp.StatusCode, tc.code)

@@ -28,8 +28,8 @@ const sampleDefiniton = `{
 				"expires": "2006-01-02 15:04",
 				"paths": {
 					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"],
-					"black_list": ["v1/disallowed/whitelist/literal", "v1/disallowed/whitelist/{id}"]
+					"white_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"],
+					"black_list": ["/v1/disallowed/whitelist/literal", "/v1/disallowed/whitelist/{id}"]
 				}
 			}
 		}
@@ -57,8 +57,8 @@ const nonExpiringDef = `{
 				"expires": "3000-01-02 15:04",
 				"paths": {
 					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
-					"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
+					"white_list": ["/v1/allowed/whitelist/literal", "/v1/allowed/whitelist/{id}"],
+					"black_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"]
 				}
 			}
 		}
@@ -86,8 +86,8 @@ const nonExpiringMultiDef = `{
 				"expires": "3000-01-02 15:04",
 				"paths": {
 					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": ["v1/allowed/whitelist/literal", "v1/allowed/whitelist/{id}"],
-					"black_list": ["v1/disallowed/blacklist/literal", "v1/disallowed/blacklist/{id}"]
+					"white_list": ["/v1/allowed/whitelist/literal", "/v1/allowed/whitelist/{id}"],
+					"black_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"]
 				}
 			},
 			"v2": {
@@ -95,7 +95,7 @@ const nonExpiringMultiDef = `{
 				"expires": "3000-01-02 15:04",
 				"paths": {
 					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"black_list": ["v1/disallowed/blacklist/literal"]
+					"black_list": ["/v1/disallowed/blacklist/literal"]
 				}
 			}
 		}
@@ -133,7 +133,7 @@ func TestExpiredRequest(t *testing.T) {
 }
 
 func TestNotVersioned(t *testing.T) {
-	req := testReq(t, "GET", "v1/allowed/whitelist/literal", nil)
+	req := testReq(t, "GET", "/v1/allowed/whitelist/literal", nil)
 
 	spec := createDefinitionFromString(nonExpiringDef)
 	spec.VersionData.NotVersioned = true
@@ -185,7 +185,7 @@ func TestWrongVersion(t *testing.T) {
 }
 
 func TestBlacklistLinks(t *testing.T) {
-	req := testReq(t, "GET", "v1/disallowed/blacklist/literal", nil)
+	req := testReq(t, "GET", "/v1/disallowed/blacklist/literal", nil)
 	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
@@ -200,7 +200,7 @@ func TestBlacklistLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	req = testReq(t, "GET", "v1/disallowed/blacklist/abacab12345", nil)
+	req = testReq(t, "GET", "/v1/disallowed/blacklist/abacab12345", nil)
 	req.Header.Set("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
@@ -215,7 +215,7 @@ func TestBlacklistLinks(t *testing.T) {
 }
 
 func TestWhiteLIstLinks(t *testing.T) {
-	req := testReq(t, "GET", "v1/allowed/whitelist/literal", nil)
+	req := testReq(t, "GET", "/v1/allowed/whitelist/literal", nil)
 	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
@@ -230,7 +230,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 		t.Error(status)
 	}
 
-	req = testReq(t, "GET", "v1/allowed/whitelist/12345abans", nil)
+	req = testReq(t, "GET", "/v1/allowed/whitelist/12345abans", nil)
 	req.Header.Set("version", "v1")
 
 	ok, status, _ = spec.IsRequestValid(req)
@@ -245,7 +245,7 @@ func TestWhiteLIstLinks(t *testing.T) {
 }
 
 func TestWhiteListBlock(t *testing.T) {
-	req := testReq(t, "GET", "v1/allowed/bananaphone", nil)
+	req := testReq(t, "GET", "/v1/allowed/bananaphone", nil)
 	req.Header.Set("version", "v1")
 
 	spec := createDefinitionFromString(nonExpiringDef)
@@ -279,7 +279,7 @@ func TestIgnored(t *testing.T) {
 }
 
 func TestBlacklistLinksMulti(t *testing.T) {
-	req := testReq(t, "GET", "v1/disallowed/blacklist/literal", nil)
+	req := testReq(t, "GET", "/v1/disallowed/blacklist/literal", nil)
 	req.Header.Set("version", "v2")
 
 	spec := createDefinitionFromString(nonExpiringMultiDef)
@@ -294,7 +294,7 @@ func TestBlacklistLinksMulti(t *testing.T) {
 		t.Error(status)
 	}
 
-	req = testReq(t, "GET", "v1/disallowed/blacklist/abacab12345", nil)
+	req = testReq(t, "GET", "/v1/disallowed/blacklist/abacab12345", nil)
 	req.Header.Set("version", "v2")
 
 	ok, status, _ = spec.IsRequestValid(req)
