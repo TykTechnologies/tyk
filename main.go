@@ -296,27 +296,27 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}).Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	r.HandleFunc("/reload/group", checkIsAPIOwner(InstrumentationMW(groupResetHandler)))
-	r.HandleFunc("/reload/", checkIsAPIOwner(InstrumentationMW(resetHandler(nil))))
+	r.HandleFunc("/reload/group", checkIsAPIOwner(InstrumentationMW(allowMethods(groupResetHandler, "GET"))))
+	r.HandleFunc("/reload/", checkIsAPIOwner(InstrumentationMW(allowMethods(resetHandler(nil), "GET"))))
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(orgHandler)))
-		r.HandleFunc("/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(policyUpdateHandler)))
-		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(createKeyHandler)))
-		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(apiHandler)))
-		r.HandleFunc("/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(apiHandler)))
-		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(healthCheckhandler)))
-		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(createOauthClient)))
-		r.HandleFunc("/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateOauthRefresh)))
-		r.HandleFunc("/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(invalidateCacheHandler)))
+		r.HandleFunc("/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))))
+		r.HandleFunc("/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(policyUpdateHandler, "POST"))))
+		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(allowMethods(createKeyHandler, "POST"))))
+		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))))
+		r.HandleFunc("/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))))
+		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(allowMethods(healthCheckhandler, "GET"))))
+		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(allowMethods(createOauthClient, "POST"))))
+		r.HandleFunc("/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateOauthRefresh, "DELETE"))))
+		r.HandleFunc("/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateCacheHandler, "DELETE"))))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(keyHandler)))
-	r.HandleFunc("/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(oAuthClientHandler)))
+	r.HandleFunc("/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))))
+	r.HandleFunc("/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(oAuthClientHandler, "GET", "DELETE"))))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -403,9 +403,9 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
-	muxer.HandleFunc(apiAuthorizePath, checkIsAPIOwner(oauthHandlers.HandleGenerateAuthCodeData))
-	muxer.HandleFunc(clientAuthPath, oauthHandlers.HandleAuthorizePassthrough)
-	muxer.HandleFunc(clientAccessPath, oauthHandlers.HandleAccessRequest)
+	muxer.HandleFunc(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
+	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
+	muxer.HandleFunc(clientAccessPath, allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST"))
 
 	return &oauthManager
 }

@@ -118,11 +118,6 @@ func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification
 
 // HandleGenerateAuthCodeData handles a resource provider approving an OAuth request from a client
 func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
-
 	// On AUTH grab session state data and add to UserData (not validated, not good!)
 	sessionStateJSONData := r.FormValue("key_rules")
 	if sessionStateJSONData == "" {
@@ -144,33 +139,28 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 // HandleAuthorizePassthrough handles a Client Auth request, first it checks if the client
 // is OK (otherwise it blocks the request), then it forwards on to the resource providers approval URI
 func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" || r.Method == "POST" {
-		// Extract client data and check
-		resp := o.Manager.HandleAuthorisation(r, false, "")
-		if resp.IsError {
-			log.Error("There was an error with the request: ", resp)
-			// Something went wrong, write out the error details and kill the response
-			doJSONWrite(w, resp.ErrorStatusCode, apiError(resp.StatusText))
-			return
-		}
-		if r.Method == "GET" {
-			var buffer bytes.Buffer
-			buffer.WriteString(o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
-			buffer.WriteString("?client_id=")
-			buffer.WriteString(r.FormValue("client_id"))
-			buffer.WriteString("&redirect_uri=")
-			buffer.WriteString(r.FormValue("redirect_uri"))
-			buffer.WriteString("&response_type=")
-			buffer.WriteString(r.FormValue("response_type"))
-			w.Header().Add("Location", buffer.String())
-		} else {
-			w.Header().Add("Location", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
-		}
-		w.WriteHeader(307)
-	} else {
-		// Return Not supported message (and code)
-		doJSONWrite(w, 405, apiError("Method not supported"))
+	// Extract client data and check
+	resp := o.Manager.HandleAuthorisation(r, false, "")
+	if resp.IsError {
+		log.Error("There was an error with the request: ", resp)
+		// Something went wrong, write out the error details and kill the response
+		doJSONWrite(w, resp.ErrorStatusCode, apiError(resp.StatusText))
+		return
 	}
+	if r.Method == "GET" {
+		var buffer bytes.Buffer
+		buffer.WriteString(o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
+		buffer.WriteString("?client_id=")
+		buffer.WriteString(r.FormValue("client_id"))
+		buffer.WriteString("&redirect_uri=")
+		buffer.WriteString(r.FormValue("redirect_uri"))
+		buffer.WriteString("&response_type=")
+		buffer.WriteString(r.FormValue("response_type"))
+		w.Header().Add("Location", buffer.String())
+	} else {
+		w.Header().Add("Location", o.Manager.API.Oauth2Meta.AuthorizeLoginRedirect)
+	}
+	w.WriteHeader(307)
 
 }
 
@@ -178,11 +168,6 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" && r.Method != "POST" {
-		doJSONWrite(w, 405, apiError("Method not supported"))
-		return
-	}
-
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg, _ := o.generateOAuthOutputFromOsinResponse(resp)
