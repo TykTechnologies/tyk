@@ -40,9 +40,9 @@ func (m *modifiedMiddleware) GetConfig() (interface{}, error) {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (m *modifiedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
-	conf := configuration.(modifiedMiddlewareConfig)
-	if conf.CustomConfigVar == "error" {
+func (m *modifiedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	mconf := conf.(modifiedMiddlewareConfig)
+	if mconf.CustomConfigVar == "error" {
 		return errors.New("Forced error called"), 400
 	}
 	return nil, 200

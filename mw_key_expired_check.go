@@ -17,7 +17,7 @@ func (k *KeyExpired) GetName() string {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	session := ctxGetSession(r)
 	if session == nil {
 		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 400

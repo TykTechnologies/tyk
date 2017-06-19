@@ -101,7 +101,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	// Allow global cache disabe
 	if !m.Spec.CacheOptions.EnableCache {

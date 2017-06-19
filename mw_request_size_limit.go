@@ -69,7 +69,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 }
 
 // RequestSizeLimit will check a request for maximum request size, this can be a global limit or a matched limit.
-func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, configuration interface{}) (error, int) {
+func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	log.Debug("Request size limiter active")
 
 	vInfo, versionPaths, _, _ := t.Spec.GetVersionData(r)
