@@ -368,6 +368,16 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 	}
 }
 
+func TestMethodNotSupported(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	req := withAuth(testReq(t, "POST", "/tyk/reload/", nil))
+
+	mainRouter.ServeHTTP(recorder, req)
+	if recorder.Code != 405 {
+		t.Fatal(`Wanted response to be 405 since the wrong method was used`)
+	}
+}
+
 func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 	for _, api_id := range []string{"1", "none", ""} {
 		createKey(t)
