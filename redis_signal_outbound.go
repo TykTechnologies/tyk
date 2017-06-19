@@ -11,7 +11,6 @@ type InterfaceNotification struct {
 	Type      string
 	Message   string
 	OrgID     string
-	Payload   interface{}
 	Timestamp time.Time
 }
 

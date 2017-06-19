@@ -37,11 +37,11 @@ Effort required by Resource Owner:
 
 // OAuthClient is a representation within an APISpec of a client
 type OAuthClient struct {
-	ClientID          string      `json:"id"`
-	ClientSecret      string      `json:"secret"`
-	ClientRedirectURI string      `json:"redirecturi"`
-	UserData          interface{} `json:",omitempty"`
-	PolicyID          string      `json:"policyid"`
+	ClientID          string `json:"id"`
+	ClientSecret      string `json:"secret"`
+	ClientRedirectURI string `json:"redirecturi"`
+	UserData          string `json:",omitempty"`
+	PolicyID          string `json:"policyid"`
 }
 
 func (oc *OAuthClient) GetId() string {
