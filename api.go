@@ -14,6 +14,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
+	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
@@ -551,11 +552,7 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 }
 
 func apiHandler(w http.ResponseWriter, r *http.Request) {
-	var apiID string
-
-	if r.URL.Path != "/tyk/apis" {
-		apiID = r.URL.Path[len("/tyk/apis/"):]
-	}
+	apiID := mux.Vars(r)["apiID"]
 
 	var obj interface{}
 	var code int
@@ -592,7 +589,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
-	keyName := r.URL.Path[len("/tyk/keys/"):]
+	keyName := mux.Vars(r)["keyName"]
 	filter := r.FormValue("filter")
 	apiID := r.FormValue("api_id")
 	var obj interface{}
@@ -637,7 +634,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	keyName := r.URL.Path[len("/tyk/keys/policy/"):]
+	keyName := mux.Vars(r)["keyName"]
 	apiID := r.FormValue("api_id")
 	obj, code := handleUpdateHashedKey(keyName, apiID, policRecord.Policy)
 
@@ -722,7 +719,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 }
 
 func orgHandler(w http.ResponseWriter, r *http.Request) {
-	keyName := r.URL.Path[len("/tyk/org/keys/"):]
+	keyName := mux.Vars(r)["keyName"]
 	filter := r.FormValue("filter")
 	var obj interface{}
 	var code int
@@ -1139,8 +1136,8 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	keyCombined := r.URL.Path[len("/tyk/oauth/refresh/"):]
-	err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyCombined)
+	keyName := mux.Vars(r)["keyName"]
+	err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyName)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1154,7 +1151,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	success := APIModifyKeySuccess{
-		Key:    keyCombined,
+		Key:    keyName,
 		Status: "ok",
 		Action: "deleted",
 	}
@@ -1162,7 +1159,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"apiID":  apiID,
-		"token":  keyCombined,
+		"token":  keyName,
 		"status": "ok",
 	}).Info("Invalidated refresh token")
 
@@ -1170,7 +1167,8 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
-	keyCombined := r.URL.Path[len("/tyk/oauth/clients/"):]
+	// TODO: split these two args in the router
+	keyCombined := mux.Vars(r)["keyCombined"]
 	var obj interface{}
 	var code int
 
@@ -1373,7 +1371,7 @@ func UserRatesCheck() http.HandlerFunc {
 }
 
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
-	apiID := r.URL.Path[len("/tyk/cache/"):]
+	apiID := mux.Vars(r)["apiID"]
 
 	spec := apisByID[apiID]
 	var orgid string

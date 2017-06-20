@@ -300,23 +300,23 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload/", checkIsAPIOwner(InstrumentationMW(allowMethods(resetHandler(nil), "GET"))))
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))))
-		r.HandleFunc("/keys/policy/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(policyUpdateHandler, "POST"))))
+		r.HandleFunc("/org/keys/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))))
+		r.HandleFunc("/keys/policy/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(policyUpdateHandler, "POST"))))
 		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(allowMethods(createKeyHandler, "POST"))))
 		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))))
-		r.HandleFunc("/apis/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))))
+		r.HandleFunc("/apis/{apiID:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))))
 		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(allowMethods(healthCheckhandler, "GET"))))
 		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(allowMethods(createOauthClient, "POST"))))
-		r.HandleFunc("/oauth/refresh/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateOauthRefresh, "DELETE"))))
-		r.HandleFunc("/cache/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateCacheHandler, "DELETE"))))
+		r.HandleFunc("/oauth/refresh/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateOauthRefresh, "DELETE"))))
+		r.HandleFunc("/cache/{apiID:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateCacheHandler, "DELETE"))))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/keys/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))))
-	r.HandleFunc("/oauth/clients/{rest:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(oAuthClientHandler, "GET", "DELETE"))))
+	r.HandleFunc("/keys/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))))
+	r.HandleFunc("/oauth/clients/{keyCombined:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(oAuthClientHandler, "GET", "DELETE"))))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
