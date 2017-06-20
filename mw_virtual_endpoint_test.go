@@ -40,13 +40,19 @@ const virtTestDef = `{
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
 	},
+	"config_data": {
+		"foo": "bar"
+	},
 	"do_not_track": true
 }`
 
 const virtTestJS = `
-function testVirtData(request, session, data) {
+function testVirtData(request, session, config) {
 	var resp = {
 		Body: request.Body + " added body",
+		Headers: {
+			"data-foo": config.config_data.foo
+		},
 		Code: 202
 	}
 	return TykJsResponse(resp, session.meta_data)   
@@ -72,9 +78,14 @@ func TestVirtualEndpoint(t *testing.T) {
 	if want := 202; rec.Code != 202 {
 		t.Fatalf("wanted code to be %d, got %d", want, rec.Code)
 	}
-	want := "initial body added body"
-	got := rec.Body.String()
-	if want != got {
-		t.Fatalf("wanted body to be %q, got %q", want, got)
+	wantBody := "initial body added body"
+	gotBody := rec.Body.String()
+	if wantBody != gotBody {
+		t.Fatalf("wanted body to be %q, got %q", wantBody, gotBody)
+	}
+	wantHdr := "bar"
+	gotHdr := rec.HeaderMap.Get("data-foo")
+	if wantHdr != gotHdr {
+		t.Fatalf("wanted header to be %q, got %q", wantHdr, gotHdr)
 	}
 }
