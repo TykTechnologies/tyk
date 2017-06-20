@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -79,9 +81,20 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	}
 }
 
+type VirtualEndpointConfig struct {
+	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+}
+
 // New lets you do any initialisations for the object can be done here
 func (d *VirtualEndpoint) New() {
 	d.sh = SuccessHandler{d.TykMiddleware}
+}
+
+func (d *VirtualEndpoint) configData() (conf VirtualEndpointConfig) {
+	if err := mapstructure.Decode(d.Spec.RawData, &conf); err != nil {
+		log.Error("Failed to parse configuration data: ", err)
+	}
+	return
 }
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {
@@ -138,13 +151,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Encode the configuration data too
-	configData, err := d.GetConfig()
-	if err != nil {
-		log.Error("Failed to parse configuration data: ", err)
-		configData = make(map[string]string)
-	}
-
-	asJsonConfigData, err := json.Marshal(configData)
+	asJsonConfigData, err := json.Marshal(d.configData())
 	if err != nil {
 		log.Error("Failed to encode request object for virtual endpoint: ", err)
 		return nil
