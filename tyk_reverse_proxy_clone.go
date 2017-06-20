@@ -10,7 +10,9 @@ import (
 	"bytes"
 	"crypto/tls"
 	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
+	"github.com/newrelic/go-agent"
 	"github.com/pmylund/go-cache"
 	"io"
 	"io/ioutil"
@@ -21,20 +23,18 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"github.com/TykTechnologies/tykcommon"
-
 )
 
 var ServiceCache *cache.Cache
 
 func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 
-	doCacheRefresh := func () (*tykcommon.HostList, error) {
+	doCacheRefresh := func() (*tykcommon.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
 		sd := ServiceDiscovery{}
 		sd.New(&spec.Proxy.ServiceDiscovery)
-		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)	
+		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err == nil {
 			// Set the cached value
 			if data.Len() == 0 {
@@ -73,7 +73,7 @@ func GetURLFromService(spec *APISpec) (*tykcommon.HostList, error) {
 			log.Debug("Cache expired! Refreshing...")
 			return doCacheRefresh()
 		}
-		
+
 	}
 
 	log.Debug("Returning from cache.")
@@ -237,9 +237,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			targetToUse = newTarget
 		}
 
-        if targetToUse == target {
-            req.URL.Scheme = targetToUse.Scheme
-            req.URL.Host = targetToUse.Host
+		if targetToUse == target {
+			req.URL.Scheme = targetToUse.Scheme
+			req.URL.Host = targetToUse.Host
 			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
 		}
 
@@ -307,7 +307,7 @@ func getMaxIdleConns() int {
 }
 
 var TykDefaultTransport *TykTransporter = &TykTransporter{http.Transport{
-	Proxy: http.ProxyFromEnvironment,
+	Proxy:               http.ProxyFromEnvironment,
 	MaxIdleConnsPerHost: getMaxIdleConns(),
 	Dial: (&net.Dialer{
 		Timeout:   30 * time.Second,
@@ -466,6 +466,10 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{thisTransport, rw, p.TLSClientConfig}
 		return wsTransport
+	}
+
+	if txn, ok := rw.(newrelic.Transaction); ok {
+		return newrelic.NewRoundTripper(txn, thisTransport)
 	}
 
 	return thisTransport

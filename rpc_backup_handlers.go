@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/TykTechnologies/logrus"
-	"github.com/gorilla/mux"
 	"github.com/rcrowley/goagain"
 	"io"
 	"strings"
@@ -91,13 +90,9 @@ func doLoadWithBackup(specs *[]*APISpec) {
 	GlobalEventsJSVM.Init()
 	log.Warning("[RPC Backup] --> Initialised JSVM")
 
-	newRouter := mux.NewRouter().SkipClean(config.HttpServerOptions.SkipURLCleaning)
-	mainRouter = newRouter
-
-	log.Warning("[RPC Backup] --> Set up routers")
-	log.Warning("[RPC Backup] --> Loading endpoints")
-
-	loadAPIEndpoints(newRouter)
+	log.Warning("[RPC Backup] --> Creating main router")
+	newRouter := router.Build()
+	log.Warning("[RPC Backup] --> Main router created")
 
 	log.Warning("[RPC Backup] --> Loading APIs")
 	loadApps(specs, newRouter)
@@ -115,8 +110,8 @@ func doLoadWithBackup(specs *[]*APISpec) {
 
 	l, goAgainErr := goagain.Listener()
 	var listenerErr error
-	
-	l, listenerErr = generateListener(l) 
+
+	l, listenerErr = generateListener(l)
 	if listenerErr != nil {
 		log.Info("Failed to generate listener!")
 	}

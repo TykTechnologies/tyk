@@ -143,7 +143,13 @@ type ServiceDiscoveryConf struct {
 type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
-	PythonPathPrefix string `json:"python_path_prefix"`
+	PythonPathPrefix    string `json:"python_path_prefix"`
+}
+
+type NewRelicConfig struct {
+	Enabled bool   `json:"enabled"`
+	License string `json:"license_key"`
+	AppName string `json:"app_name"`
 }
 
 // Config is the configuration object used by tyk to set up various parameters.
@@ -227,7 +233,8 @@ type Config struct {
 	MaxIdleConnsPerHost               int                                      `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	ReloadWaitTime                    int                                      `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                     `json:"proxy_ssl_insecure_skip_verify"`
-    ProxyDefaultTimeout               int                                      `json:"proxy_default_timeout"`
+	ProxyDefaultTimeout               int                                      `json:"proxy_default_timeout"`
+	NewRelic                          NewRelicConfig                           `json:"newrelic"`
 }
 
 type CertData struct {
