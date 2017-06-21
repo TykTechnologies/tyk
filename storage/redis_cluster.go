@@ -534,6 +534,20 @@ func (r RedisCluster) RemoveFromSet(keyName, value string) {
 	}
 }
 
+func (r RedisCluster) IsMemberOfSet(keyName, value string) bool {
+	r.ensureConnection()
+	val, err := redis.Int64(r.singleton().Do("SISMEMBER", r.fixKey(keyName), value))
+
+	if err != nil {
+		log.Error("Error trying to check set memeber: ", err)
+		return false
+	}
+
+	log.Debug("SISMEMBER", keyName, value, val, err)
+
+	return val == 1
+}
+
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
 func (r RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
 

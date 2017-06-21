@@ -34,6 +34,7 @@ import (
 
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/lint"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -55,8 +56,10 @@ var (
 	MonitoringHandler        config.TykEventHandler
 	RPCListener              RPCStorageHandler
 	DashService              DashboardServiceSender
+	CertificateManager       *certs.CertificateManager
 
 	apisMu   sync.RWMutex
+	apiSpecs []*APISpec
 	apisByID = map[string]*APISpec{}
 
 	keyGen DefaultKeyGenerator
@@ -125,7 +128,6 @@ func setupGlobals() {
 			analytics.Clean = &purger
 			go analytics.Clean.PurgeLoop(10 * time.Second)
 		}
-
 	}
 
 	// Load all the files that have the "error" prefix.
@@ -167,6 +169,12 @@ func setupGlobals() {
 		config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
 	}
 
+	certificateSecret := config.Global.Secret
+	if config.Global.Security.PrivateCertificateEncodingSecret != "" {
+		certificateSecret = config.Global.Security.PrivateCertificateEncodingSecret
+	}
+
+	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
 }
 
 func buildConnStr(resource string) string {
@@ -187,9 +195,11 @@ func buildConnStr(resource string) string {
 	return config.Global.DBAppConfOptions.ConnectionString + resource
 }
 
-func getAPISpecs() []*APISpec {
+func syncAPISpecs() {
 	loader := APIDefinitionLoader{}
-	var apiSpecs []*APISpec
+
+	apisMu.Lock()
+	defer apisMu.Unlock()
 
 	if config.Global.UseDBAppConfigs {
 
@@ -224,13 +234,12 @@ func getAPISpecs() []*APISpec {
 			apiSpecs[i].SessionProvider = config.Global.AuthOverride.SessionProvider
 		}
 	}
-
-	return apiSpecs
 }
 
-func getPolicies() {
+func syncPolicies() {
 	var pols map[string]user.Policy
-	log.WithFields(logrus.Fields{
+
+    log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")
 
@@ -296,13 +305,32 @@ func stripSlashes(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if config.Global.Security.ControlAPIUseMutualTLS {
+			if err := CertificateManager.ValidateRequestCertificate(config.Global.Security.Certificates.ControlAPI, r); err != nil {
+				doJSONWrite(w, 403, apiError(err.Error()))
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global.HostName
 	if config.Global.ControlAPIHostname != "" {
 		hostname = config.Global.ControlAPIHostname
 	}
-	if hostname != "" {
+
+    r := mux.NewRouter()
+	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
+		checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r))),
+	))
+
+    if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -311,8 +339,8 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	if httpProfile {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
-	r := mux.NewRouter()
-	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
+
+    muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(checkIsAPIOwner(InstrumentationMW(r))),
 	))
 	log.WithFields(logrus.Fields{
@@ -342,6 +370,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 
 	r.HandleFunc("/keys", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
 	r.HandleFunc("/keys/{keyName:[^/]*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
+	r.HandleFunc("/certs/{certID:[^/]*}", allowMethods(certHandler, "POST", "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 
@@ -566,11 +595,11 @@ func rpcReloadLoop(rpcKey string) {
 
 func doReload() {
 	// Load the API Policies
-	getPolicies()
-
+	syncPolicies()
 	// load the specs
-	specs := getAPISpecs()
-	if len(specs) == 0 {
+	syncAPISpecs()
+
+	if len(apiSpecs) == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
@@ -595,7 +624,8 @@ func doReload() {
 	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
-	loadApps(specs, mainRouter)
+
+	loadApps(apiSpecs, mainRouter)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -1147,28 +1177,17 @@ func generateListener(listenPort int) (net.Listener, error) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("--> Using SSL (https)")
-		certs := make([]tls.Certificate, len(config.Global.HttpServerOptions.Certificates))
-		certNameMap := make(map[string]*tls.Certificate)
-		for i, certData := range config.Global.HttpServerOptions.Certificates {
-			cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Fatalf("Server error: loadkeys: %s", err)
-			}
-			certs[i] = cert
-			certNameMap[certData.Name] = &certs[i]
+
+		tlsConfig := tls.Config{
+			GetCertificate: dummyGetCertificate,
+			ServerName:     config.Global.HttpServerOptions.ServerName,
+			MinVersion:     config.Global.HttpServerOptions.MinVersion,
+			ClientAuth:     tls.RequestClientCert,
 		}
 
-		config := tls.Config{
-			Certificates:       certs,
-			NameToCertificate:  certNameMap,
-			ServerName:         config.Global.HttpServerOptions.ServerName,
-			MinVersion:         config.Global.HttpServerOptions.MinVersion,
-			InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
-		}
-		return tls.Listen("tcp", targetPort, &config)
+		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
 
+		return tls.Listen("tcp", targetPort, &tlsConfig)
 	} else if config.Global.HttpServerOptions.UseLE_SSL {
 
 		log.WithFields(logrus.Fields{
@@ -1180,6 +1199,8 @@ func generateListener(listenPort int) (net.Listener, error) {
 		config := tls.Config{
 			GetCertificate: LE_MANAGER.GetCertificate,
 		}
+		config.GetConfigForClient = getTLSConfigForClient(&config, listenPort)
+
 		return tls.Listen("tcp", targetPort, &config)
 
 	} else {
@@ -1260,10 +1281,10 @@ func listen(l, controlListener net.Listener, err error) {
 		startDRL()
 
 		if !rpcEmergencyMode {
-			specs := getAPISpecs()
-			if specs != nil {
-				loadApps(specs, mainRouter)
-				getPolicies()
+			syncAPISpecs()
+			if apiSpecs != nil {
+				loadApps(apiSpecs, mainRouter)
+				syncPolicies()
 			}
 
 			if config.Global.ControlAPIPort > 0 {
@@ -1336,10 +1357,10 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// Resume accepting connections in a new goroutine.
 		if !rpcEmergencyMode {
-			specs := getAPISpecs()
-			if specs != nil {
-				loadApps(specs, mainRouter)
-				getPolicies()
+			syncAPISpecs()
+			if apiSpecs != nil {
+				loadApps(apiSpecs, mainRouter)
+				syncPolicies()
 			}
 
 			if config.Global.ControlAPIPort > 0 {

@@ -31,6 +31,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -409,8 +410,10 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport() // modifies a newly created transport
+	transport.TLSClientConfig = &tls.Config{}
+
 	if config.Global.ProxySSLInsecureSkipVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	// Use the default unless we've modified the timout
@@ -429,6 +432,36 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 	}
 
 	return transport
+}
+
+func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+	var certID string
+
+	for _, m := range []map[string]string{config.Global.Security.Certificates.Upstream, spec.UpstreamCertificates} {
+		if len(m) == 0 {
+			continue
+		}
+
+		if id, ok := m["*"]; ok {
+			certID = id
+		}
+
+		if id, ok := m[host]; ok {
+			certID = id
+		}
+	}
+
+	if certID == "" {
+		return nil
+	}
+
+	certs := CertificateManager.List([]string{certID}, certs.CertificatePrivate)
+
+	if len(certs) == 0 {
+		return nil
+	}
+
+	return certs[0]
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
@@ -515,6 +548,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
+
+	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+		transport.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{*cert}
+	} else {
+		transport.(*http.Transport).TLSClientConfig.Certificates = nil
+	}
 
 	var res *http.Response
 	var err error
