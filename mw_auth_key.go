@@ -59,11 +59,8 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		if cookieName == "" {
 			cookieName = config.AuthHeaderName
 		}
-		if tempRes == nil {
-			tempRes = CopyHttpRequest(r)
-		}
 
-		authCookie, err := tempRes.Cookie(cookieName)
+		authCookie, err := r.Cookie(cookieName)
 		cookieValue := ""
 		if err == nil {
 			cookieValue = authCookie.Value
