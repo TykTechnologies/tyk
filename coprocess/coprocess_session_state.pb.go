@@ -162,6 +162,7 @@ type SessionState struct {
 	IdExtractorDeadline     int64                        `protobuf:"varint,27,opt,name=id_extractor_deadline,json=idExtractorDeadline" json:"id_extractor_deadline,omitempty"`
 	SessionLifetime         int64                        `protobuf:"varint,28,opt,name=session_lifetime,json=sessionLifetime" json:"session_lifetime,omitempty"`
 	ApplyPolicies           []string                     `protobuf:"bytes,29,rep,name=apply_policies,json=applyPolicies" json:"apply_policies,omitempty"`
+	Certificate             string                       `protobuf:"bytes,30,opt,name=certificate,json=certificate" json:"certificate,omitempty"`
 }
 
 func (m *SessionState) Reset()                    { *m = SessionState{} }
