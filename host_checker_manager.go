@@ -336,8 +336,8 @@ func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
 		newHostList[host.CheckURL] = host
 	}
 
-	hc.currentHostList = newHostList
 	hc.checkerMu.Lock()
+	hc.currentHostList = newHostList
 	if hc.checker != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -353,6 +353,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 	}).Debug("--- Setting tracking list up for ID: ", apiId)
 	newHostList := make(map[string]HostData)
 
+	hc.checkerMu.Lock()
 	for _, existingHost := range hc.currentHostList {
 		if existingHost.MetaData[UnHealthyHostMetaDataAPIKey] != apiId {
 			// Add the old check list that excludes this API
@@ -372,6 +373,7 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 		}).Debug("Reset initiated")
 		hc.checker.ResetList(newHostList)
 	}
+	hc.checkerMu.Unlock()
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Info("--- Queued tracking list update for API: ", apiId)
