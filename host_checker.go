@@ -6,6 +6,7 @@ import (
 	"github.com/pmylund/go-cache"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -48,8 +49,10 @@ type HostUptimeChecker struct {
 	stopPollingChan chan bool
 	sampleCache     *cache.Cache
 	stopLoop        bool
-	doResetList     bool
-	newList         *map[string]HostData
+
+	resetListMu sync.Mutex
+	doResetList bool
+	newList     *map[string]HostData
 }
 
 func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
@@ -71,6 +74,7 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 		if h.stopLoop {
 			break
 		}
+		h.resetListMu.Lock()
 		if h.doResetList {
 			if h.newList != nil {
 				h.HostList = *h.newList
@@ -79,6 +83,7 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 				log.Debug("[HOST CHECKER] Host list reset")
 			}
 		}
+		h.resetListMu.Unlock()
 		for _, host := range h.HostList {
 			_, err := h.pool.SendWork(host)
 			if err != nil {
@@ -247,8 +252,10 @@ func (h *HostUptimeChecker) RemoveHost(name string) {
 }
 
 func (h *HostUptimeChecker) ResetList(hostList *map[string]HostData) {
+	h.resetListMu.Lock()
 	h.doResetList = true
 	h.newList = hostList
+	h.resetListMu.Unlock()
 	log.Debug("[HOST CHECKER] Checker reset queued!")
 }
 
