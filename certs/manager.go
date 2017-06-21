@@ -78,6 +78,10 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 }
 
 func isSHA256(value string) bool {
+	if hex.DecodedLen(len(value)) != sha256.Size {
+		return false
+	}
+
 	// check if hex encoded
 	if _, err := hex.DecodeString(value); err != nil {
 		return false
@@ -261,7 +265,7 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 	for {
 		var block *pem.Block
 
-		block, rest = pem.Decode(rest)
+        block, rest = pem.Decode(rest)
 		if block == nil {
 			break
 		}

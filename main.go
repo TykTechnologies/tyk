@@ -239,7 +239,7 @@ func syncAPISpecs() {
 func syncPolicies() {
 	var pols map[string]user.Policy
 
-    log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")
 
