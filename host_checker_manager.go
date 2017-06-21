@@ -9,6 +9,7 @@ import (
 	"github.com/TykTechnologies/tykcommon"
 	"gopkg.in/vmihailenco/msgpack.v2"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ var GlobalHostChecker HostCheckerManager
 type HostCheckerManager struct {
 	Id                string
 	store             *RedisClusterStorageManager
+	checkerMu         sync.Mutex
 	checker           *HostUptimeChecker
 	stopLoop          bool
 	pollerStarted     bool
@@ -164,6 +166,7 @@ func (hc *HostCheckerManager) StartPoller() {
 	}).Debug("---> Initialising checker")
 
 	// If we are restarting, we want to retain the host list
+	hc.checkerMu.Lock()
 	if hc.checker == nil {
 		hc.checker = &HostUptimeChecker{}
 	}
@@ -184,12 +187,15 @@ func (hc *HostCheckerManager) StartPoller() {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("---> Checker started.")
+	hc.checkerMu.Unlock()
 }
 
 func (hc *HostCheckerManager) StopPoller() {
+	hc.checkerMu.Lock()
 	if hc.checker != nil {
 		hc.checker.Stop()
 	}
+	hc.checkerMu.Unlock()
 }
 
 func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
@@ -338,12 +344,14 @@ func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
 	}
 
 	hc.currentHostList = newHostList
+	hc.checkerMu.Lock()
 	if hc.checker != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Debug("Reset initiated")
 		hc.checker.ResetList(&newHostList)
 	}
+	hc.checkerMu.Unlock()
 }
 
 func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId string) {
