@@ -279,8 +279,12 @@ type APIDefinition struct {
 		UseCookie      bool   `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
 		CookieName     string `mapstructure:"cookie_name" bson:"cookie_name" json:"cookie_name"`
 		AuthHeaderName string `mapstructure:"auth_header_name" bson:"auth_header_name" json:"auth_header_name"`
+		UseCertificate bool   `mapstructure:"use_certificate" bson:"use_certificate" json:"use_certificate"`
 	} `bson:"auth" json:"auth"`
 	UseBasicAuth            bool                 `bson:"use_basic_auth" json:"use_basic_auth"`
+	UseMutualTLSAuth        bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
+	ClientCertificates      []string             `bson:"client_certificates" json:"client_certificates"`
+	UpstreamCertificates    map[string]string    `bson:"upstream_certificates" json:"upstream_certificates"`
 	EnableJWT               bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth         bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
 	EnableCoProcessAuth     bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`

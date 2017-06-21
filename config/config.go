@@ -120,6 +120,7 @@ type HttpServerOptionsConfig struct {
 	SSLInsecureSkipVerify bool       `json:"ssl_insecure_skip_verify"`
 	EnableWebSockets      bool       `json:"enable_websockets"`
 	Certificates          []CertData `json:"certificates"`
+	SSLCertificates       []string   `json:"ssl_certificates"`
 	ServerName            string     `json:"server_name"`
 	MinVersion            uint16     `json:"min_version"`
 	FlushInterval         int        `json:"flush_interval"`
@@ -152,6 +153,20 @@ type ServiceDiscoveryConf struct {
 type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
+}
+
+type CertificatesConfig struct {
+	API        []string          `json:"apis"`
+	Upstream   map[string]string `json:"upstream"`
+	ControlAPI []string          `json:"control_api"`
+	Dashboard  []string          `json:"dashboard_api"`
+	MDCB       []string          `json:"mdcb_api"`
+}
+
+type SecurityConfig struct {
+	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
+	ControlAPIUseMutualTLS           bool               `json:"control_api_use_mutual_tls"`
+	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
 // Config is the configuration object used by tyk to set up various parameters.
@@ -242,6 +257,7 @@ type Config struct {
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
+	Security                          SecurityConfig                        `json:"secuity"`
 }
 
 type CertData struct {
@@ -264,12 +280,13 @@ type TykEventHandler interface {
 }
 
 const envPrefix = "TYK_GW"
+const defaultListenPort = 8080
 
 // WriteDefault will create a default configuration file and set the
 // storage type to "memory"
 func WriteDefault(path string, conf *Config) {
 	*conf = Config{
-		ListenPort:     8080,
+		ListenPort:     defaultListenPort,
 		Secret:         "352d20ee67be67f6340b4c0605b044b7",
 		TemplatePath:   "templates",
 		TykJSPath:      "js/tyk.js",

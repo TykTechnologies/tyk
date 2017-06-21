@@ -58,6 +58,7 @@ func TykSessionState(session *coprocess.SessionState) *SessionState {
 		session.OrgId,
 		session.OauthClientId,
 		session.OauthKeys,
+		session.Certificate,
 		basicAuthData,
 		jwtData,
 		session.HmacEnabled,

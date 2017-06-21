@@ -180,8 +180,12 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	// Reference layout for parsing time: "Mon Jan 2 15:04:05 MST 2006"
 
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+	refDateNumeric := "Mon, 02 Jan 2006 15:04:05 -07"
 
 	tim, err := time.Parse(refDate, dateHeaderValue)
+	if err != nil {
+		tim, err = time.Parse(refDateNumeric, dateHeaderValue)
+	}
 
 	if err != nil {
 		log.WithFields(logrus.Fields{

@@ -336,7 +336,7 @@ func stopRPCMock(server *gorpc.Server) {
 	RPCFuncClientSingleton = nil
 }
 
-func TestGetAPISpecsRPCFailure(t *testing.T) {
+func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	// Mock RPC
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
@@ -349,13 +349,13 @@ func TestGetAPISpecsRPCFailure(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	specs := getAPISpecs()
-	if len(specs) != 0 {
-		t.Error("Should return empty value for malformed rpc response", specs)
+	syncAPISpecs()
+	if len(apiSpecs) != 0 {
+		t.Error("Should return empty value for malformed rpc response", apiSpecs)
 	}
 }
 
-func TestGetAPISpecsRPCSuccess(t *testing.T) {
+func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	// Mock RPC
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
@@ -368,13 +368,13 @@ func TestGetAPISpecsRPCSuccess(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	specs := getAPISpecs()
-	if len(specs) != 1 {
-		t.Error("Should return array with one spec", specs)
+	syncAPISpecs()
+	if len(apiSpecs) != 1 {
+		t.Error("Should return array with one spec", apiSpecs)
 	}
 }
 
-func TestGetAPISpecsDashboardSuccess(t *testing.T) {
+func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	// Mock Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
