@@ -184,6 +184,7 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	// Fall back to a numeric timezone, since some environments don't provide a timezone name code
 	refDateNumeric := "Mon, 02 Jan 2006 15:04:05 -07"
 
+
 	tim, err := time.Parse(refDate, dateHeaderValue)
 	if err != nil {
 		tim, err = time.Parse(refDateNumeric, dateHeaderValue)
