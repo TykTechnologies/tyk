@@ -312,8 +312,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 
 	if config.UseCookie {
-		tempRes := CopyHttpRequest(r)
-		authCookie, err := tempRes.Cookie(config.AuthHeaderName)
+		authCookie, err := r.Cookie(config.AuthHeaderName)
 		if err != nil {
 			rawJWT = ""
 		} else {
