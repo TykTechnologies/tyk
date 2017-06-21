@@ -89,13 +89,18 @@ func TestHostChecker(t *testing.T) {
 	}
 
 	apisByID = map[string]*APISpec{spec.APIID: spec}
+	GlobalHostChecker.checkerMu.Lock()
 	GlobalHostChecker.checker.sampleTriggerLimit = 1
+	GlobalHostChecker.checkerMu.Unlock()
 	defer func() {
 		apisByID = make(map[string]*APISpec)
+		GlobalHostChecker.checkerMu.Lock()
 		GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
+		GlobalHostChecker.checkerMu.Unlock()
 	}()
 
 	SetCheckerHostList()
+	GlobalHostChecker.checkerMu.Lock()
 	if len(GlobalHostChecker.currentHostList) != 2 {
 		t.Error("Should update hosts manager check list", GlobalHostChecker.currentHostList)
 	}
@@ -103,6 +108,7 @@ func TestHostChecker(t *testing.T) {
 	if len(GlobalHostChecker.checker.newList) != 2 {
 		t.Error("Should update host checker check list")
 	}
+	GlobalHostChecker.checkerMu.Unlock()
 
 	hostCheckTicker <- struct{}{}
 	wg.Wait()
@@ -122,6 +128,7 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should return only active host", host1, host2)
 	}
 
+	GlobalHostChecker.checkerMu.Lock()
 	if GlobalHostChecker.checker.checkTimeout != defaultTimeout {
 		t.Error("Should set defaults", GlobalHostChecker.checker.checkTimeout)
 	}
@@ -130,4 +137,5 @@ func TestHostChecker(t *testing.T) {
 	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != GlobalHostChecker.checker.checkTimeout+1 {
 		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
 	}
+	GlobalHostChecker.checkerMu.Unlock()
 }
