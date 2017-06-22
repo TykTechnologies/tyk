@@ -94,36 +94,39 @@ func EnsureTransport(host string) string {
 	return host
 }
 
-func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec, tryCount int) string {
+func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
 		spec.RoundRobin.Lock()
 		spec.RoundRobin.SetMax(targetData)
-		pos := spec.RoundRobin.GetPos()
+		startPos := spec.RoundRobin.GetPos()
 		spec.RoundRobin.Unlock()
 
-		gotHost, err := targetData.GetIndex(pos)
-		if err != nil {
-			log.Error("[PROXY] [LOAD BALANCING] ", err)
-			return gotHost
-		}
+		pos := startPos
+		for {
+			gotHost, err := targetData.GetIndex(pos)
+			if err != nil {
+				log.Error("[PROXY] [LOAD BALANCING] ", err)
+				return gotHost
+			}
 
-		thisHost := EnsureTransport(gotHost)
+			host := EnsureTransport(gotHost)
 
-		// Check hosts against uptime tests
-		if spec.Proxy.CheckHostAgainstUptimeTests {
-			if GlobalHostChecker.IsHostDown(thisHost) {
-				// Don't overdo it
-				if tryCount < targetData.Len() {
-					// Host is down, skip
-					return GetNextTarget(targetData, spec, tryCount+1)
-				}
+			if !spec.Proxy.CheckHostAgainstUptimeTests {
+				return host // we don't care if it's up
+			}
+			if !GlobalHostChecker.IsHostDown(host) {
+				return host // we do care and it's up
+			}
+			// if the host is down, keep trying all the rest
+			// in order from where we started.
+			if pos = (pos + 1) % targetData.Len(); pos == startPos {
 				log.Error("[PROXY] [LOAD BALANCING] All hosts seem to be down, all uptime tests are failing!")
+				return host
 			}
 		}
 
-		return thisHost
 	}
 	// Use standard target - might still be service data
 	log.Debug("TARGET DATA:", targetData)
@@ -169,7 +172,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			} else {
 				// No error, replace the target
 				if spec.Proxy.EnableLoadBalancing {
-					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec, 0))
+					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec))
 					if err != nil {
 						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
 					} else {
@@ -178,7 +181,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 						targetQuery = target.RawQuery
 					}
 				} else {
-					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec, 0))
+					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec))
 					if err != nil {
 						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
 					} else {
@@ -196,7 +199,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0))
+				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec))
 				if lbErr != nil {
 					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
