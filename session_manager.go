@@ -60,9 +60,19 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	return false
 }
 
-// ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
-// Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) (bool, int) {
+type sessionFailReason uint
+
+const (
+	sessionFailNone sessionFailReason = iota
+	sessionFailRateLimit
+	sessionFailQuota
+)
+
+// ForwardMessage will enforce rate limiting, returning a non-zero
+// sessionFailReason if session limits have been exceeded.
+// Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
+// Per 10 seconds
+func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) sessionFailReason {
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
 
@@ -74,11 +84,11 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 			_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
 			if sentinelActive == nil {
 				// Sentinel is set, fail
-				return false, 1
+				return sessionFailRateLimit
 			}
 		} else if config.EnableRedisRollingLimiter {
 			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
-				return false, 1
+				return sessionFailRateLimit
 			}
 		} else {
 			// In-memory limiter
@@ -101,14 +111,14 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 				time.Duration(currentSession.Per)*time.Second)
 			if err != nil {
 				log.Error("Failed to create bucket!")
-				return false, 1
+				return sessionFailRateLimit
 			}
 
 			//log.Info("Add is: ", DRLManager.CurrentTokenValue)
 			_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
 
 			if errF != nil {
-				return false, 1
+				return sessionFailRateLimit
 			}
 		}
 	}
@@ -119,11 +129,11 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 		}
 
 		if l.IsRedisQuotaExceeded(currentSession, key, store) {
-			return false, 2
+			return sessionFailQuota
 		}
 	}
 
-	return true, 0
+	return sessionFailNone
 
 }
 

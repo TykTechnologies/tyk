@@ -78,30 +78,32 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	}
 
 	// We found a session, apply the quota limiter
-	forwardMessage, reason := k.sessionlimiter.ForwardMessage(&session,
+	reason := k.sessionlimiter.ForwardMessage(&session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.GetStore(), false, false)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, getLifetime(k.Spec, &session))
 
-	if !forwardMessage {
-		if reason == 2 {
-			log.WithFields(logrus.Fields{
-				"path":   r.URL.Path,
-				"origin": GetIPFromRequest(r),
-				"key":    k.Spec.OrgID,
-			}).Warning("Organisation quota has been exceeded.")
+	// org limits apply only to quotas, so we don't care about
+	// sessionFailRateLimit.
+	switch reason {
+	case sessionFailNone:
+	case sessionFailQuota:
+		log.WithFields(logrus.Fields{
+			"path":   r.URL.Path,
+			"origin": GetIPFromRequest(r),
+			"key":    k.Spec.OrgID,
+		}).Warning("Organisation quota has been exceeded.")
 
-			// Fire a quota exceeded event
-			k.FireEvent(EventOrgQuotaExceeded, EventQuotaExceededMeta{
-				EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
-				Path:             r.URL.Path,
-				Origin:           GetIPFromRequest(r),
-				Key:              k.Spec.OrgID,
-			})
+		// Fire a quota exceeded event
+		k.FireEvent(EventOrgQuotaExceeded, EventQuotaExceededMeta{
+			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
+			Path:             r.URL.Path,
+			Origin:           GetIPFromRequest(r),
+			Key:              k.Spec.OrgID,
+		})
 
-			return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
-		}
+		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
 	}
 
 	if config.Monitor.MonitorOrgKeys {

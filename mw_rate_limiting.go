@@ -72,7 +72,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	token := ctxGetAuthToken(r)
 
 	storeRef := k.Spec.SessionManager.GetStore()
-	forwardMessage, reason := sessionLimiter.ForwardMessage(session,
+	reason := sessionLimiter.ForwardMessage(session,
 		token,
 		storeRef,
 		!k.Spec.DisableRateLimit,
@@ -91,17 +91,15 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	log.Debug("SessionState: ", session)
 
-	if !forwardMessage {
-		// TODO Use an Enum!
-		switch reason {
-		case 1:
-			return k.handleRateLimitFailure(r, token)
-		case 2:
-			return k.handleQuotaFailure(r, token)
-		default:
-			// Other reason? Still not allowed
-			return errors.New("Access denied"), 403
-		}
+	switch reason {
+	case sessionFailNone:
+	case sessionFailRateLimit:
+		return k.handleRateLimitFailure(r, token)
+	case sessionFailQuota:
+		return k.handleQuotaFailure(r, token)
+	default:
+		// Other reason? Still not allowed
+		return errors.New("Access denied"), 403
 	}
 	// Run the trigger monitor
 	if config.Monitor.MonitorUserKeys {
