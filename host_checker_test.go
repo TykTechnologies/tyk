@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -109,6 +110,16 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should update host checker check list")
 	}
 	GlobalHostChecker.checkerMu.Unlock()
+
+	go func() {
+		// Simulate requests to the gateway while we update the
+		// host list. If we have a race in RoundRobin or
+		// anywhere else, this will help -race catch it.
+		for i := 0; i < 10; i++ {
+			GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0)
+			time.Sleep(time.Millisecond)
+		}
+	}()
 
 	hostCheckTicker <- struct{}{}
 	wg.Wait()

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	textTemplate "text/template"
 	"time"
 
@@ -1109,6 +1110,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 }
 
 type RoundRobin struct {
+	sync.Mutex
 	pos, max, cur int
 }
 
