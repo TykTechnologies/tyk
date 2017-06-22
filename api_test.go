@@ -433,7 +433,7 @@ func TestAPIAuthOk(t *testing.T) {
 	mainRouter.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
-		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
+		t.Error("Access to API should have gone through, but response code was: ", recorder.Code)
 	}
 }
 
