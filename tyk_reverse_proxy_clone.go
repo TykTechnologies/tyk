@@ -98,14 +98,10 @@ func GetNextTarget(targetData *tykcommon.HostList, spec *APISpec, tryCount int) 
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
+		spec.RoundRobin.Lock()
 		spec.RoundRobin.SetMax(targetData)
-
 		pos := spec.RoundRobin.GetPos()
-		if pos > (targetData.Len() - 1) {
-			// problem
-			spec.RoundRobin.SetMax(targetData)
-			pos = 0
-		}
+		spec.RoundRobin.Unlock()
 
 		gotHost, err := targetData.GetIndex(pos)
 		if err != nil {

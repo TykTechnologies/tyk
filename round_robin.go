@@ -1,10 +1,13 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/TykTechnologies/tykcommon"
 )
 
 type RoundRobin struct {
+	sync.Mutex
 	pos int
 	max int
 	cur int
