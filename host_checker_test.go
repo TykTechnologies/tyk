@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 	"text/template"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -78,11 +77,11 @@ func TestHostChecker(t *testing.T) {
 	sl := apidef.NewHostListFromList(spec.Proxy.Targets)
 	spec.Proxy.StructuredTargetList = sl
 
-	var wg sync.WaitGroup
+	var eventWG sync.WaitGroup
 	// Should receive one HostDown event
-	wg.Add(1)
+	eventWG.Add(1)
 	cb := func(em EventMessage) {
-		wg.Done()
+		eventWG.Done()
 	}
 
 	spec.EventPaths = map[apidef.TykEvent][]TykEventHandler{
@@ -111,18 +110,8 @@ func TestHostChecker(t *testing.T) {
 	}
 	GlobalHostChecker.checkerMu.Unlock()
 
-	go func() {
-		// Simulate requests to the gateway while we update the
-		// host list. If we have a race in RoundRobin or
-		// anywhere else, this will help -race catch it.
-		for i := 0; i < 10; i++ {
-			GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0)
-			time.Sleep(time.Millisecond)
-		}
-	}()
-
 	hostCheckTicker <- struct{}{}
-	wg.Wait()
+	eventWG.Wait()
 
 	if GlobalHostChecker.IsHostDown(testHttpAny) {
 		t.Error("Should not mark as down")
@@ -132,12 +121,21 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should mark as down")
 	}
 
-	host1 := GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0)
-	host2 := GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0)
-
-	if host1 != host2 || host1 != testHttpAny {
-		t.Error("Should return only active host", host1, host2)
+	// Test it many times concurrently, to simulate concurrent and
+	// parallel requests to the API. This will catch bugs in those
+	// scenarios, like data races.
+	var targetWG sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		targetWG.Add(1)
+		go func() {
+			host := GetNextTarget(spec.Proxy.StructuredTargetList, spec)
+			if host != testHttpAny {
+				t.Error("Should return only active host, got", host)
+			}
+			targetWG.Done()
+		}()
 	}
+	targetWG.Wait()
 
 	GlobalHostChecker.checkerMu.Lock()
 	if GlobalHostChecker.checker.checkTimeout != defaultTimeout {
