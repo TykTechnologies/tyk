@@ -284,9 +284,12 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	if config.ControlAPIHostname != "" {
 		hostname = config.ControlAPIHostname
 	}
-	r := muxer.PathPrefix("/tyk").Subrouter()
+	r := mux.NewRouter()
+	muxer.PathPrefix("/tyk").Handler(http.StripPrefix("/tyk",
+		checkIsAPIOwner(InstrumentationMW(r)),
+	))
 	if hostname != "" {
-		r = muxer.Host(hostname).Subrouter()
+		r = r.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
@@ -296,27 +299,27 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}).Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	r.HandleFunc("/reload/group", checkIsAPIOwner(InstrumentationMW(allowMethods(groupResetHandler, "GET"))))
-	r.HandleFunc("/reload/", checkIsAPIOwner(InstrumentationMW(allowMethods(resetHandler(nil), "GET"))))
+	r.HandleFunc("/reload/group", allowMethods(groupResetHandler, "GET"))
+	r.HandleFunc("/reload/", allowMethods(resetHandler(nil), "GET"))
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))))
-		r.HandleFunc("/keys/policy/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(policyUpdateHandler, "POST"))))
-		r.HandleFunc("/keys/create", checkIsAPIOwner(InstrumentationMW(allowMethods(createKeyHandler, "POST"))))
-		r.HandleFunc("/apis", checkIsAPIOwner(InstrumentationMW(allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))))
-		r.HandleFunc("/apis/{apiID:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))))
-		r.HandleFunc("/health/", checkIsAPIOwner(InstrumentationMW(allowMethods(healthCheckhandler, "GET"))))
-		r.HandleFunc("/oauth/clients/create", checkIsAPIOwner(InstrumentationMW(allowMethods(createOauthClient, "POST"))))
-		r.HandleFunc("/oauth/refresh/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateOauthRefresh, "DELETE"))))
-		r.HandleFunc("/cache/{apiID:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(invalidateCacheHandler, "DELETE"))))
+		r.HandleFunc("/org/keys/{keyName:.*}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
+		r.HandleFunc("/keys/policy/{keyName:.*}", allowMethods(policyUpdateHandler, "POST"))
+		r.HandleFunc("/keys/create", allowMethods(createKeyHandler, "POST"))
+		r.HandleFunc("/apis", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
+		r.HandleFunc("/apis/{apiID:.*}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
+		r.HandleFunc("/health/", allowMethods(healthCheckhandler, "GET"))
+		r.HandleFunc("/oauth/clients/create", allowMethods(createOauthClient, "POST"))
+		r.HandleFunc("/oauth/refresh/{keyName:.*}", allowMethods(invalidateOauthRefresh, "DELETE"))
+		r.HandleFunc("/cache/{apiID:.*}", allowMethods(invalidateCacheHandler, "DELETE"))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/keys/{keyName:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))))
-	r.HandleFunc("/oauth/clients/{keyCombined:.*}", checkIsAPIOwner(InstrumentationMW(allowMethods(oAuthClientHandler, "GET", "DELETE"))))
+	r.HandleFunc("/keys/{keyName:.*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
+	r.HandleFunc("/oauth/clients/{keyCombined:.*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -327,8 +330,8 @@ func loadAPIEndpoints(muxer *mux.Router) {
 // correct security credentials - this is a shared secret between the
 // client and the owner and is set in the tyk.conf file. This should
 // never be made public!
-func checkIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func checkIsAPIOwner(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
 		if tykAuthKey != config.Secret {
 			// Error
@@ -337,10 +340,8 @@ func checkIsAPIOwner(handler http.HandlerFunc) http.HandlerFunc {
 			doJSONWrite(w, 403, apiError("Forbidden"))
 			return
 		}
-
-		handler(w, r)
-
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func generateOAuthPrefix(apiID string) string {
@@ -403,7 +404,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
-	muxer.HandleFunc(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
+	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(http.HandlerFunc(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST"))))
 	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
 	muxer.HandleFunc(clientAccessPath, allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST"))
 

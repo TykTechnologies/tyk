@@ -44,11 +44,11 @@ func SetupInstrumentation(enabled bool) {
 }
 
 // InstrumentationMW will set basic instrumentation events, variables and timers on API jobs
-func InstrumentationMW(handler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func InstrumentationMW(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		job := instrument.NewJob("SystemAPICall")
 
-		handler(w, r)
+		next.ServeHTTP(w, r)
 		job.EventKv("called", health.Kvs{
 			"from_ip":  r.RemoteAddr,
 			"method":   r.Method,
@@ -57,7 +57,7 @@ func InstrumentationMW(handler http.HandlerFunc) http.HandlerFunc {
 			"size":     strconv.Itoa(int(r.ContentLength)),
 		})
 		job.Complete(health.Success)
-	}
+	})
 }
 
 func MonitorApplicationInstrumentation() {
