@@ -147,9 +147,9 @@ type CoProcessConfig struct {
 }
 
 type NewRelicConfig struct {
-	Enabled bool   `json:"enabled"`
-	License string `json:"license_key"`
-	AppName string `json:"app_name"`
+	Enabled    bool   `json:"enabled"`
+	AppName    string `json:"app_name"`
+	LicenseKey string `json:"license_key"`
 }
 
 // Config is the configuration object used by tyk to set up various parameters.

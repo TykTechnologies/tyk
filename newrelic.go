@@ -1,28 +1,25 @@
 package main
 
 import (
-	"os"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/gocraft/health"
-	"github.com/newrelic/go-agent"
 	"github.com/gorilla/mux"
+	"github.com/newrelic/go-agent"
 	"github.com/newrelic/go-agent/_integrations/nrgorilla/v1"
 )
 
 func setupNewRelic() {
-	log.WithFields(logrus.Fields{
-		"prefix": "newrelic",
-	}).Info("Initializing NewRelic...")
+	logger := log.WithFields(logrus.Fields{"prefix": "newrelic"})
 
-	cfg := newrelic.NewConfig(config.NewRelic.AppName, config.NewRelic.License)
-	//cfg.Logger = nrlogrus.StandardLogger()
-	cfg.Logger = newrelic.NewDebugLogger(os.Stdout)
+	logger.Info("Initializing NewRelic...")
+
+	cfg := newrelic.NewConfig(config.NewRelic.AppName, config.NewRelic.LicenseKey)
+	cfg.Enabled = config.NewRelic.Enabled
+	cfg.Logger = &newRelicLogger{logger}
+
 	app, err := newrelic.NewApplication(cfg)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "newrelic",
-		}).Warn("Error initializing NewRelic, skipping... ", err)
+		logger.Warn("Error initializing NewRelic, skipping... ", err)
 		return
 	}
 	router.PostProcess(NewrelicRouterInstrumentation(app))
@@ -31,6 +28,24 @@ func setupNewRelic() {
 
 func NewrelicRouterInstrumentation(app newrelic.Application) RouteProcessor {
 	return func(r *mux.Router) { nrgorilla.InstrumentRoutes(r, app) }
+}
+
+type newRelicLogger struct { *logrus.Entry }
+
+func (l *newRelicLogger) Error(msg string, c map[string]interface{}) {
+	l.WithFields(c).Error(msg)
+}
+func (l *newRelicLogger) Warn(msg string, c map[string]interface{}) {
+	l.WithFields(c).Warn(msg)
+}
+func (l *newRelicLogger) Info(msg string, c map[string]interface{}) {
+	l.WithFields(c).Info(msg)
+}
+func (l *newRelicLogger) Debug(msg string, c map[string]interface{}) {
+	l.WithFields(c).Info(msg)
+}
+func (l *newRelicLogger) DebugEnabled() bool {
+	return l.Level >= logrus.DebugLevel
 }
 
 type newRelicSink struct {
