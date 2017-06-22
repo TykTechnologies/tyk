@@ -164,7 +164,6 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
-		var targetSet bool
 		if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 			tempTargetURL, err := GetURLFromService(spec)
 			if err != nil {
@@ -191,22 +190,15 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 					}
 				}
 			}
-			// We've overridden remote now, don;t need to do it again
-			targetSet = true
-		}
-
-		if !targetSet {
-			// no override, better check if LB is enabled
-			if spec.Proxy.EnableLoadBalancing {
-				// it is, lets get that target data
-				lbRemote, err := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0))
-				if err != nil {
-					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
-				} else {
-					// Only replace target if everything is OK
-					target = lbRemote
-					targetQuery = target.RawQuery
-				}
+		} else if spec.Proxy.EnableLoadBalancing { // no override, better check if LB is enabled
+			// it is, lets get that target data
+			lbRemote, err := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec, 0))
+			if err != nil {
+				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
+			} else {
+				// Only replace target if everything is OK
+				target = lbRemote
+				targetQuery = target.RawQuery
 			}
 		}
 
