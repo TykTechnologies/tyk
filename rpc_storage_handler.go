@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"io"
 	"strings"
@@ -144,7 +145,15 @@ func (r *RPCStorageHandler) Connect() bool {
 	// RPC Client is unset
 	// Set up the cache
 	log.Info("Setting new RPC connection!")
-	RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
+	if config.SlaveOptions.UseSSL {
+		clientCfg := &tls.Config{
+			InsecureSkipVerify: config.SlaveOptions.SSLInsecureSkipVerify,
+		}
+
+		RPCCLientSingleton = gorpc.NewTLSClient(r.Address, clientCfg)
+	} else {
+		RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
+	}
 
 	if log.Level != logrus.DebugLevel {
 		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
