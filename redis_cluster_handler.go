@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -12,14 +13,18 @@ import (
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
 
-var redisClusterSingleton *rediscluster.RedisCluster
-var redisCacheClusterSingleton *rediscluster.RedisCluster
+var (
+	redisSingletonMu           sync.RWMutex
+	redisClusterSingleton      *rediscluster.RedisCluster
+	redisCacheClusterSingleton *rediscluster.RedisCluster
+)
 
 func GetRelevantClusterReference(cache bool) *rediscluster.RedisCluster {
+	redisSingletonMu.RLock()
+	defer redisSingletonMu.RUnlock()
 	if cache {
 		return redisCacheClusterSingleton
 	}
-
 	return redisClusterSingleton
 }
 
@@ -30,21 +35,11 @@ type RedisClusterStorageManager struct {
 	IsCache   bool
 }
 
-func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisCluster {
-	redisPtr := redisClusterSingleton
+func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
+	// redisSingletonMu is locked and we know the singleton is nil
 	cfg := globalConf.Storage
 	if isCache && globalConf.EnableSeperateCacheStore {
-		redisPtr = redisCacheClusterSingleton
 		cfg = globalConf.CacheStorage
-	}
-
-	if !forceReconnect {
-		if redisPtr != nil {
-			log.Debug("Redis pool already INITIALISED")
-			return redisPtr
-		}
-	} else if redisPtr != nil {
-		redisPtr.CloseConnection()
 	}
 
 	log.Debug("Creating new Redis connection pool")
@@ -87,13 +82,19 @@ func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisC
 
 // Connect will establish a connection to the GetRelevantClusterReference(r.IsCache)
 func (r *RedisClusterStorageManager) Connect() bool {
-	if GetRelevantClusterReference(r.IsCache) == nil {
+	redisSingletonMu.Lock()
+	defer redisSingletonMu.Unlock()
+	disconnected := redisClusterSingleton == nil
+	if r.IsCache {
+		disconnected = redisCacheClusterSingleton == nil
+	}
+	if disconnected {
 		log.Debug("Connecting to redis cluster")
 		if r.IsCache {
-			redisCacheClusterSingleton = NewRedisClusterPool(false, r.IsCache)
+			redisCacheClusterSingleton = NewRedisClusterPool(r.IsCache)
 			return true
 		}
-		redisClusterSingleton = NewRedisClusterPool(false, r.IsCache)
+		redisClusterSingleton = NewRedisClusterPool(r.IsCache)
 		return true
 	}
 
