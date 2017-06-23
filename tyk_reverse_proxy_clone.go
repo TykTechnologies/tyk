@@ -164,35 +164,17 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 
 	targetQuery := target.RawQuery
 	director := func(req *http.Request) {
-		if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
-			tempTargetURL, err := GetURLFromService(spec)
+		hostList := spec.Proxy.StructuredTargetList
+		switch {
+		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
+			var err error
+			hostList, err = GetURLFromService(spec)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
-			} else {
-				// No error, replace the target
-				if spec.Proxy.EnableLoadBalancing {
-					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec))
-					if err != nil {
-						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
-					} else {
-						// Only replace target if everything is OK
-						target = remote
-						targetQuery = target.RawQuery
-					}
-				} else {
-					remote, err := url.Parse(GetNextTarget(tempTargetURL, spec))
-					if err != nil {
-						log.Error("[PROXY] [SERVICE DISCOVERY] Couldn't parse target URL:", err)
-					} else {
-						// Only replace target if everything is OK
-						target = remote
-						targetQuery = target.RawQuery
-					}
-				}
 			}
-		} else if spec.Proxy.EnableLoadBalancing { // no override, better check if LB is enabled
-			// it is, lets get that target data
-			lbRemote, err := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec))
+			fallthrough // implies load balancing, with replaced host list
+		case spec.Proxy.EnableLoadBalancing:
+			lbRemote, err := url.Parse(GetNextTarget(hostList, spec))
 			if err != nil {
 				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
