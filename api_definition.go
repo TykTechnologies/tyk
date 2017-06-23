@@ -1111,7 +1111,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 
 type RoundRobin struct {
 	sync.Mutex
-	pos, max, cur int
+	pos, max int
 }
 
 func (r *RoundRobin) SetMax(max int) {
@@ -1120,9 +1120,6 @@ func (r *RoundRobin) SetMax(max int) {
 	}
 
 	// Can't have a new list substituted that's shorter
-	if r.cur > r.max {
-		r.cur = 0
-	}
 	if r.pos > r.max {
 		r.pos = 0
 	}
@@ -1131,9 +1128,9 @@ func (r *RoundRobin) SetMax(max int) {
 func (r *RoundRobin) SetLen(len int) { r.SetMax(len - 1) }
 
 func (r *RoundRobin) GetPos() int {
-	r.cur = r.pos
+	cur := r.pos
 	if r.pos++; r.pos > r.max {
 		r.pos = 0
 	}
-	return r.cur
+	return cur
 }
