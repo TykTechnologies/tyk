@@ -12,8 +12,6 @@ const (
 	SHARD_COUNT_ENV = "REDIGOCLUSTER_SHARDCOUNT"
 )
 
-var customShardCount string
-
 // A "thread" safe map of type string:Anything.
 // To avoid lock bottlenecks this map is dived to several (SHARD_COUNT) map shards.
 type ConcurrentMap []*ConcurrentMapShared
@@ -27,7 +25,7 @@ type ConcurrentMapShared struct {
 // Creates a new concurrent map.
 func NewCmap() ConcurrentMap {
 	var nShards int
-	customShardCount = os.Getenv(SHARD_COUNT_ENV)
+	customShardCount := os.Getenv(SHARD_COUNT_ENV)
 	if customShardCount == "" {
 		nShards = SHARD_COUNT
 	} else {
