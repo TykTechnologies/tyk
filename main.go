@@ -299,17 +299,17 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}).Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	r.HandleFunc("/reload/group", allowMethods(groupResetHandler, "GET"))
-	r.HandleFunc("/reload/", allowMethods(resetHandler(nil), "GET"))
+	r.HandleFunc("/reload/group{_:/?}", allowMethods(groupResetHandler, "GET"))
+	r.HandleFunc("/reload{_:/?}", allowMethods(resetHandler(nil), "GET"))
 
 	if !isRPCMode() {
 		r.HandleFunc("/org/keys/{keyName:.*}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
 		r.HandleFunc("/keys/policy/{keyName:.*}", allowMethods(policyUpdateHandler, "POST"))
-		r.HandleFunc("/keys/create", allowMethods(createKeyHandler, "POST"))
-		r.HandleFunc("/apis", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
+		r.HandleFunc("/keys/create{_:/?}", allowMethods(createKeyHandler, "POST"))
+		r.HandleFunc("/apis{_:/?}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
 		r.HandleFunc("/apis/{apiID:.*}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
-		r.HandleFunc("/health/", allowMethods(healthCheckhandler, "GET"))
-		r.HandleFunc("/oauth/clients/create", allowMethods(createOauthClient, "POST"))
+		r.HandleFunc("/health{_:/?}", allowMethods(healthCheckhandler, "GET"))
+		r.HandleFunc("/oauth/clients/create{_:/?}", allowMethods(createOauthClient, "POST"))
 		r.HandleFunc("/oauth/refresh/{keyName:.*}", allowMethods(invalidateOauthRefresh, "DELETE"))
 		r.HandleFunc("/cache/{apiID:.*}", allowMethods(invalidateCacheHandler, "DELETE"))
 	} else {
@@ -350,9 +350,9 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager {
-	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client/"
-	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize/"
-	clientAccessPath := spec.Proxy.ListenPath + "oauth/token/"
+	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client{_:/?}"
+	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize{_:/?}"
+	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
 
 	serverConfig := osin.NewServerConfig()
 	serverConfig.ErrorStatusCode = 403
