@@ -959,8 +959,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.Header.Get(a.APIDefinition.VersionDefinition.Key)
 
 	case "url-param":
-		tempRes := CopyHttpRequest(r)
-		return tempRes.FormValue(a.APIDefinition.VersionDefinition.Key)
+		return r.URL.Query().Get(a.APIDefinition.VersionDefinition.Key)
 
 	case "url":
 		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
