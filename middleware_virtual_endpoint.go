@@ -12,7 +12,6 @@ import (
 
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
-	"github.com/mitchellh/mapstructure"
 )
 
 // RequestObject is marshalled to JSON string and pased into JSON middleware
@@ -79,10 +78,6 @@ func PreLoadVirtualMetaCode(meta *tykcommon.VirtualMeta, j *JSVM) {
 	}
 }
 
-type VirtualEndpointConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
-
 // New lets you do any initialisations for the object can be done here
 func (d *VirtualEndpoint) New() {
 	d.sh = SuccessHandler{d.TykMiddleware}
@@ -90,15 +85,7 @@ func (d *VirtualEndpoint) New() {
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *VirtualEndpoint) GetConfig() (interface{}, error) {
-	var thisModuleConfig VirtualEndpointConfig
-
-	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	return thisModuleConfig, nil
+	return nil, nil
 }
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {
@@ -172,17 +159,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Encode the configuration data too
-	configData, cErr := d.GetConfig()
-	if cErr != nil {
-		log.Error("Failed to parse configuration data: ", cErr)
-		configData = make(map[string]string)
-	}
-
-	asJsonConfigData, encErr := json.Marshal(configData)
-	if encErr != nil {
-		log.Error("Failed to encode request object for virtual endpoint: ", encErr)
-		return nil
-	}
+	confData := jsonConfigData(d.Spec)
 
 	var thisSessionState = SessionState{}
 	var authHeaderValue = ""
@@ -202,7 +179,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Run the middleware
 	thisVM := d.Spec.JSVM.VM.Copy()
-	returnRaw, _ := thisVM.Run(thisMeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + string(asJsonConfigData) + `);`)
+	returnRaw, _ := thisVM.Run(thisMeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
