@@ -67,7 +67,6 @@ func TestVirtualEndpoint(t *testing.T) {
 	spec := createSpecTest(t, virtTestDef)
 	defer os.Remove(mwPath)
 
-	//loadApps([]*APISpec{spec}, discardMuxer)
 	virt := &VirtualEndpoint{TykMiddleware: &TykMiddleware{
 		spec, nil,
 	}}
