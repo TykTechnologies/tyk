@@ -10,6 +10,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestJSVMLogs(t *testing.T) {
@@ -66,7 +68,7 @@ rawlog('{"x": "y"}')
 func TestJSVMProcessTimeout(t *testing.T) {
 	dynMid := &DynamicMiddleware{
 		TykMiddleware: &TykMiddleware{
-			Spec: &APISpec{},
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 		},
 		MiddlewareClassName: "leakMid",
 		Pre:                 true,
@@ -85,8 +87,7 @@ leakMid.NewProcessRequest(function(request, session) {
        while (true) {
        }
        return leakMid.ReturnData(request, session.meta_data);
-});
-`
+});`
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -101,5 +102,38 @@ leakMid.NewProcessRequest(function(request, session) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("js vm wasn't killed after its timeout")
+	}
+}
+
+func TestJSVMConfigData(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.RawData = map[string]interface{}{
+		"config_data": map[string]interface{}{
+			"foo": "bar",
+		},
+	}
+	const js = `
+var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({});
+
+testJSVMData.NewProcessRequest(function(request, session, config) {
+	request.SetHeaders["data-foo"] = config.config_data.foo;
+	return testJSVMData.ReturnData(request, {});
+});`
+	dynMid := &DynamicMiddleware{
+		TykMiddleware:       &TykMiddleware{spec, nil},
+		MiddlewareClassName: "testJSVMData",
+		Pre:                 true,
+	}
+	jsvm := &JSVM{}
+	jsvm.Init()
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+
+	r := testReq(t, "GET", "/v1/test-data", nil)
+	dynMid.ProcessRequest(nil, r, nil)
+	if want, got := "bar", r.Header.Get("data-foo"); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }

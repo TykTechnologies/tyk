@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
@@ -58,6 +59,24 @@ func (d *DynamicMiddleware) GetName() string {
 	return "DynamicMiddleware"
 }
 
+type configDataDef struct {
+	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+}
+
+func jsonConfigData(spec *APISpec) string {
+	var conf configDataDef
+	if err := mapstructure.Decode(spec.RawData, &conf); err != nil {
+		log.Error("Failed to parse configuration data: ", err)
+		return ""
+	}
+	bs, err := json.Marshal(conf)
+	if err != nil {
+		log.Error("Failed to encode configuration data: ", err)
+		return ""
+	}
+	return string(bs)
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
@@ -94,6 +113,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
+	confData := jsonConfigData(d.Spec)
+
 	session := new(SessionState)
 	token := ctxGetAuthToken(r)
 
@@ -127,7 +148,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// the whole Go program.
 			recover()
 		}()
-		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
 		ret <- returnRaw
 	}()
 	var returnRaw otto.Value
