@@ -81,17 +81,25 @@ func (a *DynamicMiddleware) IsEnabledForSpec() bool {
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
-	var thisModuleConfig DynamicMiddlewareConfig
+	return nil, nil
+}
 
-	err := mapstructure.Decode(d.TykMiddleware.Spec.APIDefinition.RawData, &thisModuleConfig)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "jsvm",
-		}).Error(err)
-		return nil, err
+type configDataDef struct {
+	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+}
+
+func jsonConfigData(spec *APISpec) string {
+	var conf configDataDef
+	if err := mapstructure.Decode(spec.RawData, &conf); err != nil {
+		log.Error("Failed to parse configuration data: ", err)
+		return ""
 	}
-
-	return thisModuleConfig, nil
+	bs, err := json.Marshal(conf)
+	if err != nil {
+		log.Error("Failed to encode configuration data: ", err)
+		return ""
+	}
+	return string(bs)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -133,6 +141,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	var thisSessionState = SessionState{}
 	var authHeaderValue = ""
 
+	confData := jsonConfigData(d.Spec)
+
 	// Encode the session object (if not a pre-process)
 	if !d.Pre {
 		if d.UseSession {
@@ -170,7 +180,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// the regular send won't happen.
 			ret <- otto.Value{}
 		}()
-		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
 		ret <- returnRaw
 	}()
 	var returnRaw otto.Value
