@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -130,6 +131,7 @@ func (r *RPCStorageHandler) ReConnect() {
 }
 
 var RPCCLientSingleton *gorpc.Client
+var RPCClientSingletonConnectionID string
 var RPCFuncClientSingleton *gorpc.DispatcherClient
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 var RPCClientIsConnected bool
@@ -145,15 +147,9 @@ func (r *RPCStorageHandler) Connect() bool {
 	// RPC Client is unset
 	// Set up the cache
 	log.Info("Setting new RPC connection!")
-	if config.SlaveOptions.UseSSL {
-		clientCfg := &tls.Config{
-			InsecureSkipVerify: config.SlaveOptions.SSLInsecureSkipVerify,
-		}
 
-		RPCCLientSingleton = gorpc.NewTLSClient(r.Address, clientCfg)
-	} else {
-		RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
-	}
+	RPCCLientSingleton = &gorpc.Client{Addr: r.Address}
+	RPCClientSingletonConnectionID = uuid.NewV4().String()
 
 	if log.Level != logrus.DebugLevel {
 		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
@@ -161,6 +157,31 @@ func (r *RPCStorageHandler) Connect() bool {
 
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
 	RPCCLientSingleton.Conns = 50
+	RPCCLientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
+		dialer := &net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+
+		if config.SlaveOptions.UseSSL {
+			cfg := &tls.Config{
+				InsecureSkipVerify: config.SlaveOptions.SSLInsecureSkipVerify,
+			}
+
+			conn, err = tls.DialWithDialer(dialer, "tcp", addr, cfg)
+		} else {
+			conn, err = dialer.Dial("tcp", addr)
+		}
+
+		if err != nil {
+			return
+		}
+
+		conn.Write([]byte("register"))
+		conn.Write([]byte{byte(len(RPCClientSingletonConnectionID))})
+		conn.Write([]byte(RPCClientSingletonConnectionID))
+		return conn, nil
+	}
 	RPCCLientSingleton.Start()
 	d := getDispatcher()
 
