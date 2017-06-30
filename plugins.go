@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -287,6 +288,12 @@ func (j *JSVM) LoadTykJSApi() {
 			"prefix": "jsvm-logmsg",
 			"type":   "log-msg",
 		}).Info(call.Argument(0).String())
+		return otto.Value{}
+	})
+
+	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
+		io.WriteString(log.Out, call.Argument(0).String())
+		log.Out.Write([]byte("\n"))
 		return otto.Value{}
 	})
 

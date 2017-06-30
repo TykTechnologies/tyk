@@ -1,11 +1,67 @@
 package main
 
 import (
+	"bytes"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
+
+func TestJSVMLogs(t *testing.T) {
+	var buf bytes.Buffer
+	defer func(origLog *logrus.Logger) {
+		log = origLog
+	}(log)
+	// need to set up an entire new logger, as the output writer
+	// can't be safely changed once the logger is used. For example,
+	// detection of whether log.Out is a console is done only once.
+	log = logrus.New()
+	log.Out = &buf
+	log.Formatter = new(prefixed.TextFormatter)
+	jsvm := &JSVM{}
+	jsvm.Init()
+
+	const in = `
+log("foo")
+log('{"x": "y"}')
+rawlog("foo")
+rawlog('{"x": "y"}')
+`
+	// note how the logger leaves spaces at the end
+	want := []string{
+		`time=TIME level=info msg=foo type=log-msg `,
+		`time=TIME level=info msg="{\"x\": \"y\"}" type=log-msg `,
+		`foo`,
+		`{"x": "y"}`,
+	}
+	if _, err := jsvm.VM.Run(in); err != nil {
+		t.Fatalf("failed to run js: %v", err)
+	}
+	got := strings.Split(strings.Trim(buf.String(), "\n"), "\n")
+	i := 0
+	timeRe := regexp.MustCompile(`time="[^"]*"`)
+	for _, line := range got {
+		if i >= len(want) {
+			t.Logf("too many lines")
+			t.Fail()
+			break
+		}
+		s := timeRe.ReplaceAllString(line, "time=TIME")
+		if s != line && !strings.Contains(s, "type=log-msg") {
+			continue // log line from elsewhere (async)
+		}
+		if s != want[i] {
+			t.Logf("%s != %s", s, want[i])
+			t.Fail()
+		}
+		i++
+	}
+}
 
 func TestJSVMProcessTimeout(t *testing.T) {
 	dynMid := &DynamicMiddleware{
