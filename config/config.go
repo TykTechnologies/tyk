@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -10,7 +10,10 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	logger "github.com/TykTechnologies/tyk/log"
 )
+
+var log = logger.Get()
 
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
@@ -43,7 +46,7 @@ type NormalisedURLConfig struct {
 	NormaliseUUIDs     bool                 `json:"normalise_uuids"`
 	NormaliseNumbers   bool                 `json:"normalise_numbers"`
 	Custom             []string             `json:"custom_patterns"`
-	compiledPatternSet NormaliseURLPatterns // see analytics.go
+	CompiledPatternSet NormaliseURLPatterns `json:"-"` // see analytics.go
 }
 
 type NormaliseURLPatterns struct {
@@ -256,9 +259,9 @@ type TykEventHandler interface {
 
 const envPrefix = "TYK_GW"
 
-// writeDefaultConf will create a default configuration file and set the
+// WriteDefault will create a default configuration file and set the
 // storage type to "memory"
-func writeDefaultConf(path string, conf *Config) {
+func WriteDefault(path string, conf *Config) {
 	*conf = Config{
 		ListenPort:     8080,
 		Secret:         "352d20ee67be67f6340b4c0605b044b7",
@@ -294,16 +297,15 @@ func writeDefaultConf(path string, conf *Config) {
 	}
 }
 
-// LoadConfig will load a configuration file, trying each of the paths
-// given and using the first one that is a regular file and can be
-// opened.
+// Load will load a configuration file, trying each of the paths given
+// and using the first one that is a regular file and can be opened.
 //
 // If none exists, a default config will be written to the first path in
 // the list.
 //
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
-func loadConfig(paths []string, conf *Config) error {
+func Load(paths []string, conf *Config) error {
 	var bs []byte
 	for _, path := range paths {
 		var err error
@@ -320,9 +322,9 @@ func loadConfig(paths []string, conf *Config) error {
 	if bs == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
-		writeDefaultConf(path, conf)
+		WriteDefault(path, conf)
 		log.Info("Loading default configuration...")
-		return loadConfig([]string{path}, conf)
+		return Load([]string{path}, conf)
 	}
 	if err := json.Unmarshal(bs, &conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
@@ -334,7 +336,7 @@ func loadConfig(paths []string, conf *Config) error {
 	return nil
 }
 
-func (c *Config) loadIgnoredIPs() {
+func (c *Config) LoadIgnoredIPs() {
 	c.AnalyticsConfig.ignoredIPsCompiled = make(map[string]bool, len(c.AnalyticsConfig.IgnoredIPs))
 	for _, ip := range c.AnalyticsConfig.IgnoredIPs {
 		c.AnalyticsConfig.ignoredIPsCompiled[ip] = true

@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type ConfigPayload struct {
-	Configuration Config
+	Configuration config.Config
 	ForHostname   string
 	ForNodeID     string
 	TimeStamp     int64
@@ -39,9 +41,9 @@ func writeNewConfiguration(payload ConfigPayload) error {
 	return nil
 }
 
-func getExistingRawConfig() Config {
-	existingConfig := Config{}
-	loadConfig(confPaths, &existingConfig)
+func getExistingRawConfig() config.Config {
+	existingConfig := config.Config{}
+	config.Load(confPaths, &existingConfig)
 	return existingConfig
 }
 

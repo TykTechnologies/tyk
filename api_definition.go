@@ -17,6 +17,7 @@ import (
 	"github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -120,7 +121,7 @@ type APISpec struct {
 	SessionManager           SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
-	EventPaths               map[apidef.TykEvent][]TykEventHandler
+	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
 	Health                   HealthChecker
 	JSVM                     *JSVM
 	ResponseChain            []TykResponseHandler
@@ -166,7 +167,7 @@ func (a *APIDefinitionLoader) MakeSpec(appConfig *apidef.APIDefinition) *APISpec
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
-	newAppSpec.EventPaths = make(map[apidef.TykEvent][]TykEventHandler)
+	newAppSpec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range appConfig.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {

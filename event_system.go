@@ -13,6 +13,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
@@ -121,7 +122,7 @@ func EncodeRequestToEvent(r *http.Request) string {
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
-func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (TykEventHandler, error) {
+func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
 
 	var conf interface{}
 	switch x := handlerConf.HandlerMeta.(type) {
@@ -153,7 +154,7 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *A
 		}
 	case EH_CoProcessHandler:
 		if spec != nil {
-			var coprocessEventHandler TykEventHandler
+			var coprocessEventHandler config.TykEventHandler
 			var err error
 			if GlobalDispatcher == nil {
 				err = errors.New("no CP available")
@@ -173,9 +174,9 @@ func (t *TykMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
-func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]TykEventHandler) {
+func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
 	if handlers, e := handlers[name]; e {
-		eventMessage := EventMessage{
+		eventMessage := config.EventMessage{
 			Meta:      meta,
 			Type:      name,
 			TimeStamp: time.Now().Local().String(),
@@ -200,14 +201,14 @@ type LogMessageEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l *LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+func (l *LogMessageEventHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
 	handler := &LogMessageEventHandler{}
 	handler.conf = handlerConf.(map[string]interface{})
 	return handler, nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
+func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 	formattedMsgString := fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.Type)
 
 	// We can handle specific event types easily
@@ -224,8 +225,8 @@ func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
 	log.Warning(formattedMsgString)
 }
 
-func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]TykEventHandler {
-	actualEventHandlers := make(map[apidef.TykEvent][]TykEventHandler)
+func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]config.TykEventHandler {
+	actualEventHandlers := make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range theseEvents.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {

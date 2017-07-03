@@ -9,6 +9,8 @@ import (
 	"github.com/jeffail/tunny"
 	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // AnalyticsRecord encodes the details of a request
@@ -102,7 +104,7 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 	return record, nil
 }
 
-func initNormalisationPatterns() (pats NormaliseURLPatterns) {
+func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
@@ -118,12 +120,12 @@ func initNormalisationPatterns() (pats NormaliseURLPatterns) {
 
 func (a *AnalyticsRecord) NormalisePath() {
 	if globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.compiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
 	}
 	if globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.compiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
+		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
 	}
-	for _, r := range globalConf.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom {
+	for _, r := range globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
 		a.Path = r.ReplaceAllString(a.Path, "{var}")
 	}
 }

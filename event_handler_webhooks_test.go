@@ -3,10 +3,12 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func createGetHandler() *WebHookHandler {
-	eventHandlerConf := WebHookHandlerConf{
+	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   testHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
@@ -99,7 +101,7 @@ func TestBuildRequest(t *testing.T) {
 }
 
 func TestCreateBody(t *testing.T) {
-	em := EventMessage{
+	em := config.EventMessage{
 		Type:      EventQuotaExceeded,
 		TimeStamp: "0",
 	}
@@ -117,7 +119,7 @@ func TestCreateBody(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	eventHandlerConf := WebHookHandlerConf{
+	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   testHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
@@ -129,7 +131,7 @@ func TestGet(t *testing.T) {
 
 	eventHandler := ev.(*WebHookHandler)
 
-	eventMessage := EventMessage{
+	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
 		Meta: EventAuthFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
@@ -150,7 +152,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestPost(t *testing.T) {
-	eventHandlerConf := WebHookHandlerConf{
+	eventHandlerConf := config.WebHookHandlerConf{
 		TargetPath:   "`+testHttpPost+`",
 		Method:       "POST",
 		EventTimeout: 10,
@@ -161,7 +163,7 @@ func TestPost(t *testing.T) {
 	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
 	eventHandler := ev.(*WebHookHandler)
 
-	eventMessage := EventMessage{
+	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
 		Meta: EventAuthFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
