@@ -111,19 +111,6 @@ type EventTokenMeta struct {
 	Key string
 }
 
-// EventMessage is a standard form to send event data to handlers
-type EventMessage struct {
-	Type      apidef.TykEvent
-	Meta      interface{}
-	TimeStamp string
-}
-
-// TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
-type TykEventHandler interface {
-	New(interface{}) (TykEventHandler, error)
-	HandleEvent(EventMessage)
-}
-
 // EncodeRequestToEvent will write the request out in wire protocol and
 // encode it to base64 and store it in an Event object
 func EncodeRequestToEvent(r *http.Request) string {

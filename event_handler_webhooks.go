@@ -30,14 +30,6 @@ const (
 	EH_WebHook apidef.TykEventHandlerName = "eh_web_hook_handler"
 )
 
-type WebHookHandlerConf struct {
-	Method       string            `bson:"method" json:"method"`
-	TargetPath   string            `bson:"target_path" json:"target_path"`
-	TemplatePath string            `bson:"template_path" json:"template_path"`
-	HeaderList   map[string]string `bson:"header_map" json:"header_map"`
-	EventTimeout int64             `bson:"event_timeout" json:"event_timeout"`
-}
-
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
 	conf     WebHookHandlerConf

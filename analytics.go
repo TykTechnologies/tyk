@@ -102,12 +102,6 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 	return record, nil
 }
 
-type NormaliseURLPatterns struct {
-	UUIDs  *regexp.Regexp
-	IDs    *regexp.Regexp
-	Custom []*regexp.Regexp
-}
-
 func initNormalisationPatterns() (pats NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
