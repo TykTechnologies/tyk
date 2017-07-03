@@ -80,7 +80,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	token := ctxGetAuthToken(r)
 	var alias string
 
-	if globalConf.StoreAnalytics(r) {
+	ip := GetIPFromRequest(r)
+	if globalConf.StoreAnalytics(ip) {
 
 		t := time.Now()
 
@@ -147,7 +148,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			0,
 			rawRequest,
 			rawResponse,
-			GetIPFromRequest(r),
+			ip,
 			GeoData{},
 			tags,
 			alias,
@@ -155,7 +156,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			time.Now(),
 		}
 
-		record.GetGeo(GetIPFromRequest(r))
+		record.GetGeo(ip)
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if globalConf.EnforceOrgDataAge {
