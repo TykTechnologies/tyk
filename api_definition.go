@@ -159,7 +159,7 @@ func (a *APIDefinitionLoader) MakeSpec(appConfig *apidef.APIDefinition) *APISpec
 	newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 
 	// Create and init the virtual Machine
-	if config.EnableJSVM {
+	if globalConf.EnableJSVM {
 		newAppSpec.JSVM = &JSVM{}
 		newAppSpec.JSVM.Init()
 	}
@@ -272,11 +272,11 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 	// Extract tagged entries only
 	apiDefs := make([]*apidef.APIDefinition, 0)
 
-	if config.DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool, len(config.DBAppConfOptions.Tags))
+	if globalConf.DBAppConfOptions.NodeIsSegmented {
+		tagList := make(map[string]bool, len(globalConf.DBAppConfOptions.Tags))
 		toLoad := make(map[string]*apidef.APIDefinition)
 
-		for _, mt := range config.DBAppConfOptions.Tags {
+		for _, mt := range globalConf.DBAppConfOptions.Tags {
 			tagList[mt] = true
 		}
 
@@ -316,14 +316,14 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
 func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
-	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+	store := RPCStorageHandler{UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 	store.Connect()
 
 	// enable segments
 	var tags []string
-	if config.DBAppConfOptions.NodeIsSegmented {
-		log.Info("Segmented node, loading: ", config.DBAppConfOptions.Tags)
-		tags = config.DBAppConfOptions.Tags
+	if globalConf.DBAppConfOptions.NodeIsSegmented {
+		log.Info("Segmented node, loading: ", globalConf.DBAppConfOptions.Tags)
+		tags = globalConf.DBAppConfOptions.Tags
 	}
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
@@ -355,7 +355,7 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*API
 		appConfig.DecodeFromDB()
 		appConfig.RawData = strDefs[i] // Lets keep a copy for plugable modules
 
-		if config.SlaveOptions.BindToSlugsInsteadOfListenPaths {
+		if globalConf.SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + appConfig.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
@@ -693,7 +693,7 @@ func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewri
 }
 
 func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
-	if !config.EnableJSVM {
+	if !globalConf.EnableJSVM {
 		return nil
 	}
 

@@ -83,15 +83,15 @@ func CopyHttpResponse(r *http.Response) *http.Response {
 
 func RecordDetail(r *http.Request) bool {
 	// Are we even checking?
-	if !config.EnforceOrgDataDeailLogging {
-		return config.AnalyticsConfig.EnableDetailedRecording
+	if !globalConf.EnforceOrgDataDeailLogging {
+		return globalConf.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// We are, so get session data
 	ses := r.Context().Value(OrgSessionContext)
 	if ses == nil {
 		// no session found, use global config
-		return config.AnalyticsConfig.EnableDetailedRecording
+		return globalConf.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// Session found

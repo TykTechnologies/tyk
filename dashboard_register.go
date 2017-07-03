@@ -60,7 +60,7 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
 
-	h.Secret = config.NodeSecret
+	h.Secret = globalConf.NodeSecret
 	return nil
 }
 

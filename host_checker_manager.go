@@ -81,7 +81,7 @@ func (hc *HostCheckerManager) Start() {
 	// Start loop to check if we are active instance
 	if hc.Id != "" {
 		go hc.CheckActivePollerLoop()
-		if config.UptimeTests.Config.EnableUptimeAnalytics {
+		if globalConf.UptimeTests.Config.EnableUptimeAnalytics {
 			go hc.UptimePurgeLoop()
 		}
 	}
@@ -167,9 +167,9 @@ func (hc *HostCheckerManager) StartPoller() {
 		hc.checker = &HostUptimeChecker{}
 	}
 
-	hc.checker.Init(config.UptimeTests.Config.CheckerPoolSize,
-		config.UptimeTests.Config.FailureTriggerSampleSize,
-		config.UptimeTests.Config.TimeWait,
+	hc.checker.Init(globalConf.UptimeTests.Config.CheckerPoolSize,
+		globalConf.UptimeTests.Config.FailureTriggerSampleSize,
+		globalConf.UptimeTests.Config.TimeWait,
 		hc.currentHostList,
 		hc.OnHostDown,   // On failure
 		hc.OnHostBackUp, // On success
@@ -199,7 +199,7 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 }
 
 func (hc *HostCheckerManager) OnHostReport(report HostHealthReport) {
-	if config.UptimeTests.Config.EnableUptimeAnalytics {
+	if globalConf.UptimeTests.Config.EnableUptimeAnalytics {
 		go hc.RecordUptimeAnalytics(report)
 	}
 }

@@ -114,7 +114,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *SessionSt
 	v, _ := json.Marshal(session)
 
 	// Keep the TTL
-	if config.UseAsyncSessionWrite {
+	if globalConf.UseAsyncSessionWrite {
 		go b.Store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
 	}

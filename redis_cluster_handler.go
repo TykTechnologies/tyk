@@ -32,10 +32,10 @@ type RedisClusterStorageManager struct {
 
 func NewRedisClusterPool(forceReconnect bool, isCache bool) *rediscluster.RedisCluster {
 	redisPtr := redisClusterSingleton
-	cfg := config.Storage
-	if isCache && config.EnableSeperateCacheStore {
+	cfg := globalConf.Storage
+	if isCache && globalConf.EnableSeperateCacheStore {
 		redisPtr = redisCacheClusterSingleton
-		cfg = config.CacheStorage
+		cfg = globalConf.CacheStorage
 	}
 
 	if !forceReconnect {

@@ -28,11 +28,11 @@ type ChainObject struct {
 var apiCountByListenHash map[string]int
 
 func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
+	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
+	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 
 	FallbackKeySesionManager.Init(&redisStore)
 
@@ -170,7 +170,7 @@ func processSpec(referenceSpec *APISpec,
 		storageEngine := rpcAuthStore
 		authStore = storageEngine
 		orgStore = rpcOrgStore
-		config.EnforceOrgDataAge = true
+		globalConf.EnforceOrgDataAge = true
 
 	default:
 		authStore = redisStore
@@ -179,7 +179,7 @@ func processSpec(referenceSpec *APISpec,
 
 	switch referenceSpec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
-		sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+		sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 	default:
 		sessionStore = redisStore
 	}
@@ -199,8 +199,8 @@ func processSpec(referenceSpec *APISpec,
 		loadBundle(referenceSpec)
 	}
 
-	// TODO: use config.EnableCoProcess
-	if config.EnableJSVM || EnableCoProcess {
+	// TODO: use globalConf.EnableCoProcess
+	if globalConf.EnableJSVM || EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": referenceSpec.Name,
@@ -209,7 +209,7 @@ func processSpec(referenceSpec *APISpec,
 		var mwPaths []string
 		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
 
-		if config.EnableJSVM && mwDriver == apidef.OttoDriver {
+		if globalConf.EnableJSVM && mwDriver == apidef.OttoDriver {
 			var pathPrefix string
 			if referenceSpec.CustomMiddlewareBundle != "" {
 				pathPrefix = referenceSpec.APIID + "-" + referenceSpec.CustomMiddlewareBundle
@@ -550,7 +550,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
-	hostname := config.HostName
+	hostname := globalConf.HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
@@ -579,7 +579,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 		go func(referenceSpec *APISpec, i int) {
 			subrouter := muxer
 			// Handle custom domains
-			if config.EnableCustomDomains && referenceSpec.Domain != "" {
+			if globalConf.EnableCustomDomains && referenceSpec.Domain != "" {
 				log.WithFields(logrus.Fields{
 					"prefix":   "main",
 					"api_name": referenceSpec.Name,
@@ -624,7 +624,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 	log.Debug("Checker host list")
 
 	// Kick off our host checkers
-	if !config.UptimeTests.Disable {
+	if !globalConf.UptimeTests.Disable {
 		SetCheckerHostList()
 	}
 
@@ -634,7 +634,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 		"prefix": "main",
 	}).Info("Initialised API Definitions")
 
-	if config.SlaveOptions.UseRPC {
+	if globalConf.SlaveOptions.UseRPC {
 		//log.Warning("TODO: PUT THE KEEPALIVE WATCHER BACK")
 		startRPCKeepaliveWatcher(rpcAuthStore)
 		startRPCKeepaliveWatcher(rpcOrgStore)

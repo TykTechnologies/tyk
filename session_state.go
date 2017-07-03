@@ -103,8 +103,8 @@ func (s *SessionState) HasChanged() bool {
 }
 
 func getLifetime(spec *APISpec, session *SessionState) int64 {
-	if config.ForceGlobalSessionLifetime {
-		return config.GlobalSessionLifetime
+	if globalConf.ForceGlobalSessionLifetime {
+		return globalConf.GlobalSessionLifetime
 	}
 	if session.SessionLifetime > 0 {
 		return session.SessionLifetime

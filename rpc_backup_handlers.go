@@ -19,8 +19,8 @@ const BackupKeyBase = "node-definition-backup:"
 
 func getTagListAsString() string {
 	tagList := ""
-	if len(config.DBAppConfOptions.Tags) > 0 {
-		tagList = strings.Join(config.DBAppConfOptions.Tags, "-")
+	if len(globalConf.DBAppConfOptions.Tags) > 0 {
+		tagList = strings.Join(globalConf.DBAppConfOptions.Tags, "-")
 	}
 
 	return tagList
@@ -42,7 +42,7 @@ func saveRPCDefinitionsBackup(list string) {
 		return
 	}
 
-	secret := rightPad2Len(config.Secret, "=", 32)
+	secret := rightPad2Len(globalConf.Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupKeyBase+tagList, cryptoText, -1)
 	if err != nil {
@@ -64,7 +64,7 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 		return nil
 	}
 
-	secret := rightPad2Len(config.Secret, "=", 32)
+	secret := rightPad2Len(globalConf.Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 

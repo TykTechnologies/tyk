@@ -204,8 +204,8 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 func TestApiHandlerPostDbConfig(t *testing.T) {
 	uri := "/tyk/apis/1"
 
-	config.UseDBAppConfigs = true
-	defer func() { config.UseDBAppConfigs = false }()
+	globalConf.UseDBAppConfigs = true
+	defer func() { globalConf.UseDBAppConfigs = false }()
 
 	recorder := httptest.NewRecorder()
 

@@ -234,7 +234,7 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 func (r *RPCStorageHandler) GroupLogin() {
 	groupLoginData := GroupLoginRequest{
 		UserKey: r.UserKey,
-		GroupID: config.SlaveOptions.GroupID,
+		GroupID: globalConf.SlaveOptions.GroupID,
 	}
 	ok, err := RPCFuncClientSingleton.CallTimeout("LoginWithGroup", groupLoginData, GlobalRPCCallTimeout)
 	if err != nil {
@@ -260,7 +260,7 @@ func (r *RPCStorageHandler) Login() {
 	}
 
 	// If we have a group ID, lets login as a group
-	if config.SlaveOptions.GroupID != "" {
+	if globalConf.SlaveOptions.GroupID != "" {
 		r.GroupLogin()
 		return
 	}
@@ -288,7 +288,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
 	// Check the cache first
-	if config.SlaveOptions.EnableRPCCache {
+	if globalConf.SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
 		cachedVal, found := RPCGlobalCache.Get(r.fixKey(keyName))
 		log.Debug("--> Found? ", found)
@@ -315,7 +315,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	elapsed := time.Since(start)
 	log.Debug("GetKey took ", elapsed)
 
-	if config.SlaveOptions.EnableRPCCache {
+	if globalConf.SlaveOptions.EnableRPCCache {
 		// Cache it
 		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
 	}
@@ -656,7 +656,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
-	if config.SlaveOptions.DisableKeySpaceSync {
+	if globalConf.SlaveOptions.DisableKeySpaceSync {
 		return
 	}
 
@@ -675,13 +675,13 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var keys interface{}
 	var err error
 
-	if config.SlaveOptions.GroupID == "" {
+	if globalConf.SlaveOptions.GroupID == "" {
 		keys, err = RPCFuncClientSingleton.CallTimeout("GetKeySpaceUpdate", orgId, GlobalRPCCallTimeout)
 	} else {
 
 		grpReq := GroupKeySpaceRequest{
 			OrgID:   orgId,
-			GroupID: config.SlaveOptions.GroupID,
+			GroupID: globalConf.SlaveOptions.GroupID,
 		}
 		keys, err = RPCFuncClientSingleton.CallTimeout("GetGroupKeySpaceUpdate", grpReq, GlobalRPCCallTimeout)
 	}

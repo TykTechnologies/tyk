@@ -44,23 +44,23 @@ func handleDashboardZeroConfMessage(payload string) {
 		return
 	}
 
-	if !config.UseDBAppConfigs {
+	if !globalConf.UseDBAppConfigs {
 		return
 	}
 
-	if config.DisableDashboardZeroConf {
+	if globalConf.DisableDashboardZeroConf {
 		return
 	}
 
 	hostname := createConnectionStringFromDashboardObject(dashPayload)
 	setHostname := false
-	if config.DBAppConfOptions.ConnectionString == "" {
-		config.DBAppConfOptions.ConnectionString = hostname
+	if globalConf.DBAppConfOptions.ConnectionString == "" {
+		globalConf.DBAppConfOptions.ConnectionString = hostname
 		setHostname = true
 	}
 
-	if config.Policies.PolicyConnectionString == "" {
-		config.Policies.PolicyConnectionString = hostname
+	if globalConf.Policies.PolicyConnectionString == "" {
+		globalConf.Policies.PolicyConnectionString = hostname
 		setHostname = true
 	}
 

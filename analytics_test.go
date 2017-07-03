@@ -23,10 +23,10 @@ func TestGeoIPLookup(t *testing.T) {
 }
 
 func TestURLReplacer(t *testing.T) {
-	config.AnalyticsConfig.NormaliseUrls.Enabled = true
-	config.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-	config.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
-	config.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
 
 	recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
 	recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
@@ -35,7 +35,7 @@ func TestURLReplacer(t *testing.T) {
 	recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
 	recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
-	config.AnalyticsConfig.NormaliseUrls.compiledPatternSet = initNormalisationPatterns()
+	globalConf.AnalyticsConfig.NormaliseUrls.compiledPatternSet = initNormalisationPatterns()
 
 	recordUUID1.NormalisePath()
 	recordUUID2.NormalisePath()
@@ -47,7 +47,7 @@ func TestURLReplacer(t *testing.T) {
 	if recordUUID1.Path != "/{uuid}/search" {
 		t.Error("Path not altered, is:")
 		t.Error(recordUUID1.Path)
-		t.Error(config.AnalyticsConfig.NormaliseUrls)
+		t.Error(globalConf.AnalyticsConfig.NormaliseUrls)
 	}
 
 	if recordUUID2.Path != "/{uuid}/search" {

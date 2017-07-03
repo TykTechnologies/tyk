@@ -310,13 +310,13 @@ func TestBlacklistLinksMulti(t *testing.T) {
 }
 
 func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
-	config.SlaveOptions.UseRPC = true
-	config.SlaveOptions.RPCKey = "test_org"
-	config.SlaveOptions.APIKey = "test"
+	globalConf.SlaveOptions.UseRPC = true
+	globalConf.SlaveOptions.RPCKey = "test_org"
+	globalConf.SlaveOptions.APIKey = "test"
 
 	server := gorpc.NewTCPServer(":9090", dispatcher.NewHandlerFunc())
 	go server.Serve()
-	config.SlaveOptions.ConnectionString = server.Addr
+	globalConf.SlaveOptions.ConnectionString = server.Addr
 
 	RPCCLientSingleton = gorpc.NewTCPClient(server.Addr)
 	RPCCLientSingleton.Conns = 1
@@ -328,10 +328,10 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 }
 
 func stopRPCMock(server *gorpc.Server) {
-	config.SlaveOptions.ConnectionString = ""
-	config.SlaveOptions.RPCKey = ""
-	config.SlaveOptions.APIKey = ""
-	config.SlaveOptions.UseRPC = false
+	globalConf.SlaveOptions.ConnectionString = ""
+	globalConf.SlaveOptions.RPCKey = ""
+	globalConf.SlaveOptions.APIKey = ""
+	globalConf.SlaveOptions.UseRPC = false
 
 	server.Listener.Close()
 	server.Stop()
@@ -394,14 +394,14 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 
 	apisByID = make(map[string]*APISpec)
 
-	config.UseDBAppConfigs = true
-	config.AllowInsecureConfigs = true
-	config.DBAppConfOptions.ConnectionString = ts.URL
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = ts.URL
 
 	defer func() {
-		config.UseDBAppConfigs = false
-		config.AllowInsecureConfigs = false
-		config.DBAppConfOptions.ConnectionString = ""
+		globalConf.UseDBAppConfigs = false
+		globalConf.AllowInsecureConfigs = false
+		globalConf.DBAppConfOptions.ConnectionString = ""
 	}()
 
 	var wg sync.WaitGroup
