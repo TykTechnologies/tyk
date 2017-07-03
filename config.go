@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -47,6 +48,12 @@ type NormalisedURLConfig struct {
 	compiledPatternSet NormaliseURLPatterns // see analytics.go
 }
 
+type NormaliseURLPatterns struct {
+	UUIDs  *regexp.Regexp
+	IDs    *regexp.Regexp
+	Custom []*regexp.Regexp
+}
+
 type AnalyticsConfigConfig struct {
 	Type                    string              `json:"type"`
 	IgnoredIPs              []string            `json:"ignored_ips"`
@@ -69,6 +76,14 @@ type MonitorConfig struct {
 	GlobalTriggerLimit    float64            `json:"global_trigger_limit"`
 	MonitorUserKeys       bool               `json:"monitor_user_keys"`
 	MonitorOrgKeys        bool               `json:"monitor_org_keys"`
+}
+
+type WebHookHandlerConf struct {
+	Method       string            `bson:"method" json:"method"`
+	TargetPath   string            `bson:"target_path" json:"target_path"`
+	TemplatePath string            `bson:"template_path" json:"template_path"`
+	HeaderList   map[string]string `bson:"header_map" json:"header_map"`
+	EventTimeout int64             `bson:"event_timeout" json:"event_timeout"`
 }
 
 type SlaveOptionsConfig struct {
@@ -221,6 +236,19 @@ type CertData struct {
 	Name     string `json:"domain_name"`
 	CertFile string `json:"cert_file"`
 	KeyFile  string `json:"key_file"`
+}
+
+// EventMessage is a standard form to send event data to handlers
+type EventMessage struct {
+	Type      apidef.TykEvent
+	Meta      interface{}
+	TimeStamp string
+}
+
+// TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
+type TykEventHandler interface {
+	New(interface{}) (TykEventHandler, error)
+	HandleEvent(EventMessage)
 }
 
 const envPrefix = "TYK_GW"
