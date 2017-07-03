@@ -55,8 +55,8 @@ func TestConfigFiles(t *testing.T) {
 	if _, err := os.Stat(path2); err == nil {
 		t.Fatalf("loadConfig with no configs wrote too many default config files")
 	}
-	if usedConfPath != path1 {
-		t.Fatalf("usedConfPath was not set properly")
+	if conf.OriginalPath != path1 {
+		t.Fatalf("OriginalPath was not set properly")
 	}
 
 	// both exist, we use path1
@@ -64,8 +64,8 @@ func TestConfigFiles(t *testing.T) {
 	if err := loadConfig(paths, conf); err != nil {
 		t.Fatalf("loadConfig with an existing config errored")
 	}
-	if usedConfPath != path1 {
-		t.Fatalf("usedConfPath was not set properly")
+	if conf.OriginalPath != path1 {
+		t.Fatalf("OriginalPath was not set properly")
 	}
 
 	// path2 exists but path1 doesn't
@@ -76,8 +76,8 @@ func TestConfigFiles(t *testing.T) {
 	if _, err := os.Stat(path1); err == nil {
 		t.Fatalf("loadConfig with a config wrote a default config file")
 	}
-	if usedConfPath != path2 {
-		t.Fatalf("usedConfPath was not set properly")
+	if conf.OriginalPath != path2 {
+		t.Fatalf("OriginalPath was not set properly")
 	}
 
 	// path1 exists but is invalid

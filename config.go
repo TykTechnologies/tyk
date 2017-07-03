@@ -150,6 +150,11 @@ type CoProcessConfig struct {
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
+	// OriginalPath is the path to the config file that was read. If
+	// none was found, it's the path to the default config file that
+	// was written.
+	OriginalPath string `json:"-"`
+
 	ListenAddress                     string                 `json:"listen_address"`
 	ListenPort                        int                    `json:"listen_port"`
 	Secret                            string                 `json:"secret"`
@@ -253,21 +258,6 @@ type TykEventHandler interface {
 
 const envPrefix = "TYK_GW"
 
-// confPaths is the series of paths to try to use as config files. The
-// first one to exist will be used. If none exists, a default config
-// will be written to the first path in the list.
-//
-// When --conf=foo is used, this will be replaced by []string{"foo"}.
-var confPaths = []string{
-	"tyk.conf",
-	// TODO: add ~/.config/tyk/tyk.conf here?
-	"/etc/tyk/tyk.conf",
-}
-
-// usedConfPath is the path to the config file that was read. If none
-// was found, it's the path to the default config file that was written.
-var usedConfPath string
-
 // writeDefaultConf will create a default configuration file and set the
 // storage type to "memory"
 func writeDefaultConf(path string, conf *Config) {
@@ -321,7 +311,7 @@ func loadConfig(paths []string, conf *Config) error {
 		var err error
 		bs, err = ioutil.ReadFile(path)
 		if err == nil {
-			usedConfPath = path
+			conf.OriginalPath = path
 			break
 		}
 		if os.IsNotExist(err) {

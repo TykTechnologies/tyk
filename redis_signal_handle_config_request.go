@@ -40,7 +40,7 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 
 func getExistingConfig() (map[string]interface{}, error) {
 	var microConfig map[string]interface{}
-	dat, err := ioutil.ReadFile(usedConfPath)
+	dat, err := ioutil.ReadFile(globalConf.OriginalPath)
 	if err != nil {
 		return microConfig, err
 	}

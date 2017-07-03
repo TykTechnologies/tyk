@@ -65,6 +65,17 @@ var (
 	NodeID string
 
 	runningTests = false
+
+	// confPaths is the series of paths to try to use as config files. The
+	// first one to exist will be used. If none exists, a default config
+	// will be written to the first path in the list.
+	//
+	// When --conf=foo is used, this will be replaced by []string{"foo"}.
+	confPaths = []string{
+		"tyk.conf",
+		// TODO: add ~/.config/tyk/tyk.conf here?
+		"/etc/tyk/tyk.conf",
+	}
 )
 
 // Display configuration options
