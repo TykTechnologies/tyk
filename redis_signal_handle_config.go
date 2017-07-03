@@ -17,7 +17,7 @@ type ConfigPayload struct {
 }
 
 func backupConfiguration() error {
-	oldConfig, err := json.MarshalIndent(config, "", "    ")
+	oldConfig, err := json.MarshalIndent(globalConf, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func handleNewConfiguration(payload string) {
 		return
 	}
 
-	if config.AllowRemoteConfig {
+	if globalConf.AllowRemoteConfig {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Warning("Ignoring new config: Remote configuration is not allowed for this node.")

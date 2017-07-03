@@ -57,7 +57,7 @@ func (t *TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	session, found := t.Spec.OrgSessionManager.GetSessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
-		if config.EnforceOrgDataAge {
+		if globalConf.EnforceOrgDataAge {
 			// We cache org expiry data
 			log.Debug("Setting data expiry: ", session.OrgID)
 			go t.SetOrgExpiry(session.OrgID, session.DataExpires)
@@ -157,7 +157,7 @@ func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
 	// Check in-memory cache
-	if !config.LocalSessionCache.DisableCacheSessionState {
+	if !globalConf.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(key)
 		if found {
 			log.Debug("--> Key found in local cache")
@@ -214,7 +214,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		return
 	}
 
-	if config.StoreAnalytics(r) {
+	if globalConf.StoreAnalytics(r) {
 
 		t := time.Now()
 
@@ -291,7 +291,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		record.GetGeo(GetIPFromRequest(r))
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
-		if config.EnforceOrgDataAge {
+		if globalConf.EnforceOrgDataAge {
 			orgExpireDataTime := s.GetOrgSessionExpiry(s.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -301,7 +301,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		record.SetExpiry(expiresAfter)
 
-		if config.AnalyticsConfig.NormaliseUrls.Enabled {
+		if globalConf.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 

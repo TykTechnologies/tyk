@@ -99,7 +99,7 @@ func (w *WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 				"prefix": "webhooks",
 				"target": handler.conf.TargetPath,
 			}).Warning("Custom template load failure, using default: ", err)
-			defaultPath := filepath.Join(config.TemplatePath, "default_webhook.json")
+			defaultPath := filepath.Join(globalConf.TemplatePath, "default_webhook.json")
 			webHookTemplate, _ = template.ParseFiles(defaultPath)
 			templateLoaded = true
 		}
@@ -110,7 +110,7 @@ func (w *WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
 			"prefix": "webhooks",
 			"target": handler.conf.TargetPath,
 		}).Info("Loading default template.")
-		defaultPath := filepath.Join(config.TemplatePath, "default_webhook.json")
+		defaultPath := filepath.Join(globalConf.TemplatePath, "default_webhook.json")
 		webHookTemplate, _ = template.ParseFiles(defaultPath)
 	}
 

@@ -155,8 +155,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if ServiceCache == nil {
 			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
-			if config.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = config.ServiceDiscovery.DefaultCacheTimeout
+			if globalConf.ServiceDiscovery.DefaultCacheTimeout > 0 {
+				expiry = globalConf.ServiceDiscovery.DefaultCacheTimeout
 			}
 			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
 		}
@@ -217,7 +217,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 	}
 
-	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(config.HttpServerOptions.FlushInterval) * time.Millisecond}
+	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(globalConf.HttpServerOptions.FlushInterval) * time.Millisecond}
 }
 
 // onExitFlushLoop is a callback set by tests to detect the state of the
@@ -262,7 +262,7 @@ func (t *TykTransporter) SetTimeout(timeOut int) {
 }
 
 func getMaxIdleConns() int {
-	return config.MaxIdleConnsPerHost
+	return globalConf.MaxIdleConnsPerHost
 }
 
 var TykDefaultTransport = &TykTransporter{http.Transport{
@@ -383,7 +383,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := TykDefaultTransport
-	transport.TLSClientConfig.InsecureSkipVerify = config.ProxySSLInsecureSkipVerify
+	transport.TLSClientConfig.InsecureSkipVerify = globalConf.ProxySSLInsecureSkipVerify
 
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
@@ -586,7 +586,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	defer res.Body.Close()
 
 	// Close connections
-	if config.CloseConnections {
+	if globalConf.CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 

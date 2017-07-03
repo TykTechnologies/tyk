@@ -321,7 +321,7 @@ func loadConfig(paths []string, conf *Config) error {
 }
 
 // afterConfSetup takes care of non-sensical config values (such as zero
-// timeouts) and sets up a few globals that depend on the config.
+// timeouts) and sets up a few globals that depend on the globalConf.
 func afterConfSetup(conf *Config) {
 	if conf.SlaveOptions.CallTimeout == 0 {
 		conf.SlaveOptions.CallTimeout = 30

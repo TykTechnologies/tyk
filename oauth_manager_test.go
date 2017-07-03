@@ -113,7 +113,7 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	// Enable multiple Redirect URIs
-	config.OauthRedirectUriSeparator = ","
+	globalConf.OauthRedirectUriSeparator = ","
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
@@ -140,7 +140,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	// Disable multiple Redirect URIs
-	config.OauthRedirectUriSeparator = ""
+	globalConf.OauthRedirectUriSeparator = ""
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()

@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	// EnableCoProcess will be overridden by config.EnableCoProcess.
+	// EnableCoProcess will be overridden by globalConf.EnableCoProcess.
 	EnableCoProcess = false
 
 	// GlobalDispatcher will be implemented by the current CoProcess driver.
@@ -151,7 +151,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
 func CoProcessInit() error {
 	var err error
-	if config.CoProcessOptions.EnableCoProcess {
+	if globalConf.CoProcessOptions.EnableCoProcess {
 		GlobalDispatcher, err = NewCoProcessDispatcher()
 		EnableCoProcess = true
 	}
@@ -161,7 +161,7 @@ func CoProcessInit() error {
 // IsEnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
-	enableCoProcess := config.CoProcessOptions.EnableCoProcess && EnableCoProcess
+	enableCoProcess := globalConf.CoProcessOptions.EnableCoProcess && EnableCoProcess
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 

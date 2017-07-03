@@ -130,23 +130,23 @@ func TestMain(m *testing.M) {
 	go func() {
 		panic(testServer.ListenAndServe())
 	}()
-	writeDefaultConf("", &config)
-	config.Storage.Database = 1
+	writeDefaultConf("", &globalConf)
+	globalConf.Storage.Database = 1
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
 	var err error
-	config.AppPath, err = ioutil.TempDir("", "tyk-test-")
+	globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	if err != nil {
 		panic(err)
 	}
-	config.EnableAnalytics = true
-	config.AnalyticsConfig.EnableGeoIP = true
-	config.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
-	config.EnableJSVM = true
-	config.Monitor.EnableTriggerMonitors = true
-	config.AnalyticsConfig.NormaliseUrls.Enabled = true
-	afterConfSetup(&config)
+	globalConf.EnableAnalytics = true
+	globalConf.AnalyticsConfig.EnableGeoIP = true
+	globalConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	globalConf.EnableJSVM = true
+	globalConf.Monitor.EnableTriggerMonitors = true
+	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+	afterConfSetup(&globalConf)
 	initialiseSystem(nil)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
@@ -156,18 +156,18 @@ func TestMain(m *testing.M) {
 
 	exitCode := m.Run()
 
-	os.RemoveAll(config.AppPath)
+	os.RemoveAll(globalConf.AppPath)
 	os.Exit(exitCode)
 }
 
 func emptyRedis() error {
-	addr := ":" + strconv.Itoa(config.Storage.Port)
+	addr := ":" + strconv.Itoa(globalConf.Storage.Port)
 	c, err := redis.Dial("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not connect to redis: %v", err)
 	}
 	defer c.Close()
-	dbName := strconv.Itoa(config.Storage.Database)
+	dbName := strconv.Itoa(globalConf.Storage.Database)
 	if _, err := c.Do("SELECT", dbName); err != nil {
 		return err
 	}
@@ -793,16 +793,16 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			cln, _ = net.Listen("tcp", ":0")
 
 			_, port, _ := net.SplitHostPort(cln.Addr().String())
-			config.ControlAPIPort, _ = strconv.Atoi(port)
+			globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 		}
 
-		config.HttpServerOptions.OverrideDefaults = m.overrideDefaults
+		globalConf.HttpServerOptions.OverrideDefaults = m.overrideDefaults
 
 		// Ensure that no local API's installed
-		os.RemoveAll(config.AppPath)
+		os.RemoveAll(globalConf.AppPath)
 
 		var err error
-		config.AppPath, err = ioutil.TempDir("", "tyk-test-")
+		globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
 		if err != nil {
 			panic(err)
 		}
@@ -810,7 +810,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 		initialiseSystem(nil)
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
-		if config.ControlAPIPort == 0 {
+		if globalConf.ControlAPIPort == 0 {
 			loadAPIEndpoints(defaultRouter)
 		}
 
@@ -934,9 +934,9 @@ func TestControlListener(t *testing.T) {
 
 func TestManagementNodeRedisEvents(t *testing.T) {
 	defer func() {
-		config.ManagementNode = false
+		globalConf.ManagementNode = false
 	}()
-	config.ManagementNode = false
+	globalConf.ManagementNode = false
 	msg := redis.Message{
 		Data: []byte(`{"Command": "NoticeGatewayDRLNotification"}`),
 	}
@@ -946,7 +946,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		}
 	}
 	handleRedisEvent(msg, shouldHandle, nil)
-	config.ManagementNode = true
+	globalConf.ManagementNode = true
 	notHandle := func(got NotificationCommand) {
 		t.Fatalf("should have not handled redis event")
 	}

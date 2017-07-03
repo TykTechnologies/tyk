@@ -98,7 +98,7 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 		// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
 		var absURL string
 		if !unsafe {
-			absUrlHeader := "http://localhost:" + strconv.Itoa(config.ListenPort)
+			absUrlHeader := "http://localhost:" + strconv.Itoa(globalConf.ListenPort)
 			absURL = strings.Join([]string{absUrlHeader, strings.Trim(b.API.Proxy.ListenPath, "/"), requestDef.RelativeURL}, "/")
 		} else {
 			absURL = requestDef.RelativeURL

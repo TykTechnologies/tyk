@@ -80,7 +80,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	token := ctxGetAuthToken(r)
 	var alias string
 
-	if config.StoreAnalytics(r) {
+	if globalConf.StoreAnalytics(r) {
 
 		t := time.Now()
 
@@ -158,7 +158,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		record.GetGeo(GetIPFromRequest(r))
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
-		if config.EnforceOrgDataAge {
+		if globalConf.EnforceOrgDataAge {
 			orgExpireDataTime := e.GetOrgSessionExpiry(e.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -168,7 +168,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		record.SetExpiry(expiresAfter)
-		if config.AnalyticsConfig.NormaliseUrls.Enabled {
+		if globalConf.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 
@@ -179,12 +179,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	ReportHealthCheckValue(e.Spec.Health, BlockedRequestLog, "-1")
 
 	//If the config option is not set or is false, add the header
-	if !config.HideGeneratorHeader {
+	if !globalConf.HideGeneratorHeader {
 		w.Header().Add("X-Generator", "tyk.io")
 	}
 
 	// Close connections
-	if config.CloseConnections {
+	if globalConf.CloseConnections {
 		w.Header().Add("Connection", "close")
 	}
 

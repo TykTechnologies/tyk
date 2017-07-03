@@ -63,7 +63,7 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 			j.VM.Run(js)
 		}
 	case "blob":
-		if config.DisableVirtualPathBlobs {
+		if globalConf.DisableVirtualPathBlobs {
 			log.Error("[JSVM] Blobs not allowerd on this node")
 			return
 		}
@@ -98,7 +98,7 @@ func (d *VirtualEndpoint) configData() (conf VirtualEndpointConfig) {
 }
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {
-	if !config.EnableJSVM {
+	if !globalConf.EnableJSVM {
 		return false
 	}
 	for _, version := range d.Spec.VersionData.Versions {
@@ -267,7 +267,7 @@ func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Respo
 	defer res.Body.Close()
 
 	// Close connections
-	if config.CloseConnections {
+	if globalConf.CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 

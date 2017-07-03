@@ -233,7 +233,7 @@ func (j *JSVM) Init() {
 	vm := otto.New()
 
 	// Init TykJS namespace, constructors etc.
-	jscore, _ := ioutil.ReadFile(config.TykJSPath)
+	jscore, _ := ioutil.ReadFile(globalConf.TykJSPath)
 	vm.Run(jscore)
 
 	j.VM = vm

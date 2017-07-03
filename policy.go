@@ -180,7 +180,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 	var dbPolicyList []Policy
 
-	store := &RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+	store := &RPCStorageHandler{UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 	store.Connect()
 
 	rpcPolicies := store.GetPolicies(orgId)

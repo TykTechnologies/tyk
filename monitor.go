@@ -5,7 +5,7 @@ import "time"
 type Monitor struct{}
 
 func (m *Monitor) IsMonitorEnabled() bool {
-	return config.Monitor.EnableTriggerMonitors
+	return globalConf.Monitor.EnableTriggerMonitors
 }
 
 func (m *Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
@@ -43,13 +43,13 @@ func (m *Monitor) Check(sessionData *SessionState, key string) {
 		return
 	}
 
-	if config.Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Monitor.GlobalTriggerLimit {
+	if globalConf.Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= globalConf.Monitor.GlobalTriggerLimit {
 		log.Info("Firing...")
-		m.Fire(sessionData, key, config.Monitor.GlobalTriggerLimit)
+		m.Fire(sessionData, key, globalConf.Monitor.GlobalTriggerLimit)
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
-		if usagePerc >= triggerLimit && triggerLimit != config.Monitor.GlobalTriggerLimit {
+		if usagePerc >= triggerLimit && triggerLimit != globalConf.Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
 			m.Fire(sessionData, key, triggerLimit)
 			break
