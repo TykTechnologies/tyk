@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"time"
 
@@ -341,12 +340,11 @@ func (c *Config) loadIgnoredIPs() {
 	}
 }
 
-func (c *Config) StoreAnalytics(r *http.Request) bool {
+func (c *Config) StoreAnalytics(ip string) bool {
 	if !c.EnableAnalytics {
 		return false
 	}
 
-	ip := GetIPFromRequest(r)
 	return !c.AnalyticsConfig.ignoredIPsCompiled[ip]
 }
 

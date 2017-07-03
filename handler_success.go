@@ -214,7 +214,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		return
 	}
 
-	if globalConf.StoreAnalytics(r) {
+	ip := GetIPFromRequest(r)
+	if globalConf.StoreAnalytics(ip) {
 
 		t := time.Now()
 
@@ -280,7 +281,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			timing,
 			rawRequest,
 			rawResponse,
-			GetIPFromRequest(r),
+			ip,
 			GeoData{},
 			tags,
 			alias,
@@ -288,7 +289,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			time.Now(),
 		}
 
-		record.GetGeo(GetIPFromRequest(r))
+		record.GetGeo(ip)
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if globalConf.EnforceOrgDataAge {
