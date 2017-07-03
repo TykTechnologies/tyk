@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
@@ -45,7 +46,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 type CoProcessEventHandler JSVMEventHandler
 
-func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+func (l CoProcessEventHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
 	return nil, nil
 }
 

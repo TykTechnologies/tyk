@@ -21,6 +21,8 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func init() {
@@ -130,7 +132,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		panic(testServer.ListenAndServe())
 	}()
-	writeDefaultConf("", &globalConf)
+	config.WriteDefault("", &globalConf)
 	globalConf.Storage.Database = 1
 	if err := emptyRedis(); err != nil {
 		panic(err)

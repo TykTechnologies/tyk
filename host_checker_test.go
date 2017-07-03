@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const sampleUptimeTestAPI = `{
@@ -46,14 +47,14 @@ const sampleUptimeTestAPI = `{
 }`
 
 type testEventHandler struct {
-	cb func(EventMessage)
+	cb func(config.EventMessage)
 }
 
-func (w *testEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+func (w *testEventHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
 	return w, nil
 }
 
-func (w *testEventHandler) HandleEvent(em EventMessage) {
+func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 	w.cb(em)
 }
 
@@ -80,11 +81,11 @@ func TestHostChecker(t *testing.T) {
 	var eventWG sync.WaitGroup
 	// Should receive one HostDown event
 	eventWG.Add(1)
-	cb := func(em EventMessage) {
+	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
 
-	spec.EventPaths = map[apidef.TykEvent][]TykEventHandler{
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
 		"HostDown": {&testEventHandler{cb}},
 	}
 

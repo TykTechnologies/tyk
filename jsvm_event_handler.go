@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const EH_JSVMHandler apidef.TykEventHandlerName = "eh_dynamic_handler"
@@ -21,7 +22,7 @@ type JSVMEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l *JSVMEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+func (l *JSVMEventHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
 	handler := &JSVMEventHandler{}
 	handler.Spec = l.Spec
 	handler.conf = handlerConf.(map[string]interface{})
@@ -43,7 +44,7 @@ func (l *JSVMEventHandler) New(handlerConf interface{}) (TykEventHandler, error)
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (l *JSVMEventHandler) HandleEvent(em EventMessage) {
+func (l *JSVMEventHandler) HandleEvent(em config.EventMessage) {
 	// 1. Get the methodName for the Event Handler
 	methodName := l.conf["name"].(string)
 

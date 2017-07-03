@@ -15,6 +15,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type WebHookRequestMethod string
@@ -32,7 +33,7 @@ const (
 
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
-	conf     WebHookHandlerConf
+	conf     config.WebHookHandlerConf
 	template *template.Template
 	store    StorageHandler
 }
@@ -52,8 +53,8 @@ func GetRedisInterfacePointer() *RedisClusterStorageManager {
 
 // createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
 // specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
-func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (WebHookHandlerConf, error) {
-	newConf := WebHookHandlerConf{}
+func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (config.WebHookHandlerConf, error) {
+	newConf := config.WebHookHandlerConf{}
 
 	asJSON, _ := json.Marshal(handlerConf)
 	if err := json.Unmarshal(asJSON, &newConf); err != nil {
@@ -67,7 +68,7 @@ func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (WebHookHan
 }
 
 // New enables the init of event handler instances when they are created on ApiSpec creation
-func (w *WebHookHandler) New(handlerConf interface{}) (TykEventHandler, error) {
+func (w *WebHookHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
 	handler := &WebHookHandler{}
 	var err error
 	handler.conf, err = w.createConfigObject(handlerConf)
@@ -193,7 +194,7 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	return req, nil
 }
 
-func (w *WebHookHandler) CreateBody(em EventMessage) (string, error) {
+func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
 	w.template.Execute(&reqBody, em)
 
@@ -201,7 +202,7 @@ func (w *WebHookHandler) CreateBody(em EventMessage) (string, error) {
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (w *WebHookHandler) HandleEvent(em EventMessage) {
+func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	// Inject event message into template, render to string
 	reqBody, _ := w.CreateBody(em)

@@ -1,6 +1,10 @@
 package main
 
-import "time"
+import (
+	"time"
+
+	"github.com/TykTechnologies/tyk/config"
+)
 
 type Monitor struct{}
 
@@ -9,7 +13,7 @@ func (m *Monitor) IsMonitorEnabled() bool {
 }
 
 func (m *Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
-	em := EventMessage{
+	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Quota trigger reached", OriginatingRequest: ""},

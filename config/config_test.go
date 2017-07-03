@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"io/ioutil"
@@ -12,13 +12,13 @@ func TestWriteDefaultConf(t *testing.T) {
 	conf := &Config{}
 	os.Unsetenv("TYK_GW_LISTENPORT")
 	defer os.Unsetenv("TYK_GW_LISTENPORT")
-	writeDefaultConf("", conf)
+	WriteDefault("", conf)
 	if conf.ListenPort != 8080 {
 		t.Fatalf("Expected ListenPort to be set to its default")
 	}
 	*conf = Config{}
 	os.Setenv("TYK_GW_LISTENPORT", "9090")
-	writeDefaultConf("", conf)
+	WriteDefault("", conf)
 	if conf.ListenPort != 9090 {
 		t.Fatalf("Expected ListenPort to be set to 9090")
 	}
@@ -34,7 +34,7 @@ func TestConfigFiles(t *testing.T) {
 	path1 := filepath.Join(dir, "tyk1.conf")
 	path2 := filepath.Join(dir, "tyk2.conf")
 
-	writeDefaultConf(path1, conf)
+	WriteDefault(path1, conf)
 	if conf.ListenPort != 8080 {
 		t.Fatalf("Expected ListenPort to be set to its default")
 	}
@@ -46,14 +46,14 @@ func TestConfigFiles(t *testing.T) {
 
 	paths := []string{path1, path2}
 	// should write default config to path1 and return nil
-	if err := loadConfig(paths, conf); err != nil {
-		t.Fatalf("loadConfig with no existing configs errored")
+	if err := Load(paths, conf); err != nil {
+		t.Fatalf("Load with no existing configs errored")
 	}
 	if _, err := os.Stat(path1); err != nil {
-		t.Fatalf("loadConfig with no configs did not write a default config file")
+		t.Fatalf("Load with no configs did not write a default config file")
 	}
 	if _, err := os.Stat(path2); err == nil {
-		t.Fatalf("loadConfig with no configs wrote too many default config files")
+		t.Fatalf("Load with no configs wrote too many default config files")
 	}
 	if conf.OriginalPath != path1 {
 		t.Fatalf("OriginalPath was not set properly")
@@ -61,8 +61,8 @@ func TestConfigFiles(t *testing.T) {
 
 	// both exist, we use path1
 	os.Link(path1, path2)
-	if err := loadConfig(paths, conf); err != nil {
-		t.Fatalf("loadConfig with an existing config errored")
+	if err := Load(paths, conf); err != nil {
+		t.Fatalf("Load with an existing config errored")
 	}
 	if conf.OriginalPath != path1 {
 		t.Fatalf("OriginalPath was not set properly")
@@ -70,11 +70,11 @@ func TestConfigFiles(t *testing.T) {
 
 	// path2 exists but path1 doesn't
 	os.Remove(path1)
-	if err := loadConfig(paths, conf); err != nil {
-		t.Fatalf("loadConfig with an existing config errored")
+	if err := Load(paths, conf); err != nil {
+		t.Fatalf("Load with an existing config errored")
 	}
 	if _, err := os.Stat(path1); err == nil {
-		t.Fatalf("loadConfig with a config wrote a default config file")
+		t.Fatalf("Load with a config wrote a default config file")
 	}
 	if conf.OriginalPath != path2 {
 		t.Fatalf("OriginalPath was not set properly")
@@ -83,7 +83,7 @@ func TestConfigFiles(t *testing.T) {
 	// path1 exists but is invalid
 	os.Remove(path2)
 	ioutil.WriteFile(path1, []byte("{"), 0644)
-	if err := loadConfig(paths, conf); err == nil {
-		t.Fatalf("loadConfig with an invalid config did not error")
+	if err := Load(paths, conf); err == nil {
+		t.Fatalf("Load with an invalid config did not error")
 	}
 }

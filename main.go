@@ -33,12 +33,13 @@ import (
 
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
 var (
 	log                      = logger.Get()
-	globalConf               Config
+	globalConf               config.Config
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
 	GlobalEventsJSVM         JSVM
@@ -48,7 +49,7 @@ var (
 	DefaultOrgStore          DefaultSessionManager
 	DefaultQuotaStore        DefaultSessionManager
 	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
-	MonitoringHandler        TykEventHandler
+	MonitoringHandler        config.TykEventHandler
 	RPCListener              RPCStorageHandler
 	DashService              DashboardServiceSender
 
@@ -116,7 +117,7 @@ func setupGlobals() {
 	InitHostCheckManager(healthCheckStore)
 
 	if globalConf.EnableAnalytics {
-		globalConf.loadIgnoredIPs()
+		globalConf.LoadIgnoredIPs()
 		analyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -174,7 +175,7 @@ func setupGlobals() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Setting up analytics normaliser")
-		globalConf.AnalyticsConfig.NormaliseUrls.compiledPatternSet = initNormalisationPatterns()
+		globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
 	}
 
 }
@@ -814,7 +815,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	}
 
 	if !runningTests {
-		if err := loadConfig(confPaths, &globalConf); err != nil {
+		if err := config.Load(confPaths, &globalConf); err != nil {
 			return err
 		}
 		afterConfSetup(&globalConf)
@@ -870,7 +871,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 
 // afterConfSetup takes care of non-sensical config values (such as zero
 // timeouts) and sets up a few globals that depend on the config.
-func afterConfSetup(conf *Config) {
+func afterConfSetup(conf *config.Config) {
 	if conf.SlaveOptions.CallTimeout == 0 {
 		conf.SlaveOptions.CallTimeout = 30
 	}
