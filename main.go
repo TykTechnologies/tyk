@@ -8,16 +8,13 @@ import (
 	"log/syslog"
 	"net"
 	"net/http"
+	pprof_http "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
-
-	pprof_http "net/http/pprof"
-
-	logger "github.com/TykTechnologies/tyk/log"
 
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
@@ -31,10 +28,12 @@ import (
 	"github.com/lonelycode/gorpc"
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
+	uuid "github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 var (
@@ -818,6 +817,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 		if err := loadConfig(confPaths, &globalConf); err != nil {
 			return err
 		}
+		afterConfSetup(&globalConf)
 	}
 
 	if globalConf.Storage.Type != "redis" {
@@ -866,6 +866,20 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	go StartPeriodicStateBackup(&LE_MANAGER)
 
 	return nil
+}
+
+// afterConfSetup takes care of non-sensical config values (such as zero
+// timeouts) and sets up a few globals that depend on the config.
+func afterConfSetup(conf *Config) {
+	if conf.SlaveOptions.CallTimeout == 0 {
+		conf.SlaveOptions.CallTimeout = 30
+	}
+	if conf.SlaveOptions.PingTimeout == 0 {
+		conf.SlaveOptions.PingTimeout = 60
+	}
+	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
+	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
+	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
 }
 
 type AuditHostDetails struct {
@@ -984,6 +998,11 @@ func onFork() {
 	}
 
 	amForked = true
+}
+
+func generateRandomNodeID() string {
+	u := uuid.NewV4()
+	return "solo-" + u.String()
 }
 
 func main() {

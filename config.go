@@ -6,10 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
-	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -333,22 +331,7 @@ func loadConfig(paths []string, conf *Config) error {
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}
-	afterConfSetup(conf)
 	return nil
-}
-
-// afterConfSetup takes care of non-sensical config values (such as zero
-// timeouts) and sets up a few globals that depend on the globalConf.
-func afterConfSetup(conf *Config) {
-	if conf.SlaveOptions.CallTimeout == 0 {
-		conf.SlaveOptions.CallTimeout = 30
-	}
-	if conf.SlaveOptions.PingTimeout == 0 {
-		conf.SlaveOptions.PingTimeout = 60
-	}
-	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
-	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
-	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
 }
 
 func (c *Config) loadIgnoredIPs() {
@@ -364,9 +347,4 @@ func (c *Config) StoreAnalytics(ip string) bool {
 	}
 
 	return !c.AnalyticsConfig.ignoredIPsCompiled[ip]
-}
-
-func generateRandomNodeID() string {
-	u := uuid.NewV4()
-	return "solo-" + u.String()
 }
