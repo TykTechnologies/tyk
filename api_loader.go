@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/streamrail/concurrent-map"
@@ -583,7 +584,7 @@ func processSpec(referenceSpec *APISpec,
 	}).Debug("Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
 	//subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
 
-	thisChainDefinition.ThisHandler = chain
+	thisChainDefinition.ThisHandler = context.ClearHandler(chain)
 	thisChainDefinition.ListenOn = referenceSpec.Proxy.ListenPath + "{rest:.*}"
 
 	notifyAPILoaded(referenceSpec)
