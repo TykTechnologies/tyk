@@ -198,13 +198,9 @@ func SetSessionPassword(session *SessionState) {
 }
 
 func GetKeyDetail(key, apiID string) (SessionState, bool) {
-
 	sessionManager := FallbackKeySesionManager
-	if apiID != "" {
-		spec := apisByID[apiID]
-		if spec != nil {
-			sessionManager = spec.SessionManager
-		}
+	if spec := apisByID[apiID]; spec != nil {
+		sessionManager = spec.SessionManager
 	}
 
 	return sessionManager.GetSessionDetail(key)
@@ -281,11 +277,8 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 
 func handleGetDetail(sessionKey, apiID string) (interface{}, int) {
 	sessionManager := FallbackKeySesionManager
-	if apiID != "" {
-		spec := apisByID[apiID]
-		if spec != nil {
-			sessionManager = spec.SessionManager
-		}
+	if spec := apisByID[apiID]; spec != nil {
+		sessionManager = spec.SessionManager
 	}
 
 	session, ok := sessionManager.GetSessionDetail(sessionKey)
@@ -313,11 +306,8 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	}
 
 	sessionManager := FallbackKeySesionManager
-	if apiID != "" {
-		spec := apisByID[apiID]
-		if spec != nil {
-			sessionManager = spec.SessionManager
-		}
+	if spec := apisByID[apiID]; spec != nil {
+		sessionManager = spec.SessionManager
 	}
 
 	sessions := sessionManager.GetSessions(filter)
@@ -358,12 +348,9 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 
 	orgID := ""
 	sessionManager := FallbackKeySesionManager
-	if apiID != "" {
-		spec := apisByID[apiID]
-		if spec != nil {
-			orgID = spec.OrgID
-			sessionManager = spec.SessionManager
-		}
+	if spec := apisByID[apiID]; spec != nil {
+		orgID = spec.OrgID
+		sessionManager = spec.SessionManager
 	}
 
 	sessionManager.RemoveSession(keyName)
@@ -406,11 +393,8 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 	}
 
 	sessionManager := FallbackKeySesionManager
-	if apiID != "" {
-		spec := apisByID[apiID]
-		if spec != nil {
-			sessionManager = spec.SessionManager
-		}
+	if spec := apisByID[apiID]; spec != nil {
+		sessionManager = spec.SessionManager
 	}
 
 	// This is so we bypass the hash function
@@ -643,11 +627,8 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 	sessionManager := FallbackKeySesionManager
-	if apiID != "" {
-		spec := apisByID[apiID]
-		if spec != nil {
-			sessionManager = spec.SessionManager
-		}
+	if spec := apisByID[apiID]; spec != nil {
+		sessionManager = spec.SessionManager
 	}
 
 	// This is so we bypass the hash function
@@ -729,7 +710,6 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 		obj, code = handleOrgAddOrUpdate(keyName, r)
 
 	case "GET":
-
 		if keyName != "" {
 			// Return single org detail
 			obj, code = handleGetOrgDetail(keyName)
