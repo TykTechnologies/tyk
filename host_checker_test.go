@@ -50,8 +50,8 @@ type testEventHandler struct {
 	cb func(config.EventMessage)
 }
 
-func (w *testEventHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
-	return w, nil
+func (w *testEventHandler) Init(handlerConf interface{}) error {
+	return nil
 }
 
 func (w *testEventHandler) HandleEvent(em config.EventMessage) {

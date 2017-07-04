@@ -162,12 +162,13 @@ func setupGlobals() {
 	MainNotifier = RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
 
 	if globalConf.Monitor.EnableTriggerMonitors {
-		var err error
-		MonitoringHandler, err = (&WebHookHandler{}).New(globalConf.Monitor.Config)
-		if err != nil {
+		h := &WebHookHandler{}
+		if err := h.Init(globalConf.Monitor.Config); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Error("Failed to initialise monitor! ", err)
+		} else {
+			MonitoringHandler = h
 		}
 	}
 

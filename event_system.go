@@ -140,30 +140,33 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *A
 
 	switch handlerConf.Handler {
 	case EH_LogHandler:
-		return (&LogMessageEventHandler{}).New(conf)
+		h := &LogMessageEventHandler{}
+		err := h.Init(conf)
+		return h, err
 	case EH_WebHook:
-		return (&WebHookHandler{}).New(conf)
+		h := &WebHookHandler{}
+		err := h.Init(conf)
+		return h, err
 	case EH_JSVMHandler:
 		// Load the globals and file here
 		if spec != nil {
-			jsVmEventHandler, err := (&JSVMEventHandler{Spec: spec}).New(conf)
+			h := &JSVMEventHandler{Spec: spec}
+			err := h.Init(conf)
 			if err == nil {
 				GlobalEventsJSVM.LoadJSPaths([]string{conf.(map[string]interface{})["path"].(string)}, "")
 			}
-			return jsVmEventHandler, err
+			return h, err
 		}
 	case EH_CoProcessHandler:
 		if spec != nil {
-			var coprocessEventHandler config.TykEventHandler
-			var err error
 			if GlobalDispatcher == nil {
-				err = errors.New("no CP available")
-			} else {
-				coprocessEventHandler, err = CoProcessEventHandler{Spec: spec}.New(conf)
+				return nil, errors.New("no CP available")
 			}
-			return coprocessEventHandler, err
+			h := &CoProcessEventHandler{}
+			h.Spec = spec
+			err := h.Init(conf)
+			return h, err
 		}
-
 	}
 
 	return nil, errors.New("Handler not found")
@@ -201,10 +204,9 @@ type LogMessageEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l *LogMessageEventHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
-	handler := &LogMessageEventHandler{}
-	handler.conf = handlerConf.(map[string]interface{})
-	return handler, nil
+func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
+	l.conf = handlerConf.(map[string]interface{})
+	return nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain

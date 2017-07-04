@@ -15,13 +15,16 @@ func createGetHandler() *WebHookHandler {
 		TemplatePath: "templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
 	}
-	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
-	return ev.(*WebHookHandler)
+	ev := &WebHookHandler{}
+	if err := ev.Init(eventHandlerConf); err != nil {
+		panic(err)
+	}
+	return ev
 }
 
 func TestNewValid(t *testing.T) {
-	o := WebHookHandler{}
-	_, err := o.New(map[string]interface{}{
+	h := &WebHookHandler{}
+	err := h.Init(map[string]interface{}{
 		"method":        "POST",
 		"target_path":   testHttpPost,
 		"template_path": "templates/default_webhook.json",
@@ -34,8 +37,8 @@ func TestNewValid(t *testing.T) {
 }
 
 func TestNewInvlalid(t *testing.T) {
-	o := WebHookHandler{}
-	_, err := o.New(map[string]interface{}{
+	h := &WebHookHandler{}
+	err := h.Init(map[string]interface{}{
 		"method":        123,
 		"target_path":   testHttpPost,
 		"template_path": "templates/default_webhook.json",
@@ -119,17 +122,7 @@ func TestCreateBody(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	eventHandlerConf := config.WebHookHandlerConf{
-		TargetPath:   testHttpGet,
-		Method:       "GET",
-		EventTimeout: 10,
-		TemplatePath: "templates/default_webhook.json",
-		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
-	}
-
-	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
-
-	eventHandler := ev.(*WebHookHandler)
+	eventHandler := createGetHandler()
 
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
@@ -160,8 +153,10 @@ func TestPost(t *testing.T) {
 		HeaderList:   map[string]string{"x-tyk-test": "TEST POST"},
 	}
 
-	ev, _ := (&WebHookHandler{}).New(eventHandlerConf)
-	eventHandler := ev.(*WebHookHandler)
+	eventHandler := &WebHookHandler{}
+	if err := eventHandler.Init(eventHandlerConf); err != nil {
+		t.Fatal(err)
+	}
 
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
