@@ -11,9 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type URLRewriter struct{}
-
-func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
+func urlRewrite(meta *apidef.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
 	// Find all the matching groups:
 	mp, err := regexp.Compile(meta.MatchPattern)
 	if err != nil {
@@ -118,7 +116,6 @@ func valToStr(v interface{}) string {
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
 type URLRewriteMiddleware struct {
 	*TykMiddleware
-	Rewriter *URLRewriter
 }
 
 func (m *URLRewriteMiddleware) GetName() string {
@@ -133,11 +130,6 @@ func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
 		}
 	}
 	return false
-}
-
-func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {
-	m.Rewriter = &URLRewriter{}
-	return nil, nil
 }
 
 func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
@@ -158,7 +150,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		umeta := meta.(*apidef.URLRewriteMeta)
 		log.Debug(r.URL)
 		oldPath := r.URL.String()
-		p, err := m.Rewriter.Rewrite(umeta, r.URL.String(), true, r)
+		p, err := urlRewrite(umeta, r.URL.String(), true, r)
 		if err != nil {
 			return err, 500
 		}

@@ -56,13 +56,12 @@ func TestRewriter(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			rw := URLRewriter{}
 			testConf := apidef.URLRewriteMeta{
 				MatchPattern: tc.pattern,
 				RewriteTo:    tc.to,
 			}
 			r := httptest.NewRequest("GET", "/", nil)
-			got, err := rw.Rewrite(&testConf, tc.in, false, r)
+			got, err := urlRewrite(&testConf, tc.in, false, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}

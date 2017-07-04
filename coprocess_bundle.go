@@ -138,7 +138,7 @@ type BundleSaver interface {
 type ZipBundleSaver struct{}
 
 // Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
-func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
+func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
 	buf := bytes.NewReader(bundle.Data)
 	reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
 
@@ -215,7 +215,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 	// TODO: use enums?
 	switch bundleFormat {
 	case "zip":
-		bundleSaver = &ZipBundleSaver{}
+		bundleSaver = ZipBundleSaver{}
 	}
 
 	bundleSaver.Save(bundle, destPath, spec)
