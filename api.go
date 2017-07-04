@@ -226,22 +226,22 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 			// Ge the session
 			var originalKey SessionState
 			var found bool
-			for api_id := range newSession.AccessRights {
-				originalKey, found = GetKeyDetail(keyName, api_id)
+			for apiID := range newSession.AccessRights {
+				originalKey, found = GetKeyDetail(keyName, apiID)
 				if found {
 					break
 				}
 			}
 
-			if found {
-				// Found the key
-				if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
-					// passwords dont match assume it's new, lets hash it
-					log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
-					log.Debug("New: newSession.BasicAuthData.Password")
-					log.Debug("Changing password")
-					SetSessionPassword(&newSession)
-				}
+			if !found {
+				break
+			}
+			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
+				// passwords dont match assume it's new, lets hash it
+				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
+				log.Debug("New: newSession.BasicAuthData.Password")
+				log.Debug("Changing password")
+				SetSessionPassword(&newSession)
 			}
 		}
 

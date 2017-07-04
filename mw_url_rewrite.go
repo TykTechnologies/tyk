@@ -145,25 +145,26 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	_, versionPaths, _, _ := m.Spec.GetVersionData(r)
 	found, meta := m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
-	if found {
-		log.Debug("Rewriter active")
-		umeta := meta.(*apidef.URLRewriteMeta)
-		log.Debug(r.URL)
-		oldPath := r.URL.String()
-		p, err := urlRewrite(umeta, r.URL.String(), true, r)
-		if err != nil {
-			return err, 500
-		}
+	if !found {
+		return nil, 200
+	}
 
-		m.CheckHostRewrite(oldPath, p, r)
+	log.Debug("Rewriter active")
+	umeta := meta.(*apidef.URLRewriteMeta)
+	log.Debug(r.URL)
+	oldPath := r.URL.String()
+	p, err := urlRewrite(umeta, r.URL.String(), true, r)
+	if err != nil {
+		return err, 500
+	}
 
-		newURL, err := url.Parse(p)
-		if err != nil {
-			log.Error("URL Rewrite failed, could not parse: ", p)
-		} else {
-			r.URL = newURL
-		}
+	m.CheckHostRewrite(oldPath, p, r)
 
+	newURL, err := url.Parse(p)
+	if err != nil {
+		log.Error("URL Rewrite failed, could not parse: ", p)
+	} else {
+		r.URL = newURL
 	}
 	return nil, 200
 }
