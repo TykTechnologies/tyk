@@ -44,11 +44,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, 200
 }
 
-type CoProcessEventHandler JSVMEventHandler
-
-func (l CoProcessEventHandler) New(handlerConf interface{}) (config.TykEventHandler, error) {
-	return nil, nil
+type CoProcessEventHandler struct {
+	Spec *APISpec
 }
+
+func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
+	return nil
+}
+func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {}
 
 func CoProcessInit() {
 	log.WithFields(logrus.Fields{

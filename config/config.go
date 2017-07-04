@@ -253,7 +253,7 @@ type EventMessage struct {
 
 // TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
 type TykEventHandler interface {
-	New(interface{}) (TykEventHandler, error)
+	Init(interface{}) error
 	HandleEvent(EventMessage)
 }
 
