@@ -8,11 +8,11 @@ import (
 
 type Monitor struct{}
 
-func (m *Monitor) IsMonitorEnabled() bool {
+func (Monitor) IsMonitorEnabled() bool {
 	return globalConf.Monitor.EnableTriggerMonitors
 }
 
-func (m *Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
+func (Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
 	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
@@ -27,7 +27,7 @@ func (m *Monitor) Fire(sessionData *SessionState, key string, triggerLimit float
 	go MonitoringHandler.HandleEvent(em)
 }
 
-func (m *Monitor) Check(sessionData *SessionState, key string) {
+func (m Monitor) Check(sessionData *SessionState, key string) {
 	if !m.IsMonitorEnabled() || sessionData.QuotaMax == -1 {
 		return
 	}
