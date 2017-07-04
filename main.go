@@ -34,6 +34,7 @@ import (
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/lint"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -906,6 +907,7 @@ func getCmdArguments() map[string]interface{} {
 
 	Usage:
 		tyk [options]
+		tyk lint
 
 	Options:
 		-h --help                    Show this screen
@@ -1008,6 +1010,17 @@ func generateRandomNodeID() string {
 
 func main() {
 	arguments := getCmdArguments()
+	if arguments["lint"] == true {
+		lines, err := lint.Run()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		for _, line := range lines {
+			fmt.Println(line)
+		}
+		return
+	}
 	NodeID = generateRandomNodeID()
 	l, goAgainErr := goagain.Listener(onFork)
 	controlListener, goAgainErr := goagain.Listener(onFork)
