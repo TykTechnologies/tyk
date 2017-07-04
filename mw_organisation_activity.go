@@ -146,11 +146,9 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *
 	orgActiveMap.RLock()
 	active, found := orgActiveMap.OrgMap[k.Spec.OrgID]
 	orgActiveMap.RUnlock()
-	if found {
+	if found && !active {
 		log.Debug("Is not active")
-		if !active {
-			return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
-		}
+		return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
 	}
 
 	log.Debug("Key not found")

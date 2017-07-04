@@ -55,16 +55,12 @@ func (t *TykMiddleware) GetConfig() (interface{}, error) {
 func (t *TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.GetSessionDetail(key)
-	if found {
+	if found && globalConf.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
-		if globalConf.EnforceOrgDataAge {
-			// We cache org expiry data
-			log.Debug("Setting data expiry: ", session.OrgID)
-			go t.SetOrgExpiry(session.OrgID, session.DataExpires)
-		}
-		return session, true
+		// We cache org expiry data
+		log.Debug("Setting data expiry: ", session.OrgID)
+		go t.SetOrgExpiry(session.OrgID, session.DataExpires)
 	}
-
 	return session, found
 }
 

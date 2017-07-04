@@ -210,8 +210,8 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	}).Debug("Update key: ", hc.getHostKey(report))
 	hc.store.SetKey(hc.getHostKey(report), "1", int64(hc.checker.checkTimeout+1))
 
-	spec, found := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
-	if !found {
+	spec := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
@@ -253,8 +253,8 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 	}).Debug("Delete key: ", hc.getHostKey(report))
 	hc.store.DeleteKey(hc.getHostKey(report))
 
-	spec, found := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
-	if !found {
+	spec := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
@@ -380,8 +380,8 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 }
 
 func (hc *HostCheckerManager) GetListFromService(apiID string) ([]HostData, error) {
-	spec, found := apisByID[apiID]
-	if !found {
+	spec := apisByID[apiID]
+	if spec == nil {
 		return nil, errors.New("API ID not found in register")
 	}
 	sd := ServiceDiscovery{}
@@ -441,9 +441,9 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	spec, found := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	spec := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
 	orgID := ""
-	if found {
+	if spec != nil {
 		orgID = spec.OrgID
 	}
 
