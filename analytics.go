@@ -153,12 +153,17 @@ type RedisAnalyticsHandler struct {
 }
 
 func (r *RedisAnalyticsHandler) Init() {
+	var err error
 	if globalConf.AnalyticsConfig.EnableGeoIP {
-		go r.reloadDB()
+		db, err := maxminddb.Open(globalConf.AnalyticsConfig.GeoIPDBLocation)
+		if err != nil {
+			log.Error("Failed to init GeoIP Database: ", err)
+		} else {
+			r.GeoIPDB = db
+		}
 	}
 
 	analytics.Store.Connect()
-	var err error
 
 	ps := globalConf.AnalyticsConfig.PoolSize
 	if ps == 0 {
@@ -168,20 +173,6 @@ func (r *RedisAnalyticsHandler) Init() {
 	AnalyticsPool, err = tunny.CreatePoolGeneric(ps).Open()
 	if err != nil {
 		log.Error("Failed to init analytics pool")
-	}
-}
-
-func (r *RedisAnalyticsHandler) reloadDB() {
-	db, err := maxminddb.Open(globalConf.AnalyticsConfig.GeoIPDBLocation)
-	if err != nil {
-		log.Error("Failed to init GeoIP Database: ", err)
-	} else {
-		oldDB := r.GeoIPDB
-		r.GeoIPDB = db
-		if oldDB != nil {
-			oldDB.Close()
-		}
-
 	}
 }
 
