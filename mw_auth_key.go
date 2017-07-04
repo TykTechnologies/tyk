@@ -33,8 +33,6 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 }
 
 func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	var tempRes *http.Request
-
 	config := k.Spec.Auth
 
 	key := r.Header.Get(config.AuthHeaderName)
@@ -45,8 +43,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 			paramName = config.AuthHeaderName
 		}
 
-		tempRes = CopyHttpRequest(r)
-		paramValue := tempRes.FormValue(paramName)
+		paramValue := r.URL.Query().Get(paramName)
 
 		// Only use the paramValue if it has an actual value
 		if paramValue != "" {
