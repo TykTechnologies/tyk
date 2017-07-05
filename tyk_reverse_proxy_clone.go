@@ -492,6 +492,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq.ProtoMinor = 1
 	outreq.Close = false
 
+	// Remove headers with the same name as the connection-tokens.
+	// See RFC 2616, section 14.10.
+	if c := outreq.Header.Get("Connection"); c != "" {
+		for _, f := range strings.Split(c, ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				outreq.Header.Del(f)
+			}
+		}
+	}
+
 	log.Debug("Outbound Request: ", outreq.URL.String())
 
 	// Do not modify outbound request headers if they are WS
