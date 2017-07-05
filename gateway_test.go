@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -505,16 +504,9 @@ const extendedPathGatewaySetup = `{
 	}
 }`
 
-func testName(t *testing.T) string {
-	// TODO(mvdan): replace with t.Name() once 1.9 is out and we
-	// drop support for 1.7.x (approx July 2017)
-	v := reflect.Indirect(reflect.ValueOf(t))
-	return v.FieldByName("name").String()
-}
-
 func createSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
-	tname := testName(t)
+	tname := t.Name()
 	redisStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apikey."}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: tname + "-orgKey."}
@@ -523,7 +515,7 @@ func createSpecTest(t *testing.T, def string) *APISpec {
 }
 
 func testKey(t *testing.T, name string) string {
-	return fmt.Sprintf("%s-%s", testName(t), name)
+	return fmt.Sprintf("%s-%s", t.Name(), name)
 }
 
 func testReqBody(t *testing.T, body interface{}) io.Reader {
