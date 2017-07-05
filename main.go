@@ -925,14 +925,12 @@ func getCmdArguments() map[string]interface{} {
 		--as-version=<version>       The version number to use when inserting
 		--log-instrumentation        Output instrumentation data to stdout
 	`
-
 	arguments, err := docopt.Parse(usage, nil, true, VERSION, false)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("Error while parsing arguments: ", err)
+		// docopt will exit on its own if there are any user
+		// errors, such as an unknown flag being used.
+		panic(err)
 	}
-
 	return arguments
 }
 
