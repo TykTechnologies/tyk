@@ -247,6 +247,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 type JSVM struct {
 	VM      *otto.Otto
 	Timeout time.Duration
+	Log     *logrus.Logger // logger used by the JS code
 }
 
 // Init creates the JSVM with the core library (tyk.js) and sets up a
@@ -264,6 +265,7 @@ func (j *JSVM) Init() {
 	j.LoadTykJSApi()
 
 	j.Timeout = 5 * time.Second
+	j.Log = log // use the global logger by default
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
@@ -305,7 +307,7 @@ type TykJSHttpResponse struct {
 func (j *JSVM) LoadTykJSApi() {
 	// Enable a log
 	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
-		log.WithFields(logrus.Fields{
+		j.Log.WithFields(logrus.Fields{
 			"prefix": "jsvm-logmsg",
 			"type":   "log-msg",
 		}).Info(call.Argument(0).String())
@@ -313,8 +315,8 @@ func (j *JSVM) LoadTykJSApi() {
 	})
 
 	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
-		io.WriteString(log.Out, call.Argument(0).String())
-		log.Out.Write([]byte("\n"))
+		io.WriteString(j.Log.Out, call.Argument(0).String())
+		j.Log.Out.Write([]byte("\n"))
 		return otto.Value{}
 	})
 

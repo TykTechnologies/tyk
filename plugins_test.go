@@ -16,17 +16,11 @@ import (
 
 func TestJSVMLogs(t *testing.T) {
 	var buf bytes.Buffer
-	defer func(origLog *logrus.Logger) {
-		log = origLog
-	}(log)
-	// need to set up an entire new logger, as the output writer
-	// can't be safely changed once the logger is used. For example,
-	// detection of whether log.Out is a console is done only once.
-	log = logrus.New()
-	log.Out = &buf
-	log.Formatter = new(prefixed.TextFormatter)
 	jsvm := &JSVM{}
 	jsvm.Init()
+	jsvm.Log = logrus.New()
+	jsvm.Log.Out = &buf
+	jsvm.Log.Formatter = new(prefixed.TextFormatter)
 
 	const in = `
 log("foo")
