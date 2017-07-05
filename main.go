@@ -116,17 +116,14 @@ func setupGlobals() {
 	healthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(healthCheckStore)
 
-	if globalConf.EnableAnalytics {
+	if globalConf.EnableAnalytics && analytics.Store == nil {
 		globalConf.LoadIgnoredIPs()
 		analyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Setting up analytics DB connection")
 
-		analytics = RedisAnalyticsHandler{
-			Store: &analyticsStore,
-		}
-
+		analytics.Store = &analyticsStore
 		analytics.Init()
 
 		if globalConf.AnalyticsConfig.Type == "rpc" {
