@@ -801,7 +801,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			panic(err)
 		}
 
-		initialiseSystem(nil)
+		setupGlobals()
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
 		if globalConf.ControlAPIPort == 0 {
