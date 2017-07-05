@@ -329,8 +329,8 @@ var hopHeaders = []string{
 	"Keep-Alive",
 	"Proxy-Authenticate",
 	"Proxy-Authorization",
-	"Te", // canonicalized version of "TE"
-	"Trailers",
+	"Te",      // canonicalized version of "TE"
+	"Trailer", // not Trailers per URL above; http://www.rfc-editor.org/errata_search.php?eid=4522
 	"Transfer-Encoding",
 	"Upgrade",
 }
