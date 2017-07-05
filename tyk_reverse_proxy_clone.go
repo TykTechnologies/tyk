@@ -335,6 +335,24 @@ var hopHeaders = []string{
 	"Upgrade",
 }
 
+type requestCanceler interface {
+	CancelRequest(*http.Request)
+}
+
+type runOnFirstRead struct {
+	io.Reader
+
+	fn func() // Run before first Read, then set to nil
+}
+
+func (c *runOnFirstRead) Read(bs []byte) (int, error) {
+	if c.fn != nil {
+		c.fn()
+		c.fn = nil
+	}
+	return c.Reader.Read(bs)
+}
+
 func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
 	p.ErrorHandler = ErrorHandler{TykMiddleware: &TykMiddleware{spec, p}}
 	return nil, nil
@@ -428,6 +446,34 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if req.Context().Value(RetainHost) == true {
 			log.Debug("Detected host rewrite, notifying director")
 			setCtxValue(outreq, RetainHost, true)
+		}
+	}
+
+	if closeNotifier, ok := rw.(http.CloseNotifier); ok {
+		if requestCanceler, ok := transport.(requestCanceler); ok {
+			reqDone := make(chan struct{})
+			defer close(reqDone)
+
+			clientGone := closeNotifier.CloseNotify()
+
+			outreq.Body = struct {
+				io.Reader
+				io.Closer
+			}{
+				Reader: &runOnFirstRead{
+					Reader: outreq.Body,
+					fn: func() {
+						go func() {
+							select {
+							case <-clientGone:
+								requestCanceler.CancelRequest(outreq)
+							case <-reqDone:
+							}
+						}()
+					},
+				},
+				Closer: outreq.Body,
+			}
 		}
 	}
 
