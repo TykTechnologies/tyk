@@ -215,6 +215,10 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		} else {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
+		if _, ok := req.Header["User-Agent"]; !ok {
+			// explicitly disable User-Agent so it's not set to default value
+			req.Header.Set("User-Agent", "")
+		}
 	}
 
 	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(globalConf.HttpServerOptions.FlushInterval) * time.Millisecond}
