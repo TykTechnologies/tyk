@@ -10,7 +10,7 @@ import (
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformMethod struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (t *TransformMethod) GetName() string {

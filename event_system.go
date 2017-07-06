@@ -157,8 +157,8 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *A
 	return nil, errors.New("Handler not found")
 }
 
-// FireEvent is added to the tykMiddleware object so it is available across the entire stack
-func (t *TykMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
+// FireEvent is added to the BaseMiddleware object so it is available across the entire stack
+func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
 }
 

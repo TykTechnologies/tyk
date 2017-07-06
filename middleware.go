@@ -15,7 +15,7 @@ const mwStatusRespond = 666
 
 var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
-type TykMiddlewareImplementation interface {
+type TykMiddleware interface {
 	New()
 	GetConfig() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
@@ -23,23 +23,23 @@ type TykMiddlewareImplementation interface {
 	GetName() string
 }
 
-func CreateDynamicMiddleware(name string, isPre, useSession bool, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
-		TykMiddleware:       tykMwSuper,
+		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,
 		Pre:                 isPre,
 		UseSession:          useSession,
 	}
 
-	return CreateMiddleware(dMiddleware, tykMwSuper)
+	return CreateMiddleware(dMiddleware, baseMid)
 }
 
-func CreateDynamicAuthMiddleware(name string, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
-	return CreateDynamicMiddleware(name, true, false, tykMwSuper)
+func CreateDynamicAuthMiddleware(name string, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
+	return CreateDynamicMiddleware(name, true, false, baseMid)
 }
 
 // Generic middleware caller to make extension easier
-func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateMiddleware(mw TykMiddleware, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	// construct a new instance
 	mw.New()
 
@@ -65,13 +65,13 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 			job.EventKv(eventName, meta)
 			startTime := time.Now()
 
-			if tykMwSuper.Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
+			if baseMid.Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
 				return
 			}
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-				handler := ErrorHandler{tykMwSuper}
+				handler := ErrorHandler{baseMid}
 				handler.HandleError(w, r, err.Error(), errCode)
 				meta["error"] = err.Error()
 				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
@@ -92,26 +92,26 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 	}
 }
 
-func AppendMiddleware(chain *[]alice.Constructor, mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware) {
+func AppendMiddleware(chain *[]alice.Constructor, mw TykMiddleware, baseMid *BaseMiddleware) {
 	if mw.IsEnabledForSpec() {
-		*chain = append(*chain, CreateMiddleware(mw, tykMwSuper))
+		*chain = append(*chain, CreateMiddleware(mw, baseMid))
 	}
 }
 
-func CheckCBEnabled(tykMwSuper *TykMiddleware) bool {
-	for _, v := range tykMwSuper.Spec.VersionData.Versions {
+func CheckCBEnabled(baseMid *BaseMiddleware) bool {
+	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
-			tykMwSuper.Spec.CircuitBreakerEnabled = true
+			baseMid.Spec.CircuitBreakerEnabled = true
 			return true
 		}
 	}
 	return false
 }
 
-func CheckETEnabled(tykMwSuper *TykMiddleware) bool {
-	for _, v := range tykMwSuper.Spec.VersionData.Versions {
+func CheckETEnabled(baseMid *BaseMiddleware) bool {
+	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.HardTimeouts) > 0 {
-			tykMwSuper.Spec.EnforcedTimeoutEnabled = true
+			baseMid.Spec.EnforcedTimeoutEnabled = true
 			return true
 		}
 	}

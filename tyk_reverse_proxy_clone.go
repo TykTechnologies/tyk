@@ -366,7 +366,7 @@ func (c *runOnFirstRead) Read(bs []byte) (int, error) {
 }
 
 func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	p.ErrorHandler = ErrorHandler{TykMiddleware: &TykMiddleware{spec, p}}
+	p.ErrorHandler = ErrorHandler{BaseMiddleware: &BaseMiddleware{spec, p}}
 	return nil, nil
 }
 

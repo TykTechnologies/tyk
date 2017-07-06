@@ -61,7 +61,7 @@ rawlog('{"x": "y"}')
 
 func TestJSVMProcessTimeout(t *testing.T) {
 	dynMid := &DynamicMiddleware{
-		TykMiddleware: &TykMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 		},
 		MiddlewareClassName: "leakMid",
@@ -114,7 +114,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
-		TykMiddleware:       &TykMiddleware{spec, nil},
+		BaseMiddleware:      &BaseMiddleware{spec, nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 type MiddlewareContextVars struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (m *MiddlewareContextVars) GetName() string {

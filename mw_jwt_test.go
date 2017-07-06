@@ -183,14 +183,14 @@ func getJWTChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+		CreateMiddleware(&IPWhiteListMiddleware{baseMid}, baseMid),
+		CreateMiddleware(&JWTMiddleware{baseMid}, baseMid),
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}, baseMid),
+		CreateMiddleware(&KeyExpired{baseMid}, baseMid),
+		CreateMiddleware(&AccessRightsCheck{baseMid}, baseMid),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}, baseMid)).Then(proxyHandler)
 
 	return chain
 }

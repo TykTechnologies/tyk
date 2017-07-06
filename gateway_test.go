@@ -254,7 +254,7 @@ type tykErrorResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tm := TykMiddleware{apiSpec, p}
+		tm := BaseMiddleware{apiSpec, p}
 		handler := SuccessHandler{&tm}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
@@ -265,16 +265,16 @@ func getChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&TransformHeaders{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+		CreateMiddleware(&IPWhiteListMiddleware{baseMid}, baseMid),
+		CreateMiddleware(&MiddlewareContextVars{BaseMiddleware: baseMid}, baseMid),
+		CreateMiddleware(&AuthKey{baseMid}, baseMid),
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}, baseMid),
+		CreateMiddleware(&KeyExpired{baseMid}, baseMid),
+		CreateMiddleware(&AccessRightsCheck{baseMid}, baseMid),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}, baseMid),
+		CreateMiddleware(&TransformHeaders{baseMid}, baseMid)).Then(proxyHandler)
 
 	return chain
 }

@@ -10,13 +10,13 @@ import (
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
-	*TykMiddleware
+	*BaseMiddleware
 	sh SuccessHandler
 }
 
 // New lets you do any initialisations for the object can be done here
 func (v *VersionCheck) New() {
-	v.sh = SuccessHandler{v.TykMiddleware}
+	v.sh = SuccessHandler{v.BaseMiddleware}
 }
 
 func (v *VersionCheck) GetName() string {

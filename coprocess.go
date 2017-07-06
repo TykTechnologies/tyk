@@ -24,7 +24,7 @@ var (
 
 // CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
@@ -35,15 +35,15 @@ func (mw *CoProcessMiddleware) GetName() string {
 }
 
 // CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
-func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
-		TykMiddleware:    tykMwSuper,
+		BaseMiddleware:   baseMid,
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
 	}
 
-	return CreateMiddleware(dMiddleware, tykMwSuper)
+	return CreateMiddleware(dMiddleware, baseMid)
 }
 
 func doCoprocessReload() {
@@ -257,7 +257,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with invalid key.")
 
 		// Fire Authfailed Event
-		AuthFailed(m.TykMiddleware, r, token)
+		AuthFailed(m.BaseMiddleware, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
