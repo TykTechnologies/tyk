@@ -183,8 +183,8 @@ type SessionProviderMeta struct {
 }
 
 type EventHandlerTriggerConfig struct {
-	Handler     TykEventHandlerName `bson:"handler_name" json:"handler_name"`
-	HandlerMeta interface{}         `bson:"handler_meta" json:"handler_meta"`
+	Handler     TykEventHandlerName    `bson:"handler_name" json:"handler_name"`
+	HandlerMeta map[string]interface{} `bson:"handler_meta" json:"handler_meta"`
 }
 
 type EventHandlerMetaConfig struct {

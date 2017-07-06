@@ -3,14 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/rubyist/circuitbreaker"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -124,20 +122,7 @@ func EncodeRequestToEvent(r *http.Request) string {
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
 func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
 
-	var conf interface{}
-	switch x := handlerConf.HandlerMeta.(type) {
-	case bson.M:
-		asByte, ok := json.Marshal(x)
-		if ok != nil {
-			log.Error("Failed to unmarshal handler meta! ", ok)
-		}
-		if err := json.Unmarshal(asByte, &conf); err != nil {
-			log.Error("Return conversion failed, ", err)
-		}
-	default:
-		conf = x
-	}
-
+	conf := handlerConf.HandlerMeta
 	switch handlerConf.Handler {
 	case EH_LogHandler:
 		h := &LogMessageEventHandler{}
@@ -153,7 +138,7 @@ func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *A
 			h := &JSVMEventHandler{Spec: spec}
 			err := h.Init(conf)
 			if err == nil {
-				GlobalEventsJSVM.LoadJSPaths([]string{conf.(map[string]interface{})["path"].(string)}, "")
+				GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
 			}
 			return h, err
 		}
