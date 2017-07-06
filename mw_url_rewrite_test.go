@@ -61,7 +61,7 @@ func TestRewriter(t *testing.T) {
 				RewriteTo:    tc.to,
 			}
 			r := httptest.NewRequest("GET", "/", nil)
-			got, err := urlRewrite(&testConf, tc.in, false, r)
+			got, err := urlRewrite(&testConf, tc.in, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
