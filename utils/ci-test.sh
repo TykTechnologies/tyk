@@ -32,9 +32,11 @@ for pkg in $PKGS; do
 done
 
 if [[ ! $LATEST_GO ]]; then
-	echo "Skipping linting and coverage report"
+	echo "Skipping race, checks, and coverage report"
 	exit 0
 fi
+
+go test -race $PKGS || fatal "go test -race failed"
 
 for opts in "${MATRIX[@]}"; do
 	show go vet -v $opts $PKGS || fatal "go vet errored"
