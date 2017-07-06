@@ -184,9 +184,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			}
 		}
 
-		// Specifically override with a URL rewrite
-		var newTarget *url.URL
-		switchTargets := false
+		targetToUse := target
 
 		if spec.URLRewriteEnabled && req.Context().Value(RetainHost) == true {
 			log.Debug("Detected host rewrite, overriding target")
@@ -194,16 +192,12 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			if err != nil {
 				log.Error("Failed to parse URL! Err: ", err)
 			} else {
-				newTarget = tmpTarget
-				switchTargets = true
+				// Specifically override with a URL rewrite
+				targetToUse = tmpTarget
 			}
 		}
 
 		// No override, and no load balancing? Use the existing target
-		targetToUse := target
-		if switchTargets {
-			targetToUse = newTarget
-		}
 		req.URL.Scheme = targetToUse.Scheme
 		req.URL.Host = targetToUse.Host
 
