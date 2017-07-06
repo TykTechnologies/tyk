@@ -11,7 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func urlRewrite(meta *apidef.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
+func urlRewrite(meta *apidef.URLRewriteMeta, path string, r *http.Request) (string, error) {
 	// Find all the matching groups:
 	mp, err := regexp.Compile(meta.MatchPattern)
 	if err != nil {
@@ -51,20 +51,17 @@ func urlRewrite(meta *apidef.URLRewriteMeta, path string, useContext bool, r *ht
 		// return newpath, nil
 	}
 
-	if useContext {
-		log.Debug("Using context")
-		contextData := ctxGetData(r)
+	contextData := ctxGetData(r)
 
-		dollarMatch := regexp.MustCompile(`\$tyk_context.(\w+)`)
-		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
-		for _, v := range replace_slice {
-			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
-			log.Debug("Replacing: ", v[0])
+	dollarMatch := regexp.MustCompile(`\$tyk_context.(\w+)`)
+	replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
+	for _, v := range replace_slice {
+		contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
+		log.Debug("Replacing: ", v[0])
 
-			if val, ok := contextData[contextKey]; ok {
-				newpath = strings.Replace(newpath, v[0],
-					url.QueryEscape(valToStr(val)), -1)
-			}
+		if val, ok := contextData[contextKey]; ok {
+			newpath = strings.Replace(newpath, v[0],
+				url.QueryEscape(valToStr(val)), -1)
 		}
 	}
 
@@ -153,7 +150,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
-	p, err := urlRewrite(umeta, r.URL.String(), true, r)
+	p, err := urlRewrite(umeta, r.URL.String(), r)
 	if err != nil {
 		return err, 500
 	}
