@@ -85,7 +85,9 @@ func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 	if session.ApplyPolicyID == "" {
 		return
 	}
-	policy, ok := Policies[session.ApplyPolicyID]
+	policiesMu.RLock()
+	policy, ok := policiesByID[session.ApplyPolicyID]
+	policiesMu.RUnlock()
 	if !ok {
 		return
 	}
