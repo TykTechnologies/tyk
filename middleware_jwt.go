@@ -461,8 +461,10 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 
 func generateSessionFromPolicy(policyID string, OrgID string, enforceOrg bool) (SessionState, error) {
 	log.Debug("Generating from policyID: ", policyID)
-	log.Debug(Policies)
-	policy, ok := Policies[policyID]
+	policiesMu.RLock()
+	log.Debug(policiesByID)
+	policy, ok := policiesByID[policyID]
+	policiesMu.RUnlock()
 	thisSessionState := SessionState{}
 	log.Debug(ok)
 	if ok {

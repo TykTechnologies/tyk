@@ -14,6 +14,7 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	pprof_http "net/http/pprof"
@@ -44,7 +45,8 @@ var GlobalEventsJSVM = &JSVM{}
 var doHTTPProfile bool
 var doMemoryProfile bool
 var doCpuProfile bool
-var Policies = make(map[string]Policy)
+var policiesMu sync.RWMutex
+var policiesByID = make(map[string]Policy)
 var MainNotifier = RedisNotifier{}
 var DefaultOrgStore = DefaultSessionManager{}
 var DefaultQuotaStore = DefaultSessionManager{}
@@ -289,7 +291,9 @@ func getPolicies() {
 	}
 
 	if len(thesePolicies) > 0 {
-		Policies = thesePolicies
+		policiesMu.Lock()
+		policiesByID = thesePolicies
+		policiesMu.Unlock()
 		return
 	}
 }
@@ -374,7 +378,7 @@ func addOAuthHandlers(spec *APISpec, Muxer *mux.Router, test bool) *OAuthManager
 		testPolicy.QuotaMax = -1
 		testPolicy.QuotaRenewalRate = 1000000000
 
-		Policies["TEST-4321"] = testPolicy
+		policiesByID["TEST-4321"] = testPolicy
 
 		var redirectURI string
 		// If separator is not set that means multiple redirect uris not supported
