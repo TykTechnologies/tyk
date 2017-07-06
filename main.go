@@ -862,7 +862,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	//SetupInstrumentation(doInstrumentation)
 	SetupInstrumentation(true)
 	
-	if config.HttpServerOptions.UseLE_SSL {
+	if globalConf.HttpServerOptions.UseLE_SSL {
 		go StartPeriodicStateBackup(&LE_MANAGER)
 	}
 
