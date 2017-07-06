@@ -961,3 +961,14 @@ func TestReloadPoliciesRace(t *testing.T) {
 	}
 	getPolicies()
 }
+
+func TestReloadApisRace(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		go func() {
+			apisMu.RLock()
+			_ = apisByID["foo"]
+			apisMu.RUnlock()
+		}()
+	}
+	loadSampleAPI(t, apiTestDef)
+}
