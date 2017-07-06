@@ -861,8 +861,10 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	//doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
 	//SetupInstrumentation(doInstrumentation)
 	SetupInstrumentation(true)
-
-	go StartPeriodicStateBackup(&LE_MANAGER)
+	
+	if config.HttpServerOptions.UseLE_SSL {
+		go StartPeriodicStateBackup(&LE_MANAGER)
+	}
 
 	return nil
 }
