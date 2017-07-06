@@ -56,7 +56,7 @@ var (
 	apisMu   sync.RWMutex
 	apisByID map[string]*APISpec
 
-	keyGen   DefaultKeyGenerator
+	keyGen DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
 	policiesByID map[string]Policy
