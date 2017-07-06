@@ -130,7 +130,7 @@ func processSpec(referenceSpec *APISpec,
 			break
 		}
 		if !pathModified {
-			prev := apisByID[referenceSpec.APIID]
+			prev := getApiSpec(referenceSpec.APIID)
 			if prev != nil && prev.Proxy.ListenPath == referenceSpec.Proxy.ListenPath {
 				// if this APIID was already loaded and
 				// had this listen path, let it keep it.
@@ -619,7 +619,9 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 	muxer.HandleFunc("/hello", pingTest)
 
 	// Swap in the new register
+	apisMu.Lock()
 	apisByID = tmpSpecRegister
+	apisMu.Unlock()
 
 	log.Debug("Checker host list")
 

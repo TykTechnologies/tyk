@@ -53,7 +53,9 @@ var (
 	RPCListener              RPCStorageHandler
 	DashService              DashboardServiceSender
 
+	apisMu   sync.RWMutex
 	apisByID map[string]*APISpec
+
 	keyGen   DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
@@ -80,6 +82,13 @@ var (
 		"/etc/tyk/tyk.conf",
 	}
 )
+
+func getApiSpec(apiID string) *APISpec {
+	apisMu.RLock()
+	spec := apisByID[apiID]
+	apisMu.RUnlock()
+	return spec
+}
 
 // Display configuration options
 func displayConfig() {
