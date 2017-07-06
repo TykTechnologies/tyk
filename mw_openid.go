@@ -35,8 +35,6 @@ func (k *OpenIDMW) New() {
 	k.providerConfiguration, err = openid.NewConfiguration(openid.ProvidersGetter(k.getProviders),
 		openid.ErrorHandler(k.dummyErrorHandler))
 
-	k.lock = sync.RWMutex{}
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,
@@ -116,9 +114,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		return errors.New("Key not authorised"), 403
 	}
 
-	k.lock.Lock()
+	k.lock.RLock()
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
-	k.lock.Unlock()
+	k.lock.RUnlock()
 	if !foundIssuer {
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,

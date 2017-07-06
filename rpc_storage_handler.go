@@ -56,7 +56,7 @@ var (
 
 // ------------------- CLOUD STORAGE MANAGER -------------------------------
 
-var RPCCLientRWMutex = sync.RWMutex{}
+var RPCCLientRWMutex sync.RWMutex
 var RPCClients = map[string]chan int{}
 
 func rpcKeepAliveCheck(r *RPCStorageHandler) {
