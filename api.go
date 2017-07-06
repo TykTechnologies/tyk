@@ -85,7 +85,9 @@ func GetSpecForOrg(APIID string) *APISpec {
 func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionState) {
 	// Check the policy to see if we are forcing an expiry on the key
 	if newSession.ApplyPolicyID != "" {
-		thisPolicy, foundPolicy := Policies[newSession.ApplyPolicyID]
+		policiesMu.RLock()
+		thisPolicy, foundPolicy := policiesByID[newSession.ApplyPolicyID]
+		policiesMu.RUnlock()
 		if foundPolicy {
 			// Are we foring an expiry?
 			if thisPolicy.KeyExpiresIn > 0 {

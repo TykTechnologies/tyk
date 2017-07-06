@@ -101,7 +101,9 @@ func (t TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 func (t TykMiddleware) ApplyPolicyIfExists(key string, thisSession *SessionState) {
 	if thisSession.ApplyPolicyID != "" {
 		log.Debug("Session has policy, checking")
-		policy, ok := Policies[thisSession.ApplyPolicyID]
+		policiesMu.RLock()
+		policy, ok := policiesByID[thisSession.ApplyPolicyID]
+		policiesMu.RUnlock()
 		if ok {
 			// Check ownership, policy org owner must be the same as API,
 			// otherwise youcould overwrite a session key with a policy from a different org!
