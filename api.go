@@ -56,6 +56,8 @@ func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 }
 
 func GetSpecForApi(APIID string) *APISpec {
+	apisMu.RLock()
+	defer apisMu.RUnlock()
 	if ApiSpecRegister == nil {
 		log.Error("No API Register present!")
 		return nil
@@ -70,6 +72,8 @@ func GetSpecForApi(APIID string) *APISpec {
 }
 
 func GetSpecForOrg(APIID string) *APISpec {
+	apisMu.RLock()
+	defer apisMu.RUnlock()
 	var aKey string
 	for k, v := range *ApiSpecRegister {
 		if v.OrgID == APIID {
@@ -145,6 +149,8 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 		// nothing defined, add key to ALL
 		if config.AllowMasterKeys {
 			log.Warning("No API Access Rights set, adding key to ALL.")
+			apisMu.RLock()
+			defer apisMu.RUnlock()
 			for _, spec := range *ApiSpecRegister {
 				if !dontReset {
 					spec.SessionManager.ResetQuota(keyName, newSession)
@@ -440,6 +446,8 @@ func handleDeleteKey(keyName string, apiID string) ([]byte, int) {
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
+		apisMu.RLock()
+		defer apisMu.RUnlock()
 		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 			spec.SessionManager.ResetQuota(keyName, SessionState{})
@@ -505,6 +513,8 @@ func handleDeleteHashedKey(keyName string, apiID string) ([]byte, int) {
 
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
+		apisMu.RLock()
+		defer apisMu.RUnlock()
 		for _, spec := range *ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 		}
@@ -604,6 +614,8 @@ func HandleGetAPIList() ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
+	apisMu.RLock()
+	defer apisMu.RUnlock()
 	thisAPIIDList := make([]*tykcommon.APIDefinition, len(*ApiSpecRegister))
 
 	c := 0
@@ -627,6 +639,8 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 	var responseMessage []byte
 	var err error
 
+	apisMu.RLock()
+	defer apisMu.RUnlock()
 	for _, apiSpec := range *ApiSpecRegister {
 		if apiSpec.APIDefinition.APIID == APIID {
 
@@ -1354,6 +1368,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 						"server_name": "system",
 					}).Warning("No API Access Rights set on key session, adding key to all APIs.")
 
+					apisMu.RLock()
+					defer apisMu.RUnlock()
 					for _, spec := range *ApiSpecRegister {
 						checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
 						if !spec.DontSetQuotasOnCreate {
