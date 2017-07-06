@@ -225,7 +225,7 @@ func processSpec(referenceSpec *APISpec,
 	if referenceSpec.UseOauth2 {
 		log.Debug("Loading OAuth Manager")
 		if !RPC_EmergencyMode {
-			oauthManager := addOAuthHandlers(referenceSpec, subrouter, false)
+			oauthManager := addOAuthHandlers(referenceSpec, subrouter)
 			log.Debug("-- Added OAuth Handlers")
 
 			referenceSpec.OAuthManager = oauthManager

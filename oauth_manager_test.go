@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -72,7 +73,34 @@ const oauthDefinition = `{
 func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(muxer)
-	addOAuthHandlers(spec, muxer, true)
+	manager := addOAuthHandlers(spec, muxer)
+
+	// add a test client
+	testPolicy := Policy{}
+	testPolicy.Rate = 100
+	testPolicy.Per = 1
+	testPolicy.QuotaMax = -1
+	testPolicy.QuotaRenewalRate = 1000000000
+
+	policiesByID["TEST-4321"] = testPolicy
+
+	var redirectURI string
+	// If separator is not set that means multiple redirect uris not supported
+	if globalConf.OauthRedirectUriSeparator == "" {
+		redirectURI = "http://client.oauth.com"
+
+		// If separator config is set that means multiple redirect uris are supported
+	} else {
+		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, globalConf.OauthRedirectUriSeparator)
+	}
+	testClient := OAuthClient{
+		ClientID:          "1234",
+		ClientSecret:      "aabbccdd",
+		ClientRedirectURI: redirectURI,
+		PolicyID:          "TEST-4321",
+	}
+	manager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)

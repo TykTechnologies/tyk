@@ -372,7 +372,7 @@ func generateOAuthPrefix(apiID string) string {
 }
 
 // Create API-specific OAuth handlers and respective auth servers
-func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager {
+func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	apiAuthorizePath := spec.Proxy.ListenPath + "tyk/oauth/authorize-client{_:/?}"
 	clientAuthPath := spec.Proxy.ListenPath + "oauth/authorize{_:/?}"
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
@@ -387,40 +387,6 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager
 	storageManager := getGlobalStorageHandler(prefix, false)
 	storageManager.Connect()
 	osinStorage := &RedisOsinStorageInterface{storageManager, spec.SessionManager} //TODO: Needs storage manager from APISpec
-
-	if test {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("Adding test clients")
-
-		testPolicy := Policy{}
-		testPolicy.Rate = 100
-		testPolicy.Per = 1
-		testPolicy.QuotaMax = -1
-		testPolicy.QuotaRenewalRate = 1000000000
-
-		policiesByID["TEST-4321"] = testPolicy
-
-		var redirectURI string
-		// If separator is not set that means multiple redirect uris not supported
-		if globalConf.OauthRedirectUriSeparator == "" {
-			redirectURI = "http://client.oauth.com"
-
-			// If separator config is set that means multiple redirect uris are supported
-		} else {
-			redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, globalConf.OauthRedirectUriSeparator)
-		}
-		testClient := OAuthClient{
-			ClientID:          "1234",
-			ClientSecret:      "aabbccdd",
-			ClientRedirectURI: redirectURI,
-			PolicyID:          "TEST-4321",
-		}
-		osinStorage.SetClient(testClient.ClientID, &testClient, false)
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("Test client added")
-	}
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
