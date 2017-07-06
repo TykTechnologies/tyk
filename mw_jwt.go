@@ -425,7 +425,9 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 }
 
 func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (SessionState, error) {
-	policy, ok := Policies[policyID]
+	policiesMu.RLock()
+	policy, ok := policiesByID[policyID]
+	policiesMu.RUnlock()
 	session := SessionState{}
 	if !ok {
 		return session, errors.New("Policy not found")

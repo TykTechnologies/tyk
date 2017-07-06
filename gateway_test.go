@@ -946,3 +946,18 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	}
 	handleRedisEvent(msg, notHandle, nil)
 }
+
+func TestReloadPoliciesRace(t *testing.T) {
+	defer func(orig string) {
+		globalConf.Policies.PolicyRecordName = orig
+	}(globalConf.Policies.PolicyRecordName)
+	globalConf.Policies.PolicyRecordName = "policies/policies.json"
+	for i := 0; i < 10; i++ {
+		go func() {
+			policiesMu.RLock()
+			_ = policiesByID["foo"]
+			policiesMu.RUnlock()
+		}()
+	}
+	getPolicies()
+}

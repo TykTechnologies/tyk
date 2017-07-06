@@ -14,6 +14,7 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -44,7 +45,6 @@ var (
 	analytics                RedisAnalyticsHandler
 	GlobalEventsJSVM         JSVM
 	memProfFile              *os.File
-	Policies                 = map[string]Policy{}
 	MainNotifier             RedisNotifier
 	DefaultOrgStore          DefaultSessionManager
 	DefaultQuotaStore        DefaultSessionManager
@@ -55,6 +55,9 @@ var (
 
 	apisByID map[string]*APISpec
 	keyGen   DefaultKeyGenerator
+
+	policiesMu   sync.RWMutex
+	policiesByID map[string]Policy
 
 	mainRouter    *mux.Router
 	defaultRouter *mux.Router
@@ -283,7 +286,9 @@ func getPolicies() {
 	}
 
 	if len(pols) > 0 {
-		Policies = pols
+		policiesMu.Lock()
+		policiesByID = pols
+		policiesMu.Unlock()
 	}
 }
 
@@ -385,7 +390,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router, test bool) *OAuthManager
 		testPolicy.QuotaMax = -1
 		testPolicy.QuotaRenewalRate = 1000000000
 
-		Policies["TEST-4321"] = testPolicy
+		policiesByID["TEST-4321"] = testPolicy
 
 		var redirectURI string
 		// If separator is not set that means multiple redirect uris not supported

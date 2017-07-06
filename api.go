@@ -84,7 +84,9 @@ func checkAndApplyTrialPeriod(keyName, apiId string, newSession *SessionState) {
 	if newSession.ApplyPolicyID == "" {
 		return
 	}
-	policy, ok := Policies[newSession.ApplyPolicyID]
+	policiesMu.RLock()
+	policy, ok := policiesByID[newSession.ApplyPolicyID]
+	policiesMu.RUnlock()
 	if !ok {
 		return
 	}
