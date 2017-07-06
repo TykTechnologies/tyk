@@ -29,7 +29,7 @@ var (
 )
 
 type CoProcessMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
@@ -61,4 +61,4 @@ func CoProcessInit() {
 
 func doCoprocessReload() {}
 
-func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {}
+func newExtractor(referenceSpec *APISpec, mw *BaseMiddleware) {}

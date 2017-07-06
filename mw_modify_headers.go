@@ -9,7 +9,7 @@ import (
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformHeaders struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 const (

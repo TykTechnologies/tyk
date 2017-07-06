@@ -67,7 +67,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	spec := createSpecTest(t, virtTestDef)
 	defer os.Remove(mwPath)
 
-	virt := &VirtualEndpoint{TykMiddleware: &TykMiddleware{
+	virt := &VirtualEndpoint{BaseMiddleware: &BaseMiddleware{
 		spec, nil,
 	}}
 	virt.New()

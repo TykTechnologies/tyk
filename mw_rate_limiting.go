@@ -13,7 +13,7 @@ var sessionMonitor = Monitor{}
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (k *RateLimitAndQuotaCheck) GetName() string {

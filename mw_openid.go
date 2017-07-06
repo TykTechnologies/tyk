@@ -18,7 +18,7 @@ import (
 const OIDPREFIX = "openid"
 
 type OpenIDMW struct {
-	*TykMiddleware
+	*BaseMiddleware
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 	lock                      sync.RWMutex
@@ -214,7 +214,7 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event
-	AuthFailed(k.TykMiddleware, r, tykId)
+	AuthFailed(k.BaseMiddleware, r, tykId)
 
 	// Report in health check
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")

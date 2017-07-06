@@ -11,7 +11,7 @@ import (
 // permission to access the specific version. If no permission data is in the SessionState, then
 // it is assumed that the user can go through.
 type AccessRightsCheck struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (a *AccessRightsCheck) GetName() string {

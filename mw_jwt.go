@@ -19,7 +19,7 @@ import (
 )
 
 type JWTMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (k *JWTMiddleware) GetName() string {
@@ -270,7 +270,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
 	// Fire Authfailed Event
-	AuthFailed(k.TykMiddleware, r, tykId)
+	AuthFailed(k.BaseMiddleware, r, tykId)
 
 	// Report in health check
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")

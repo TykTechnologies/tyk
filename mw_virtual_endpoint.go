@@ -34,7 +34,7 @@ type VMResponseObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
-	*TykMiddleware
+	*BaseMiddleware
 	sh SuccessHandler
 }
 
@@ -81,7 +81,7 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 
 // New lets you do any initialisations for the object can be done here
 func (d *VirtualEndpoint) New() {
-	d.sh = SuccessHandler{d.TykMiddleware}
+	d.sh = SuccessHandler{d.BaseMiddleware}
 }
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {

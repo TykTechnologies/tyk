@@ -24,14 +24,14 @@ import (
 type IdExtractor interface {
 	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
 	PostProcess(*http.Request, *SessionState, string)
-	GenerateSessionID(string, *TykMiddleware) string
+	GenerateSessionID(string, *BaseMiddleware) string
 }
 
 // BaseExtractor is the base structure for an ID extractor, it implements the IdExtractor interface. Other extractors may override some of its methods.
 type BaseExtractor struct {
-	Config        *apidef.MiddlewareIdExtractor
-	TykMiddleware *TykMiddleware
-	Spec          *APISpec
+	Config  *apidef.MiddlewareIdExtractor
+	BaseMid *BaseMiddleware
+	Spec    *APISpec
 }
 
 // ExtractAndCheck is called from the CP middleware, if ID extractor is enabled for the current API.
@@ -94,7 +94,7 @@ func (e *BaseExtractor) Error(r *http.Request, err error, message string) (retur
 }
 
 // GenerateSessionID is a helper for generating session IDs, it takes an input (usually the extractor output) and a middleware pointer.
-func (e *BaseExtractor) GenerateSessionID(input string, mw *TykMiddleware) (sessionID string) {
+func (e *BaseExtractor) GenerateSessionID(input string, mw *BaseMiddleware) (sessionID string) {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
 	sessionID = mw.Spec.OrgID + tokenID
@@ -137,9 +137,9 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 		return sessionID, returnOverrides
 	}
 
-	sessionID = e.GenerateSessionID(extractorOutput, e.TykMiddleware)
+	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMid)
 
-	previousSession, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(sessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID)
 
 	if keyExists {
 		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
@@ -205,9 +205,9 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	regexOutput := expression.FindAllString(extractorOutput, -1)
 
-	SessionID = e.GenerateSessionID(regexOutput[config.RegexMatchIndex], e.TykMiddleware)
+	SessionID = e.GenerateSessionID(regexOutput[config.RegexMatchIndex], e.BaseMid)
 
-	previousSession, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
 
@@ -285,9 +285,9 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(output, e.TykMiddleware)
+	SessionID = e.GenerateSessionID(output, e.BaseMid)
 
-	previousSession, keyExists := e.TykMiddleware.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
 
@@ -307,7 +307,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 }
 
 // newExtractor is called from the CP middleware for every API that specifies extractor settings.
-func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {
+func newExtractor(referenceSpec *APISpec, mw *BaseMiddleware) {
 	var extractor IdExtractor
 
 	baseExtractor := BaseExtractor{&referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}

@@ -19,11 +19,11 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	spec := createSpecTest(t, idExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 
-	newExtractor(spec, tykMiddleware)
+	newExtractor(spec, baseMid)
 
-	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := baseMid.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	session := createBasicAuthSession()
 	username := "4321"
@@ -52,11 +52,11 @@ func TestValueExtractorFormSource(t *testing.T) {
 	spec := createSpecTest(t, valueExtractorFormSource)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 
-	newExtractor(spec, tykMiddleware)
+	newExtractor(spec, baseMid)
 
-	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := baseMid.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	session := createBasicAuthSession()
 	username := "4321"
@@ -80,7 +80,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 
 	sessionID, _ := extractor.ExtractAndCheck(req)
-	expectedSessionID := computeSessionID([]byte(authValue), tykMiddleware)
+	expectedSessionID := computeSessionID([]byte(authValue), baseMid)
 
 	if sessionID != expectedSessionID {
 		t.Fatal("Value Extractor output (using form source) doesn't match the computed session ID.")
@@ -91,11 +91,11 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 	spec := createSpecTest(t, idExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 
-	newExtractor(spec, tykMiddleware)
+	newExtractor(spec, baseMid)
 
-	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := baseMid.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	session := createBasicAuthSession()
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
@@ -121,11 +121,11 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	spec := createSpecTest(t, regexExtractorDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 
-	newExtractor(spec, tykMiddleware)
+	newExtractor(spec, baseMid)
 
-	extractor := tykMiddleware.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
+	extractor := baseMid.Spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
 
 	session := createBasicAuthSession()
 
@@ -143,7 +143,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 
 	sessionID, _ := extractor.ExtractAndCheck(req)
-	expectedSessionID := computeSessionID(matchedHeaderValue, tykMiddleware)
+	expectedSessionID := computeSessionID(matchedHeaderValue, baseMid)
 
 	if sessionID != expectedSessionID {
 		t.Fatal("Regex Extractor output doesn't match the computed session ID.")
@@ -151,9 +151,9 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 
 }
 
-func computeSessionID(input []byte, tykMiddleware *TykMiddleware) (sessionID string) {
+func computeSessionID(input []byte, baseMid *BaseMiddleware) (sessionID string) {
 	tokenID := fmt.Sprintf("%x", md5.Sum(input))
-	return tykMiddleware.Spec.OrgID + tokenID
+	return baseMid.Spec.OrgID + tokenID
 }
 
 const idExtractorCoProcessDef = `{

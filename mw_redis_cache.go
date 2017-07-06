@@ -21,7 +21,7 @@ const (
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 	CacheStore StorageHandler
 	sh         SuccessHandler
 }
@@ -32,7 +32,7 @@ func (m *RedisCacheMiddleware) GetName() string {
 
 // New lets you do any initialisations for the object can be done here
 func (m *RedisCacheMiddleware) New() {
-	m.sh = SuccessHandler{m.TykMiddleware}
+	m.sh = SuccessHandler{m.BaseMiddleware}
 }
 
 func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
@@ -152,7 +152,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		var reqVal *http.Response
 		if isVirtual {
 			log.Debug("This is a virtual function")
-			vp := VirtualEndpoint{TykMiddleware: m.TykMiddleware}
+			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
 			vp.New()
 			reqVal = vp.ServeHTTPForCache(w, r)
 		} else {

@@ -13,7 +13,7 @@ import (
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type Oauth2KeyExists struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (k *Oauth2KeyExists) GetName() string {
@@ -55,7 +55,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		}).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, accessToken)
+		AuthFailed(k.BaseMiddleware, r, accessToken)
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
 

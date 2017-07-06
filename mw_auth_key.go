@@ -13,7 +13,7 @@ import (
 // KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type AuthKey struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (k *AuthKey) GetName() string {
@@ -91,7 +91,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		}).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, key)
+		AuthFailed(k.BaseMiddleware, r, key)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
@@ -116,7 +116,7 @@ func stripBearer(token string) string {
 	return strings.TrimSpace(token)
 }
 
-func AuthFailed(m *TykMiddleware, r *http.Request, token string) {
+func AuthFailed(m *BaseMiddleware, r *http.Request, token string) {
 	m.FireEvent(EventAuthFailure, EventAuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
