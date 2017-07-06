@@ -214,7 +214,9 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	}).Debug("Update key: ", hc.getHostKey(report))
 	hc.store.SetKey(hc.getHostKey(report), "1", int64(hc.checker.checkTimeout+1))
 
+	apisMu.RLock()
 	thisSpec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	apisMu.RUnlock()
 	if !found {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -258,7 +260,9 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 	}).Debug("Delete key: ", hc.getHostKey(report))
 	hc.store.DeleteKey(hc.getHostKey(report))
 
+	apisMu.RLock()
 	thisSpec, found := (*ApiSpecRegister)[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	apisMu.RUnlock()
 	if !found {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
@@ -387,7 +391,9 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 }
 
 func (hc *HostCheckerManager) GetListFromService(APIID string) ([]HostData, error) {
+	apisMu.RLock()
 	spec, found := (*ApiSpecRegister)[APIID]
+	apisMu.RUnlock()
 	if !found {
 		return []HostData{}, errors.New("API ID not found in register!")
 	}
@@ -450,7 +456,9 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(APIID string) {
 func (hc HostCheckerManager) RecordUptimeAnalytics(thisReport HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
+	apisMu.RLock()
 	thisSpec, found := (*ApiSpecRegister)[thisReport.MetaData[UnHealthyHostMetaDataAPIKey]]
+	apisMu.RUnlock()
 	thisOrg := ""
 	if found {
 		thisOrg = thisSpec.OrgID
@@ -518,6 +526,7 @@ func SetCheckerHostList() {
 		"prefix": "host-check-mgr",
 	}).Info("Loading uptime tests...")
 	hostList := []HostData{}
+	apisMu.RLock()
 	for _, spec := range *ApiSpecRegister {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
 			thisHostList, sdErr := GlobalHostChecker.GetListFromService(spec.APIID)
@@ -551,6 +560,7 @@ func SetCheckerHostList() {
 			}
 		}
 	}
+	apisMu.RUnlock()
 
 	GlobalHostChecker.UpdateTrackingList(hostList)
 }
