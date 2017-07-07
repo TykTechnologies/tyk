@@ -507,6 +507,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	spec.SessionManager.ResetQuota(tokenID, session)
 	spec.SessionManager.UpdateSession(tokenID, session, 60)
 
+	policiesMu.Lock()
 	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
@@ -522,6 +523,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 		Active:       true,
 		KeyExpiresIn: 60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -557,6 +559,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	spec := createSpecTest(t, jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
 
+	policiesMu.Lock()
 	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
@@ -568,6 +571,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -605,6 +609,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	spec := createSpecTest(t, jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
 
+	policiesMu.Lock()
 	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
@@ -616,6 +621,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -653,6 +659,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	spec := createSpecTest(t, jwtWithJWKDef)
 	spec.JWTSigningMethod = "rsa"
 
+	policiesMu.Lock()
 	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
@@ -664,6 +671,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))

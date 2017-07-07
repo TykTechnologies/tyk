@@ -89,12 +89,16 @@ func TestHostChecker(t *testing.T) {
 		"HostDown": {&testEventHandler{cb}},
 	}
 
+	apisMu.Lock()
 	apisByID = map[string]*APISpec{spec.APIID: spec}
+	apisMu.Unlock()
 	GlobalHostChecker.checkerMu.Lock()
 	GlobalHostChecker.checker.sampleTriggerLimit = 1
 	GlobalHostChecker.checkerMu.Unlock()
 	defer func() {
+		apisMu.Lock()
 		apisByID = make(map[string]*APISpec)
+		apisMu.Unlock()
 		GlobalHostChecker.checkerMu.Lock()
 		GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
 		GlobalHostChecker.checkerMu.Unlock()

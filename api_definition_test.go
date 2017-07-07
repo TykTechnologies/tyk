@@ -392,7 +392,9 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 
 	globalConf.UseDBAppConfigs = true
 	globalConf.AllowInsecureConfigs = true
@@ -422,9 +424,11 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
+	apisMu.Lock()
 	if len(apisByID) != 1 {
 		t.Error("Should return array with one spec", apisByID)
 	}
+	apisMu.Unlock()
 }
 
 func TestRoundRobin(t *testing.T) {

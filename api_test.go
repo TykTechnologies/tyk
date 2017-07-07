@@ -157,45 +157,51 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	var s2, s3 *APISpec
 
 	// both dups added at the same time
-	apisByID = nil
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 	loadApps(specs(), discardMuxer)
 
-	s2 = apisByID["2"]
+	s2 = getApiSpec("2")
 	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
 		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
 	}
-	s3 = apisByID["3"]
+	s3 = getApiSpec("3")
 	if want, got := "/v1-3", s3.Proxy.ListenPath; want != got {
 		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
 	}
 
 	// one dup was there first, gets to keep its path. apiids are
 	// not used to mandate priority. survives multiple reloads too.
-	apisByID = nil
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 	loadApps(specs()[1:], discardMuxer)
 	loadApps(specs(), discardMuxer)
 	loadApps(specs(), discardMuxer)
 
-	s2 = apisByID["2"]
+	s2 = getApiSpec("2")
 	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
 		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
 	}
-	s3 = apisByID["3"]
+	s3 = getApiSpec("3")
 	if want, got := "/v1", s3.Proxy.ListenPath; want != got {
 		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
 	}
 
 	// both dups were there first, neither gets to keep its original
 	// path.
-	apisByID = nil
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 	loadApps(specs(), discardMuxer)
 	loadApps(specs(), discardMuxer)
 
-	s2 = apisByID["2"]
+	s2 = getApiSpec("2")
 	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
 		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
 	}
-	s3 = apisByID["3"]
+	s3 = getApiSpec("3")
 	if want, got := "/v1-3", s3.Proxy.ListenPath; want != got {
 		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
 	}
@@ -446,19 +452,25 @@ func TestGetOAuthClients(t *testing.T) {
 		t.Fatal("Retrieving OAuth clients from nonexistent APIs must return error.")
 	}
 
+	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
 	apisByID[testAPIID] = &APISpec{}
+	apisMu.Unlock()
 
 	_, responseCode = getOauthClients(testAPIID)
 	if responseCode != 400 {
 		t.Fatal("Retrieving OAuth clients from APIs with no OAuthManager must return an error.")
 	}
 
-	apisByID = nil
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 }
 
 func TestResetHandler(t *testing.T) {
+	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 
 	loadSampleAPI(t, apiTestDef)
 	recorder := httptest.NewRecorder()
@@ -474,9 +486,11 @@ func TestResetHandler(t *testing.T) {
 	reloadTick <- time.Time{}
 	wg.Wait()
 
+	apisMu.RLock()
 	if len(apisByID) == 0 {
 		t.Fatal("Hot reload was triggered but no APIs were found.")
 	}
+	apisMu.RUnlock()
 }
 
 func TestGroupResetHandler(t *testing.T) {
@@ -509,7 +523,9 @@ func TestGroupResetHandler(t *testing.T) {
 
 	uri := "/tyk/reload/group"
 
+	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 
 	loadSampleAPI(t, apiTestDef)
 
@@ -526,9 +542,11 @@ func TestGroupResetHandler(t *testing.T) {
 		t.Fatal("Hot reload (group) failed, response code was: ", recorder.Code)
 	}
 
+	apisMu.RLock()
 	if len(apisByID) == 0 {
 		t.Fatal("Hot reload (group) was triggered but no APIs were found.")
 	}
+	apisMu.RUnlock()
 
 	// We wait for the right notification (NoticeGroupReload), other
 	// type of notifications may be received during tests, as this

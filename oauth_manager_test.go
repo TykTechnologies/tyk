@@ -82,7 +82,9 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	testPolicy.QuotaMax = -1
 	testPolicy.QuotaRenewalRate = 1000000000
 
+	policiesMu.Lock()
 	policiesByID["TEST-4321"] = testPolicy
+	policiesMu.Unlock()
 
 	var redirectURI string
 	// If separator is not set that means multiple redirect uris not supported
