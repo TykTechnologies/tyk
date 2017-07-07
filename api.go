@@ -463,12 +463,8 @@ func handleGetAPIList() (interface{}, int) {
 }
 
 func handleGetAPI(apiID string) (interface{}, int) {
-	apisMu.RLock()
-	defer apisMu.RUnlock()
-	for _, apiSpec := range apisByID {
-		if apiSpec.APIID == apiID {
-			return apiSpec.APIDefinition, 200
-		}
+	if spec := getApiSpec(apiID); spec != nil {
+		return spec.APIDefinition, 200
 	}
 
 	log.WithFields(logrus.Fields{
