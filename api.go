@@ -1163,26 +1163,11 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: split these two args in the router
-	keyCombined := mux.Vars(r)["keyCombined"]
+	apiID := mux.Vars(r)["apiID"]
+	keyName := mux.Vars(r)["keyName"]
+
 	var obj interface{}
 	var code int
-
-	keyName := ""
-	apiID := ""
-
-	parts := strings.Split(keyCombined, "/")
-	switch len(parts) {
-	case 2:
-		keyName = parts[1]
-		apiID = parts[0]
-	case 1:
-		apiID = parts[0]
-	default:
-		doJSONWrite(w, 400, apiError("Missing URL params"))
-		return
-	}
-
 	switch r.Method {
 	case "GET":
 		if keyName != "" {
