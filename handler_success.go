@@ -44,7 +44,7 @@ type BaseMiddleware struct {
 	Proxy ReturningHttpHandler
 }
 
-func (t *BaseMiddleware) New() {}
+func (t *BaseMiddleware) Init() {}
 func (t *BaseMiddleware) IsEnabledForSpec() bool {
 	return true
 }

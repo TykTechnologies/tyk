@@ -30,8 +30,7 @@ func (m *RedisCacheMiddleware) GetName() string {
 	return "RedisCacheMiddleware"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (m *RedisCacheMiddleware) New() {
+func (m *RedisCacheMiddleware) Init() {
 	m.sh = SuccessHandler{m.BaseMiddleware}
 }
 
@@ -153,7 +152,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		if isVirtual {
 			log.Debug("This is a virtual function")
 			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
-			vp.New()
+			vp.Init()
 			reqVal = vp.ServeHTTPForCache(w, r)
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache

@@ -24,8 +24,8 @@ func (m *modifiedMiddleware) GetName() string {
 	return "modifiedMiddleware"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (m *modifiedMiddleware) New() {}
+// Init lets you do any initialisations for the object can be done here
+func (m *modifiedMiddleware) Init() {}
 
 // GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
 func (m *modifiedMiddleware) GetConfig() (interface{}, error) {

@@ -70,7 +70,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	virt := &VirtualEndpoint{BaseMiddleware: &BaseMiddleware{
 		spec, nil,
 	}}
-	virt.New()
+	virt.Init()
 	rec := httptest.NewRecorder()
 	r := testReq(t, "GET", "/v1/test-data", "initial body")
 	virt.ProcessRequest(rec, r, nil)

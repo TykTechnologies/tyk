@@ -16,7 +16,7 @@ const mwStatusRespond = 666
 var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddleware interface {
-	New()
+	Init()
 	GetConfig() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	IsEnabledForSpec() bool
@@ -41,7 +41,7 @@ func CreateDynamicAuthMiddleware(name string, baseMid *BaseMiddleware) func(http
 // Generic middleware caller to make extension easier
 func CreateMiddleware(mw TykMiddleware, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	// construct a new instance
-	mw.New()
+	mw.Init()
 
 	// Pull the configuration
 	mwConf, err := mw.GetConfig()

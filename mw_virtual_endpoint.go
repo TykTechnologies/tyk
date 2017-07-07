@@ -79,8 +79,7 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	}
 }
 
-// New lets you do any initialisations for the object can be done here
-func (d *VirtualEndpoint) New() {
+func (d *VirtualEndpoint) Init() {
 	d.sh = SuccessHandler{d.BaseMiddleware}
 }
 

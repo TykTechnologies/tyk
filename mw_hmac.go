@@ -30,7 +30,7 @@ func (hm *HMACMiddleware) GetName() string {
 	return "HMAC"
 }
 
-func (hm *HMACMiddleware) New() {
+func (hm *HMACMiddleware) Init() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 

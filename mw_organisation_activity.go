@@ -32,12 +32,6 @@ func (k *OrganizationMonitor) GetName() string {
 	return "OrganizationMonitor"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (k *OrganizationMonitor) New() {
-	k.sessionlimiter = SessionLimiter{}
-	k.mon = Monitor{}
-}
-
 func (k *OrganizationMonitor) IsEnabledForSpec() bool {
 	// If false, we aren't enforcing quotas so skip this mw
 	// altogether
