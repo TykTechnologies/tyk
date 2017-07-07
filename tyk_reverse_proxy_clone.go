@@ -675,7 +675,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int
 	var written int64
 	for {
 		nr, rerr := src.Read(buf)
-		if rerr != nil && rerr != io.EOF {
+		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
 			log.WithFields(logrus.Fields{
 				"prefix": "proxy",
 				"org_id": p.TykAPISpec.OrgID,
