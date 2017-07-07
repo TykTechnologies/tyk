@@ -338,7 +338,6 @@ func stopRPCMock(server *gorpc.Server) {
 
 	RPCCLientSingleton.Stop()
 	RPCClientIsConnected = false
-	RPCClients = map[string]chan int{}
 	RPCCLientSingleton = nil
 	RPCFuncClientSingleton = nil
 }
