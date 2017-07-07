@@ -338,27 +338,6 @@ var hopHeaders = []string{
 	"Upgrade",
 }
 
-type requestCanceler interface {
-	CancelRequest(*http.Request)
-}
-
-type runOnFirstRead struct {
-	io.Reader // optional; nil means empty body
-
-	fn func() // Run before first Read, then set to nil
-}
-
-func (c *runOnFirstRead) Read(bs []byte) (int, error) {
-	if c.fn != nil {
-		c.fn()
-		c.fn = nil
-	}
-	if c.Reader == nil {
-		return 0, io.EOF
-	}
-	return c.Reader.Read(bs)
-}
-
 func (p *ReverseProxy) Init(spec *APISpec) error {
 	p.ErrorHandler = ErrorHandler{BaseMiddleware: &BaseMiddleware{spec, p}}
 	return nil
@@ -433,6 +412,22 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 	transport := GetTransport(timeout, rw, req, p)
 
+	ctx := req.Context()
+	if cn, ok := rw.(http.CloseNotifier); ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+		notifyChan := cn.CloseNotify()
+		go func() {
+			select {
+			case <-notifyChan:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
+
+
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
 
@@ -455,39 +450,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	if closeNotifier, ok := rw.(http.CloseNotifier); ok {
-		if requestCanceler, ok := transport.(requestCanceler); ok {
-			reqDone := make(chan struct{})
-			defer close(reqDone)
-
-			clientGone := closeNotifier.CloseNotify()
-
-			outreq.Body = struct {
-				io.Reader
-				io.Closer
-			}{
-				Reader: &runOnFirstRead{
-					Reader: outreq.Body,
-					fn: func() {
-						go func() {
-							select {
-							case <-clientGone:
-								requestCanceler.CancelRequest(outreq)
-							case <-reqDone:
-							}
-						}()
-					},
-				},
-				Closer: outreq.Body,
-			}
-		}
+	if req.ContentLength == 0 {
+		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
 	}
+	outreq = outreq.WithContext(ctx)
 
 	p.Director(outreq)
-
-	outreq.Proto = "HTTP/1.1"
-	outreq.ProtoMajor = 1
-	outreq.ProtoMinor = 1
 	outreq.Close = false
 
 	// Remove headers with the same name as the connection-tokens.
