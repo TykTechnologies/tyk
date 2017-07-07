@@ -324,6 +324,16 @@ func copyHeader(dst, src http.Header) {
 	}
 }
 
+func cloneHeader(h http.Header) http.Header {
+	h2 := make(http.Header, len(h))
+	for k, vv := range h {
+		vv2 := make([]string, len(vv))
+		copy(vv2, vv)
+		h2[k] = vv2
+	}
+	return h2
+}
+
 // Hop-by-hop headers. These are removed when sent to the backend.
 // http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
 var hopHeaders = []string{
@@ -454,23 +464,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	outreq = outreq.WithContext(ctx)
 
+	outreq.Header = cloneHeader(req.Header)
+
 	p.Director(outreq)
 	outreq.Close = false
-
-	// We are modifying the same underlying map from req (shallow
-	// copied above) so we only copy it if necessary.
-	copiedHeaders := false
 
 	// Remove hop-by-hop headers listed in the "Connection" header.
 	// See RFC 2616, section 14.10.
 	if c := outreq.Header.Get("Connection"); c != "" {
 		for _, f := range strings.Split(c, ",") {
 			if f = strings.TrimSpace(f); f != "" {
-				if !copiedHeaders {
-					outreq.Header = make(http.Header)
-					copyHeader(outreq.Header, req.Header)
-					copiedHeaders = true
-				}
 				outreq.Header.Del(f)
 			}
 		}
@@ -480,20 +483,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Do not modify outbound request headers if they are WS
 	if !IsWebsocket(outreq) {
-
 		// Remove hop-by-hop headers to the backend. Especially
 		// important is "Connection" because we want a persistent
 		// connection, regardless of what the client sent to us.
-		copiedHeaders := false
 		for _, h := range hopHeaders {
 			if outreq.Header.Get(h) != "" {
-				if !copiedHeaders {
-					outreq.Header = make(http.Header)
-					logreq.Header = make(http.Header)
-					copyHeader(outreq.Header, req.Header)
-					copyHeader(logreq.Header, req.Header)
-					copiedHeaders = true
-				}
 				outreq.Header.Del(h)
 				logreq.Header.Del(h)
 			}
