@@ -427,7 +427,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}()
 	}
 
-
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
 
@@ -666,7 +665,39 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader) {
 		}
 	}
 
-	io.Copy(dst, src)
+	p.copyBuffer(dst, src, nil)
+}
+
+func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int64, error) {
+	if len(buf) == 0 {
+		buf = make([]byte, 32*1024)
+	}
+	var written int64
+	for {
+		nr, rerr := src.Read(buf)
+		if rerr != nil && rerr != io.EOF {
+			log.WithFields(logrus.Fields{
+				"prefix": "proxy",
+				"org_id": p.TykAPISpec.OrgID,
+				"api_id": p.TykAPISpec.APIID,
+			}).Error("http: proxy error during body copy: ", rerr)
+		}
+		if nr > 0 {
+			nw, werr := dst.Write(buf[:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if werr != nil {
+				return written, werr
+			}
+			if nr != nw {
+				return written, io.ErrShortWrite
+			}
+		}
+		if rerr != nil {
+			return written, rerr
+		}
+	}
 }
 
 type writeFlusher interface {
