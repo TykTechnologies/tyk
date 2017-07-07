@@ -462,7 +462,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// copied above) so we only copy it if necessary.
 	copiedHeaders := false
 
-	// Remove headers with the same name as the connection-tokens.
+	// Remove hop-by-hop headers listed in the "Connection" header.
 	// See RFC 2616, section 14.10.
 	if c := outreq.Header.Get("Connection"); c != "" {
 		for _, f := range strings.Split(c, ",") {
@@ -616,6 +616,16 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 }
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+
+	// Remove hop-by-hop headers listed in the
+	// "Connection" header of the response.
+	if c := res.Header.Get("Connection"); c != "" {
+		for _, f := range strings.Split(c, ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				res.Header.Del(f)
+			}
+		}
+	}
 
 	for _, h := range hopHeaders {
 		res.Header.Del(h)
