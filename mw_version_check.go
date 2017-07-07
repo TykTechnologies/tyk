@@ -14,8 +14,7 @@ type VersionCheck struct {
 	sh SuccessHandler
 }
 
-// New lets you do any initialisations for the object can be done here
-func (v *VersionCheck) New() {
+func (v *VersionCheck) Init() {
 	v.sh = SuccessHandler{v.BaseMiddleware}
 }
 

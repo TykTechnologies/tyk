@@ -28,7 +28,7 @@ func (k *OpenIDMW) GetName() string {
 	return "OpenIDMW"
 }
 
-func (k *OpenIDMW) New() {
+func (k *OpenIDMW) Init() {
 	k.provider_client_policymap = make(map[string]map[string]string)
 	// Create an OpenID Configuration and store
 	var err error
