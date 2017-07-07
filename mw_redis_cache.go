@@ -119,8 +119,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	} else {
 		// New request checker, more targeted, less likely to fail
 		_, versionPaths, _, _ := m.Spec.GetVersionData(r)
-		found, _ := m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
-		isVirtual, _ = m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+		found, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
+		isVirtual, _ = m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 		if found {
 			stat = StatusCached
 		}

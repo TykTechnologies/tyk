@@ -832,15 +832,15 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(method, url string, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+func (a *APISpec) IsURLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
 	for _, v := range rxPaths {
-		if !v.Spec.MatchString(strings.ToLower(url)) {
+		if !v.Spec.MatchString(strings.ToLower(r.URL.Path)) {
 			continue
 		}
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
-			methodMeta, matchMethodOk := v.MethodActions[method]
+			methodMeta, matchMethodOk := v.MethodActions[r.Method]
 			if matchMethodOk {
 				// Matched the method, check what status it is:
 				if methodMeta.Action == apidef.NoAction {
@@ -890,10 +890,10 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, rxPaths []URLSpec, 
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
-func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
 	for _, v := range rxPaths {
-		match := v.Spec.MatchString(url)
+		match := v.Spec.MatchString(r.URL.Path)
 		// only return it it's what we are looking for
 		if !match || mode != v.Status {
 			continue
@@ -902,51 +902,51 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []UR
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
 		case Transformed:
-			if method == v.TransformAction.Method {
+			if r.Method == v.TransformAction.Method {
 				return true, &v.TransformAction
 			}
 		case HeaderInjected:
-			if method == v.InjectHeaders.Method {
+			if r.Method == v.InjectHeaders.Method {
 				return true, &v.InjectHeaders
 			}
 		case HeaderInjectedResponse:
-			if method == v.InjectHeadersResponse.Method {
+			if r.Method == v.InjectHeadersResponse.Method {
 				return true, &v.InjectHeadersResponse
 			}
 		case TransformedResponse:
-			if method == v.TransformResponseAction.Method {
+			if r.Method == v.TransformResponseAction.Method {
 				return true, &v.TransformResponseAction
 			}
 		case HardTimeout:
-			if method == v.HardTimeout.Method {
+			if r.Method == v.HardTimeout.Method {
 				return true, &v.HardTimeout.TimeOut
 			}
 		case CircuitBreaker:
-			if method == v.CircuitBreaker.Method {
+			if r.Method == v.CircuitBreaker.Method {
 				return true, &v.CircuitBreaker
 			}
 		case URLRewrite:
-			if method == v.URLRewrite.Method {
+			if r.Method == v.URLRewrite.Method {
 				return true, &v.URLRewrite
 			}
 		case VirtualPath:
-			if method == v.VirtualPathSpec.Method {
+			if r.Method == v.VirtualPathSpec.Method {
 				return true, &v.VirtualPathSpec
 			}
 		case RequestSizeLimit:
-			if method == v.RequestSize.Method {
+			if r.Method == v.RequestSize.Method {
 				return true, &v.RequestSize
 			}
 		case MethodTransformed:
-			if method == v.MethodTransform.Method {
+			if r.Method == v.MethodTransform.Method {
 				return true, &v.MethodTransform
 			}
 		case RequestTracked:
-			if method == v.TrackEndpoint.Method {
+			if r.Method == v.TrackEndpoint.Method {
 				return true, &v.TrackEndpoint
 			}
 		case RequestNotTracked:
-			if method == v.DoNotTrackEndpoint.Method {
+			if r.Method == v.DoNotTrackEndpoint.Method {
 				return true, &v.DoNotTrackEndpoint
 			}
 		}
@@ -1025,7 +1025,7 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 	}
 
 	// not expired, let's check path info
-	requestStatus, meta := a.IsURLAllowedAndIgnored(r.Method, r.URL.Path, versionPaths, whiteListStatus)
+	requestStatus, meta := a.IsURLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 
 	switch requestStatus {
 	case EndPointNotAllowed:
