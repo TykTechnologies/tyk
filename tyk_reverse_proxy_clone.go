@@ -458,11 +458,20 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.Director(outreq)
 	outreq.Close = false
 
+	// We are modifying the same underlying map from req (shallow
+	// copied above) so we only copy it if necessary.
+	copiedHeaders := false
+
 	// Remove headers with the same name as the connection-tokens.
 	// See RFC 2616, section 14.10.
 	if c := outreq.Header.Get("Connection"); c != "" {
 		for _, f := range strings.Split(c, ",") {
 			if f = strings.TrimSpace(f); f != "" {
+				if !copiedHeaders {
+					outreq.Header = make(http.Header)
+					copyHeader(outreq.Header, req.Header)
+					copiedHeaders = true
+				}
 				outreq.Header.Del(f)
 			}
 		}
@@ -473,11 +482,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// Do not modify outbound request headers if they are WS
 	if !IsWebsocket(outreq) {
 
-		// Remove hop-by-hop headers to the backend.  Especially
+		// Remove hop-by-hop headers to the backend. Especially
 		// important is "Connection" because we want a persistent
-		// connection, regardless of what the client sent to us.  This
-		// is modifying the same underlying map from req (shallow
-		// copied above) so we only copy it if necessary.
+		// connection, regardless of what the client sent to us.
 		copiedHeaders := false
 		for _, h := range hopHeaders {
 			if outreq.Header.Get(h) != "" {
