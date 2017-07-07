@@ -23,26 +23,20 @@ type ResponseTransformMiddleware struct {
 	config ResponsetransformOptions
 }
 
-func (rt ResponseTransformMiddleware) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
+func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 	handler := ResponseTransformMiddleware{}
-	moduleConfig := ResponsetransformOptions{}
 
-	if err := mapstructure.Decode(c, &moduleConfig); err != nil {
+	if err := mapstructure.Decode(c, &h.config); err != nil {
 		log.Error(err)
-		return nil, err
+		return err
 	}
-
-	handler.config = moduleConfig
 	handler.Spec = spec
-
-	log.Debug("Response body transform processor initialised")
-
-	return handler, nil
+	return nil
 }
 
-func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
-	_, versionPaths, _, _ := rt.Spec.GetVersionData(req)
-	found, meta := rt.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, TransformedResponse)
+func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+	_, versionPaths, _, _ := h.Spec.GetVersionData(req)
+	found, meta := h.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, TransformedResponse)
 	if !found {
 		return nil
 	}
@@ -64,8 +58,8 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "outbound-transform",
-				"server_name": rt.Spec.Proxy.TargetURL,
-				"api_id":      rt.Spec.APIID,
+				"server_name": h.Spec.Proxy.TargetURL,
+				"api_id":      h.Spec.APIID,
 				"path":        req.URL.Path,
 			}).Error("Error unmarshalling XML: ", err)
 		}
@@ -78,8 +72,8 @@ func (rt ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "outbound-transform",
-			"server_name": rt.Spec.Proxy.TargetURL,
-			"api_id":      rt.Spec.APIID,
+			"server_name": h.Spec.Proxy.TargetURL,
+			"api_id":      h.Spec.APIID,
 			"path":        req.URL.Path,
 		}).Error("Failed to apply template to request: ", err)
 	}
