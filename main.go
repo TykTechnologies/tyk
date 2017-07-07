@@ -54,12 +54,12 @@ var (
 	DashService              DashboardServiceSender
 
 	apisMu   sync.RWMutex
-	apisByID map[string]*APISpec
+	apisByID = map[string]*APISpec{}
 
 	keyGen DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
-	policiesByID map[string]Policy
+	policiesByID = map[string]Policy{}
 
 	mainRouter    *mux.Router
 	defaultRouter *mux.Router

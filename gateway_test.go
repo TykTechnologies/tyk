@@ -155,6 +155,23 @@ func TestMain(m *testing.M) {
 
 	go reloadLoop(reloadTick)
 
+	go func() {
+		// simulate reloads in the background, i.e. writes to
+		// global variables that should not be accessed in a
+		// racy way like the policies and api specs maps.
+		for {
+			policiesMu.Lock()
+			policiesByID["_"] = Policy{}
+			delete(policiesByID, "_")
+			policiesMu.Unlock()
+			apisMu.Lock()
+			apisByID["_"] = nil
+			delete(apisByID, "_")
+			apisMu.Unlock()
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
 	exitCode := m.Run()
 
 	os.RemoveAll(globalConf.AppPath)
@@ -945,30 +962,4 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		t.Fatalf("should have not handled redis event")
 	}
 	handleRedisEvent(msg, notHandle, nil)
-}
-
-func TestReloadPoliciesRace(t *testing.T) {
-	defer func(orig string) {
-		globalConf.Policies.PolicyRecordName = orig
-	}(globalConf.Policies.PolicyRecordName)
-	globalConf.Policies.PolicyRecordName = "policies/policies.json"
-	for i := 0; i < 10; i++ {
-		go func() {
-			policiesMu.RLock()
-			_ = policiesByID["foo"]
-			policiesMu.RUnlock()
-		}()
-	}
-	getPolicies()
-}
-
-func TestReloadApisRace(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		go func() {
-			apisMu.RLock()
-			_ = apisByID["foo"]
-			apisMu.RUnlock()
-		}()
-	}
-	loadSampleAPI(t, apiTestDef)
 }
