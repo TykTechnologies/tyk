@@ -259,7 +259,7 @@ func processSpec(referenceSpec *APISpec,
 	}
 
 	// initialise the proxy
-	proxy.New(nil, referenceSpec)
+	proxy.Init(referenceSpec)
 
 	// Create the response processors
 	creeateResponseMiddlewareChain(referenceSpec)

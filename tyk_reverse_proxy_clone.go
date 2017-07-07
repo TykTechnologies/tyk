@@ -359,9 +359,9 @@ func (c *runOnFirstRead) Read(bs []byte) (int, error) {
 	return c.Reader.Read(bs)
 }
 
-func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
+func (p *ReverseProxy) Init(spec *APISpec) error {
 	p.ErrorHandler = ErrorHandler{BaseMiddleware: &BaseMiddleware{spec, p}}
-	return nil, nil
+	return nil
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {

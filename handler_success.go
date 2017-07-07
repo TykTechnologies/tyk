@@ -31,10 +31,10 @@ var SessionCache = cache.New(10*time.Second, 5*time.Second)
 var ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
 
 type ReturningHttpHandler interface {
+	Init(*APISpec) error
 	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response
 	ServeHTTPForCache(http.ResponseWriter, *http.Request) *http.Response
 	CopyResponse(io.Writer, io.Reader)
-	New(interface{}, *APISpec) (TykResponseHandler, error)
 }
 
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
