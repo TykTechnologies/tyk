@@ -688,7 +688,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 			"err":    err,
 		}).Error("Failed to update hashed key.")
 
-		return apiError("Marshalling failed"), 400
+		return apiError("Marshalling failed"), 500
 	}
 
 	if err := sessStore.SetRawKey(setKeyName, string(sessAsJS), 0); err != nil {
@@ -699,7 +699,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 			"err":    err,
 		}).Error("Failed to update hashed key.")
 
-		return apiError("Could not write key data"), 400
+		return apiError("Could not write key data"), 500
 	}
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "updated"}
@@ -755,7 +755,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	if spec == nil {
 		log.Warning("Couldn't find org session store in active API list")
 		if globalConf.SupressDefaultOrgStore {
-			return apiError("No such organisation found in Active API list"), 400
+			return apiError("No such organisation found in Active API list"), 404
 		}
 		sessionManager = &DefaultOrgStore
 	} else {
@@ -773,7 +773,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 
 	err := sessionManager.UpdateSession(keyName, newSession, 0)
 	if err != nil {
-		return apiError("Error writing to key store " + err.Error()), 400
+		return apiError("Error writing to key store " + err.Error()), 500
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1142,7 +1142,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 			"err":    err,
 		}).Error("Failed to invalidate refresh token")
 
-		doJSONWrite(w, 400, apiError("Failed to invalidate refresh token"))
+		doJSONWrite(w, 500, apiError("Failed to invalidate refresh token"))
 		return
 	}
 
