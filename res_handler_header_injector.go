@@ -31,7 +31,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 	// TODO: This should only target specific paths
 
 	_, versionPaths, _, _ := h.Spec.GetVersionData(req)
-	found, meta := h.Spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HeaderInjectedResponse)
+	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {

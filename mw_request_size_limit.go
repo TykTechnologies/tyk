@@ -91,7 +91,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	}
 
 	// If there's a potential match, try to match
-	found, meta := t.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, RequestSizeLimit)
+	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, RequestSizeLimit)
 	if found {
 		log.Debug("Request size limit matched for this URL, checking...")
 		rmeta := meta.(*apidef.RequestSizeMeta)
