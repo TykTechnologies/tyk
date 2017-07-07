@@ -18,16 +18,16 @@ type HeaderInjector struct {
 	config HeaderInjectorOptions
 }
 
-func (h HeaderInjector) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	handler := HeaderInjector{Spec: spec}
-	if err := mapstructure.Decode(c, &handler.config); err != nil {
+func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
+	h.Spec = spec
+	if err := mapstructure.Decode(c, &h.config); err != nil {
 		log.Error(err)
-		return nil, err
+		return err
 	}
-	return handler, nil
+	return nil
 }
 
-func (h HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	// TODO: This should only target specific paths
 
 	_, versionPaths, _, _ := h.Spec.GetVersionData(req)

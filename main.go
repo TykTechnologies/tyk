@@ -509,14 +509,14 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 
 	responseChain := make([]TykResponseHandler, len(referenceSpec.ResponseProcessors))
 	for i, processorDetail := range referenceSpec.ResponseProcessors {
-		processorType, err := GetResponseProcessorByName(processorDetail.Name)
+		processor, err := GetResponseProcessorByName(processorDetail.Name)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Error("Failed to load processor! ", err)
 			return
 		}
-		processor, _ := processorType.New(processorDetail.Options, referenceSpec)
+		_ = processor.Init(processorDetail.Options, referenceSpec)
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Loading Response processor: ", processorDetail.Name)

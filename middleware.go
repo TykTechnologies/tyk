@@ -119,18 +119,18 @@ func CheckETEnabled(baseMid *BaseMiddleware) bool {
 }
 
 type TykResponseHandler interface {
+	Init(interface{}, *APISpec) error
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *SessionState) error
-	New(interface{}, *APISpec) (TykResponseHandler, error)
 }
 
 func GetResponseProcessorByName(name string) (TykResponseHandler, error) {
 	switch name {
 	case "header_injector":
-		return HeaderInjector{}, nil
+		return &HeaderInjector{}, nil
 	case "response_body_transform":
-		return ResponseTransformMiddleware{}, nil
+		return &ResponseTransformMiddleware{}, nil
 	case "header_transform":
-		return HeaderTransform{}, nil
+		return &HeaderTransform{}, nil
 	default:
 		return nil, errors.New("not found")
 	}
