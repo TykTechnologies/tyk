@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -54,41 +53,37 @@ var (
 	GlobalRPCPingTimeout time.Duration
 )
 
-// ------------------- CLOUD STORAGE MANAGER -------------------------------
-
-var RPCCLientRWMutex sync.RWMutex
-var RPCClients = map[string]chan int{}
-
 func rpcKeepAliveCheck(r *RPCStorageHandler) {
 	// Only run when connected
-	if RPCClientIsConnected {
-		// Make sure the auth back end is still alive
-		c1 := make(chan string, 1)
+	if !RPCClientIsConnected {
+		return
+	}
+	// Make sure the auth back end is still alive
+	c1 := make(chan string, 1)
 
-		go func() {
-			log.Debug("Getting keyspace check test key")
-			r.GetKey("0000")
-			log.Debug("--> done")
-			c1 <- "1"
-			close(c1)
-		}()
+	go func() {
+		log.Debug("Getting keyspace check test key")
+		r.GetKey("0000")
+		log.Debug("--> done")
+		c1 <- "1"
+		close(c1)
+	}()
 
-		ctd := false
-		select {
-		case res := <-c1:
-			log.Debug("RPC Still alive: ", res)
-			ctd = true
-		case <-time.After(time.Second * 10):
-			log.WithFields(logrus.Fields{
-				"prefix": "RPC Conn Mgr",
-			}).Warning("Handler seems to have disconnected, attempting reconnect")
-			r.ReConnect()
-		}
+	ctd := false
+	select {
+	case res := <-c1:
+		log.Debug("RPC Still alive: ", res)
+		ctd = true
+	case <-time.After(time.Second * 10):
+		log.WithFields(logrus.Fields{
+			"prefix": "RPC Conn Mgr",
+		}).Warning("Handler seems to have disconnected, attempting reconnect")
+		r.ReConnect()
+	}
 
-		if ctd {
-			// Don't run too quickly, pulse every 10 secs
-			time.Sleep(time.Second * 10)
-		}
+	if ctd {
+		// Don't run too quickly, pulse every 10 secs
+		time.Sleep(time.Second * 10)
 	}
 }
 
@@ -108,9 +103,6 @@ type RPCStorageHandler struct {
 func (r *RPCStorageHandler) Register() {
 	r.ID = uuid.NewV4().String()
 	myChan := make(chan int)
-	RPCCLientRWMutex.Lock()
-	RPCClients[r.ID] = myChan
-	RPCCLientRWMutex.Unlock()
 	r.killChan = myChan
 	log.Debug("RPC Client registered")
 }
@@ -177,9 +169,6 @@ func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteClo
 func (r *RPCStorageHandler) Disconnect() bool {
 	if RPCClientIsConnected {
 		RPCClientIsConnected = false
-		RPCCLientRWMutex.Lock()
-		delete(RPCClients, r.ID)
-		RPCCLientRWMutex.Unlock()
 	}
 	return true
 }
