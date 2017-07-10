@@ -149,6 +149,8 @@ func TestMain(m *testing.M) {
 	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
 	afterConfSetup(&globalConf)
 	initialiseSystem(nil)
+	// Small part of start()
+	loadAPIEndpoints(mainRouter)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}

@@ -1377,7 +1377,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleInvalidateAPICache(apiID string) error {
-	keyPrefix := "cache-" + strings.Replace(apiID, "/", "", -1)
+	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
 	store := getGlobalLocalCacheStorageHandler(keyPrefix, false)
 

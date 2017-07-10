@@ -445,6 +445,25 @@ func TestAPIAuthOk(t *testing.T) {
 	}
 }
 
+func TestInvalidateCache(t *testing.T) {
+	for _, suffix := range []string{"", "/"} {
+		loadSampleAPI(t, apiTestDef)
+
+		// TODO: Note that this test is fairly dumb, as it doesn't check
+		// that the cache is empty and will pass even if the apiID does
+		// not exist. This test should be improved to check that the
+		// endpoint actually did what it's supposed to.
+		rec := httptest.NewRecorder()
+		req := withAuth(testReq(t, "DELETE", "/tyk/cache/1"+suffix, nil))
+
+		mainRouter.ServeHTTP(rec, req)
+
+		if rec.Code != 200 {
+			t.Errorf("Could not invalidate cache: %v\n%v", rec.Code, rec.Body)
+		}
+	}
+}
+
 func TestGetOAuthClients(t *testing.T) {
 	testAPIID := "1"
 	var responseCode int

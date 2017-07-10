@@ -334,7 +334,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/health{_:/?}", allowMethods(healthCheckhandler, "GET"))
 		r.HandleFunc("/oauth/clients/create{_:/?}", allowMethods(createOauthClient, "POST"))
 		r.HandleFunc("/oauth/refresh/{keyName}", allowMethods(invalidateOauthRefresh, "DELETE"))
-		r.HandleFunc("/cache/{apiID}", allowMethods(invalidateCacheHandler, "DELETE"))
+		r.HandleFunc("/cache/{apiID}{_:/?}", allowMethods(invalidateCacheHandler, "DELETE"))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
