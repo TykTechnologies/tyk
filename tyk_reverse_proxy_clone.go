@@ -35,7 +35,7 @@ func GetURLFromService(spec *APISpec) (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
 		sd := ServiceDiscovery{}
-		sd.New(&spec.Proxy.ServiceDiscovery)
+		sd.Init(&spec.Proxy.ServiceDiscovery)
 		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
 			spec.ServiceRefreshInProgress = false
