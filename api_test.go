@@ -314,24 +314,26 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 }
 
 func TestKeyHandlerGetKey(t *testing.T) {
-	for _, api_id := range []string{"1", "none", ""} {
-		loadSampleAPI(t, apiTestDef)
-		createKey(t)
+	for _, pathSuffix := range []string{"/", "/1234"} {
+		for _, api_id := range []string{"1", "none", ""} {
+			loadSampleAPI(t, apiTestDef)
+			createKey(t)
 
-		uri := "/tyk/keys/1234"
+			uri := "/tyk/keys" + pathSuffix
 
-		recorder := httptest.NewRecorder()
-		param := make(url.Values)
+			recorder := httptest.NewRecorder()
+			param := make(url.Values)
 
-		if api_id != "" {
-			param.Set("api_id", api_id)
-		}
-		req := withAuth(testReq(t, "GET", uri+"?"+param.Encode(), nil))
+			if api_id != "" {
+				param.Set("api_id", api_id)
+			}
+			req := withAuth(testReq(t, "GET", uri+"?"+param.Encode(), nil))
 
-		mainRouter.ServeHTTP(recorder, req)
+			mainRouter.ServeHTTP(recorder, req)
 
-		if recorder.Code != 200 {
-			t.Error("key not requested, status error:\n", recorder.Body.String())
+			if recorder.Code != 200 {
+				t.Error("key not requested, status error:\n", recorder.Body.String())
+			}
 		}
 	}
 }

@@ -326,7 +326,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload{_:/?}", allowMethods(resetHandler(nil), "GET"))
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys/{keyName}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
+		r.HandleFunc("/org/keys/{keyName:[^/]*}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
 		r.HandleFunc("/keys/policy/{keyName}", allowMethods(policyUpdateHandler, "POST"))
 		r.HandleFunc("/keys/create{_:/?}", allowMethods(createKeyHandler, "POST"))
 		r.HandleFunc("/apis{_:/?}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
@@ -341,9 +341,9 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		}).Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/keys/{keyName}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
+	r.HandleFunc("/keys/{keyName:[^/]*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
