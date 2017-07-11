@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -43,13 +44,24 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if !found {
 		return nil, 200
 	}
-	tmeta := meta.(*TransformSpec)
+	err := transformBody(r, meta.(*TransformSpec), t.Spec.EnableContextVars)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix":      "inbound-transform",
+			"server_name": t.Spec.Proxy.TargetURL,
+			"api_id":      t.Spec.APIID,
+			"path":        r.URL.Path,
+		}).Error(err)
+	}
+	return nil, 200
+}
 
+func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) error {
 	// Read the body:
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, http.StatusBadRequest
+		return err
 	}
 
 	// Put into an interface:
@@ -60,15 +72,12 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		var err error
 		bodyData, err = mxj.NewMapXml(body) // unmarshal
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix":      "inbound-transform",
-				"server_name": t.Spec.Proxy.TargetURL,
-				"api_id":      t.Spec.APIID,
-				"path":        r.URL.Path,
-			}).Error("Error unmarshalling XML: ", err)
+			return fmt.Errorf("error unmarshalling XML: %v", err)
 		}
 	case apidef.RequestJSON:
 		json.Unmarshal(body, &bodyData)
+	default:
+		return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
 	}
 
 	if tmeta.TemplateData.EnableSession {
@@ -76,22 +85,17 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		bodyData["_tyk_meta"] = session.MetaData
 	}
 
-	if t.Spec.EnableContextVars {
+	if contextVars {
 		bodyData["_tyk_context"] = ctxGetData(r)
 	}
 
 	// Apply to template
 	var bodyBuffer bytes.Buffer
-	if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":      "inbound-transform",
-			"server_name": t.Spec.Proxy.TargetURL,
-			"api_id":      t.Spec.APIID,
-			"path":        r.URL.Path,
-		}).Error("Failed to apply template to request: ", err)
+	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+		return fmt.Errorf("failed to apply template to request: %v", err)
 	}
 	r.Body = ioutil.NopCloser(&bodyBuffer)
 	r.ContentLength = int64(bodyBuffer.Len())
 
-	return nil, 200
+	return nil
 }
