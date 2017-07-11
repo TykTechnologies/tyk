@@ -17,7 +17,7 @@ type modifiedMiddleware struct {
 }
 
 type modifiedMiddlewareConfig struct {
-	CustomConfigVar string `mapstructure:"custom_config_var" bson:"custom_config_var" json:"custom_config_var"`
+	CustomData string `mapstructure:"custom_data" json:"custom_data"`
 }
 
 func (m *modifiedMiddleware) GetName() string {
@@ -31,7 +31,7 @@ func (m *modifiedMiddleware) Init() {}
 func (m *modifiedMiddleware) GetConfig() (interface{}, error) {
 	var conf modifiedMiddlewareConfig
 
-	err := mapstructure.Decode(m.Spec.RawData, &conf)
+	err := mapstructure.Decode(m.Spec.ConfigData, &conf)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (m *modifiedMiddleware) GetConfig() (interface{}, error) {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *modifiedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	mconf := conf.(modifiedMiddlewareConfig)
-	if mconf.CustomConfigVar == "error" {
+	if mconf.CustomData == "error" {
 		return errors.New("Forced error called"), 400
 	}
 	return nil, 200

@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
@@ -59,17 +58,13 @@ func (d *DynamicMiddleware) GetName() string {
 	return "DynamicMiddleware"
 }
 
-type configDataDef struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
-
 func jsonConfigData(spec *APISpec) string {
-	var conf configDataDef
-	if err := mapstructure.Decode(spec.RawData, &conf); err != nil {
-		log.Error("Failed to parse configuration data: ", err)
-		return ""
+	m := map[string]interface{}{
+		// For backwards compatibility within 2.x.
+		// TODO: simplify or refactor in 3.x or later.
+		"config_data": spec.ConfigData,
 	}
-	bs, err := json.Marshal(conf)
+	bs, err := json.Marshal(m)
 	if err != nil {
 		log.Error("Failed to encode configuration data: ", err)
 		return ""
