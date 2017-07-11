@@ -955,12 +955,12 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
-	switch a.APIDefinition.VersionDefinition.Location {
+	switch a.VersionDefinition.Location {
 	case "header":
-		return r.Header.Get(a.APIDefinition.VersionDefinition.Key)
+		return r.Header.Get(a.VersionDefinition.Key)
 
 	case "url-param":
-		return r.URL.Query().Get(a.APIDefinition.VersionDefinition.Key)
+		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case "url":
 		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
@@ -1061,9 +1061,9 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 		version = *v
 	} else {
 		// Are we versioned?
-		if a.APIDefinition.VersionData.NotVersioned {
+		if a.VersionData.NotVersioned {
 			// Get the first one in the list
-			for k, v := range a.APIDefinition.VersionData.Versions {
+			for k, v := range a.VersionData.Versions {
 				versionKey = k
 				version = v
 				break
@@ -1078,7 +1078,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 
 		// Load Version Data - General
 		var ok bool
-		version, ok = a.APIDefinition.VersionData.Versions[versionKey]
+		version, ok = a.VersionData.Versions[versionKey]
 		if !ok {
 			return &version, versionRxPaths, versionWLStatus, VersionDoesNotExist
 		}
