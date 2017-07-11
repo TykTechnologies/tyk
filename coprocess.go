@@ -43,7 +43,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		MiddlewareDriver: mwDriver,
 	}
 
-	return CreateMiddleware(dMiddleware, baseMid)
+	return CreateMiddleware(dMiddleware)
 }
 
 func doCoprocessReload() {
