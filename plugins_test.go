@@ -101,10 +101,8 @@ leakMid.NewProcessRequest(function(request, session) {
 
 func TestJSVMConfigData(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	spec.RawData = map[string]interface{}{
-		"config_data": map[string]interface{}{
-			"foo": "bar",
-		},
+	spec.ConfigData = map[string]interface{}{
+		"foo": "bar",
 	}
 	const js = `
 var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({});

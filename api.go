@@ -452,11 +452,9 @@ func handleGetAPIList() (interface{}, int) {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
 	apiIDList := make([]*apidef.APIDefinition, len(apisByID))
-
 	c := 0
 	for _, apiSpec := range apisByID {
 		apiIDList[c] = apiSpec.APIDefinition
-		apiIDList[c].RawData = nil
 		c++
 	}
 	return apiIDList, 200

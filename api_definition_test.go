@@ -108,8 +108,7 @@ const nonExpiringMultiDef = `{
 
 func createDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
-	def, rawDef := loader.ParseDefinition([]byte(defStr))
-	def.RawData = rawDef
+	def := loader.ParseDefinition([]byte(defStr))
 	spec := loader.MakeSpec(def)
 	spec.APIDefinition = def
 	return spec
