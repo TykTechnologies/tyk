@@ -2,7 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// HTTP reverse proxy handler
+// Fork of Go's net/http/httputil/reverseproxy.go with multiple changes,
+// including:
+//
+// * caching
+// * load balancing
+// * service discovery
 
 package main
 
