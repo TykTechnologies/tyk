@@ -14,8 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
-// CoProcessName specifies the driver name.
-const CoProcessName = apidef.GrpcDriver
+const CoProcessName = "test"
 
 // MessageType sets the default message type.
 var MessageType = coprocess.ProtobufMessage
@@ -23,13 +22,11 @@ var MessageType = coprocess.ProtobufMessage
 var grpcConnection *grpc.ClientConn
 var grpcClient coprocess.DispatcherClient
 
-// GRPCDispatcher implements a coprocess.Dispatcher
-type GRPCDispatcher struct {
-	coprocess.Dispatcher
-}
+// GRPCDriver wraps the driver methods.
+type GRPCDriver coprocess.Driver
 
-func dialer(addr string, timeout time.Duration) (net.Conn, error) {
-	grpcUrl, err := url.Parse(globalConf.CoProcessOptions.CoProcessGRPCServer)
+func (d *GRPCDriver) dialer(addr string, timeout time.Duration) (net.Conn, error) {
+	grpcURL, err := url.Parse(globalConf.CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
@@ -37,7 +34,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, err
 	}
 
-	if grpcUrl == nil || globalConf.CoProcessOptions.CoProcessGRPCServer == "" {
+	if grpcURL == nil || globalConf.CoProcessOptions.CoProcessGRPCServer == "" {
 		errString := "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
@@ -45,12 +42,12 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, errors.New(errString)
 	}
 
-	grpcUrlString := globalConf.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:]
-	return net.DialTimeout(grpcUrl.Scheme, grpcUrlString, timeout)
+	grpcURLString := globalConf.CoProcessOptions.CoProcessGRPCServer[len(grpcURL.Scheme)+3:]
+	return net.DialTimeout(grpcURL.Scheme, grpcURLString, timeout)
 }
 
-// Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
+// DispatchObject takes a CoProcessMessage and sends it to the CP.
+func (d *GRPCDriver) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
 	newObject, err := grpcClient.Dispatch(context.Background(), object)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -61,7 +58,7 @@ func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Ob
 }
 
 // DispatchEvent dispatches a Tyk event.
-func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
+func (d *GRPCDriver) DispatchEvent(eventJSON []byte) {
 	eventObject := &coprocess.Event{
 		Payload: string(eventJSON),
 	}
@@ -75,28 +72,35 @@ func (d *GRPCDispatcher) DispatchEvent(eventJSON []byte) {
 	}
 }
 
-// Reload triggers a reload affecting CP middlewares and event handlers.
-func (d *GRPCDispatcher) Reload() {}
-
 // HandleMiddlewareCache isn't used by gRPC.
-func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
+func (d *GRPCDriver) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
 
-// NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
+// Init wraps all the initial actions needed for this CP.
+func (d *GRPCDriver) Init() error {
 	var err error
-	grpcConnection, err = grpc.Dial("", grpc.WithInsecure(), grpc.WithDialer(dialer))
+	grpcConnection, err = grpc.Dial("", grpc.WithInsecure(), grpc.WithDialer(d.dialer))
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
-
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
 		}).Error(err)
-		return nil, err
+		return err
 	}
-	return &GRPCDispatcher{}, nil
+	return nil
 }
+
+// Reload isn't used by gRPC.
+func (d *GRPCDriver) Reload() {}
+
+// LoadModules isn't used by gRPC.
+func (d *GRPCDriver) LoadModules() {}
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 	return GlobalDispatcher.DispatchObject(object)
+}
+
+func init() {
+	driver := GRPCDriver{}
+	Drivers[apidef.GrpcDriver] = &driver
 }
