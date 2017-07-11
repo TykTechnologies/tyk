@@ -108,11 +108,11 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}, baseMid),
-		CreateMiddleware(&Oauth2KeyExists{baseMid}, baseMid),
-		CreateMiddleware(&KeyExpired{baseMid}, baseMid),
-		CreateMiddleware(&AccessRightsCheck{baseMid}, baseMid),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}, baseMid)).Then(proxyHandler)
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		CreateMiddleware(&Oauth2KeyExists{baseMid}),
+		CreateMiddleware(&KeyExpired{baseMid}),
+		CreateMiddleware(&AccessRightsCheck{baseMid}),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
 
 	muxer.Handle(spec.Proxy.ListenPath, chain)
 }

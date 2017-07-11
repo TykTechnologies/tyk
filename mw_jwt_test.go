@@ -185,12 +185,12 @@ func getJWTChain(spec *APISpec) http.Handler {
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}, baseMid),
-		CreateMiddleware(&JWTMiddleware{baseMid}, baseMid),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}, baseMid),
-		CreateMiddleware(&KeyExpired{baseMid}, baseMid),
-		CreateMiddleware(&AccessRightsCheck{baseMid}, baseMid),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}, baseMid)).Then(proxyHandler)
+		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
+		CreateMiddleware(&JWTMiddleware{baseMid}),
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		CreateMiddleware(&KeyExpired{baseMid}),
+		CreateMiddleware(&AccessRightsCheck{baseMid}),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
 
 	return chain
 }

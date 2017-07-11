@@ -17,6 +17,7 @@ var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddleware interface {
 	Init()
+	Base() *BaseMiddleware
 	GetConfig() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	IsEnabledForSpec() bool
@@ -31,7 +32,7 @@ func CreateDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseM
 		UseSession:          useSession,
 	}
 
-	return CreateMiddleware(dMiddleware, baseMid)
+	return CreateMiddleware(dMiddleware)
 }
 
 func CreateDynamicAuthMiddleware(name string, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
@@ -39,7 +40,7 @@ func CreateDynamicAuthMiddleware(name string, baseMid *BaseMiddleware) func(http
 }
 
 // Generic middleware caller to make extension easier
-func CreateMiddleware(mw TykMiddleware, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
+func CreateMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	// construct a new instance
 	mw.Init()
 
@@ -65,13 +66,13 @@ func CreateMiddleware(mw TykMiddleware, baseMid *BaseMiddleware) func(http.Handl
 			job.EventKv(eventName, meta)
 			startTime := time.Now()
 
-			if baseMid.Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
+			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
 				return
 			}
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-				handler := ErrorHandler{baseMid}
+				handler := ErrorHandler{mw.Base()}
 				handler.HandleError(w, r, err.Error(), errCode)
 				meta["error"] = err.Error()
 				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
@@ -92,9 +93,9 @@ func CreateMiddleware(mw TykMiddleware, baseMid *BaseMiddleware) func(http.Handl
 	}
 }
 
-func AppendMiddleware(chain *[]alice.Constructor, mw TykMiddleware, baseMid *BaseMiddleware) {
+func AppendMiddleware(chain *[]alice.Constructor, mw TykMiddleware) {
 	if mw.IsEnabledForSpec() {
-		*chain = append(*chain, CreateMiddleware(mw, baseMid))
+		*chain = append(*chain, CreateMiddleware(mw))
 	}
 }
 

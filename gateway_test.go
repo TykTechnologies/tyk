@@ -286,14 +286,14 @@ func getChain(spec *APISpec) http.Handler {
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}, baseMid),
-		CreateMiddleware(&MiddlewareContextVars{BaseMiddleware: baseMid}, baseMid),
-		CreateMiddleware(&AuthKey{baseMid}, baseMid),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}, baseMid),
-		CreateMiddleware(&KeyExpired{baseMid}, baseMid),
-		CreateMiddleware(&AccessRightsCheck{baseMid}, baseMid),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}, baseMid),
-		CreateMiddleware(&TransformHeaders{baseMid}, baseMid)).Then(proxyHandler)
+		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
+		CreateMiddleware(&MiddlewareContextVars{BaseMiddleware: baseMid}),
+		CreateMiddleware(&AuthKey{baseMid}),
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		CreateMiddleware(&KeyExpired{baseMid}),
+		CreateMiddleware(&AccessRightsCheck{baseMid}),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}),
+		CreateMiddleware(&TransformHeaders{baseMid})).Then(proxyHandler)
 
 	return chain
 }

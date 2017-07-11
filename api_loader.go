@@ -286,19 +286,19 @@ func processSpec(referenceSpec *APISpec,
 		handleCORS(&chainArray, referenceSpec)
 
 		baseChainArray := []alice.Constructor{}
-		AppendMiddleware(&baseChainArray, &RateCheckMW{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &OrganizationMonitor{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &MiddlewareContextVars{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &VersionCheck{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &RequestSizeLimitMiddleware{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &TrackEndpointMiddleware{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &TransformMiddleware{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &TransformHeaders{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore}, baseMid)
-		AppendMiddleware(&baseChainArray, &VirtualEndpoint{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray, &TransformMethod{BaseMiddleware: baseMid}, baseMid)
+		AppendMiddleware(&baseChainArray, &RateCheckMW{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &VersionCheck{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &RequestSizeLimitMiddleware{baseMid})
+		AppendMiddleware(&baseChainArray, &TrackEndpointMiddleware{baseMid})
+		AppendMiddleware(&baseChainArray, &TransformMiddleware{baseMid})
+		AppendMiddleware(&baseChainArray, &TransformHeaders{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		AppendMiddleware(&baseChainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray, &TransformMethod{BaseMiddleware: baseMid})
 
 		log.Debug(referenceSpec.Name, " - CHAIN SIZE: ", len(baseChainArray))
 
@@ -308,7 +308,7 @@ func processSpec(referenceSpec *APISpec,
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver}, baseMid)
+				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
@@ -322,7 +322,7 @@ func processSpec(referenceSpec *APISpec,
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver}, baseMid)
+				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
@@ -338,13 +338,13 @@ func processSpec(referenceSpec *APISpec,
 		handleCORS(&chainArray, referenceSpec)
 
 		var baseChainArray_PreAuth []alice.Constructor
-		AppendMiddleware(&baseChainArray_PreAuth, &RateCheckMW{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PreAuth, &IPWhiteListMiddleware{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PreAuth, &OrganizationMonitor{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PreAuth, &VersionCheck{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PreAuth, &RequestSizeLimitMiddleware{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PreAuth, &MiddlewareContextVars{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PreAuth, &TrackEndpointMiddleware{baseMid}, baseMid)
+		AppendMiddleware(&baseChainArray_PreAuth, &RateCheckMW{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PreAuth, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PreAuth, &OrganizationMonitor{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PreAuth, &VersionCheck{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PreAuth, &RequestSizeLimitMiddleware{baseMid})
+		AppendMiddleware(&baseChainArray_PreAuth, &MiddlewareContextVars{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PreAuth, &TrackEndpointMiddleware{baseMid})
 
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
@@ -353,7 +353,7 @@ func processSpec(referenceSpec *APISpec,
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver}, baseMid)
+				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
@@ -369,7 +369,7 @@ func processSpec(referenceSpec *APISpec,
 				"prefix":   "main",
 				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: OAuth")
-			authArray = append(authArray, CreateMiddleware(&Oauth2KeyExists{baseMid}, baseMid))
+			authArray = append(authArray, CreateMiddleware(&Oauth2KeyExists{baseMid}))
 
 		}
 
@@ -386,7 +386,7 @@ func processSpec(referenceSpec *APISpec,
 				"prefix":   "main",
 				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: Basic")
-			authArray = append(authArray, CreateMiddleware(&BasicAuthKeyIsValid{baseMid}, baseMid))
+			authArray = append(authArray, CreateMiddleware(&BasicAuthKeyIsValid{baseMid}))
 		}
 
 		if referenceSpec.EnableSignatureChecking {
@@ -395,7 +395,7 @@ func processSpec(referenceSpec *APISpec,
 				"prefix":   "main",
 				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: HMAC")
-			authArray = append(authArray, CreateMiddleware(&HMACMiddleware{BaseMiddleware: baseMid}, baseMid))
+			authArray = append(authArray, CreateMiddleware(&HMACMiddleware{BaseMiddleware: baseMid}))
 		}
 
 		if referenceSpec.EnableJWT {
@@ -404,7 +404,7 @@ func processSpec(referenceSpec *APISpec,
 				"prefix":   "main",
 				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: JWT")
-			authArray = append(authArray, CreateMiddleware(&JWTMiddleware{baseMid}, baseMid))
+			authArray = append(authArray, CreateMiddleware(&JWTMiddleware{baseMid}))
 		}
 
 		if referenceSpec.UseOpenID {
@@ -415,7 +415,7 @@ func processSpec(referenceSpec *APISpec,
 			}).Info("Checking security policy: OpenID")
 
 			// initialise the OID configuration on this reference Spec
-			authArray = append(authArray, CreateMiddleware(&OpenIDMW{BaseMiddleware: baseMid}, baseMid))
+			authArray = append(authArray, CreateMiddleware(&OpenIDMW{BaseMiddleware: baseMid}))
 		}
 
 		if useCoProcessAuth {
@@ -432,7 +432,7 @@ func processSpec(referenceSpec *APISpec,
 
 			if useCoProcessAuth {
 				newExtractor(referenceSpec, baseMid)
-				AppendMiddleware(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver}, baseMid)
+				AppendMiddleware(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
 			}
 		}
 
@@ -450,7 +450,7 @@ func processSpec(referenceSpec *APISpec,
 				"prefix":   "main",
 				"api_name": referenceSpec.Name,
 			}).Info("Checking security policy: Token")
-			authArray = append(authArray, CreateMiddleware(&AuthKey{baseMid}, baseMid))
+			authArray = append(authArray, CreateMiddleware(&AuthKey{baseMid}))
 		}
 
 		chainArray = append(chainArray, authArray...)
@@ -460,20 +460,20 @@ func processSpec(referenceSpec *APISpec,
 				"prefix":   "coprocess",
 				"api_name": referenceSpec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver}, baseMid)
+			AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
 		}
 
 		var baseChainArray_PostAuth []alice.Constructor
-		AppendMiddleware(&baseChainArray_PostAuth, &KeyExpired{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &AccessRightsCheck{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &RateLimitAndQuotaCheck{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &GranularAccessMiddleware{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &TransformMiddleware{baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &TransformHeaders{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &URLRewriteMiddleware{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &TransformMethod{BaseMiddleware: baseMid}, baseMid)
-		AppendMiddleware(&baseChainArray_PostAuth, &VirtualEndpoint{BaseMiddleware: baseMid}, baseMid)
+		AppendMiddleware(&baseChainArray_PostAuth, &KeyExpired{baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &AccessRightsCheck{baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &RateLimitAndQuotaCheck{baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &GranularAccessMiddleware{baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &TransformMiddleware{baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &TransformHeaders{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		AppendMiddleware(&baseChainArray_PostAuth, &TransformMethod{BaseMiddleware: baseMid})
+		AppendMiddleware(&baseChainArray_PostAuth, &VirtualEndpoint{BaseMiddleware: baseMid})
 
 		chainArray = append(chainArray, baseChainArray_PostAuth...)
 
@@ -483,7 +483,7 @@ func processSpec(referenceSpec *APISpec,
 					"prefix":   "coprocess",
 					"api_name": referenceSpec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver}, baseMid)
+				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
@@ -494,20 +494,20 @@ func processSpec(referenceSpec *APISpec,
 			"api_name": referenceSpec.Name,
 		}).Debug("Custom middleware completed processing")
 
-		// Use CreateMiddleware(&ModifiedMiddleware{baseMid}, baseMid)  to run custom middleware
+		// Use CreateMiddleware(&ModifiedMiddleware{baseMid})  to run custom middleware
 		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
 		log.Debug("Chain completed")
 
 		userCheckHandler := UserRatesCheck()
 		simpleChain_PreAuth := []alice.Constructor{
-			CreateMiddleware(&IPWhiteListMiddleware{baseMid}, baseMid),
-			CreateMiddleware(&OrganizationMonitor{BaseMiddleware: baseMid}, baseMid),
-			CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}, baseMid)}
+			CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
+			CreateMiddleware(&OrganizationMonitor{BaseMiddleware: baseMid}),
+			CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid})}
 
 		simpleChain_PostAuth := []alice.Constructor{
-			CreateMiddleware(&KeyExpired{baseMid}, baseMid),
-			CreateMiddleware(&AccessRightsCheck{baseMid}, baseMid)}
+			CreateMiddleware(&KeyExpired{baseMid}),
+			CreateMiddleware(&AccessRightsCheck{baseMid})}
 
 		var fullSimpleChain []alice.Constructor
 		fullSimpleChain = append(fullSimpleChain, simpleChain_PreAuth...)
