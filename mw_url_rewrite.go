@@ -11,13 +11,14 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func urlRewrite(meta *apidef.URLRewriteMeta, path string, r *http.Request) (string, error) {
+func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	// Find all the matching groups:
 	mp, err := regexp.Compile(meta.MatchPattern)
 	if err != nil {
 		log.Debug("Compilation error: ", err)
 		return "", err
 	}
+	path := r.URL.String()
 	log.Debug("Inbound path: ", path)
 	newpath := path
 
@@ -150,7 +151,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
-	p, err := urlRewrite(umeta, r.URL.String(), r)
+	p, err := urlRewrite(umeta, r)
 	if err != nil {
 		return err, 500
 	}
