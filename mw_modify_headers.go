@@ -9,7 +9,7 @@ import (
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformHeaders struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 const (
@@ -87,7 +87,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		t.iterateAddHeaders(vInfo.GlobalHeaders, r)
 	}
 
-	found, meta := t.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, HeaderInjected)
+	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, HeaderInjected)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, dKey := range hmeta.DeleteHeaders {

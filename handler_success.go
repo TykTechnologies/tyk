@@ -31,48 +31,46 @@ var SessionCache = cache.New(10*time.Second, 5*time.Second)
 var ExpiryCache = cache.New(600*time.Second, 10*time.Minute)
 
 type ReturningHttpHandler interface {
+	Init(*APISpec) error
 	ServeHTTP(http.ResponseWriter, *http.Request) *http.Response
 	ServeHTTPForCache(http.ResponseWriter, *http.Request) *http.Response
 	CopyResponse(io.Writer, io.Reader)
-	New(interface{}, *APISpec) (TykResponseHandler, error)
 }
 
-// TykMiddleware wraps up the ApiSpec and Proxy objects to be included in a
+// BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
-type TykMiddleware struct {
+type BaseMiddleware struct {
 	Spec  *APISpec
 	Proxy ReturningHttpHandler
 }
 
-func (t *TykMiddleware) New() {}
-func (t *TykMiddleware) IsEnabledForSpec() bool {
+func (t *BaseMiddleware) Base() *BaseMiddleware { return t }
+
+func (t *BaseMiddleware) Init() {}
+func (t *BaseMiddleware) IsEnabledForSpec() bool {
 	return true
 }
-func (t *TykMiddleware) GetConfig() (interface{}, error) {
+func (t *BaseMiddleware) GetConfig() (interface{}, error) {
 	return nil, nil
 }
 
-func (t *TykMiddleware) GetOrgSession(key string) (SessionState, bool) {
+func (t *BaseMiddleware) GetOrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.GetSessionDetail(key)
-	if found {
+	if found && globalConf.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
-		if config.EnforceOrgDataAge {
-			// We cache org expiry data
-			log.Debug("Setting data expiry: ", session.OrgID)
-			go t.SetOrgExpiry(session.OrgID, session.DataExpires)
-		}
-		return session, true
+		// We cache org expiry data
+		log.Debug("Setting data expiry: ", session.OrgID)
+		go t.SetOrgExpiry(session.OrgID, session.DataExpires)
 	}
-
 	return session, found
 }
 
-func (t *TykMiddleware) SetOrgExpiry(orgid string, expiry int64) {
+func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 	ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
-func (t *TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
+func (t *BaseMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 	log.Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
@@ -85,11 +83,13 @@ func (t *TykMiddleware) GetOrgSessionExpiry(orgid string) int64 {
 }
 
 // ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
-func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
+func (t *BaseMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 	if session.ApplyPolicyID == "" {
 		return
 	}
-	policy, ok := Policies[session.ApplyPolicyID]
+	policiesMu.RLock()
+	policy, ok := policiesByID[session.ApplyPolicyID]
+	policiesMu.RUnlock()
 	if !ok {
 		return
 	}
@@ -153,11 +153,11 @@ func (t *TykMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
+func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
 	// Check in-memory cache
-	if !config.LocalSessionCache.DisableCacheSessionState {
+	if !globalConf.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(key)
 		if found {
 			log.Debug("--> Key found in local cache")
@@ -205,7 +205,7 @@ func (t *TykMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
@@ -214,7 +214,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		return
 	}
 
-	if config.StoreAnalytics(r) {
+	ip := GetIPFromRequest(r)
+	if globalConf.StoreAnalytics(ip) {
 
 		t := time.Now()
 
@@ -280,7 +281,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			timing,
 			rawRequest,
 			rawResponse,
-			GetIPFromRequest(r),
+			ip,
 			GeoData{},
 			tags,
 			alias,
@@ -288,10 +289,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			time.Now(),
 		}
 
-		record.GetGeo(GetIPFromRequest(r))
+		record.GetGeo(ip)
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
-		if config.EnforceOrgDataAge {
+		if globalConf.EnforceOrgDataAge {
 			orgExpireDataTime := s.GetOrgSessionExpiry(s.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -301,7 +302,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		record.SetExpiry(expiresAfter)
 
-		if config.AnalyticsConfig.NormaliseUrls.Enabled {
+		if globalConf.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 

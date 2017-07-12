@@ -36,7 +36,7 @@ type DefaultHealthChecker struct {
 }
 
 func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
-	if config.HealthCheck.EnableHealthChecks {
+	if globalConf.HealthCheck.EnableHealthChecks {
 		log.Debug("Health Checker initialised.")
 	}
 
@@ -56,29 +56,29 @@ func ReportHealthCheckValue(checker HealthChecker, counter HealthPrefix, value s
 }
 
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
-	if !config.HealthCheck.EnableHealthChecks {
+	if !globalConf.HealthCheck.EnableHealthChecks {
 		return
 	}
 	searchStr := h.CreateKeyName(counterType)
 	log.Debug("Adding Healthcheck to: ", searchStr)
 	log.Debug("Val is: ", value)
-	//go h.storage.SetKey(searchStr, value, config.HealthCheck.HealthCheckValueTimeout)
+	//go h.storage.SetKey(searchStr, value, globalConf.HealthCheck.HealthCheckValueTimeout)
 	if value != "-1" {
 		// need to ensure uniqueness
 		now_string := strconv.Itoa(int(time.Now().UnixNano()))
 		value = now_string + "." + value
 		log.Debug("Set value to: ", value)
 	}
-	go h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, value)
+	go h.storage.SetRollingWindow(searchStr, globalConf.HealthCheck.HealthCheckValueTimeout, value)
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
 
-	count, _ := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
+	count, _ := h.storage.SetRollingWindow(searchStr, globalConf.HealthCheck.HealthCheckValueTimeout, "-1")
 	log.Debug("Count is: ", count)
-	divisor := float64(config.HealthCheck.HealthCheckValueTimeout)
+	divisor := float64(globalConf.HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
 		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
 		divisor = 60.0
@@ -106,7 +106,7 @@ func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
 	// Get the micro latency graph, an average upstream latency
 	searchStr := h.APIID + "." + string(RequestLog)
 	log.Debug("Searching KV for: ", searchStr)
-	_, vals := h.storage.SetRollingWindow(searchStr, config.HealthCheck.HealthCheckValueTimeout, "-1")
+	_, vals := h.storage.SetRollingWindow(searchStr, globalConf.HealthCheck.HealthCheckValueTimeout, "-1")
 	log.Debug("Found: ", vals)
 	if len(vals) == 0 {
 		return values, nil

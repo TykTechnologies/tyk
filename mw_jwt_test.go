@@ -183,14 +183,14 @@ func getJWTChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&JWTMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
+		CreateMiddleware(&JWTMiddleware{baseMid}),
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		CreateMiddleware(&KeyExpired{baseMid}),
+		CreateMiddleware(&AccessRightsCheck{baseMid}),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
 
 	return chain
 }
@@ -507,7 +507,8 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	spec.SessionManager.ResetQuota(tokenID, session)
 	spec.SessionManager.UpdateSession(tokenID, session, 60)
 
-	Policies["987654321"] = Policy{
+	policiesMu.Lock()
+	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,
@@ -522,6 +523,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 		Active:       true,
 		KeyExpiresIn: 60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -557,7 +559,8 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	spec := createSpecTest(t, jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
 
-	Policies["987654321"] = Policy{
+	policiesMu.Lock()
+	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,
@@ -568,6 +571,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -605,7 +609,8 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	spec := createSpecTest(t, jwtWithCentralDef)
 	spec.JWTSigningMethod = "rsa"
 
-	Policies["987654321"] = Policy{
+	policiesMu.Lock()
+	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,
@@ -616,6 +621,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -653,7 +659,8 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	spec := createSpecTest(t, jwtWithJWKDef)
 	spec.JWTSigningMethod = "rsa"
 
-	Policies["987654321"] = Policy{
+	policiesMu.Lock()
+	policiesByID["987654321"] = Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,
@@ -664,6 +671,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
+	policiesMu.Unlock()
 
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))

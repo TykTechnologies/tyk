@@ -25,7 +25,7 @@ type ServiceDiscovery struct {
 	targetPath          string
 }
 
-func (s *ServiceDiscovery) New(spec *apidef.ServiceDiscoveryConfiguration) {
+func (s *ServiceDiscovery) Init(spec *apidef.ServiceDiscoveryConfiguration) {
 	s.spec = spec
 	s.isNested = spec.UseNestedQuery
 	s.isTargetList = spec.UseTargetList

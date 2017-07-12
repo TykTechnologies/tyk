@@ -8,7 +8,7 @@ import (
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream
 type IPWhiteListMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (i *IPWhiteListMiddleware) GetName() string {
@@ -50,7 +50,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Fire Authfailed Event
-	AuthFailed(i.TykMiddleware, r, remoteIP.String())
+	AuthFailed(i.BaseMiddleware, r, remoteIP.String())
 	// Report in health check
 	ReportHealthCheckValue(i.Spec.Health, KeyFailure, "-1")
 

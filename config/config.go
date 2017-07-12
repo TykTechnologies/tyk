@@ -1,18 +1,19 @@
-package main
+package config
 
 import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
-	"time"
+	"regexp"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	logger "github.com/TykTechnologies/tyk/log"
 )
+
+var log = logger.Get()
 
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
@@ -45,7 +46,13 @@ type NormalisedURLConfig struct {
 	NormaliseUUIDs     bool                 `json:"normalise_uuids"`
 	NormaliseNumbers   bool                 `json:"normalise_numbers"`
 	Custom             []string             `json:"custom_patterns"`
-	compiledPatternSet NormaliseURLPatterns // see analytics.go
+	CompiledPatternSet NormaliseURLPatterns `json:"-"` // see analytics.go
+}
+
+type NormaliseURLPatterns struct {
+	UUIDs  *regexp.Regexp
+	IDs    *regexp.Regexp
+	Custom []*regexp.Regexp
 }
 
 type AnalyticsConfigConfig struct {
@@ -70,6 +77,14 @@ type MonitorConfig struct {
 	GlobalTriggerLimit    float64            `json:"global_trigger_limit"`
 	MonitorUserKeys       bool               `json:"monitor_user_keys"`
 	MonitorOrgKeys        bool               `json:"monitor_org_keys"`
+}
+
+type WebHookHandlerConf struct {
+	Method       string            `bson:"method" json:"method"`
+	TargetPath   string            `bson:"target_path" json:"target_path"`
+	TemplatePath string            `bson:"template_path" json:"template_path"`
+	HeaderList   map[string]string `bson:"header_map" json:"header_map"`
+	EventTimeout int64             `bson:"event_timeout" json:"event_timeout"`
 }
 
 type SlaveOptionsConfig struct {
@@ -138,6 +153,11 @@ type CoProcessConfig struct {
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
+	// OriginalPath is the path to the config file that was read. If
+	// none was found, it's the path to the default config file that
+	// was written.
+	OriginalPath string `json:"-"`
+
 	ListenAddress                     string                 `json:"listen_address"`
 	ListenPort                        int                    `json:"listen_port"`
 	Secret                            string                 `json:"secret"`
@@ -226,26 +246,24 @@ type CertData struct {
 	KeyFile  string `json:"key_file"`
 }
 
-const envPrefix = "TYK_GW"
-
-// confPaths is the series of paths to try to use as config files. The
-// first one to exist will be used. If none exists, a default config
-// will be written to the first path in the list.
-//
-// When --conf=foo is used, this will be replaced by []string{"foo"}.
-var confPaths = []string{
-	"tyk.conf",
-	// TODO: add ~/.config/tyk/tyk.conf here?
-	"/etc/tyk/tyk.conf",
+// EventMessage is a standard form to send event data to handlers
+type EventMessage struct {
+	Type      apidef.TykEvent
+	Meta      interface{}
+	TimeStamp string
 }
 
-// usedConfPath is the path to the config file that was read. If none
-// was found, it's the path to the default config file that was written.
-var usedConfPath string
+// TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
+type TykEventHandler interface {
+	Init(interface{}) error
+	HandleEvent(EventMessage)
+}
 
-// writeDefaultConf will create a default configuration file and set the
+const envPrefix = "TYK_GW"
+
+// WriteDefault will create a default configuration file and set the
 // storage type to "memory"
-func writeDefaultConf(path string, conf *Config) {
+func WriteDefault(path string, conf *Config) {
 	*conf = Config{
 		ListenPort:     8080,
 		Secret:         "352d20ee67be67f6340b4c0605b044b7",
@@ -281,22 +299,21 @@ func writeDefaultConf(path string, conf *Config) {
 	}
 }
 
-// LoadConfig will load a configuration file, trying each of the paths
-// given and using the first one that is a regular file and can be
-// opened.
+// Load will load a configuration file, trying each of the paths given
+// and using the first one that is a regular file and can be opened.
 //
 // If none exists, a default config will be written to the first path in
 // the list.
 //
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
-func loadConfig(paths []string, conf *Config) error {
+func Load(paths []string, conf *Config) error {
 	var bs []byte
 	for _, path := range paths {
 		var err error
 		bs, err = ioutil.ReadFile(path)
 		if err == nil {
-			usedConfPath = path
+			conf.OriginalPath = path
 			break
 		}
 		if os.IsNotExist(err) {
@@ -307,9 +324,9 @@ func loadConfig(paths []string, conf *Config) error {
 	if bs == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
-		writeDefaultConf(path, conf)
+		WriteDefault(path, conf)
 		log.Info("Loading default configuration...")
-		return loadConfig([]string{path}, conf)
+		return Load([]string{path}, conf)
 	}
 	if err := json.Unmarshal(bs, &conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
@@ -318,41 +335,20 @@ func loadConfig(paths []string, conf *Config) error {
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}
-	afterConfSetup(conf)
 	return nil
 }
 
-// afterConfSetup takes care of non-sensical config values (such as zero
-// timeouts) and sets up a few globals that depend on the config.
-func afterConfSetup(conf *Config) {
-	if conf.SlaveOptions.CallTimeout == 0 {
-		conf.SlaveOptions.CallTimeout = 30
-	}
-	if conf.SlaveOptions.PingTimeout == 0 {
-		conf.SlaveOptions.PingTimeout = 60
-	}
-	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
-	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
-	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
-}
-
-func (c *Config) loadIgnoredIPs() {
+func (c *Config) LoadIgnoredIPs() {
 	c.AnalyticsConfig.ignoredIPsCompiled = make(map[string]bool, len(c.AnalyticsConfig.IgnoredIPs))
 	for _, ip := range c.AnalyticsConfig.IgnoredIPs {
 		c.AnalyticsConfig.ignoredIPsCompiled[ip] = true
 	}
 }
 
-func (c *Config) StoreAnalytics(r *http.Request) bool {
+func (c *Config) StoreAnalytics(ip string) bool {
 	if !c.EnableAnalytics {
 		return false
 	}
 
-	ip := GetIPFromRequest(r)
 	return !c.AnalyticsConfig.ignoredIPsCompiled[ip]
-}
-
-func generateRandomNodeID() string {
-	u := uuid.NewV4()
-	return "solo-" + u.String()
 }

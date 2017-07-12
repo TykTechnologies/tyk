@@ -81,7 +81,7 @@ func (hc *HostCheckerManager) Start() {
 	// Start loop to check if we are active instance
 	if hc.Id != "" {
 		go hc.CheckActivePollerLoop()
-		if config.UptimeTests.Config.EnableUptimeAnalytics {
+		if globalConf.UptimeTests.Config.EnableUptimeAnalytics {
 			go hc.UptimePurgeLoop()
 		}
 	}
@@ -167,9 +167,9 @@ func (hc *HostCheckerManager) StartPoller() {
 		hc.checker = &HostUptimeChecker{}
 	}
 
-	hc.checker.Init(config.UptimeTests.Config.CheckerPoolSize,
-		config.UptimeTests.Config.FailureTriggerSampleSize,
-		config.UptimeTests.Config.TimeWait,
+	hc.checker.Init(globalConf.UptimeTests.Config.CheckerPoolSize,
+		globalConf.UptimeTests.Config.FailureTriggerSampleSize,
+		globalConf.UptimeTests.Config.TimeWait,
 		hc.currentHostList,
 		hc.OnHostDown,   // On failure
 		hc.OnHostBackUp, // On success
@@ -199,7 +199,7 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 }
 
 func (hc *HostCheckerManager) OnHostReport(report HostHealthReport) {
-	if config.UptimeTests.Config.EnableUptimeAnalytics {
+	if globalConf.UptimeTests.Config.EnableUptimeAnalytics {
 		go hc.RecordUptimeAnalytics(report)
 	}
 }
@@ -210,8 +210,8 @@ func (hc *HostCheckerManager) OnHostDown(report HostHealthReport) {
 	}).Debug("Update key: ", hc.getHostKey(report))
 	hc.store.SetKey(hc.getHostKey(report), "1", int64(hc.checker.checkTimeout+1))
 
-	spec, found := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
-	if !found {
+	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
@@ -253,8 +253,8 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 	}).Debug("Delete key: ", hc.getHostKey(report))
 	hc.store.DeleteKey(hc.getHostKey(report))
 
-	spec, found := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
-	if !found {
+	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
+	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
 		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
@@ -380,12 +380,12 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 }
 
 func (hc *HostCheckerManager) GetListFromService(apiID string) ([]HostData, error) {
-	spec, found := apisByID[apiID]
-	if !found {
+	spec := getApiSpec(apiID)
+	if spec == nil {
 		return nil, errors.New("API ID not found in register")
 	}
 	sd := ServiceDiscovery{}
-	sd.New(&spec.UptimeTests.Config.ServiceDiscovery)
+	sd.Init(&spec.UptimeTests.Config.ServiceDiscovery)
 	data, err := sd.GetTarget(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
 
 	if err != nil {
@@ -441,9 +441,9 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) error {
 	// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 
-	spec, found := apisByID[report.MetaData[UnHealthyHostMetaDataAPIKey]]
+	spec := getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	orgID := ""
-	if found {
+	if spec != nil {
 		orgID = spec.OrgID
 	}
 
@@ -509,6 +509,7 @@ func SetCheckerHostList() {
 		"prefix": "host-check-mgr",
 	}).Info("Loading uptime tests...")
 	hostList := []HostData{}
+	apisMu.RLock()
 	for _, spec := range apisByID {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
 			hostList, err := GlobalHostChecker.GetListFromService(spec.APIID)
@@ -542,6 +543,7 @@ func SetCheckerHostList() {
 			}
 		}
 	}
+	apisMu.RUnlock()
 
 	GlobalHostChecker.UpdateTrackingList(hostList)
 }

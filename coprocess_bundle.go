@@ -24,7 +24,7 @@ import (
 var tykBundlePath string
 
 func init() {
-	tykBundlePath = filepath.Join(config.MiddlewarePath, "middleware", "bundles")
+	tykBundlePath = filepath.Join(globalConf.MiddlewarePath, "middleware", "bundles")
 }
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -46,14 +46,14 @@ func (b *Bundle) Verify() error {
 	var bundleVerifier goverify.Verifier
 
 	// Perform signature verification if a public key path is set:
-	if config.PublicKeyPath != "" {
+	if globalConf.PublicKeyPath != "" {
 		if b.Manifest.Signature == "" {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
 		if notificationVerifier == nil {
 			var err error
-			bundleVerifier, err = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
+			bundleVerifier, err = goverify.LoadPublicKeyFromFile(globalConf.PublicKeyPath)
 			if err != nil {
 				return err
 			}
@@ -138,7 +138,7 @@ type BundleSaver interface {
 type ZipBundleSaver struct{}
 
 // Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
-func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
+func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
 	buf := bytes.NewReader(bundle.Data)
 	reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
 
@@ -173,7 +173,7 @@ func (s *ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) 
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
 func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 
-	if !config.EnableBundleDownloader {
+	if !globalConf.EnableBundleDownloader {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("Bundle downloader is disabled.")
@@ -181,7 +181,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		return bundle, err
 	}
 
-	bundleURL := config.BundleBaseURL + spec.CustomMiddlewareBundle
+	bundleURL := globalConf.BundleBaseURL + spec.CustomMiddlewareBundle
 
 	var getter BundleGetter
 
@@ -215,7 +215,7 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 	// TODO: use enums?
 	switch bundleFormat {
 	case "zip":
-		bundleSaver = &ZipBundleSaver{}
+		bundleSaver = ZipBundleSaver{}
 	}
 
 	bundleSaver.Save(bundle, destPath, spec)
@@ -263,7 +263,7 @@ func loadBundle(spec *APISpec) {
 	}
 
 	// Skip if no bundle base URL is set.
-	if config.BundleBaseURL == "" {
+	if globalConf.BundleBaseURL == "" {
 		bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 		return
 	}

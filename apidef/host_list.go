@@ -11,18 +11,15 @@ type HostList struct {
 }
 
 func NewHostList() *HostList {
-	thisHL := HostList{}
-	thisHL.hosts = make([]string, 0)
-	thisHL.hMutex = sync.RWMutex{}
-
-	return &thisHL
+	hl := HostList{}
+	hl.hosts = make([]string, 0)
+	return &hl
 }
 
 func NewHostListFromList(newList []string) *HostList {
-	thisHL := NewHostList()
-	thisHL.Set(newList)
-
-	return thisHL
+	hl := NewHostList()
+	hl.Set(newList)
+	return hl
 }
 
 func (h *HostList) Set(newList []string) {

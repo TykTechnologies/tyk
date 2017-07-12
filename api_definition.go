@@ -17,6 +17,7 @@ import (
 	"github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -120,7 +121,7 @@ type APISpec struct {
 	SessionManager           SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
-	EventPaths               map[apidef.TykEvent][]TykEventHandler
+	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
 	Health                   HealthChecker
 	JSVM                     *JSVM
 	ResponseChain            []TykResponseHandler
@@ -159,14 +160,14 @@ func (a *APIDefinitionLoader) MakeSpec(appConfig *apidef.APIDefinition) *APISpec
 	newAppSpec.OrgSessionManager = &DefaultSessionManager{}
 
 	// Create and init the virtual Machine
-	if config.EnableJSVM {
+	if globalConf.EnableJSVM {
 		newAppSpec.JSVM = &JSVM{}
 		newAppSpec.JSVM.Init()
 	}
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
-	newAppSpec.EventPaths = make(map[apidef.TykEvent][]TykEventHandler)
+	newAppSpec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range appConfig.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
@@ -263,30 +264,22 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 		return nil
 	}
 
-	rawList := make(map[string]interface{})
-	if err := json.Unmarshal(retBody, &rawList); err != nil {
-		log.Error("Failed to decode body (raw): ", err)
-		return nil
-	}
-
 	// Extract tagged entries only
 	apiDefs := make([]*apidef.APIDefinition, 0)
 
-	if config.DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool, len(config.DBAppConfOptions.Tags))
+	if globalConf.DBAppConfOptions.NodeIsSegmented {
+		tagList := make(map[string]bool, len(globalConf.DBAppConfOptions.Tags))
 		toLoad := make(map[string]*apidef.APIDefinition)
 
-		for _, mt := range config.DBAppConfOptions.Tags {
+		for _, mt := range globalConf.DBAppConfOptions.Tags {
 			tagList[mt] = true
 		}
 
-		for index, apiEntry := range list.Message {
+		for _, apiEntry := range list.Message {
 			for _, t := range apiEntry.ApiDefinition.Tags {
 				if tagList[t] {
-					apiEntry.ApiDefinition.RawData = rawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
 					toLoad[apiEntry.ApiDefinition.APIID] = apiEntry.ApiDefinition
 				}
-
 			}
 		}
 
@@ -294,8 +287,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 			apiDefs = append(apiDefs, apiDef)
 		}
 	} else {
-		for index, apiEntry := range list.Message {
-			apiEntry.ApiDefinition.RawData = rawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
+		for _, apiEntry := range list.Message {
 			apiDefs = append(apiDefs, apiEntry.ApiDefinition)
 		}
 	}
@@ -316,14 +308,14 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 
 // LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
 func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
-	store := RPCStorageHandler{UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
+	store := RPCStorageHandler{UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 	store.Connect()
 
 	// enable segments
 	var tags []string
-	if config.DBAppConfOptions.NodeIsSegmented {
-		log.Info("Segmented node, loading: ", config.DBAppConfOptions.Tags)
-		tags = config.DBAppConfOptions.Tags
+	if globalConf.DBAppConfOptions.NodeIsSegmented {
+		log.Info("Segmented node, loading: ", globalConf.DBAppConfOptions.Tags)
+		tags = globalConf.DBAppConfOptions.Tags
 	}
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
@@ -344,18 +336,12 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*API
 		log.Error("Failed decode: ", err)
 		return nil
 	}
-	var strDefs []map[string]interface{}
-	if err := json.Unmarshal([]byte(apiCollection), &strDefs); err != nil {
-		log.Error("Failed decode: ", err)
-		return nil
-	}
 
 	var apiSpecs []*APISpec
-	for i, appConfig := range apiDefs {
+	for _, appConfig := range apiDefs {
 		appConfig.DecodeFromDB()
-		appConfig.RawData = strDefs[i] // Lets keep a copy for plugable modules
 
-		if config.SlaveOptions.BindToSlugsInsteadOfListenPaths {
+		if globalConf.SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + appConfig.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
@@ -372,17 +358,12 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*API
 	return apiSpecs
 }
 
-func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) (*apidef.APIDefinition, map[string]interface{}) {
+func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) *apidef.APIDefinition {
 	appConfig := &apidef.APIDefinition{}
 	if err := json.Unmarshal(apiDef, appConfig); err != nil {
 		log.Error("[RPC] --> Couldn't unmarshal api configuration: ", err)
 	}
-
-	// Got the structured version - now lets get a raw copy for modules
-	rawConfig := make(map[string]interface{})
-	json.Unmarshal(apiDef, &rawConfig)
-
-	return appConfig, rawConfig
+	return appConfig
 }
 
 // LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
@@ -396,15 +377,12 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
 			filePath := filepath.Join(dir, f.Name())
 			log.Info("Loading API Specification from ", filePath)
 			appConfigBody, err := ioutil.ReadFile(filePath)
-			appConfig, rawConfig := a.ParseDefinition(appConfigBody)
 			if err != nil {
 				log.Error("Couldn't load app configuration file: ", err)
 			}
-
-			appConfig.RawData = rawConfig // Lets keep a copy for plugable modules
+			appConfig := a.ParseDefinition(appConfigBody)
 			newAppSpec := a.MakeSpec(appConfig)
 			apiSpecs = append(apiSpecs, newAppSpec)
-
 		}
 	}
 
@@ -693,7 +671,7 @@ func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewri
 }
 
 func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
-	if !config.EnableJSVM {
+	if !globalConf.EnableJSVM {
 		return nil
 	}
 
@@ -831,15 +809,15 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 }
 
 // IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(method, url string, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+func (a *APISpec) IsURLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
 	for _, v := range rxPaths {
-		if !v.Spec.MatchString(strings.ToLower(url)) {
+		if !v.Spec.MatchString(strings.ToLower(r.URL.Path)) {
 			continue
 		}
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
-			methodMeta, matchMethodOk := v.MethodActions[method]
+			methodMeta, matchMethodOk := v.MethodActions[r.Method]
 			if matchMethodOk {
 				// Matched the method, check what status it is:
 				if methodMeta.Action == apidef.NoAction {
@@ -889,10 +867,10 @@ func (a *APISpec) IsURLAllowedAndIgnored(method, url string, rxPaths []URLSpec, 
 }
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
-func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
 	for _, v := range rxPaths {
-		match := v.Spec.MatchString(url)
+		match := v.Spec.MatchString(r.URL.Path)
 		// only return it it's what we are looking for
 		if !match || mode != v.Status {
 			continue
@@ -901,51 +879,51 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []UR
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
 		case Transformed:
-			if method == v.TransformAction.Method {
+			if r.Method == v.TransformAction.Method {
 				return true, &v.TransformAction
 			}
 		case HeaderInjected:
-			if method == v.InjectHeaders.Method {
+			if r.Method == v.InjectHeaders.Method {
 				return true, &v.InjectHeaders
 			}
 		case HeaderInjectedResponse:
-			if method == v.InjectHeadersResponse.Method {
+			if r.Method == v.InjectHeadersResponse.Method {
 				return true, &v.InjectHeadersResponse
 			}
 		case TransformedResponse:
-			if method == v.TransformResponseAction.Method {
+			if r.Method == v.TransformResponseAction.Method {
 				return true, &v.TransformResponseAction
 			}
 		case HardTimeout:
-			if method == v.HardTimeout.Method {
+			if r.Method == v.HardTimeout.Method {
 				return true, &v.HardTimeout.TimeOut
 			}
 		case CircuitBreaker:
-			if method == v.CircuitBreaker.Method {
+			if r.Method == v.CircuitBreaker.Method {
 				return true, &v.CircuitBreaker
 			}
 		case URLRewrite:
-			if method == v.URLRewrite.Method {
+			if r.Method == v.URLRewrite.Method {
 				return true, &v.URLRewrite
 			}
 		case VirtualPath:
-			if method == v.VirtualPathSpec.Method {
+			if r.Method == v.VirtualPathSpec.Method {
 				return true, &v.VirtualPathSpec
 			}
 		case RequestSizeLimit:
-			if method == v.RequestSize.Method {
+			if r.Method == v.RequestSize.Method {
 				return true, &v.RequestSize
 			}
 		case MethodTransformed:
-			if method == v.MethodTransform.Method {
+			if r.Method == v.MethodTransform.Method {
 				return true, &v.MethodTransform
 			}
 		case RequestTracked:
-			if method == v.TrackEndpoint.Method {
+			if r.Method == v.TrackEndpoint.Method {
 				return true, &v.TrackEndpoint
 			}
 		case RequestNotTracked:
-			if method == v.DoNotTrackEndpoint.Method {
+			if r.Method == v.DoNotTrackEndpoint.Method {
 				return true, &v.DoNotTrackEndpoint
 			}
 		}
@@ -954,13 +932,12 @@ func (a *APISpec) CheckSpecMatchesStatus(url string, method string, rxPaths []UR
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
-	switch a.APIDefinition.VersionDefinition.Location {
+	switch a.VersionDefinition.Location {
 	case "header":
-		return r.Header.Get(a.APIDefinition.VersionDefinition.Key)
+		return r.Header.Get(a.VersionDefinition.Key)
 
 	case "url-param":
-		tempRes := CopyHttpRequest(r)
-		return tempRes.FormValue(a.APIDefinition.VersionDefinition.Key)
+		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case "url":
 		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
@@ -1025,7 +1002,7 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 	}
 
 	// not expired, let's check path info
-	requestStatus, meta := a.IsURLAllowedAndIgnored(r.Method, r.URL.Path, versionPaths, whiteListStatus)
+	requestStatus, meta := a.IsURLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 
 	switch requestStatus {
 	case EndPointNotAllowed:
@@ -1061,9 +1038,9 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 		version = *v
 	} else {
 		// Are we versioned?
-		if a.APIDefinition.VersionData.NotVersioned {
+		if a.VersionData.NotVersioned {
 			// Get the first one in the list
-			for k, v := range a.APIDefinition.VersionData.Versions {
+			for k, v := range a.VersionData.Versions {
 				versionKey = k
 				version = v
 				break
@@ -1078,7 +1055,7 @@ func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpe
 
 		// Load Version Data - General
 		var ok bool
-		version, ok = a.APIDefinition.VersionData.Versions[versionKey]
+		version, ok = a.VersionData.Versions[versionKey]
 		if !ok {
 			return &version, versionRxPaths, versionWLStatus, VersionDoesNotExist
 		}

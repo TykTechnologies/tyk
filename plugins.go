@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -46,7 +47,7 @@ type VMReturnObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type DynamicMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool
@@ -55,6 +56,20 @@ type DynamicMiddleware struct {
 
 func (d *DynamicMiddleware) GetName() string {
 	return "DynamicMiddleware"
+}
+
+func jsonConfigData(spec *APISpec) string {
+	m := map[string]interface{}{
+		// For backwards compatibility within 2.x.
+		// TODO: simplify or refactor in 3.x or later.
+		"config_data": spec.ConfigData,
+	}
+	bs, err := json.Marshal(m)
+	if err != nil {
+		log.Error("Failed to encode configuration data: ", err)
+		return ""
+	}
+	return string(bs)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -93,6 +108,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
+	confData := jsonConfigData(d.Spec)
+
 	session := new(SessionState)
 	token := ctxGetAuthToken(r)
 
@@ -126,7 +143,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// the whole Go program.
 			recover()
 		}()
-		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `);`)
+		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
 		ret <- returnRaw
 	}()
 	var returnRaw otto.Value
@@ -225,6 +242,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 type JSVM struct {
 	VM      *otto.Otto
 	Timeout time.Duration
+	Log     *logrus.Logger // logger used by the JS code
 }
 
 // Init creates the JSVM with the core library (tyk.js) and sets up a
@@ -233,7 +251,7 @@ func (j *JSVM) Init() {
 	vm := otto.New()
 
 	// Init TykJS namespace, constructors etc.
-	jscore, _ := ioutil.ReadFile(config.TykJSPath)
+	jscore, _ := ioutil.ReadFile(globalConf.TykJSPath)
 	vm.Run(jscore)
 
 	j.VM = vm
@@ -242,6 +260,7 @@ func (j *JSVM) Init() {
 	j.LoadTykJSApi()
 
 	j.Timeout = 5 * time.Second
+	j.Log = log // use the global logger by default
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
@@ -283,10 +302,16 @@ type TykJSHttpResponse struct {
 func (j *JSVM) LoadTykJSApi() {
 	// Enable a log
 	j.VM.Set("log", func(call otto.FunctionCall) otto.Value {
-		log.WithFields(logrus.Fields{
+		j.Log.WithFields(logrus.Fields{
 			"prefix": "jsvm-logmsg",
 			"type":   "log-msg",
 		}).Info(call.Argument(0).String())
+		return otto.Value{}
+	})
+
+	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
+		io.WriteString(j.Log.Out, call.Argument(0).String())
+		j.Log.Out.Write([]byte("\n"))
 		return otto.Value{}
 	})
 

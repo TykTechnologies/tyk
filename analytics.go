@@ -9,6 +9,8 @@ import (
 	"github.com/jeffail/tunny"
 	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // AnalyticsRecord encodes the details of a request
@@ -61,7 +63,7 @@ type GeoData struct {
 const analyticsKeyName = "tyk-system-analytics"
 
 func (a *AnalyticsRecord) GetGeo(ipStr string) {
-	if !config.AnalyticsConfig.EnableGeoIP {
+	if !globalConf.AnalyticsConfig.EnableGeoIP {
 		return
 	}
 	// Not great, tightly coupled
@@ -102,17 +104,11 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 	return record, nil
 }
 
-type NormaliseURLPatterns struct {
-	UUIDs  *regexp.Regexp
-	IDs    *regexp.Regexp
-	Custom []*regexp.Regexp
-}
-
-func initNormalisationPatterns() (pats NormaliseURLPatterns) {
+func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
-	for _, pattern := range config.AnalyticsConfig.NormaliseUrls.Custom {
+	for _, pattern := range globalConf.AnalyticsConfig.NormaliseUrls.Custom {
 		if patRe, err := regexp.Compile(pattern); err != nil {
 			log.Error("failed to compile custom pattern: ", err)
 		} else {
@@ -123,13 +119,13 @@ func initNormalisationPatterns() (pats NormaliseURLPatterns) {
 }
 
 func (a *AnalyticsRecord) NormalisePath() {
-	if config.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-		a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+	if globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
 	}
-	if config.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-		a.Path = config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
+	if globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
 	}
-	for _, r := range config.AnalyticsConfig.NormaliseUrls.compiledPatternSet.Custom {
+	for _, r := range globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
 		a.Path = r.ReplaceAllString(a.Path, "{var}")
 	}
 }
@@ -157,14 +153,19 @@ type RedisAnalyticsHandler struct {
 }
 
 func (r *RedisAnalyticsHandler) Init() {
-	if config.AnalyticsConfig.EnableGeoIP {
-		go r.reloadDB()
+	var err error
+	if globalConf.AnalyticsConfig.EnableGeoIP {
+		db, err := maxminddb.Open(globalConf.AnalyticsConfig.GeoIPDBLocation)
+		if err != nil {
+			log.Error("Failed to init GeoIP Database: ", err)
+		} else {
+			r.GeoIPDB = db
+		}
 	}
 
 	analytics.Store.Connect()
-	var err error
 
-	ps := config.AnalyticsConfig.PoolSize
+	ps := globalConf.AnalyticsConfig.PoolSize
 	if ps == 0 {
 		ps = 50
 	}
@@ -175,20 +176,6 @@ func (r *RedisAnalyticsHandler) Init() {
 	}
 }
 
-func (r *RedisAnalyticsHandler) reloadDB() {
-	db, err := maxminddb.Open(config.AnalyticsConfig.GeoIPDBLocation)
-	if err != nil {
-		log.Error("Failed to init GeoIP Database: ", err)
-	} else {
-		oldDB := r.GeoIPDB
-		r.GeoIPDB = db
-		if oldDB != nil {
-			oldDB.Close()
-		}
-
-	}
-}
-
 // RecordHit will store an AnalyticsRecord in Redis
 func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 
@@ -196,14 +183,14 @@ func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 		record.APIKey = publicHash(record.APIKey)
 
-		if config.SlaveOptions.UseRPC {
+		if globalConf.SlaveOptions.UseRPC {
 			// Extend tag list to include this data so wecan segment by node if necessary
 			record.Tags = append(record.Tags, "tyk-hybrid-rpc")
 		}
 
-		if config.DBAppConfOptions.NodeIsSegmented {
+		if globalConf.DBAppConfOptions.NodeIsSegmented {
 			// Extend tag list to include this data so wecan segment by node if necessary
-			record.Tags = append(record.Tags, config.DBAppConfOptions.Tags...)
+			record.Tags = append(record.Tags, globalConf.DBAppConfOptions.Tags...)
 		}
 
 		// Lets add some metadata

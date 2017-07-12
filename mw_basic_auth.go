@@ -14,7 +14,7 @@ import (
 
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (k *BasicAuthKeyIsValid) GetName() string {
@@ -86,7 +86,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with non-existent user.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, token)
+		AuthFailed(k.BaseMiddleware, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
@@ -118,7 +118,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with existing user but failed password check.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.TykMiddleware, r, token)
+		AuthFailed(k.BaseMiddleware, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")

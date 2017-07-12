@@ -11,15 +11,14 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type URLRewriter struct{}
-
-func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContext bool, r *http.Request) (string, error) {
+func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	// Find all the matching groups:
 	mp, err := regexp.Compile(meta.MatchPattern)
 	if err != nil {
 		log.Debug("Compilation error: ", err)
 		return "", err
 	}
+	path := r.URL.String()
 	log.Debug("Inbound path: ", path)
 	newpath := path
 
@@ -53,20 +52,17 @@ func (u URLRewriter) Rewrite(meta *apidef.URLRewriteMeta, path string, useContex
 		// return newpath, nil
 	}
 
-	if useContext {
-		log.Debug("Using context")
-		contextData := ctxGetData(r)
+	contextData := ctxGetData(r)
 
-		dollarMatch := regexp.MustCompile(`\$tyk_context.(\w+)`)
-		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
-		for _, v := range replace_slice {
-			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
-			log.Debug("Replacing: ", v[0])
+	dollarMatch := regexp.MustCompile(`\$tyk_context.(\w+)`)
+	replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
+	for _, v := range replace_slice {
+		contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
+		log.Debug("Replacing: ", v[0])
 
-			if val, ok := contextData[contextKey]; ok {
-				newpath = strings.Replace(newpath, v[0],
-					url.QueryEscape(valToStr(val)), -1)
-			}
+		if val, ok := contextData[contextKey]; ok {
+			newpath = strings.Replace(newpath, v[0],
+				url.QueryEscape(valToStr(val)), -1)
 		}
 	}
 
@@ -117,8 +113,7 @@ func valToStr(v interface{}) string {
 
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
 type URLRewriteMiddleware struct {
-	*TykMiddleware
-	Rewriter *URLRewriter
+	*BaseMiddleware
 }
 
 func (m *URLRewriteMiddleware) GetName() string {
@@ -135,11 +130,6 @@ func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
 	return false
 }
 
-func (m *URLRewriteMiddleware) GetConfig() (interface{}, error) {
-	m.Rewriter = &URLRewriter{}
-	return nil, nil
-}
-
 func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
 	oldAsURL, _ := url.Parse(oldPath)
 	newAsURL, _ := url.Parse(newTarget)
@@ -152,26 +142,27 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	_, versionPaths, _, _ := m.Spec.GetVersionData(r)
-	found, meta := m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, URLRewrite)
-	if found {
-		log.Debug("Rewriter active")
-		umeta := meta.(*apidef.URLRewriteMeta)
-		log.Debug(r.URL)
-		oldPath := r.URL.String()
-		p, err := m.Rewriter.Rewrite(umeta, r.URL.String(), true, r)
-		if err != nil {
-			return err, 500
-		}
+	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, URLRewrite)
+	if !found {
+		return nil, 200
+	}
 
-		m.CheckHostRewrite(oldPath, p, r)
+	log.Debug("Rewriter active")
+	umeta := meta.(*apidef.URLRewriteMeta)
+	log.Debug(r.URL)
+	oldPath := r.URL.String()
+	p, err := urlRewrite(umeta, r)
+	if err != nil {
+		return err, 500
+	}
 
-		newURL, err := url.Parse(p)
-		if err != nil {
-			log.Error("URL Rewrite failed, could not parse: ", p)
-		} else {
-			r.URL = newURL
-		}
+	m.CheckHostRewrite(oldPath, p, r)
 
+	newURL, err := url.Parse(p)
+	if err != nil {
+		log.Error("URL Rewrite failed, could not parse: ", p)
+	} else {
+		r.URL = newURL
 	}
 	return nil, 200
 }

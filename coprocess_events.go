@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Constant for event system.
@@ -20,15 +21,13 @@ type CoProcessEventHandler struct {
 }
 
 type CoProcessEventWrapper struct {
-	Event    EventMessage     `json:"message"`
-	Handler  string           `json:"handler_name"`
-	SpecJSON *json.RawMessage `json:"spec"`
+	Event    config.EventMessage `json:"message"`
+	Handler  string              `json:"handler_name"`
+	SpecJSON *json.RawMessage    `json:"spec"`
 }
 
-func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	handler := CoProcessEventHandler{}
-	handler.Spec = l.Spec
-	handler.conf = handlerConf.(map[string]interface{})
+func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
+	l.conf = handlerConf.(map[string]interface{})
 
 	// Set the VM globals
 	globalVals := JSVMContextGlobal{
@@ -41,11 +40,11 @@ func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, er
 		log.Error("Failed to marshal globals! ", err)
 	}
 
-	handler.SpecJSON = json.RawMessage(gValAsJSON)
-	return handler, nil
+	l.SpecJSON = json.RawMessage(gValAsJSON)
+	return nil
 }
 
-func (l CoProcessEventHandler) HandleEvent(em EventMessage) {
+func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {
 	// 1. Get the methodName for the Event Handler
 	methodName := l.conf["name"].(string)
 

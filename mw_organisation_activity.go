@@ -23,7 +23,7 @@ var orgActiveMap = orgActiveMapMu{
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type OrganizationMonitor struct {
-	*TykMiddleware
+	*BaseMiddleware
 	sessionlimiter SessionLimiter
 	mon            Monitor
 }
@@ -32,20 +32,14 @@ func (k *OrganizationMonitor) GetName() string {
 	return "OrganizationMonitor"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (k *OrganizationMonitor) New() {
-	k.sessionlimiter = SessionLimiter{}
-	k.mon = Monitor{}
-}
-
 func (k *OrganizationMonitor) IsEnabledForSpec() bool {
 	// If false, we aren't enforcing quotas so skip this mw
 	// altogether
-	return config.EnforceOrgQuotas
+	return globalConf.EnforceOrgQuotas
 }
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
-	if config.ExperimentalProcessOrgOffThread {
+	if globalConf.ExperimentalProcessOrgOffThread {
 		return k.ProcessRequestOffThread(w, r, conf)
 	}
 	return k.ProcessRequestLive(w, r, conf)
@@ -54,7 +48,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	if !config.EnforceOrgQuotas {
+	if !globalConf.EnforceOrgQuotas {
 		// We aren;t enforcing quotas, so skip this altogether
 		return nil, 200
 	}
@@ -106,7 +100,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
 	}
 
-	if config.Monitor.MonitorOrgKeys {
+	if globalConf.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}
@@ -129,7 +123,7 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 
 func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	if !config.EnforceOrgQuotas {
+	if !globalConf.EnforceOrgQuotas {
 		// We aren't enforcing quotas, so skip this altogether
 		return nil, 200
 	}
@@ -146,11 +140,9 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *
 	orgActiveMap.RLock()
 	active, found := orgActiveMap.OrgMap[k.Spec.OrgID]
 	orgActiveMap.RUnlock()
-	if found {
+	if found && !active {
 		log.Debug("Is not active")
-		if !active {
-			return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
-		}
+		return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
 	}
 
 	log.Debug("Key not found")
@@ -205,7 +197,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 		//return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
 		orgChan <- false
 
-		if config.Monitor.MonitorOrgKeys {
+		if globalConf.Monitor.MonitorOrgKeys {
 			// Run the trigger monitor
 			k.mon.Check(&session, "")
 		}
@@ -213,7 +205,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 		return
 	}
 
-	if config.Monitor.MonitorOrgKeys {
+	if globalConf.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}

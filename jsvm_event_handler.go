@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const EH_JSVMHandler apidef.TykEventHandlerName = "eh_dynamic_handler"
@@ -21,10 +22,8 @@ type JSVMEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l *JSVMEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	handler := &JSVMEventHandler{}
-	handler.Spec = l.Spec
-	handler.conf = handlerConf.(map[string]interface{})
+func (l *JSVMEventHandler) Init(handlerConf interface{}) error {
+	l.conf = handlerConf.(map[string]interface{})
 
 	// Set the VM globals
 	globalVals := JSVMContextGlobal{
@@ -37,13 +36,12 @@ func (l *JSVMEventHandler) New(handlerConf interface{}) (TykEventHandler, error)
 		log.Error("Failed to marshal globals! ", err)
 	}
 
-	handler.SpecJSON = string(gValAsJSON)
-
-	return handler, nil
+	l.SpecJSON = string(gValAsJSON)
+	return nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (l *JSVMEventHandler) HandleEvent(em EventMessage) {
+func (l *JSVMEventHandler) HandleEvent(em config.EventMessage) {
 	// 1. Get the methodName for the Event Handler
 	methodName := l.conf["name"].(string)
 

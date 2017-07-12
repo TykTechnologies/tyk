@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	// EnableCoProcess will be overridden by config.EnableCoProcess.
+	// EnableCoProcess will be overridden by globalConf.EnableCoProcess.
 	EnableCoProcess = false
 
 	// GlobalDispatcher will be implemented by the current CoProcess driver.
@@ -24,7 +24,7 @@ var (
 
 // CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
@@ -35,15 +35,15 @@ func (mw *CoProcessMiddleware) GetName() string {
 }
 
 // CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
-func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, tykMwSuper *TykMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
-		TykMiddleware:    tykMwSuper,
+		BaseMiddleware:   baseMid,
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
 	}
 
-	return CreateMiddleware(dMiddleware, tykMwSuper)
+	return CreateMiddleware(dMiddleware)
 }
 
 func doCoprocessReload() {
@@ -151,7 +151,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
 func CoProcessInit() error {
 	var err error
-	if config.CoProcessOptions.EnableCoProcess {
+	if globalConf.CoProcessOptions.EnableCoProcess {
 		GlobalDispatcher, err = NewCoProcessDispatcher()
 		EnableCoProcess = true
 	}
@@ -161,7 +161,7 @@ func CoProcessInit() error {
 // IsEnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
 	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
-	enableCoProcess := config.CoProcessOptions.EnableCoProcess && EnableCoProcess
+	enableCoProcess := globalConf.CoProcessOptions.EnableCoProcess && EnableCoProcess
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 
@@ -257,7 +257,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with invalid key.")
 
 		// Fire Authfailed Event
-		AuthFailed(m.TykMiddleware, r, token)
+		AuthFailed(m.BaseMiddleware, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")

@@ -28,11 +28,11 @@ const (
 // check if a message should pass through or not
 type SessionLimiter struct{}
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) bool {
+func (SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	var ratePerPeriodNow int
-	if config.EnableNonTransactionalRateLimiter {
+	if globalConf.EnableNonTransactionalRateLimiter {
 		ratePerPeriodNow, _ = store.SetRollingWindowPipeline(rateLimiterKey, int64(currentSession.Per), "-1")
 	} else {
 		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), "-1")
@@ -42,7 +42,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
-	if config.EnableSentinelRateLImiter {
+	if globalConf.EnableSentinelRateLImiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
@@ -51,7 +51,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	if ratePerPeriodNow > int(currentSession.Rate)-subtractor {
 		// Set a sentinel value with expire
-		if config.EnableSentinelRateLImiter {
+		if globalConf.EnableSentinelRateLImiter {
 			store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
 		}
 		return true
@@ -72,12 +72,12 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) sessionFailReason {
+func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) sessionFailReason {
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
 
 	if enableRL {
-		if config.EnableSentinelRateLImiter {
+		if globalConf.EnableSentinelRateLImiter {
 			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
 
 			// Check sentinel
@@ -86,7 +86,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 				// Sentinel is set, fail
 				return sessionFailRateLimit
 			}
-		} else if config.EnableRedisRollingLimiter {
+		} else if globalConf.EnableRedisRollingLimiter {
 			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
 				return sessionFailRateLimit
 			}
@@ -124,7 +124,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 	}
 
 	if enableQ {
-		if config.LegacyEnableAllowanceCountdown {
+		if globalConf.LegacyEnableAllowanceCountdown {
 			currentSession.Allowance--
 		}
 
@@ -143,7 +143,7 @@ func initBucketStore() {
 	BucketStore = memorycache.New()
 }
 
-func (l *SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
+func (SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
 
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {

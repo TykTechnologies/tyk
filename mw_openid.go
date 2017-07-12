@@ -18,7 +18,7 @@ import (
 const OIDPREFIX = "openid"
 
 type OpenIDMW struct {
-	*TykMiddleware
+	*BaseMiddleware
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 	lock                      sync.RWMutex
@@ -28,14 +28,12 @@ func (k *OpenIDMW) GetName() string {
 	return "OpenIDMW"
 }
 
-func (k *OpenIDMW) New() {
+func (k *OpenIDMW) Init() {
 	k.provider_client_policymap = make(map[string]map[string]string)
 	// Create an OpenID Configuration and store
 	var err error
 	k.providerConfiguration, err = openid.NewConfiguration(openid.ProvidersGetter(k.getProviders),
 		openid.ErrorHandler(k.dummyErrorHandler))
-
-	k.lock = sync.RWMutex{}
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -116,9 +114,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		return errors.New("Key not authorised"), 403
 	}
 
-	k.lock.Lock()
+	k.lock.RLock()
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
-	k.lock.Unlock()
+	k.lock.RUnlock()
 	if !foundIssuer {
 		log.WithFields(logrus.Fields{
 			"prefix": OIDPREFIX,
@@ -214,7 +212,7 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event
-	AuthFailed(k.TykMiddleware, r, tykId)
+	AuthFailed(k.BaseMiddleware, r, tykId)
 
 	// Report in health check
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")

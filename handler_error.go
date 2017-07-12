@@ -25,7 +25,7 @@ type APIError struct {
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
 // the ErrorHandler if something is wrong with the request and halt the request processing through the chain
 type ErrorHandler struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
@@ -80,7 +80,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	token := ctxGetAuthToken(r)
 	var alias string
 
-	if config.StoreAnalytics(r) {
+	ip := GetIPFromRequest(r)
+	if globalConf.StoreAnalytics(ip) {
 
 		t := time.Now()
 
@@ -147,7 +148,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			0,
 			rawRequest,
 			rawResponse,
-			GetIPFromRequest(r),
+			ip,
 			GeoData{},
 			tags,
 			alias,
@@ -155,10 +156,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			time.Now(),
 		}
 
-		record.GetGeo(GetIPFromRequest(r))
+		record.GetGeo(ip)
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
-		if config.EnforceOrgDataAge {
+		if globalConf.EnforceOrgDataAge {
 			orgExpireDataTime := e.GetOrgSessionExpiry(e.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -168,7 +169,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		record.SetExpiry(expiresAfter)
-		if config.AnalyticsConfig.NormaliseUrls.Enabled {
+		if globalConf.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 
@@ -179,12 +180,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	ReportHealthCheckValue(e.Spec.Health, BlockedRequestLog, "-1")
 
 	//If the config option is not set or is false, add the header
-	if !config.HideGeneratorHeader {
+	if !globalConf.HideGeneratorHeader {
 		w.Header().Add("X-Generator", "tyk.io")
 	}
 
 	// Close connections
-	if config.CloseConnections {
+	if globalConf.CloseConnections {
 		w.Header().Add("Connection", "close")
 	}
 
