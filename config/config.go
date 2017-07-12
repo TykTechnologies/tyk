@@ -89,6 +89,8 @@ type WebHookHandlerConf struct {
 
 type SlaveOptionsConfig struct {
 	UseRPC                          bool   `json:"use_rpc"`
+	UseSSL                          bool   `json:"use_ssl"`
+	SSLInsecureSkipVerify           bool   `json:"ssl_insecure_skip_verify"`
 	ConnectionString                string `json:"connection_string"`
 	RPCKey                          string `json:"rpc_key"`
 	APIKey                          string `json:"api_key"`
