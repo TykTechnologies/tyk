@@ -476,24 +476,18 @@ func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, 
 	}
 
 	handshake := make([]byte, 8)
-	_, err = c.Read(handshake)
-
-	// Let gorpc handle it
-	if err != nil {
+	if _, err = io.ReadFull(c, handshake); err != nil {
 		return
 	}
 
 	idLenBuf := make([]byte, 1)
-	_, err = c.Read(idLenBuf)
-	if err != nil {
+	if _, err = io.ReadFull(c, idLenBuf); err != nil {
 		return
 	}
 
 	idLen := uint8(idLenBuf[0])
 	id := make([]byte, idLen)
-	_, err = c.Read(id)
-
-	if err != nil {
+	if _, err = io.ReadFull(c, id); err != nil {
 		return
 	}
 
