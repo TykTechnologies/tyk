@@ -211,6 +211,10 @@ func fetchBundle(spec *APISpec) (thisBundle Bundle, err error) {
 		thisGetter = &HttpBundleGetter{
 			Url: bundleUrl,
 		}
+	case "https":
+		getter = &HTTPBundleGetter{
+			URL: bundleURL,
+		}
 	default:
 		err = errors.New("Unknown URL scheme!")
 	}
