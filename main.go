@@ -211,16 +211,14 @@ func buildConnStr(resource string) string {
 	return connStr
 }
 
-// Pull API Specs from configuration
-var APILoader = APIDefinitionLoader{}
-
 func getAPISpecs() []*APISpec {
+	loader := APIDefinitionLoader{}
 	var apiSpecs []*APISpec
 
 	if globalConf.UseDBAppConfigs {
 
 		connStr := buildConnStr("/system/apis")
-		apiSpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, globalConf.NodeSecret)
+		apiSpecs = loader.FromDashboardService(connStr, globalConf.NodeSecret)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -230,9 +228,9 @@ func getAPISpecs() []*APISpec {
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
 
-		apiSpecs = APILoader.LoadDefinitionsFromRPC(globalConf.SlaveOptions.RPCKey)
+		apiSpecs = loader.FromRPC(globalConf.SlaveOptions.RPCKey)
 	} else {
-		apiSpecs = APILoader.LoadDefinitions(globalConf.AppPath)
+		apiSpecs = loader.FromDir(globalConf.AppPath)
 	}
 
 	log.WithFields(logrus.Fields{

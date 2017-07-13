@@ -135,8 +135,8 @@ type APISpec struct {
 	ServiceRefreshInProgress bool
 }
 
-// APIDefinitionLoader will load an Api definition from a storage system. It has two methods LoadDefinitionsFromMongo()
-// and LoadDefinitions(), each will pull api specifications from different locations.
+// APIDefinitionLoader will load an Api definition from a storage
+// system.
 type APIDefinitionLoader struct{}
 
 // Nonce to use when interacting with the dashboard service
@@ -144,74 +144,74 @@ var ServiceNonce string
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a *APIDefinitionLoader) MakeSpec(appConfig *apidef.APIDefinition) *APISpec {
-	newAppSpec := &APISpec{}
-	newAppSpec.APIDefinition = appConfig
+func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
+	spec := &APISpec{}
+	spec.APIDefinition = def
 
 	// We'll push the default HealthChecker:
-	newAppSpec.Health = &DefaultHealthChecker{
-		APIID: newAppSpec.APIID,
+	spec.Health = &DefaultHealthChecker{
+		APIID: spec.APIID,
 	}
 
 	// Add any new session managers or auth handlers here
-	newAppSpec.AuthManager = &DefaultAuthorisationManager{}
+	spec.AuthManager = &DefaultAuthorisationManager{}
 
-	newAppSpec.SessionManager = &DefaultSessionManager{}
-	newAppSpec.OrgSessionManager = &DefaultSessionManager{}
+	spec.SessionManager = &DefaultSessionManager{}
+	spec.OrgSessionManager = &DefaultSessionManager{}
 
 	// Create and init the virtual Machine
 	if globalConf.EnableJSVM {
-		newAppSpec.JSVM = &JSVM{}
-		newAppSpec.JSVM.Init()
+		spec.JSVM = &JSVM{}
+		spec.JSVM.Init()
 	}
 
 	// Set up Event Handlers
 	log.Debug("INITIALISING EVENT HANDLERS")
-	newAppSpec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
-	for eventName, eventHandlerConfs := range appConfig.EventHandlers.Events {
+	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
+	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := GetEventHandlerByName(handlerConf, newAppSpec)
+			eventHandlerInstance, err := GetEventHandlerByName(handlerConf, spec)
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
 			} else {
 				log.Debug("Init Event Handler: ", eventName)
-				newAppSpec.EventPaths[eventName] = append(newAppSpec.EventPaths[eventName], eventHandlerInstance)
+				spec.EventPaths[eventName] = append(spec.EventPaths[eventName], eventHandlerInstance)
 			}
 
 		}
 	}
 
-	newAppSpec.RxPaths = make(map[string][]URLSpec, len(appConfig.VersionData.Versions))
-	newAppSpec.WhiteListEnabled = make(map[string]bool, len(appConfig.VersionData.Versions))
-	for _, v := range appConfig.VersionData.Versions {
+	spec.RxPaths = make(map[string][]URLSpec, len(def.VersionData.Versions))
+	spec.WhiteListEnabled = make(map[string]bool, len(def.VersionData.Versions))
+	for _, v := range def.VersionData.Versions {
 		var pathSpecs []URLSpec
 		var whiteListSpecs bool
 
 		// If we have transitioned to extended path specifications, we should use these now
 		if v.UseExtendedPaths {
-			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, newAppSpec)
+			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
 
 		} else {
 			log.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
 		}
-		newAppSpec.RxPaths[v.Name] = pathSpecs
-		newAppSpec.WhiteListEnabled[v.Name] = whiteListSpecs
+		spec.RxPaths[v.Name] = pathSpecs
+		spec.WhiteListEnabled[v.Name] = whiteListSpecs
 	}
 
-	return newAppSpec
+	return spec
 }
 
-func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) {
+func (a APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) {
 	defer response.Body.Close()
 	return ioutil.ReadAll(response.Body)
 }
 
-// LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secret string) []*APISpec {
+// FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
+func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*APISpec {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -294,9 +294,9 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 
 	// Process
 	var apiSpecs []*APISpec
-	for _, appConfig := range apiDefs {
-		newAppSpec := a.MakeSpec(appConfig)
-		apiSpecs = append(apiSpecs, newAppSpec)
+	for _, def := range apiDefs {
+		spec := a.MakeSpec(def)
+		apiSpecs = append(apiSpecs, spec)
 	}
 
 	// Set the nonce
@@ -306,8 +306,8 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secr
 	return apiSpecs
 }
 
-// LoadDefinitionsFromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
+// FromCloud will connect and download ApiDefintions from a Mongo DB instance.
+func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 	store := RPCStorageHandler{UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 	store.Connect()
 
@@ -329,7 +329,7 @@ func (a *APIDefinitionLoader) LoadDefinitionsFromRPC(orgId string) []*APISpec {
 	return a.processRPCDefinitions(apiCollection)
 }
 
-func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APISpec {
+func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APISpec {
 
 	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
@@ -338,37 +338,37 @@ func (a *APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*API
 	}
 
 	var apiSpecs []*APISpec
-	for _, appConfig := range apiDefs {
-		appConfig.DecodeFromDB()
+	for _, def := range apiDefs {
+		def.DecodeFromDB()
 
 		if globalConf.SlaveOptions.BindToSlugsInsteadOfListenPaths {
-			newListenPath := "/" + appConfig.Slug //+ "/"
+			newListenPath := "/" + def.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
 				" instead of ",
-				appConfig.Proxy.ListenPath)
+				def.Proxy.ListenPath)
 
-			appConfig.Proxy.ListenPath = newListenPath
+			def.Proxy.ListenPath = newListenPath
 		}
 
-		newAppSpec := a.MakeSpec(appConfig)
-		apiSpecs = append(apiSpecs, newAppSpec)
+		spec := a.MakeSpec(def)
+		apiSpecs = append(apiSpecs, spec)
 	}
 
 	return apiSpecs
 }
 
-func (a *APIDefinitionLoader) ParseDefinition(apiDef []byte) *apidef.APIDefinition {
-	appConfig := &apidef.APIDefinition{}
-	if err := json.Unmarshal(apiDef, appConfig); err != nil {
+func (a APIDefinitionLoader) ParseDefinition(apiDef []byte) *apidef.APIDefinition {
+	def := &apidef.APIDefinition{}
+	if err := json.Unmarshal(apiDef, def); err != nil {
 		log.Error("[RPC] --> Couldn't unmarshal api configuration: ", err)
 	}
-	return appConfig
+	return def
 }
 
-// LoadDefinitions will load APIDefinitions from a directory on the filesystem. Definitions need
+// FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
-func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
+func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	var apiSpecs []*APISpec
 	// Grab json files from directory
 	files, _ := ioutil.ReadDir(dir)
@@ -376,20 +376,20 @@ func (a *APIDefinitionLoader) LoadDefinitions(dir string) []*APISpec {
 		if strings.Contains(f.Name(), ".json") {
 			filePath := filepath.Join(dir, f.Name())
 			log.Info("Loading API Specification from ", filePath)
-			appConfigBody, err := ioutil.ReadFile(filePath)
+			defBody, err := ioutil.ReadFile(filePath)
 			if err != nil {
 				log.Error("Couldn't load app configuration file: ", err)
 			}
-			appConfig := a.ParseDefinition(appConfigBody)
-			newAppSpec := a.MakeSpec(appConfig)
-			apiSpecs = append(apiSpecs, newAppSpec)
+			def := a.ParseDefinition(defBody)
+			spec := a.MakeSpec(def)
+			apiSpecs = append(apiSpecs, spec)
 		}
 	}
 
 	return apiSpecs
 }
 
-func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {
+func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {
 	ignoredPaths := a.compilePathSpec(apiVersionDef.Paths.Ignored, Ignored)
 	blackListPaths := a.compilePathSpec(apiVersionDef.Paths.BlackList, BlackList)
 	whiteListPaths := a.compilePathSpec(apiVersionDef.Paths.WhiteList, WhiteList)
@@ -402,7 +402,7 @@ func (a *APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-func (a *APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
+func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
 	apiLangIDsRegex := regexp.MustCompile(`{(.*?)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `(.*?)`)
 	asRegex := regexp.MustCompile(asRegexStr)
@@ -410,7 +410,7 @@ func (a *APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec,
 	newSpec.Spec = asRegex
 }
 
-func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus) []URLSpec {
 	// transform a configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -424,7 +424,7 @@ func (a *APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMeta, specType URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMeta, specType URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -441,7 +441,7 @@ func (a *APIDefinitionLoader) compileExtendedPathSpec(paths []apidef.EndPointMet
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
+func (a APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -456,12 +456,12 @@ func (a *APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
+func (a APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
 	return textTemplate.ParseFiles(path)
 }
 
-func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
+func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
 	log.Debug("-- Loading blob")
 	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
@@ -470,7 +470,7 @@ func (a *APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Templ
 	return textTemplate.New("blob").Parse(string(uDec))
 }
 
-func (a *APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -517,7 +517,7 @@ func (a *APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMe
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInjectionMeta, stat URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -538,7 +538,7 @@ func (a *APIDefinitionLoader) compileInjectedHeaderSpec(paths []apidef.HeaderInj
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTransformMeta, stat URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -554,7 +554,7 @@ func (a *APIDefinitionLoader) compileMethodTransformSpec(paths []apidef.MethodTr
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutMeta, stat URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -571,7 +571,7 @@ func (a *APIDefinitionLoader) compileTimeoutPathSpec(paths []apidef.HardTimeoutM
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSizeMeta, stat URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -588,7 +588,7 @@ func (a *APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestS
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.CircuitBreakerMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -653,7 +653,7 @@ func (a *APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circu
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewriteMeta, stat URLStatus) []URLSpec {
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
 	urlSpec := []URLSpec{}
@@ -670,7 +670,7 @@ func (a *APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewri
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
+func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
 	if !globalConf.EnableJSVM {
 		return nil
 	}
@@ -692,7 +692,7 @@ func (a *APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.Virtual
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
@@ -706,7 +706,7 @@ func (a *APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
+func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
@@ -720,7 +720,7 @@ func (a *APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apid
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
+func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
 	ignoredPaths := a.compileExtendedPathSpec(apiVersionDef.ExtendedPaths.Ignored, Ignored)
