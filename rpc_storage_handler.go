@@ -142,12 +142,12 @@ func (r *RPCStorageHandler) Connect() bool {
 
 	RPCClientSingletonConnectionID = uuid.NewV4().String()
 
-    // Length should fit into 1 byte. Protection if we decide change uuid in future.
-    if len(RPCClientSingletonConnectionID) > 255 {
-        panic("RPCClientSingletonConnectionID is too long")
-    }
+	// Length should fit into 1 byte. Protection if we decide change uuid in future.
+	if len(RPCClientSingletonConnectionID) > 255 {
+		panic("RPCClientSingletonConnectionID is too long")
+	}
 
-    if globalConf.SlaveOptions.UseSSL {
+	if globalConf.SlaveOptions.UseSSL {
 		clientCfg := &tls.Config{
 			InsecureSkipVerify: globalConf.SlaveOptions.SSLInsecureSkipVerify,
 		}
