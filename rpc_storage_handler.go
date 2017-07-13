@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -123,6 +124,7 @@ func (r *RPCStorageHandler) ReConnect() {
 }
 
 var RPCCLientSingleton *gorpc.Client
+var RPCCLientSingletonMu sync.Mutex
 var RPCClientSingletonConnectionID string
 var RPCFuncClientSingleton *gorpc.DispatcherClient
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
@@ -130,7 +132,6 @@ var RPCClientIsConnected bool
 
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
-
 	if RPCClientIsConnected {
 		log.Debug("Using RPC singleton for connection")
 		return true
@@ -206,6 +207,9 @@ func (r *RPCStorageHandler) Connect() bool {
 }
 
 func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+	RPCCLientSingletonMu.Lock()
+	defer RPCCLientSingletonMu.Unlock()
+
 	RPCClientIsConnected = true
 	return rwc, nil
 }
