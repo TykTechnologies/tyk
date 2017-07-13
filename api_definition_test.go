@@ -5,6 +5,9 @@ import (
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/lonelycode/gorpc"
 	"io/ioutil"
+	"io"
+	"net"
+    "time"
 	"net/http"
 	"net/url"
 	"testing"
@@ -426,14 +429,12 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	config.SlaveOptions.APIKey = "test"
 
 	server := gorpc.NewTCPServer(":9090", dispatcher.NewHandlerFunc())
-	go server.Serve()
+	server.Listener = &customListener{}
+	server.LogError = gorpc.NilErrorLogger
+
 	config.SlaveOptions.ConnectionString = server.Addr
 
-	RPCCLientSingleton = gorpc.NewTCPClient(server.Addr)
-	RPCCLientSingleton.Conns = 1
-	RPCCLientSingleton.Start()
-	RPCClientIsConnected = true
-	RPCFuncClientSingleton = GetDispatcher().NewFuncClient(RPCCLientSingleton)
+	go server.Serve()
 
 	return server
 }
@@ -492,4 +493,66 @@ func TestGetAPISpecsRPCSuccess(t *testing.T) {
 	}
 
 	stopRPCMock(rpc)
+}
+
+func setupKeepalive(conn net.Conn) error {
+	tcpConn := conn.(*net.TCPConn)
+	if err := tcpConn.SetKeepAlive(true); err != nil {
+		return err
+	}
+	if err := tcpConn.SetKeepAlivePeriod(30 * time.Second); err != nil {
+		return err
+	}
+	return nil
+}
+
+type customListener struct {
+	L net.Listener
+}
+
+func (ln *customListener) Init(addr string) (err error) {
+	ln.L, err = net.Listen("tcp", addr)
+	return
+}
+
+func (ln *customListener) ListenAddr() net.Addr {
+	if ln.L != nil {
+		return ln.L.Addr()
+	}
+	return nil
+}
+
+func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, err error) {
+	c, err := ln.L.Accept()
+
+	if err != nil {
+		return
+	}
+
+	if err = setupKeepalive(c); err != nil {
+		c.Close()
+		return
+	}
+
+	handshake := make([]byte, 6)
+	if _, err = io.ReadFull(c, handshake); err != nil {
+		return
+	}
+
+	idLenBuf := make([]byte, 1)
+	if _, err = io.ReadFull(c, idLenBuf); err != nil {
+		return
+	}
+
+	idLen := uint8(idLenBuf[0])
+	id := make([]byte, idLen)
+	if _, err = io.ReadFull(c, id); err != nil {
+		return
+	}
+
+	return c, string(id), nil
+}
+
+func (ln *customListener) Close() error {
+	return ln.L.Close()
 }

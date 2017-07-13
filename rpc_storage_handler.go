@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -153,13 +154,14 @@ func (r *RPCStorageHandler) ReConnect() {
 }
 
 var RPCCLientSingleton *gorpc.Client
+var RPCCLientSingletonMu sync.Mutex
+var RPCClientSingletonConnectionID string
 var RPCFuncClientSingleton *gorpc.DispatcherClient
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 var RPCClientIsConnected bool
 
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
-
 	if RPCClientIsConnected {
 		log.Debug("Using RPC singleton for connection")
 		return true
@@ -168,9 +170,17 @@ func (r *RPCStorageHandler) Connect() bool {
 	// RPC Client is unset
 	// Set up the cache
 	log.Info("Setting new RPC connection!")
-	if globalConf.SlaveOptions.UseSSL {
+
+	RPCClientSingletonConnectionID = uuid.NewUUID().String()
+
+	// Length should fit into 1 byte. Protection if we decide change uuid in future.
+	if len(RPCClientSingletonConnectionID) > 255 {
+		panic("RPCClientSingletonConnectionID is too long")
+	}
+
+	if config.SlaveOptions.UseSSL {
 		clientCfg := &tls.Config{
-			InsecureSkipVerify: globalConf.SlaveOptions.SSLInsecureSkipVerify,
+			InsecureSkipVerify: config.SlaveOptions.SSLInsecureSkipVerify,
 		}
 
 		RPCCLientSingleton = gorpc.NewTLSClient(r.Address, clientCfg)
@@ -179,11 +189,36 @@ func (r *RPCStorageHandler) Connect() bool {
 	}
 
 	if log.Level != logrus.DebugLevel {
-		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
+		RPCCLientSingleton.LogError = gorpc.NilErrorLogger
 	}
 
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
 	RPCCLientSingleton.Conns = 50
+	RPCCLientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
+		dialer := &net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+
+		if config.SlaveOptions.UseSSL {
+			cfg := &tls.Config{
+				InsecureSkipVerify: config.SlaveOptions.SSLInsecureSkipVerify,
+			}
+
+			conn, err = tls.DialWithDialer(dialer, "tcp", addr, cfg)
+		} else {
+			conn, err = dialer.Dial("tcp", addr)
+		}
+
+		if err != nil {
+			return
+		}
+
+		conn.Write([]byte("proto2"))
+		conn.Write([]byte{byte(len(RPCClientSingletonConnectionID))})
+		conn.Write([]byte(RPCClientSingletonConnectionID))
+		return conn, nil
+	}
 	RPCCLientSingleton.Start()
 	d := GetDispatcher()
 
@@ -202,6 +237,9 @@ func (r *RPCStorageHandler) Connect() bool {
 }
 
 func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+	RPCCLientSingletonMu.Lock()
+	defer RPCCLientSingletonMu.Unlock()
+
 	RPCClientIsConnected = true
 	return rwc, nil
 }
