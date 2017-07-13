@@ -181,7 +181,7 @@ func TestMain(m *testing.M) {
 }
 
 func emptyRedis() error {
-	addr := ":" + strconv.Itoa(globalConf.Storage.Port)
+	addr := globalConf.Storage.Host + ":" + strconv.Itoa(globalConf.Storage.Port)
 	c, err := redis.Dial("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not connect to redis: %v", err)
