@@ -21,7 +21,7 @@ const (
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 	CacheStore StorageHandler
 	sh         SuccessHandler
 }
@@ -30,9 +30,8 @@ func (m *RedisCacheMiddleware) GetName() string {
 	return "RedisCacheMiddleware"
 }
 
-// New lets you do any initialisations for the object can be done here
-func (m *RedisCacheMiddleware) New() {
-	m.sh = SuccessHandler{m.TykMiddleware}
+func (m *RedisCacheMiddleware) Init() {
+	m.sh = SuccessHandler{m.BaseMiddleware}
 }
 
 func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
@@ -120,8 +119,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	} else {
 		// New request checker, more targeted, less likely to fail
 		_, versionPaths, _, _ := m.Spec.GetVersionData(r)
-		found, _ := m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, Cached)
-		isVirtual, _ = m.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+		found, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
+		isVirtual, _ = m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 		if found {
 			stat = StatusCached
 		}
@@ -152,8 +151,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		var reqVal *http.Response
 		if isVirtual {
 			log.Debug("This is a virtual function")
-			vp := VirtualEndpoint{TykMiddleware: m.TykMiddleware}
-			vp.New()
+			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
+			vp.Init()
 			reqVal = vp.ServeHTTPForCache(w, r)
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache

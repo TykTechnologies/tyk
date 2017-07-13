@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -72,17 +73,46 @@ const oauthDefinition = `{
 func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(muxer)
-	addOAuthHandlers(spec, muxer, true)
+	manager := addOAuthHandlers(spec, muxer)
+
+	// add a test client
+	testPolicy := Policy{}
+	testPolicy.Rate = 100
+	testPolicy.Per = 1
+	testPolicy.QuotaMax = -1
+	testPolicy.QuotaRenewalRate = 1000000000
+
+	policiesMu.Lock()
+	policiesByID["TEST-4321"] = testPolicy
+	policiesMu.Unlock()
+
+	var redirectURI string
+	// If separator is not set that means multiple redirect uris not supported
+	if globalConf.OauthRedirectUriSeparator == "" {
+		redirectURI = "http://client.oauth.com"
+
+		// If separator config is set that means multiple redirect uris are supported
+	} else {
+		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, globalConf.OauthRedirectUriSeparator)
+	}
+	testClient := OAuthClient{
+		ClientID:          "1234",
+		ClientSecret:      "aabbccdd",
+		ClientRedirectURI: redirectURI,
+		PolicyID:          "TEST-4321",
+	}
+	manager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&Oauth2KeyExists{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		CreateMiddleware(&Oauth2KeyExists{baseMid}),
+		CreateMiddleware(&KeyExpired{baseMid}),
+		CreateMiddleware(&AccessRightsCheck{baseMid}),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
 
 	muxer.Handle(spec.Proxy.ListenPath, chain)
 }
@@ -113,7 +143,7 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	// Enable multiple Redirect URIs
-	config.OauthRedirectUriSeparator = ","
+	globalConf.OauthRedirectUriSeparator = ","
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
@@ -140,7 +170,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	// Disable multiple Redirect URIs
-	config.OauthRedirectUriSeparator = ""
+	globalConf.OauthRedirectUriSeparator = ""
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()

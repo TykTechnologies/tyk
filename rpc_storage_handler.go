@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -56,41 +55,37 @@ var (
 	GlobalRPCPingTimeout time.Duration
 )
 
-// ------------------- CLOUD STORAGE MANAGER -------------------------------
-
-var RPCCLientRWMutex = sync.RWMutex{}
-var RPCClients = map[string]chan int{}
-
 func rpcKeepAliveCheck(r *RPCStorageHandler) {
 	// Only run when connected
-	if RPCClientIsConnected {
-		// Make sure the auth back end is still alive
-		c1 := make(chan string, 1)
+	if !RPCClientIsConnected {
+		return
+	}
+	// Make sure the auth back end is still alive
+	c1 := make(chan string, 1)
 
-		go func() {
-			log.Debug("Getting keyspace check test key")
-			r.GetKey("0000")
-			log.Debug("--> done")
-			c1 <- "1"
-			close(c1)
-		}()
+	go func() {
+		log.Debug("Getting keyspace check test key")
+		r.GetKey("0000")
+		log.Debug("--> done")
+		c1 <- "1"
+		close(c1)
+	}()
 
-		ctd := false
-		select {
-		case res := <-c1:
-			log.Debug("RPC Still alive: ", res)
-			ctd = true
-		case <-time.After(time.Second * 10):
-			log.WithFields(logrus.Fields{
-				"prefix": "RPC Conn Mgr",
-			}).Warning("Handler seems to have disconnected, attempting reconnect")
-			r.ReConnect()
-		}
+	ctd := false
+	select {
+	case res := <-c1:
+		log.Debug("RPC Still alive: ", res)
+		ctd = true
+	case <-time.After(time.Second * 10):
+		log.WithFields(logrus.Fields{
+			"prefix": "RPC Conn Mgr",
+		}).Warning("Handler seems to have disconnected, attempting reconnect")
+		r.ReConnect()
+	}
 
-		if ctd {
-			// Don't run too quickly, pulse every 10 secs
-			time.Sleep(time.Second * 10)
-		}
+	if ctd {
+		// Don't run too quickly, pulse every 10 secs
+		time.Sleep(time.Second * 10)
 	}
 }
 
@@ -110,9 +105,6 @@ type RPCStorageHandler struct {
 func (r *RPCStorageHandler) Register() {
 	r.ID = uuid.NewV4().String()
 	myChan := make(chan int)
-	RPCCLientRWMutex.Lock()
-	RPCClients[r.ID] = myChan
-	RPCCLientRWMutex.Unlock()
 	r.killChan = myChan
 	log.Debug("RPC Client registered")
 }
@@ -148,8 +140,17 @@ func (r *RPCStorageHandler) Connect() bool {
 	// Set up the cache
 	log.Info("Setting new RPC connection!")
 
-	RPCCLientSingleton = &gorpc.Client{Addr: r.Address}
 	RPCClientSingletonConnectionID = uuid.NewV4().String()
+
+    if globalConf.SlaveOptions.UseSSL {
+		clientCfg := &tls.Config{
+			InsecureSkipVerify: globalConf.SlaveOptions.SSLInsecureSkipVerify,
+		}
+
+		RPCCLientSingleton = gorpc.NewTLSClient(r.Address, clientCfg)
+	} else {
+		RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
+	}
 
 	if log.Level != logrus.DebugLevel {
 		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
@@ -163,9 +164,9 @@ func (r *RPCStorageHandler) Connect() bool {
 			KeepAlive: 30 * time.Second,
 		}
 
-		if config.SlaveOptions.UseSSL {
+		if globalConf.SlaveOptions.UseSSL {
 			cfg := &tls.Config{
-				InsecureSkipVerify: config.SlaveOptions.SSLInsecureSkipVerify,
+				InsecureSkipVerify: globalConf.SlaveOptions.SSLInsecureSkipVerify,
 			}
 
 			conn, err = tls.DialWithDialer(dialer, "tcp", addr, cfg)
@@ -207,9 +208,6 @@ func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteClo
 func (r *RPCStorageHandler) Disconnect() bool {
 	if RPCClientIsConnected {
 		RPCClientIsConnected = false
-		RPCCLientRWMutex.Lock()
-		delete(RPCClients, r.ID)
-		RPCCLientRWMutex.Unlock()
 	}
 	return true
 }
@@ -264,7 +262,7 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 func (r *RPCStorageHandler) GroupLogin() {
 	groupLoginData := GroupLoginRequest{
 		UserKey: r.UserKey,
-		GroupID: config.SlaveOptions.GroupID,
+		GroupID: globalConf.SlaveOptions.GroupID,
 	}
 	ok, err := RPCFuncClientSingleton.CallTimeout("LoginWithGroup", groupLoginData, GlobalRPCCallTimeout)
 	if err != nil {
@@ -290,7 +288,7 @@ func (r *RPCStorageHandler) Login() {
 	}
 
 	// If we have a group ID, lets login as a group
-	if config.SlaveOptions.GroupID != "" {
+	if globalConf.SlaveOptions.GroupID != "" {
 		r.GroupLogin()
 		return
 	}
@@ -318,7 +316,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
 	// Check the cache first
-	if config.SlaveOptions.EnableRPCCache {
+	if globalConf.SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
 		cachedVal, found := RPCGlobalCache.Get(r.fixKey(keyName))
 		log.Debug("--> Found? ", found)
@@ -345,7 +343,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	elapsed := time.Since(start)
 	log.Debug("GetKey took ", elapsed)
 
-	if config.SlaveOptions.EnableRPCCache {
+	if globalConf.SlaveOptions.EnableRPCCache {
 		// Cache it
 		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
 	}
@@ -686,7 +684,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
-	if config.SlaveOptions.DisableKeySpaceSync {
+	if globalConf.SlaveOptions.DisableKeySpaceSync {
 		return
 	}
 
@@ -705,13 +703,13 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	var keys interface{}
 	var err error
 
-	if config.SlaveOptions.GroupID == "" {
+	if globalConf.SlaveOptions.GroupID == "" {
 		keys, err = RPCFuncClientSingleton.CallTimeout("GetKeySpaceUpdate", orgId, GlobalRPCCallTimeout)
 	} else {
 
 		grpReq := GroupKeySpaceRequest{
 			OrgID:   orgId,
-			GroupID: config.SlaveOptions.GroupID,
+			GroupID: globalConf.SlaveOptions.GroupID,
 		}
 		keys, err = RPCFuncClientSingleton.CallTimeout("GetGroupKeySpaceUpdate", grpReq, GlobalRPCCallTimeout)
 	}

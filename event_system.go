@@ -3,16 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/rubyist/circuitbreaker"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
@@ -111,19 +110,6 @@ type EventTokenMeta struct {
 	Key string
 }
 
-// EventMessage is a standard form to send event data to handlers
-type EventMessage struct {
-	Type      apidef.TykEvent
-	Meta      interface{}
-	TimeStamp string
-}
-
-// TykEventHandler defines an event handler, e.g. LogMessageEventHandler will handle an event by logging it to stdout.
-type TykEventHandler interface {
-	New(interface{}) (TykEventHandler, error)
-	HandleEvent(EventMessage)
-}
-
 // EncodeRequestToEvent will write the request out in wire protocol and
 // encode it to base64 and store it in an Event object
 func EncodeRequestToEvent(r *http.Request) string {
@@ -134,61 +120,51 @@ func EncodeRequestToEvent(r *http.Request) string {
 }
 
 // GetEventHandlerByName is a convenience function to get event handler instances from an API Definition
-func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (TykEventHandler, error) {
+func GetEventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APISpec) (config.TykEventHandler, error) {
 
-	var conf interface{}
-	switch x := handlerConf.HandlerMeta.(type) {
-	case bson.M:
-		asByte, ok := json.Marshal(x)
-		if ok != nil {
-			log.Error("Failed to unmarshal handler meta! ", ok)
-		}
-		if err := json.Unmarshal(asByte, &conf); err != nil {
-			log.Error("Return conversion failed, ", err)
-		}
-	default:
-		conf = x
-	}
-
+	conf := handlerConf.HandlerMeta
 	switch handlerConf.Handler {
 	case EH_LogHandler:
-		return (&LogMessageEventHandler{}).New(conf)
+		h := &LogMessageEventHandler{}
+		err := h.Init(conf)
+		return h, err
 	case EH_WebHook:
-		return (&WebHookHandler{}).New(conf)
+		h := &WebHookHandler{}
+		err := h.Init(conf)
+		return h, err
 	case EH_JSVMHandler:
 		// Load the globals and file here
 		if spec != nil {
-			jsVmEventHandler, err := (&JSVMEventHandler{Spec: spec}).New(conf)
+			h := &JSVMEventHandler{Spec: spec}
+			err := h.Init(conf)
 			if err == nil {
-				GlobalEventsJSVM.LoadJSPaths([]string{conf.(map[string]interface{})["path"].(string)}, "")
+				GlobalEventsJSVM.LoadJSPaths([]string{conf["path"].(string)}, "")
 			}
-			return jsVmEventHandler, err
+			return h, err
 		}
 	case EH_CoProcessHandler:
 		if spec != nil {
-			var coprocessEventHandler TykEventHandler
-			var err error
 			if GlobalDispatcher == nil {
-				err = errors.New("no CP available")
-			} else {
-				coprocessEventHandler, err = CoProcessEventHandler{Spec: spec}.New(conf)
+				return nil, errors.New("no CP available")
 			}
-			return coprocessEventHandler, err
+			h := &CoProcessEventHandler{}
+			h.Spec = spec
+			err := h.Init(conf)
+			return h, err
 		}
-
 	}
 
 	return nil, errors.New("Handler not found")
 }
 
-// FireEvent is added to the tykMiddleware object so it is available across the entire stack
-func (t *TykMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
+// FireEvent is added to the BaseMiddleware object so it is available across the entire stack
+func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
-func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]TykEventHandler) {
+func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
 	if handlers, e := handlers[name]; e {
-		eventMessage := EventMessage{
+		eventMessage := config.EventMessage{
 			Meta:      meta,
 			Type:      name,
 			TimeStamp: time.Now().Local().String(),
@@ -204,7 +180,7 @@ func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
 }
 
 func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, config.EventTriggers)
+	fireEvent(name, meta, globalConf.EventTriggers)
 }
 
 // LogMessageEventHandler is a sample Event Handler
@@ -213,14 +189,13 @@ type LogMessageEventHandler struct {
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
-func (l *LogMessageEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	handler := &LogMessageEventHandler{}
-	handler.conf = handlerConf.(map[string]interface{})
-	return handler, nil
+func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
+	l.conf = handlerConf.(map[string]interface{})
+	return nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
-func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
+func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 	formattedMsgString := fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.Type)
 
 	// We can handle specific event types easily
@@ -237,8 +212,8 @@ func (l *LogMessageEventHandler) HandleEvent(em EventMessage) {
 	log.Warning(formattedMsgString)
 }
 
-func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]TykEventHandler {
-	actualEventHandlers := make(map[apidef.TykEvent][]TykEventHandler)
+func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]config.TykEventHandler {
+	actualEventHandlers := make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range theseEvents.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {

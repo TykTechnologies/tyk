@@ -2,7 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// HTTP reverse proxy handler
+// Fork of Go's net/http/httputil/reverseproxy.go with multiple changes,
+// including:
+//
+// * caching
+// * load balancing
+// * service discovery
 
 package main
 
@@ -35,7 +40,7 @@ func GetURLFromService(spec *APISpec) (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
 		sd := ServiceDiscovery{}
-		sd.New(&spec.Proxy.ServiceDiscovery)
+		sd.Init(&spec.Proxy.ServiceDiscovery)
 		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
 			spec.ServiceRefreshInProgress = false
@@ -155,8 +160,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if ServiceCache == nil {
 			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
-			if config.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = config.ServiceDiscovery.DefaultCacheTimeout
+			if globalConf.ServiceDiscovery.DefaultCacheTimeout > 0 {
+				expiry = globalConf.ServiceDiscovery.DefaultCacheTimeout
 			}
 			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
 		}
@@ -184,9 +189,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			}
 		}
 
-		// Specifically override with a URL rewrite
-		var newTarget *url.URL
-		switchTargets := false
+		targetToUse := target
 
 		if spec.URLRewriteEnabled && req.Context().Value(RetainHost) == true {
 			log.Debug("Detected host rewrite, overriding target")
@@ -194,19 +197,19 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			if err != nil {
 				log.Error("Failed to parse URL! Err: ", err)
 			} else {
-				newTarget = tmpTarget
-				switchTargets = true
+				// Specifically override with a URL rewrite
+				targetToUse = tmpTarget
 			}
 		}
 
 		// No override, and no load balancing? Use the existing target
-		targetToUse := target
-		if switchTargets {
-			targetToUse = newTarget
-		}
 		req.URL.Scheme = targetToUse.Scheme
 		req.URL.Host = targetToUse.Host
-		req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
+
+		// TODO: figure out a better fix for this
+		if targetToUse.Path != req.URL.Path {
+			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
+		}
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
 		}
@@ -215,9 +218,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		} else {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
+		if _, ok := req.Header["User-Agent"]; !ok {
+			// explicitly disable User-Agent so it's not set to default value
+			req.Header.Set("User-Agent", "")
+		}
 	}
 
-	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(config.HttpServerOptions.FlushInterval) * time.Millisecond}
+	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(globalConf.HttpServerOptions.FlushInterval) * time.Millisecond}
 }
 
 // onExitFlushLoop is a callback set by tests to detect the state of the
@@ -262,7 +269,7 @@ func (t *TykTransporter) SetTimeout(timeOut int) {
 }
 
 func getMaxIdleConns() int {
-	return config.MaxIdleConnsPerHost
+	return globalConf.MaxIdleConnsPerHost
 }
 
 var TykDefaultTransport = &TykTransporter{http.Transport{
@@ -322,22 +329,33 @@ func copyHeader(dst, src http.Header) {
 	}
 }
 
+func cloneHeader(h http.Header) http.Header {
+	h2 := make(http.Header, len(h))
+	for k, vv := range h {
+		vv2 := make([]string, len(vv))
+		copy(vv2, vv)
+		h2[k] = vv2
+	}
+	return h2
+}
+
 // Hop-by-hop headers. These are removed when sent to the backend.
 // http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
 var hopHeaders = []string{
 	"Connection",
+	"Proxy-Connection", // non-standard but still sent by libcurl and rejected by e.g. google
 	"Keep-Alive",
 	"Proxy-Authenticate",
 	"Proxy-Authorization",
-	"Te", // canonicalized version of "TE"
-	"Trailers",
+	"Te",      // canonicalized version of "TE"
+	"Trailer", // not Trailers per URL above; http://www.rfc-editor.org/errata_search.php?eid=4522
 	"Transfer-Encoding",
 	"Upgrade",
 }
 
-func (p *ReverseProxy) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	p.ErrorHandler = ErrorHandler{TykMiddleware: &TykMiddleware{spec, p}}
-	return nil, nil
+func (p *ReverseProxy) Init(spec *APISpec) error {
+	p.ErrorHandler = ErrorHandler{BaseMiddleware: &BaseMiddleware{spec, p}}
+	return nil
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
@@ -355,7 +373,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	}
 
 	_, versionPaths, _, _ := spec.GetVersionData(req)
-	found, meta := spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, HardTimeout)
+	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
 		intMeta := meta.(*int)
 		log.Debug("HARD TIMEOUT ENFORCED: ", *intMeta)
@@ -371,7 +389,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	}
 
 	_, versionPaths, _, _ := spec.GetVersionData(req)
-	found, meta := spec.CheckSpecMatchesStatus(req.URL.Path, req.Method, versionPaths, CircuitBreaker)
+	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, CircuitBreaker)
 	if found {
 		exMeta := meta.(*ExtendedCircuitBreakerMeta)
 		log.Debug("CB Enforced for path: ", *exMeta)
@@ -383,7 +401,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := TykDefaultTransport
-	transport.TLSClientConfig.InsecureSkipVerify = config.ProxySSLInsecureSkipVerify
+	transport.TLSClientConfig.InsecureSkipVerify = globalConf.ProxySSLInsecureSkipVerify
 
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
@@ -409,6 +427,21 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 	transport := GetTransport(timeout, rw, req, p)
 
+	ctx := req.Context()
+	if cn, ok := rw.(http.CloseNotifier); ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+		notifyChan := cn.CloseNotify()
+		go func() {
+			select {
+			case <-notifyChan:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
+
 	// Do this before we make a shallow copy
 	session := ctxGetSession(req)
 
@@ -431,33 +464,35 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	p.Director(outreq)
+	if req.ContentLength == 0 {
+		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
+	}
+	outreq = outreq.WithContext(ctx)
 
-	outreq.Proto = "HTTP/1.1"
-	outreq.ProtoMajor = 1
-	outreq.ProtoMinor = 1
+	outreq.Header = cloneHeader(req.Header)
+
+	p.Director(outreq)
 	outreq.Close = false
+
+	// Remove hop-by-hop headers listed in the "Connection" header.
+	// See RFC 2616, section 14.10.
+	if c := outreq.Header.Get("Connection"); c != "" {
+		for _, f := range strings.Split(c, ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				outreq.Header.Del(f)
+			}
+		}
+	}
 
 	log.Debug("Outbound Request: ", outreq.URL.String())
 
 	// Do not modify outbound request headers if they are WS
 	if !IsWebsocket(outreq) {
-
-		// Remove hop-by-hop headers to the backend.  Especially
+		// Remove hop-by-hop headers to the backend. Especially
 		// important is "Connection" because we want a persistent
-		// connection, regardless of what the client sent to us.  This
-		// is modifying the same underlying map from req (shallow
-		// copied above) so we only copy it if necessary.
-		copiedHeaders := false
+		// connection, regardless of what the client sent to us.
 		for _, h := range hopHeaders {
 			if outreq.Header.Get(h) != "" {
-				if !copiedHeaders {
-					outreq.Header = make(http.Header)
-					logreq.Header = make(http.Header)
-					copyHeader(outreq.Header, req.Header)
-					copyHeader(logreq.Header, req.Header)
-					copiedHeaders = true
-				}
 				outreq.Header.Del(h)
 				logreq.Header.Del(h)
 			}
@@ -580,13 +615,23 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 
+	// Remove hop-by-hop headers listed in the
+	// "Connection" header of the response.
+	if c := res.Header.Get("Connection"); c != "" {
+		for _, f := range strings.Split(c, ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				res.Header.Del(f)
+			}
+		}
+	}
+
 	for _, h := range hopHeaders {
 		res.Header.Del(h)
 	}
 	defer res.Body.Close()
 
 	// Close connections
-	if config.CloseConnections {
+	if globalConf.CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 
@@ -619,7 +664,39 @@ func (p *ReverseProxy) CopyResponse(dst io.Writer, src io.Reader) {
 		}
 	}
 
-	io.Copy(dst, src)
+	p.copyBuffer(dst, src, nil)
+}
+
+func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int64, error) {
+	if len(buf) == 0 {
+		buf = make([]byte, 32*1024)
+	}
+	var written int64
+	for {
+		nr, rerr := src.Read(buf)
+		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
+			log.WithFields(logrus.Fields{
+				"prefix": "proxy",
+				"org_id": p.TykAPISpec.OrgID,
+				"api_id": p.TykAPISpec.APIID,
+			}).Error("http: proxy error during body copy: ", rerr)
+		}
+		if nr > 0 {
+			nw, werr := dst.Write(buf[:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if werr != nil {
+				return written, werr
+			}
+			if nr != nw {
+				return written, io.ErrShortWrite
+			}
+		}
+		if rerr != nil {
+			return written, rerr
+		}
+	}
 }
 
 type writeFlusher interface {
@@ -631,13 +708,13 @@ type maxLatencyWriter struct {
 	dst     writeFlusher
 	latency time.Duration
 
-	lk   sync.Mutex // protects Write + Flush
+	mu   sync.Mutex // protects Write + Flush
 	done chan bool
 }
 
 func (m *maxLatencyWriter) Write(p []byte) (int, error) {
-	m.lk.Lock()
-	defer m.lk.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.dst.Write(p)
 }
 
@@ -652,9 +729,9 @@ func (m *maxLatencyWriter) flushLoop() {
 			}
 			return
 		case <-t.C:
-			m.lk.Lock()
+			m.mu.Lock()
 			m.dst.Flush()
-			m.lk.Unlock()
+			m.mu.Unlock()
 		}
 	}
 }

@@ -29,7 +29,7 @@ type WSDialer struct {
 
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
-	if !config.HttpServerOptions.EnableWebSockets {
+	if !globalConf.HttpServerOptions.EnableWebSockets {
 		return nil, errors.New("WebSockets has been disabled on this host")
 	}
 
@@ -114,7 +114,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func IsWebsocket(req *http.Request) bool {
-	if !config.HttpServerOptions.EnableWebSockets {
+	if !globalConf.HttpServerOptions.EnableWebSockets {
 		return false
 	}
 

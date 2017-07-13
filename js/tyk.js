@@ -11,13 +11,13 @@ var TykJS = {
         }
 };
 
-TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessRequest = function(request, session) {
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessRequest = function(request, session, config) {
     log("Process Request Not Implemented");
     return request;
 };
 
-TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessRequest = function(request, session) {
-    var processed_request = this.ProcessRequest(request, session);
+TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessRequest = function(request, session, config) {
+    var processed_request = this.ProcessRequest(request, session, config);
 
     if (!processed_request) {
         log("Middleware didn't return request object!");

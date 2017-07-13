@@ -14,9 +14,7 @@ type redisChannelHook struct {
 func newRedisHook() *redisChannelHook {
 	hook := &redisChannelHook{}
 	hook.formatter = new(logrus.JSONFormatter)
-	hook.Notifier = RedisNotificationHandler{}
 	hook.Notifier.Start()
-
 	return hook
 }
 

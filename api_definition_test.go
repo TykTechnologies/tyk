@@ -110,8 +110,7 @@ const nonExpiringMultiDef = `{
 
 func createDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
-	def, rawDef := loader.ParseDefinition([]byte(defStr))
-	def.RawData = rawDef
+	def := loader.ParseDefinition([]byte(defStr))
 	spec := loader.MakeSpec(def)
 	spec.APIDefinition = def
 	return spec
@@ -312,13 +311,13 @@ func TestBlacklistLinksMulti(t *testing.T) {
 }
 
 func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
-	config.SlaveOptions.UseRPC = true
-	config.SlaveOptions.RPCKey = "test_org"
-	config.SlaveOptions.APIKey = "test"
+	globalConf.SlaveOptions.UseRPC = true
+	globalConf.SlaveOptions.RPCKey = "test_org"
+	globalConf.SlaveOptions.APIKey = "test"
 
 	server := gorpc.NewTCPServer(":9090", dispatcher.NewHandlerFunc())
 	server.Listener = &customListener{}
-	config.SlaveOptions.ConnectionString = server.Addr
+	globalConf.SlaveOptions.ConnectionString = server.Addr
 
 	go server.Serve()
 
@@ -326,17 +325,16 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 }
 
 func stopRPCMock(server *gorpc.Server) {
-	config.SlaveOptions.ConnectionString = ""
-	config.SlaveOptions.RPCKey = ""
-	config.SlaveOptions.APIKey = ""
-	config.SlaveOptions.UseRPC = false
+	globalConf.SlaveOptions.ConnectionString = ""
+	globalConf.SlaveOptions.RPCKey = ""
+	globalConf.SlaveOptions.APIKey = ""
+	globalConf.SlaveOptions.UseRPC = false
 
 	server.Listener.Close()
 	server.Stop()
 
 	RPCCLientSingleton.Stop()
 	RPCClientIsConnected = false
-	RPCClients = map[string]chan int{}
 	RPCCLientSingleton = nil
 	RPCFuncClientSingleton = nil
 }
@@ -390,16 +388,18 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 
-	config.UseDBAppConfigs = true
-	config.AllowInsecureConfigs = true
-	config.DBAppConfOptions.ConnectionString = ts.URL
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = ts.URL
 
 	defer func() {
-		config.UseDBAppConfigs = false
-		config.AllowInsecureConfigs = false
-		config.DBAppConfOptions.ConnectionString = ""
+		globalConf.UseDBAppConfigs = false
+		globalConf.AllowInsecureConfigs = false
+		globalConf.DBAppConfOptions.ConnectionString = ""
 	}()
 
 	var wg sync.WaitGroup
@@ -420,9 +420,11 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
+	apisMu.Lock()
 	if len(apisByID) != 1 {
 		t.Error("Should return array with one spec", apisByID)
 	}
+	apisMu.Unlock()
 }
 
 func TestRoundRobin(t *testing.T) {

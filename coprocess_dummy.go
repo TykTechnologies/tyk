@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
@@ -28,7 +29,7 @@ var (
 )
 
 type CoProcessMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
@@ -43,11 +44,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, 200
 }
 
-type CoProcessEventHandler JSVMEventHandler
-
-func (l CoProcessEventHandler) New(handlerConf interface{}) (TykEventHandler, error) {
-	return nil, nil
+type CoProcessEventHandler struct {
+	Spec *APISpec
 }
+
+func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
+	return nil
+}
+func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {}
 
 func CoProcessInit() {
 	log.WithFields(logrus.Fields{
@@ -57,4 +61,4 @@ func CoProcessInit() {
 
 func doCoprocessReload() {}
 
-func newExtractor(referenceSpec *APISpec, mw *TykMiddleware) {}
+func newExtractor(referenceSpec *APISpec, mw *BaseMiddleware) {}

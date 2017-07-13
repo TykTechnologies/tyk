@@ -30,14 +30,14 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
+		CreateMiddleware(&AuthKey{baseMid}),
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		CreateMiddleware(&KeyExpired{baseMid}),
+		CreateMiddleware(&AccessRightsCheck{baseMid}),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
 
 	return chain
 }

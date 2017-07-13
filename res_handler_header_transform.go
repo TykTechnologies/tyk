@@ -22,21 +22,16 @@ type HeaderTransform struct {
 	config HeaderTransformOptions
 }
 
-func (h HeaderTransform) New(c interface{}, spec *APISpec) (TykResponseHandler, error) {
-	handler := HeaderTransform{}
-	moduleConfig := HeaderTransformOptions{}
-
-	if err := mapstructure.Decode(c, &moduleConfig); err != nil {
+func (h *HeaderTransform) Init(c interface{}, spec *APISpec) error {
+	if err := mapstructure.Decode(c, &h.config); err != nil {
 		log.Error(err)
-		return nil, err
+		return err
 	}
-
-	handler.config = moduleConfig
-	handler.Spec = spec
-	return handler, nil
+	h.Spec = spec
+	return nil
 }
 
-func (h HeaderTransform) HandleResponse(rw http.ResponseWriter,
+func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 	res *http.Response, req *http.Request, ses *SessionState) error {
 
 	// Parse target_host parameter from configuration

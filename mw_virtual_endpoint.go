@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -36,7 +34,7 @@ type VMResponseObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
-	*TykMiddleware
+	*BaseMiddleware
 	sh SuccessHandler
 }
 
@@ -63,7 +61,7 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 			j.VM.Run(js)
 		}
 	case "blob":
-		if config.DisableVirtualPathBlobs {
+		if globalConf.DisableVirtualPathBlobs {
 			log.Error("[JSVM] Blobs not allowerd on this node")
 			return
 		}
@@ -81,24 +79,12 @@ func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	}
 }
 
-type VirtualEndpointConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
-}
-
-// New lets you do any initialisations for the object can be done here
-func (d *VirtualEndpoint) New() {
-	d.sh = SuccessHandler{d.TykMiddleware}
-}
-
-func (d *VirtualEndpoint) configData() (conf VirtualEndpointConfig) {
-	if err := mapstructure.Decode(d.Spec.RawData, &conf); err != nil {
-		log.Error("Failed to parse configuration data: ", err)
-	}
-	return
+func (d *VirtualEndpoint) Init() {
+	d.sh = SuccessHandler{d.BaseMiddleware}
 }
 
 func (d *VirtualEndpoint) IsEnabledForSpec() bool {
-	if !config.EnableJSVM {
+	if !globalConf.EnableJSVM {
 		return false
 	}
 	for _, version := range d.Spec.VersionData.Versions {
@@ -111,7 +97,7 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 
 func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
 	_, versionPaths, _, _ := d.Spec.GetVersionData(r)
-	found, meta := d.Spec.CheckSpecMatchesStatus(r.URL.Path, r.Method, versionPaths, VirtualPath)
+	found, meta := d.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	if !found {
 		return nil
@@ -151,11 +137,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Encode the configuration data too
-	asJsonConfigData, err := json.Marshal(d.configData())
-	if err != nil {
-		log.Error("Failed to encode request object for virtual endpoint: ", err)
-		return nil
-	}
+	confData := jsonConfigData(d.Spec)
 
 	session := new(SessionState)
 	token := ctxGetAuthToken(r)
@@ -173,7 +155,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Run the middleware
 	vm := d.Spec.JSVM.VM.Copy()
-	returnRaw, _ := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + string(asJsonConfigData) + `);`)
+	returnRaw, _ := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
@@ -267,7 +249,7 @@ func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Respo
 	defer res.Body.Close()
 
 	// Close connections
-	if config.CloseConnections {
+	if globalConf.CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 

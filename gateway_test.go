@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,6 +20,8 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func init() {
@@ -130,44 +131,63 @@ func TestMain(m *testing.M) {
 	go func() {
 		panic(testServer.ListenAndServe())
 	}()
-	writeDefaultConf("", &config)
-	config.Storage.Database = 1
+	config.WriteDefault("", &globalConf)
+	globalConf.Storage.Database = 1
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
 	var err error
-	config.AppPath, err = ioutil.TempDir("", "tyk-test-")
+	globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	if err != nil {
 		panic(err)
 	}
-	config.EnableAnalytics = true
-	config.AnalyticsConfig.EnableGeoIP = true
-	config.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
-	config.EnableJSVM = true
-	config.Monitor.EnableTriggerMonitors = true
-	config.AnalyticsConfig.NormaliseUrls.Enabled = true
-	afterConfSetup(&config)
+	globalConf.EnableAnalytics = true
+	globalConf.AnalyticsConfig.EnableGeoIP = true
+	globalConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	globalConf.EnableJSVM = true
+	globalConf.Monitor.EnableTriggerMonitors = true
+	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+	afterConfSetup(&globalConf)
 	initialiseSystem(nil)
+	// Small part of start()
+	loadAPIEndpoints(mainRouter)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
 
 	go reloadLoop(reloadTick)
 
+	go func() {
+		// simulate reloads in the background, i.e. writes to
+		// global variables that should not be accessed in a
+		// racy way like the policies and api specs maps.
+		for {
+			policiesMu.Lock()
+			policiesByID["_"] = Policy{}
+			delete(policiesByID, "_")
+			policiesMu.Unlock()
+			apisMu.Lock()
+			apisByID["_"] = nil
+			delete(apisByID, "_")
+			apisMu.Unlock()
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
 	exitCode := m.Run()
 
-	os.RemoveAll(config.AppPath)
+	os.RemoveAll(globalConf.AppPath)
 	os.Exit(exitCode)
 }
 
 func emptyRedis() error {
-	addr := ":" + strconv.Itoa(config.Storage.Port)
+	addr := ":" + strconv.Itoa(globalConf.Storage.Port)
 	c, err := redis.Dial("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not connect to redis: %v", err)
 	}
 	defer c.Close()
-	dbName := strconv.Itoa(config.Storage.Database)
+	dbName := strconv.Itoa(globalConf.Storage.Database)
 	if _, err := c.Do("SELECT", dbName); err != nil {
 		return err
 	}
@@ -253,7 +273,7 @@ type tykErrorResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tm := TykMiddleware{apiSpec, p}
+		tm := BaseMiddleware{apiSpec, p}
 		handler := SuccessHandler{&tm}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
@@ -264,16 +284,16 @@ func getChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&MiddlewareContextVars{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AuthKey{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&VersionCheck{TykMiddleware: tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&KeyExpired{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&AccessRightsCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware),
-		CreateMiddleware(&TransformHeaders{tykMiddleware}, tykMiddleware)).Then(proxyHandler)
+		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
+		CreateMiddleware(&MiddlewareContextVars{BaseMiddleware: baseMid}),
+		CreateMiddleware(&AuthKey{baseMid}),
+		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		CreateMiddleware(&KeyExpired{baseMid}),
+		CreateMiddleware(&AccessRightsCheck{baseMid}),
+		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}),
+		CreateMiddleware(&TransformHeaders{baseMid})).Then(proxyHandler)
 
 	return chain
 }
@@ -503,16 +523,9 @@ const extendedPathGatewaySetup = `{
 	}
 }`
 
-func testName(t *testing.T) string {
-	// TODO(mvdan): replace with t.Name() once 1.9 is out and we
-	// drop support for 1.7.x (approx July 2017)
-	v := reflect.Indirect(reflect.ValueOf(t))
-	return v.FieldByName("name").String()
-}
-
 func createSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
-	tname := testName(t)
+	tname := t.Name()
 	redisStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apikey."}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: tname + "-orgKey."}
@@ -521,7 +534,7 @@ func createSpecTest(t *testing.T, def string) *APISpec {
 }
 
 func testKey(t *testing.T, name string) string {
-	return fmt.Sprintf("%s-%s", testName(t), name)
+	return fmt.Sprintf("%s-%s", t.Name(), name)
 }
 
 func testReqBody(t *testing.T, body interface{}) io.Reader {
@@ -793,24 +806,24 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			cln, _ = net.Listen("tcp", ":0")
 
 			_, port, _ := net.SplitHostPort(cln.Addr().String())
-			config.ControlAPIPort, _ = strconv.Atoi(port)
+			globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 		}
 
-		config.HttpServerOptions.OverrideDefaults = m.overrideDefaults
+		globalConf.HttpServerOptions.OverrideDefaults = m.overrideDefaults
 
 		// Ensure that no local API's installed
-		os.RemoveAll(config.AppPath)
+		os.RemoveAll(globalConf.AppPath)
 
 		var err error
-		config.AppPath, err = ioutil.TempDir("", "tyk-test-")
+		globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
 		if err != nil {
 			panic(err)
 		}
 
-		initialiseSystem(nil)
+		setupGlobals()
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
-		if config.ControlAPIPort == 0 {
+		if globalConf.ControlAPIPort == 0 {
 			loadAPIEndpoints(defaultRouter)
 		}
 
@@ -934,9 +947,9 @@ func TestControlListener(t *testing.T) {
 
 func TestManagementNodeRedisEvents(t *testing.T) {
 	defer func() {
-		config.ManagementNode = false
+		globalConf.ManagementNode = false
 	}()
-	config.ManagementNode = false
+	globalConf.ManagementNode = false
 	msg := redis.Message{
 		Data: []byte(`{"Command": "NoticeGatewayDRLNotification"}`),
 	}
@@ -946,7 +959,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		}
 	}
 	handleRedisEvent(msg, shouldHandle, nil)
-	config.ManagementNode = true
+	globalConf.ManagementNode = true
 	notHandle := func(got NotificationCommand) {
 		t.Fatalf("should have not handled redis event")
 	}

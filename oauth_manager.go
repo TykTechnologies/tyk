@@ -250,7 +250,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
 			keyName := o.API.OrgID + username
-			if config.HashKeys {
+			if globalConf.HashKeys {
 				// HASHING? FIX THE KEY
 				keyName = doHash(keyName)
 			}
@@ -426,13 +426,13 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 		Config:            config,
 		Storage:           storage,
 		AuthorizeTokenGen: &osin.AuthorizeTokenGenDefault{},
-		AccessTokenGen:    &AccessTokenGenTyk{},
+		AccessTokenGen:    AccessTokenGenTyk{},
 	}
 
 	overrideServer.Server.Config = config
 	overrideServer.Server.Storage = storage
 	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
-	overrideServer.Server.AccessTokenGen = &AccessTokenGenTyk{}
+	overrideServer.Server.AccessTokenGen = AccessTokenGenTyk{}
 
 	return &overrideServer
 }
@@ -499,7 +499,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	}
 
 	var clientJSON map[string]string
-	if !config.Storage.EnableCluster {
+	if !globalConf.Storage.EnableCluster {
 		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
 	} else {
 		keyForSet := prefixClientset + prefixClient // Org ID
@@ -620,8 +620,8 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
-	if config.OauthTokenExpire != 0 {
-		accessData.ExpiresIn = config.OauthTokenExpire
+	if globalConf.OauthTokenExpire != 0 {
+		accessData.ExpiresIn = globalConf.OauthTokenExpire
 	}
 
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
@@ -670,8 +670,8 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		key := prefixRefresh + accessData.RefreshToken
 		log.Debug("Saving REFRESH key: ", key)
 		refreshExpire := int64(1209600) // 14 days
-		if config.OauthRefreshExpire != 0 {
-			refreshExpire = config.OauthRefreshExpire
+		if globalConf.OauthRefreshExpire != 0 {
+			refreshExpire = globalConf.OauthRefreshExpire
 		}
 		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
 		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))
@@ -747,7 +747,7 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 type AccessTokenGenTyk struct{}
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
-func (a *AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
+func (AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
 	log.Info("[OAuth] Generating new token")
 
 	var newSession SessionState

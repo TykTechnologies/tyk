@@ -20,7 +20,7 @@ func setupDRL() {
 }
 
 func startRateLimitNotifications() {
-	notificationFreq := config.DRLNotificationFrequency
+	notificationFreq := globalConf.DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
 	}
@@ -41,7 +41,7 @@ func startRateLimitNotifications() {
 
 func getTagHash() string {
 	th := ""
-	for _, tag := range config.DBAppConfOptions.Tags {
+	for _, tag := range globalConf.DBAppConfOptions.Tags {
 		th += tag
 	}
 	return th

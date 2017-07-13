@@ -7,17 +7,19 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type ConfigPayload struct {
-	Configuration Config
+	Configuration config.Config
 	ForHostname   string
 	ForNodeID     string
 	TimeStamp     int64
 }
 
 func backupConfiguration() error {
-	oldConfig, err := json.MarshalIndent(config, "", "    ")
+	oldConfig, err := json.MarshalIndent(globalConf, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -39,9 +41,9 @@ func writeNewConfiguration(payload ConfigPayload) error {
 	return nil
 }
 
-func getExistingRawConfig() Config {
-	existingConfig := Config{}
-	loadConfig(confPaths, &existingConfig)
+func getExistingRawConfig() config.Config {
+	existingConfig := config.Config{}
+	config.Load(confPaths, &existingConfig)
 	return existingConfig
 }
 
@@ -69,7 +71,7 @@ func handleNewConfiguration(payload string) {
 		return
 	}
 
-	if config.AllowRemoteConfig {
+	if globalConf.AllowRemoteConfig {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Warning("Ignoring new config: Remote configuration is not allowed for this node.")

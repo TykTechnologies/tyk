@@ -6,8 +6,9 @@
 Tyk is a lightweight, open source API Gateway and Management Platform enables you to control who accesses your API, when they access it and how they access it. Tyk will
 also record detailed analytics on how your users are interacting with your API and when things go wrong.
 
-Go version 1.7 or later is required to build. Tyk is officially
-supported on `linux/amd64`, `linux/i386` and `linux/arm64`.
+Go version 1.8 or later is required to build `master`, the current
+development version. Tyk is officially supported on `linux/amd64`,
+`linux/i386` and `linux/arm64`.
 
 ## What is an API Gateway?
 
@@ -38,24 +39,24 @@ though it can be deployed without either (not recommended).
 
 ## Why?
 
-Tyk was built because other open source API Gateways in the market come with dependencies and bloat, attempting to be too many things to too many people. tyk is focused,
+Tyk was built because other open source API Gateways in the market come with dependencies and bloat, attempting to be too many things to too many people. Tyk is focused,
 simple and does one thing well - protecting your API from unauthorised access.
 
 ### Documentation
 
-All the documentation can be found on our main site at http://tyk.io/.
+All the documentation can be found at http://tyk.io/docs/.
 
 ### License
 
-Tyk is released under the MPL v2.0 please see the [license file](LICENSE.md) for a full version of the license.
+Tyk is released under the MPL v2.0; please see [LICENSE.md] for a full version of the license.
 
 ### Contributing
 
-For more information about contributing PRs and issues, see our [Contribution Guidelines](CONTRIBUTING.md).
+For more information about contributing PRs and issues, see [CONTRIBUTING.md].
 
 ### Roadmap
 
 To coordinate development and be completely transparent as to where the project is going, the version roadmap for the next version, as well as proposed features
 and adopted proposals can be viewed on our public [Trello board](https://trello.com/b/59d5kAZ5/tyk-api-gateway-roadmap).
 
-Any proposals can be made in the Github issue tracker, proposals that are adopted will be placed into the trello and then moved according to their status.
+Any proposals can be made in the Github issue tracker. Proposals that are adopted will be placed into trello and then moved according to their status.

@@ -47,7 +47,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	mw := &TykMiddleware{spec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 
 	meta := EventAuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
@@ -56,7 +56,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 		Key:              "abc",
 	}
 
-	mw.FireEvent(EventAuthFailure, meta)
+	baseMid.FireEvent(EventAuthFailure, meta)
 
 	wrapper := CoProcessEventWrapper{}
 	if err := json.Unmarshal(<-CoProcessDispatchEvent, &wrapper); err != nil {
@@ -134,8 +134,8 @@ func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.Hook
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	tykMiddleware := &TykMiddleware{spec, proxy}
-	mw := CreateCoProcessMiddleware(hookName, hookType, driver, tykMiddleware)
+	baseMid := &BaseMiddleware{spec, proxy}
+	mw := CreateCoProcessMiddleware(hookName, hookType, driver, baseMid)
 	return alice.New(mw).Then(proxyHandler)
 }
 

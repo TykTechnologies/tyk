@@ -19,7 +19,7 @@ import (
 )
 
 type JWTMiddleware struct {
-	*TykMiddleware
+	*BaseMiddleware
 }
 
 func (k *JWTMiddleware) GetName() string {
@@ -270,7 +270,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
 	// Fire Authfailed Event
-	AuthFailed(k.TykMiddleware, r, tykId)
+	AuthFailed(k.BaseMiddleware, r, tykId)
 
 	// Report in health check
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
@@ -305,10 +305,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	// Get the token
 	rawJWT := r.Header.Get(config.AuthHeaderName)
 	if config.UseParam {
-		tempRes := CopyHttpRequest(r)
-
 		// Set hte header name
-		rawJWT = tempRes.FormValue(config.AuthHeaderName)
+		rawJWT = r.URL.Query().Get(config.AuthHeaderName)
 	}
 
 	if config.UseCookie {
@@ -427,7 +425,9 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 }
 
 func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (SessionState, error) {
-	policy, ok := Policies[policyID]
+	policiesMu.RLock()
+	policy, ok := policiesByID[policyID]
+	policiesMu.RUnlock()
 	session := SessionState{}
 	if !ok {
 		return session, errors.New("Policy not found")

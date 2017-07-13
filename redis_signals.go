@@ -71,7 +71,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	case NoticeDashboardConfigRequest:
 		handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		if config.ManagementNode {
+		if globalConf.ManagementNode {
 			// DRL is not initialized, going through would
 			// be mostly harmless but would flood the log
 			// with warnings since DRLManager.Ready == false
@@ -107,7 +107,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if notification.Signature == "" && config.AllowInsecureConfigs {
+	if notification.Signature == "" && globalConf.AllowInsecureConfigs {
 		if !warnedOnce {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
@@ -117,10 +117,10 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if config.PublicKeyPath != "" {
+	if globalConf.PublicKeyPath != "" {
 		if notificationVerifier == nil {
 			var err error
-			notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.PublicKeyPath)
+			notificationVerifier, err = goverify.LoadPublicKeyFromFile(globalConf.PublicKeyPath)
 			if err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "pub-sub",
