@@ -184,7 +184,7 @@ func (r *RPCStorageHandler) Connect() bool {
 			return
 		}
 
-		conn.Write([]byte("register"))
+		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(RPCClientSingletonConnectionID))})
 		conn.Write([]byte(RPCClientSingletonConnectionID))
 		return conn, nil

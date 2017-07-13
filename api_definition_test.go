@@ -479,7 +479,7 @@ func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, 
 		return
 	}
 
-	handshake := make([]byte, 8)
+	handshake := make([]byte, 6)
 	if _, err = io.ReadFull(c, handshake); err != nil {
 		return
 	}
