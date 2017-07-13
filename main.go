@@ -972,7 +972,9 @@ func initialiseSystem(arguments map[string]interface{}) {
 
 	go reloadLoop()
 
-	go StartPeriodicStateBackup(&LE_MANAGER)
+    if globalConf.HttpServerOptions.UseLE_SSL {
+        go StartPeriodicStateBackup(&LE_MANAGER)
+    }
 }
 
 func getCmdArguments() map[string]interface{} {
