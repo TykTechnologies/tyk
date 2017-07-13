@@ -317,6 +317,8 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 
 	server := gorpc.NewTCPServer(":9090", dispatcher.NewHandlerFunc())
 	server.Listener = &customListener{}
+	server.LogError = gorpc.NilErrorLogger
+
 	globalConf.SlaveOptions.ConnectionString = server.Addr
 
 	go server.Serve()

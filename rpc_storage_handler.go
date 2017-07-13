@@ -159,7 +159,7 @@ func (r *RPCStorageHandler) Connect() bool {
 	}
 
 	if log.Level != logrus.DebugLevel {
-		gorpc.SetErrorLogger(gorpc.NilErrorLogger)
+		RPCCLientSingleton.LogError = gorpc.NilErrorLogger
 	}
 
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
