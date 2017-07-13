@@ -76,6 +76,9 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 
 func (h *HostUptimeChecker) HostCheckLoop() {
 	for !h.stopLoop {
+		if runningTests {
+			<-hostCheckTicker
+		}
 		h.resetListMu.Lock()
 		if h.doResetList {
 			if h.newList != nil {
@@ -93,9 +96,7 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 			}
 		}
 
-		if runningTests {
-			<-hostCheckTicker
-		} else {
+		if !runningTests {
 			time.Sleep(h.getStaggeredTime())
 		}
 	}
