@@ -28,7 +28,7 @@ type OrganizationMonitor struct {
 	mon            Monitor
 }
 
-func (k *OrganizationMonitor) GetName() string {
+func (k *OrganizationMonitor) Name() string {
 	return "OrganizationMonitor"
 }
 
@@ -53,7 +53,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		return nil, 200
 	}
 
-	session, found := k.GetOrgSession(k.Spec.OrgID)
+	session, found := k.OrgSession(k.Spec.OrgID)
 
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
@@ -64,7 +64,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	if session.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation access is disabled.")
 
@@ -85,7 +85,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 	case sessionFailQuota:
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation quota has been exceeded.")
 
@@ -93,7 +93,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.
 		k.FireEvent(EventOrgQuotaExceeded, EventQuotaExceededMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           GetIPFromRequest(r),
+			Origin:           requestIP(r),
 			Key:              k.Spec.OrgID,
 		})
 
@@ -153,7 +153,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *
 
 func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request) {
 
-	session, found := k.GetOrgSession(k.Spec.OrgID)
+	session, found := k.OrgSession(k.Spec.OrgID)
 
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
@@ -165,7 +165,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	if session.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation access is disabled.")
 
@@ -182,7 +182,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	if isQuotaExceeded {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    k.Spec.OrgID,
 		}).Warning("Organisation quota has been exceeded.")
 
@@ -190,7 +190,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 		k.FireEvent(EventOrgQuotaExceeded, EventQuotaExceededMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           GetIPFromRequest(r),
+			Origin:           requestIP(r),
 			Key:              k.Spec.OrgID,
 		})
 

@@ -30,7 +30,7 @@ type CoProcessMiddleware struct {
 	MiddlewareDriver apidef.MiddlewareDriver
 }
 
-func (mw *CoProcessMiddleware) GetName() string {
+func (mw *CoProcessMiddleware) Name() string {
 	return "CoProcessMiddleware"
 }
 
@@ -62,8 +62,8 @@ type CoProcessor struct {
 	Middleware *CoProcessMiddleware
 }
 
-// GetObjectFromRequest constructs a CoProcessObject from a given http.Request.
-func (c *CoProcessor) GetObjectFromRequest(r *http.Request) *coprocess.Object {
+// ObjectFromRequest constructs a CoProcessObject from a given http.Request.
+func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	var body string
 	if r.Body == nil {
 		body = ""
@@ -232,7 +232,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// HookType: coprocess.PreHook,
 	}
 
-	object := coProcessor.GetObjectFromRequest(r)
+	object := coProcessor.ObjectFromRequest(r)
 
 	returnObject, err := coProcessor.Dispatch(object)
 	if err != nil {
@@ -252,7 +252,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    token,
 		}).Info("Attempted access with invalid key.")
 

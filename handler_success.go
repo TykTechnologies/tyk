@@ -50,13 +50,13 @@ func (t *BaseMiddleware) Init() {}
 func (t *BaseMiddleware) IsEnabledForSpec() bool {
 	return true
 }
-func (t *BaseMiddleware) GetConfig() (interface{}, error) {
+func (t *BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
 }
 
-func (t *BaseMiddleware) GetOrgSession(key string) (SessionState, bool) {
+func (t *BaseMiddleware) OrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.GetSessionDetail(key)
+	session, found := t.Spec.OrgSessionManager.SessionDetail(key)
 	if found && globalConf.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -70,11 +70,11 @@ func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 	ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
-func (t *BaseMiddleware) GetOrgSessionExpiry(orgid string) int64 {
+func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	log.Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
-		go t.GetOrgSession(orgid)
+		go t.OrgSession(orgid)
 		log.Debug("no cached entry found, returning 7 days")
 		return 604800
 	}
@@ -169,7 +169,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (Session
 
 	// Check session store
 	log.Debug("Querying keystore")
-	session, found := t.Spec.SessionManager.GetSessionDetail(key)
+	session, found := t.Spec.SessionManager.SessionDetail(key)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it
@@ -214,7 +214,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		return
 	}
 
-	ip := GetIPFromRequest(r)
+	ip := requestIP(r)
 	if globalConf.StoreAnalytics(ip) {
 
 		t := time.Now()
@@ -293,7 +293,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if globalConf.EnforceOrgDataAge {
-			orgExpireDataTime := s.GetOrgSessionExpiry(s.Spec.OrgID)
+			orgExpireDataTime := s.OrgSessionExpiry(s.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime

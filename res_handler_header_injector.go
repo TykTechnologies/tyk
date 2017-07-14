@@ -30,7 +30,7 @@ func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
 	// TODO: This should only target specific paths
 
-	_, versionPaths, _, _ := h.Spec.GetVersionData(req)
+	_, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
 	if found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)

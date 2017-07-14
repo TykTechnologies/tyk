@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func GetIPFromRequest(r *http.Request) string {
+func requestIP(r *http.Request) string {
 	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
 		// X-Forwarded-For has no port
 		if i := strings.IndexByte(fw, ','); i >= 0 {

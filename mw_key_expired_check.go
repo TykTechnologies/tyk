@@ -12,7 +12,7 @@ type KeyExpired struct {
 	*BaseMiddleware
 }
 
-func (k *KeyExpired) GetName() string {
+func (k *KeyExpired) Name() string {
 	return "KeyExpired"
 }
 
@@ -27,7 +27,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	if session.IsInactive {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    token,
 		}).Info("Attempted access from inactive key.")
 
@@ -35,7 +35,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		k.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           GetIPFromRequest(r),
+			Origin:           requestIP(r),
 			Key:              token,
 		})
 
@@ -50,7 +50,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	if keyExpired {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    token,
 		}).Info("Attempted access from expired key.")
 
@@ -58,7 +58,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		k.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
 			Path:             r.URL.Path,
-			Origin:           GetIPFromRequest(r),
+			Origin:           requestIP(r),
 			Key:              token,
 		})
 

@@ -26,7 +26,7 @@ type HMACMiddleware struct {
 	lowercasePattern *regexp.Regexp
 }
 
-func (hm *HMACMiddleware) GetName() string {
+func (hm *HMACMiddleware) Name() string {
 	return "HMAC"
 }
 

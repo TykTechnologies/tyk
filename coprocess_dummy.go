@@ -35,7 +35,7 @@ type CoProcessMiddleware struct {
 	MiddlewareDriver apidef.MiddlewareDriver
 }
 
-func (m *CoProcessMiddleware) GetName() string {
+func (m *CoProcessMiddleware) Name() string {
 	return "CoProcessMiddlewareDummy"
 }
 

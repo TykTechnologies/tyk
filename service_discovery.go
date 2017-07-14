@@ -97,7 +97,7 @@ func (s *ServiceDiscovery) addPortFromObject(host string, obj *gabs.Container) s
 	return host + ":" + portToUse
 }
 
-func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
+func (s *ServiceDiscovery) NestedObject(item *gabs.Container) string {
 	parentData := s.decodeToNameSpace(s.parentPath, item)
 	// Get the data path from the decoded object
 	subContainer := gabs.Container{}
@@ -108,10 +108,10 @@ func (s *ServiceDiscovery) GetNestedObject(item *gabs.Container) string {
 		log.Debug("Get Nested Object: parentData is not a string")
 		return ""
 	}
-	return s.GetObject(&subContainer)
+	return s.Object(&subContainer)
 }
 
-func (s *ServiceDiscovery) GetObject(item *gabs.Container) string {
+func (s *ServiceDiscovery) Object(item *gabs.Container) string {
 	hostnameData := s.decodeToNameSpace(s.dataPath, item)
 	if str, ok := hostnameData.(string); ok {
 		// Get the port
@@ -122,13 +122,13 @@ func (s *ServiceDiscovery) GetObject(item *gabs.Container) string {
 	return ""
 }
 
-func (s *ServiceDiscovery) GetHostname(item *gabs.Container) string {
+func (s *ServiceDiscovery) Hostname(item *gabs.Container) string {
 	var hostname string
 	// Get a nested object
 	if s.isNested {
-		hostname = s.GetNestedObject(item)
+		hostname = s.NestedObject(item)
 	} else {
-		hostname = s.GetObject(item)
+		hostname = s.Object(item)
 	}
 	return hostname
 }
@@ -137,7 +137,7 @@ func (s *ServiceDiscovery) isList(val string) bool {
 	return strings.HasPrefix(val, "[")
 }
 
-func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []string {
+func (s *ServiceDiscovery) SubObjectFromList(objList *gabs.Container) []string {
 	hostList := []string{}
 	var hostname string
 	var set []*gabs.Container
@@ -168,7 +168,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 				// Hijack this here because we need to use a non-nested get
 				for _, item := range set {
 					log.Debug("Child in list: ", item)
-					hostname = s.GetObject(item) + s.targetPath
+					hostname = s.Object(item) + s.targetPath
 					// Add to list
 					hostList = append(hostList, hostname)
 				}
@@ -187,7 +187,7 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 	if set != nil {
 		for _, item := range set {
 			log.Debug("Child in list: ", item)
-			hostname = s.GetHostname(item) + s.targetPath
+			hostname = s.Hostname(item) + s.targetPath
 			// Add to list
 			hostList = append(hostList, hostname)
 		}
@@ -197,8 +197,8 @@ func (s *ServiceDiscovery) GetSubObjectFromList(objList *gabs.Container) []strin
 	return hostList
 }
 
-func (s *ServiceDiscovery) GetSubObject(obj *gabs.Container) string {
-	return s.GetHostname(obj) + s.targetPath
+func (s *ServiceDiscovery) SubObject(obj *gabs.Container) string {
+	return s.Hostname(obj) + s.targetPath
 }
 
 func (s *ServiceDiscovery) rawListToObj(rawData string) string {
@@ -234,14 +234,14 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, err
 		// Treat JSON as a list and then apply the data path
 		if s.isTargetList {
 			// Get all values
-			asList := s.GetSubObjectFromList(&jsonParsed)
+			asList := s.SubObjectFromList(&jsonParsed)
 			log.Debug("Host list:", asList)
 			hostlist.Set(asList)
 			return hostlist, nil
 		}
 
 		// Get the top value
-		list := s.GetSubObjectFromList(&jsonParsed)
+		list := s.SubObjectFromList(&jsonParsed)
 		var host string
 		for _, v := range list {
 			host = v
@@ -259,20 +259,20 @@ func (s *ServiceDiscovery) ProcessRawData(rawData string) (*apidef.HostList, err
 		log.Debug("It's a target list - getting sub object from list")
 		log.Debug("Passing in: ", jsonParsed)
 
-		asList := s.GetSubObjectFromList(&jsonParsed)
+		asList := s.SubObjectFromList(&jsonParsed)
 		hostlist.Set(asList)
 		log.Debug("Got from object: ", hostlist)
 		return hostlist, nil
 	}
 
 	// It's a single object
-	host := s.GetSubObject(&jsonParsed)
+	host := s.SubObject(&jsonParsed)
 	hostlist.Set([]string{host})
 
 	return hostlist, nil
 }
 
-func (s *ServiceDiscovery) GetTarget(serviceURL string) (*apidef.HostList, error) {
+func (s *ServiceDiscovery) Target(serviceURL string) (*apidef.HostList, error) {
 	// Get the data
 	rawData, err := s.getServiceData(serviceURL)
 	if err != nil {

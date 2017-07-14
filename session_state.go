@@ -81,7 +81,7 @@ func (s *SessionState) SetFirstSeenHash() {
 	s.firstSeenHash = fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
-func (s *SessionState) GetHash() string {
+func (s *SessionState) Hash() string {
 	encoded, err := msgpack.Marshal(s)
 	if err != nil {
 		log.Error("Error encoding session data: ", err)
@@ -95,10 +95,10 @@ func (s *SessionState) HasChanged() bool {
 	if s.firstSeenHash == "" {
 		return true
 	}
-	if s.firstSeenHash == s.GetHash() {
+	if s.firstSeenHash == s.Hash() {
 		return false
 	}
-	// log.Debug("s.firstSeenHash: ", s.firstSeenHash, " current hash: ", s.GetHash())
+	// log.Debug("s.firstSeenHash: ", s.firstSeenHash, " current hash: ", s.Hash())
 	return true
 }
 

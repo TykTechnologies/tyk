@@ -18,7 +18,7 @@ func (v *VersionCheck) Init() {
 	v.sh = SuccessHandler{v.BaseMiddleware}
 }
 
-func (v *VersionCheck) GetName() string {
+func (v *VersionCheck) Name() string {
 	return "VersionCheck"
 }
 
@@ -43,7 +43,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           GetIPFromRequest(r),
+			Origin:           requestIP(r),
 			Key:              "",
 			Reason:           string(stat),
 		})

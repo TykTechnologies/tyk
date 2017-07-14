@@ -13,7 +13,7 @@ type GranularAccessMiddleware struct {
 	*BaseMiddleware
 }
 
-func (m *GranularAccessMiddleware) GetName() string {
+func (m *GranularAccessMiddleware) Name() string {
 	return "GranularAccessMiddleware"
 }
 
@@ -56,7 +56,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	// No paths matched, disallow
 	log.WithFields(logrus.Fields{
 		"path":      r.URL.Path,
-		"origin":    GetIPFromRequest(r),
+		"origin":    requestIP(r),
 		"key":       token,
 		"api_found": false,
 	}).Info("Attempted access to unauthorised endpoint (Granular).")

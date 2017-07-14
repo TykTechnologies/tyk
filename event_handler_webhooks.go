@@ -167,7 +167,7 @@ func (w *WebHookHandler) checkURL(r string) bool {
 	return true
 }
 
-func (w *WebHookHandler) GetChecksum(reqBody string) (string, error) {
+func (w *WebHookHandler) Checksum(reqBody string) (string, error) {
 	// We do this twice because fuck it.
 	localRequest, _ := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
 	h := md5.New()
@@ -213,7 +213,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 
 	// Generate signature for request
-	reqChecksum, _ := w.GetChecksum(reqBody)
+	reqChecksum, _ := w.Checksum(reqBody)
 
 	// Check request velocity for this hook (wasHookFired())
 	if w.WasHookFired(reqChecksum) {

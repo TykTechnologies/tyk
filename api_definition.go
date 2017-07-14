@@ -172,7 +172,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
-			eventHandlerInstance, err := GetEventHandlerByName(handlerConf, spec)
+			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
@@ -984,7 +984,7 @@ func (a *APISpec) IsThisAPIVersionExpired(versionDef *apidef.VersionInfo) (bool,
 // data and return a RequestStatus that describes the status of the
 // request
 func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
-	versionMetaData, versionPaths, whiteListStatus, stat := a.GetVersionData(r)
+	versionMetaData, versionPaths, whiteListStatus, stat := a.Version(r)
 
 	// Screwed up version info - fail and pass through
 	if stat != StatusOk {
@@ -1025,9 +1025,9 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 
 }
 
-// GetVersionData attempts to extract the version data from a request, depending on where it is stored in the
+// Version attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
-func (a *APISpec) GetVersionData(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
+func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
 	var version apidef.VersionInfo
 	var versionRxPaths []URLSpec
 	var versionWLStatus bool
@@ -1104,7 +1104,7 @@ func (r *RoundRobin) SetMax(max int) {
 
 func (r *RoundRobin) SetLen(len int) { r.SetMax(len - 1) }
 
-func (r *RoundRobin) GetPos() int {
+func (r *RoundRobin) Pos() int {
 	cur := r.pos
 	if r.pos++; r.pos > r.max {
 		r.pos = 0

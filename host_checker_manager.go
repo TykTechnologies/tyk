@@ -379,14 +379,14 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 	}).Info("--- Queued tracking list update for API: ", apiId)
 }
 
-func (hc *HostCheckerManager) GetListFromService(apiID string) ([]HostData, error) {
+func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) {
 	spec := getApiSpec(apiID)
 	if spec == nil {
 		return nil, errors.New("API ID not found in register")
 	}
 	sd := ServiceDiscovery{}
 	sd.Init(&spec.UptimeTests.Config.ServiceDiscovery)
-	data, err := sd.GetTarget(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
+	data, err := sd.Target(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -423,7 +423,7 @@ func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("[HOST CHECKER MANAGER] Getting data from service")
-	hostData, err := hc.GetListFromService(apiID)
+	hostData, err := hc.ListFromService(apiID)
 	if err != nil {
 		return
 	}
@@ -512,7 +512,7 @@ func SetCheckerHostList() {
 	apisMu.RLock()
 	for _, spec := range apisByID {
 		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
-			hostList, err := GlobalHostChecker.GetListFromService(spec.APIID)
+			hostList, err := GlobalHostChecker.ListFromService(spec.APIID)
 			if err == nil {
 				hostList = append(hostList, hostList...)
 				for _, t := range hostList {

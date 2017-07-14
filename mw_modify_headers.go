@@ -17,7 +17,7 @@ const (
 	contextLabel = "$tyk_context."
 )
 
-func (t *TransformHeaders) GetName() string {
+func (t *TransformHeaders) Name() string {
 	return "TransformHeaders"
 }
 
@@ -74,7 +74,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	vInfo, versionPaths, _, _ := t.Spec.GetVersionData(r)
+	vInfo, versionPaths, _, _ := t.Spec.Version(r)
 
 	// Manage global headers first - remove
 	for _, gdKey := range vInfo.GlobalHeadersRemove {

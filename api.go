@@ -209,7 +209,7 @@ func GetKeyDetail(key, apiID string) (SessionState, bool) {
 		sessionManager = spec.SessionManager
 	}
 
-	return sessionManager.GetSessionDetail(key)
+	return sessionManager.SessionDetail(key)
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
@@ -287,7 +287,7 @@ func handleGetDetail(sessionKey, apiID string) (interface{}, int) {
 		sessionManager = spec.SessionManager
 	}
 
-	session, ok := sessionManager.GetSessionDetail(sessionKey)
+	session, ok := sessionManager.SessionDetail(sessionKey)
 	if !ok {
 		return apiError("Key not found"), 404
 	}
@@ -316,7 +316,7 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 		sessionManager = spec.SessionManager
 	}
 
-	sessions := sessionManager.GetSessions(filter)
+	sessions := sessionManager.Sessions(filter)
 
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
@@ -796,7 +796,7 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 		return apiError("Org not found"), 404
 	}
 
-	session, ok := spec.OrgSessionManager.GetSessionDetail(orgID)
+	session, ok := spec.OrgSessionManager.SessionDetail(orgID)
 	if !ok {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -820,7 +820,7 @@ func handleGetAllOrgKeys(filter string) (interface{}, int) {
 		return apiError("ORG not found"), 404
 	}
 
-	sessions := spec.OrgSessionManager.GetSessions(filter)
+	sessions := spec.OrgSessionManager.Sessions(filter)
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
 		if !strings.Contains(s, QuotaKeyPrefix) && !strings.Contains(s, RateLimitKeyPrefix) {
@@ -1322,7 +1322,7 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 		doJSONWrite(w, 404, apiError("API ID not found"))
 		return
 	}
-	health, _ := apiSpec.Health.GetApiHealthValues()
+	health, _ := apiSpec.Health.ApiHealthValues()
 	doJSONWrite(w, 200, health)
 }
 

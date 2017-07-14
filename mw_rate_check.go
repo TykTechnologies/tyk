@@ -6,7 +6,7 @@ type RateCheckMW struct {
 	*BaseMiddleware
 }
 
-func (m *RateCheckMW) GetName() string {
+func (m *RateCheckMW) Name() string {
 	return "RateCheckMW"
 }
 

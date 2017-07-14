@@ -80,7 +80,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	token := ctxGetAuthToken(r)
 	var alias string
 
-	ip := GetIPFromRequest(r)
+	ip := requestIP(r)
 	if globalConf.StoreAnalytics(ip) {
 
 		t := time.Now()
@@ -160,7 +160,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if globalConf.EnforceOrgDataAge {
-			orgExpireDataTime := e.GetOrgSessionExpiry(e.Spec.OrgID)
+			orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime

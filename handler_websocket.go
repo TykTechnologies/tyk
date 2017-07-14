@@ -60,7 +60,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		http.Error(ws.RW, "Error contacting backend server.", 500)
 		log.WithFields(logrus.Fields{
 			"path":   target,
-			"origin": GetIPFromRequest(req),
+			"origin": requestIP(req),
 		}).Error("Error dialing websocket backend", target, ": ", err)
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": GetIPFromRequest(req),
+			"origin": requestIP(req),
 		}).Errorf("Hijack error: %v", err)
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := req.Write(d); err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": GetIPFromRequest(req),
+			"origin": requestIP(req),
 		}).Errorf("Error copying request to target: %v", err)
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		err = cerr
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": GetIPFromRequest(req),
+			"origin": requestIP(req),
 		}).Errorf("Error transmitting request: %v", err)
 	}
 
