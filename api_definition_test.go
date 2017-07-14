@@ -434,7 +434,7 @@ func TestRoundRobin(t *testing.T) {
 	rr.SetMax(2)
 
 	for _, want := range []int{0, 1, 2, 0} {
-		if got := rr.GetPos(); got != want {
+		if got := rr.Pos(); got != want {
 			t.Errorf("RR Pos wrong: want %d got %d", want, got)
 		}
 	}

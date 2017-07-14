@@ -18,7 +18,7 @@ const (
 
 type HealthChecker interface {
 	Init(StorageHandler)
-	GetApiHealthValues() (HealthCheckValues, error)
+	ApiHealthValues() (HealthCheckValues, error)
 	StoreCounterVal(HealthPrefix, string)
 }
 
@@ -94,7 +94,7 @@ func roundValue(untruncated float64) float64 {
 	return float64(int(untruncated*100)) / 100
 }
 
-func (h *DefaultHealthChecker) GetApiHealthValues() (HealthCheckValues, error) {
+func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	values := HealthCheckValues{}
 
 	// Get the counted / average values

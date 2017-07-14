@@ -18,10 +18,10 @@ var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 type TykMiddleware interface {
 	Init()
 	Base() *BaseMiddleware
-	GetConfig() (interface{}, error)
+	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	IsEnabledForSpec() bool
-	GetName() string
+	Name() string
 }
 
 func CreateDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
@@ -45,7 +45,7 @@ func CreateMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	mw.Init()
 
 	// Pull the configuration
-	mwConf, err := mw.GetConfig()
+	mwConf, err := mw.Config()
 	if err != nil {
 		log.Fatal("[Middleware] Configuration load failed")
 	}
@@ -59,9 +59,9 @@ func CreateMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 				"endpoint": r.URL.Path,
 				"raw_url":  r.URL.String(),
 				"size":     strconv.Itoa(int(r.ContentLength)),
-				"mw_name":  mw.GetName(),
+				"mw_name":  mw.Name(),
 			}
-			eventName := mw.GetName() + "." + "executed"
+			eventName := mw.Name() + "." + "executed"
 			job.EventKv("executed", meta)
 			job.EventKv(eventName, meta)
 			startTime := time.Now()
@@ -124,7 +124,7 @@ type TykResponseHandler interface {
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *SessionState) error
 }
 
-func GetResponseProcessorByName(name string) (TykResponseHandler, error) {
+func ResponseProcessorByName(name string) (TykResponseHandler, error) {
 	switch name {
 	case "header_injector":
 		return &HeaderInjector{}, nil

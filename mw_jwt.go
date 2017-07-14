@@ -22,7 +22,7 @@ type JWTMiddleware struct {
 	*BaseMiddleware
 }
 
-func (k *JWTMiddleware) GetName() string {
+func (k *JWTMiddleware) Name() string {
 	return "JWTMiddleware"
 }
 
@@ -322,7 +322,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// No header value, fail
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 		}).Info("Attempted access with malformed header, no JWT auth header found.")
 
 		log.Debug("Looked in: ", config.AuthHeaderName)
@@ -390,13 +390,13 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
-		"origin": GetIPFromRequest(r),
+		"origin": requestIP(r),
 	}).Info("Attempted JWT access with non-existent key.")
 
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 		}).Error("JWT validation error: ", err)
 	}
 

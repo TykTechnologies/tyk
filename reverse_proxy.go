@@ -34,14 +34,14 @@ import (
 
 var ServiceCache *cache.Cache
 
-func GetURLFromService(spec *APISpec) (*apidef.HostList, error) {
+func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 
 	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
 		sd := ServiceDiscovery{}
 		sd.Init(&spec.Proxy.ServiceDiscovery)
-		data, err := sd.GetTarget(spec.Proxy.ServiceDiscovery.QueryEndpoint)
+		data, err := sd.Target(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
 			spec.ServiceRefreshInProgress = false
 			return nil, err
@@ -102,14 +102,14 @@ func EnsureTransport(host string) string {
 	return "http://" + host
 }
 
-func GetNextTarget(targetData *apidef.HostList, spec *APISpec) string {
+func nextTarget(targetData *apidef.HostList, spec *APISpec) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
 		// TODO: do better than a mutex to avoid contention
 		spec.RoundRobin.Lock()
 		spec.RoundRobin.SetLen(targetData.Len())
-		startPos := spec.RoundRobin.GetPos()
+		startPos := spec.RoundRobin.Pos()
 		spec.RoundRobin.Unlock()
 
 		pos := startPos
@@ -173,13 +173,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		switch {
 		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 			var err error
-			hostList, err = GetURLFromService(spec)
+			hostList, err = urlFromService(spec)
 			if err != nil {
 				log.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
-			lbRemote, err := url.Parse(GetNextTarget(hostList, spec))
+			lbRemote, err := url.Parse(nextTarget(hostList, spec))
 			if err != nil {
 				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
@@ -372,7 +372,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 		return false, 0
 	}
 
-	_, versionPaths, _, _ := spec.GetVersionData(req)
+	_, versionPaths, _, _ := spec.Version(req)
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HardTimeout)
 	if found {
 		intMeta := meta.(*int)
@@ -388,7 +388,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 		return false, nil
 	}
 
-	_, versionPaths, _, _ := spec.GetVersionData(req)
+	_, versionPaths, _, _ := spec.Version(req)
 	found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, CircuitBreaker)
 	if found {
 		exMeta := meta.(*ExtendedCircuitBreakerMeta)
@@ -399,7 +399,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	return false, nil
 }
 
-func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
+func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := TykDefaultTransport
 	transport.TLSClientConfig.InsecureSkipVerify = globalConf.ProxySSLInsecureSkipVerify
 
@@ -425,7 +425,7 @@ func GetTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Rev
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	// 1. Check if timeouts are set for this endpoint
 	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-	transport := GetTransport(timeout, rw, req, p)
+	transport := httpTransport(timeout, rw, req, p)
 
 	ctx := req.Context()
 	if cn, ok := rw.(http.CloseNotifier); ok {

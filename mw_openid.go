@@ -24,7 +24,7 @@ type OpenIDMW struct {
 	lock                      sync.RWMutex
 }
 
-func (k *OpenIDMW) GetName() string {
+func (k *OpenIDMW) Name() string {
 	return "OpenIDMW"
 }
 

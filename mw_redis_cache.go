@@ -26,7 +26,7 @@ type RedisCacheMiddleware struct {
 	sh         SuccessHandler
 }
 
-func (m *RedisCacheMiddleware) GetName() string {
+func (m *RedisCacheMiddleware) Name() string {
 	return "RedisCacheMiddleware"
 }
 
@@ -118,7 +118,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		stat = StatusCached
 	} else {
 		// New request checker, more targeted, less likely to fail
-		_, versionPaths, _, _ := m.Spec.GetVersionData(r)
+		_, versionPaths, _, _ := m.Spec.Version(r)
 		found, _ := m.Spec.CheckSpecMatchesStatus(r, versionPaths, Cached)
 		isVirtual, _ = m.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 		if found {
@@ -134,7 +134,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// No authentication data? use the IP.
 	if token == "" {
-		token = GetIPFromRequest(r)
+		token = requestIP(r)
 	}
 
 	var copiedRequest *http.Request

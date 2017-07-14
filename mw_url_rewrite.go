@@ -116,7 +116,7 @@ type URLRewriteMiddleware struct {
 	*BaseMiddleware
 }
 
-func (m *URLRewriteMiddleware) GetName() string {
+func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
@@ -141,7 +141,7 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := m.Spec.GetVersionData(r)
+	_, versionPaths, _, _ := m.Spec.Version(r)
 	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, URLRewrite)
 	if !found {
 		return nil, 200

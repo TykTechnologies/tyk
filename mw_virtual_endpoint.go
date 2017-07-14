@@ -38,7 +38,7 @@ type VirtualEndpoint struct {
 	sh SuccessHandler
 }
 
-func (d *VirtualEndpoint) GetName() string {
+func (d *VirtualEndpoint) Name() string {
 	return "VirtualEndpoint"
 }
 
@@ -96,7 +96,7 @@ func (d *VirtualEndpoint) IsEnabledForSpec() bool {
 }
 
 func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
-	_, versionPaths, _, _ := d.Spec.GetVersionData(r)
+	_, versionPaths, _, _ := d.Spec.Version(r)
 	found, meta := d.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
 
 	if !found {

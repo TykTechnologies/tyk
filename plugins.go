@@ -54,7 +54,7 @@ type DynamicMiddleware struct {
 	Auth                bool
 }
 
-func (d *DynamicMiddleware) GetName() string {
+func (d *DynamicMiddleware) Name() string {
 	return "DynamicMiddleware"
 }
 

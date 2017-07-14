@@ -27,8 +27,8 @@ type SessionHandler interface {
 	Init(store StorageHandler)
 	UpdateSession(keyName string, session *SessionState, resetTTLTo int64) error
 	RemoveSession(keyName string)
-	GetSessionDetail(keyName string) (SessionState, bool)
-	GetSessions(filter string) []string
+	SessionDetail(keyName string) (SessionState, bool)
+	Sessions(filter string) []string
 	GetStore() StorageHandler
 	ResetQuota(string, *SessionState)
 }
@@ -125,8 +125,8 @@ func (b *DefaultSessionManager) RemoveSession(keyName string) {
 	b.Store.DeleteKey(keyName)
 }
 
-// GetSessionDetail returns the session detail using the storage engine (either in memory or Redis)
-func (b *DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, bool) {
+// SessionDetail returns the session detail using the storage engine (either in memory or Redis)
+func (b *DefaultSessionManager) SessionDetail(keyName string) (SessionState, bool) {
 	jsonKeyVal, err := b.Store.GetKey(keyName)
 	var session SessionState
 	if err != nil {
@@ -148,8 +148,8 @@ func (b *DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, 
 	return session, true
 }
 
-// GetSessions returns all sessions in the key store that match a filter key (a prefix)
-func (b *DefaultSessionManager) GetSessions(filter string) []string {
+// Sessions returns all sessions in the key store that match a filter key (a prefix)
+func (b *DefaultSessionManager) Sessions(filter string) []string {
 	return b.Store.GetKeys(filter)
 }
 

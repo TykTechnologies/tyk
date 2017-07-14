@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGetIPFromRequest(t *testing.T) {
+func TestRequestIP(t *testing.T) {
 	tests := []struct {
 		remote, forwarded, want string
 	}{
@@ -24,9 +24,9 @@ func TestGetIPFromRequest(t *testing.T) {
 	for _, tc := range tests {
 		r := &http.Request{RemoteAddr: tc.remote, Header: http.Header{}}
 		r.Header.Set("x-forwarded-for", tc.forwarded)
-		got := GetIPFromRequest(r)
+		got := requestIP(r)
 		if got != tc.want {
-			t.Errorf("GetIPFromRequest({%q, %q}) got %q, want %q",
+			t.Errorf("requestIP({%q, %q}) got %q, want %q",
 				tc.remote, tc.forwarded, got, tc.want)
 		}
 	}

@@ -16,7 +16,7 @@ type RateLimitAndQuotaCheck struct {
 	*BaseMiddleware
 }
 
-func (k *RateLimitAndQuotaCheck) GetName() string {
+func (k *RateLimitAndQuotaCheck) Name() string {
 	return "RateLimitAndQuotaCheck"
 }
 
@@ -27,7 +27,7 @@ func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
 func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token string) (error, int) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
-		"origin": GetIPFromRequest(r),
+		"origin": requestIP(r),
 		"key":    token,
 	}).Info("Key rate limit exceeded.")
 
@@ -35,7 +35,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 	k.FireEvent(EventRateLimitExceeded, EventRateLimitExceededMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           GetIPFromRequest(r),
+		Origin:           requestIP(r),
 		Key:              token,
 	})
 
@@ -48,7 +48,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token string) (error, int) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
-		"origin": GetIPFromRequest(r),
+		"origin": requestIP(r),
 		"key":    token,
 	}).Info("Key quota limit exceeded.")
 
@@ -56,7 +56,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	k.FireEvent(EventQuotaExceeded, EventQuotaExceededMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           GetIPFromRequest(r),
+		Origin:           requestIP(r),
 		Key:              token,
 	})
 

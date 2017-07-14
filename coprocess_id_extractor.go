@@ -84,7 +84,7 @@ func (e *BaseExtractor) ExtractBody(r *http.Request) (bodyValue string, err erro
 func (e *BaseExtractor) Error(r *http.Request, err error, message string) (returnOverrides ReturnOverrides) {
 	log.WithFields(logrus.Fields{
 		"path":   r.URL.Path,
-		"origin": GetIPFromRequest(r),
+		"origin": requestIP(r),
 	}).Info("Extractor error: ", message, ", ", err)
 
 	return ReturnOverrides{

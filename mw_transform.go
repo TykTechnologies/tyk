@@ -24,7 +24,7 @@ type TransformMiddleware struct {
 	*BaseMiddleware
 }
 
-func (t *TransformMiddleware) GetName() string {
+func (t *TransformMiddleware) Name() string {
 	return "TransformMiddleware"
 }
 
@@ -39,7 +39,7 @@ func (t *TransformMiddleware) IsEnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := t.Spec.GetVersionData(r)
+	_, versionPaths, _, _ := t.Spec.Version(r)
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, Transformed)
 	if !found {
 		return nil, 200

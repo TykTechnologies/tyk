@@ -16,7 +16,7 @@ type AuthKey struct {
 	*BaseMiddleware
 }
 
-func (k *AuthKey) GetName() string {
+func (k *AuthKey) Name() string {
 	return "AuthKey"
 }
 
@@ -72,7 +72,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		// No header value, fail
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 		}).Info("Attempted access with malformed header, no auth header found.")
 
 		return errors.New("Authorization field missing"), 401
@@ -86,7 +86,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	if !keyExists {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"key":    key,
 		}).Info("Attempted access with non-existent key.")
 
@@ -120,7 +120,7 @@ func AuthFailed(m *BaseMiddleware, r *http.Request, token string) {
 	m.FireEvent(EventAuthFailure, EventAuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           GetIPFromRequest(r),
+		Origin:           requestIP(r),
 		Key:              token,
 	})
 }

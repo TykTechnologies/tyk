@@ -50,7 +50,7 @@ func TestNewInvlalid(t *testing.T) {
 	}
 }
 
-func TestGetChecksum(t *testing.T) {
+func TestChecksum(t *testing.T) {
 	rBody := `{
 		"event": "QuotaExceeded",
 		"message": "Key Quota Limit Exceeded",
@@ -61,7 +61,7 @@ func TestGetChecksum(t *testing.T) {
 	}`
 
 	hook := createGetHandler()
-	checksum, err := hook.GetChecksum(rBody)
+	checksum, err := hook.Checksum(rBody)
 
 	if err != nil {
 		t.Error("Checksum should not have failed with good objet and body")
@@ -135,7 +135,7 @@ func TestGet(t *testing.T) {
 	}
 	body, _ := eventHandler.CreateBody(eventMessage)
 
-	checksum, _ := eventHandler.GetChecksum(body)
+	checksum, _ := eventHandler.Checksum(body)
 	eventHandler.HandleEvent(eventMessage)
 
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
@@ -170,7 +170,7 @@ func TestPost(t *testing.T) {
 
 	body, _ := eventHandler.CreateBody(eventMessage)
 
-	checksum, _ := eventHandler.GetChecksum(body)
+	checksum, _ := eventHandler.Checksum(body)
 	eventHandler.HandleEvent(eventMessage)
 
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {

@@ -15,7 +15,7 @@ type RequestSizeLimitMiddleware struct {
 	*BaseMiddleware
 }
 
-func (t *RequestSizeLimitMiddleware) GetName() string {
+func (t *RequestSizeLimitMiddleware) Name() string {
 	return "RequestSizeLimitMiddleware"
 }
 
@@ -44,7 +44,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 	if int64(asInt) > sizeLimit {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"size":   statedCL,
 			"limit":  sizeLimit,
 		}).Info("Attempted access with large request size, blocked.")
@@ -57,7 +57,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 		// Request size is too big for globals
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
-			"origin": GetIPFromRequest(r),
+			"origin": requestIP(r),
 			"size":   r.ContentLength,
 			"limit":  sizeLimit,
 		}).Info("Attempted access with large request size, blocked.")
@@ -72,7 +72,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	log.Debug("Request size limiter active")
 
-	vInfo, versionPaths, _, _ := t.Spec.GetVersionData(r)
+	vInfo, versionPaths, _, _ := t.Spec.Version(r)
 
 	log.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
 	// Manage global headers first

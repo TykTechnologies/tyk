@@ -11,7 +11,7 @@ type IPWhiteListMiddleware struct {
 	*BaseMiddleware
 }
 
-func (i *IPWhiteListMiddleware) GetName() string {
+func (i *IPWhiteListMiddleware) Name() string {
 	return "IPWhiteListMiddleware"
 }
 
@@ -26,7 +26,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		return nil, 200
 	}
 
-	remoteIP := net.ParseIP(GetIPFromRequest(r))
+	remoteIP := net.ParseIP(requestIP(r))
 
 	// Enabled, check incoming IP address
 	for _, ip := range i.Spec.AllowedIPs {

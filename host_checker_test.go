@@ -133,7 +133,7 @@ func TestHostChecker(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		targetWG.Add(1)
 		go func() {
-			host := GetNextTarget(spec.Proxy.StructuredTargetList, spec)
+			host := nextTarget(spec.Proxy.StructuredTargetList, spec)
 			if host != testHttpAny {
 				t.Error("Should return only active host, got", host)
 			}

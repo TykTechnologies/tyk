@@ -11,7 +11,7 @@ type MiddlewareContextVars struct {
 	*BaseMiddleware
 }
 
-func (m *MiddlewareContextVars) GetName() string {
+func (m *MiddlewareContextVars) Name() string {
 	return "MiddlewareContextVars"
 }
 

@@ -13,7 +13,7 @@ type TransformMethod struct {
 	*BaseMiddleware
 }
 
-func (t *TransformMethod) GetName() string {
+func (t *TransformMethod) Name() string {
 	return "TransformMethod"
 }
 
@@ -28,7 +28,7 @@ func (t *TransformMethod) IsEnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	_, versionPaths, _, _ := t.Spec.GetVersionData(r)
+	_, versionPaths, _, _ := t.Spec.Version(r)
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, MethodTransformed)
 	if !found {
 		return nil, 200

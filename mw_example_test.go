@@ -20,15 +20,15 @@ type modifiedMiddlewareConfig struct {
 	CustomData string `mapstructure:"custom_data" json:"custom_data"`
 }
 
-func (m *modifiedMiddleware) GetName() string {
+func (m *modifiedMiddleware) Name() string {
 	return "modifiedMiddleware"
 }
 
 // Init lets you do any initialisations for the object can be done here
 func (m *modifiedMiddleware) Init() {}
 
-// GetConfig retrieves the configuration from the API config - we user mapstructure for this for simplicity
-func (m *modifiedMiddleware) GetConfig() (interface{}, error) {
+// Config retrieves the configuration from the API config - we user mapstructure for this for simplicity
+func (m *modifiedMiddleware) Config() (interface{}, error) {
 	var conf modifiedMiddlewareConfig
 
 	err := mapstructure.Decode(m.Spec.ConfigData, &conf)

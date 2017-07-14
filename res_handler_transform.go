@@ -35,7 +35,7 @@ func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 }
 
 func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
-	_, versionPaths, _, _ := h.Spec.GetVersionData(req)
+	_, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedResponse)
 	if !found {
 		return nil
