@@ -145,6 +145,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		values.Set(p, v)
 	}
 
+	r.URL.Path = object.Request.Url
 	r.URL.RawQuery = values.Encode()
 }
 
