@@ -80,6 +80,12 @@ type TemplateMeta struct {
 	Method string `bson:"method" json:"method"`
 }
 
+type TransformJQMeta struct {
+	Filter string `bson:"filter" json:"filter"`
+	Path   string `bson:"path" json:"path"`
+	Method string `bson:"method" json:"method"`
+}
+
 type HeaderInjectionMeta struct {
 	DeleteHeaders []string          `bson:"delete_headers" json:"delete_headers"`
 	AddHeaders    map[string]string `bson:"add_headers" json:"add_headers"`
@@ -142,6 +148,8 @@ type ExtendedPathsSet struct {
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`
 	TransformResponse       []TemplateMeta        `bson:"transform_response" json:"transform_response,omitempty"`
+	TransformJQ             []TransformJQMeta     `bson:"transform_jq" json:"transform_jq,omitempty"`
+	TransformJQResponse     []TransformJQMeta     `bson:"transform_jq_response" json:"transform_jq_response,omitempty"`
 	TransformHeader         []HeaderInjectionMeta `bson:"transform_headers" json:"transform_headers,omitempty"`
 	TransformResponseHeader []HeaderInjectionMeta `bson:"transform_response_headers" json:"transform_response_headers,omitempty"`
 	HardTimeouts            []HardTimeoutMeta     `bson:"hard_timeouts" json:"hard_timeouts,omitempty"`

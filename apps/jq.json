@@ -1,0 +1,39 @@
+{
+    "name": "JQ Transform test API",
+    "api_id": "4",
+    "org_id": "default",
+    "definition": {
+        "location": "",
+        "key": ""
+    },
+    "use_keyless": true,
+    "auth": {
+        "auth_header_name": ""
+    },
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "Default": {
+                "name": "Default",
+                "expires": "3000-01-02 15:04",
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "ignored": [],
+                    "white_list": ["/post/"],
+                    "black_list": [],
+                    "transform_jq": [{
+                        "path": "/post",
+                        "method": "POST",
+                        "filter": "{\"renamedkey\": .bla, \"newkey\": 42}"
+                    }]
+                }
+            }
+        }
+    },
+    "proxy": {
+        "listen_path": "/jq/",
+        "target_url": "http://httpbin.org/",
+        "strip_listen_path": true
+    },
+    "do_not_track": true
+}
