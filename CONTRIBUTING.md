@@ -8,7 +8,7 @@ However, for those individuals who want a bit more guidance on the best way to c
 
 If you have a question about Tyk or have a problem using it, please
 start with the GitHub search and our [community forum](https://community.tyk.io). If that doesn't answer your questions, or if you think you found a bug, please [file an
-issue](https://github.com/kubernetes/kubernetes/issues/new).
+issue](https://github.com/TykTechnologies/tyk/issues/new).
 
 ## How to become a contributor and submit your own code
 
