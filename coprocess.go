@@ -1,8 +1,8 @@
-// +build coprocess
-
 package main
 
 import (
+	"fmt"
+
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -20,6 +20,9 @@ var (
 
 	// GlobalDispatcher will be implemented by the current CoProcess driver.
 	GlobalDispatcher coprocess.Dispatcher
+
+	// Drivers will track the supported/loaded drivers.
+	Drivers = map[apidef.MiddlewareDriver]coprocess.Dispatcher{}
 )
 
 // CoProcessMiddleware is the basic CP middleware struct.
@@ -148,12 +151,18 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 	r.URL.RawQuery = values.Encode()
 }
 
-// CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
-func CoProcessInit() error {
-	var err error
-	if globalConf.CoProcessOptions.EnableCoProcess {
-		GlobalDispatcher, err = NewCoProcessDispatcher()
-		EnableCoProcess = true
+// CoProcessInit initializes the dispatchers from the available drivers.
+func CoProcessInit() (err error) {
+	if !globalConf.CoProcessOptions.EnableCoProcess {
+		Drivers = make(map[apidef.MiddlewareDriver]coprocess.Dispatcher)
+		return nil
+	}
+	for driverName, driver := range Drivers {
+		fmt.Println("*** Loading ", driverName, driver)
+		err := driver.Init()
+		if err != nil {
+			delete(Drivers, driverName)
+		}
 	}
 	return err
 }

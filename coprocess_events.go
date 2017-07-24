@@ -1,5 +1,3 @@
-// +build coprocess
-
 package main
 
 import (
