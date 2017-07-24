@@ -545,14 +545,14 @@ func TestGetOAuthClients(t *testing.T) {
 	var responseCode int
 
 	var tempSpecRegister = make(map[string]*APISpec)
-	ApiSpecRegister = &tempSpecRegister
+	ApiSpecRegister = tempSpecRegister
 
 	_, responseCode = getOauthClients(testAPIID)
 	if responseCode != 400 {
 		t.Fatal("Retrieving OAuth clients from nonexistent APIs must return error.")
 	}
 
-	(*ApiSpecRegister)[testAPIID] = &APISpec{}
+	ApiSpecRegister[testAPIID] = &APISpec{}
 
 	_, responseCode = getOauthClients(testAPIID)
 	if responseCode != 400 {

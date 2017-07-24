@@ -146,7 +146,7 @@ func processSpec(referenceSpec *APISpec,
 		}
 		if !pathModified {
 			apisMu.RLock()
-			prev := (*ApiSpecRegister)[referenceSpec.APIID]
+			prev := ApiSpecRegister[referenceSpec.APIID]
 			apisMu.RUnlock()
 			if prev != nil && prev.Proxy.ListenPath == referenceSpec.Proxy.ListenPath {
 				// if this APIID was already loaded and
@@ -681,7 +681,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 
 	// Swap in the new register
 	apisMu.Lock()
-	ApiSpecRegister = &tempSpecRegister
+	ApiSpecRegister = tempSpecRegister
 	apisMu.Unlock()
 
 	log.Debug("Checker host list")
