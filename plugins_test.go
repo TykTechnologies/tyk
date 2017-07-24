@@ -16,7 +16,7 @@ import (
 
 func TestJSVMLogs(t *testing.T) {
 	var buf bytes.Buffer
-	jsvm := &JSVM{}
+	jsvm := JSVM{}
 	jsvm.Init()
 	jsvm.Log = logrus.New()
 	jsvm.Log.Out = &buf
@@ -68,7 +68,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 		Pre:                 true,
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
-	jsvm := &JSVM{}
+	jsvm := JSVM{}
 	jsvm.Init()
 	jsvm.Timeout = time.Millisecond
 
@@ -116,7 +116,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
-	jsvm := &JSVM{}
+	jsvm := JSVM{}
 	jsvm.Init()
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
