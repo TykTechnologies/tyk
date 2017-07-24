@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
+	"sync/atomic"
 	textTemplate "text/template"
 	"time"
 
@@ -1086,27 +1086,14 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 }
 
 type RoundRobin struct {
-	sync.Mutex
-	pos, max int
+	pos uint32
 }
 
-func (r *RoundRobin) SetMax(max int) {
-	if r.max = max; r.max < 0 {
-		r.max = 0
+func (r *RoundRobin) WithLen(len int) int {
+	if len < 1 {
+		return 0
 	}
-
-	// Can't have a new list substituted that's shorter
-	if r.pos > r.max {
-		r.pos = 0
-	}
-}
-
-func (r *RoundRobin) SetLen(len int) { r.SetMax(len - 1) }
-
-func (r *RoundRobin) Pos() int {
-	cur := r.pos
-	if r.pos++; r.pos > r.max {
-		r.pos = 0
-	}
-	return cur
+	// -1 to start at 0, not 1
+	cur := atomic.AddUint32(&r.pos, 1) - 1
+	return int(cur) % len
 }

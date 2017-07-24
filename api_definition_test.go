@@ -428,12 +428,13 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 
 func TestRoundRobin(t *testing.T) {
 	rr := RoundRobin{}
-	rr.SetMax(2)
-
 	for _, want := range []int{0, 1, 2, 0} {
-		if got := rr.Pos(); got != want {
+		if got := rr.WithLen(3); got != want {
 			t.Errorf("RR Pos wrong: want %d got %d", want, got)
 		}
+	}
+	if got, want := rr.WithLen(0), 0; got != want {
+		t.Errorf("RR Pos of 0 wrong: want %d got %d", want, got)
 	}
 }
 

@@ -108,12 +108,7 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) string {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
-		// TODO: do better than a mutex to avoid contention
-		spec.RoundRobin.Lock()
-		spec.RoundRobin.SetLen(targetData.Len())
-		startPos := spec.RoundRobin.Pos()
-		spec.RoundRobin.Unlock()
-
+		startPos := spec.RoundRobin.WithLen(targetData.Len())
 		pos := startPos
 		for {
 			gotHost, err := targetData.GetIndex(pos)
