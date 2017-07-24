@@ -309,52 +309,52 @@
 			"revisionTime": "2016-01-27T17:00:04Z"
 		},
 		{
-			"checksumSHA1": "5qwv3yDROEz5ZV8HztOBmQxen8c=",
+			"checksumSHA1": "ZSYig6eYkc34ELHl6O5gRtJvr6o=",
 			"path": "github.com/robertkrimen/otto",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
-			"checksumSHA1": "qgziiO3/QDVJMKw2nGrUbC8QldY=",
+			"checksumSHA1": "q1HKpLIWi3tTT5W5LqMlwPcGmyQ=",
 			"path": "github.com/robertkrimen/otto/ast",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
 			"checksumSHA1": "L0KsB2EzTlPgv0iae3q3SukNW7U=",
 			"path": "github.com/robertkrimen/otto/dbg",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
 			"checksumSHA1": "euDLJKhw4doeTSxjEoezjxYXLzs=",
 			"path": "github.com/robertkrimen/otto/file",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
 			"checksumSHA1": "LLuLITFO8chqSG0+APJIy5NtOHU=",
 			"path": "github.com/robertkrimen/otto/parser",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
 			"checksumSHA1": "7J/7NaYRqKhBvZ+dTIutsEoEgFw=",
 			"path": "github.com/robertkrimen/otto/registry",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
 			"checksumSHA1": "/jMXYuXycBpTqWhRyJ2xsqvHvQI=",
 			"path": "github.com/robertkrimen/otto/token",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
 			"checksumSHA1": "PEC19eE84u8Fsg+NT+4x47h+7CQ=",
 			"path": "github.com/robertkrimen/otto/underscore",
-			"revision": "bf1c3795ba078da6905fe80bfbc3ed3d8c36e9aa",
-			"revisionTime": "2016-10-04T12:49:59Z"
+			"revision": "fc2eb1bbf1c5c462313c810bb02dc93cd964aebe",
+			"revisionTime": "2017-07-21T19:43:36Z"
 		},
 		{
 			"checksumSHA1": "LjPdvMphElL0GOVNQCsmZMVgWIw=",

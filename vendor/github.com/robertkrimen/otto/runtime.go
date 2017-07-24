@@ -302,7 +302,11 @@ func (self *_runtime) convertCallParameter(v Value, t reflect.Type) reflect.Valu
 	}
 
 	if t.Kind() == reflect.Interface {
-		iv := reflect.ValueOf(v.export())
+		e := v.export()
+		if e == nil {
+			return reflect.Zero(t)
+		}
+		iv := reflect.ValueOf(e)
 		if iv.Type().AssignableTo(t) {
 			return iv
 		}
