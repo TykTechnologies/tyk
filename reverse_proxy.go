@@ -609,11 +609,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// We should at least copy the status code in
 	inres.StatusCode = res.StatusCode
 	inres.ContentLength = res.ContentLength
-	p.HandleResponse(rw, res, req, ses)
+	p.HandleResponse(rw, res, ses)
 	return inres
 }
 
-func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
 
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.
