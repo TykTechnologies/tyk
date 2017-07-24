@@ -58,24 +58,14 @@ func DoJSONWrite(w http.ResponseWriter, code int, responseMessage []byte) {
 func GetSpecForApi(APIID string) *APISpec {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
-	if ApiSpecRegister == nil {
-		log.Error("No API Register present!")
-		return nil
-	}
-
-	spec, ok := (*ApiSpecRegister)[APIID]
-	if !ok {
-		return nil
-	}
-
-	return spec
+	return ApiSpecRegister[APIID]
 }
 
 func GetSpecForOrg(APIID string) *APISpec {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
 	var aKey string
-	for k, v := range *ApiSpecRegister {
+	for k, v := range ApiSpecRegister {
 		if v.OrgID == APIID {
 			return v
 		}
@@ -83,7 +73,7 @@ func GetSpecForOrg(APIID string) *APISpec {
 	}
 
 	// If we can't find a spec, it doesn;t matter, because we default to Redis anyway, grab whatever you can find
-	return (*ApiSpecRegister)[aKey]
+	return ApiSpecRegister[aKey]
 }
 
 func checkAndApplyTrialPeriod(keyName string, apiId string, newSession *SessionState) {
@@ -151,7 +141,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 			log.Warning("No API Access Rights set, adding key to ALL.")
 			apisMu.RLock()
 			defer apisMu.RUnlock()
-			for _, spec := range *ApiSpecRegister {
+			for _, spec := range ApiSpecRegister {
 				if !dontReset {
 					spec.SessionManager.ResetQuota(keyName, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
@@ -448,7 +438,7 @@ func handleDeleteKey(keyName string, apiID string) ([]byte, int) {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
 		defer apisMu.RUnlock()
-		for _, spec := range *ApiSpecRegister {
+		for _, spec := range ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 			spec.SessionManager.ResetQuota(keyName, SessionState{})
 		}
@@ -515,7 +505,7 @@ func handleDeleteHashedKey(keyName string, apiID string) ([]byte, int) {
 		// Go through ALL managed API's and delete the key
 		apisMu.RLock()
 		defer apisMu.RUnlock()
-		for _, spec := range *ApiSpecRegister {
+		for _, spec := range ApiSpecRegister {
 			spec.SessionManager.RemoveSession(keyName)
 		}
 
@@ -616,10 +606,10 @@ func HandleGetAPIList() ([]byte, int) {
 
 	apisMu.RLock()
 	defer apisMu.RUnlock()
-	thisAPIIDList := make([]*tykcommon.APIDefinition, len(*ApiSpecRegister))
+	thisAPIIDList := make([]*tykcommon.APIDefinition, len(ApiSpecRegister))
 
 	c := 0
-	for _, apiSpec := range *ApiSpecRegister {
+	for _, apiSpec := range ApiSpecRegister {
 		thisAPIIDList[c] = apiSpec.APIDefinition
 		thisAPIIDList[c].RawData = nil
 		c++
@@ -641,7 +631,7 @@ func HandleGetAPI(APIID string) ([]byte, int) {
 
 	apisMu.RLock()
 	defer apisMu.RUnlock()
-	for _, apiSpec := range *ApiSpecRegister {
+	for _, apiSpec := range ApiSpecRegister {
 		if apiSpec.APIDefinition.APIID == APIID {
 
 			responseMessage, err = json.Marshal(apiSpec.APIDefinition)
@@ -1370,7 +1360,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 					apisMu.RLock()
 					defer apisMu.RUnlock()
-					for _, spec := range *ApiSpecRegister {
+					for _, spec := range ApiSpecRegister {
 						checkAndApplyTrialPeriod(newKey, spec.APIID, &newSession)
 						if !spec.DontSetQuotasOnCreate {
 							// Reset quote by default

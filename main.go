@@ -57,7 +57,7 @@ var argumentsBackup map[string]interface{}
 var DashService DashboardServiceSender
 
 var apisMu sync.RWMutex
-var ApiSpecRegister *map[string]*APISpec //make(map[string]*APISpec)
+var ApiSpecRegister map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
 
 var mainRouter *mux.Router
