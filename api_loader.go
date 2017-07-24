@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -44,32 +45,32 @@ func prepareSortOrder(apiSpecs []*APISpec) {
 	sort.Sort(SortableAPISpecListByListen(apiSpecs))
 }
 
-func skipSpecBecauseInvalid(referenceSpec *APISpec) bool {
+func skipSpecBecauseInvalid(spec *APISpec) bool {
 
-	if referenceSpec.Proxy.ListenPath == "" {
+	if spec.Proxy.ListenPath == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.OrgID,
-			"api_id": referenceSpec.APIID,
-		}).Error("Listen path is empty, skipping API ID: ", referenceSpec.APIID)
+			"org_id": spec.OrgID,
+			"api_id": spec.APIID,
+		}).Error("Listen path is empty, skipping API ID: ", spec.APIID)
 		return true
 	}
 
-	if strings.Contains(referenceSpec.Proxy.ListenPath, " ") {
+	if strings.Contains(spec.Proxy.ListenPath, " ") {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.OrgID,
-			"api_id": referenceSpec.APIID,
-		}).Error("Listen path contains spaces, is invalid, skipping API ID: ", referenceSpec.APIID)
+			"org_id": spec.OrgID,
+			"api_id": spec.APIID,
+		}).Error("Listen path contains spaces, is invalid, skipping API ID: ", spec.APIID)
 		return true
 	}
 
-	_, err := url.Parse(referenceSpec.Proxy.TargetURL)
+	_, err := url.Parse(spec.Proxy.TargetURL)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.OrgID,
-			"api_id": referenceSpec.APIID,
+			"org_id": spec.OrgID,
+			"api_id": spec.APIID,
 		}).Error("Couldn't parse target URL: ", err)
 		return true
 	}
@@ -83,25 +84,25 @@ func generateDomainPath(hostname, listenPath string) string {
 
 func generateListenPathMap(apiSpecs []*APISpec) {
 	// We must track the hostname no matter what
-	for _, referenceSpec := range apiSpecs {
-		domainHash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
+	for _, spec := range apiSpecs {
+		domainHash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
 		count := apiCountByListenHash[domainHash]
 		apiCountByListenHash[domainHash]++
 		if count == 0 {
-			dN := referenceSpec.Domain
+			dN := spec.Domain
 			if dN == "" {
 				dN = "(no host)"
 			}
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 				"domain":   dN,
 			}).Info("Tracking hostname")
 		}
 	}
 }
 
-func processSpec(referenceSpec *APISpec,
+func processSpec(spec *APISpec,
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore StorageHandler,
 	subrouter *mux.Router) *ChainObject {
 
@@ -110,13 +111,13 @@ func processSpec(referenceSpec *APISpec,
 
 	log.WithFields(logrus.Fields{
 		"prefix":   "main",
-		"api_name": referenceSpec.Name,
+		"api_name": spec.Name,
 	}).Info("Loading API")
 
-	if skipSpecBecauseInvalid(referenceSpec) {
+	if skipSpecBecauseInvalid(spec) {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.Name,
+			"api_name": spec.Name,
 		}).Warning("Skipped!")
 		chainDef.Skip = true
 		return &chainDef
@@ -124,46 +125,46 @@ func processSpec(referenceSpec *APISpec,
 
 	pathModified := false
 	for {
-		hash := generateDomainPath(referenceSpec.Domain, referenceSpec.Proxy.ListenPath)
+		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
 		if apiCountByListenHash[hash] < 2 {
 			// not a duplicate
 			break
 		}
 		if !pathModified {
-			prev := getApiSpec(referenceSpec.APIID)
-			if prev != nil && prev.Proxy.ListenPath == referenceSpec.Proxy.ListenPath {
+			prev := getApiSpec(spec.APIID)
+			if prev != nil && prev.Proxy.ListenPath == spec.Proxy.ListenPath {
 				// if this APIID was already loaded and
 				// had this listen path, let it keep it.
 				break
 			}
-			referenceSpec.Proxy.ListenPath += "-" + referenceSpec.APIID
+			spec.Proxy.ListenPath += "-" + spec.APIID
 			pathModified = true
 		} else {
 			// keep adding '_' chars
-			referenceSpec.Proxy.ListenPath += "_"
+			spec.Proxy.ListenPath += "_"
 		}
 	}
 	if pathModified {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-			"org_id": referenceSpec.OrgID,
-			"api_id": referenceSpec.APIID,
-		}).Error("Listen path collision, changed to ", referenceSpec.Proxy.ListenPath)
+			"org_id": spec.OrgID,
+			"api_id": spec.APIID,
+		}).Error("Listen path collision, changed to ", spec.Proxy.ListenPath)
 	}
 
 	// Set up LB targets:
-	if referenceSpec.Proxy.EnableLoadBalancing {
-		sl := apidef.NewHostListFromList(referenceSpec.Proxy.Targets)
-		referenceSpec.Proxy.StructuredTargetList = sl
+	if spec.Proxy.EnableLoadBalancing {
+		sl := apidef.NewHostListFromList(spec.Proxy.Targets)
+		spec.Proxy.StructuredTargetList = sl
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
 	var authStore, sessionStore, orgStore StorageHandler
 
-	switch referenceSpec.AuthProvider.StorageEngine {
+	switch spec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
-		storageEngine.LoadConfFromMeta(referenceSpec.AuthProvider.Meta)
+		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
 		authStore = &storageEngine
 		orgStore = redisOrgStore
 	case RPCStorageEngine:
@@ -177,7 +178,7 @@ func processSpec(referenceSpec *APISpec,
 		orgStore = redisOrgStore
 	}
 
-	switch referenceSpec.SessionProvider.StorageEngine {
+	switch spec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
 		sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 	default:
@@ -185,7 +186,7 @@ func processSpec(referenceSpec *APISpec,
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
-	referenceSpec.Init(authStore, sessionStore, healthStore, orgStore)
+	spec.Init(authStore, sessionStore, healthStore, orgStore)
 
 	//Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
@@ -196,39 +197,39 @@ func processSpec(referenceSpec *APISpec,
 	var mwDriver apidef.MiddlewareDriver
 
 	if EnableCoProcess {
-		loadBundle(referenceSpec)
+		loadBundle(spec)
 	}
 
 	// TODO: use globalConf.EnableCoProcess
 	if globalConf.EnableJSVM || EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.Name,
+			"api_name": spec.Name,
 		}).Debug("Loading Middleware")
 
 		var mwPaths []string
-		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(referenceSpec)
+		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
 
 		if globalConf.EnableJSVM && mwDriver == apidef.OttoDriver {
 			var pathPrefix string
-			if referenceSpec.CustomMiddlewareBundle != "" {
-				pathPrefix = referenceSpec.APIID + "-" + referenceSpec.CustomMiddlewareBundle
+			if spec.CustomMiddlewareBundle != "" {
+				pathPrefix = spec.APIID + "-" + spec.CustomMiddlewareBundle
 			}
-			referenceSpec.JSVM.LoadJSPaths(mwPaths, pathPrefix)
+			spec.JSVM.LoadJSPaths(mwPaths, pathPrefix)
 		}
 	}
 
-	if referenceSpec.EnableBatchRequestSupport {
-		addBatchEndpoint(referenceSpec, subrouter)
+	if spec.EnableBatchRequestSupport {
+		addBatchEndpoint(spec, subrouter)
 	}
 
-	if referenceSpec.UseOauth2 {
+	if spec.UseOauth2 {
 		log.Debug("Loading OAuth Manager")
 		if !RPC_EmergencyMode {
-			oauthManager := addOAuthHandlers(referenceSpec, subrouter)
+			oauthManager := addOAuthHandlers(spec, subrouter)
 			log.Debug("-- Added OAuth Handlers")
 
-			referenceSpec.OAuthManager = oauthManager
+			spec.OAuthManager = oauthManager
 			log.Debug("Done loading OAuth Manager")
 		} else {
 			log.Warning("RPC Emergency mode detected! OAuth APIs will not function!")
@@ -236,7 +237,7 @@ func processSpec(referenceSpec *APISpec,
 	}
 
 	enableVersionOverrides := false
-	for _, versionData := range referenceSpec.VersionData.Versions {
+	for _, versionData := range spec.VersionData.Versions {
 		if versionData.OverrideTarget != "" {
 			enableVersionOverrides = true
 			break
@@ -244,46 +245,46 @@ func processSpec(referenceSpec *APISpec,
 	}
 
 	// Already vetted
-	remote, _ := url.Parse(referenceSpec.Proxy.TargetURL)
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
 
-	referenceSpec.target = remote
+	spec.target = remote
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.Name,
+			"api_name": spec.Name,
 		}).Info("Multi target enabled")
 		proxy = &MultiTargetProxy{}
 	} else {
-		proxy = TykNewSingleHostReverseProxy(remote, referenceSpec)
+		proxy = TykNewSingleHostReverseProxy(remote, spec)
 	}
 
 	// initialise the proxy
-	proxy.Init(referenceSpec)
+	proxy.Init(spec)
 
 	// Create the response processors
-	creeateResponseMiddlewareChain(referenceSpec)
+	creeateResponseMiddlewareChain(spec)
 
-	baseMid := &BaseMiddleware{referenceSpec, proxy}
+	baseMid := &BaseMiddleware{spec, proxy}
 	CheckCBEnabled(baseMid)
 	CheckETEnabled(baseMid)
 
-	keyPrefix := "cache-" + referenceSpec.APIID
+	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
 	cacheStore.Connect()
 
 	var chain http.Handler
 
-	if referenceSpec.UseKeylessAccess {
+	if spec.UseKeylessAccess {
 		chainDef.Open = true
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.Name,
+			"api_name": spec.Name,
 		}).Info("Checking security policy: Open")
 
 		// Add pre-process MW
 		chainArray := []alice.Constructor{}
-		handleCORS(&chainArray, referenceSpec)
+		handleCORS(&chainArray, spec)
 
 		baseChainArray := []alice.Constructor{}
 		AppendMiddleware(&baseChainArray, &RateCheckMW{BaseMiddleware: baseMid})
@@ -300,13 +301,13 @@ func processSpec(referenceSpec *APISpec,
 		AppendMiddleware(&baseChainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 		AppendMiddleware(&baseChainArray, &TransformMethod{BaseMiddleware: baseMid})
 
-		log.Debug(referenceSpec.Name, " - CHAIN SIZE: ", len(baseChainArray))
+		log.Debug(spec.Name, " - CHAIN SIZE: ", len(baseChainArray))
 
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.Name,
+					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
@@ -320,7 +321,7 @@ func processSpec(referenceSpec *APISpec,
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.Name,
+					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
@@ -335,7 +336,7 @@ func processSpec(referenceSpec *APISpec,
 
 		var chainArray []alice.Constructor
 
-		handleCORS(&chainArray, referenceSpec)
+		handleCORS(&chainArray, spec)
 
 		var baseChainArray_PreAuth []alice.Constructor
 		AppendMiddleware(&baseChainArray_PreAuth, &RateCheckMW{BaseMiddleware: baseMid})
@@ -351,7 +352,7 @@ func processSpec(referenceSpec *APISpec,
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.Name,
+					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
@@ -363,55 +364,55 @@ func processSpec(referenceSpec *APISpec,
 
 		// Select the keying method to use for setting session states
 		var authArray []alice.Constructor
-		if referenceSpec.UseOauth2 {
+		if spec.UseOauth2 {
 			// Oauth2
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Info("Checking security policy: OAuth")
 			authArray = append(authArray, CreateMiddleware(&Oauth2KeyExists{baseMid}))
 
 		}
 
-		useCoProcessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && referenceSpec.EnableCoProcessAuth
+		useCoProcessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
 
 		useOttoAuth := false
 		if !useCoProcessAuth {
-			useOttoAuth = mwDriver == apidef.OttoDriver && referenceSpec.EnableCoProcessAuth
+			useOttoAuth = mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 		}
 
-		if referenceSpec.UseBasicAuth {
+		if spec.UseBasicAuth {
 			// Basic Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Info("Checking security policy: Basic")
 			authArray = append(authArray, CreateMiddleware(&BasicAuthKeyIsValid{baseMid}))
 		}
 
-		if referenceSpec.EnableSignatureChecking {
+		if spec.EnableSignatureChecking {
 			// HMAC Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Info("Checking security policy: HMAC")
 			authArray = append(authArray, CreateMiddleware(&HMACMiddleware{BaseMiddleware: baseMid}))
 		}
 
-		if referenceSpec.EnableJWT {
+		if spec.EnableJWT {
 			// JWT Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Info("Checking security policy: JWT")
 			authArray = append(authArray, CreateMiddleware(&JWTMiddleware{baseMid}))
 		}
 
-		if referenceSpec.UseOpenID {
+		if spec.UseOpenID {
 			// JWT Auth
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Info("Checking security policy: OpenID")
 
 			// initialise the OID configuration on this reference Spec
@@ -422,16 +423,16 @@ func processSpec(referenceSpec *APISpec,
 			// TODO: check if mwAuthCheckFunc is available/valid
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Info("Checking security policy: CoProcess Plugin")
 
 			log.WithFields(logrus.Fields{
 				"prefix":   "coprocess",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 			if useCoProcessAuth {
-				newExtractor(referenceSpec, baseMid)
+				newExtractor(spec, baseMid)
 				AppendMiddleware(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
 			}
 		}
@@ -444,11 +445,11 @@ func processSpec(referenceSpec *APISpec,
 			authArray = append(authArray, CreateDynamicAuthMiddleware(mwAuthCheckFunc.Name, baseMid))
 		}
 
-		if referenceSpec.UseStandardAuth || (!referenceSpec.UseOpenID && !referenceSpec.EnableJWT && !referenceSpec.EnableSignatureChecking && !referenceSpec.UseBasicAuth && !referenceSpec.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
+		if spec.UseStandardAuth || (!spec.UseOpenID && !spec.EnableJWT && !spec.EnableSignatureChecking && !spec.UseBasicAuth && !spec.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
 			// Auth key
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Info("Checking security policy: Token")
 			authArray = append(authArray, CreateMiddleware(&AuthKey{baseMid}))
 		}
@@ -458,7 +459,7 @@ func processSpec(referenceSpec *APISpec,
 		for _, obj := range mwPostAuthCheckFuncs {
 			log.WithFields(logrus.Fields{
 				"prefix":   "coprocess",
-				"api_name": referenceSpec.Name,
+				"api_name": spec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
 		}
@@ -481,7 +482,7 @@ func processSpec(referenceSpec *APISpec,
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
-					"api_name": referenceSpec.Name,
+					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
@@ -491,7 +492,7 @@ func processSpec(referenceSpec *APISpec,
 
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.Name,
+			"api_name": spec.Name,
 		}).Debug("Custom middleware completed processing")
 
 		// Use CreateMiddleware(&ModifiedMiddleware{baseMid})  to run custom middleware
@@ -516,10 +517,10 @@ func processSpec(referenceSpec *APISpec,
 
 		simpleChain := alice.New(fullSimpleChain...).Then(userCheckHandler)
 
-		rateLimitPath := referenceSpec.Proxy.ListenPath + "tyk/rate-limits/"
+		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
-			"api_name": referenceSpec.Name,
+			"api_name": spec.Name,
 		}).Debug("Rate limit endpoint is: ", rateLimitPath)
 		//subrouter.Handle(rateLimitPath, simpleChain)
 		chainDef.RateLimitPath = rateLimitPath
@@ -528,14 +529,23 @@ func processSpec(referenceSpec *APISpec,
 
 	log.WithFields(logrus.Fields{
 		"prefix":   "main",
-		"api_name": referenceSpec.Name,
-	}).Debug("Setting Listen Path: ", referenceSpec.Proxy.ListenPath)
-	//subrouter.Handle(referenceSpec.Proxy.ListenPath+"{rest:.*}", chain)
+		"api_name": spec.Name,
+	}).Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
+	//subrouter.Handle(spec.Proxy.ListenPath+"{rest:.*}", chain)
 
 	chainDef.ThisHandler = chain
-	chainDef.ListenOn = referenceSpec.Proxy.ListenPath + "{rest:.*}"
+	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
 
-	notifyAPILoaded(referenceSpec)
+	if globalConf.UseRedisLog {
+		log.WithFields(logrus.Fields{
+			"prefix":      "gateway",
+			"user_ip":     "--",
+			"server_name": "--",
+			"user_id":     "--",
+			"org_id":      spec.OrgID,
+			"api_id":      spec.APIID,
+		}).Info("Loaded: ", spec.Name)
+	}
 
 	return &chainDef
 }
@@ -575,25 +585,25 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 	// Create a new handler for each API spec
 	loadList := make([]*ChainObject, len(apiSpecs))
 	generateListenPathMap(apiSpecs)
-	for i, referenceSpec := range apiSpecs {
-		go func(referenceSpec *APISpec, i int) {
+	for i, spec := range apiSpecs {
+		go func(spec *APISpec, i int) {
 			subrouter := muxer
 			// Handle custom domains
-			if globalConf.EnableCustomDomains && referenceSpec.Domain != "" {
+			if globalConf.EnableCustomDomains && spec.Domain != "" {
 				log.WithFields(logrus.Fields{
 					"prefix":   "main",
-					"api_name": referenceSpec.Name,
-					"domain":   referenceSpec.Domain,
+					"api_name": spec.Name,
+					"domain":   spec.Domain,
 				}).Info("Custom Domain set.")
-				subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
+				subrouter = mainRouter.Host(spec.Domain).Subrouter()
 			}
-			chainObj := processSpec(referenceSpec, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
+			chainObj := processSpec(spec, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
-		}(referenceSpec, i)
+		}(spec, i)
 
 		// TODO: This will not deal with skipped APis well
-		tmpSpecRegister[referenceSpec.APIID] = referenceSpec
+		tmpSpecRegister[spec.APIID] = spec
 	}
 
 	for range apiSpecs {
@@ -616,7 +626,9 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 
 	// All APIs processed, now we can healthcheck
 	// Add a root message to check all is OK
-	muxer.HandleFunc("/hello", pingTest)
+	muxer.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello Tiki")
+	})
 
 	// Swap in the new register
 	apisMu.Lock()

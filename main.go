@@ -107,10 +107,6 @@ func displayConfig() {
 	}).Info("--> PID: ", HostDetails.PID)
 }
 
-func pingTest(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello Tiki")
-}
-
 // Create all globals and init connection handlers
 func setupGlobals() {
 	mainRouter = mux.NewRouter()
@@ -408,7 +404,7 @@ func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
 	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
-func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
+func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, []apidef.MiddlewareDefinition, apidef.MiddlewareDriver) {
 	mwPaths := []string{}
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
 	mwPreFuncs := []apidef.MiddlewareDefinition{}
@@ -417,23 +413,23 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	mwDriver := apidef.OttoDriver
 
 	// Set AuthCheck hook
-	if referenceSpec.CustomMiddleware.AuthCheck.Name != "" {
-		mwAuthCheckFunc = referenceSpec.CustomMiddleware.AuthCheck
-		if referenceSpec.CustomMiddleware.AuthCheck.Path != "" {
+	if spec.CustomMiddleware.AuthCheck.Name != "" {
+		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
+		if spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
-			mwPaths = append(mwPaths, referenceSpec.CustomMiddleware.AuthCheck.Path)
+			mwPaths = append(mwPaths, spec.CustomMiddleware.AuthCheck.Path)
 		}
 	}
 
 	// Load from the configuration
-	for _, mwObj := range referenceSpec.CustomMiddleware.Pre {
+	for _, mwObj := range spec.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
-	for _, mwObj := range referenceSpec.CustomMiddleware.Post {
+	for _, mwObj := range spec.CustomMiddleware.Post {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		log.WithFields(logrus.Fields{
@@ -453,7 +449,7 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 		{name: "post_auth", slice: &mwPostKeyAuthFuncs, session: true},
 		{name: "post", slice: &mwPostFuncs, session: true},
 	} {
-		dirPath := filepath.Join(globalConf.MiddlewarePath, referenceSpec.APIID, folder.name)
+		dirPath := filepath.Join(globalConf.MiddlewarePath, spec.APIID, folder.name)
 		files, _ := ioutil.ReadDir(dirPath)
 		for _, f := range files {
 			if strings.Contains(f.Name(), ".js") {
@@ -486,12 +482,12 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	}
 
 	// Set middleware driver, defaults to OttoDriver
-	if referenceSpec.CustomMiddleware.Driver != "" {
-		mwDriver = referenceSpec.CustomMiddleware.Driver
+	if spec.CustomMiddleware.Driver != "" {
+		mwDriver = spec.CustomMiddleware.Driver
 	}
 
 	// Load PostAuthCheck hooks
-	for _, mwObj := range referenceSpec.CustomMiddleware.PostKeyAuth {
+	for _, mwObj := range spec.CustomMiddleware.PostKeyAuth {
 		if mwObj.Path != "" {
 			// Otto files are specified here
 			mwPaths = append(mwPaths, mwObj.Path)
@@ -502,11 +498,11 @@ func loadCustomMiddleware(referenceSpec *APISpec) ([]string, apidef.MiddlewareDe
 	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwDriver
 }
 
-func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
+func creeateResponseMiddlewareChain(spec *APISpec) {
 	// Create the response processors
 
-	responseChain := make([]TykResponseHandler, len(referenceSpec.ResponseProcessors))
-	for i, processorDetail := range referenceSpec.ResponseProcessors {
+	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
+	for i, processorDetail := range spec.ResponseProcessors {
 		processor, err := ResponseProcessorByName(processorDetail.Name)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -514,15 +510,15 @@ func creeateResponseMiddlewareChain(referenceSpec *APISpec) {
 			}).Error("Failed to load processor! ", err)
 			return
 		}
-		_ = processor.Init(processorDetail.Options, referenceSpec)
+		_ = processor.Init(processorDetail.Options, spec)
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = processor
 	}
-	referenceSpec.ResponseChain = responseChain
+	spec.ResponseChain = responseChain
 	if len(responseChain) > 0 {
-		referenceSpec.ResponseHandlersActive = true
+		spec.ResponseHandlersActive = true
 	}
 }
 
@@ -574,20 +570,6 @@ func (s SortableAPISpecListByHost) Swap(i, j int) {
 }
 func (s SortableAPISpecListByHost) Less(i, j int) bool {
 	return len(s[i].Domain) > len(s[j].Domain)
-}
-
-func notifyAPILoaded(spec *APISpec) {
-	if globalConf.UseRedisLog {
-		log.WithFields(logrus.Fields{
-			"prefix":      "gateway",
-			"user_ip":     "--",
-			"server_name": "--",
-			"user_id":     "--",
-			"org_id":      spec.OrgID,
-			"api_id":      spec.APIID,
-		}).Info("Loaded: ", spec.Name)
-	}
-
 }
 
 func rpcReloadLoop(rpcKey string) {
@@ -978,14 +960,9 @@ func onFork() {
 	amForked = true
 }
 
-func generateRandomNodeID() string {
-	u := uuid.NewV4()
-	return "solo-" + u.String()
-}
-
 func main() {
 	arguments := getCmdArguments()
-	NodeID = generateRandomNodeID()
+	NodeID = "solo-" + uuid.NewV4().String()
 	l, goAgainErr := goagain.Listener(onFork)
 	controlListener, goAgainErr := goagain.Listener(onFork)
 
