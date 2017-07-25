@@ -306,7 +306,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		hostname = globalConf.ControlAPIHostname
 	}
 	r := mux.NewRouter()
-	muxer.PathPrefix("/tyk").Handler(http.StripPrefix("/tyk",
+	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		checkIsAPIOwner(InstrumentationMW(r)),
 	))
 	if hostname != "" {
