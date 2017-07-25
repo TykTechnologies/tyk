@@ -807,6 +807,8 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 
 			_, port, _ := net.SplitHostPort(cln.Addr().String())
 			globalConf.ControlAPIPort, _ = strconv.Atoi(port)
+		} else {
+			globalConf.ControlAPIPort = 0
 		}
 
 		globalConf.HttpServerOptions.OverrideDefaults = m.overrideDefaults
@@ -903,24 +905,24 @@ const sampleAPI = `{
 		}
 	},
 	"proxy": {
-		"listen_path": "/",
-		"target_url": "http://127.0.0.1:16500"
+		"listen_path": "/sample",
+		"target_url": "` + testHttpAny + `"
 	},
 	"active": true
 }`
 
 func TestListener(t *testing.T) {
 	tests := []tykHttpTest{
-		{method: "GET", path: "/", code: 404},
+		{method: "GET", path: "/sample", code: 404},
 		{method: "GET", path: "/tyk/apis/", code: 403},
 		{method: "GET", path: "/tyk/apis/", adminAuth: true, code: 200},
 		{method: "GET", path: "/tyk/apis", code: 403},
 		{method: "GET", path: "/tyk/apis", adminAuth: true, code: 200},
 		{method: "POST", path: "/tyk/apis", body: sampleAPI, adminAuth: true, code: 200},
 		// API definitions not reloaded yet
-		{method: "GET", path: "/", code: 404},
+		{method: "GET", path: "/sample", code: 404},
 		{method: "GET", path: "/tyk/reload/", adminAuth: true, code: 200, afterFn: func() { doReload() }},
-		{method: "GET", path: "/", code: 200},
+		{method: "GET", path: "/sample", code: 200},
 	}
 
 	testHttp(t, tests, false)
@@ -964,4 +966,28 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		t.Fatalf("should have not handled redis event")
 	}
 	handleRedisEvent(msg, notHandle, nil)
+}
+
+const apiWithTykListenPathPrefix = `{
+	"api_id": "test",
+	"use_keyless": true,
+	"version_data": {
+		"not_versioned": true,
+		"versions": {"Default": {"name": "Default"}}
+	},
+	"proxy": {
+		"listen_path": "/tyk-foo/",
+		"target_url": "` + testHttpAny + `"
+	},
+	"active": true
+}`
+
+func TestListenPathTykPrefix(t *testing.T) {
+	tests := []tykHttpTest{
+		{method: "POST", path: "/tyk/apis", body: apiWithTykListenPathPrefix, adminAuth: true, code: 200},
+		{method: "GET", path: "/tyk-foo/", code: 404},
+		{method: "GET", path: "/tyk/reload/", adminAuth: true, code: 200, afterFn: func() { doReload() }},
+		{method: "GET", path: "/tyk-foo/", code: 200},
+	}
+	testHttp(t, tests, false)
 }
