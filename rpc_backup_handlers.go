@@ -94,6 +94,7 @@ func doLoadWithBackup(specs *[]*APISpec) {
 
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
+	defaultRouter = mainRouter
 
 	log.Warning("[RPC Backup] --> Set up routers")
 	log.Warning("[RPC Backup] --> Loading endpoints")
