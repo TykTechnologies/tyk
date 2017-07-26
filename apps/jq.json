@@ -19,12 +19,17 @@
                 "use_extended_paths": true,
                 "extended_paths": {
                     "ignored": [],
-                    "white_list": ["/post/"],
+                    "white_list": [],
                     "black_list": [],
                     "transform_jq": [{
                         "path": "/post",
                         "method": "POST",
                         "filter": "{\"renamedkey\": .bla, \"newkey\": 42}"
+                    }],
+                    "transform_jq_response": [{
+                        "path": "/post",
+                        "method": "POST",
+                        "filter": ". + {\"modified_response\": true}"
                     }]
                 }
             }
@@ -35,5 +40,12 @@
         "target_url": "http://httpbin.org/",
         "strip_listen_path": true
     },
-    "do_not_track": true
+    "do_not_track": true,
+
+    "response_processors": [
+        {
+            "name": "response_body_transform_jq",
+            "options": {}
+        }
+    ]
 }
