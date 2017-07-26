@@ -90,23 +90,6 @@ func getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
-// Display configuration options
-func displayConfig() {
-	address := globalConf.ListenAddress
-	if globalConf.ListenAddress == "" {
-		address = "(open interface)"
-	}
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("--> Listening on address: ", address)
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("--> Listening on port: ", globalConf.ListenPort)
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("--> PID: ", HostDetails.PID)
-}
-
 // Create all globals and init connection handlers
 func setupGlobals() {
 	mainRouter = mux.NewRouter()
@@ -1272,8 +1255,6 @@ func listen(l, controlListener net.Listener, err error) {
 				}
 				go cs.Serve(controlListener)
 			}
-
-			displayConfig()
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1290,8 +1271,6 @@ func listen(l, controlListener net.Listener, err error) {
 					go http.Serve(controlListener, controlRouter)
 				}
 			}
-
-			displayConfig()
 		}
 	} else {
 		// handle dashboard registration and nonces if available
@@ -1357,8 +1336,6 @@ func listen(l, controlListener net.Listener, err error) {
 				}
 				go cs.Serve(controlListener)
 			}
-
-			displayConfig()
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1375,13 +1352,23 @@ func listen(l, controlListener net.Listener, err error) {
 					go http.Serve(controlListener, controlRouter)
 				}
 			}
-
-			displayConfig()
 		}
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Resuming on", l.Addr())
-
 	}
+	address := globalConf.ListenAddress
+	if globalConf.ListenAddress == "" {
+		address = "(open interface)"
+	}
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("--> Listening on address: ", address)
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("--> Listening on port: ", globalConf.ListenPort)
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("--> PID: ", HostDetails.PID)
 }
