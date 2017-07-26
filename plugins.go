@@ -65,7 +65,7 @@ type DynamicMiddleware struct {
 }
 
 type DynamicMiddlewareConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+	ConfigData map[string]interface{} `mapstructure:"config_data" bson:"config_data" json:"config_data"`
 }
 
 func (mw *DynamicMiddleware) GetName() string {
@@ -85,7 +85,7 @@ func (d *DynamicMiddleware) GetConfig() (interface{}, error) {
 }
 
 type configDataDef struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+	ConfigData map[string]interface{} `mapstructure:"config_data" bson:"config_data" json:"config_data"`
 }
 
 func jsonConfigData(spec *APISpec) string {

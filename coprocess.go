@@ -169,7 +169,7 @@ func CoProcessInit() (err error) {
 
 // CoProcessMiddlewareConfig holds the middleware configuration.
 type CoProcessMiddlewareConfig struct {
-	ConfigData map[string]string `mapstructure:"config_data" bson:"config_data" json:"config_data"`
+	ConfigData map[string]interface{} `mapstructure:"config_data" bson:"config_data" json:"config_data"`
 }
 
 // New lets you do any initialisations for the object can be done here
