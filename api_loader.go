@@ -449,6 +449,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
 		mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
