@@ -19,7 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 
-	"github.com/mgood/go-jq"
+	"github.com/klyr/go-jq"
 )
 
 const (
@@ -516,7 +516,8 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 }
 
 func (a *APIDefinitionLoader) compileJQFilter(filter string) (*jq.JQ, error) {
-	return jq.NewJQ(filter)
+	v, err := jq.NewJQ(filter)
+	return v, err
 }
 
 func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus) []URLSpec {
