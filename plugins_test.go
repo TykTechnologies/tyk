@@ -53,7 +53,8 @@ func TestJSVMConfigData(t *testing.T) {
 	spec := &APISpec{APIDefinition: &tykcommon.APIDefinition{}}
 	spec.RawData = map[string]interface{}{
 		"config_data": map[string]interface{}{
-			"foo": "bar",
+			"foo": "x",
+			"bar": map[string]interface{}{"y": 3},
 		},
 	}
 	const js = `
@@ -61,6 +62,7 @@ var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({});
 
 testJSVMData.NewProcessRequest(function(request, session, config) {
 	request.SetHeaders["data-foo"] = config.config_data.foo;
+	request.SetHeaders["data-bar-y"] = config.config_data.bar.y.toString();
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
@@ -77,7 +79,10 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 
 	r := httptest.NewRequest("GET", "/v1/test-data", nil)
 	dynMid.ProcessRequest(nil, r, nil)
-	if want, got := "bar", r.Header.Get("data-foo"); want != got {
+	if want, got := "x", r.Header.Get("data-foo"); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+	if want, got := "3", r.Header.Get("data-bar-y"); want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
