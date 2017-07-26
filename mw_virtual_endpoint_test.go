@@ -41,7 +41,8 @@ const virtTestDef = `{
 		"target_url": "` + testHttpAny + `"
 	},
 	"config_data": {
-		"foo": "bar"
+		"foo": "x",
+		"bar": {"y": 3}
 	},
 	"do_not_track": true
 }`
@@ -51,7 +52,8 @@ function testVirtData(request, session, config) {
 	var resp = {
 		Body: request.Body + " added body",
 		Headers: {
-			"data-foo": config.config_data.foo
+			"data-foo": config.config_data.foo,
+			"data-bar-y": config.config_data.bar.y.toString()
 		},
 		Code: 202
 	}
@@ -82,9 +84,10 @@ func TestVirtualEndpoint(t *testing.T) {
 	if wantBody != gotBody {
 		t.Fatalf("wanted body to be %q, got %q", wantBody, gotBody)
 	}
-	wantHdr := "bar"
-	gotHdr := rec.HeaderMap.Get("data-foo")
-	if wantHdr != gotHdr {
-		t.Fatalf("wanted header to be %q, got %q", wantHdr, gotHdr)
+	if want, got := "x", rec.HeaderMap.Get("data-foo"); got != want {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+	if want, got := "3", rec.HeaderMap.Get("data-bar-y"); got != want {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
