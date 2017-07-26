@@ -36,7 +36,9 @@ if [[ ! $LATEST_GO ]]; then
 	exit 0
 fi
 
-go test -race $PKGS || fatal "go test -race failed"
+for opts in "${MATRIX[@]}"; do
+	show go test -v -race $opts $PKGS || fatal "go test -race failed"
+done
 
 for opts in "${MATRIX[@]}"; do
 	show go vet -v $opts $PKGS || fatal "go vet errored"
