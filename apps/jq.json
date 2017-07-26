@@ -24,12 +24,12 @@
                     "transform_jq": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": "{\"renamedkey\": .bla, \"newkey\": 42}"
+                        "filter": ". + {\"TRANSFORMED-REQUEST-BY-JQ\": true}"
                     }],
                     "transform_jq_response": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ". + {\"modified_response\": true}"
+                        "filter": ". + {\"TRANSFORMED-RESPONSE-BY-JQ\": true}"
                     }]
                 }
             }
