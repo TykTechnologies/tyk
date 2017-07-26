@@ -70,6 +70,8 @@ export CPBINNAME_PYTHON=tyk_linux_amd64_python
 gox -osarch="linux/amd64" -tags 'coprocess python' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_python'
 gox -osarch="linux/amd64" -tags 'coprocess lua' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_lua'
 
+CONFIGFILES="--config-files apps --config-files templates --config-files middleware --config-files event_handlers/sample --config-files js --config-files policies --config-files tyk.conf"
+
 echo Prepping TGZ Dirs
 mkdir -p $i386TGZDIR/apps
 mkdir -p $i386TGZDIR/js
@@ -123,8 +125,8 @@ rm -f *.rpm
 
 echo Creating Deb Package for AMD64
 cd $amd64TGZDIR/
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t deb ./=/opt/tyk-gateway
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm $CONFIGFILES ./=/opt/tyk-gateway
 
 AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
 AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
@@ -134,8 +136,8 @@ echo "Signing AMD RPM"
 
 echo Creating Deb Package for i386
 cd $i386TGZDIR/
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb ./=/opt/tyk-gateway
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t rpm ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t rpm $CONFIGFILES ./=/opt/tyk-gateway
 
 i386DEBNAME="tyk-gateway_"$VERSION"_i386.deb"
 i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
@@ -145,8 +147,8 @@ echo "Signing i386 RPM"
 
 echo Creating Deb Package for ARM
 cd $armTGZDIR/
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t deb ./=/opt/tyk-gateway
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t rpm ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
+fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t rpm $CONFIGFILES ./=/opt/tyk-gateway
 
 ARMDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
 ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
