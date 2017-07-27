@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	//	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 
@@ -41,6 +42,7 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 			"api_id":      t.Spec.APIID,
 			"path":        r.URL.Path,
 		}).Error(err)
+		return err, 415
 	}
 	return nil, 200
 }
@@ -53,24 +55,25 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		return err
 	}
 
-	// Put into an interface:
-	// bodyData := make(map[string]interface{})
-	//json.Unmarshal(body, &bodyData)
-
+	// XXX
 	// if contextVars {
 	//	bodyData["_tyk_context"] = ctxGetData(r)
 	//}
 
-	// Apply to template
-	//var bodyBuffer bytes.Buffer
-	// XXX: Do the real transform
+	err = t.JQFilter.HandleJson(string(body))
+	if err != nil {
+		return errors.New("Input is not a valid JSON")
+	}
 
-	t.JQFilter.HandleJson(string(body))
-	t.JQFilter.Next()
-	transformed := t.JQFilter.ValueJson()
-	bodyBuffer := bytes.NewBufferString(transformed)
-	r.Body = ioutil.NopCloser(bodyBuffer)
-	r.ContentLength = int64(bodyBuffer.Len())
+	filterResult := t.JQFilter.Next()
+	if filterResult {
+		transformed := t.JQFilter.ValueJson()
+		bodyBuffer := bytes.NewBufferString(transformed)
+		r.Body = ioutil.NopCloser(bodyBuffer)
+		r.ContentLength = int64(bodyBuffer.Len())
+	} else {
+		return errors.New("Errors while applying JQ filter to input")
+	}
 
 	return nil
 }
