@@ -1,14 +1,21 @@
 #!/bin/bash
+: ${ORGDIR:="/src/github.com/TykTechnologies"}
+: ${SOURCEBINPATH:="${ORGDIR}/tyk"}
+: ${SIGNKEY:="729EA673"}
+: ${BUILDPKGS:="1"}
+BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
+
 echo Set version number
 export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)
 
 echo Generating key
-[[ $(gpg --list-keys | grep -w 729EA673) ]] && echo "Key exists" || gpg --import build_key.key
+
+[[ $(gpg --list-keys | grep -w $SIGNKEY) ]] && echo "Key exists" || gpg --import $BUILDTOOLSDIR/build_key.key
 
 echo Prepare the release directories
+
 export SOURCEBIN=tyk
 export CLIBIN=tyk-cli
-export SOURCEBINPATH=/src/github.com/TykTechnologies/tyk
 export i386BINDIR=$SOURCEBINPATH/build/i386/tyk.linux.i386-$VERSION
 export amd64BINDIR=$SOURCEBINPATH/build/amd64/tyk.linux.amd64-$VERSION
 export armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm64-$VERSION
@@ -16,10 +23,8 @@ export armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm64-$VERSION
 export i386TGZDIR=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
 export amd64TGZDIR=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
 export armTGZDIR=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
-export PACKAGECLOUDREPO=$PC_TARGET
 
-orgDir=/src/github.com/TykTechnologies
-cliDIR=/src/github.com/TykTechnologies/tyk-cli
+cliDIR=$ORGDIR/tyk-cli
 cliTmpDir=$SOURCEBINPATH/temp/cli
 DESCRIPTION="Tyk Open Source API Gateway written in Go"
 
@@ -28,7 +33,7 @@ rm -rf $cliTmpDir
 mkdir -p $cliTmpDir
 
 echo "Preparing CLI Build"
-cd $orgDir
+cd $ORGDIR
 git clone https://github.com/TykTechnologies/tyk-cli.git
 cd $cliDIR
 git checkout master
@@ -69,8 +74,6 @@ export CPBINNAME_PYTHON=tyk_linux_amd64_python
 
 gox -osarch="linux/amd64" -tags 'coprocess python' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_python'
 gox -osarch="linux/amd64" -tags 'coprocess lua' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_lua'
-
-CONFIGFILES="--config-files apps --config-files templates --config-files middleware --config-files event_handlers/sample --config-files js --config-files policies --config-files tyk.conf"
 
 echo Prepping TGZ Dirs
 mkdir -p $i386TGZDIR/apps
@@ -119,39 +122,44 @@ tar -pczf $amd64TGZDIR/../tyk-linux-amd64-$VERSION.tar.gz tyk.linux.amd64-$VERSI
 cd $armTGZDIR/../
 tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION/
 
-echo "Removing old builds"
-rm -f *.deb
-rm -f *.rpm
+if [ $BUILDPKGS == "1" ]; then
+    CONFIGFILES=(--config-files /opt/tyk-gateway/apps --config-files /opt/tyk-gateway/templates --config-files /opt/tyk-gateway/middleware --config-files /opt/tyk-gateway/event_handlers --config-files /opt/tyk-gateway/js --config-files /opt/tyk-gateway/policies --config-files /opt/tyk-gateway/tyk.conf)
+    FPMCOMMON=(--name tyk-gateway --description "$DESCRIPTION" -v $VERSION --vendor "Tyk Technologies Ltd" -m "<info@tyk.io>" --url "https://tyk.io" -s dir)
 
-echo Creating Deb Package for AMD64
-cd $amd64TGZDIR/
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION  --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -s dir -t rpm $CONFIGFILES ./=/opt/tyk-gateway
+    echo "Removing old builds"
+    rm -f *.deb
+    rm -f *.rpm
 
-AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
-AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
+    echo Creating Deb Package for AMD64
+    cd $amd64TGZDIR/
+    fpm "${FPMCOMMON[@]}" --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
 
-echo "Signing AMD RPM"
-/src/github.com/TykTechnologies/tyk/build_tools/rpm-sign.exp $amd64TGZDIR/$AMDRPMNAME
+    AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
+    AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
 
-echo Creating Deb Package for i386
-cd $i386TGZDIR/
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -s dir -t rpm $CONFIGFILES ./=/opt/tyk-gateway
+    echo "Signing AMD64 RPM"
+    $BUILDTOOLSDIR/rpm-sign.exp $amd64TGZDIR/$AMDRPMNAME
 
-i386DEBNAME="tyk-gateway_"$VERSION"_i386.deb"
-i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
+    echo Creating Deb Package for i386
+    cd $i386TGZDIR/
+    fpm "${FPMCOMMON[@]}" --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
 
-echo "Signing i386 RPM"
-/src/github.com/TykTechnologies/tyk/build_tools/rpm-sign.exp $i386TGZDIR/$i386RPMNAME
+    i386DEBNAME="tyk-gateway_"$VERSION"_i386.deb"
+    i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
 
-echo Creating Deb Package for ARM
-cd $armTGZDIR/
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t deb $CONFIGFILES ./=/opt/tyk-gateway
-fpm -n tyk-gateway --description "$DESCRIPTION" -v $VERSION --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -s dir -t rpm $CONFIGFILES ./=/opt/tyk-gateway
+    echo "Signing i386 RPM"
+    $BUILDTOOLSDIR/rpm-sign.exp $i386TGZDIR/$i386RPMNAME
 
-ARMDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
-ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
+    echo Creating Deb Package for ARM
+    cd $armTGZDIR/
+    fpm "${FPMCOMMON[@]}" --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
 
-echo "Signing Arm RPM"
-/src/github.com/TykTechnologies/tyk/build_tools/rpm-sign.exp $armTGZDIR/$ARMRPMNAME
+    ARMDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
+    ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
+
+    echo "Signing Arm RPM"
+    $BUILDTOOLSDIR/rpm-sign.exp $armTGZDIR/$ARMRPMNAME
+fi

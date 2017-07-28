@@ -1,9 +1,11 @@
 #!/bin/bash
+: ${ORGDIR:="/src/github.com/TykTechnologies"}
+: ${SOURCEBINPATH:="${ORGDIR}/tyk"}
+
 export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)
 
 export SOURCEBIN=tyk
 export CLIBIN=tyk-cli
-export SOURCEBINPATH=/src/github.com/TykTechnologies/tyk
 export i386BINDIR=$SOURCEBINPATH/build/i386/tyk.linux.i386-$VERSION
 export amd64BINDIR=$SOURCEBINPATH/build/amd64/tyk.linux.amd64-$VERSION
 export armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm64-$VERSION
