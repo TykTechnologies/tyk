@@ -12,6 +12,9 @@ testapps/
 /utils/build_hybrid.sh
 /utils/cloud_release.sh
 
+build_tools/
+build/
+
 tyk.conf
 tyk.zeroconf.cluster.conf
 tyk_elasticache.conf
@@ -58,3 +61,5 @@ petstore.json
 coprocess_gen_test.go
 session_state_gen_test.go
 __pycache__/
+
+tyk_linux_*
