@@ -5,24 +5,23 @@
 : ${BUILDPKGS:="1"}
 BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
 
-echo Set version number
+echo "Set version number"
 export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)
 
-echo Generating key
+if [ $BUILDPKGS == "1" ]; then
+    echo "Importing signing key"
+    gpg --list-keys | grep -w $SIGNKEY && echo "Key exists" || gpg --import $BUILDTOOLSDIR/build_key.key
+fi
 
-[[ $(gpg --list-keys | grep -w $SIGNKEY) ]] && echo "Key exists" || gpg --import $BUILDTOOLSDIR/build_key.key
-
-echo Prepare the release directories
+echo "Prepare the release directories"
 
 export SOURCEBIN=tyk
 export CLIBIN=tyk-cli
-export i386BINDIR=$SOURCEBINPATH/build/i386/tyk.linux.i386-$VERSION
-export amd64BINDIR=$SOURCEBINPATH/build/amd64/tyk.linux.amd64-$VERSION
-export armBINDIR=$SOURCEBINPATH/build/arm/tyk.linux.arm64-$VERSION
 
-export i386TGZDIR=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
-export amd64TGZDIR=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
-export armTGZDIR=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
+declare -A ARCHTGZDIRS
+ARCHTGZDIRS[i386]=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
+ARCHTGZDIRS[amd64]=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
+ARCHTGZDIRS[arm64]=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
 
 cliDIR=$ORGDIR/tyk-cli
 cliTmpDir=$SOURCEBINPATH/temp/cli
@@ -34,132 +33,98 @@ mkdir -p $cliTmpDir
 
 echo "Preparing CLI Build"
 cd $ORGDIR
-git clone https://github.com/TykTechnologies/tyk-cli.git
+[ -d $cliDIR ] || git clone https://github.com/TykTechnologies/tyk-cli.git
 cd $cliDIR
 git checkout master
+git pull
 go get -v ./...
 gox -osarch="linux/arm64 linux/amd64 linux/386"
 
 echo "Copying CLI Build files"
-cp tyk-cli_linux_386 $cliTmpDir/
-cp tyk-cli_linux_amd64 $cliTmpDir/
-cp tyk-cli_linux_arm64 $cliTmpDir/
+mv tyk-cli_linux_* $cliTmpDir/
 
-echo "Cleaning up"
-rm tyk-cli_linux_386
-rm tyk-cli_linux_amd64
-rm tyk-cli_linux_arm64
-
-echo "Retuning to Tyk build"
+echo "Starting Tyk build"
 cd $SOURCEBINPATH
 
-echo Starting Tyk build
-cd $SOURCEBINPATH
+echo "Blitzing TGZ dirs"
+for arch in ${!ARCHTGZDIRS[@]}
+do
+    rm -rf ${ARCHTGZDIRS[$arch]}
+    mkdir -p ${ARCHTGZDIRS[$arch]}
+done
 
-echo Blitzing TGZ dirs
-rm -rf $i386TGZDIR
-rm -rf $amd64TGZDIR
-rm -rf $armTGZDIR
-
-mkdir -p $i386TGZDIR
-mkdir -p $amd64TGZDIR
-mkdir -p $armTGZDIR
-
-echo Building Tyk binaries
+echo "Building Tyk binaries"
 gox -osarch="linux/arm64 linux/amd64 linux/386" -tags 'coprocess grpc'
 
-echo Building Tyk CP binaries
+echo "Building Tyk CP binaries"
 export CPBINNAME_LUA=tyk_linux_amd64_lua
 export CPBINNAME_PYTHON=tyk_linux_amd64_python
 
 gox -osarch="linux/amd64" -tags 'coprocess python' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_python'
 gox -osarch="linux/amd64" -tags 'coprocess lua' -output '{{.Dir}}_{{.OS}}_{{.Arch}}_lua'
 
-echo Prepping TGZ Dirs
-mkdir -p $i386TGZDIR/apps
-mkdir -p $i386TGZDIR/js
-mkdir -p $i386TGZDIR/middleware
-mkdir -p $i386TGZDIR/middleware/python
-mkdir -p $i386TGZDIR/middleware/lua
-mkdir -p $i386TGZDIR/event_handlers
-mkdir -p $i386TGZDIR/event_handlers/sample
-mkdir -p $i386TGZDIR/templates
-mkdir -p $i386TGZDIR/policies
-mkdir -p $i386TGZDIR/utils
-mkdir -p $i386TGZDIR/install
+TEMPLATEDIR=${ARCHTGZDIRS[i386]}
+echo "Prepping TGZ Dirs"
+mkdir -p $TEMPLATEDIR/apps
+mkdir -p $TEMPLATEDIR/js
+mkdir -p $TEMPLATEDIR/middleware
+mkdir -p $TEMPLATEDIR/middleware/python
+mkdir -p $TEMPLATEDIR/middleware/lua
+mkdir -p $TEMPLATEDIR/event_handlers
+mkdir -p $TEMPLATEDIR/event_handlers/sample
+mkdir -p $TEMPLATEDIR/templates
+mkdir -p $TEMPLATEDIR/policies
+mkdir -p $TEMPLATEDIR/utils
+mkdir -p $TEMPLATEDIR/install
 
-cp $SOURCEBINPATH/apps/app_sample.json $i386TGZDIR/apps
-cp $SOURCEBINPATH/templates/*.json $i386TGZDIR/templates
-cp -R $SOURCEBINPATH/install/* $i386TGZDIR/install
-cp $SOURCEBINPATH/middleware/*.js $i386TGZDIR/middleware
-cp $SOURCEBINPATH/event_handlers/sample/*.js $i386TGZDIR/event_handlers/sample
-cp $SOURCEBINPATH/js/*.js $i386TGZDIR/js
-cp $SOURCEBINPATH/policies/*.json $i386TGZDIR/policies
-cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/
-cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/tyk.conf
-cp -R $SOURCEBINPATH/coprocess $i386TGZDIR/
+cp $SOURCEBINPATH/apps/app_sample.json $TEMPLATEDIR/apps
+cp $SOURCEBINPATH/templates/*.json $TEMPLATEDIR/templates
+cp -R $SOURCEBINPATH/install/* $TEMPLATEDIR/install
+cp $SOURCEBINPATH/middleware/*.js $TEMPLATEDIR/middleware
+cp $SOURCEBINPATH/event_handlers/sample/*.js $TEMPLATEDIR/event_handlers/sample
+cp $SOURCEBINPATH/js/*.js $TEMPLATEDIR/js
+cp $SOURCEBINPATH/policies/*.json $TEMPLATEDIR/policies
+cp $SOURCEBINPATH/tyk.conf.example $TEMPLATEDIR/
+cp $SOURCEBINPATH/tyk.conf.example $TEMPLATEDIR/tyk.conf
+cp -R $SOURCEBINPATH/coprocess $TEMPLATEDIR/
 
-cp -R $i386TGZDIR/* $amd64TGZDIR
-cp -R $i386TGZDIR/* $armTGZDIR
+# Clone template dir to all architectures and copy corresponding binaries
+for arch in ${!ARCHTGZDIRS[@]}
+do
+    archDir=${ARCHTGZDIRS[$arch]}
+    [ $archDir != $TEMPLATEDIR ] && cp -R $TEMPLATEDIR/* $archDir
+    mv tyk_linux_${arch/i386/386} $archDir/$SOURCEBIN
+    cp $cliTmpDir/tyk-cli_linux_${arch/i386/386} $archDir/utils/$CLIBIN
+done
+mv $CPBINNAME_LUA ${ARCHTGZDIRS[amd64]}/$SOURCEBIN-lua
+mv $CPBINNAME_PYTHON ${ARCHTGZDIRS[amd64]}/$SOURCEBIN-python
 
-cp tyk_linux_386 $i386TGZDIR/$SOURCEBIN
-cp tyk_linux_arm64 $armTGZDIR/$SOURCEBIN
-cp tyk_linux_amd64 $amd64TGZDIR/$SOURCEBIN
-cp $CPBINNAME_LUA $amd64TGZDIR/$SOURCEBIN-lua
-cp $CPBINNAME_PYTHON $amd64TGZDIR/$SOURCEBIN-python
-
-cp $cliTmpDir/tyk-cli_linux_386 $i386TGZDIR/utils/$CLIBIN
-cp $cliTmpDir/tyk-cli_linux_amd64 $amd64TGZDIR/utils/$CLIBIN
-cp $cliTmpDir/tyk-cli_linux_arm64 $armTGZDIR/utils/$CLIBIN
-
-echo Compressing
-cd $i386TGZDIR/../
-tar -pczf $i386TGZDIR/../tyk-linux-i386-$VERSION.tar.gz tyk.linux.i386-$VERSION/
-
-cd $amd64TGZDIR/../
-tar -pczf $amd64TGZDIR/../tyk-linux-amd64-$VERSION.tar.gz tyk.linux.amd64-$VERSION/
-
-cd $armTGZDIR/../
-tar -pczf $armTGZDIR/../tyk-linux-arm64-$VERSION.tar.gz tyk.linux.arm64-$VERSION/
+echo "Compressing"
+for arch in ${!ARCHTGZDIRS[@]}
+do
+    cd ${ARCHTGZDIRS[$arch]}/../
+    tar -pczf ${ARCHTGZDIRS[$arch]}/../tyk-linux-$arch-$VERSION.tar.gz tyk.linux.$arch-$VERSION/
+done
 
 if [ $BUILDPKGS == "1" ]; then
     CONFIGFILES=(--config-files /opt/tyk-gateway/apps --config-files /opt/tyk-gateway/templates --config-files /opt/tyk-gateway/middleware --config-files /opt/tyk-gateway/event_handlers --config-files /opt/tyk-gateway/js --config-files /opt/tyk-gateway/policies --config-files /opt/tyk-gateway/tyk.conf)
     FPMCOMMON=(--name tyk-gateway --description "$DESCRIPTION" -v $VERSION --vendor "Tyk Technologies Ltd" -m "<info@tyk.io>" --url "https://tyk.io" -s dir)
 
-    echo "Removing old builds"
-    rm -f *.deb
-    rm -f *.rpm
+    for arch in ${!ARCHTGZDIRS[@]}
+    do
+        archDir=${ARCHTGZDIRS[$arch]}
+        cd $archDir/
+        echo "Removing old $arch packages"
+        rm -f *.deb
+        rm -f *.rpm
 
-    echo Creating Deb Package for AMD64
-    cd $amd64TGZDIR/
-    fpm "${FPMCOMMON[@]}" --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
-    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a amd64 -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+        echo "Creating DEB Package for $arch"
+        fpm "${FPMCOMMON[@]}" --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+        echo "Creating RPM Package for $arch"
+        fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
 
-    AMDDEBNAME="tyk-gateway_"$VERSION"_amd64.deb"
-    AMDRPMNAME="tyk-gateway-"$VERSION"-1.x86_64.rpm"
-
-    echo "Signing AMD64 RPM"
-    $BUILDTOOLSDIR/rpm-sign.exp $amd64TGZDIR/$AMDRPMNAME
-
-    echo Creating Deb Package for i386
-    cd $i386TGZDIR/
-    fpm "${FPMCOMMON[@]}" --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
-    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a i386 -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
-
-    i386DEBNAME="tyk-gateway_"$VERSION"_i386.deb"
-    i386RPMNAME="tyk-gateway-"$VERSION"-1.i386.rpm"
-
-    echo "Signing i386 RPM"
-    $BUILDTOOLSDIR/rpm-sign.exp $i386TGZDIR/$i386RPMNAME
-
-    echo Creating Deb Package for ARM
-    cd $armTGZDIR/
-    fpm "${FPMCOMMON[@]}" --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
-    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $amd64TGZDIR/install/post_install.sh --after-remove $amd64TGZDIR/install/post_remove.sh -a arm64 -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
-
-    ARMDEBNAME="tyk-gateway_"$VERSION"_arm64.deb"
-    ARMRPMNAME="tyk-gateway-"$VERSION"-1.arm64.rpm"
-
-    echo "Signing Arm RPM"
-    $BUILDTOOLSDIR/rpm-sign.exp $armTGZDIR/$ARMRPMNAME
+        rpmName="tyk-gateway-$VERSION-1.${arch/amd64/x86_64}.rpm"
+        echo "Signing $arch RPM"
+        $BUILDTOOLSDIR/rpm-sign.exp $archDir/$rpmName
+    done
 fi
