@@ -10,8 +10,12 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/justinas/alice"
 )
@@ -69,9 +73,45 @@ func getHMACAuthChain(spec *APISpec) http.Handler {
 	return chain
 }
 
+type testAuthFailEventHandler struct {
+	cb func(config.EventMessage)
+}
+
+func (w *testAuthFailEventHandler) Init(handlerConf interface{}) error {
+	return nil
+}
+
+func (w *testAuthFailEventHandler) HandleEvent(em config.EventMessage) {
+	w.cb(em)
+}
+
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
 func TestHMACAuthSessionPass(t *testing.T) {
 	spec := createSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
+
+	// Should not receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
@@ -104,11 +144,26 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
 	}
+
+	// Check we did not get our AuthFailure event
+	if !waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should not have generated an AuthFailure event!: \n")
+	}
 }
 
 func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	spec := createSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
+
+	// Should not receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
@@ -141,11 +196,26 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
 	}
+
+	// Check we did not get our AuthFailure event
+	if !waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should not have generated an AuthFailure event!: \n")
+	}
 }
 
 func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	spec := createSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
+
+	// Should receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
@@ -178,11 +248,26 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	if recorder.Code != 400 {
 		t.Error("Request should have failed with out of date error!: \n", recorder.Code)
 	}
+
+	// Check we did get our AuthFailure event
+	if waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should have generated an AuthFailure event!: \n")
+	}
 }
 
 func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	spec := createSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
+
+	// Should receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
@@ -215,11 +300,26 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	if recorder.Code != 400 {
 		t.Error("Request should have failed with key not found error!: \n", recorder.Code)
 	}
+
+	// Check we did get our AuthFailure event
+	if waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should have generated an AuthFailure event!: \n")
+	}
 }
 
 func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	spec := createSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
+
+	// Should receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
@@ -252,11 +352,26 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	if recorder.Code != 400 {
 		t.Error("Request should have failed with key not found error!: \n", recorder.Code)
 	}
+
+	// Check we did get our AuthFailure event
+	if waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should have generated an AuthFailure event!: \n")
+	}
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	spec := createSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
+
+	// Should not receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
@@ -294,6 +409,11 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
 	}
+
+	// Check we did not get our AuthFailure event
+	if !waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should not have generated an AuthFailure event!: \n")
+	}
 }
 
 func getUpperCaseEscaped(signature string) (bool, []string) {
@@ -315,6 +435,16 @@ func replaceUpperCase(originalSignature string, lowercaseList []string) string {
 func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	spec := createSpecTest(t, hmacAuthDef)
 	session := createHMACAuthSession()
+
+	// Should not receive an AuthFailure event
+	var eventWG sync.WaitGroup
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"AuthFailure": {&testAuthFailEventHandler{cb}},
+	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("9876", session, 60)
@@ -354,5 +484,10 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+	}
+
+	// Check we did not get our AuthFailure event
+	if !waitTimeout(&eventWG, 20*time.Millisecond) {
+		t.Error("Request should not have generated an AuthFailure event!: \n")
 	}
 }
