@@ -727,6 +727,7 @@ func doReload() {
 	}).Info("Preparing new router")
 	newRouter := mux.NewRouter()
 	mainRouter = newRouter
+	defaultRouter = mainRouter
 
 	loadAPIEndpoints(newRouter)
 	loadApps(specs, newRouter)
