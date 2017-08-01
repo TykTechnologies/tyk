@@ -32,6 +32,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+const defaultUserAgent = "Tyk/" + VERSION
+
 var ServiceCache *cache.Cache
 
 func urlFromService(spec *APISpec) (*apidef.HostList, error) {
@@ -219,8 +221,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
 		if _, ok := req.Header["User-Agent"]; !ok {
-			// explicitly disable User-Agent so it's not set to default value
-			req.Header.Set("User-Agent", "")
+			// Set Tyk's own default user agent. Without
+			// this line, we would get the net/http default.
+			req.Header.Set("User-Agent", defaultUserAgent)
 		}
 	}
 

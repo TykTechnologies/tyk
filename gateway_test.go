@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -990,4 +991,47 @@ func TestListenPathTykPrefix(t *testing.T) {
 		{method: "GET", path: "/tyk-foo/", code: 200},
 	}
 	testHttp(t, tests, false)
+}
+
+func TestProxyUserAgent(t *testing.T) {
+	spec := createSpecTest(t, sampleAPI)
+	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxyHandler := ProxyHandler(proxy, spec)
+
+	tests := []struct {
+		sent   interface{}
+		wantRe string
+	}{
+		// none set; use our default
+		{nil, `^Tyk/v\d+\.\d+\.\d+$`},
+		// set but empty; let it through
+		{"", `^$`},
+		// set and not empty
+		{"SomeAgent", `^SomeAgent$`},
+	}
+	for _, tc := range tests {
+		rec := httptest.NewRecorder()
+		req := testReq(t, "GET", "/sample", nil)
+		if s, ok := tc.sent.(string); ok {
+			req.Header.Set("User-Agent", s)
+		}
+
+		proxyHandler.ServeHTTP(rec, req)
+
+		if rec.Code != 200 {
+			t.Error("Initial request failed with non-200 code: ", rec.Code)
+			t.Error(rec.Body)
+		}
+
+		var resp testHttpResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatal("JSON decoding failed:", err)
+		}
+
+		rx := regexp.MustCompile(tc.wantRe)
+		if got := resp.Headers["User-Agent"]; !rx.MatchString(got) {
+			t.Errorf("Wanted agent to match %q, got %q\n", tc.wantRe, got)
+		}
+	}
 }
