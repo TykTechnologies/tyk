@@ -39,12 +39,10 @@ static int Python_LoadDispatcher() {
   PyObject *module_name = PyUnicode_FromString( dispatcher_module_name );
   dispatcher_module = PyImport_Import( module_name );
 
-	Py_DECREF(module_name);
-
-  if( dispatcher_module == NULL ) {
-    PyErr_Print();
-    return -1;
-  }
+	if( dispatcher_module == NULL ) {
+		PyErr_Print();
+		return -1;
+	}
 
   dispatcher_module_dict = PyModule_GetDict(dispatcher_module);
 
@@ -86,20 +84,22 @@ static void Python_HandleMiddlewareCache(char* bundle_path) {
 }
 
 static int Python_NewDispatcher(char* middleware_path, char* event_handler_path, char* bundle_paths) {
-  if( PyCallable_Check(dispatcher_class) ) {
-    dispatcher_args = PyTuple_Pack( 3, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path), PyUnicode_FromString(bundle_paths) );
-    dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
+	PyThreadState*  mainThreadState = PyEval_SaveThread();
+	gilState = PyGILState_Ensure();
+	if( PyCallable_Check(dispatcher_class) ) {
+		dispatcher_args = PyTuple_Pack( 3, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path), PyUnicode_FromString(bundle_paths) );
+		dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
 
-		Py_DECREF(dispatcher_args);
-
-    if( dispatcher == NULL) {
-      PyErr_Print();
-      return -1;
-    }
-  } else {
-    PyErr_Print();
-    return -1;
-  }
+		if( dispatcher == NULL) {
+			PyErr_Print();
+			PyGILState_Release(gilState);
+			return -1;
+		}
+	} else {
+		PyErr_Print();
+		PyGILState_Release(gilState);
+		return -1;
+	}
 
   dispatcher_hook_name = PyUnicode_FromString( hook_name );
   dispatcher_hook = PyObject_GetAttr(dispatcher, dispatcher_hook_name);
@@ -110,15 +110,13 @@ static int Python_NewDispatcher(char* middleware_path, char* event_handler_path,
 	dispatcher_load_bundle_name = PyUnicode_FromString( load_bundle_name );
 	dispatcher_load_bundle = PyObject_GetAttr(dispatcher, dispatcher_load_bundle_name);
 
-	Py_DECREF(dispatcher_hook_name);
-	Py_DECREF(dispatch_event_name);
-
-  if( dispatcher_hook == NULL ) {
-    PyErr_Print();
-    return -1;
-  }
-
-  return 0;
+	if( dispatcher_hook == NULL ) {
+		PyErr_Print();
+		PyGILState_Release(gilState);
+		return -1;
+	}
+	PyGILState_Release(gilState);
+	return 0;
 }
 
 static void Python_SetEnv(char* python_path) {
@@ -169,11 +167,12 @@ import "C"
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"unsafe"
-    "runtime"
 
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -218,9 +217,10 @@ func (d *PythonDispatcher) Reload() {
 }
 
 // HandleMiddlewareCache isn't used by Python.
-func (d* PythonDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+func (d *PythonDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
 	go func() {
 		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 		CBundlePath := C.CString(basePath)
 		C.Python_HandleMiddlewareCache(CBundlePath)
 	}()
@@ -278,15 +278,26 @@ func PythonSetEnv(pythonPaths ...string) {
 	C.free(unsafe.Pointer(CPythonPath))
 }
 
-// NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
+// getBundlePaths will return an array of the available bundle directories:
+func getBundlePaths() []string {
+	directories := make([]string, 0)
+	bundles, _ := ioutil.ReadDir(tykBundlePath)
+	for _, f := range bundles {
+		if f.IsDir() {
+			fullPath := filepath.Join(tykBundlePath, f.Name())
+			directories = append(directories, fullPath)
+		}
+	}
+	return directories
+}
 
+func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	workDir, _ := os.Getwd()
 
-	dispatcherPath := path.Join(workDir, "coprocess/python")
-	middlewarePath := path.Join(workDir, "middleware/python")
-	eventHandlerPath := path.Join(workDir, "event_handlers")
-	protoPath := path.Join(workDir, "coprocess/python/proto")
+	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
+	middlewarePath := filepath.Join(workDir, "middleware", "python")
+	eventHandlerPath := filepath.Join(workDir, "event_handlers")
+	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
 
 	paths := []string{dispatcherPath, middlewarePath, eventHandlerPath, protoPath}
 
@@ -296,20 +307,23 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 		paths = append(paths, v)
 	}
 
-	PythonSetEnv(paths...)
+	// initDone is used to signal the end of Python initialization step:
+	initDone := make(chan error)
 
-	PythonInit()
-	PythonLoadDispatcher()
-
-	dispatcher, err = PythonNewDispatcher(middlewarePath, eventHandlerPath, bundlePaths)
-
-	C.PyEval_ReleaseLock()
-
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Error(err)
-	}
-
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		PythonSetEnv(paths...)
+		PythonInit()
+		PythonLoadDispatcher()
+		dispatcher, err = PythonNewDispatcher(middlewarePath, eventHandlerPath, bundlePaths)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).Error(err)
+		}
+		initDone <- err
+	}()
+	err = <-initDone
 	return dispatcher, err
 }
