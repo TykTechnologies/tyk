@@ -39,8 +39,6 @@ static int Python_LoadDispatcher() {
 	PyObject *module_name = PyUnicode_FromString( dispatcher_module_name );
 	dispatcher_module = PyImport_Import( module_name );
 
-	Py_DECREF(module_name);
-
 	if( dispatcher_module == NULL ) {
 		PyErr_Print();
 		return -1;
@@ -86,18 +84,20 @@ static void Python_HandleMiddlewareCache(char* bundle_path) {
 }
 
 static int Python_NewDispatcher(char* middleware_path, char* event_handler_path, char* bundle_paths) {
+	PyThreadState*  mainThreadState = PyEval_SaveThread();
+	gilState = PyGILState_Ensure();
 	if( PyCallable_Check(dispatcher_class) ) {
 		dispatcher_args = PyTuple_Pack( 3, PyUnicode_FromString(middleware_path), PyUnicode_FromString(event_handler_path), PyUnicode_FromString(bundle_paths) );
 		dispatcher = PyObject_CallObject( dispatcher_class, dispatcher_args );
 
-		Py_DECREF(dispatcher_args);
-
 		if( dispatcher == NULL) {
 			PyErr_Print();
+			PyGILState_Release(gilState);
 			return -1;
 		}
 	} else {
 		PyErr_Print();
+		PyGILState_Release(gilState);
 		return -1;
 	}
 
@@ -110,14 +110,12 @@ static int Python_NewDispatcher(char* middleware_path, char* event_handler_path,
 	dispatcher_load_bundle_name = PyUnicode_FromString( load_bundle_name );
 	dispatcher_load_bundle = PyObject_GetAttr(dispatcher, dispatcher_load_bundle_name);
 
-	Py_DECREF(dispatcher_hook_name);
-	Py_DECREF(dispatch_event_name);
-
 	if( dispatcher_hook == NULL ) {
 		PyErr_Print();
+		PyGILState_Release(gilState);
 		return -1;
 	}
-
+	PyGILState_Release(gilState);
 	return 0;
 }
 
@@ -215,6 +213,7 @@ func (d *PythonDispatcher) Reload() {
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
 	go func() {
 		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 		CBundlePath := C.CString(basePath)
 		C.Python_HandleMiddlewareCache(CBundlePath)
 	}()
@@ -278,8 +277,7 @@ func getBundlePaths() []string {
 }
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
-func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
-
+func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 	workDir, _ := os.Getwd()
 
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
@@ -295,20 +293,23 @@ func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 		paths = append(paths, v)
 	}
 
-	PythonSetEnv(paths...)
+	// initDone is used to signal the end of Python initialization step:
+	initDone := make(chan error)
 
-	PythonInit()
-	PythonLoadDispatcher()
-
-	dispatcher, err := PythonNewDispatcher(middlewarePath, eventHandlerPath, bundlePaths)
-
-	C.PyEval_ReleaseLock()
-
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Error(err)
-	}
-
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		PythonSetEnv(paths...)
+		PythonInit()
+		PythonLoadDispatcher()
+		dispatcher, err = PythonNewDispatcher(middlewarePath, eventHandlerPath, bundlePaths)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).Error(err)
+		}
+		initDone <- err
+	}()
+	err = <-initDone
 	return dispatcher, err
 }
