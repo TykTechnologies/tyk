@@ -19,9 +19,11 @@ export SOURCEBIN=tyk
 export CLIBIN=tyk-cli
 
 declare -A ARCHTGZDIRS
-ARCHTGZDIRS[i386]=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
-ARCHTGZDIRS[amd64]=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
-ARCHTGZDIRS[arm64]=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
+ARCHTGZDIRS=(
+    [i386]=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
+    [amd64]=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
+    [arm64]=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
+)
 
 cliDIR=$ORGDIR/tyk-cli
 cliTmpDir=$SOURCEBINPATH/temp/cli
@@ -106,25 +108,42 @@ do
     tar -pczf ${ARCHTGZDIRS[$arch]}/../tyk-linux-$arch-$VERSION.tar.gz tyk.linux.$arch-$VERSION/
 done
 
-if [ $BUILDPKGS == "1" ]; then
-    CONFIGFILES=(--config-files /opt/tyk-gateway/apps --config-files /opt/tyk-gateway/templates --config-files /opt/tyk-gateway/middleware --config-files /opt/tyk-gateway/event_handlers --config-files /opt/tyk-gateway/js --config-files /opt/tyk-gateway/policies --config-files /opt/tyk-gateway/tyk.conf)
-    FPMCOMMON=(--name tyk-gateway --description "$DESCRIPTION" -v $VERSION --vendor "Tyk Technologies Ltd" -m "<info@tyk.io>" --url "https://tyk.io" -s dir)
+# Nothing more to do if we're not going to build packages
+[ $BUILDPKGS != "1" ] && exit 0
 
-    for arch in ${!ARCHTGZDIRS[@]}
-    do
-        archDir=${ARCHTGZDIRS[$arch]}
-        cd $archDir/
-        echo "Removing old $arch packages"
-        rm -f *.deb
-        rm -f *.rpm
+CONFIGFILES=(
+    --config-files /opt/tyk-gateway/apps
+    --config-files /opt/tyk-gateway/templates
+    --config-files /opt/tyk-gateway/middleware
+    --config-files /opt/tyk-gateway/event_handlers
+    --config-files /opt/tyk-gateway/js
+    --config-files /opt/tyk-gateway/policies
+    --config-files /opt/tyk-gateway/tyk.conf
+)
+FPMCOMMON=(
+    --name tyk-gateway
+    --description "$DESCRIPTION"
+    -v $VERSION
+    --vendor "Tyk Technologies Ltd"
+    -m "<info@tyk.io>"
+    --url "https://tyk.io"
+    -s dir
+)
 
-        echo "Creating DEB Package for $arch"
-        fpm "${FPMCOMMON[@]}" --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
-        echo "Creating RPM Package for $arch"
-        fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+for arch in ${!ARCHTGZDIRS[@]}
+do
+    archDir=${ARCHTGZDIRS[$arch]}
+    cd $archDir/
+    echo "Removing old $arch packages"
+    rm -f *.deb
+    rm -f *.rpm
 
-        rpmName="tyk-gateway-$VERSION-1.${arch/amd64/x86_64}.rpm"
-        echo "Signing $arch RPM"
-        $BUILDTOOLSDIR/rpm-sign.exp $archDir/$rpmName
-    done
-fi
+    echo "Creating DEB Package for $arch"
+    fpm "${FPMCOMMON[@]}" --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+    echo "Creating RPM Package for $arch"
+    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+
+    rpmName="tyk-gateway-$VERSION-1.${arch/amd64/x86_64}.rpm"
+    echo "Signing $arch RPM"
+    $BUILDTOOLSDIR/rpm-sign.exp $archDir/$rpmName
+done
