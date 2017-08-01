@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	//	"encoding/json"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -55,12 +55,31 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		return err
 	}
 
-	// XXX
-	// if contextVars {
-	//	bodyData["_tyk_context"] = ctxGetData(r)
-	//}
+	var sessionJson []byte
+	session := ctxGetSession(r)
 
-	err = t.JQFilter.HandleJson(string(body))
+	if session != nil {
+		sessionJson, _ = json.Marshal(session)
+	} else {
+		sessionJson = []byte("{}")
+	}
+
+	var contextJson []byte
+	if contextVars {
+		contextJson, _ = json.Marshal(ctxGetData(r))
+	} else {
+		contextJson = []byte("{}")
+	}
+
+	bodyBuffer := bytes.NewBufferString("[")
+	bodyBuffer.Write(contextJson)
+	bodyBuffer.WriteString(",")
+	bodyBuffer.Write(sessionJson)
+	bodyBuffer.WriteString(",")
+	bodyBuffer.Write(body)
+	bodyBuffer.WriteString("]")
+
+	err = t.JQFilter.HandleJson(bodyBuffer.String())
 	if err != nil {
 		return errors.New("Input is not a valid JSON")
 	}

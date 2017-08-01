@@ -10,6 +10,7 @@
     "auth": {
         "auth_header_name": ""
     },
+    "enable_context_vars": true,
     "version_data": {
         "not_versioned": true,
         "versions": {
@@ -24,7 +25,7 @@
                     "transform_jq": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ". + {\"TRANSFORMED-REQUEST-BY-JQ\": true}"
+                        "filter": ". as [$context, $meta, $body] | $body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: $context.path, user_agent: $context.headers_User_Agent}"
                     }],
                     "transform_jq_response": [{
                         "path": "/post",
