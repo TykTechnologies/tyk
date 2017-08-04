@@ -237,14 +237,14 @@ func getAPISpecs() *[]*APISpec {
 	}).Printf("Detected %v APIs", len(*APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].AuthProvider = config.AuthOverride.AuthProvider
 
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
@@ -314,7 +314,7 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 		}).Info("Control API hostname set: ", hostname)
 	}
 
-    log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising Tyk REST API Endpoints")
 
@@ -877,7 +877,7 @@ func setupLogger() {
 func initialiseSystem(arguments map[string]interface{}) {
 
 	// Enable command mode
-	for k, _ := range CommandModeOptions {
+	for k := range CommandModeOptions {
 
 		v := arguments[k]
 
@@ -972,9 +972,9 @@ func initialiseSystem(arguments map[string]interface{}) {
 
 	go reloadLoop()
 
-    if config.HttpServerOptions.UseLE_SSL {
-        go StartPeriodicStateBackup(&LE_MANAGER)
-    }
+	if config.HttpServerOptions.UseLE_SSL {
+		go StartPeriodicStateBackup(&LE_MANAGER)
+	}
 }
 
 func getCmdArguments() map[string]interface{} {
@@ -1380,8 +1380,11 @@ func listen(l net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
 				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
-				Handler:      defaultRouter,
 			}
+
+			newServeMux := http.NewServeMux()
+			newServeMux.Handle("/", defaultRouter)
+			http.DefaultServeMux = newServeMux
 
 			// Accept connections in a new goroutine.
 			go s.Serve(l)
@@ -1391,7 +1394,9 @@ func listen(l net.Listener, err error) {
 				"prefix": "main",
 			}).Printf("Gateway started (%v)", VERSION)
 			if !RPC_EmergencyMode {
-				http.Handle("/", mainRouter)
+				newServeMux := http.NewServeMux()
+				newServeMux.Handle("/", mainRouter)
+				http.DefaultServeMux = newServeMux
 			}
 			go http.Serve(l, nil)
 			displayConfig()
@@ -1439,8 +1444,11 @@ func listen(l net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
 				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
-				Handler:      defaultRouter,
 			}
+
+			newServeMux := http.NewServeMux()
+			newServeMux.Handle("/", defaultRouter)
+			http.DefaultServeMux = newServeMux
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1452,7 +1460,11 @@ func listen(l net.Listener, err error) {
 				"prefix": "main",
 			}).Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
-			http.Handle("/", mainRouter)
+
+			newServeMux := http.NewServeMux()
+			newServeMux.Handle("/", mainRouter)
+			http.DefaultServeMux = newServeMux
+
 			go http.Serve(l, nil)
 		}
 
