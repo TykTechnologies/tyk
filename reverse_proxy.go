@@ -372,7 +372,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
 	if !spec.EnforcedTimeoutEnabled {
-		return false, 0
+		return false, globalConf.ProxyDefaultTimeout
 	}
 
 	_, versionPaths, _, _ := spec.Version(req)
@@ -383,7 +383,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 		return true, *intMeta
 	}
 
-	return false, 0
+	return false, globalConf.ProxyDefaultTimeout
 }
 
 func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Request) (bool, *ExtendedCircuitBreakerMeta) {
