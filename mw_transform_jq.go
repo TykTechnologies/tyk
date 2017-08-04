@@ -84,10 +84,10 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		return errors.New("Input is not a valid JSON")
 	}
 
-	filterResult := t.JQFilter.Next()
-	if filterResult {
-		transformed := t.JQFilter.ValueJson()
-		bodyBuffer := bytes.NewBufferString(transformed)
+	if t.JQFilter.Next() {
+		transformed, _ := json.Marshal(t.JQFilter.Value())
+
+		bodyBuffer := bytes.NewBuffer(transformed)
 		r.Body = ioutil.NopCloser(bodyBuffer)
 		r.ContentLength = int64(bodyBuffer.Len())
 	} else {
