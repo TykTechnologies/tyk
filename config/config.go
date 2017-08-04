@@ -238,6 +238,7 @@ type Config struct {
 	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
+	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
 }
 
 type CertData struct {
