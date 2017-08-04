@@ -250,6 +250,22 @@ func TestCoProcessReturnOverrides(t *testing.T) {
 	}
 }
 
+func TestCoProcessReturnOverridesErrorMessage(t *testing.T) {
+	spec := createSpecTest(t, basicCoProcessDef)
+	chain := buildCoProcessChain(spec, "hook_test_return_overrides_error", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
+	session := createNonThrottledSession()
+	spec.SessionManager.UpdateSession("abc", session, 60)
+
+	recorder := httptest.NewRecorder()
+
+	req := testReq(t, "GET", "/headers", nil)
+	req.Header.Set("authorization", "abc")
+	chain.ServeHTTP(recorder, req)
+	if recorder.Code != 401 || recorder.Body.String() != "{\n    \"error\": \"custom error message\"\n}" {
+		t.Fatal("ReturnOverrides HTTP response is invalid", recorder.Code, recorder.Body)
+	}
+}
+
 const basicCoProcessDef = `{
 	"api_id": "1",
 	"org_id": "default",
