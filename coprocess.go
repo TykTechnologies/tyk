@@ -263,7 +263,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Report in health check
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
 
-		return errors.New("Key not authorised"), int(returnObject.Request.ReturnOverrides.ResponseCode)
+		errorMsg := "Key not authorised"
+		if returnObject.Request.ReturnOverrides.ResponseError != "" {
+			errorMsg = returnObject.Request.ReturnOverrides.ResponseError
+		}
+
+		return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
 	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {
