@@ -37,6 +37,7 @@ import (
 )
 
 var log = logger.GetLogger()
+var rawLog = logger.GetRaw()
 var config = Config{}
 var templates = &template.Template{}
 var analytics = RedisAnalyticsHandler{}
@@ -811,6 +812,7 @@ func setupLogger() {
 
 		if err == nil {
 			log.Hooks.Add(hook)
+			rawLog.Hooks.Add(hook)
 		}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -827,6 +829,7 @@ func setupLogger() {
 
 		if err == nil {
 			log.Hooks.Add(hook)
+			rawLog.Hooks.Add(hook)
 		}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -841,6 +844,7 @@ func setupLogger() {
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
+		rawLog.Hooks.Add(hook)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -857,6 +861,7 @@ func setupLogger() {
 
 		if err == nil {
 			log.Hooks.Add(hook)
+			rawLog.Hooks.Add(hook)
 		}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -866,6 +871,7 @@ func setupLogger() {
 	if config.UseRedisLog {
 		redisHook := NewRedisHook()
 		log.Hooks.Add(redisHook)
+		rawLog.Hooks.Add(redisHook)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",

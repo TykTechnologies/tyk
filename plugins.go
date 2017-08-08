@@ -356,8 +356,7 @@ func (j *JSVM) LoadTykJSApi() {
 	})
 
 	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
-		io.WriteString(log.Out, call.Argument(0).String())
-		log.Out.Write([]byte("\n"))
+        rawLog.Print(call.Argument(0).String() + "\n")
 		return otto.Value{}
 	})
 
