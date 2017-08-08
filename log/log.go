@@ -9,9 +9,17 @@ import (
 )
 
 var log = logrus.New()
+var rawLog = logrus.New()
+
+type RawFormatter struct{}
+
+func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return []byte(entry.Message), nil
+}
 
 func init() {
 	log.Formatter = new(prefixed.TextFormatter)
+	rawLog.Formatter = new(RawFormatter)
 }
 
 func Get() *logrus.Logger {
@@ -26,4 +34,8 @@ func Get() *logrus.Logger {
 		log.Level = logrus.InfoLevel
 	}
 	return log
+}
+
+func GetRaw() *logrus.Logger {
+	return rawLog
 }
