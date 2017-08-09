@@ -205,11 +205,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 
 		// No override, and no load balancing? Use the existing target
-		req.URL.Scheme = targetToUse.Scheme
-		req.URL.Host = targetToUse.Host
 
-		// TODO: figure out a better fix for this
-		if targetToUse.Path != req.URL.Path {
+		// if this is false, there was an url rewrite, thus we
+		// don't want to do anything to the path - req.URL is
+		// already final.
+		if targetToUse == target {
+			req.URL.Scheme = targetToUse.Scheme
+			req.URL.Host = targetToUse.Host
 			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
 		}
 		if !spec.Proxy.PreserveHostHeader {
