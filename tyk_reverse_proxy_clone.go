@@ -236,13 +236,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if switchTargets {
 			targetToUse = newTarget
 		}
-		req.URL.Scheme = targetToUse.Scheme
-		req.URL.Host = targetToUse.Host
 
-		// TODO: figure out a better fix for this
-		if targetToUse.Path != req.URL.Path {
+        if targetToUse == target {
+            req.URL.Scheme = targetToUse.Scheme
+            req.URL.Host = targetToUse.Host
 			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
 		}
+
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
 		}
