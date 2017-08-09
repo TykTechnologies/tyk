@@ -242,6 +242,7 @@ type JSVM struct {
 	VM      *otto.Otto
 	Timeout time.Duration
 	Log     *logrus.Logger // logger used by the JS code
+	RawLog  *logrus.Logger // logger used by `rawlog` func to avoid formatting
 }
 
 // Init creates the JSVM with the core library (tyk.js) and sets up a
@@ -260,6 +261,7 @@ func (j *JSVM) Init() {
 
 	j.Timeout = 5 * time.Second
 	j.Log = log // use the global logger by default
+	j.RawLog = rawLog
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
@@ -309,7 +311,7 @@ func (j *JSVM) LoadTykJSApi() {
 	})
 
 	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
-		rawLog.Print(call.Argument(0).String() + "\n")
+		j.RawLog.Print(call.Argument(0).String() + "\n")
 		return otto.Value{}
 	})
 
