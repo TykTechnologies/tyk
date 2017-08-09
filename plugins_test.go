@@ -12,6 +12,7 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 func TestJSVMLogs(t *testing.T) {
@@ -21,6 +22,10 @@ func TestJSVMLogs(t *testing.T) {
 	jsvm.Log = logrus.New()
 	jsvm.Log.Out = &buf
 	jsvm.Log.Formatter = new(prefixed.TextFormatter)
+
+	jsvm.RawLog = logrus.New()
+	jsvm.RawLog.Out = &buf
+	jsvm.RawLog.Formatter = new(logger.RawFormatter)
 
 	const in = `
 log("foo")
