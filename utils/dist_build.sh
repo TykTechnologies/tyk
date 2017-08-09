@@ -27,6 +27,7 @@ ARCHTGZDIRS=(
 
 cliDIR=$ORGDIR/tyk-cli
 cliTmpDir=$SOURCEBINPATH/temp/cli
+DESCRIPTION="Tyk Open Source API Gateway written in Go"
 
 echo "Clearing CLI temp folder"
 rm -rf $cliTmpDir
