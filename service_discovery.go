@@ -145,54 +145,46 @@ func (s *ServiceDiscovery) SubObjectFromList(objList *gabs.Container) []string {
 		// pre-process the object since we've nested it
 		set = s.decodeToNameSpaceAsArray(arrayName, objList)
 		log.Debug("set: ", set)
-	} else {
-		// It's an object, but the value may be nested
-		if s.isNested {
-			// Get the actual raw string object
-			parentData := s.decodeToNameSpace(s.parentPath, objList)
-			// Get the data path from the decoded object
-			subContainer := gabs.Container{}
+	} else if s.isNested { // It's an object, but the value may be nested
+		// Get the actual raw string object
+		parentData := s.decodeToNameSpace(s.parentPath, objList)
+		// Get the data path from the decoded object
+		subContainer := gabs.Container{}
 
-			// Now check if this string is a list
-			nestedString, ok := parentData.(string)
-			if !ok {
-				log.Debug("parentData is not a string")
-				return hostList
-			}
-			if s.isList(nestedString) {
-				log.Debug("Yup, it's a list")
-				jsonData := s.rawListToObj(nestedString)
-				s.ParseObject(jsonData, &subContainer)
-				set = s.decodeToNameSpaceAsArray(arrayName, &subContainer)
-
-				// Hijack this here because we need to use a non-nested get
-				for _, item := range set {
-					log.Debug("Child in list: ", item)
-					hostname = s.Object(item) + s.targetPath
-					// Add to list
-					hostList = append(hostList, hostname)
-				}
-				return hostList
-			}
-			log.Debug("Not a list")
-			s.ParseObject(nestedString, &subContainer)
-			set = s.decodeToNameSpaceAsArray(s.dataPath, objList)
-			log.Debug("set (object list): ", objList)
-		} else if s.parentPath != "" {
-			set = s.decodeToNameSpaceAsArray(s.parentPath, objList)
+		// Now check if this string is a list
+		nestedString, ok := parentData.(string)
+		if !ok {
+			log.Debug("parentData is not a string")
+			return hostList
 		}
+		if s.isList(nestedString) {
+			log.Debug("Yup, it's a list")
+			jsonData := s.rawListToObj(nestedString)
+			s.ParseObject(jsonData, &subContainer)
+			set = s.decodeToNameSpaceAsArray(arrayName, &subContainer)
 
+			// Hijack this here because we need to use a non-nested get
+			for _, item := range set {
+				log.Debug("Child in list: ", item)
+				hostname = s.Object(item) + s.targetPath
+				// Add to list
+				hostList = append(hostList, hostname)
+			}
+			return hostList
+		}
+		log.Debug("Not a list")
+		s.ParseObject(nestedString, &subContainer)
+		set = s.decodeToNameSpaceAsArray(s.dataPath, objList)
+		log.Debug("set (object list): ", objList)
+	} else if s.parentPath != "" {
+		set = s.decodeToNameSpaceAsArray(s.parentPath, objList)
 	}
 
-	if set != nil {
-		for _, item := range set {
-			log.Debug("Child in list: ", item)
-			hostname = s.Hostname(item) + s.targetPath
-			// Add to list
-			hostList = append(hostList, hostname)
-		}
-	} else {
-		log.Debug("Set is nil")
+	for _, item := range set {
+		log.Debug("Child in list: ", item)
+		hostname = s.Hostname(item) + s.targetPath
+		// Add to list
+		hostList = append(hostList, hostname)
 	}
 	return hostList
 }
