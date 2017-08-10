@@ -219,6 +219,12 @@
 			"versionExact": "v1.3.0"
 		},
 		{
+			"checksumSHA1": "ypvLaN7/mVm3i/KN72AzXygyqkk=",
+			"path": "github.com/klyr/go-jq",
+			"revision": "6f915c7d523de62d2dbec8099795eb50ebe4f7ed",
+			"revisionTime": "2017-07-27T14:43:42Z"
+		},
+		{
 			"checksumSHA1": "Zgi7LCXXiFQYL84rwInvfJHEOQM=",
 			"path": "github.com/lonelycode/go-uuid/uuid",
 			"revision": "ed3ca8a15a931b141440a7e98e4f716eec255f7d",
