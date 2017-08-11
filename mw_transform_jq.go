@@ -55,15 +55,6 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		return err
 	}
 
-	var sessionJson []byte
-	session := ctxGetSession(r)
-
-	if session != nil {
-		sessionJson, _ = json.Marshal(session)
-	} else {
-		sessionJson = []byte("{}")
-	}
-
 	var contextJson []byte
 	if contextVars {
 		contextJson, _ = json.Marshal(ctxGetData(r))
@@ -73,8 +64,6 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 
 	bodyBuffer := bytes.NewBufferString("[")
 	bodyBuffer.Write(contextJson)
-	bodyBuffer.WriteString(",")
-	bodyBuffer.Write(sessionJson)
 	bodyBuffer.WriteString(",")
 	bodyBuffer.Write(body)
 	bodyBuffer.WriteString("]")
