@@ -44,15 +44,14 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 
 	t := meta.(*TransformJQSpec)
 
-	contextJson, _ := json.Marshal(ctxGetData(req))
+	reqContextJson, _ := json.Marshal(ctxGetData(req))
 
-	// XXX: Get the real session
-	sessionJson := []byte("{}")
+	resHeadersJson, _ := json.Marshal(res.Header)
 
 	bodyBuffer := bytes.NewBufferString("[")
-	bodyBuffer.Write(contextJson)
+	bodyBuffer.Write(reqContextJson)
 	bodyBuffer.WriteString(",")
-	bodyBuffer.Write(sessionJson)
+	bodyBuffer.Write(resHeadersJson)
 	bodyBuffer.WriteString(",")
 	bodyBuffer.Write(body)
 	bodyBuffer.WriteString("]")

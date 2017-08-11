@@ -30,7 +30,7 @@
                     "transform_jq_response": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ". as [$context, $meta, $body] | $body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true}"
+                        "filter": ". as [$reqContext, $resHeaders, $body] | $body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": $resHeaders}"
                     }]
                 }
             }
