@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -78,7 +79,7 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 				if thisSessionState.MetaData != nil {
 					tempVal, ok := thisSessionState.MetaData.(map[string]interface{})[metaKey]
 					if ok {
-						nVal = tempVal.(string)
+						nVal = fmt.Sprintf("%v", tempVal)
 						r.Header.Add(nKey, nVal)
 					} else {
 						log.Warning("Session Meta Data not found for key in map: ", metaKey)
