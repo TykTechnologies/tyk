@@ -197,7 +197,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, config
 		}
 
 		thisSessionState = newSessionState
-		thisSessionState.MetaData = map[string]string{"TykJWTSessionID": SessionID, "ClientID": thisClientID}
+		thisSessionState.MetaData = map[string]interface{}{"TykJWTSessionID": SessionID, "ClientID": thisClientID}
 		thisSessionState.Alias = thisClientID + ":" + user.ID
 
 		// Update the session in the session manager in case it gets called again

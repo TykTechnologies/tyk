@@ -113,10 +113,34 @@ func (u URLRewriter) Rewrite(thisMeta *tykcommon.URLRewriteMeta, path string, us
 			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
 			log.Debug("Replacing: ", v[0])
 
-			tempVal, ok := thisSessionState.MetaData[contextKey]
+			tempVal, ok := thisSessionState.MetaData.(map[string]interface{})[contextKey]
 			if ok {
-				nVal := tempVal
-				newpath = strings.Replace(newpath, string(v[0]), url.QueryEscape(nVal), -1)
+				var nVal string
+				if ok {
+					switch tempVal.(type) {
+					case string:
+						nVal = tempVal.(string)
+					case []string:
+						nVal = strings.Join(tempVal.([]string), ",")
+						// Remove empty start
+						nVal = strings.TrimPrefix(nVal, ",")
+					case url.Values:
+						end := len(tempVal.(url.Values))
+						i := 0
+						nVal = ""
+						for key, val := range tempVal.(url.Values) {
+							nVal += key + ":" + strings.Join(val, ",")
+							if i < end-1 {
+								nVal += ";"
+							}
+							i++
+						}
+					default:
+						log.Error("Context variable type is not supported: ", reflect.TypeOf(tempVal))
+					}
+					newpath = strings.Replace(newpath, string(v[0]), url.QueryEscape(nVal), -1)
+				}
+
 			}
 
 		}
