@@ -57,7 +57,7 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 			if len(h.Spec.target.Path) != 0 {
 				newHeaderValue = strings.Replace(
 					newHeaderValue, h.Spec.target.Path,
-					h.Spec.Proxy.ListenPath, -1)
+					h.Spec.Proxy.ListenPath, 1)
 			} else {
 				newHeaderValue = strings.Replace(
 					newHeaderValue, req.URL.Path,
