@@ -25,12 +25,12 @@
                     "transform_jq": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ". as [$context, $body] | $body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: $context.path, user_agent: $context.headers_User_Agent}"
+                        "filter": ". as [$context, $body] | $body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: $context.path, user_agent: $context.headers_User_Agent}, . as [$context, $body] | {\"output_headers\": {\"X-M2M-Origin\": \"CSE3219/C9886\", \"DEVICE\": $body.DEVICEID}}"
                     }],
                     "transform_jq_response": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ". as [$reqContext, $resHeaders, $body] | $body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": $resHeaders}"
+                        "filter": ". as [$reqContext, $resHeaders, $body] | $body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": $resHeaders}, . as [$context, $resHeaders, $body] | {\"output_headers\": {\"JQ-Response-header\": $body.origin}}"
                     }]
                 }
             }

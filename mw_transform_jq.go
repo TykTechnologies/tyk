@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/Sirupsen/logrus"
+	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/Sirupsen/logrus"
 )
 
 type TransformJQMiddleware struct {
 	*BaseMiddleware
+}
+
+type JQTransformOptions struct {
+	OutputHeaders map[string]string `mapstructure:"output_headers"`
 }
 
 func (t *TransformJQMiddleware) GetName() string {
@@ -73,6 +77,7 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		return errors.New("Input is not a valid JSON")
 	}
 
+	// First element is the transformed body
 	if t.JQFilter.Next() {
 		transformed, _ := json.Marshal(t.JQFilter.Value())
 
@@ -81,6 +86,23 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		r.ContentLength = int64(bodyBuffer.Len())
 	} else {
 		return errors.New("Errors while applying JQ filter to input")
+	}
+
+	// Second optional element is an object like:
+	// { "output_headers": {"header_name": "header_value", ...}}
+	if t.JQFilter.Next() {
+		options := t.JQFilter.Value()
+
+		var opts JQTransformOptions
+		err := mapstructure.Decode(options, &opts)
+		if err != nil {
+			return errors.New("Errors while reading JQ filter transform options")
+		}
+
+		// Replace header in the request
+		for hName, hValue := range opts.OutputHeaders {
+			r.Header.Set(hName, hValue)
+		}
 	}
 
 	return nil

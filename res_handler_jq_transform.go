@@ -72,5 +72,22 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		errors.New("Error while applying JQ filter to upstream response")
 	}
 
+	// Second optional element is an object like:
+	// { "output_headers": {"header_name": "header_value", ...}}
+	if t.JQFilter.Next() {
+		options := t.JQFilter.Value()
+
+		var opts JQTransformOptions
+		err := mapstructure.Decode(options, &opts)
+		if err != nil {
+			return errors.New("Errors while reading JQ filter transform options")
+		}
+
+		// Replace header in the response
+		for hName, hValue := range opts.OutputHeaders {
+			res.Header.Set(hName, hValue)
+		}
+	}
+
 	return nil
 }
