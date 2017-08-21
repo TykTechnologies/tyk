@@ -497,7 +497,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	addrs := requestAddrs(req)
+	addrs := requestIPHops(req)
 	outreq.Header.Set("X-Forwarded-For", addrs)
 
 	// Circuit breaker
