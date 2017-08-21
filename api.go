@@ -84,25 +84,23 @@ func GetSpecForOrg(apiID string) *APISpec {
 }
 
 func checkAndApplyTrialPeriod(keyName, apiId string, newSession *SessionState) {
-	// Check the policy to see if we are forcing an expiry on the key
-	if newSession.ApplyPolicyID == "" {
-		return
-	}
-	policiesMu.RLock()
-	policy, ok := policiesByID[newSession.ApplyPolicyID]
-	policiesMu.RUnlock()
-	if !ok {
-		return
-	}
-	// Are we foring an expiry?
-	if policy.KeyExpiresIn > 0 {
-		// We are, does the key exist?
-		_, found := GetKeyDetail(keyName, apiId)
-		if !found {
-			// this is a new key, lets expire it
-			newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
+	// Check the policies to see if we are forcing an expiry on the key
+	for _, polID := range newSession.PolicyIDs() {
+		policiesMu.RLock()
+		policy, ok := policiesByID[polID]
+		policiesMu.RUnlock()
+		if !ok {
+			continue
 		}
-
+		// Are we foring an expiry?
+		if policy.KeyExpiresIn > 0 {
+			// We are, does the key exist?
+			_, found := GetKeyDetail(keyName, apiId)
+			if !found {
+				// this is a new key, lets expire it
+				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
+			}
+		}
 	}
 }
 
@@ -644,7 +642,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 
 	// Set the policy
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	sess.ApplyPolicyID = policyId
+	sess.SetPolicies(policyId)
 
 	sessAsJS, err := json.Marshal(sess)
 	if err != nil {

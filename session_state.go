@@ -52,11 +52,12 @@ type SessionState struct {
 	JWTData struct {
 		Secret string `json:"secret" msg:"secret"`
 	} `json:"jwt_data" msg:"jwt_data"`
-	HMACEnabled   bool   `json:"hmac_enabled" msg:"hmac_enabled"`
-	HmacSecret    string `json:"hmac_string" msg:"hmac_string"`
-	IsInactive    bool   `json:"is_inactive" msg:"is_inactive"`
-	ApplyPolicyID string `json:"apply_policy_id" msg:"apply_policy_id"`
-	DataExpires   int64  `json:"data_expires" msg:"data_expires"`
+	HMACEnabled   bool     `json:"hmac_enabled" msg:"hmac_enabled"`
+	HmacSecret    string   `json:"hmac_string" msg:"hmac_string"`
+	IsInactive    bool     `json:"is_inactive" msg:"is_inactive"`
+	ApplyPolicyID string   `json:"apply_policy_id" msg:"apply_policy_id"`
+	ApplyPolicies []string `json:"apply_policies" msg:"apply_policies"`
+	DataExpires   int64    `json:"data_expires" msg:"data_expires"`
 	Monitor       struct {
 		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
 	} `json:"monitor" msg:"monitor"`
@@ -115,4 +116,22 @@ func getLifetime(spec *APISpec, session *SessionState) int64 {
 		return spec.SessionLifetime
 	}
 	return 0
+}
+
+// PolicyIDs returns the IDs of all the policies applied to this
+// session. For backwards compatibility reasons, this falls back to
+// ApplyPolicyID if ApplyPolicies is empty.
+func (s *SessionState) PolicyIDs() []string {
+	if len(s.ApplyPolicies) > 0 {
+		return s.ApplyPolicies
+	}
+	if s.ApplyPolicyID != "" {
+		return []string{s.ApplyPolicyID}
+	}
+	return nil
+}
+
+func (s *SessionState) SetPolicies(ids ...string) {
+	s.ApplyPolicyID = ""
+	s.ApplyPolicies = ids
 }

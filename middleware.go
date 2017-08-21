@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -153,33 +154,77 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	return cachedVal.(int64)
 }
 
-// ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
-func (t BaseMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
-	if session.ApplyPolicyID == "" {
-		return
-	}
-	policiesMu.RLock()
-	policy, ok := policiesByID[session.ApplyPolicyID]
-	policiesMu.RUnlock()
-	if !ok {
-		return
-	}
-	// Check ownership, policy org owner must be the same as API,
-	// otherwise youcould overwrite a session key with a policy from a different org!
-	if policy.OrgID != t.Spec.OrgID {
-		log.Error("Attempting to apply policy from different organisation to key, skipping")
-		return
-	}
+// ApplyPolicies will check if any policies are loaded. If any are, it
+// will overwrite the session state to use the policy values.
+func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) {
+	tags := make(map[string]bool)
+	didQuota, didRateLimit, didACL := false, false, false
+	policies := session.PolicyIDs()
+	for i, polID := range policies {
+		policiesMu.RLock()
+		policy, ok := policiesByID[polID]
+		policiesMu.RUnlock()
+		if !ok {
+			return
+		}
+		// Check ownership, policy org owner must be the same as API,
+		// otherwise youcould overwrite a session key with a policy from a different org!
+		if policy.OrgID != t.Spec.OrgID {
+			log.Error("Attempting to apply policy from different organisation to key, skipping")
+			return
+		}
 
-	if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
-		// This is a partitioned policy, only apply what is active
-		if policy.Partitions.Quota {
+		if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
+			// This is a partitioned policy, only apply what is active
+			if policy.Partitions.Quota {
+				if didQuota {
+					log.Error("Cannot apply multiple quota policies")
+					return
+				}
+				didQuota = true
+				// Quotas
+				session.QuotaMax = policy.QuotaMax
+				session.QuotaRenewalRate = policy.QuotaRenewalRate
+			}
+
+			if policy.Partitions.RateLimit {
+				if didRateLimit {
+					log.Error("Cannot apply multiple rate limit policies")
+					return
+				}
+				didRateLimit = true
+				// Rate limting
+				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+				session.Rate = policy.Rate
+				session.Per = policy.Per
+				if policy.LastUpdated != "" {
+					session.LastUpdated = policy.LastUpdated
+				}
+			}
+
+			if policy.Partitions.Acl {
+				// ACL
+				if !didACL { // first, overwrite rights
+					session.AccessRights = policy.AccessRights
+					didACL = true
+				} else { // second or later, merge
+					for k, v := range policy.AccessRights {
+						session.AccessRights[k] = v
+					}
+				}
+				session.HMACEnabled = policy.HMACEnabled
+			}
+
+		} else {
+			if len(policies) > 1 {
+				log.Error("Cannot apply multiple policies if any are non-partitioned")
+				return
+			}
+			// This is not a partitioned policy, apply everything
 			// Quotas
 			session.QuotaMax = policy.QuotaMax
 			session.QuotaRenewalRate = policy.QuotaRenewalRate
-		}
 
-		if policy.Partitions.RateLimit {
 			// Rate limting
 			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 			session.Rate = policy.Rate
@@ -187,37 +232,26 @@ func (t BaseMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 			if policy.LastUpdated != "" {
 				session.LastUpdated = policy.LastUpdated
 			}
-		}
 
-		if policy.Partitions.Acl {
 			// ACL
 			session.AccessRights = policy.AccessRights
 			session.HMACEnabled = policy.HMACEnabled
 		}
 
-	} else {
-		// This is not a partitioned policy, apply everything
-		// Quotas
-		session.QuotaMax = policy.QuotaMax
-		session.QuotaRenewalRate = policy.QuotaRenewalRate
-
-		// Rate limting
-		session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-		session.Rate = policy.Rate
-		session.Per = policy.Per
-		if policy.LastUpdated != "" {
-			session.LastUpdated = policy.LastUpdated
+		// Required for all
+		if i == 0 { // if any is true, key is inactive
+			session.IsInactive = policy.IsInactive
+		} else if policy.IsInactive {
+			session.IsInactive = true
 		}
-
-		// ACL
-		session.AccessRights = policy.AccessRights
-		session.HMACEnabled = policy.HMACEnabled
+		for _, tag := range policy.Tags {
+			tags[tag] = true
+		}
 	}
-
-	// Required for all
-	session.IsInactive = policy.IsInactive
-	session.Tags = policy.Tags
-
+	session.Tags = make([]string, 0, len(tags))
+	for tag := range tags {
+		session.Tags = append(session.Tags, tag)
+	}
 	// Update the session in the session manager in case it gets called again
 	t.Spec.SessionManager.UpdateSession(key, session, getLifetime(t.Spec, session))
 }
@@ -233,7 +267,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		if found {
 			log.Debug("--> Key found in local cache")
 			session := cachedVal.(SessionState)
-			t.ApplyPolicyIfExists(key, &session)
+			t.ApplyPolicies(key, &session)
 			return session, true
 		}
 	}
@@ -247,7 +281,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		go SessionCache.Set(key, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		t.ApplyPolicyIfExists(key, &session)
+		t.ApplyPolicies(key, &session)
 		log.Debug("--> Got key")
 		return session, true
 	}
@@ -263,7 +297,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		go SessionCache.Set(key, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		t.ApplyPolicyIfExists(key, &session)
+		t.ApplyPolicies(key, &session)
 
 		log.Debug("Lifetime is: ", getLifetime(t.Spec, &session))
 		// Need to set this in order for the write to work!
