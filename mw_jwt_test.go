@@ -159,7 +159,7 @@ func createJWTSessionWithRSA() *SessionState {
 
 func createJWTSessionWithRSAWithPolicy() *SessionState {
 	session := createJWTSessionWithRSA()
-	session.ApplyPolicyID = "987654321"
+	session.SetPolicies("987654321")
 	return session
 }
 

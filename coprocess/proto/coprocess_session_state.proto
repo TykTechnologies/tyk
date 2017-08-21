@@ -68,4 +68,5 @@ message SessionState {
 
   int64 id_extractor_deadline = 27;
   int64 session_lifetime = 28;
+  repeated string apply_policies = 29;
 }

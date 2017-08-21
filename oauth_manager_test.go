@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -282,7 +283,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		t.Error("Key was not created (Can't find it)!")
 	}
 
-	if session.ApplyPolicyID != "TEST-4321" {
+	if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
 		t.Error("Policy not added to token!")
 	}
 }

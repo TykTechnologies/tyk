@@ -180,12 +180,13 @@ func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 			return "", false
 		}
 
-		if clientSession.ApplyPolicyID == "" {
+		pols := clientSession.PolicyIDs()
+		if len(pols) < 1 {
 			return "", false
 		}
 
 		// Use the policy from the client ID
-		return clientSession.ApplyPolicyID, true
+		return pols[0], true
 	}
 
 	return "", false
@@ -440,7 +441,7 @@ func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (Session
 		orgID = policy.OrgID
 	}
 
-	session.ApplyPolicyID = policyID
+	session.SetPolicies(policyID)
 	session.OrgID = orgID
 	session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 	session.Rate = policy.Rate
