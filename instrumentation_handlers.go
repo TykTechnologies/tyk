@@ -50,7 +50,7 @@ func InstrumentationMW(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 		job.EventKv("called", health.Kvs{
-			"from_ip":  r.RemoteAddr,
+			"from_ip":  requestIP(r),
 			"method":   r.Method,
 			"endpoint": r.URL.Path,
 			"raw_url":  r.URL.String(),

@@ -47,6 +47,7 @@ func TestContextVarsMiddleware(t *testing.T) {
 	req := testReq(t, method, uri+param.Encode(), nil)
 	req.RemoteAddr = "127.0.0.1:80"
 	req.Header.Set("authorization", "1234wer")
+	req.Header.Set("x-forwarded-for", "1.2.3.4, 5.6.7.8")
 
 	chain := getChain(spec)
 	chain.ServeHTTP(recorder, req)
@@ -63,8 +64,11 @@ func TestContextVarsMiddleware(t *testing.T) {
 		t.Fatal("Could not find Path in header")
 	}
 
-	if req.Header.Get("X-Remote-Addr") == "" {
+	addr := req.Header.Get("X-Remote-Addr")
+	if addr == "" {
 		t.Fatal("Could not find Remote-Addr in header")
+	} else if addr != "1.2.3.4" {
+		t.Fatal("Remote-Addr is not the expected value")
 	}
 
 	if req.Header.Get("X-Request-ID") == "" {

@@ -168,7 +168,7 @@ func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 	log.WithFields(logrus.Fields{
 		"prefix": "hmac",
 		"path":   r.URL.Path,
-		"origin": r.RemoteAddr,
+		"origin": requestIP(r),
 	}).Info("Authorization field missing or malformed")
 
 	AuthFailed(hm, r, r.Header.Get("Authorization"))
