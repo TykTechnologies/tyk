@@ -26,15 +26,18 @@ func requestIP(r *http.Request) string {
 	return host
 }
 
-func requestAddrs(r *http.Request) string {
-	addrs := r.RemoteAddr
+func requestIPHops(r *http.Request) string {
+	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return ""
+	}
 	// If we aren't the first proxy retain prior
 	// X-Forwarded-For information as a comma+space
 	// separated list and fold multiple headers into one.
 	if prior, ok := r.Header["X-Forwarded-For"]; ok {
-		addrs = strings.Join(prior, ", ") + ", " + addrs
+		clientIP = strings.Join(prior, ", ") + ", " + clientIP
 	}
-	return addrs
+	return clientIP
 }
 
 func CopyHttpRequest(r *http.Request) *http.Request {
