@@ -49,7 +49,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 	contextDataObject["path"] = copiedRequest.URL.Path
 
 	// IP:Port
-	contextDataObject["remote_addr"] = copiedRequest.RemoteAddr
+	contextDataObject["remote_addr"] = requestIP(copiedRequest)
 
 	//Correlation ID
 	contextDataObject["request_id"] = uuid.NewV4().String()

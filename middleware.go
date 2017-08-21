@@ -54,7 +54,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
-				"from_ip":  r.RemoteAddr,
+				"from_ip":  requestIP(r),
 				"method":   r.Method,
 				"endpoint": r.URL.Path,
 				"raw_url":  r.URL.String(),
