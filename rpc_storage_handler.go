@@ -125,7 +125,6 @@ func (r *RPCStorageHandler) ReConnect() {
 
 var RPCCLientSingleton *gorpc.Client
 var RPCCLientSingletonMu sync.Mutex
-var RPCClientSingletonConnectionID string
 var RPCFuncClientSingleton *gorpc.DispatcherClient
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
 var RPCClientIsConnected bool
@@ -141,11 +140,11 @@ func (r *RPCStorageHandler) Connect() bool {
 	// Set up the cache
 	log.Info("Setting new RPC connection!")
 
-	RPCClientSingletonConnectionID = uuid.NewV4().String()
+	connID := uuid.NewV4().String()
 
 	// Length should fit into 1 byte. Protection if we decide change uuid in future.
-	if len(RPCClientSingletonConnectionID) > 255 {
-		panic("RPCClientSingletonConnectionID is too long")
+	if len(connID) > 255 {
+		panic("connID is too long")
 	}
 
 	if globalConf.SlaveOptions.UseSSL {
@@ -185,8 +184,8 @@ func (r *RPCStorageHandler) Connect() bool {
 		}
 
 		conn.Write([]byte("proto2"))
-		conn.Write([]byte{byte(len(RPCClientSingletonConnectionID))})
-		conn.Write([]byte(RPCClientSingletonConnectionID))
+		conn.Write([]byte{byte(len(connID))})
+		conn.Write([]byte(connID))
 		return conn, nil
 	}
 	RPCCLientSingleton.Start()
