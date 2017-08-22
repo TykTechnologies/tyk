@@ -244,19 +244,17 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
 
-	if RPC_LoadCount == 0 {
-		if !RPC_EmergencyModeLoaded {
-			log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
-			apiList := LoadDefinitionsFromRPCBackup()
-			log.Warning("[RPC Store] --> Done")
-			if apiList != nil {
-				RPC_EmergencyMode = true
-				log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-				doLoadWithBackup(apiList)
-			}
-
-			//LoadPoliciesFromRPCBackup()
+	if RPC_LoadCount == 0 && !RPC_EmergencyModeLoaded {
+		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
+		apiList := LoadDefinitionsFromRPCBackup()
+		log.Warning("[RPC Store] --> Done")
+		if apiList != nil {
+			RPC_EmergencyMode = true
+			log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
+			doLoadWithBackup(apiList)
 		}
+
+		//LoadPoliciesFromRPCBackup()
 	}
 
 	time.Sleep(time.Second * 3)
@@ -632,11 +630,9 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 
 	defString, err := RPCFuncClientSingleton.CallTimeout("GetApiDefinitions", dr, GlobalRPCCallTimeout)
 
-	if err != nil {
-		if r.IsAccessError(err) {
-			r.Login()
-			return r.GetApiDefinitions(orgId, tags)
-		}
+	if err != nil && r.IsAccessError(err) {
+		r.Login()
+		return r.GetApiDefinitions(orgId, tags)
 	}
 	log.Debug("API Definitions retrieved")
 
@@ -644,27 +640,21 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		log.Warning("RPC Handler: GetApiDefinitions() returned nil, returning empty string")
 		return ""
 	}
-
 	return defString.(string)
-
 }
 
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 	defString, err := RPCFuncClientSingleton.CallTimeout("GetPolicies", orgId, GlobalRPCCallTimeout)
-	if err != nil {
-		if r.IsAccessError(err) {
-			r.Login()
-			return r.GetPolicies(orgId)
-		}
+	if err != nil && r.IsAccessError(err) {
+		r.Login()
+		return r.GetPolicies(orgId)
 	}
 
 	if defString != nil {
 		return defString.(string)
 	}
-
 	return ""
-
 }
 
 // CheckForReload will start a long poll

@@ -117,16 +117,14 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if globalConf.PublicKeyPath != "" {
-		if notificationVerifier == nil {
-			var err error
-			notificationVerifier, err = goverify.LoadPublicKeyFromFile(globalConf.PublicKeyPath)
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "pub-sub",
-				}).Error("Notification signer: Failed loading private key from path: ", err)
-				return false
-			}
+	if globalConf.PublicKeyPath != "" && notificationVerifier == nil {
+		var err error
+		notificationVerifier, err = goverify.LoadPublicKeyFromFile(globalConf.PublicKeyPath)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "pub-sub",
+			}).Error("Notification signer: Failed loading private key from path: ", err)
+			return false
 		}
 	}
 
