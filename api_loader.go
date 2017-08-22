@@ -40,11 +40,6 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
-func prepareSortOrder(apiSpecs []*APISpec) {
-	sort.Sort(SortableAPISpecListByHost(apiSpecs))
-	sort.Sort(SortableAPISpecListByListen(apiSpecs))
-}
-
 func skipSpecBecauseInvalid(spec *APISpec) bool {
 
 	if spec.Proxy.ListenPath == "" {
@@ -578,7 +573,11 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 	// Only create this once, add other types here as needed, seems wasteful but we can let the GC handle it
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore := prepareStorage()
 
-	prepareSortOrder(apiSpecs)
+	// sort by listen path from longer to shorter, so that /foo
+	// doesn't break /foo-bar
+	sort.Slice(apiSpecs, func(i, j int) bool {
+		return len(apiSpecs[i].Proxy.ListenPath) > len(apiSpecs[j].Proxy.ListenPath)
+	})
 
 	chainChannel := make(chan *ChainObject)
 

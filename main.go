@@ -532,30 +532,6 @@ func isRPCMode() bool {
 		globalConf.AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
 }
 
-type SortableAPISpecListByListen []*APISpec
-
-func (s SortableAPISpecListByListen) Len() int {
-	return len(s)
-}
-func (s SortableAPISpecListByListen) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-func (s SortableAPISpecListByListen) Less(i, j int) bool {
-	return len(s[i].Proxy.ListenPath) > len(s[j].Proxy.ListenPath)
-}
-
-type SortableAPISpecListByHost []*APISpec
-
-func (s SortableAPISpecListByHost) Len() int {
-	return len(s)
-}
-func (s SortableAPISpecListByHost) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-func (s SortableAPISpecListByHost) Less(i, j int) bool {
-	return len(s[i].Domain) > len(s[j].Domain)
-}
-
 func rpcReloadLoop(rpcKey string) {
 	for {
 		RPCListener.CheckForReload(rpcKey)
