@@ -515,7 +515,9 @@ func TestResetHandler(t *testing.T) {
 }
 
 func TestResetHandlerBlock(t *testing.T) {
+	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
 	loadSampleAPI(t, apiTestDef)
 
 	recorder := httptest.NewRecorder()
@@ -530,9 +532,11 @@ func TestResetHandlerBlock(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Fatal("Hot reload failed, response code was: ", recorder.Code)
 	}
+	apisMu.RLock()
 	if len(apisByID) == 0 {
 		t.Fatal("Hot reload was triggered but no APIs were found.")
 	}
+	apisMu.RUnlock()
 }
 
 func TestGroupResetHandler(t *testing.T) {
