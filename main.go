@@ -372,7 +372,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	oauthManager := OAuthManager{spec, osinServer}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
-	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(http.HandlerFunc(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST"))))
+	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
 	muxer.HandleFunc(clientAuthPath, allowMethods(oauthHandlers.HandleAuthorizePassthrough, "GET", "POST"))
 	muxer.HandleFunc(clientAccessPath, allowMethods(oauthHandlers.HandleAccessRequest, "GET", "POST"))
 
