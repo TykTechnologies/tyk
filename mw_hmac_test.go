@@ -416,10 +416,10 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	}
 }
 
-func getUpperCaseEscaped(signature string) (bool, []string) {
+func getUpperCaseEscaped(signature string) []string {
 	r := regexp.MustCompile(`%[A-F0-9][A-F0-9]`)
 	foundList := r.FindAllString(signature, -1)
-	return len(foundList) > 0, foundList
+	return foundList
 }
 
 func replaceUpperCase(originalSignature string, lowercaseList []string) string {
@@ -474,7 +474,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	sigString := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	encodedString := url.QueryEscape(sigString)
 
-	_, upperCaseList := getUpperCaseEscaped(encodedString)
+	upperCaseList := getUpperCaseEscaped(encodedString)
 	newEncodedSignature := replaceUpperCase(encodedString, upperCaseList)
 
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"9876\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", newEncodedSignature))

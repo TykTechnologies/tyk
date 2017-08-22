@@ -88,7 +88,7 @@ type OAuthHandlers struct {
 	Manager OAuthManager
 }
 
-func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.Response) ([]byte, bool) {
+func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.Response) []byte {
 
 	// TODO: Might need to clear this out
 	if osinResponse.Output["state"] == "" {
@@ -104,16 +104,14 @@ func (o *OAuthHandlers) generateOAuthOutputFromOsinResponse(osinResponse *osin.R
 
 	respData, err := json.Marshal(&osinResponse.Output)
 	if err != nil {
-		return nil, false
+		return nil
 	}
-	return respData, true
-
+	return respData
 }
 
-func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification) bool {
+func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification) {
 	log.Info("[OAuth] Notifying client host")
 	go o.Manager.API.NotificationsDetails.SendRequest(false, 0, notification)
-	return true
 }
 
 // HandleGenerateAuthCodeData handles a resource provider approving an OAuth request from a client
@@ -127,7 +125,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 	// Handle the authorisation and write the JSON output to the resource provider
 	resp := o.Manager.HandleAuthorisation(r, true, sessionStateJSONData)
 	code := 200
-	msg, _ := o.generateOAuthOutputFromOsinResponse(resp)
+	msg := o.generateOAuthOutputFromOsinResponse(resp)
 	if resp.IsError {
 		code = resp.ErrorStatusCode
 		log.Error("[OAuth] OAuth response marked as error: ", resp)
@@ -170,7 +168,7 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
-	msg, _ := o.generateOAuthOutputFromOsinResponse(resp)
+	msg := o.generateOAuthOutputFromOsinResponse(resp)
 	if resp.IsError {
 		// Something went wrong, write out the error details and kill the response
 		w.WriteHeader(resp.ErrorStatusCode)
