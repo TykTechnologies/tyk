@@ -96,15 +96,13 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// Ensure that the username and password match up
 	var passMatch bool
-	if session.BasicAuthData.Hash == HashBCrypt {
+	switch session.BasicAuthData.Hash {
+	case HashBCrypt:
 		err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(authValues[1]))
-
 		if err == nil {
 			passMatch = true
 		}
-	}
-
-	if session.BasicAuthData.Hash == HashPlainText {
+	case HashPlainText:
 		if session.BasicAuthData.Password == authValues[1] {
 			passMatch = true
 		}

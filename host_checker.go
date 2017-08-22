@@ -80,13 +80,11 @@ func (h *HostUptimeChecker) HostCheckLoop() {
 			<-hostCheckTicker
 		}
 		h.resetListMu.Lock()
-		if h.doResetList {
-			if h.newList != nil {
-				h.HostList = h.newList
-				h.newList = nil
-				h.doResetList = false
-				log.Debug("[HOST CHECKER] Host list reset")
-			}
+		if h.doResetList && h.newList != nil {
+			h.HostList = h.newList
+			h.newList = nil
+			h.doResetList = false
+			log.Debug("[HOST CHECKER] Host list reset")
 		}
 		h.resetListMu.Unlock()
 		for _, host := range h.HostList {

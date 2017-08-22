@@ -462,11 +462,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	log.Debug("UPSTREAM REQUEST URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
-	if p.TykAPISpec.URLRewriteEnabled {
-		if req.Context().Value(RetainHost) == true {
-			log.Debug("Detected host rewrite, notifying director")
-			setCtxValue(outreq, RetainHost, true)
-		}
+	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(RetainHost) == true {
+		log.Debug("Detected host rewrite, notifying director")
+		setCtxValue(outreq, RetainHost, true)
 	}
 
 	if req.ContentLength == 0 {
