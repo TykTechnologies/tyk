@@ -22,7 +22,6 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\n\x16\x63oprocess_common.proto\x12\tcoprocess\"\x1c\n\x0bStringSlice\x12\r\n\x05items\x18\x01 \x03(\t*O\n\x08HookType\x12\x0b\n\x07Unknown\x10\x00\x12\x07\n\x03Pre\x10\x01\x12\x08\n\x04Post\x10\x02\x12\x0f\n\x0bPostKeyAuth\x10\x03\x12\x12\n\x0e\x43ustomKeyCheck\x10\x04\x62\x06proto3')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _HOOKTYPE = _descriptor.EnumDescriptor(
   name='HookType',
@@ -99,6 +98,7 @@ _STRINGSLICE = _descriptor.Descriptor(
 
 DESCRIPTOR.message_types_by_name['StringSlice'] = _STRINGSLICE
 DESCRIPTOR.enum_types_by_name['HookType'] = _HOOKTYPE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 StringSlice = _reflection.GeneratedProtocolMessageType('StringSlice', (_message.Message,), dict(
   DESCRIPTOR = _STRINGSLICE,
