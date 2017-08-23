@@ -21,7 +21,6 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\n coprocess_return_overrides.proto\x12\tcoprocess\"\xaa\x01\n\x0fReturnOverrides\x12\x15\n\rresponse_code\x18\x01 \x01(\x05\x12\x16\n\x0eresponse_error\x18\x02 \x01(\t\x12\x38\n\x07headers\x18\x03 \x03(\x0b\x32\'.coprocess.ReturnOverrides.HeadersEntry\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -110,6 +109,7 @@ _RETURNOVERRIDES = _descriptor.Descriptor(
 _RETURNOVERRIDES_HEADERSENTRY.containing_type = _RETURNOVERRIDES
 _RETURNOVERRIDES.fields_by_name['headers'].message_type = _RETURNOVERRIDES_HEADERSENTRY
 DESCRIPTOR.message_types_by_name['ReturnOverrides'] = _RETURNOVERRIDES
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 ReturnOverrides = _reflection.GeneratedProtocolMessageType('ReturnOverrides', (_message.Message,), dict(
 

@@ -19,9 +19,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_session_state.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_pb=_b('\n\x1d\x63oprocess_session_state.proto\x12\tcoprocess\"*\n\nAccessSpec\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0f\n\x07methods\x18\x02 \x03(\t\"s\n\x10\x41\x63\x63\x65ssDefinition\x12\x10\n\x08\x61pi_name\x18\x01 \x01(\t\x12\x0e\n\x06\x61pi_id\x18\x02 \x01(\t\x12\x10\n\x08versions\x18\x03 \x03(\t\x12+\n\x0c\x61llowed_urls\x18\x04 \x03(\x0b\x32\x15.coprocess.AccessSpec\"/\n\rBasicAuthData\x12\x10\n\x08password\x18\x01 \x01(\t\x12\x0c\n\x04hash\x18\x02 \x01(\t\"\x19\n\x07JWTData\x12\x0e\n\x06secret\x18\x01 \x01(\t\"!\n\x07Monitor\x12\x16\n\x0etrigger_limits\x18\x01 \x03(\x01\"\xf8\x06\n\x0cSessionState\x12\x12\n\nlast_check\x18\x01 \x01(\x03\x12\x11\n\tallowance\x18\x02 \x01(\x01\x12\x0c\n\x04rate\x18\x03 \x01(\x01\x12\x0b\n\x03per\x18\x04 \x01(\x01\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\tquota_max\x18\x06 \x01(\x03\x12\x14\n\x0cquota_renews\x18\x07 \x01(\x03\x12\x17\n\x0fquota_remaining\x18\x08 \x01(\x03\x12\x1a\n\x12quota_renewal_rate\x18\t \x01(\x03\x12@\n\raccess_rights\x18\n \x03(\x0b\x32).coprocess.SessionState.AccessRightsEntry\x12\x0e\n\x06org_id\x18\x0b \x01(\t\x12\x17\n\x0foauth_client_id\x18\x0c \x01(\t\x12:\n\noauth_keys\x18\r \x03(\x0b\x32&.coprocess.SessionState.OauthKeysEntry\x12\x31\n\x0f\x62\x61sic_auth_data\x18\x0e \x01(\x0b\x32\x18.coprocess.BasicAuthData\x12$\n\x08jwt_data\x18\x0f \x01(\x0b\x32\x12.coprocess.JWTData\x12\x14\n\x0chmac_enabled\x18\x10 \x01(\x08\x12\x13\n\x0bhmac_secret\x18\x11 \x01(\t\x12\x13\n\x0bis_inactive\x18\x12 \x01(\x08\x12\x17\n\x0f\x61pply_policy_id\x18\x13 \x01(\t\x12\x14\n\x0c\x64\x61ta_expires\x18\x14 \x01(\x03\x12#\n\x07monitor\x18\x15 \x01(\x0b\x32\x12.coprocess.Monitor\x12!\n\x19\x65nable_detailed_recording\x18\x16 \x01(\x08\x12\x10\n\x08metadata\x18\x17 \x01(\t\x12\x0c\n\x04tags\x18\x18 \x03(\t\x12\r\n\x05\x61lias\x18\x19 \x01(\t\x12\x14\n\x0clast_updated\x18\x1a \x01(\t\x12\x1d\n\x15id_extractor_deadline\x18\x1b \x01(\x03\x12\x18\n\x10session_lifetime\x18\x1c \x01(\x03\x1aP\n\x11\x41\x63\x63\x65ssRightsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.coprocess.AccessDefinition:\x02\x38\x01\x1a\x30\n\x0eOauthKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
+  serialized_pb=_b('\n\x1d\x63oprocess_session_state.proto\x12\tcoprocess\"*\n\nAccessSpec\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0f\n\x07methods\x18\x02 \x03(\t\"s\n\x10\x41\x63\x63\x65ssDefinition\x12\x10\n\x08\x61pi_name\x18\x01 \x01(\t\x12\x0e\n\x06\x61pi_id\x18\x02 \x01(\t\x12\x10\n\x08versions\x18\x03 \x03(\t\x12+\n\x0c\x61llowed_urls\x18\x04 \x03(\x0b\x32\x15.coprocess.AccessSpec\"/\n\rBasicAuthData\x12\x10\n\x08password\x18\x01 \x01(\t\x12\x0c\n\x04hash\x18\x02 \x01(\t\"\x19\n\x07JWTData\x12\x0e\n\x06secret\x18\x01 \x01(\t\"!\n\x07Monitor\x12\x16\n\x0etrigger_limits\x18\x01 \x03(\x01\"\x90\x07\n\x0cSessionState\x12\x12\n\nlast_check\x18\x01 \x01(\x03\x12\x11\n\tallowance\x18\x02 \x01(\x01\x12\x0c\n\x04rate\x18\x03 \x01(\x01\x12\x0b\n\x03per\x18\x04 \x01(\x01\x12\x0f\n\x07\x65xpires\x18\x05 \x01(\x03\x12\x11\n\tquota_max\x18\x06 \x01(\x03\x12\x14\n\x0cquota_renews\x18\x07 \x01(\x03\x12\x17\n\x0fquota_remaining\x18\x08 \x01(\x03\x12\x1a\n\x12quota_renewal_rate\x18\t \x01(\x03\x12@\n\raccess_rights\x18\n \x03(\x0b\x32).coprocess.SessionState.AccessRightsEntry\x12\x0e\n\x06org_id\x18\x0b \x01(\t\x12\x17\n\x0foauth_client_id\x18\x0c \x01(\t\x12:\n\noauth_keys\x18\r \x03(\x0b\x32&.coprocess.SessionState.OauthKeysEntry\x12\x31\n\x0f\x62\x61sic_auth_data\x18\x0e \x01(\x0b\x32\x18.coprocess.BasicAuthData\x12$\n\x08jwt_data\x18\x0f \x01(\x0b\x32\x12.coprocess.JWTData\x12\x14\n\x0chmac_enabled\x18\x10 \x01(\x08\x12\x13\n\x0bhmac_secret\x18\x11 \x01(\t\x12\x13\n\x0bis_inactive\x18\x12 \x01(\x08\x12\x17\n\x0f\x61pply_policy_id\x18\x13 \x01(\t\x12\x14\n\x0c\x64\x61ta_expires\x18\x14 \x01(\x03\x12#\n\x07monitor\x18\x15 \x01(\x0b\x32\x12.coprocess.Monitor\x12!\n\x19\x65nable_detailed_recording\x18\x16 \x01(\x08\x12\x10\n\x08metadata\x18\x17 \x01(\t\x12\x0c\n\x04tags\x18\x18 \x03(\t\x12\r\n\x05\x61lias\x18\x19 \x01(\t\x12\x14\n\x0clast_updated\x18\x1a \x01(\t\x12\x1d\n\x15id_extractor_deadline\x18\x1b \x01(\x03\x12\x18\n\x10session_lifetime\x18\x1c \x01(\x03\x12\x16\n\x0e\x61pply_policies\x18\x1d \x03(\t\x1aP\n\x11\x41\x63\x63\x65ssRightsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.coprocess.AccessDefinition:\x02\x38\x01\x1a\x30\n\x0eOauthKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -249,8 +248,8 @@ _SESSIONSTATE_ACCESSRIGHTSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1075,
-  serialized_end=1155,
+  serialized_start=1099,
+  serialized_end=1179,
 )
 
 _SESSIONSTATE_OAUTHKEYSENTRY = _descriptor.Descriptor(
@@ -286,8 +285,8 @@ _SESSIONSTATE_OAUTHKEYSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1157,
-  serialized_end=1205,
+  serialized_start=1181,
+  serialized_end=1229,
 )
 
 _SESSIONSTATE = _descriptor.Descriptor(
@@ -493,6 +492,13 @@ _SESSIONSTATE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='apply_policies', full_name='coprocess.SessionState.apply_policies', index=28,
+      number=29, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -506,7 +512,7 @@ _SESSIONSTATE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=317,
-  serialized_end=1205,
+  serialized_end=1229,
 )
 
 _ACCESSDEFINITION.fields_by_name['allowed_urls'].message_type = _ACCESSSPEC
@@ -524,6 +530,7 @@ DESCRIPTOR.message_types_by_name['BasicAuthData'] = _BASICAUTHDATA
 DESCRIPTOR.message_types_by_name['JWTData'] = _JWTDATA
 DESCRIPTOR.message_types_by_name['Monitor'] = _MONITOR
 DESCRIPTOR.message_types_by_name['SessionState'] = _SESSIONSTATE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 AccessSpec = _reflection.GeneratedProtocolMessageType('AccessSpec', (_message.Message,), dict(
   DESCRIPTOR = _ACCESSSPEC,
