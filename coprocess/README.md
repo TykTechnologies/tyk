@@ -2,6 +2,11 @@
 
 This feature makes it possible to write Tyk middleware using your favorite languages.
 
+## Proto files
+
+To change the proto files and update the bindings, see proto/ and
+proto/update_bindings.sh.
+
 ## Python support
 
 [Python](https://www.python.org/) support is available, more notes [here](python/README.md).
