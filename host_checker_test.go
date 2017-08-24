@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 	"text/template"
@@ -25,11 +27,11 @@ const sampleUptimeTestAPI = `{
 	"uptime_tests": {
 		"check_list": [
 			{
-				"url": "{{.ActiveHost}}/get",
+				"url": "{{.Host1}}/get",
 				"method": "GET"
 			},
 			{
-				"url": "{{.InactiveHost}}/get",
+				"url": "{{.Host2}}/get",
 				"method": "GET"
 			}
 		]
@@ -39,8 +41,8 @@ const sampleUptimeTestAPI = `{
 		"enable_load_balancing": true,
 		"check_host_against_uptime_tests": true,
 		"target_list": [
-			"{{.ActiveHost}}",
-			"{{.InactiveHost}}"
+			"{{.Host1}}",
+			"{{.Host2}}"
 		]
 	},
 	"active": true
@@ -62,8 +64,7 @@ func TestHostChecker(t *testing.T) {
 	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
 
 	tmplData := struct {
-		ActiveHost   string
-		InactiveHost string
+		Host1, Host2 string
 	}{
 		testHttpAny,
 		testHttpFailureAny,
@@ -133,7 +134,10 @@ func TestHostChecker(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		targetWG.Add(1)
 		go func() {
-			host := nextTarget(spec.Proxy.StructuredTargetList, spec)
+			host, err := nextTarget(spec.Proxy.StructuredTargetList, spec)
+			if err != nil {
+				t.Error("Should return nil error, got", err)
+			}
 			if host != testHttpAny {
 				t.Error("Should return only active host, got", host)
 			}
@@ -152,4 +156,65 @@ func TestHostChecker(t *testing.T) {
 		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
 	}
 	GlobalHostChecker.checkerMu.Unlock()
+}
+
+func TestReverseProxyAllDown(t *testing.T) {
+	specTmpl := template.Must(template.New("spec").Parse(sampleUptimeTestAPI))
+
+	tmplData := struct {
+		Host1, Host2 string
+	}{
+		testHttpFailureAny,
+		testHttpFailureAny,
+	}
+
+	specBuf := &bytes.Buffer{}
+	specTmpl.ExecuteTemplate(specBuf, specTmpl.Name(), &tmplData)
+
+	spec := createDefinitionFromString(specBuf.String())
+
+	// From api_loader.go#processSpec
+	sl := apidef.NewHostListFromList(spec.Proxy.Targets)
+	spec.Proxy.StructuredTargetList = sl
+
+	var eventWG sync.WaitGroup
+	// Should receive one HostDown event
+	eventWG.Add(1)
+	cb := func(em config.EventMessage) {
+		eventWG.Done()
+	}
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+		"HostDown": {&testEventHandler{cb}},
+	}
+
+	apisMu.Lock()
+	apisByID = map[string]*APISpec{spec.APIID: spec}
+	apisMu.Unlock()
+	GlobalHostChecker.checkerMu.Lock()
+	GlobalHostChecker.checker.sampleTriggerLimit = 1
+	GlobalHostChecker.checkerMu.Unlock()
+	defer func() {
+		apisMu.Lock()
+		apisByID = make(map[string]*APISpec)
+		apisMu.Unlock()
+		GlobalHostChecker.checkerMu.Lock()
+		GlobalHostChecker.checker.sampleTriggerLimit = defaultSampletTriggerLimit
+		GlobalHostChecker.checkerMu.Unlock()
+	}()
+
+	SetCheckerHostList()
+
+	hostCheckTicker <- struct{}{}
+	eventWG.Wait()
+
+	remote, _ := url.Parse(testHttpAny)
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxy.Init(spec)
+
+	req := testReq(t, "GET", "/", nil)
+	rec := httptest.NewRecorder()
+	proxy.ServeHTTP(rec, req)
+	if rec.Code != 503 {
+		t.Fatalf("wanted code to be 503, was %d", rec.Code)
+	}
 }
