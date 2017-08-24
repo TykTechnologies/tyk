@@ -216,7 +216,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	// Save the sesison data (if modified)
 	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
-		session.MetaData = newRequestData.SessionMeta
+		session.MetaData = mapStrsToIfaces(newRequestData.SessionMeta)
 		d.Spec.SessionManager.UpdateSession(token, session, getLifetime(d.Spec, session))
 	}
 
@@ -234,6 +234,16 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	return nil, 200
+}
+
+func mapStrsToIfaces(m map[string]string) map[string]interface{} {
+	// TODO: do we really need this conversion? note that we can't
+	// make SessionState.MetaData a map[string]string, however.
+	m2 := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		m2[k] = v
+	}
+	return m2
 }
 
 // --- Utility functions during startup to ensure a sane VM is present for each API Def ----

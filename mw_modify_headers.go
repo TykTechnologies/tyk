@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -46,9 +47,11 @@ func (t *TransformHeaders) iterateAddHeaders(kv map[string]string, r *http.Reque
 			// Using meta_data key
 			if session != nil {
 				metaKey := strings.Replace(nVal, metaLabel, "", 1)
-				metaVal, ok := session.MetaData[metaKey]
+				tempVal, ok := session.MetaData[metaKey]
 				if ok {
-					r.Header.Set(nKey, metaVal)
+					// TODO: do a better job than fmt's %v
+					nVal = fmt.Sprintf("%v", tempVal)
+					r.Header.Set(nKey, nVal)
 				} else {
 					log.Warning("Session Meta Data not found for key in map: ", metaKey)
 				}
