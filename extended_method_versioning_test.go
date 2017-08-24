@@ -11,9 +11,7 @@ const nonExpiringExtendedDef = `{
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
 			"v1": {
@@ -135,9 +133,7 @@ const nonExpiringExtendedDefNoWhitelist = `{
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
 			"v1": {

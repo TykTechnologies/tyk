@@ -302,14 +302,11 @@ func getChain(spec *APISpec) http.Handler {
 
 const nonExpiringDefNoWhiteList = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
@@ -349,19 +346,14 @@ const nonExpiringDefNoWhiteList = `{
 
 const versionedDefinition = `{
 	"api_id": "9991",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
-			"v1": {
-				"name": "v1"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"event_handlers": {
@@ -394,7 +386,6 @@ const versionedDefinition = `{
 
 const pathBasedDefinition = `{
 	"api_id": "9992",
-	"org_id": "default",
 	"auth": {
 		"use_param": true,
 		"auth_header_name": "authorization"
@@ -415,19 +406,16 @@ const pathBasedDefinition = `{
 
 const extendedPathGatewaySetup = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default",
+			"v1": {
+				"name": "v1",
 				"use_extended_paths": true,
 				"extended_paths": {
 					"ignored": [
@@ -890,22 +878,18 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 }
 
 const sampleAPI = `{
-	"slug": "api",
 	"api_id": "test",
 	"use_keyless": true,
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
 		"listen_path": "/sample",
 		"target_url": "` + testHttpAny + `"
-	},
-	"active": true
+	}
 }`
 
 func TestListener(t *testing.T) {
@@ -977,13 +961,12 @@ const apiWithTykListenPathPrefix = `{
 	"use_keyless": true,
 	"version_data": {
 		"not_versioned": true,
-		"versions": {"Default": {"name": "Default"}}
+		"versions": {"v1": {"name": "v1"}}
 	},
 	"proxy": {
 		"listen_path": "/tyk-foo/",
 		"target_url": "` + testHttpAny + `"
-	},
-	"active": true
+	}
 }`
 
 func TestListenPathTykPrefix(t *testing.T) {

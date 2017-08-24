@@ -17,15 +17,11 @@ const basicAuthDef = `{
 	"api_id": "1",
 	"org_id": "default",
 	"use_basic_auth": true,
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

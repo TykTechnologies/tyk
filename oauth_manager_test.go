@@ -36,9 +36,7 @@ const keyRules = `{
 const oauthDefinition = `{
 	"api_id": "999999",
 	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"use_oauth2": true,
 	"oauth_meta": {
 		"allowed_access_types": [
@@ -59,9 +57,7 @@ const oauthDefinition = `{
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

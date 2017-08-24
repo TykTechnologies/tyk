@@ -15,15 +15,11 @@ const jwtDef = `{
 	"api_id": "76",
 	"org_id": "default",
 	"enable_jwt": true,
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -40,15 +36,11 @@ const jwtWithJWKDef = `{
 	"jwt_signing_method": "RSA",
 	"jwt_identity_base_field": "user_id",
 	"jwt_policy_field_name": "policy_id",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -65,15 +57,11 @@ const jwtWithCentralDef = `{
 	"jwt_signing_method": "RSA",
 	"jwt_identity_base_field": "user_id",
 	"jwt_policy_field_name": "policy_id",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -90,15 +78,11 @@ const jwtWithCentralDefNoPolicyBaseField = `{
 	"jwt_signing_method": "RSA",
 	"jwt_identity_base_field": "user_id",
 	"jwt_client_base_field": "azp",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

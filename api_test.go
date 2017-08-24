@@ -19,19 +19,14 @@ import (
 
 const apiTestDef = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -81,7 +76,7 @@ func createSampleSession() *SessionState {
 			"1": {
 				APIName:  "Test",
 				APIID:    "1",
-				Versions: []string{"Default"},
+				Versions: []string{"v1"},
 			},
 		},
 	}
@@ -642,20 +637,15 @@ func TestHotReloadMany(t *testing.T) {
 
 const apiBenchDef = `{
 	"api_id": "REPLACE",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

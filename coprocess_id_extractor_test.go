@@ -159,28 +159,20 @@ func computeSessionID(input []byte, baseMid *BaseMiddleware) (sessionID string) 
 const idExtractorCoProcessDef = `{
 	"api_id": "1",
 	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"v1": {
-				"name": "v1"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"event_handlers": {
-		"events": {
-			"AuthFailure": [
-				{
-					"handler_name":"cp_dynamic_handler",
-					"handler_meta": {
-						"name": "my_handler"
-					}
-				}
-			]
-		}
+		"events": {"AuthFailure": [{
+			"handler_name":"cp_dynamic_handler",
+			"handler_meta": {
+				"name": "my_handler"
+			}
+		}]}
 	},
 	"custom_middleware": {
 		"pre": [{
@@ -204,28 +196,20 @@ const idExtractorCoProcessDef = `{
 const valueExtractorFormSource = `{
 	"api_id": "1",
 	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"v1": {
-				"name": "v1"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"event_handlers": {
-		"events": {
-			"AuthFailure": [
-				{
-					"handler_name":"cp_dynamic_handler",
-					"handler_meta": {
-						"name": "my_handler"
-					}
-				}
-			]
-		}
+		"events": {"AuthFailure": [{
+			"handler_name":"cp_dynamic_handler",
+			"handler_meta": {
+				"name": "my_handler"
+			}
+		}]}
 	},
 	"custom_middleware": {
 		"pre": [{
@@ -249,28 +233,20 @@ const valueExtractorFormSource = `{
 const regexExtractorDef = `{
 	"api_id": "1",
 	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"v1": {
-				"name": "v1"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"event_handlers": {
-		"events": {
-			"AuthFailure": [
-				{
-					"handler_name":"cp_dynamic_handler",
-					"handler_meta": {
-						"name": "my_handler"
-					}
-				}
-			]
-		}
+		"events": {"AuthFailure": [{
+			"handler_name":"cp_dynamic_handler",
+			"handler_meta": {
+				"name": "my_handler"
+			}
+		}]}
 	},
 	"custom_middleware": {
 		"id_extractor": {

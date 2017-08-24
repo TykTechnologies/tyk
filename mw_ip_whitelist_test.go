@@ -7,7 +7,6 @@ import (
 
 const ipMiddlewareTestDefinitionEnabledFail = `{
 	"api_id": "1",
-	"org_id": "default",
 	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
@@ -23,7 +22,6 @@ const ipMiddlewareTestDefinitionEnabledFail = `{
 
 const ipMiddlewareTestDefinitionEnabledPass = `{
 	"api_id": "1",
-	"org_id": "default",
 	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
@@ -39,7 +37,6 @@ const ipMiddlewareTestDefinitionEnabledPass = `{
 
 const ipMiddlewareTestDefinitionDisabled = `{
 	"api_id": "1",
-	"org_id": "default",
 	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
@@ -53,7 +50,6 @@ const ipMiddlewareTestDefinitionDisabled = `{
 
 const ipMiddlewareTestDefinitionMissing = `{
 	"api_id": "1",
-	"org_id": "default",
 	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
