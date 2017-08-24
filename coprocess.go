@@ -258,7 +258,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with invalid key.")
 
 		// Fire Authfailed Event
-		AuthFailed(m.BaseMiddleware, r, token)
+		AuthFailed(m, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")

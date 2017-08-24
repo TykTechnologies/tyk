@@ -91,7 +91,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		}).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.BaseMiddleware, r, key)
+		AuthFailed(k, r, key)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
@@ -116,8 +116,8 @@ func stripBearer(token string) string {
 	return strings.TrimSpace(token)
 }
 
-func AuthFailed(m *BaseMiddleware, r *http.Request, token string) {
-	m.FireEvent(EventAuthFailure, EventAuthFailureMeta{
+func AuthFailed(m TykMiddleware, r *http.Request, token string) {
+	m.Base().FireEvent(EventAuthFailure, EventAuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           requestIP(r),

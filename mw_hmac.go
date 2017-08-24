@@ -171,7 +171,7 @@ func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 		"origin": r.RemoteAddr,
 	}).Info("Authorization field missing or malformed")
 
-	AuthFailed(hm.BaseMiddleware, r, r.Header.Get("Authorization"))
+	AuthFailed(hm, r, r.Header.Get("Authorization"))
 
 	return errors.New("Authorization field missing, malformed or invalid"), 400
 }

@@ -268,7 +268,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
 	// Fire Authfailed Event
-	AuthFailed(k.BaseMiddleware, r, tykId)
+	AuthFailed(k, r, tykId)
 
 	// Report in health check
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
