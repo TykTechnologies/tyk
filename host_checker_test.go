@@ -13,15 +13,12 @@ import (
 )
 
 const sampleUptimeTestAPI = `{
-	"slug": "api",
 	"api_id": "test",
 	"use_keyless": true,
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"uptime_tests": {
@@ -44,8 +41,7 @@ const sampleUptimeTestAPI = `{
 			"{{.Host1}}",
 			"{{.Host2}}"
 		]
-	},
-	"active": true
+	}
 }`
 
 type testEventHandler struct {

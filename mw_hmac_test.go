@@ -25,15 +25,11 @@ const hmacAuthDef = `{
 	"org_id": "default",
 	"enable_signature_checking": true,
 	"hmac_allowed_clock_skew": 5000,
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

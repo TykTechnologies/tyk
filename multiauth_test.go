@@ -19,15 +19,11 @@ const multiAuthDev = `{
 	"use_basic_auth": true,
 	"use_standard_auth": true,
 	"base_identity_provided_by": "auth_token",
-	"auth": {
-		"auth_header_name": "x-standard-auth"
-	},
+	"auth": {"auth_header_name": "x-standard-auth"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

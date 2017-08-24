@@ -10,19 +10,16 @@ import (
 
 const virtTestDef = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default",
+			"v1": {
+				"name": "v1",
 				"use_extended_paths": true,
 				"extended_paths": {
 					"virtual": [{
@@ -43,8 +40,7 @@ const virtTestDef = `{
 	"config_data": {
 		"foo": "x",
 		"bar": {"y": 3}
-	},
-	"do_not_track": true
+	}
 }`
 
 const virtTestJS = `
