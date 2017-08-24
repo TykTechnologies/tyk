@@ -86,7 +86,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with non-existent user.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.BaseMiddleware, r, token)
+		AuthFailed(k, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
@@ -116,7 +116,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}).Info("Attempted access with existing user but failed password check.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.BaseMiddleware, r, token)
+		AuthFailed(k, r, token)
 
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")

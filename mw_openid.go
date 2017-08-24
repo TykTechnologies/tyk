@@ -212,7 +212,7 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event
-	AuthFailed(k.BaseMiddleware, r, tykId)
+	AuthFailed(k, r, tykId)
 
 	// Report in health check
 	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")

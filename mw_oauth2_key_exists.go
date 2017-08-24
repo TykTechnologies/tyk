@@ -55,7 +55,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		}).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
-		AuthFailed(k.BaseMiddleware, r, accessToken)
+		AuthFailed(k, r, accessToken)
 		// Report in health check
 		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
 

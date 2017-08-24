@@ -50,7 +50,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Fire Authfailed Event
-	AuthFailed(i.BaseMiddleware, r, remoteIP.String())
+	AuthFailed(i, r, remoteIP.String())
 	// Report in health check
 	ReportHealthCheckValue(i.Spec.Health, KeyFailure, "-1")
 
