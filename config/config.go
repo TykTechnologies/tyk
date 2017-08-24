@@ -278,10 +278,6 @@ func WriteDefault(path string, conf *Config) {
 			MaxIdle: 100,
 			Port:    6379,
 		},
-		HealthCheck: HealthCheckConfig{
-			EnableHealthChecks:      true,
-			HealthCheckValueTimeout: 60,
-		},
 		AnalyticsConfig: AnalyticsConfigConfig{
 			IgnoredIPs: make([]string, 0),
 		},

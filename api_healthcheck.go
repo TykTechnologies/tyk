@@ -38,6 +38,7 @@ type DefaultHealthChecker struct {
 func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
 	if globalConf.HealthCheck.EnableHealthChecks {
 		log.Debug("Health Checker initialised.")
+		log.Warning("The Health Checker is deprecated and we do no longer recommend its use.")
 	}
 
 	h.storage = storeType
