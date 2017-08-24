@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -104,7 +105,7 @@ func EnsureTransport(host string) string {
 	return "http://" + host
 }
 
-func nextTarget(targetData *apidef.HostList, spec *APISpec) string {
+func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 	if spec.Proxy.EnableLoadBalancing {
 		log.Debug("[PROXY] [LOAD BALANCING] Load balancer enabled, getting upstream target")
 		// Use a HostList
@@ -113,23 +114,21 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) string {
 		for {
 			gotHost, err := targetData.GetIndex(pos)
 			if err != nil {
-				log.Error("[PROXY] [LOAD BALANCING] ", err)
-				return gotHost
+				return "", err
 			}
 
 			host := EnsureTransport(gotHost)
 
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
-				return host // we don't care if it's up
+				return host, nil // we don't care if it's up
 			}
 			if !GlobalHostChecker.IsHostDown(host) {
-				return host // we do care and it's up
+				return host, nil // we do care and it's up
 			}
 			// if the host is down, keep trying all the rest
 			// in order from where we started.
 			if pos = (pos + 1) % targetData.Len(); pos == startPos {
-				log.Error("[PROXY] [LOAD BALANCING] All hosts seem to be down, all uptime tests are failing!")
-				return host
+				return "", fmt.Errorf("all hosts are down, uptime tests are failing")
 			}
 		}
 
@@ -139,11 +138,16 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) string {
 
 	gotHost, err := targetData.GetIndex(0)
 	if err != nil {
-		log.Error("[PROXY] ", err)
-		return gotHost
+		return "", err
 	}
-	return EnsureTransport(gotHost)
+	return EnsureTransport(gotHost), nil
 }
+
+var (
+	onceStartAllHostsDown sync.Once
+
+	allHostsDownURL string
+)
 
 // TykNewSingleHostReverseProxy returns a new ReverseProxy that rewrites
 // URLs to the scheme, host, and base path provided in target. If the
@@ -152,6 +156,25 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) string {
 // stdlib version by also setting the host to the target, this allows
 // us to work with heroku and other such providers
 func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy {
+	onceStartAllHostsDown.Do(func() {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "all hosts are down", http.StatusServiceUnavailable)
+		}
+		listener, err := net.Listen("tcp", ":0")
+		if err != nil {
+			panic(err)
+		}
+		server := &http.Server{
+			Handler:        http.HandlerFunc(handler),
+			ReadTimeout:    1 * time.Second,
+			WriteTimeout:   1 * time.Second,
+			MaxHeaderBytes: 1 << 20,
+		}
+		allHostsDownURL = "http://" + listener.Addr().String()
+		go func() {
+			panic(server.Serve(listener))
+		}()
+	})
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		log.Debug("[PROXY] Service discovery enabled")
 		if ServiceCache == nil {
@@ -176,7 +199,12 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			}
 			fallthrough // implies load balancing, with replaced host list
 		case spec.Proxy.EnableLoadBalancing:
-			lbRemote, err := url.Parse(nextTarget(hostList, spec))
+			host, err := nextTarget(hostList, spec)
+			if err != nil {
+				log.Error("[PROXY] [LOAD BALANCING] ", err)
+				host = allHostsDownURL
+			}
+			lbRemote, err := url.Parse(host)
 			if err != nil {
 				log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
