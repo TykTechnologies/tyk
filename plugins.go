@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/robertkrimen/otto"
@@ -181,10 +182,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Reconstruct the request parts
 	if newRequestData.Request.IgnoreBody {
 		r.ContentLength = int64(len(originalBody))
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(originalBody))
+		r.Body = ioutil.NopCloser(bytes.NewReader(originalBody))
 	} else {
 		r.ContentLength = int64(len(newRequestData.Request.Body))
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(newRequestData.Request.Body))
+		r.Body = ioutil.NopCloser(bytes.NewReader(newRequestData.Request.Body))
 	}
 
 	r.URL.Path = newRequestData.Request.URL
@@ -411,7 +412,7 @@ func (j *JSVM) LoadTykJSApi() {
 		r, _ := http.NewRequest(hro.Method, urlStr, nil)
 
 		if d != "" {
-			r, _ = http.NewRequest(hro.Method, urlStr, bytes.NewBufferString(d))
+			r, _ = http.NewRequest(hro.Method, urlStr, strings.NewReader(d))
 		}
 
 		for k, v := range hro.Headers {

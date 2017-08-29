@@ -3,12 +3,13 @@
 package main
 
 import (
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 
-	"bytes"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -126,7 +127,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
 func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) {
 	r.ContentLength = int64(len(object.Request.Body))
-	r.Body = ioutil.NopCloser(bytes.NewBufferString(object.Request.Body))
+	r.Body = ioutil.NopCloser(strings.NewReader(object.Request.Body))
 
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)

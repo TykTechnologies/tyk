@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"math/rand"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -148,8 +148,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		useMethod = "GET"
 	}
 
-	body := []byte(toCheck.Body)
-	req, err := http.NewRequest(useMethod, toCheck.CheckURL, bytes.NewBuffer(body))
+	req, err := http.NewRequest(useMethod, toCheck.CheckURL, strings.NewReader(toCheck.Body))
 	if err != nil {
 		log.Error("Could not create request: ", err)
 		return
