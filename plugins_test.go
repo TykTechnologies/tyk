@@ -219,6 +219,6 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 
 	wantBody := "Foobarbaz"
 	if !strings.Contains(err.Error(), wantBody) {
-		t.Fatalf("wanted body to contain to be %d, got %d", wantBody, err.Error())
+		t.Fatalf("wanted body to contain to be %v, got %v", wantBody, err.Error())
 	}
 }
