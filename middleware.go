@@ -156,7 +156,7 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
-func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) {
+func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) error {
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
 	policies := session.PolicyIDs()
@@ -165,21 +165,19 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) {
 		policy, ok := policiesByID[polID]
 		policiesMu.RUnlock()
 		if !ok {
-			return
+			return fmt.Errorf("policy not found: %q", polID)
 		}
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise youcould overwrite a session key with a policy from a different org!
 		if policy.OrgID != t.Spec.OrgID {
-			log.Error("Attempting to apply policy from different organisation to key, skipping")
-			return
+			return fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
 		}
 
 		if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
 			// This is a partitioned policy, only apply what is active
 			if policy.Partitions.Quota {
 				if didQuota {
-					log.Error("Cannot apply multiple quota policies")
-					return
+					return fmt.Errorf("cannot apply multiple quota policies")
 				}
 				didQuota = true
 				// Quotas
@@ -189,8 +187,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) {
 
 			if policy.Partitions.RateLimit {
 				if didRateLimit {
-					log.Error("Cannot apply multiple rate limit policies")
-					return
+					return fmt.Errorf("cannot apply multiple rate limit policies")
 				}
 				didRateLimit = true
 				// Rate limting
@@ -217,8 +214,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) {
 
 		} else {
 			if len(policies) > 1 {
-				log.Error("Cannot apply multiple policies if any are non-partitioned")
-				return
+				return fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
 			}
 			// This is not a partitioned policy, apply everything
 			// Quotas
@@ -253,7 +249,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) {
 		session.Tags = append(session.Tags, tag)
 	}
 	// Update the session in the session manager in case it gets called again
-	t.Spec.SessionManager.UpdateSession(key, session, getLifetime(t.Spec, session))
+	return t.Spec.SessionManager.UpdateSession(key, session, getLifetime(t.Spec, session))
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
@@ -267,7 +263,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		if found {
 			log.Debug("--> Key found in local cache")
 			session := cachedVal.(SessionState)
-			t.ApplyPolicies(key, &session)
+			if err := t.ApplyPolicies(key, &session); err != nil {
+				log.Error(err)
+			}
 			return session, true
 		}
 	}
@@ -281,7 +279,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		go SessionCache.Set(key, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		t.ApplyPolicies(key, &session)
+		if err := t.ApplyPolicies(key, &session); err != nil {
+			log.Error(err)
+		}
 		log.Debug("--> Got key")
 		return session, true
 	}
@@ -297,7 +297,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		go SessionCache.Set(key, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
-		t.ApplyPolicies(key, &session)
+		if err := t.ApplyPolicies(key, &session); err != nil {
+			log.Error(err)
+		}
 
 		log.Debug("Lifetime is: ", getLifetime(t.Spec, &session))
 		// Need to set this in order for the write to work!
