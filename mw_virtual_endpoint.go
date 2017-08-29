@@ -174,19 +174,19 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	copiedResponse, code := ForceResponse(w, r, &newResponseData, d.Spec, session, false)
+	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false)
 
-	go d.sh.RecordHit(r, 0, code, copiedRequest, copiedResponse)
+	go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedRequest, copiedResponse)
 
 	return copiedResponse
 
 }
 
-func ForceResponse(w http.ResponseWriter,
+func forceResponse(w http.ResponseWriter,
 	r *http.Request,
 	newResponseData *VMResponseObject,
 	spec *APISpec,
-	session *SessionState, isPre bool) (*http.Response, int) {
+	session *SessionState, isPre bool) *http.Response {
 	responseMessage := []byte(newResponseData.Response.Body)
 
 	// Create an http.Response object so we can send it tot he cache middleware
@@ -232,10 +232,10 @@ func ForceResponse(w http.ResponseWriter,
 	newResponse.Body = ioutil.NopCloser(&bodyBuffer)
 	copiedRes.Body = ioutil.NopCloser(bodyBuffer2)
 
-	HandleForcedResponse(w, newResponse, session)
+	handleForcedResponse(w, newResponse, session)
 
 	// Record analytics
-	return copiedRes, newResponse.StatusCode
+	return copiedRes
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -252,11 +252,11 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
 	// Externalising this from the MW so we can re-use it elsewhere
-	return HandleForcedResponse(rw, res, ses)
+	return handleForcedResponse(rw, res, ses)
 
 }
 
-func HandleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
 	defer res.Body.Close()
 
 	// Close connections

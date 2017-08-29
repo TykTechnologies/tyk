@@ -18,8 +18,8 @@ import (
 
 // Lets the user override and return a response from middleware
 type ReturnOverrides struct {
-	ResponseCode  int
-	ResponseError string
+	ResponseCode    int
+	ResponseError   string
 	ResponseHeaders map[string]string
 }
 
@@ -225,22 +225,22 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		"prefix": "jsvm",
 	}).Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode > 300 {
+	if newRequestData.Request.ReturnOverrides.ResponseCode >= 400 {
 		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
 	}
 
-	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode < 300 {
+	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode <= 300 {
 
 		responseObject := VMResponseObject{
 			Response: ResponseObject{
-				Body: newRequestData.Request.ReturnOverrides.ResponseError,
-				Code: newRequestData.Request.ReturnOverrides.ResponseCode,
+				Body:    newRequestData.Request.ReturnOverrides.ResponseError,
+				Code:    newRequestData.Request.ReturnOverrides.ResponseCode,
 				Headers: newRequestData.Request.ReturnOverrides.ResponseHeaders,
 			},
 		}
 
-		ForceResponse(w, r, &responseObject, d.Spec, session, d.Pre)
-		return nil, 666
+		forceResponse(w, r, &responseObject, d.Spec, session, d.Pre)
+		return nil, mwStatusRespond
 	}
 
 	if d.Auth {
