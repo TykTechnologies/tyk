@@ -956,7 +956,7 @@ func onFork() {
 func main() {
 	arguments := getCmdArguments()
 	NodeID = "solo-" + uuid.NewV4().String()
-	l, goAgainErr := goagain.Listener(onFork)
+	l, _ := goagain.Listener(onFork)
 	controlListener, goAgainErr := goagain.Listener(onFork)
 
 	if err := initialiseSystem(arguments); err != nil {
@@ -984,7 +984,7 @@ func main() {
 
 		listen(l, controlListener, goAgainErr)
 	} else {
-		listen(l, controlListener, goAgainErr)
+		listen(l, controlListener, nil)
 
 		// Kill the parent, now that the child has started successfully.
 		log.Debug("KILLING PARENT PROCESS")
