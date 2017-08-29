@@ -16,6 +16,7 @@ type TransformJQMiddleware struct {
 
 type JQTransformOptions struct {
 	OutputHeaders map[string]string `mapstructure:"output_headers"`
+	OutputVars    map[string]string `mapstructure:"output_vars"`
 }
 
 func (t *TransformJQMiddleware) GetName() string {
@@ -89,7 +90,9 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 	}
 
 	// Second optional element is an object like:
-	// { "output_headers": {"header_name": "header_value", ...}}
+	// { "output_headers": {"header_name": "header_value", ...},
+	//   "outputs_vars":   {"var_name_1": "var_value_1", ...}
+	//}
 	if t.JQFilter.Next() {
 		options := t.JQFilter.Value()
 
@@ -103,6 +106,14 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		for hName, hValue := range opts.OutputHeaders {
 			r.Header.Set(hName, hValue)
 		}
+
+		// Set variables in context vars
+		contextDataObject := ctxGetData(r)
+		for k, v := range opts.OutputVars {
+			contextDataObject["jq_output_var_" + k] = v
+		}
+
+		ctxSetData(r, contextDataObject)
 	}
 
 	return nil
