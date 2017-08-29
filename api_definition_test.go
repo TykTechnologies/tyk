@@ -458,13 +458,6 @@ func (ln *customListener) Init(addr string) (err error) {
 	return
 }
 
-func (ln *customListener) ListenAddr() net.Addr {
-	if ln.L != nil {
-		return ln.L.Addr()
-	}
-	return nil
-}
-
 func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, err error) {
 	c, err := ln.L.Accept()
 
