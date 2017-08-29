@@ -247,11 +247,6 @@ func (h *HostUptimeChecker) Stop() {
 	h.pool.Close()
 }
 
-func (h *HostUptimeChecker) RemoveHost(name string) {
-	delete(h.HostList, name)
-	log.Info("[HOST CHECKER] Stopped tracking: ", name)
-}
-
 func (h *HostUptimeChecker) ResetList(hostList map[string]HostData) {
 	h.resetListMu.Lock()
 	h.doResetList = true
