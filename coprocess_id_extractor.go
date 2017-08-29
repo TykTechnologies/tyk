@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -251,7 +250,6 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	expressionString := e.Config.ExtractorConfig["xpath_expression"].(string)
 
 	expression, err := xmlpath.Compile(expressionString)
-
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
 		return SessionID, returnOverrides
@@ -265,21 +263,18 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	case apidef.FormSource:
 		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
 	}
-
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor error")
 		return SessionID, returnOverrides
 	}
 
-	extractedXml, err := xmlpath.Parse(bytes.NewBufferString(extractorOutput))
-
+	extractedXml, err := xmlpath.Parse(strings.NewReader(extractorOutput))
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: couldn't parse input")
 		return SessionID, returnOverrides
 	}
 
 	output, ok := expression.String(extractedXml)
-
 	if !ok {
 		returnOverrides = e.Error(r, err, "XPathExtractor: no input")
 		return SessionID, returnOverrides
@@ -288,7 +283,6 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	SessionID = e.GenerateSessionID(output, e.BaseMid)
 
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
-
 	if keyExists {
 
 		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
