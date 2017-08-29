@@ -28,12 +28,14 @@ type Policy struct {
 	IsInactive       bool                        `bson:"is_inactive" json:"is_inactive"`
 	Tags             []string                    `bson:"tags" json:"tags"`
 	KeyExpiresIn     int64                       `bson:"key_expires_in" json:"key_expires_in"`
-	Partitions       struct {
-		Quota     bool `bson:"quota" json:"quota"`
-		RateLimit bool `bson:"rate_limit" json:"rate_limit"`
-		Acl       bool `bson:"acl" json:"acl"`
-	} `bson:"partitions" json:"partitions"`
-	LastUpdated string `bson:"last_updated" json:"last_updated"`
+	Partitions       PolicyPartitions            `bson:"partitions" json:"partitions"`
+	LastUpdated      string                      `bson:"last_updated" json:"last_updated"`
+}
+
+type PolicyPartitions struct {
+	Quota     bool `bson:"quota" json:"quota"`
+	RateLimit bool `bson:"rate_limit" json:"rate_limit"`
+	Acl       bool `bson:"acl" json:"acl"`
 }
 
 type DBAccessDefinition struct {
