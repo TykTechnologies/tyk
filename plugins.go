@@ -14,6 +14,7 @@ import (
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/Sirupsen/logrus"
+	"fmt"
 )
 
 // Lets the user override and return a response from middleware
@@ -224,8 +225,21 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		"prefix": "jsvm",
 	}).Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 {
+	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode > 300 {
 		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
+	}
+
+	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode < 300 {
+
+		responseObject := VMResponseObject{
+			Response: ResponseObject{
+				Body: newRequestData.Request.ReturnOverrides.ResponseError,
+				Code: newRequestData.Request.ReturnOverrides.ResponseCode,
+			},
+		}
+
+		ForceResponse(w, r, &responseObject, d.Spec, session, d.Pre)
+		return nil, 666
 	}
 
 	if d.Auth {
