@@ -14,13 +14,13 @@ import (
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/Sirupsen/logrus"
-	"fmt"
 )
 
 // Lets the user override and return a response from middleware
 type ReturnOverrides struct {
 	ResponseCode  int
 	ResponseError string
+	ResponseHeaders map[string]string
 }
 
 // MiniRequestObject is marshalled to JSON string and passed into JSON middleware
@@ -235,6 +235,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			Response: ResponseObject{
 				Body: newRequestData.Request.ReturnOverrides.ResponseError,
 				Code: newRequestData.Request.ReturnOverrides.ResponseCode,
+				Headers: newRequestData.Request.ReturnOverrides.ResponseHeaders,
 			},
 		}
 
