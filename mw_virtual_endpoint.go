@@ -250,13 +250,12 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return nil, mwStatusRespond
 }
 
-func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
 	// Externalising this from the MW so we can re-use it elsewhere
-	return handleForcedResponse(rw, res, ses)
-
+	handleForcedResponse(rw, res, ses)
 }
 
-func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
 	defer res.Body.Close()
 
 	// Close connections
@@ -276,5 +275,4 @@ func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *Sessi
 
 	rw.WriteHeader(res.StatusCode)
 	io.Copy(rw, res.Body)
-	return nil
 }
