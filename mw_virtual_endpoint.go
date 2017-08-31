@@ -174,6 +174,19 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
 
+	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false)
+
+	go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedRequest, copiedResponse)
+
+	return copiedResponse
+
+}
+
+func forceResponse(w http.ResponseWriter,
+	r *http.Request,
+	newResponseData *VMResponseObject,
+	spec *APISpec,
+	session *SessionState, isPre bool) *http.Response {
 	responseMessage := []byte(newResponseData.Response.Body)
 
 	// Create an http.Response object so we can send it tot he cache middleware
@@ -195,15 +208,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Header.Set("Server", "tyk")
 	newResponse.Header.Set("Date", requestTime)
 
-	// Handle response middleware
-	if err := handleResponseChain(d.Spec.ResponseChain, w, newResponse, r, session); err != nil {
-		log.Error("Response chain failed! ", err)
-	}
-
-	// deep logging
-	var copiedResponse *http.Response
-	if RecordDetail(r) {
-		copiedResponse = CopyHttpResponse(newResponse)
+	if !isPre {
+		// Handle response middleware
+		if err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
+			log.Error("Response chain failed! ", err)
+		}
 	}
 
 	// Clone the response so we can save it
@@ -223,13 +232,10 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	newResponse.Body = ioutil.NopCloser(&bodyBuffer)
 	copiedRes.Body = ioutil.NopCloser(bodyBuffer2)
 
-	d.HandleResponse(w, newResponse, session)
+	handleForcedResponse(w, newResponse, session)
 
 	// Record analytics
-	go d.sh.RecordHit(r, 0, newResponse.StatusCode, copiedRequest, copiedResponse)
-
 	return copiedRes
-
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -244,8 +250,12 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return nil, mwStatusRespond
 }
 
-func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
+	// Externalising this from the MW so we can re-use it elsewhere
+	handleForcedResponse(rw, res, ses)
+}
 
+func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
 	defer res.Body.Close()
 
 	// Close connections
@@ -265,5 +275,4 @@ func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Respo
 
 	rw.WriteHeader(res.StatusCode)
 	io.Copy(rw, res.Body)
-	return nil
 }

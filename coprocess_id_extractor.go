@@ -39,7 +39,7 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 	log.WithFields(logrus.Fields{
 		"prefix": "idextractor",
 	}).Error("This extractor doesn't implement an extraction method, rejecting.")
-	return "", ReturnOverrides{403, "Key not authorised"}
+	return "", ReturnOverrides{ResponseCode: 403, ResponseError: "Key not authorised"}
 }
 
 // PostProcess sets context variables and updates the storage.
