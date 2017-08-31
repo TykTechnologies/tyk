@@ -216,21 +216,7 @@ func forceResponse(w http.ResponseWriter,
 	}
 
 	// Clone the response so we can save it
-	copiedRes := new(http.Response)
-	*copiedRes = *newResponse // includes shallow copies of maps, but okay
-
-	defer newResponse.Body.Close()
-
-	// Buffer body data
-	var bodyBuffer bytes.Buffer
-	bodyBuffer2 := new(bytes.Buffer)
-
-	io.Copy(&bodyBuffer, newResponse.Body)
-	*bodyBuffer2 = bodyBuffer
-
-	// Create new ReadClosers so we can split output
-	newResponse.Body = ioutil.NopCloser(&bodyBuffer)
-	copiedRes.Body = ioutil.NopCloser(bodyBuffer2)
+	copiedRes := CopyHttpResponse(newResponse)
 
 	handleForcedResponse(w, newResponse, session)
 
