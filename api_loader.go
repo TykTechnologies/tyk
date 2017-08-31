@@ -249,13 +249,10 @@ func processSpec(spec *APISpec,
 			"prefix":   "main",
 			"api_name": spec.Name,
 		}).Info("Multi target enabled")
-		proxy = &MultiTargetProxy{}
+		proxy = NewMultiTargetProxy(spec)
 	} else {
 		proxy = TykNewSingleHostReverseProxy(remote, spec)
 	}
-
-	// initialise the proxy
-	proxy.Init(spec)
 
 	// Create the response processors
 	creeateResponseMiddlewareChain(spec)

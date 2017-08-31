@@ -252,7 +252,13 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		}
 	}
 
-	return &ReverseProxy{Director: director, TykAPISpec: spec, FlushInterval: time.Duration(globalConf.HttpServerOptions.FlushInterval) * time.Millisecond}
+	proxy := &ReverseProxy{
+		Director:      director,
+		TykAPISpec:    spec,
+		FlushInterval: time.Duration(globalConf.HttpServerOptions.FlushInterval) * time.Millisecond,
+	}
+	proxy.ErrorHandler.BaseMiddleware = &BaseMiddleware{spec, proxy}
+	return proxy
 }
 
 // onExitFlushLoop is a callback set by tests to detect the state of the
@@ -379,11 +385,6 @@ var hopHeaders = []string{
 	"Trailer", // not Trailers per URL above; http://www.rfc-editor.org/errata_search.php?eid=4522
 	"Transfer-Encoding",
 	"Upgrade",
-}
-
-func (p *ReverseProxy) Init(spec *APISpec) error {
-	p.ErrorHandler = ErrorHandler{BaseMiddleware: &BaseMiddleware{spec, p}}
-	return nil
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
