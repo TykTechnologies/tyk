@@ -53,7 +53,8 @@ func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {
 	m.defaultProxy.CopyResponse(dst, src)
 }
 
-func (m *MultiTargetProxy) Init(spec *APISpec) error {
+func NewMultiTargetProxy(spec *APISpec) *MultiTargetProxy {
+	m := &MultiTargetProxy{}
 	m.VersionProxyMap = make(map[string]*ReverseProxy)
 	m.specReference = spec
 
@@ -64,7 +65,6 @@ func (m *MultiTargetProxy) Init(spec *APISpec) error {
 		}).Error("Couldn't parse default target URL in MultiTarget: ", err)
 	}
 	m.defaultProxy = TykNewSingleHostReverseProxy(remote, spec)
-	m.defaultProxy.Init(spec)
 
 	for versionName, versionData := range spec.VersionData.Versions {
 		if versionData.OverrideTarget == "" {
@@ -89,7 +89,6 @@ func (m *MultiTargetProxy) Init(spec *APISpec) error {
 				}).Error("Couldn't parse version target URL in MultiTarget: ", err)
 			}
 			versionProxy := TykNewSingleHostReverseProxy(versionRemote, spec)
-			versionProxy.Init(spec)
 			m.VersionProxyMap[versionName] = versionProxy
 		}
 	}
