@@ -321,7 +321,9 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 
 	globalConf.SlaveOptions.ConnectionString = server.Addr
 
-	go server.Serve()
+	if err := server.Start(); err != nil {
+		panic(err)
+	}
 
 	return server
 }
