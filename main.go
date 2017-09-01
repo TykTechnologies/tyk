@@ -579,8 +579,8 @@ func doReload() {
 	}).Info("API reload complete")
 
 	// Unset these
-	RPC_EmergencyModeLoaded = false
-	RPC_EmergencyMode = false
+	rpcEmergencyModeLoaded = false
+	rpcEmergencyMode = false
 }
 
 // startReloadChan and reloadDoneChan are used by the two reload loops
@@ -1223,7 +1223,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 		startDRL()
 
-		if !RPC_EmergencyMode {
+		if !rpcEmergencyMode {
 			specs := getAPISpecs()
 			if specs != nil {
 				loadApps(specs, defaultRouter)
@@ -1273,7 +1273,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 			go http.Serve(l, nil)
 
-			if !RPC_EmergencyMode {
+			if !rpcEmergencyMode {
 				newServeMux := http.NewServeMux()
 				newServeMux.Handle("/", mainRouter)
 				http.DefaultServeMux = newServeMux
@@ -1306,7 +1306,7 @@ func listen(l, controlListener net.Listener, err error) {
 		startDRL()
 
 		// Resume accepting connections in a new goroutine.
-		if !RPC_EmergencyMode {
+		if !rpcEmergencyMode {
 			specs := getAPISpecs()
 			if specs != nil {
 				loadApps(specs, defaultRouter)
@@ -1354,7 +1354,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 			go http.Serve(l, nil)
 
-			if !RPC_EmergencyMode {
+			if !rpcEmergencyMode {
 				newServeMux := http.NewServeMux()
 				newServeMux.Handle("/", mainRouter)
 				http.DefaultServeMux = newServeMux
