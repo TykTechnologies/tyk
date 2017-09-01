@@ -255,7 +255,10 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	}
 	suppressReset := r.FormValue("suppress_reset") == "1"
 	if err := doAddOrUpdate(keyName, &newSession, suppressReset); err != nil {
-		return apiError("Failed to create key, ensure security settings are correct."), 500
+		// TODO: revisit this 200 before 2.4, since we probably
+		// want it to be an error code like 500. The code is 200
+		// on stable (2.3.x).
+		return apiError("Failed to create key, ensure security settings are correct."), 200
 	}
 
 	action := "modified"
