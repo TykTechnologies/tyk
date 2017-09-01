@@ -315,15 +315,15 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	globalConf.SlaveOptions.RPCKey = "test_org"
 	globalConf.SlaveOptions.APIKey = "test"
 
-	server := gorpc.NewTCPServer(":9090", dispatcher.NewHandlerFunc())
-	server.Listener = &customListener{}
+	server := gorpc.NewTCPServer(":0", dispatcher.NewHandlerFunc())
+	list := &customListener{}
+	server.Listener = list
 	server.LogError = gorpc.NilErrorLogger
-
-	globalConf.SlaveOptions.ConnectionString = server.Addr
 
 	if err := server.Start(); err != nil {
 		panic(err)
 	}
+	globalConf.SlaveOptions.ConnectionString = list.L.Addr().String()
 
 	return server
 }
@@ -462,7 +462,6 @@ func (ln *customListener) Init(addr string) (err error) {
 
 func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, err error) {
 	c, err := ln.L.Accept()
-
 	if err != nil {
 		return
 	}
