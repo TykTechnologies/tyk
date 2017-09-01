@@ -47,10 +47,10 @@ type GroupKeySpaceRequest struct {
 }
 
 var (
-	// RPC_LoadCount is a counter to check if this is a cold boot
-	RPC_LoadCount           int
-	RPC_EmergencyMode       bool
-	RPC_EmergencyModeLoaded bool
+	// rpcLoadCount is a counter to check if this is a cold boot
+	rpcLoadCount           int
+	rpcEmergencyMode       bool
+	rpcEmergencyModeLoaded bool
 
 	GlobalRPCCallTimeout time.Duration
 	GlobalRPCPingTimeout time.Duration
@@ -72,21 +72,16 @@ func rpcKeepAliveCheck(r *RPCStorageHandler) {
 		close(c1)
 	}()
 
-	ctd := false
 	select {
 	case res := <-c1:
 		log.Debug("RPC Still alive: ", res)
-		ctd = true
+		// Don't run too quickly, pulse every 10 secs
+		time.Sleep(time.Second * 10)
 	case <-time.After(time.Second * 10):
 		log.WithFields(logrus.Fields{
 			"prefix": "RPC Conn Mgr",
 		}).Warning("Handler seems to have disconnected, attempting reconnect")
 		r.ReConnect()
-	}
-
-	if ctd {
-		// Don't run too quickly, pulse every 10 secs
-		time.Sleep(time.Second * 10)
 	}
 }
 
@@ -105,8 +100,7 @@ type RPCStorageHandler struct {
 
 func (r *RPCStorageHandler) Register() {
 	r.ID = uuid.NewV4().String()
-	myChan := make(chan int)
-	r.killChan = myChan
+	r.killChan = make(chan int)
 	log.Debug("RPC Client registered")
 }
 
@@ -118,9 +112,7 @@ func (r *RPCStorageHandler) checkDisconnect() {
 }
 
 func (r *RPCStorageHandler) ReConnect() {
-
 	// no-op, let the gorpc client handle it.
-
 }
 
 var RPCCLientSingleton *gorpc.Client
@@ -214,9 +206,7 @@ func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteClo
 }
 
 func (r *RPCStorageHandler) Disconnect() bool {
-	if RPCClientIsConnected {
-		RPCClientIsConnected = false
-	}
+	RPCClientIsConnected = false
 	return true
 }
 
@@ -244,12 +234,12 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
 
-	if RPC_LoadCount == 0 && !RPC_EmergencyModeLoaded {
+	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
 		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
 		apiList := LoadDefinitionsFromRPCBackup()
 		log.Warning("[RPC Store] --> Done")
 		if apiList != nil {
-			RPC_EmergencyMode = true
+			rpcEmergencyMode = true
 			log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
 			doLoadWithBackup(apiList)
 		}
@@ -283,7 +273,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		return
 	}
 	log.Debug("[RPC Store] Group Login complete")
-	RPC_LoadCount++
+	rpcLoadCount++
 }
 
 func (r *RPCStorageHandler) Login() {
@@ -312,7 +302,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 	log.Debug("[RPC Store] Login complete")
-	RPC_LoadCount++
+	rpcLoadCount++
 }
 
 // GetKey will retrieve a key from the database
@@ -336,7 +326,6 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 	// Not cached
 	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", r.fixKey(keyName), GlobalRPCCallTimeout)
-
 	if err != nil {
 		if r.IsAccessError(err) {
 			r.Login()
@@ -359,25 +348,21 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	log.Error("Not Implemented!")
-
 	return "", nil
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
 	value, err := RPCFuncClientSingleton.CallTimeout("GetExp", r.fixKey(keyName), GlobalRPCCallTimeout)
-
 	if err != nil {
 		if r.IsAccessError(err) {
 			r.Login()
 			return r.GetExp(keyName)
 		}
 		log.Error("Error trying to get TTL: ", err)
-	} else {
-		return value.(int64), nil
+		return 0, errKeyNotFound
 	}
-
-	return 0, errKeyNotFound
+	return value.(int64), nil
 }
 
 // SetKey will create (or update) a key value in the store
@@ -390,7 +375,6 @@ func (r *RPCStorageHandler) SetKey(keyName, sessionState string, timeout int64) 
 	}
 
 	_, err := RPCFuncClientSingleton.CallTimeout("SetKey", ibd, GlobalRPCCallTimeout)
-
 	if r.IsAccessError(err) {
 		r.Login()
 		return r.SetKey(keyName, sessionState, timeout)
@@ -413,7 +397,6 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 	if r.IsAccessError(err) {
 		r.Login()
 		r.Decrement(keyName)
-		return
 	}
 }
 
@@ -555,7 +538,6 @@ func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
 }
 
 func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
-
 	ibd := InboundData{
 		KeyName: keyName,
 		Value:   value,
@@ -565,9 +547,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 	if r.IsAccessError(err) {
 		r.Login()
 		r.AppendToSet(keyName, value)
-		return
 	}
-
 }
 
 // SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
@@ -629,7 +609,6 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 	}
 
 	defString, err := RPCFuncClientSingleton.CallTimeout("GetApiDefinitions", dr, GlobalRPCCallTimeout)
-
 	if err != nil && r.IsAccessError(err) {
 		r.Login()
 		return r.GetApiDefinitions(orgId, tags)

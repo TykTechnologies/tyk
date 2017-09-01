@@ -321,7 +321,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 
 	//store.Disconnect()
 
-	if RPC_LoadCount > 0 {
+	if rpcLoadCount > 0 {
 		saveRPCDefinitionsBackup(apiCollection)
 	}
 

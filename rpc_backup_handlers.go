@@ -115,7 +115,7 @@ func doLoadWithBackup(specs []*APISpec) {
 	}).Info("API backup load complete")
 
 	log.Warning("[RPC Backup] --> Ready to listen")
-	RPC_EmergencyModeLoaded = true
+	rpcEmergencyModeLoaded = true
 
 	l, err := generateListener(0)
 	if err != nil {
