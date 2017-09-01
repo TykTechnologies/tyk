@@ -29,28 +29,28 @@ type SessionHandler interface {
 	RemoveSession(keyName string)
 	SessionDetail(keyName string) (SessionState, bool)
 	Sessions(filter string) []string
-	GetStore() StorageHandler
+	Store() StorageHandler
 	ResetQuota(string, *SessionState)
 }
 
 // DefaultAuthorisationManager implements AuthorisationHandler,
 // requires a StorageHandler to interact with key store
 type DefaultAuthorisationManager struct {
-	Store StorageHandler
+	store StorageHandler
 }
 
 type DefaultSessionManager struct {
-	Store StorageHandler
+	store StorageHandler
 }
 
 func (b *DefaultAuthorisationManager) Init(store StorageHandler) {
-	b.Store = store
-	b.Store.Connect()
+	b.store = store
+	b.store.Connect()
 }
 
 // IsKeyAuthorised checks if key exists and can be read into a SessionState object
 func (b *DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionState, bool) {
-	jsonKeyVal, err := b.Store.GetKey(keyName)
+	jsonKeyVal, err := b.store.GetKey(keyName)
 	var newSession SessionState
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -79,12 +79,12 @@ func (b *DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) boo
 }
 
 func (b *DefaultSessionManager) Init(store StorageHandler) {
-	b.Store = store
-	b.Store.Connect()
+	b.store = store
+	b.store.Connect()
 }
 
-func (b *DefaultSessionManager) GetStore() StorageHandler {
-	return b.Store
+func (b *DefaultSessionManager) Store() StorageHandler {
+	return b.store
 }
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *SessionState) {
@@ -98,10 +98,10 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *SessionState
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(keyName) + ".BLOCKED"
 	// Clear the rate limiter
-	go b.Store.DeleteRawKey(rateLimiterSentinelKey)
+	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
-	go b.Store.DeleteRawKey(rawKey)
-	//go b.Store.SetKey(rawKey, "0", session.QuotaRenewalRate)
+	go b.store.DeleteRawKey(rawKey)
+	//go b.store.SetKey(rawKey, "0", session.QuotaRenewalRate)
 }
 
 // UpdateSession updates the session state in the storage engine
@@ -115,19 +115,19 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *SessionSt
 
 	// Keep the TTL
 	if globalConf.UseAsyncSessionWrite {
-		go b.Store.SetKey(keyName, string(v), resetTTLTo)
+		go b.store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
 	}
-	return b.Store.SetKey(keyName, string(v), resetTTLTo)
+	return b.store.SetKey(keyName, string(v), resetTTLTo)
 }
 
 func (b *DefaultSessionManager) RemoveSession(keyName string) {
-	b.Store.DeleteKey(keyName)
+	b.store.DeleteKey(keyName)
 }
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
 func (b *DefaultSessionManager) SessionDetail(keyName string) (SessionState, bool) {
-	jsonKeyVal, err := b.Store.GetKey(keyName)
+	jsonKeyVal, err := b.store.GetKey(keyName)
 	var session SessionState
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -150,7 +150,7 @@ func (b *DefaultSessionManager) SessionDetail(keyName string) (SessionState, boo
 
 // Sessions returns all sessions in the key store that match a filter key (a prefix)
 func (b *DefaultSessionManager) Sessions(filter string) []string {
-	return b.Store.GetKeys(filter)
+	return b.store.GetKeys(filter)
 }
 
 type DefaultKeyGenerator struct{}

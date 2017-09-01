@@ -409,7 +409,7 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 	}
 
 	// This is so we bypass the hash function
-	sessStore := sessionManager.GetStore()
+	sessStore := sessionManager.Store()
 
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
@@ -641,7 +641,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 	}
 
 	// This is so we bypass the hash function
-	sessStore := sessionManager.GetStore()
+	sessStore := sessionManager.Store()
 
 	// TODO: This is pretty ugly
 	setKeyName := "apikey-" + keyName
