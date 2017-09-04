@@ -32,12 +32,12 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := &BaseMiddleware{spec, proxy}
 	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
-		CreateMiddleware(&AuthKey{baseMid}),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		CreateMiddleware(&KeyExpired{baseMid}),
-		CreateMiddleware(&AccessRightsCheck{baseMid}),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
+		createMiddleware(&IPWhiteListMiddleware{baseMid}),
+		createMiddleware(&AuthKey{baseMid}),
+		createMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
+		createMiddleware(&KeyExpired{baseMid}),
+		createMiddleware(&AccessRightsCheck{baseMid}),
+		createMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
 
 	return chain
 }

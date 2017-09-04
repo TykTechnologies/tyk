@@ -32,7 +32,7 @@ func CreateDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseM
 		UseSession:          useSession,
 	}
 
-	return CreateMiddleware(dMiddleware)
+	return createMiddleware(dMiddleware)
 }
 
 func CreateDynamicAuthMiddleware(name string, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
@@ -40,7 +40,7 @@ func CreateDynamicAuthMiddleware(name string, baseMid *BaseMiddleware) func(http
 }
 
 // Generic middleware caller to make extension easier
-func CreateMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
+func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	// construct a new instance
 	mw.Init()
 
@@ -93,9 +93,9 @@ func CreateMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	}
 }
 
-func AppendMiddleware(chain *[]alice.Constructor, mw TykMiddleware) {
+func appendMiddleware(chain *[]alice.Constructor, mw TykMiddleware) {
 	if mw.IsEnabledForSpec() {
-		*chain = append(*chain, CreateMiddleware(mw))
+		*chain = append(*chain, createMiddleware(mw))
 	}
 }
 
