@@ -13,13 +13,12 @@ import (
 var applicationGCStats = debug.GCStats{}
 var instrument = health.NewStream()
 
-// SetupInstrumentation handles all the intialisation of the instrumentation handler
-func SetupInstrumentation(enabled bool) {
-	if os.Getenv("TYK_INSTRUMENTATION") == "1" {
-		enabled = true
-	}
-
-	if !enabled {
+// setupInstrumentation handles all the intialisation of the instrumentation handler
+func setupInstrumentation(arguments map[string]interface{}) {
+	switch {
+	case arguments["--log-instrumentation"] == true:
+	case os.Getenv("TYK_INSTRUMENTATION") == "1":
+	default:
 		return
 	}
 

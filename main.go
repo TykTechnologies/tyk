@@ -811,10 +811,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	}
 
 	getHostDetails()
-
-	//doInstrumentation, _ := arguments["--log-instrumentation"].(bool)
-	//SetupInstrumentation(doInstrumentation)
-	SetupInstrumentation(true)
+	setupInstrumentation(arguments)
 
 	if globalConf.HttpServerOptions.UseLE_SSL {
 		go StartPeriodicStateBackup(&LE_MANAGER)
