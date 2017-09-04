@@ -89,7 +89,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		AuthFailed(k, r, token)
 
 		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
+		reportHealthValue(k.Spec, KeyFailure, "-1")
 
 		return k.requestForBasicAuth(w, "User not authorised")
 	}
@@ -119,7 +119,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		AuthFailed(k, r, token)
 
 		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
+		reportHealthValue(k.Spec, KeyFailure, "-1")
 
 		return k.requestForBasicAuth(w, "User not authorised")
 	}

@@ -271,7 +271,7 @@ func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
 	AuthFailed(k, r, tykId)
 
 	// Report in health check
-	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+	reportHealthValue(k.Spec, KeyFailure, "1")
 }
 
 func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Token) (error, int) {

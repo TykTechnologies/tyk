@@ -40,7 +40,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		})
 
 		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
+		reportHealthValue(k.Spec, KeyFailure, "-1")
 
 		return errors.New("Key is inactive, please renew"), 403
 	}
@@ -54,16 +54,8 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		"key":    token,
 	}).Info("Attempted access from expired key.")
 
-	// Fire a key expired event
-	k.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
-		Path:             r.URL.Path,
-		Origin:           requestIP(r),
-		Key:              token,
-	})
-
 	// Report in health check
-	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
+	reportHealthValue(k.Spec, KeyFailure, "-1")
 
 	return errors.New("Key has expired, please renew"), 401
 }

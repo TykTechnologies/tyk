@@ -177,7 +177,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	// Report in health check
-	ReportHealthCheckValue(e.Spec.Health, BlockedRequestLog, "-1")
+	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 
 	//If the config option is not set or is false, add the header
 	if !globalConf.HideGeneratorHeader {

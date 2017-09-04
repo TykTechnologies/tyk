@@ -94,7 +94,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		AuthFailed(k, r, key)
 
 		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+		reportHealthValue(k.Spec, KeyFailure, "1")
 
 		return errors.New("Key not authorised"), 403
 	}
