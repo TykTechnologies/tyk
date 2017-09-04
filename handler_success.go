@@ -309,7 +309,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 	}
 
 	// Report in health check
-	ReportHealthCheckValue(s.Spec.Health, RequestLog, strconv.FormatInt(timing, 10))
+	reportHealthValue(s.Spec, RequestLog, strconv.FormatInt(timing, 10))
 
 	if memProfFile != nil {
 		pprof.WriteHeapProfile(memProfFile)

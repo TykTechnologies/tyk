@@ -262,7 +262,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		AuthFailed(m, r, token)
 
 		// Report in health check
-		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
+		reportHealthValue(m.Spec, KeyFailure, "1")
 
 		errorMsg := "Key not authorised"
 		if returnObject.Request.ReturnOverrides.ResponseError != "" {
