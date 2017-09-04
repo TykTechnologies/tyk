@@ -295,7 +295,7 @@ func (j *JSVM) Init() {
 func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
 	for _, mwPath := range paths {
 		if pathPrefix != "" {
-			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
+			mwPath = filepath.Join(getTykBundlePath(), pathPrefix, mwPath)
 		}
 		js, err := ioutil.ReadFile(mwPath)
 		if err != nil {

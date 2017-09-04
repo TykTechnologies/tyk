@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"path"
 )
 
 type ChainObject struct {
@@ -537,6 +538,16 @@ func processSpec(spec *APISpec,
 			"org_id":      spec.OrgID,
 			"api_id":      spec.APIID,
 		}).Info("Loaded: ", spec.Name)
+	}
+
+	if spec.CustomMiddleware.GRPCProxy.Path != "" {
+		pluginPath := spec.CustomMiddleware.GRPCProxy.Path
+		pathPrefix := globalConf.MiddlewarePath
+		if spec.CustomMiddlewareBundle != "" {
+			pathPrefix = path.Join(getTykBundlePath(), spec.APIID + "-" + spec.CustomMiddlewareBundle)
+		}
+		filePath := path.Join(pathPrefix, pluginPath)
+		loadGRPCProxyPlugin(filePath, spec)
 	}
 
 	return &chainDef

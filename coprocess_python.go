@@ -266,10 +266,10 @@ func PythonSetEnv(pythonPaths ...string) {
 // getBundlePaths will return an array of the available bundle directories:
 func getBundlePaths() []string {
 	directories := make([]string, 0)
-	bundles, _ := ioutil.ReadDir(tykBundlePath)
+	bundles, _ := ioutil.ReadDir(getTykBundlePath())
 	for _, f := range bundles {
 		if f.IsDir() {
-			fullPath := filepath.Join(tykBundlePath, f.Name())
+			fullPath := filepath.Join(getTykBundlePath(), f.Name())
 			directories = append(directories, fullPath)
 		}
 	}

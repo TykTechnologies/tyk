@@ -87,6 +87,11 @@ func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePat
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 	var err error
+
+	if globalConf.CoProcessOptions.CoProcessGRPCServer == "" {
+		return nil, errors.New("No gRPC URL is set, feature is disabled.")
+	}
+
 	grpcConnection, err = grpc.Dial("", grpc.WithInsecure(), grpc.WithDialer(dialer))
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 

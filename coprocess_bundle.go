@@ -21,12 +21,11 @@ import (
 	"path/filepath"
 )
 
-var tykBundlePath string
+//var tykBundlePath string
 
-func init() {
-	tykBundlePath = filepath.Join(globalConf.MiddlewarePath, "middleware", "bundles")
+func getTykBundlePath() string {
+	return filepath.Join(globalConf.MiddlewarePath, "bundles")
 }
-
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
 	Name     string
@@ -182,7 +181,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 	}
 
 	bundleURL := globalConf.BundleBaseURL + spec.CustomMiddlewareBundle
-
+	log.Info("Fetching: ", bundleURL)
 	var getter BundleGetter
 
 	u, err := url.Parse(bundleURL)
@@ -274,7 +273,7 @@ func loadBundle(spec *APISpec) {
 
 	// Skip if the bundle destination path already exists.
 	bundlePath := spec.APIID + "-" + spec.CustomMiddlewareBundle
-	destPath := filepath.Join(tykBundlePath, bundlePath)
+	destPath := filepath.Join(getTykBundlePath(), bundlePath)
 
 	// The bundle exists, load and return:
 	if _, err := os.Stat(destPath); err == nil {
@@ -314,7 +313,7 @@ func loadBundle(spec *APISpec) {
 		return
 	}
 
-	if err := os.Mkdir(destPath, 0700); err != nil {
+	if err := os.MkdirAll(destPath, 0700); err != nil {
 		bundleError(spec, err, "Couldn't create bundle directory")
 		return
 	}

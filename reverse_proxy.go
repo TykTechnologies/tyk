@@ -31,6 +31,7 @@ import (
 	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"net/http/httptest"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
@@ -451,6 +452,16 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 	return transport
 }
 
+func (p *ReverseProxy) handleBreaker(err error, res *http.Response, breakerConf *ExtendedCircuitBreakerMeta) {
+	if err != nil {
+		breakerConf.CB.Fail()
+	} else if res.StatusCode == 500 {
+		breakerConf.CB.Fail()
+	} else {
+		breakerConf.CB.Success()
+	}
+}
+
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	// 1. Check if timeouts are set for this endpoint
 	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
@@ -534,24 +545,47 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	var res *http.Response
 	var err error
-	if breakerEnforced {
-		log.Debug("ON REQUEST: Breaker status: ", breakerConf.CB.Ready())
-		if breakerConf.CB.Ready() {
-			res, err = transport.RoundTrip(outreq)
-			if err != nil {
-				breakerConf.CB.Fail()
-			} else if res.StatusCode == 500 {
-				breakerConf.CB.Fail()
+
+	// Handle gRPC Proxy
+	log.Debug("===> GRPC Server service name: ", p.TykAPISpec.CustomMiddleware.GRPCProxy.Name)
+	if p.TykAPISpec.CustomMiddleware.GRPCProxy.Name != "" {
+		log.Debug("====> Calling: ", outreq.URL.String())
+		if breakerEnforced {
+			if breakerConf.CB.Ready() {
+				rec := httptest.NewRecorder()
+				gRPCProxyMux.ServeHTTP(rec, outreq)
+				res = rec.Result()
+
+				p.handleBreaker(err, res, breakerConf)
+
 			} else {
-				breakerConf.CB.Success()
+				p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503)
+				return nil
 			}
 		} else {
-			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
-			return nil
+			rec := httptest.NewRecorder()
+			gRPCProxyMux.ServeHTTP(rec, outreq)
+			res = rec.Result()
+			log.Warning(rec.Result())
 		}
+
 	} else {
-		res, err = transport.RoundTrip(outreq)
+		// Not gRPC, use normal round trip
+		if breakerEnforced {
+			log.Debug("ON REQUEST: Breaker status: ", breakerConf.CB.Ready())
+			if breakerConf.CB.Ready() {
+				res, err = transport.RoundTrip(outreq)
+				p.handleBreaker(err, res, breakerConf)
+			} else {
+				p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503)
+				return nil
+			}
+		} else {
+			res, err = transport.RoundTrip(outreq)
+		}
 	}
+
+
 
 	if err != nil {
 

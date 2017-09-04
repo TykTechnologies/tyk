@@ -1,6 +1,7 @@
 .idea/
 .vagrant/
 temp/
+/middleware/bundles
 /middleware/e1d21f942ec746ed416ab97fe1bf07e8/
 /middleware/e1d21f942ec746ed416ab97fe1bf07e8_IGNORED/
 testapps/

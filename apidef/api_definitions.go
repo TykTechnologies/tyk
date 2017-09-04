@@ -35,6 +35,7 @@ const (
 	PythonDriver MiddlewareDriver = "python"
 	LuaDriver    MiddlewareDriver = "lua"
 	GrpcDriver   MiddlewareDriver = "grpc"
+	GrpcProxyDriver MiddlewareDriver = "grpc_proxy"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -210,6 +211,7 @@ type MiddlewareSection struct {
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
+	GRPCProxy   MiddlewareDefinition   `bson:"grpc_proxy" json:"grpc_proxy"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
 }
