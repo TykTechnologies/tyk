@@ -45,28 +45,25 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		return errors.New("Key is inactive, please renew"), 403
 	}
 
-	keyExpired := k.Spec.AuthManager.IsKeyExpired(session)
-
-	if keyExpired {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    token,
-		}).Info("Attempted access from expired key.")
-
-		// Fire a key expired event
-		k.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
-			Path:             r.URL.Path,
-			Origin:           requestIP(r),
-			Key:              token,
-		})
-
-		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
-
-		return errors.New("Key has expired, please renew"), 401
+	if !k.Spec.AuthManager.IsKeyExpired(session) {
+		return nil, 200
 	}
+	log.WithFields(logrus.Fields{
+		"path":   r.URL.Path,
+		"origin": requestIP(r),
+		"key":    token,
+	}).Info("Attempted access from expired key.")
 
-	return nil, 200
+	// Fire a key expired event
+	k.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key."},
+		Path:             r.URL.Path,
+		Origin:           requestIP(r),
+		Key:              token,
+	})
+
+	// Report in health check
+	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
+
+	return errors.New("Key has expired, please renew"), 401
 }
