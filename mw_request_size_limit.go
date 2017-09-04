@@ -34,31 +34,21 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 		return errors.New("Content length is required for this request"), 411
 	}
 
-	asInt, err := strconv.Atoi(statedCL)
+	size, err := strconv.ParseInt(statedCL, 0, 64)
 	if err != nil {
 		log.Error("String conversion for content length failed:", err)
 		return errors.New("content length is not a valid Integer"), 400
 	}
-
-	// Check stated size
-	if int64(asInt) > sizeLimit {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"size":   statedCL,
-			"limit":  sizeLimit,
-		}).Info("Attempted access with large request size, blocked.")
-
-		return errors.New("Request is too large"), 400
+	if r.ContentLength > size {
+		size = r.ContentLength
 	}
 
-	// Check actual size
-	if r.ContentLength > sizeLimit {
-		// Request size is too big for globals
+	// Check stated size
+	if size > sizeLimit {
 		log.WithFields(logrus.Fields{
 			"path":   r.URL.Path,
 			"origin": requestIP(r),
-			"size":   r.ContentLength,
+			"size":   size,
 			"limit":  sizeLimit,
 		}).Info("Attempted access with large request size, blocked.")
 
