@@ -863,6 +863,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 				t.Error(err)
 				continue
 			}
+			resp.Body.Close()
 
 			if resp.StatusCode != tc.code {
 				t.Errorf("[%d]%s%s %s Status %d, want %d", ti, tPrefix, tc.method, tc.path, resp.StatusCode, tc.code)
