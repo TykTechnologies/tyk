@@ -155,7 +155,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Run the middleware
 	vm := d.Spec.JSVM.VM.Copy()
-	returnRaw, _ := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+	returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+	if err != nil {
+		log.Error("Failed to run virtual endpoint JS code:", err)
+		return nil
+	}
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
