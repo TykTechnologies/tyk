@@ -121,9 +121,9 @@ func TestJSVMProcessTimeout(t *testing.T) {
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({});
 
 leakMid.NewProcessRequest(function(request, session) {
-       while (true) {
-       }
-       return leakMid.ReturnData(request, session.meta_data);
+	while (true) {
+	}
+	return leakMid.ReturnData(request, session.meta_data);
 });`
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
