@@ -138,6 +138,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// buffered, leaving no chance of a goroutine leak since the
 	// spawned goroutine will send 0 or 1 values.
 	ret := make(chan otto.Value, 1)
+	errRet := make(chan error, 1)
 	go func() {
 		defer func() {
 			// the VM executes the panic func that gets it
@@ -145,13 +146,20 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// the whole Go program.
 			recover()
 		}()
-		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
 		ret <- returnRaw
+		errRet <- err
 	}()
 	var returnRaw otto.Value
 	t := time.NewTimer(d.Spec.JSVM.Timeout)
 	select {
 	case returnRaw = <-ret:
+		if err := <-errRet; err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("Failed to run JS middleware: ", err)
+			return nil, 200
+		}
 		t.Stop()
 	case <-t.C:
 		t.Stop()
