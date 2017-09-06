@@ -789,10 +789,10 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 	for _, m := range testMatrix {
 		var ln, cln net.Listener
 
-		ln, _ = net.Listen("tcp", ":0")
+		ln, _ = net.Listen("tcp", "127.0.0.1:0")
 
 		if separateControlPort {
-			cln, _ = net.Listen("tcp", ":0")
+			cln, _ = net.Listen("tcp", "127.0.0.1:0")
 
 			_, port, _ := net.SplitHostPort(cln.Addr().String())
 			globalConf.ControlAPIPort, _ = strconv.Atoi(port)

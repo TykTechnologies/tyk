@@ -306,7 +306,7 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	globalConf.SlaveOptions.RPCKey = "test_org"
 	globalConf.SlaveOptions.APIKey = "test"
 
-	server := gorpc.NewTCPServer(":0", dispatcher.NewHandlerFunc())
+	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
 	list := &customListener{}
 	server.Listener = list
 	server.LogError = gorpc.NilErrorLogger
