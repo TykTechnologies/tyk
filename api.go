@@ -253,7 +253,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		}
 
 	}
-	suppressReset := r.FormValue("suppress_reset") == "1"
+	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 	if err := doAddOrUpdate(keyName, &newSession, suppressReset); err != nil {
 		return apiError("Failed to create key, ensure security settings are correct."), 500
 	}
@@ -583,8 +583,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
-	filter := r.FormValue("filter")
-	apiID := r.FormValue("api_id")
+	filter := r.URL.Query().Get("filter")
+	apiID := r.URL.Query().Get("api_id")
 	var obj interface{}
 	var code int
 
@@ -602,7 +602,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "DELETE":
-		hashed := r.FormValue("hashed")
+		hashed := r.URL.Query().Get("hashed")
 		// Remove a key
 		if hashed == "" {
 			obj, code = handleDeleteKey(keyName, apiID)
@@ -628,7 +628,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keyName := mux.Vars(r)["keyName"]
-	apiID := r.FormValue("api_id")
+	apiID := r.URL.Query().Get("api_id")
 	obj, code := handleUpdateHashedKey(keyName, apiID, policRecord.Policy)
 
 	doJSONWrite(w, code, obj)
@@ -710,7 +710,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 
 func orgHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
-	filter := r.FormValue("filter")
+	filter := r.URL.Query().Get("filter")
 	var obj interface{}
 	var code int
 
@@ -757,7 +757,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		sessionManager = spec.OrgSessionManager
 	}
 
-	if r.FormValue("reset_quota") == "1" {
+	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(keyName, newSession)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 		rawKey := QuotaKeyPrefix + publicHash(keyName)
@@ -1101,7 +1101,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
-	apiID := r.FormValue("api_id")
+	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {
 		doJSONWrite(w, 400, apiError("Missing parameter api_id"))
 		return
@@ -1323,7 +1323,7 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 		return
 	}
-	apiID := r.FormValue("api_id")
+	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {
 		doJSONWrite(w, 400, apiError("missing api_id parameter"))
 		return
