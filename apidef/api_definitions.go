@@ -31,10 +31,10 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver   MiddlewareDriver = "otto"
-	PythonDriver MiddlewareDriver = "python"
-	LuaDriver    MiddlewareDriver = "lua"
-	GrpcDriver   MiddlewareDriver = "grpc"
+	OttoDriver      MiddlewareDriver = "otto"
+	PythonDriver    MiddlewareDriver = "python"
+	LuaDriver       MiddlewareDriver = "lua"
+	GrpcDriver      MiddlewareDriver = "grpc"
 	GrpcProxyDriver MiddlewareDriver = "grpc_proxy"
 
 	BodySource        IdExtractorSource = "body"

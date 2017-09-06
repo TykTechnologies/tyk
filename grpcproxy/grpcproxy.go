@@ -3,17 +3,17 @@ package grpcproxy
 import (
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
-	"plugin"
+	"fmt"
+	"github.com/akutz/gpds/lib"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"strings"
 	"log"
-	"github.com/akutz/gpds/lib"
-	"fmt"
 	"os"
+	"plugin"
+	"strings"
 )
 
-type conf struct {}
+type conf struct{}
 
 func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.ServeMux) error {
 	var err error
@@ -61,7 +61,6 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	ctx := context.Background()
 	ctx, _ = context.WithCancel(ctx)
 
-
 	endpoint := strings.Replace(targetURL, "http://", "", 1)
 	endpoint = strings.Replace(endpoint, "https://", "", 1)
 
@@ -69,7 +68,7 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	config := &v2Config{
 		ctx: ctx,
 		mux: gRPCProxyMux,
-		e: endpoint,
+		e:   endpoint,
 	}
 
 	// Initialize mod_go with a v2 config implementation
@@ -81,9 +80,9 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 }
 
 type v2Config struct {
-	ctx context.Context
-	mux *runtime.ServeMux
-	e string
+	ctx  context.Context
+	mux  *runtime.ServeMux
+	e    string
 	opts []grpc.DialOption
 }
 
@@ -116,42 +115,3 @@ func (c *v2Config) Set(ctx context.Context, key string, val interface{}) {
 		c.opts = val.([]grpc.DialOption)
 	}
 }
-
-//func LoadGRPCProxyPluginOld(path string, serviceName string, targetURL string, gRPCProxyMux *runtime.ServeMux) error {
-//	var err error
-//	var p *plugin.Plugin
-//	var getServiceAdd plugin.Symbol
-//
-//
-//	// Load our plugin
-//	if p, err = plugin.Open(path); err != nil {
-//		log.Fatal(err)
-//		return err
-//	}
-//
-//	// We need to know the service name in order to find the registration func
-//	registrationName := "GetServicer" //fmt.Sprintf("Register%sHandlerFromEndpoint")
-//	if getServiceAdd, err = p.Lookup(registrationName); err != nil {
-//		log.Fatal(err)
-//		return err
-//	}
-//
-//	// TODO: Needs to be configurable
-//	opts := []grpc.DialOption{grpc.WithInsecure()}
-//
-//	endpoint := strings.Replace(targetURL, "http://", "", 1)
-//	endpoint = strings.Replace(endpoint, "https://", "", 1)
-//
-//	// Call the registration function and add to grpc muxer, needs a type cast
-//	ctx := context.Background()
-//	ctx, _ = context.WithCancel(ctx)
-//	svc := getServiceAdd.(func() interface{})().(func (context.Context, *runtime.ServeMux, string, []grpc.DialOption) error)
-//
-//
-//	if err = svc(ctx, gRPCProxyMux, endpoint, opts); err != nil {
-//		log.Fatal(err)
-//		return err
-//	}
-//
-//	return nil
-//}

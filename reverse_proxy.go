@@ -566,7 +566,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			rec := httptest.NewRecorder()
 			gRPCProxyMux.ServeHTTP(rec, outreq)
 			res = rec.Result()
-			log.Warning(rec.Result())
 		}
 
 	} else {
@@ -584,8 +583,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			res, err = transport.RoundTrip(outreq)
 		}
 	}
-
-
 
 	if err != nil {
 

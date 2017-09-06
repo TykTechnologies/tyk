@@ -3,6 +3,9 @@
 **This is currently a very manual process due to how Golang's plugin mechanism works. We are working on a bakery-style
 docker image that will make this process more automated**
 
+*Edit* To make this easier, use the `tykio/bakery` container, it will generate a plugin file from your proto
+files without any additional steps.
+
 To add a gRPC PRoxy to Tyk, you will need a go build environment that is GRPC enabled, the first half of these instructions
 are lifted from the grpc-gateway project:
 
