@@ -67,6 +67,12 @@
 			"revisionTime": "2016-08-17T21:35:54Z"
 		},
 		{
+			"checksumSHA1": "N5ASOKUr6M2K7wSebHiIvI8TuLA=",
+			"path": "github.com/akutz/gpds/lib",
+			"revision": "956a055e25c223bc81f4dbf7ee8c0a04903bf6c0",
+			"revisionTime": "2017-06-01T02:39:08Z"
+		},
+		{
 			"checksumSHA1": "9dh0q0rB99j2KWdfon8u6GtLf6U=",
 			"path": "github.com/bshuster-repo/logrus-logstash-hook",
 			"revision": "5f729f2fb50a301153cae84ff5c58981d51c095a",
@@ -179,8 +185,20 @@
 			"revisionTime": "2016-07-11T12:47:28Z"
 		},
 		{
+			"checksumSHA1": "X2LnRUNy+EG1/YManJYmaTFTj+s=",
+			"path": "github.com/golang/protobuf/jsonpb",
+			"revision": "17ce1425424ab154092bbb43af630bd647f3bb0d",
+			"revisionTime": "2017-09-02T00:04:52Z"
+		},
+		{
 			"checksumSHA1": "yqF125xVSkmfLpIVGrLlfE05IUk=",
 			"path": "github.com/golang/protobuf/proto",
+			"revision": "17ce1425424ab154092bbb43af630bd647f3bb0d",
+			"revisionTime": "2017-09-02T00:04:52Z"
+		},
+		{
+			"checksumSHA1": "Ylq6kq3KWBy6mu68oyEwenhNMdg=",
+			"path": "github.com/golang/protobuf/ptypes/struct",
 			"revision": "17ce1425424ab154092bbb43af630bd647f3bb0d",
 			"revisionTime": "2017-09-02T00:04:52Z"
 		},
@@ -203,6 +221,24 @@
 			"revisionTime": "2017-05-21T04:50:13Z",
 			"version": "v1.4.0",
 			"versionExact": "v1.4.0"
+		},
+		{
+			"checksumSHA1": "sHES012Eu0cX/hacOeSfKE442bs=",
+			"path": "github.com/grpc-ecosystem/grpc-gateway/runtime",
+			"revision": "f2862b476edcef83412c7af8687c9cd8e4097c0f",
+			"revisionTime": "2017-07-24T00:48:29Z"
+		},
+		{
+			"checksumSHA1": "V1qChZAWS+xzlEBSyz2r8JlzmM8=",
+			"path": "github.com/grpc-ecosystem/grpc-gateway/runtime/internal",
+			"revision": "f2862b476edcef83412c7af8687c9cd8e4097c0f",
+			"revisionTime": "2017-07-24T00:48:29Z"
+		},
+		{
+			"checksumSHA1": "vqiK5r5dntV7JNZ+ZsGlD0Samos=",
+			"path": "github.com/grpc-ecosystem/grpc-gateway/utilities",
+			"revision": "f2862b476edcef83412c7af8687c9cd8e4097c0f",
+			"revisionTime": "2017-07-24T00:48:29Z"
 		},
 		{
 			"checksumSHA1": "tP/Ohi+jei+mhMoXH5iEGav3ZTE=",
@@ -697,6 +733,12 @@
 			"path": "google.golang.org/grpc/stats",
 			"revision": "708a7f9f3283aa2d4f6132d287d78683babe55c8",
 			"revisionTime": "2016-12-02T18:43:27Z",
+			"version": "v1.0.5",
+			"versionExact": "v1.0.5"
+		},
+		{
+			"path": "google.golang.org/grpc/status",
+			"revision": "708a7f9f3283aa2d4f6132d287d78683babe55c8",
 			"version": "v1.0.5",
 			"versionExact": "v1.0.5"
 		},
