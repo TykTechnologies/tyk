@@ -553,7 +553,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if breakerEnforced {
 			if breakerConf.CB.Ready() {
 				rec := httptest.NewRecorder()
-				gRPCProxyMux.ServeHTTP(rec, outreq)
+				p.TykAPISpec.grpcProxyMux.ServeHTTP(rec, outreq)
 				res = rec.Result()
 
 				p.handleBreaker(err, res, breakerConf)
@@ -564,7 +564,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			}
 		} else {
 			rec := httptest.NewRecorder()
-			gRPCProxyMux.ServeHTTP(rec, outreq)
+			p.TykAPISpec.grpcProxyMux.ServeHTTP(rec, outreq)
 			res = rec.Result()
 		}
 

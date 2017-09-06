@@ -30,7 +30,6 @@ type ChainObject struct {
 }
 
 var apiCountByListenHash map[string]int
-var gRPCProxyMux *runtime.ServeMux = runtime.NewServeMux()
 
 func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys}
@@ -550,7 +549,8 @@ func processSpec(spec *APISpec,
 			pathPrefix = path.Join(getTykBundlePath(), spec.APIID + "-" + spec.CustomMiddlewareBundle)
 		}
 		filePath := path.Join(pathPrefix, pluginPath)
-		grpcproxy.LoadGRPCProxyPlugin(filePath, spec.Proxy.TargetURL, gRPCProxyMux)
+		spec.grpcProxyMux = runtime.NewServeMux()
+		grpcproxy.LoadGRPCProxyPlugin(filePath, spec.Proxy.TargetURL, spec.grpcProxyMux)
 	}
 
 	return &chainDef

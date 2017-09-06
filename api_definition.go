@@ -18,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 )
 
 const (
@@ -133,6 +134,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
+	grpcProxyMux			 *runtime.ServeMux
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
