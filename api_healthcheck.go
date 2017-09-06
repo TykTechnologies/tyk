@@ -3,6 +3,7 @@ package main
 import (
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -35,10 +36,14 @@ type DefaultHealthChecker struct {
 	APIID   string
 }
 
+var healthWarn sync.Once
+
 func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
 	if globalConf.HealthCheck.EnableHealthChecks {
 		log.Debug("Health Checker initialised.")
-		log.Warning("The Health Checker is deprecated and we do no longer recommend its use.")
+		healthWarn.Do(func() {
+			log.Warning("The Health Checker is deprecated and we do no longer recommend its use.")
+		})
 	}
 
 	h.storage = storeType
