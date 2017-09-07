@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -305,11 +306,11 @@ func WriteDefault(path string, conf *Config) {
 // An error will be returned only if any of the paths existed but was
 // not a valid config file.
 func Load(paths []string, conf *Config) error {
-	var bs []byte
+	var r io.Reader
 	for _, path := range paths {
-		var err error
-		bs, err = ioutil.ReadFile(path)
+		f, err := os.Open(path)
 		if err == nil {
+			r = f
 			conf.OriginalPath = path
 			break
 		}
@@ -318,14 +319,14 @@ func Load(paths []string, conf *Config) error {
 		}
 		return err
 	}
-	if bs == nil {
+	if r == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
 		WriteDefault(path, conf)
 		log.Info("Loading default configuration...")
 		return Load([]string{path}, conf)
 	}
-	if err := json.Unmarshal(bs, &conf); err != nil {
+	if err := json.NewDecoder(r).Decode(&conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
 

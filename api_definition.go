@@ -204,11 +204,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 	return spec
 }
 
-func (a APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) {
-	defer response.Body.Close()
-	return ioutil.ReadAll(response.Body)
-}
-
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*APISpec {
 	// Get the definitions
@@ -227,26 +222,21 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	c := &http.Client{
 		Timeout: 120 * time.Second,
 	}
-	response, err := c.Do(newRequest)
+	resp, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Request failed: ", err)
 		return nil
 	}
+	defer resp.Body.Close()
 
-	retBody, err := a.readBody(response)
-	if err != nil {
-		log.Error("Failed to read body: ", err)
-		return nil
-	}
-
-	if response.StatusCode == 403 {
-		log.Error("Login failure, Response was: ", string(retBody))
+	if resp.StatusCode == 403 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Error("Login failure, Response was: ", string(body))
 		reLogin()
 		return nil
 	}
 
 	// Extract tagged APIs#
-
 	type ResponseStruct struct {
 		ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
 	}
@@ -257,8 +247,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 
 	list := NodeResponseOK{}
-	if err := json.Unmarshal(retBody, &list); err != nil {
-		log.Error("Failed to decode body: ", err, "Response was: ", string(retBody))
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		log.Error("Failed to decode body: ", err)
 		log.Info("--> Retrying in 5s")
 		return nil
 	}

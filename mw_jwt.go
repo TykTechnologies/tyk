@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -55,21 +54,15 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 	if !found {
 		// Get the JWK
 		log.Debug("Pulling JWK")
-		response, err := http.Get(url)
+		resp, err := http.Get(url)
 		if err != nil {
 			log.Error("Failed to get resource URL: ", err)
 			return nil, err
 		}
+		defer resp.Body.Close()
 
 		// Decode it
-		defer response.Body.Close()
-		contents, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			log.Error("Failed to read body data: ", err)
-			return nil, err
-		}
-
-		if err := json.Unmarshal(contents, &jwkSet); err != nil {
+		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
 			log.Error("Failed to decode body JWK: ", err)
 			return nil, err
 		}
