@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -286,8 +287,20 @@ func (j *JSVM) Init() {
 	vm := otto.New()
 
 	// Init TykJS namespace, constructors etc.
-	jscore, _ := ioutil.ReadFile(globalConf.TykJSPath)
-	vm.Run(jscore)
+	f, err := os.Open(globalConf.TykJSPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Could not open TykJS: ", err)
+		return
+	}
+	if _, err := vm.Run(f); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Could not load TykJS: ", err)
+		return
+	}
+	f.Close()
 
 	j.VM = vm
 
@@ -305,18 +318,22 @@ func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
 		if pathPrefix != "" {
 			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
 		}
-		js, err := ioutil.ReadFile(mwPath)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Info("Loading JS File: ", mwPath)
+		f, err := os.Open(mwPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("Failed to load Middleware JS: ", err)
-		} else {
-			// No error, load the JS into the VM
+			}).Error("Failed to open JS middleware file: ", err)
+			continue
+		}
+		if _, err := j.VM.Run(f); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Info("Loading JS File: ", mwPath)
-			j.VM.Run(js)
+			}).Error("Failed to load JS middleware: ", err)
 		}
+		f.Close()
 	}
 }
 
@@ -455,7 +472,6 @@ func (j *JSVM) LoadTykJSApi() {
 	})
 
 	// Expose Setters and Getters in the REST API for a key:
-
 	j.VM.Set("TykGetKeyData", func(call otto.FunctionCall) otto.Value {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
@@ -514,11 +530,7 @@ func (j *JSVM) LoadTykJSApi() {
 		return returnVal
 	})
 
-	tykReturnFunc := `
-	function TykJsResponse(response, session_meta) {
+	j.VM.Run(`function TykJsResponse(response, session_meta) {
 		return JSON.stringify({Response: response, SessionMeta: session_meta})
-	};`
-
-	j.VM.Run(tykReturnFunc)
-
+	}`)
 }
