@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -13,7 +14,7 @@ type APIImporterSource string
 const ApiaryBluePrint APIImporterSource = "blueprint"
 
 type APIImporter interface {
-	ReadString(string) error
+	LoadFrom(io.Reader) error
 	ConvertIntoApiVersion(bool) (apidef.VersionInfo, error)
 	InsertIntoAPIDefinitionAsVersion(apidef.VersionInfo, *apidef.APIDefinition, string) error
 }
@@ -110,10 +111,10 @@ type BluePrintAST struct {
 	} `json:"resourceGroups"`
 }
 
-func (b *BluePrintAST) ReadString(asJson string) error {
-	if err := json.Unmarshal([]byte(asJson), &b); err != nil {
-		log.Error("Marshalling failed: ", err)
-		return errors.New("Could not unmarshal string for Bluprint AST object")
+func (b *BluePrintAST) LoadFrom(r io.Reader) error {
+	if err := json.NewDecoder(r).Decode(&b); err != nil {
+		log.Error("Unmarshalling failed: ", err)
+		return err
 	}
 	return nil
 }

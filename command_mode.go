@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/satori/go.uuid"
@@ -135,36 +135,37 @@ func createDefFromBluePrint(bp *BluePrintAST, orgID, upstreamURL string, asMock 
 	return &ad, err
 }
 
-func bluePrintLoadFile(filePath string) (*BluePrintAST, error) {
+func bluePrintLoadFile(path string) (*BluePrintAST, error) {
 	blueprint, err := GetImporterForSource(ApiaryBluePrint)
 	if err != nil {
 		log.Error("Couldn't get blueprint importer: ", err)
 		return nil, err
 	}
 
-	bluePrintFileData, err := ioutil.ReadFile(filePath)
+	f, err := os.Open(path)
 	if err != nil {
-		log.Error("Couldn't load blueprint file: ", err)
+		log.Error("Couldn't open blueprint file: ", err)
 		return nil, err
 	}
+	defer f.Close()
 
-	if err := blueprint.ReadString(string(bluePrintFileData)); err != nil {
-		log.Error("Failed to decode object")
+	if err := blueprint.LoadFrom(f); err != nil {
+		log.Error("Failed to decode object: ", err)
 		return nil, err
 	}
 
 	return blueprint.(*BluePrintAST), nil
 }
 
-func apiDefLoadFile(filePath string) (*apidef.APIDefinition, error) {
-	defFileData, err := ioutil.ReadFile(filePath)
+func apiDefLoadFile(path string) (*apidef.APIDefinition, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		log.Error("Couldn't load API Definition file: ", err)
+		log.Error("Couldn't open API Definition file: ", err)
 		return nil, err
 	}
 
 	def := &apidef.APIDefinition{}
-	if err := json.Unmarshal(defFileData, &def); err != nil {
+	if err := json.NewDecoder(f).Decode(&def); err != nil {
 		log.Error("Failed to unmarshal the JSON definition: ", err)
 		return nil, err
 	}

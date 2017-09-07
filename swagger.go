@@ -3,7 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/satori/go.uuid"
@@ -74,9 +75,9 @@ type SwaggerAST struct {
 	Swagger  string                    `json:"swagger"`
 }
 
-func (s *SwaggerAST) ReadString(asJson string) error {
-	if err := json.Unmarshal([]byte(asJson), &s); err != nil {
-		log.Error("Marshalling failed: ", err)
+func (s *SwaggerAST) LoadFrom(r io.Reader) error {
+	if err := json.NewDecoder(r).Decode(&s); err != nil {
+		log.Error("Unmarshalling failed: ", err)
 		return err
 	}
 	return nil
@@ -231,21 +232,22 @@ func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool
 	return &ad, nil
 }
 
-func swaggerLoadFile(filePath string) (*SwaggerAST, error) {
+func swaggerLoadFile(path string) (*SwaggerAST, error) {
 	swagger, err := GetImporterForSource(SwaggerSource)
 	if err != nil {
 		log.Error("Couldn't get swagger importer: ", err)
 		return nil, err
 	}
 
-	swaggerFileData, err := ioutil.ReadFile(filePath)
+	f, err := os.Open(path)
 	if err != nil {
-		log.Error("Couldn't load swagger file: ", err)
+		log.Error("Couldn't open swagger file: ", err)
 		return nil, err
 	}
+	defer f.Close()
 
-	if err := swagger.ReadString(string(swaggerFileData)); err != nil {
-		log.Error("Failed to decode object")
+	if err := swagger.LoadFrom(f); err != nil {
+		log.Error("Failed to load swagger object: ", err)
 		return nil, err
 	}
 
