@@ -370,21 +370,18 @@ func (a APIDefinitionLoader) ParseDefinition(apiDef []byte) *apidef.APIDefinitio
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	var apiSpecs []*APISpec
 	// Grab json files from directory
-	files, _ := ioutil.ReadDir(dir)
-	for _, f := range files {
-		if strings.Contains(f.Name(), ".json") {
-			filePath := filepath.Join(dir, f.Name())
-			log.Info("Loading API Specification from ", filePath)
-			defBody, err := ioutil.ReadFile(filePath)
-			if err != nil {
-				log.Error("Couldn't load app configuration file: ", err)
-			}
-			def := a.ParseDefinition(defBody)
-			spec := a.MakeSpec(def)
-			apiSpecs = append(apiSpecs, spec)
+	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	for _, path := range paths {
+		log.Info("Loading API Specification from ", path)
+		defBody, err := ioutil.ReadFile(path)
+		if err != nil {
+			log.Error("Couldn't load app configuration file: ", err)
+			continue
 		}
+		def := a.ParseDefinition(defBody)
+		spec := a.MakeSpec(def)
+		apiSpecs = append(apiSpecs, spec)
 	}
-
 	return apiSpecs
 }
 
