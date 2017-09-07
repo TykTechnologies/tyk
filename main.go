@@ -433,34 +433,30 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 		{name: "post_auth", slice: &mwPostKeyAuthFuncs, session: true},
 		{name: "post", slice: &mwPostFuncs, session: true},
 	} {
-		dirPath := filepath.Join(globalConf.MiddlewarePath, spec.APIID, folder.name)
-		files, _ := ioutil.ReadDir(dirPath)
-		for _, f := range files {
-			if strings.Contains(f.Name(), ".js") {
-				filePath := filepath.Join(dirPath, f.Name())
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Debug("Loading file middleware from ", filePath)
-				mwObjName := strings.Split(f.Name(), ".")[0]
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Debug("-- Middleware name ", mwObjName)
+		globPath := filepath.Join(globalConf.MiddlewarePath, spec.APIID, folder.name, "*.js")
+		paths, _ := filepath.Glob(globPath)
+		for _, path := range paths {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Loading file middleware from ", path)
 
-				mwDef := apidef.MiddlewareDefinition{}
-				mwDef.Name = mwObjName
-				mwDef.Path = filePath
-				if folder.session {
-					mwDef.RequireSession = strings.Contains(mwObjName, "_with_session")
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Debug("-- Middleware requires session: ", mwDef.RequireSession)
-				}
-				mwPaths = append(mwPaths, filePath)
-				if folder.single != nil {
-					*folder.single = mwDef
-				} else {
-					*folder.slice = append(*folder.slice, mwDef)
-				}
+			mwDef := apidef.MiddlewareDefinition{}
+			mwDef.Name = strings.Split(filepath.Base(path), ".")[0]
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("-- Middleware name ", mwDef.Name)
+			mwDef.Path = path
+			if folder.session {
+				mwDef.RequireSession = strings.Contains(mwDef.Name, "_with_session")
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Debug("-- Middleware requires session: ", mwDef.RequireSession)
+			}
+			mwPaths = append(mwPaths, path)
+			if folder.single != nil {
+				*folder.single = mwDef
+			} else {
+				*folder.slice = append(*folder.slice, mwDef)
 			}
 		}
 	}
