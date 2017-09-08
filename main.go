@@ -423,15 +423,14 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 
 	// Load from folders
 	for _, folder := range [...]struct {
-		name    string
-		single  *apidef.MiddlewareDefinition
-		slice   *[]apidef.MiddlewareDefinition
-		session bool
+		name   string
+		single *apidef.MiddlewareDefinition
+		slice  *[]apidef.MiddlewareDefinition
 	}{
-		{name: "pre", slice: &mwPreFuncs, session: true},
+		{name: "pre", slice: &mwPreFuncs},
 		{name: "auth", single: &mwAuthCheckFunc},
-		{name: "post_auth", slice: &mwPostKeyAuthFuncs, session: true},
-		{name: "post", slice: &mwPostFuncs, session: true},
+		{name: "post_auth", slice: &mwPostKeyAuthFuncs},
+		{name: "post", slice: &mwPostFuncs},
 	} {
 		globPath := filepath.Join(globalConf.MiddlewarePath, spec.APIID, folder.name, "*.js")
 		paths, _ := filepath.Glob(globPath)
@@ -446,11 +445,18 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 				"prefix": "main",
 			}).Debug("-- Middleware name ", mwDef.Name)
 			mwDef.Path = path
-			if folder.session {
-				mwDef.RequireSession = strings.Contains(mwDef.Name, "_with_session")
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Debug("-- Middleware requires session: ", mwDef.RequireSession)
+			mwDef.RequireSession = strings.Contains(mwDef.Name, "_with_session")
+			if mwDef.RequireSession {
+				switch folder.name {
+				case "post_auth", "post":
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Debug("-- Middleware requires session")
+				default:
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Warning("Middleware requires session, but isn't post-auth: ", mwDef.Name)
+				}
 			}
 			mwPaths = append(mwPaths, path)
 			if folder.single != nil {
