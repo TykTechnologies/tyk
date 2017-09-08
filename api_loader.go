@@ -154,30 +154,23 @@ func processSpec(spec *APISpec,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	var authStore, sessionStore, orgStore StorageHandler
-
+	authStore := redisStore
+	orgStore := redisOrgStore
 	switch spec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
 		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
 		authStore = &storageEngine
-		orgStore = redisOrgStore
 	case RPCStorageEngine:
-		storageEngine := rpcAuthStore
-		authStore = storageEngine
+		authStore = rpcAuthStore
 		orgStore = rpcOrgStore
 		globalConf.EnforceOrgDataAge = true
-
-	default:
-		authStore = redisStore
-		orgStore = redisOrgStore
 	}
 
+	sessionStore := redisStore
 	switch spec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
-		sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
-	default:
-		sessionStore = redisStore
+		sessionStore = rpcAuthStore
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
@@ -359,11 +352,7 @@ func processSpec(spec *APISpec,
 		}
 
 		useCoProcessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
-
-		useOttoAuth := false
-		if !useCoProcessAuth {
-			useOttoAuth = mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
-		}
+		useOttoAuth := !useCoProcessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 
 		if spec.UseBasicAuth {
 			// Basic Auth
@@ -481,38 +470,27 @@ func processSpec(spec *APISpec,
 
 		log.Debug("Chain completed")
 
-		userCheckHandler := UserRatesCheck()
-		simpleChain_PreAuth := []alice.Constructor{
-			createMiddleware(&IPWhiteListMiddleware{baseMid}),
-			createMiddleware(&OrganizationMonitor{BaseMiddleware: baseMid}),
-			createMiddleware(&VersionCheck{BaseMiddleware: baseMid})}
-
-		simpleChain_PostAuth := []alice.Constructor{
-			createMiddleware(&KeyExpired{baseMid}),
-			createMiddleware(&AccessRightsCheck{baseMid})}
-
-		var fullSimpleChain []alice.Constructor
-		fullSimpleChain = append(fullSimpleChain, simpleChain_PreAuth...)
-		fullSimpleChain = append(fullSimpleChain, authArray...)
-		fullSimpleChain = append(fullSimpleChain, simpleChain_PostAuth...)
-
-		simpleChain := alice.New(fullSimpleChain...).Then(userCheckHandler)
+		var simpleArray []alice.Constructor
+		simpleArray = append(simpleArray, createMiddleware(&IPWhiteListMiddleware{baseMid}))
+		simpleArray = append(simpleArray, createMiddleware(&OrganizationMonitor{BaseMiddleware: baseMid}))
+		simpleArray = append(simpleArray, createMiddleware(&VersionCheck{BaseMiddleware: baseMid}))
+		simpleArray = append(simpleArray, authArray...)
+		simpleArray = append(simpleArray, createMiddleware(&KeyExpired{baseMid}))
+		simpleArray = append(simpleArray, createMiddleware(&AccessRightsCheck{baseMid}))
 
 		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": spec.Name,
 		}).Debug("Rate limit endpoint is: ", rateLimitPath)
-		//subrouter.Handle(rateLimitPath, simpleChain)
 		chainDef.RateLimitPath = rateLimitPath
-		chainDef.RateLimitChain = simpleChain
+		chainDef.RateLimitChain = alice.New(simpleArray...).Then(UserRatesCheck())
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix":   "main",
 		"api_name": spec.Name,
 	}).Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
-	//subrouter.Handle(spec.Proxy.ListenPath+"{rest:.*}", chain)
 
 	chainDef.ThisHandler = chain
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
