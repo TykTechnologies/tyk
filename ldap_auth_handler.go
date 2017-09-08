@@ -18,22 +18,21 @@ type LDAPStorageHandler struct {
 	store                *ldap.LDAPConnection
 }
 
-func (l *LDAPStorageHandler) LoadConfFromMeta(confMeta interface{}) {
-	asMap := confMeta.(map[string]interface{})
-	l.LDAPServer = asMap["ldap_server"].(string)
-	l.LDAPPort = uint16(asMap["ldap_port"].(float64))
-	l.BaseDN = asMap["base_dn"].(string)
+func (l *LDAPStorageHandler) LoadConfFromMeta(meta map[string]interface{}) {
+	l.LDAPServer = meta["ldap_server"].(string)
+	l.LDAPPort = uint16(meta["ldap_port"].(float64))
+	l.BaseDN = meta["base_dn"].(string)
 
 	attrArray := []string{}
 
-	for _, attr := range asMap["attributes"].([]interface{}) {
+	for _, attr := range meta["attributes"].([]interface{}) {
 		val := attr.(string)
 		attrArray = append(attrArray, val)
 	}
 
 	l.Attributes = attrArray
-	l.SessionAttributeName = asMap["session_attribute_name"].(string)
-	l.SearchString = asMap["search_string"].(string)
+	l.SessionAttributeName = meta["session_attribute_name"].(string)
+	l.SearchString = meta["search_string"].(string)
 
 }
 
