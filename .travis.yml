@@ -18,7 +18,7 @@ addons:
 matrix:
   include:
     - go: 1.8.x
-    - go: 1.9rc2
+    - go: 1.9.x
       env: LATEST_GO=true # run linters and report coverage
 
 services:
