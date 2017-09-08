@@ -1386,11 +1386,8 @@ func listen(l net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
 				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				Handler:      defaultRouter,
 			}
-
-			newServeMux := http.NewServeMux()
-			newServeMux.Handle("/", defaultRouter)
-			http.DefaultServeMux = newServeMux
 
 			// Accept connections in a new goroutine.
 			go s.Serve(l)
@@ -1450,11 +1447,8 @@ func listen(l net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
 				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				Handler:      defaultRouter,
 			}
-
-			newServeMux := http.NewServeMux()
-			newServeMux.Handle("/", defaultRouter)
-			http.DefaultServeMux = newServeMux
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
