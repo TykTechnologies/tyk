@@ -913,14 +913,6 @@ func startRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 	}()
 }
 
-func getGlobalLocalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
-	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys}
-}
-
-func getGlobalLocalCacheStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
-	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys, IsCache: true}
-}
-
 func getGlobalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
 	if globalConf.SlaveOptions.UseRPC {
 		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}

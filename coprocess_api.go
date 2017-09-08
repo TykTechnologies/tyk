@@ -33,8 +33,8 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
 
-	storageHandler := getGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
-	storageHandler.SetKey(key, value, ttl)
+	store := &RedisClusterStorageManager{KeyPrefix: CoProcessDefaultKeyPrefix}
+	store.SetKey(key, value, ttl)
 }
 
 // TykGetData is a CoProcess API function for fetching data.
@@ -42,9 +42,9 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
-	storageHandler := getGlobalLocalStorageHandler(CoProcessDefaultKeyPrefix, false)
+	store := &RedisClusterStorageManager{KeyPrefix: CoProcessDefaultKeyPrefix}
 	// TODO: return error
-	val, _ := storageHandler.GetKey(key)
+	val, _ := store.GetKey(key)
 	return C.CString(val)
 }
 

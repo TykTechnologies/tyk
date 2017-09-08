@@ -38,19 +38,6 @@ type WebHookHandler struct {
 	store    StorageHandler
 }
 
-// Not Pretty, but will avoi dmillions of connections
-var WebHookRedisStorePointer *RedisClusterStorageManager
-
-// GetRedisInterfacePointer creates a reference to a redis connection pool that can be shared across all webhook instances
-func GetRedisInterfacePointer() *RedisClusterStorageManager {
-	if WebHookRedisStorePointer == nil {
-		WebHookRedisStorePointer = &RedisClusterStorageManager{KeyPrefix: "webhook.cache."}
-		WebHookRedisStorePointer.Connect()
-	}
-
-	return WebHookRedisStorePointer
-}
-
 // createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
 // specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
 func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (config.WebHookHandlerConf, error) {
@@ -78,8 +65,8 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return err
 	}
 
-	// Get a storage reference
-	w.store = GetRedisInterfacePointer()
+	w.store = &RedisClusterStorageManager{KeyPrefix: "webhook.cache."}
+	w.store.Connect()
 
 	// Pre-load template on init
 	if w.conf.TemplatePath != "" {
