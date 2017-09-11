@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"testing"
 
@@ -51,6 +52,27 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			proxy.Director(req)
 			if got := req.URL.String(); got != tc.wantURL {
 				t.Fatalf("wanted url %q, got %q", tc.wantURL, got)
+			}
+		})
+	}
+}
+
+func TestSingleJoiningSlash(t *testing.T) {
+	tests := []struct {
+		a, b, want string
+	}{
+		{"foo", "", "foo"},
+		{"foo", "bar", "foo/bar"},
+		{"foo/", "bar", "foo/bar"},
+		{"foo", "/bar", "foo/bar"},
+		{"foo/", "/bar", "foo/bar"},
+		{"foo//", "//bar", "foo/bar"},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s+%s", tc.a, tc.b), func(t *testing.T) {
+			got := singleJoiningSlash(tc.a, tc.b)
+			if got != tc.want {
+				t.Fatalf("want %s, got %s", tc.want, got)
 			}
 		})
 	}
