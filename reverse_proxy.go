@@ -293,29 +293,21 @@ type ReverseProxy struct {
 	ErrorHandler ErrorHandler
 }
 
-type TykTransporter struct {
-	http.Transport
+func defaultTransport() *http.Transport {
+	// allocate a new one every time for now, to avoid modifying a
+	// global variable for each request's needs (e.g. timeouts).
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: globalConf.MaxIdleConnsPerHost, // default is 100
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
 }
-
-func (t *TykTransporter) SetTimeout(timeOut int) {
-	//t.Dial.Timeout = time.Duration(timeOut) * time.Second
-	t.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
-}
-
-func getMaxIdleConns() int {
-	return globalConf.MaxIdleConnsPerHost
-}
-
-var TykDefaultTransport = &TykTransporter{http.Transport{
-	Proxy:               http.ProxyFromEnvironment,
-	MaxIdleConnsPerHost: getMaxIdleConns(),
-	Dial: (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).Dial,
-	TLSHandshakeTimeout: 10 * time.Second,
-	TLSClientConfig:     &tls.Config{},
-}}
 
 func singleJoiningSlash(a, b string) string {
 	a = strings.TrimRight(a, "/")
@@ -400,8 +392,10 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 }
 
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
-	transport := TykDefaultTransport
-	transport.TLSClientConfig.InsecureSkipVerify = globalConf.ProxySSLInsecureSkipVerify
+	transport := defaultTransport() // modifies a newly created transport
+	if globalConf.ProxySSLInsecureSkipVerify {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
@@ -410,8 +404,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 			Timeout:   time.Duration(timeOut) * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext
-		transport.SetTimeout(timeOut)
-
+		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}
 
 	if IsWebsocket(req) {
