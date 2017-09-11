@@ -33,7 +33,6 @@ func setupInstrumentation(arguments map[string]interface{}) {
 
 	if err != nil {
 		log.Fatal("Failed to start StatsD check: ", err)
-		return
 	}
 
 	log.Info("StatsD instrumentation sink started")
