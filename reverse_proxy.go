@@ -317,42 +317,13 @@ var TykDefaultTransport = &TykTransporter{http.Transport{
 	TLSClientConfig:     &tls.Config{},
 }}
 
-func cleanSlashes(a string) string {
-	endSlash := strings.HasSuffix(a, "//")
-	startSlash := strings.HasPrefix(a, "//")
-
-	if startSlash {
-		a = "/" + strings.TrimPrefix(a, "//")
-	}
-
-	if endSlash {
-		a = strings.TrimSuffix(a, "//") + "/"
-	}
-
-	return a
-}
-
 func singleJoiningSlash(a, b string) string {
-	a = cleanSlashes(a)
-	b = cleanSlashes(b)
-
-	aslash := strings.HasSuffix(a, "/")
-	bslash := strings.HasPrefix(b, "/")
-
-	switch {
-	case aslash && bslash:
-		log.Debug(a + b)
-		return a + b[1:]
-	case !aslash && !bslash:
-		if len(b) > 0 {
-			log.Debug(a + b)
-			return a + "/" + b
-		}
-		log.Debug(a + b)
-		return a
+	a = strings.TrimRight(a, "/")
+	b = strings.TrimLeft(b, "/")
+	if len(b) > 0 {
+		return a + "/" + b
 	}
-	log.Debug(a + b)
-	return a + b
+	return a
 }
 
 func copyHeader(dst, src http.Header) {
