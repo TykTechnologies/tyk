@@ -1014,7 +1014,7 @@ func main() {
 		log.Info("Terminated from fork.")
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 }
 
 func start(arguments map[string]interface{}) {
