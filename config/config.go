@@ -271,7 +271,6 @@ var Default = Config{
 	ListenPort:     8080,
 	Secret:         "352d20ee67be67f6340b4c0605b044b7",
 	TemplatePath:   "templates",
-	TykJSPath:      "js/tyk.js",
 	MiddlewarePath: "middleware",
 	AppPath:        "apps/",
 	Storage: StorageOptionsConf{

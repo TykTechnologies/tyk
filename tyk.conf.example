@@ -3,7 +3,6 @@
   "listen_port": 8080,
   "secret": "352d20ee67be67f6340b4c0605b044b7",
   "template_path": "/etc/tyk/templates",
-  "tyk_js_path": "/etc/tyk/js/tyk.js",
   "use_db_app_configs": false,
   "app_path": "/etc/tyk/apps",
   "middleware_path": "/etc/tyk/middleware",
