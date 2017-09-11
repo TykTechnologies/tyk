@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net/http/httptest"
 	"regexp"
@@ -13,6 +14,7 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -79,11 +81,11 @@ func TestJSVMBody(t *testing.T) {
 	jsvm.Init()
 
 	const js = `
-var leakMid = new TykJS.TykMiddleware.NewMiddleware({});
+var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
 
 leakMid.NewProcessRequest(function(request, session) {
 	request.Body += " appended"
-	return leakMid.ReturnData(request, session.meta_data);
+	return leakMid.ReturnData(request, session.meta_data)
 });`
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -118,12 +120,12 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	// this js plugin just loops forever, keeping Otto at 100% CPU
 	// usage and running forever.
 	const js = `
-var leakMid = new TykJS.TykMiddleware.NewMiddleware({});
+var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
 
 leakMid.NewProcessRequest(function(request, session) {
 	while (true) {
 	}
-	return leakMid.ReturnData(request, session.meta_data);
+	return leakMid.ReturnData(request, session.meta_data)
 });`
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -148,11 +150,11 @@ func TestJSVMConfigData(t *testing.T) {
 		"foo": "bar",
 	}
 	const js = `
-var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({});
+var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
 
 testJSVMData.NewProcessRequest(function(request, session, config) {
-	request.SetHeaders["data-foo"] = config.config_data.foo;
-	return testJSVMData.ReturnData(request, {});
+	request.SetHeaders["data-foo"] = config.config_data.foo
+	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware:      BaseMiddleware{spec, nil},
@@ -179,7 +181,7 @@ func TestJSVMReturnOverridesFullResponse(t *testing.T) {
 		"foo": "bar",
 	}
 	const js = `
-var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({});
+var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
 
 testJSVMData.NewProcessRequest(function(request, session, config) {
 	request.ReturnOverrides.ResponseError = "Foobarbaz"
@@ -188,7 +190,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 		"X-Foo": "Bar",
 		"X-Baz": "Qux"
 	}
-	return testJSVMData.ReturnData(request, {});
+	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware:      BaseMiddleware{spec, nil},
@@ -229,12 +231,12 @@ func TestJSVMReturnOverridesError(t *testing.T) {
 		"foo": "bar",
 	}
 	const js = `
-var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({});
+var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
 
 testJSVMData.NewProcessRequest(function(request, session, config) {
 	request.ReturnOverrides.ResponseError = "Foobarbaz"
 	request.ReturnOverrides.ResponseCode = 401
-	return testJSVMData.ReturnData(request, {});
+	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware:      BaseMiddleware{spec, nil},
@@ -258,5 +260,44 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	wantBody := "Foobarbaz"
 	if !strings.Contains(err.Error(), wantBody) {
 		t.Fatalf("wanted body to contain to be %v, got %v", wantBody, err.Error())
+	}
+}
+
+func TestJSVMUserCore(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	const js = `
+var testJSVMCore = new TykJS.TykMiddleware.NewMiddleware({})
+
+testJSVMCore.NewProcessRequest(function(request, session, config) {
+	request.SetHeaders["global"] = globalVar
+	return testJSVMCore.ReturnData(request, {})
+});`
+	dynMid := &DynamicMiddleware{
+		BaseMiddleware:      BaseMiddleware{spec, nil},
+		MiddlewareClassName: "testJSVMCore",
+		Pre:                 true,
+	}
+	tfile, err := ioutil.TempFile("", "tykjs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(tfile, `var globalVar = "globalValue"`); err != nil {
+		t.Fatal(err)
+	}
+	old := config.Global.TykJSPath
+	config.Global.TykJSPath = tfile.Name()
+	defer func() { config.Global.TykJSPath = old }()
+	jsvm := JSVM{}
+	jsvm.Init()
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+
+	r := testReq(t, "GET", "/foo", nil)
+	dynMid.ProcessRequest(nil, r, nil)
+
+	if want, got := "globalValue", r.Header.Get("global"); want != got {
+		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
