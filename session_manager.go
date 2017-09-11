@@ -93,7 +93,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 		} else {
 			// In-memory limiter
 			if BucketStore == nil {
-				initBucketStore()
+				BucketStore = memorycache.New()
 			}
 
 			// If a token has been updated, we must ensure we dont use
@@ -138,10 +138,6 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 }
 
 var BucketStore leakybucket.Storage
-
-func initBucketStore() {
-	BucketStore = memorycache.New()
-}
 
 func (SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
 

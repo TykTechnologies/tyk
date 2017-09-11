@@ -186,9 +186,7 @@ func buildConnStr(resource string) string {
 		}
 	}
 
-	connStr := globalConf.DBAppConfOptions.ConnectionString
-	connStr = connStr + resource
-	return connStr
+	return globalConf.DBAppConfOptions.ConnectionString + resource
 }
 
 func getAPISpecs() []*APISpec {
@@ -1146,24 +1144,25 @@ func generateListener(listenPort int) (net.Listener, error) {
 }
 
 func handleDashboardRegistration() {
-	if globalConf.UseDBAppConfigs {
-
-		if DashService == nil {
-			DashService = &HTTPDashboardHandler{}
-			DashService.Init()
-		}
-
-		// connStr := buildConnStr("/register/node")
-
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Registering node.")
-		if err := DashService.Register(); err != nil {
-			log.Fatal("Registration failed: ", err)
-		}
-
-		startHeartBeat()
+	if !globalConf.UseDBAppConfigs {
+		return
 	}
+
+	if DashService == nil {
+		DashService = &HTTPDashboardHandler{}
+		DashService.Init()
+	}
+
+	// connStr := buildConnStr("/register/node")
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Registering node.")
+	if err := DashService.Register(); err != nil {
+		log.Fatal("Registration failed: ", err)
+	}
+
+	startHeartBeat()
 }
 
 func startHeartBeat() {

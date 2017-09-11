@@ -40,13 +40,13 @@ func (k *OrganizationMonitor) IsEnabledForSpec() bool {
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	if globalConf.ExperimentalProcessOrgOffThread {
-		return k.ProcessRequestOffThread(w, r, conf)
+		return k.ProcessRequestOffThread(r)
 	}
-	return k.ProcessRequestLive(w, r, conf)
+	return k.ProcessRequestLive(r)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 
 	if !globalConf.EnforceOrgQuotas {
 		// We aren;t enforcing quotas, so skip this altogether
@@ -121,7 +121,7 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	}
 }
 
-func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, int) {
 
 	if !globalConf.EnforceOrgQuotas {
 		// We aren't enforcing quotas, so skip this altogether
