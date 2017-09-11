@@ -174,7 +174,6 @@ func buildConnStr(resource string) string {
 
 	if globalConf.DBAppConfOptions.ConnectionString == "" && globalConf.DisableDashboardZeroConf {
 		log.Fatal("Connection string is empty, failing.")
-		return ""
 	}
 
 	if !globalConf.DisableDashboardZeroConf && globalConf.DBAppConfOptions.ConnectionString == "" {
@@ -238,21 +237,19 @@ func getPolicies() {
 
 	switch globalConf.Policies.PolicySource {
 	case "service":
-		if globalConf.Policies.PolicyConnectionString != "" {
-			connStr := globalConf.Policies.PolicyConnectionString
-			connStr = connStr + "/system/policies"
-
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Using Policies from Dashboard Service")
-
-			pols = LoadPoliciesFromDashboard(connStr, globalConf.NodeSecret, globalConf.Policies.AllowExplicitPolicyID)
-
-		} else {
+		if globalConf.Policies.PolicyConnectionString == "" {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Fatal("No connection string or node ID present. Failing.")
 		}
+		connStr := globalConf.Policies.PolicyConnectionString
+		connStr = connStr + "/system/policies"
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Using Policies from Dashboard Service")
+
+		pols = LoadPoliciesFromDashboard(connStr, globalConf.NodeSecret, globalConf.Policies.AllowExplicitPolicyID)
 
 	case "rpc":
 		log.WithFields(logrus.Fields{
@@ -268,6 +265,14 @@ func getPolicies() {
 			return
 		}
 		pols = LoadPoliciesFromFile(globalConf.Policies.PolicyRecordName)
+	}
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Infof("Policies found (%d total):", len(pols))
+	for id := range pols {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Infof(" - %s", id)
 	}
 
 	if len(pols) > 0 {

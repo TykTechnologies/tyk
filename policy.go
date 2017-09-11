@@ -150,20 +150,15 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 			id = p.ID
 		}
 		p.ID = id
-		_, foundP := policies[id]
-		if !foundP {
-			policies[id] = p.ToRegularPolicy()
-			log.WithFields(logrus.Fields{
-				"prefix": "policy",
-			}).Info("--> Processing policy ID: ", p.ID)
-			log.Debug("POLICY ACCESS RIGHTS: ", p.AccessRights)
-		} else {
+		if _, ok := policies[id]; ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "policy",
 				"policyID": p.ID,
 				"OrgID":    p.OrgID,
 			}).Warning("--> Skipping policy, new item has a duplicate ID!")
+			continue
 		}
+		policies[id] = p.ToRegularPolicy()
 	}
 
 	return policies
@@ -188,15 +183,9 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 
 	policies := make(map[string]Policy, len(dbPolicyList))
 
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Info("Policies found: ", len(dbPolicyList))
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Info("--> Processing policy ID: ", p.ID)
 	}
 
 	return policies
