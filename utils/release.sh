@@ -61,7 +61,6 @@ fi
 
 echo "Preping TGZ Dirs"
 mkdir $i386TGZDIR/apps
-mkdir $i386TGZDIR/js
 mkdir $i386TGZDIR/middleware
 mkdir $i386TGZDIR/middleware/python
 mkdir $i386TGZDIR/middleware/lua
@@ -74,7 +73,6 @@ cp $SOURCEBINPATH/apps/app_sample.json $i386TGZDIR/apps
 cp $SOURCEBINPATH/templates/*.json $i386TGZDIR/templates
 cp $SOURCEBINPATH/middleware/*.js $i386TGZDIR/middleware
 cp $SOURCEBINPATH/event_handlers/sample/*.js $i386TGZDIR/event_handlers/sample
-cp $SOURCEBINPATH/js/*.js $i386TGZDIR/js
 cp $SOURCEBINPATH/policies/*.json $i386TGZDIR/policies
 cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/
 cp $SOURCEBINPATH/tyk.conf.example $i386TGZDIR/tyk.conf
@@ -110,7 +108,6 @@ cd $SOURCEBINPATH
 # cp $SOURCEBINPATH/tyk.conf.example $i386BINDIR/tyk.conf
 # cp -r $SOURCEBINPATH/middleware/*.js $i386BINDIR
 # cp -r $SOURCEBINPATH/event_handlers/sample/*.js $i386BINDIR
-# cp -r $SOURCEBINPATH/js/tyk.js $i386BINDIR
 # cp -r $SOURCEBINPATH/policies/policies.json $i386BINDIR
 
 
@@ -119,7 +116,6 @@ cd $SOURCEBINPATH
 # cp $SOURCEBINPATH/tyk.conf.example $amd64BINDIR/tyk.conf
 # cp -r $SOURCEBINPATH/middleware/*.js $amd64BINDIR
 # cp -r $SOURCEBINPATH/event_handlers/sample/*.js $amd64BINDIR
-# cp -r $SOURCEBINPATH/js/tyk.js $amd64BINDIR
 # cp -r $SOURCEBINPATH/policies/policies.json $amd64BINDIR
 
 
@@ -128,7 +124,6 @@ cd $SOURCEBINPATH
 # cp $SOURCEBINPATH/tyk.conf.example $armBINDIR/tyk.conf
 # cp -r $SOURCEBINPATH/middleware/*.js $armBINDIR
 # cp -r $SOURCEBINPATH/event_handlers/sample/*.js $armBINDIR
-# cp -r $SOURCEBINPATH/js/tyk.js $armBINDIR
 # cp -r $SOURCEBINPATH/policies/policies.json $armBINDIR
 
 # # -------------------------------------------------------
