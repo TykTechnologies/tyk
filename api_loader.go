@@ -575,16 +575,17 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 	}
 
 	for _, chainObj := range loadList {
-		if !chainObj.Skip {
-			if !chainObj.Open {
-				chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
-			}
-
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Processed and listening on: ", chainObj.ListenOn)
-			chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+		if chainObj.Skip {
+			continue
 		}
+		if !chainObj.Open {
+			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Processed and listening on: ", chainObj.ListenOn)
+		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 	}
 
 	// All APIs processed, now we can healthcheck
