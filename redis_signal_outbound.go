@@ -40,7 +40,7 @@ func (u *RedisNotificationHandler) Notify(n InterfaceNotification) error {
 }
 
 func (u *RedisNotificationHandler) StartUIPubSubConn() {
-	u.CacheStore = &RedisClusterStorageManager{KeyPrefix: "gateway-notifications:", HashKeys: false}
+	u.CacheStore = &RedisClusterStorageManager{KeyPrefix: "gateway-notifications:"}
 	u.CacheStore.Connect()
 	// On message, synchronize
 	for {

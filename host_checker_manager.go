@@ -313,16 +313,15 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 
 	hostData = HostData{
 		CheckURL: checkObject.CheckURL,
-		MetaData: make(map[string]string),
-		Method:   checkObject.Method,
-		Headers:  checkObject.Headers,
-		Body:     bodyData,
+		MetaData: map[string]string{
+			UnHealthyHostMetaDataTargetKey: checkObject.CheckURL,
+			UnHealthyHostMetaDataAPIKey:    apiID,
+			UnHealthyHostMetaDataHostKey:   u.Host,
+		},
+		Method:  checkObject.Method,
+		Headers: checkObject.Headers,
+		Body:    bodyData,
 	}
-
-	// Add our specific metadata
-	hostData.MetaData[UnHealthyHostMetaDataTargetKey] = checkObject.CheckURL
-	hostData.MetaData[UnHealthyHostMetaDataAPIKey] = apiID
-	hostData.MetaData[UnHealthyHostMetaDataHostKey] = u.Host
 
 	return hostData, nil
 }
