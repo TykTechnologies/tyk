@@ -26,6 +26,7 @@ import (
 func getTykBundlePath() string {
 	return filepath.Join(globalConf.MiddlewarePath, "bundles")
 }
+
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
 	Name     string

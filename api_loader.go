@@ -13,9 +13,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"path"
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/TykTechnologies/tyk/grpcproxy"
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"path"
 )
 
 type ChainObject struct {
@@ -546,7 +546,7 @@ func processSpec(spec *APISpec,
 		pluginPath := spec.CustomMiddleware.GRPCProxy.Path
 		pathPrefix := globalConf.MiddlewarePath
 		if spec.CustomMiddlewareBundle != "" {
-			pathPrefix = path.Join(getTykBundlePath(), spec.APIID + "-" + spec.CustomMiddlewareBundle)
+			pathPrefix = path.Join(getTykBundlePath(), spec.APIID+"-"+spec.CustomMiddlewareBundle)
 		}
 		filePath := path.Join(pathPrefix, pluginPath)
 		spec.grpcProxyMux = runtime.NewServeMux()

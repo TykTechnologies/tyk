@@ -134,7 +134,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
-	grpcProxyMux			 *runtime.ServeMux
+	grpcProxyMux             *runtime.ServeMux
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
