@@ -425,8 +425,6 @@ func (j *JSVM) LoadTykJSApi() {
 		u.Path = hro.Resource
 		urlStr := u.String() // "https://api.com/user/"
 
-		client := &http.Client{}
-
 		var d string
 		if hro.Body != "" {
 			d = hro.Body
@@ -444,7 +442,7 @@ func (j *JSVM) LoadTykJSApi() {
 			r.Header.Set(k, v)
 		}
 		r.Close = true
-		resp, err := client.Do(r)
+		resp, err := http.DefaultClient.Do(r)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",

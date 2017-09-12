@@ -38,8 +38,7 @@ type BatchRequestHandler struct {
 
 // doAsyncRequest runs an async request and replies to a channel
 func (b *BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, out chan BatchReplyUnit) {
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Error("Webhook request failed: ", err)
 		return
@@ -62,8 +61,7 @@ func (b *BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, o
 
 // doSyncRequest will make the same request but return a BatchReplyUnit
 func (b *BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) BatchReplyUnit {
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Error("Webhook request failed: ", err)
 		return BatchReplyUnit{}
