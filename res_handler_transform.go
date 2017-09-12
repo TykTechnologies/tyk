@@ -9,28 +9,16 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
-	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type ResponsetransformOptions struct {
-	//FlushInterval time.Duration
-}
-
 type ResponseTransformMiddleware struct {
-	Spec   *APISpec
-	config ResponsetransformOptions
+	Spec *APISpec
 }
 
 func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
-	handler := ResponseTransformMiddleware{}
-
-	if err := mapstructure.Decode(c, &h.config); err != nil {
-		log.Error(err)
-		return err
-	}
-	handler.Spec = spec
+	h.Spec = spec
 	return nil
 }
 

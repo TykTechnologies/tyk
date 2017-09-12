@@ -500,18 +500,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var err error
 	if breakerEnforced {
 		log.Debug("ON REQUEST: Breaker status: ", breakerConf.CB.Ready())
-		if breakerConf.CB.Ready() {
-			res, err = transport.RoundTrip(outreq)
-			if err != nil {
-				breakerConf.CB.Fail()
-			} else if res.StatusCode == 500 {
-				breakerConf.CB.Fail()
-			} else {
-				breakerConf.CB.Success()
-			}
-		} else {
+		if !breakerConf.CB.Ready() {
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
 			return nil
+		}
+		res, err = transport.RoundTrip(outreq)
+		if err != nil || res.StatusCode == 500 {
+			breakerConf.CB.Fail()
+		} else {
+			breakerConf.CB.Success()
 		}
 	} else {
 		res, err = transport.RoundTrip(outreq)
@@ -589,12 +586,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ses = session
 	}
 
-	if p.TykAPISpec.ResponseHandlersActive {
-		// Middleware chain handling here - very simple, but should do the trick
-		err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
-		if err != nil {
-			log.Error("Response chain failed! ", err)
-		}
+	// Middleware chain handling here - very simple, but should do
+	// the trick. Chain can be empty, in which case this is a no-op.
+	if err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses); err != nil {
+		log.Error("Response chain failed! ", err)
 	}
 
 	// We should at least copy the status code in

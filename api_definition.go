@@ -129,7 +129,6 @@ type APISpec struct {
 	URLRewriteEnabled        bool
 	CircuitBreakerEnabled    bool
 	EnforcedTimeoutEnabled   bool
-	ResponseHandlersActive   bool
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
