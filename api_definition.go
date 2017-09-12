@@ -927,20 +927,12 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 
 	case "url":
 		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
-		if len(url) == 0 {
-			return ""
+		// First non-empty part of the path is the version ID
+		for _, part := range strings.Split(url, "/") {
+			if part != "" {
+				return part
+			}
 		}
-		if url[:1] == "/" {
-			url = url[1:]
-		}
-
-		// Assume first param is the version ID
-		firstParamEndsAt := strings.Index(url, "/")
-		if firstParamEndsAt == -1 {
-			return ""
-		}
-
-		return url[:firstParamEndsAt]
 	}
 	return ""
 }
