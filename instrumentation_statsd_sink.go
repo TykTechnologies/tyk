@@ -107,7 +107,7 @@ func NewStatsDSink(addr string, options *StatsDSinkOptions) (*StatsDSink, error)
 		drainDoneChan: make(chan struct{}),
 		stopDoneChan:  make(chan struct{}),
 		flushPeriod:   100 * time.Millisecond,
-		prefixBuffers: make(map[eventKey]prefixBuffer),
+		prefixBuffers: map[eventKey]prefixBuffer{},
 	}
 
 	if options != nil {

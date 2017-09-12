@@ -17,7 +17,7 @@ type orgActiveMapMu struct {
 }
 
 var orgActiveMap = orgActiveMapMu{
-	OrgMap: make(map[string]bool),
+	OrgMap: map[string]bool{},
 }
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and

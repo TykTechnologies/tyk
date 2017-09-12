@@ -265,12 +265,9 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		event = EventTokenCreated
 	}
 	FireSystemEvent(event, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            "Key modified.",
-			OriginatingRequest: "",
-		},
-		Org: newSession.OrgID,
-		Key: keyName,
+		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
+		Org:              newSession.OrgID,
+		Key:              keyName,
 	})
 
 	response := APIModifyKeySuccess{
@@ -368,12 +365,9 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
 
 	FireSystemEvent(EventTokenDeleted, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            "Key deleted.",
-			OriginatingRequest: "",
-		},
-		Org: orgID,
-		Key: keyName,
+		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
+		Org:              orgID,
+		Key:              keyName,
 	})
 
 	log.WithFields(logrus.Fields{
@@ -985,12 +979,9 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	FireSystemEvent(EventTokenCreated, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            "Key generated.",
-			OriginatingRequest: "",
-		},
-		Org: newSession.OrgID,
-		Key: newKey,
+		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
+		Org:              newSession.OrgID,
+		Key:              newKey,
 	})
 
 	log.WithFields(logrus.Fields{

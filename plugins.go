@@ -92,15 +92,14 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	requestData := MiniRequestObject{
 		Headers:        r.Header,
-		SetHeaders:     make(map[string]string),
-		DeleteHeaders:  make([]string, 0),
+		SetHeaders:     map[string]string{},
+		DeleteHeaders:  []string{},
 		Body:           originalBody,
 		URL:            r.URL.Path,
 		Params:         r.URL.Query(),
-		AddParams:      make(map[string]string),
-		ExtendedParams: make(map[string][]string),
-		DeleteParams:   make([]string, 0),
-		IgnoreBody:     false,
+		AddParams:      map[string]string{},
+		ExtendedParams: map[string][]string{},
+		DeleteParams:   []string{},
 	}
 
 	asJsonRequestObj, err := json.Marshal(requestData)
