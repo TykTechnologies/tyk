@@ -825,8 +825,6 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			listen(ln, cln, fmt.Errorf("Without goagain"))
 		}
 
-		client := &http.Client{}
-
 		for ti, tc := range tests {
 			tPrefix := ""
 			if m.goagain {
@@ -859,7 +857,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 				req = withAuth(req)
 			}
 
-			resp, err := client.Do(req)
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Error(err)
 				continue

@@ -210,8 +210,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 	// Fire web hook routine (setHookFired())
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
