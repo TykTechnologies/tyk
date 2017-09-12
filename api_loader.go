@@ -251,8 +251,14 @@ func processSpec(spec *APISpec,
 	creeateResponseMiddlewareChain(spec)
 
 	baseMid := &BaseMiddleware{spec, proxy}
-	CheckCBEnabled(baseMid)
-	CheckETEnabled(baseMid)
+	for _, v := range baseMid.Spec.VersionData.Versions {
+		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
+			baseMid.Spec.CircuitBreakerEnabled = true
+		}
+		if len(v.ExtendedPaths.HardTimeouts) > 0 {
+			baseMid.Spec.EnforcedTimeoutEnabled = true
+		}
+	}
 
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
@@ -279,7 +285,7 @@ func processSpec(spec *APISpec,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -305,7 +311,7 @@ func processSpec(spec *APISpec,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -327,7 +333,7 @@ func processSpec(spec *APISpec,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -415,7 +421,7 @@ func processSpec(spec *APISpec,
 				"prefix": "main",
 			}).Info("----> Checking security policy: JS Plugin")
 
-			authArray = append(authArray, CreateDynamicAuthMiddleware(mwAuthCheckFunc.Name, baseMid))
+			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
 		}
 
 		if spec.UseStandardAuth || (!spec.UseOpenID && !spec.EnableJWT && !spec.EnableSignatureChecking && !spec.UseBasicAuth && !spec.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
@@ -456,7 +462,7 @@ func processSpec(spec *APISpec,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
 		}
 

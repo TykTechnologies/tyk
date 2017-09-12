@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,7 +23,7 @@ type TykMiddleware interface {
 	Name() string
 }
 
-func CreateDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
+func createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,
@@ -33,10 +32,6 @@ func CreateDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseM
 	}
 
 	return createMiddleware(dMiddleware)
-}
-
-func CreateDynamicAuthMiddleware(name string, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
-	return CreateDynamicMiddleware(name, true, false, baseMid)
 }
 
 // Generic middleware caller to make extension easier
@@ -99,42 +94,21 @@ func appendMiddleware(chain *[]alice.Constructor, mw TykMiddleware) {
 	}
 }
 
-func CheckCBEnabled(baseMid *BaseMiddleware) bool {
-	for _, v := range baseMid.Spec.VersionData.Versions {
-		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
-			baseMid.Spec.CircuitBreakerEnabled = true
-			return true
-		}
-	}
-	return false
-}
-
-func CheckETEnabled(baseMid *BaseMiddleware) bool {
-	for _, v := range baseMid.Spec.VersionData.Versions {
-		if len(v.ExtendedPaths.HardTimeouts) > 0 {
-			baseMid.Spec.EnforcedTimeoutEnabled = true
-			return true
-		}
-	}
-	return false
-}
-
 type TykResponseHandler interface {
 	Init(interface{}, *APISpec) error
 	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *SessionState) error
 }
 
-func ResponseProcessorByName(name string) (TykResponseHandler, error) {
+func responseProcessorByName(name string) TykResponseHandler {
 	switch name {
 	case "header_injector":
-		return &HeaderInjector{}, nil
+		return &HeaderInjector{}
 	case "response_body_transform":
-		return &ResponseTransformMiddleware{}, nil
+		return &ResponseTransformMiddleware{}
 	case "header_transform":
-		return &HeaderTransform{}, nil
-	default:
-		return nil, errors.New("not found")
+		return &HeaderTransform{}
 	}
+	return nil
 }
 
 func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {

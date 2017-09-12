@@ -489,23 +489,24 @@ func creeateResponseMiddlewareChain(spec *APISpec) {
 
 	responseChain := make([]TykResponseHandler, len(spec.ResponseProcessors))
 	for i, processorDetail := range spec.ResponseProcessors {
-		processor, err := ResponseProcessorByName(processorDetail.Name)
-		if err != nil {
+		processor := responseProcessorByName(processorDetail.Name)
+		if processor == nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Error("Failed to load processor! ", err)
+			}).Error("No such processor: ", processorDetail.Name)
 			return
 		}
-		_ = processor.Init(processorDetail.Options, spec)
+		if err := processor.Init(processorDetail.Options, spec); err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Debug("Failed to init processor: ", err)
+		}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = processor
 	}
 	spec.ResponseChain = responseChain
-	if len(responseChain) > 0 {
-		spec.ResponseHandlersActive = true
-	}
 }
 
 func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
