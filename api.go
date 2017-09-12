@@ -321,7 +321,7 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
-		if !strings.Contains(s, QuotaKeyPrefix) && !strings.Contains(s, RateLimitKeyPrefix) {
+		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
 			fixed_sessions = append(fixed_sessions, s)
 		}
 	}
@@ -824,7 +824,7 @@ func handleGetAllOrgKeys(filter string) (interface{}, int) {
 	sessions := spec.OrgSessionManager.Sessions(filter)
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
-		if !strings.Contains(s, QuotaKeyPrefix) && !strings.Contains(s, RateLimitKeyPrefix) {
+		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
 			fixed_sessions = append(fixed_sessions, s)
 		}
 	}

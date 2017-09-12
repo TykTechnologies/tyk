@@ -445,7 +445,7 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 				"prefix": "main",
 			}).Debug("-- Middleware name ", mwDef.Name)
 			mwDef.Path = path
-			mwDef.RequireSession = strings.Contains(mwDef.Name, "_with_session")
+			mwDef.RequireSession = strings.HasSuffix(mwDef.Name, "_with_session")
 			if mwDef.RequireSession {
 				switch folder.name {
 				case "post_auth", "post":
