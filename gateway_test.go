@@ -22,6 +22,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -1027,5 +1028,57 @@ func TestProxyUserAgent(t *testing.T) {
 		if got := resp.Headers["User-Agent"]; !rx.MatchString(got) {
 			t.Errorf("Wanted agent to match %q, got %q\n", tc.wantRe, got)
 		}
+	}
+}
+
+func buildAndLoadAPI(apiGens ...func(spec *APISpec)) {
+	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
+	defer func() {
+		os.RemoveAll(globalConf.AppPath)
+		globalConf.AppPath = "apps/"
+	}()
+
+	for i, gen := range apiGens {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		json.Unmarshal([]byte(sampleAPI), spec.APIDefinition)
+		gen(spec)
+		specBytes, _ := json.Marshal(spec)
+		specFilePath := filepath.Join(globalConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
+		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+			panic(err)
+		}
+	}
+
+	doReload()
+}
+
+func TestSkipUrlCleaning(t *testing.T) {
+	globalConf.HttpServerOptions.OverrideDefaults = true
+	globalConf.HttpServerOptions.SkipURLCleaning = true
+
+	ln, _ := generateListener(0)
+	baseURL := "http://" + ln.Addr().String()
+	listen(ln, nil, nil)
+
+	defer func() {
+		globalConf.HttpServerOptions.OverrideDefaults = false
+		globalConf.HttpServerOptions.SkipURLCleaning = false
+		ln.Close()
+	}()
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(r.URL.Path))
+	}))
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = s.URL
+	})
+
+	resp, _ := http.Get(baseURL + "/http://example.com")
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	if string(body) != "/http://example.com" {
+		t.Error("Should not strip URL", string(body))
 	}
 }
