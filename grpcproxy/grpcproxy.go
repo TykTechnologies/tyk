@@ -4,13 +4,14 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
 	"fmt"
-	"github.com/akutz/gpds/lib"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"log"
 	"os"
 	"plugin"
 	"strings"
+
+	"github.com/akutz/gpds/lib"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 type conf struct{}

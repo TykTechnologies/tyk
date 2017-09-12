@@ -16,9 +16,10 @@ import (
 
 	"github.com/rubyist/circuitbreaker"
 
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 )
 
 const (

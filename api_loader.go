@@ -11,11 +11,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"path"
+
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/grpcproxy"
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"path"
 )
 
 type ChainObject struct {

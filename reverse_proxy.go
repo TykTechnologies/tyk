@@ -30,8 +30,9 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http/httptest"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
