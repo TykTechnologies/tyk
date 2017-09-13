@@ -103,7 +103,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	var copiedRequest *http.Request
 	if RecordDetail(r) {
-		copiedRequest = CopyHttpRequest(r)
+		copiedRequest = copyRequest(r)
 	}
 
 	t1 := time.Now().UnixNano()
@@ -218,7 +218,7 @@ func forceResponse(w http.ResponseWriter,
 	}
 
 	// Clone the response so we can save it
-	copiedRes := CopyHttpResponse(newResponse)
+	copiedRes := copyResponse(newResponse)
 
 	handleForcedResponse(w, newResponse, session)
 

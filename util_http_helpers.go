@@ -40,48 +40,34 @@ func requestIPHops(r *http.Request) string {
 	return clientIP
 }
 
-func CopyHttpRequest(r *http.Request) *http.Request {
-	reqCopy := new(http.Request)
-	*reqCopy = *r
-
+func copyRequest(r *http.Request) *http.Request {
+	r2 := *r
 	if r.Body != nil {
 		defer r.Body.Close()
 
-		// Buffer body data
-		var bodyBuffer bytes.Buffer
-		bodyBuffer2 := new(bytes.Buffer)
+		var buf1, buf2 bytes.Buffer
+		io.Copy(&buf1, r.Body)
+		buf2 = buf1
 
-		io.Copy(&bodyBuffer, r.Body)
-		*bodyBuffer2 = bodyBuffer
-
-		// Create new ReadClosers so we can split output
-		r.Body = ioutil.NopCloser(&bodyBuffer)
-		reqCopy.Body = ioutil.NopCloser(bodyBuffer2)
+		r.Body = ioutil.NopCloser(&buf1)
+		r2.Body = ioutil.NopCloser(&buf2)
 	}
-
-	return reqCopy
+	return &r2
 }
 
-func CopyHttpResponse(r *http.Response) *http.Response {
-	resCopy := new(http.Response)
-	*resCopy = *r
-
+func copyResponse(r *http.Response) *http.Response {
+	r2 := *r
 	if r.Body != nil {
 		defer r.Body.Close()
 
-		// Buffer body data
-		var bodyBuffer bytes.Buffer
-		bodyBuffer2 := new(bytes.Buffer)
+		var buf1, buf2 bytes.Buffer
+		io.Copy(&buf1, r.Body)
+		buf2 = buf1
 
-		io.Copy(&bodyBuffer, r.Body)
-		*bodyBuffer2 = bodyBuffer
-
-		// Create new ReadClosers so we can split output
-		r.Body = ioutil.NopCloser(&bodyBuffer)
-		resCopy.Body = ioutil.NopCloser(bodyBuffer2)
+		r.Body = ioutil.NopCloser(&buf1)
+		r2.Body = ioutil.NopCloser(&buf2)
 	}
-
-	return resCopy
+	return &r2
 }
 
 func RecordDetail(r *http.Request) bool {
