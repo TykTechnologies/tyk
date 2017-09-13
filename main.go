@@ -834,20 +834,17 @@ func afterConfSetup(conf *config.Config) {
 	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
 }
 
-type AuditHostDetails struct {
+var hostDetails struct {
 	Hostname string
 	PID      int
 }
 
-var HostDetails AuditHostDetails
-
 func getHostDetails() {
 	var err error
-	if HostDetails.PID, err = pidfile.Read(); err != nil {
+	if hostDetails.PID, err = pidfile.Read(); err != nil {
 		log.Error("Failed ot get host pid: ", err)
 	}
-
-	if HostDetails.Hostname, err = os.Hostname(); err != nil {
+	if hostDetails.Hostname, err = os.Hostname(); err != nil {
 		log.Error("Failed ot get hostname: ", err)
 	}
 }
@@ -924,27 +921,24 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
 	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
-// Handles pre-fork actions if we get a SIGHUP2
-var amForked bool
-
-func onFork() {
-	if globalConf.UseDBAppConfigs {
-		log.Info("Stopping heartbeat")
-		DashService.StopBeating()
-
-		log.Info("Waiting to de-register")
-		time.Sleep(10 * time.Second)
-
-		os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
-		os.Setenv("TYK_SERVICE_NODEID", NodeID)
-	}
-
-	amForked = true
-}
-
 func main() {
 	arguments := getCmdArguments()
 	NodeID = "solo-" + uuid.NewV4().String()
+
+	amForked := false
+
+	onFork := func() {
+		if globalConf.UseDBAppConfigs {
+			log.Info("Stopping heartbeat")
+			DashService.StopBeating()
+			log.Info("Waiting to de-register")
+			time.Sleep(10 * time.Second)
+
+			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
+			os.Setenv("TYK_SERVICE_NODEID", NodeID)
+		}
+	}
+
 	l, _ := goagain.Listener(onFork)
 	controlListener, goAgainErr := goagain.Listener(onFork)
 
@@ -1358,5 +1352,5 @@ func listen(l, controlListener net.Listener, err error) {
 	}).Info("--> Listening on port: ", globalConf.ListenPort)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("--> PID: ", HostDetails.PID)
+	}).Info("--> PID: ", hostDetails.PID)
 }

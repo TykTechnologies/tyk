@@ -134,7 +134,7 @@ func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
 		panic(err)
 	}
 	req.Header.Set("authorization", h.Secret)
-	req.Header.Set("x-tyk-hostname", HostDetails.Hostname)
+	req.Header.Set("x-tyk-hostname", hostDetails.Hostname)
 	return req
 }
 

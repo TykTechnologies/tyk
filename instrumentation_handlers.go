@@ -63,7 +63,7 @@ func MonitorApplicationInstrumentation() {
 	go func() {
 		job := instrument.NewJob("GCActivity")
 		job_rl := instrument.NewJob("Load")
-		metadata := health.Kvs{"host": HostDetails.Hostname}
+		metadata := health.Kvs{"host": hostDetails.Hostname}
 		applicationGCStats.PauseQuantiles = make([]time.Duration, 5)
 
 		for {
