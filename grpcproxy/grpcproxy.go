@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.ServeMux) error  {
+func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.ServeMux) error {
 	// Load our plugin
 	p, err := plugin.Open(path)
 	if err != nil {
