@@ -1032,10 +1032,11 @@ func TestProxyUserAgent(t *testing.T) {
 }
 
 func buildAndLoadAPI(apiGens ...func(spec *APISpec)) {
+	oldPath := globalConf.AppPath
 	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
 	defer func() {
 		os.RemoveAll(globalConf.AppPath)
-		globalConf.AppPath = "apps/"
+		globalConf.AppPath = oldPath
 	}()
 
 	for i, gen := range apiGens {
