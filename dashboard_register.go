@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -52,7 +53,10 @@ func reLogin() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Recovering configurations, reloading...")
-	doReload()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	reloadURLStructure(wg.Done)
+	wg.Wait()
 }
 
 func (h *HTTPDashboardHandler) Init() error {
