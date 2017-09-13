@@ -23,18 +23,18 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	// register the plug-in's modules
 	tmapObj, err := p.Lookup("Types")
 	if err != nil {
-		return fmt.Errorf("error: failed to lookup type map: %v", err)
+		return fmt.Errorf("failed to lookup type map: %v", err)
 	}
 
 	// assert that the Types symbol is a *map[string]func() interface{}
 	tmapPtr, tmapOk := tmapObj.(*map[string]func() interface{})
 	if !tmapOk {
-		return fmt.Errorf("error: invalid type map: %T", tmapObj)
+		return fmt.Errorf("invalid type map: %T", tmapObj)
 	}
 
 	// assert that the type map pointer is not nil
 	if tmapPtr == nil {
-		return fmt.Errorf("error: nil type map: type=%[1]T val=%[1]v", tmapPtr)
+		return fmt.Errorf("Map pointer is nil: %v", tmapPtr)
 	}
 
 	// dereference the type map pointer

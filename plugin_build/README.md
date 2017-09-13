@@ -1,9 +1,6 @@
 # GRPC Proxy How To
 
-**This is currently a very manual process due to how Golang's plugin mechanism works. We are working on a bakery-style
-docker image that will make this process more automated**
-
-*Edit* To make this easier, use the `tykio/bakery` container, it will generate a plugin file from your proto
+To make this easier, use the `tykio/bakery` container, it will generate a plugin file from your proto
 files without any additional steps.
 
 If you do not want to use the bakery, please use the following steps...
@@ -97,7 +94,7 @@ It will generate a stub file `path/to/your_service.pb.go`.
 
 It will generate a reverse proxy `path/to/your_service.pb.gw.go`.
 
-Note: After generating the code for each of the stubs, in order to build the code, you will want to run ```go get .``` from the directory containing the stubs.
+Note: After generating the code for each of the stubs, in order to build the code, you will want to run `go get .` from the directory containing the stubs.
 
 ## Step 6: Create the gRPC Proxy plugin for Tyk:
 
@@ -108,7 +105,9 @@ Copy the wrapper files from the [Tyk Github Repo](https://github.com/Tyktechnolo
 
 Copy these to the same directory as your stubs.
 
-Open the *.pb.gw.go and *.pb.go files, you must change the package name from whatever was generated, to `main`, so the
+Open both of these files and remove the `// +build ignore` comment from the first line
+
+Open the ``*.pb.gw.go` and `*.pb.go` files, you must change the package name from whatever was generated, to `main`, so the
 header for all files should read:
 
     ```go

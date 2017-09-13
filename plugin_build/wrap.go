@@ -1,14 +1,16 @@
+// +build ignore
+
 package main
 
 import (
-	"golang.org/x/net/context"
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"errors"
+
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
-
-type registerFunc func (context.Context, *runtime.ServeMux, string, []grpc.DialOption) (err error)
+type registerFunc func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) (err error)
 
 // errInvalidConfig is the error returned when a module is initialized
 // with an invalid configuration argument
@@ -26,7 +28,7 @@ var Types = map[string]func() interface{}{
 	"register": func() interface{} { return &module{} },
 }
 
-type module struct{
+type module struct {
 }
 
 func (m *module) Init(ctx context.Context, configObj interface{}) error {
@@ -36,15 +38,15 @@ func (m *module) Init(ctx context.Context, configObj interface{}) error {
 	}
 
 	doRegister(
-		config.Get(ctx,"ctx").(context.Context),
-		config.Get(ctx,"mux").(*runtime.ServeMux),
-		config.Get(ctx,"e").(string),
+		config.Get(ctx, "ctx").(context.Context),
+		config.Get(ctx, "mux").(*runtime.ServeMux),
+		config.Get(ctx, "e").(string),
 		getOpts())
 
 	return nil
 }
 
 // Do not edit this function
-func changeMe(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) (err error) {
+func entryPointFunction(ctx context.Context, mux *runtime.ServeMux, endpoint string, opts []grpc.DialOption) (err error) {
 	return nil
 }

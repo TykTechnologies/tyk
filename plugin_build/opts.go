@@ -1,3 +1,5 @@
+// +build ignore
+
 package main
 
 import "google.golang.org/grpc"
@@ -8,4 +10,4 @@ func getOpts() []grpc.DialOption {
 	}
 }
 
-var doRegister = changeMe
+var doRegister = entryPointFunction
