@@ -4,8 +4,6 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
 	"fmt"
-	"log"
-	"os"
 	"plugin"
 	"strings"
 
@@ -14,15 +12,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-type conf struct{}
-
-func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.ServeMux) error {
-	var err error
-	var p *plugin.Plugin
-
+func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.ServeMux) error  {
 	// Load our plugin
-	if p, err = plugin.Open(path); err != nil {
-		log.Fatal(err)
+	p, err := plugin.Open(path)
+	if err != nil {
 		return err
 	}
 
@@ -30,22 +23,18 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	// register the plug-in's modules
 	tmapObj, err := p.Lookup("Types")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to lookup type map: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error: failed to lookup type map: %v", err)
 	}
 
 	// assert that the Types symbol is a *map[string]func() interface{}
 	tmapPtr, tmapOk := tmapObj.(*map[string]func() interface{})
 	if !tmapOk {
-		fmt.Fprintf(os.Stderr, "error: invalid type map: %T\n", tmapObj)
-		os.Exit(1)
+		return fmt.Errorf("error: invalid type map: %T", tmapObj)
 	}
 
 	// assert that the type map pointer is not nil
 	if tmapPtr == nil {
-		fmt.Fprintf(
-			os.Stderr, "error: nil type map: type=%[1]T val=%[1]v\n", tmapPtr)
-		os.Exit(1)
+		return fmt.Errorf("error: nil type map: type=%[1]T val=%[1]v", tmapPtr)
 	}
 
 	// dereference the type map pointer
@@ -60,16 +49,15 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	modGo := lib.NewModule("register")
 
 	ctx := context.Background()
-	ctx, _ = context.WithCancel(ctx)
 
 	endpoint := strings.Replace(targetURL, "http://", "", 1)
 	endpoint = strings.Replace(endpoint, "https://", "", 1)
 
 	// Create a new v2 config
 	config := &v2Config{
-		ctx: ctx,
-		mux: gRPCProxyMux,
-		e:   endpoint,
+		ctx:        ctx,
+		mux:        gRPCProxyMux,
+		entrypoint: endpoint,
 	}
 
 	// Initialize mod_go with a v2 config implementation
@@ -81,10 +69,10 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 }
 
 type v2Config struct {
-	ctx  context.Context
-	mux  *runtime.ServeMux
-	e    string
-	opts []grpc.DialOption
+	ctx        context.Context
+	mux        *runtime.ServeMux
+	entrypoint string
+	opts       []grpc.DialOption
 }
 
 // Get returns the value for the specified key
@@ -95,7 +83,7 @@ func (c *v2Config) Get(ctx context.Context, key string) interface{} {
 	case "mux":
 		return c.mux
 	case "e":
-		return c.e
+		return c.entrypoint
 	case "opts":
 		return c.opts
 	}
@@ -111,7 +99,7 @@ func (c *v2Config) Set(ctx context.Context, key string, val interface{}) {
 	case "mux":
 		c.mux = val.(*runtime.ServeMux)
 	case "e":
-		c.e = val.(string)
+		c.entrypoint = val.(string)
 	case "opts":
 		c.opts = val.([]grpc.DialOption)
 	}

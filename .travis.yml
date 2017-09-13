@@ -25,9 +25,6 @@ services:
   - redis-server
 
 install:
-  # gRPC Proxy as plugins means we can't have these vendored
-  - go get "github.com/grpc-ecosystem/grpc-gateway/runtime"
-  - go get "golang.org/x/net/trace"
   - go install ./...
     # As of 1.9, ./... no longer includes ./vendor/...
   - go install ./vendor/{golang.org/x/tools/cmd/goimports,github.com/wadey/gocovmerge,github.com/mattn/goveralls}
