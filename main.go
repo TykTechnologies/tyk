@@ -726,16 +726,13 @@ func doReload() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Preparing new router")
-	newRouter := mux.NewRouter()
-	mainRouter = newRouter
+	mainRouter = mux.NewRouter()
+	if config.HttpServerOptions.OverrideDefaults {
+		mainRouter.SkipClean(config.HttpServerOptions.SkipURLCleaning)
+	}
 
-	loadAPIEndpoints(newRouter)
-	loadApps(specs, newRouter)
-
-	newServeMux := http.NewServeMux()
-	newServeMux.Handle("/", mainRouter)
-
-	http.DefaultServeMux = newServeMux
+	loadAPIEndpoints(mainRouter)
+	loadApps(specs, mainRouter)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -1340,16 +1337,23 @@ func StartDRL() {
 	StartRateLimitNotifications()
 }
 
+// mainHandler's only purpose is to allow mainRouter to be dynamically replaced
+type mainHandler struct{}
+
+func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	mainRouter.ServeHTTP(w, r)
+}
+
 func listen(l net.Listener, err error) {
-	ReadTimeout := 120
-	WriteTimeout := 120
+	readTimeout := 120
+	writeTimeout := 120
 	targetPort := fmt.Sprintf("%s:%d", config.ListenAddress, config.ListenPort)
 	if config.HttpServerOptions.ReadTimeout > 0 {
-		ReadTimeout = config.HttpServerOptions.ReadTimeout
+		readTimeout = config.HttpServerOptions.ReadTimeout
 	}
 
 	if config.HttpServerOptions.WriteTimeout > 0 {
-		WriteTimeout = config.HttpServerOptions.WriteTimeout
+		writeTimeout = config.HttpServerOptions.WriteTimeout
 	}
 
 	// Handle reload when SIGUSR2 is received
@@ -1384,13 +1388,10 @@ func listen(l net.Listener, err error) {
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
-				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
-				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				ReadTimeout:  time.Duration(readTimeout) * time.Second,
+				WriteTimeout: time.Duration(writeTimeout) * time.Second,
+				Handler:      mainHandler{},
 			}
-
-			newServeMux := http.NewServeMux()
-			newServeMux.Handle("/", defaultRouter)
-			http.DefaultServeMux = newServeMux
 
 			// Accept connections in a new goroutine.
 			go s.Serve(l)
@@ -1398,13 +1399,10 @@ func listen(l net.Listener, err error) {
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Printf("Gateway started (%v)", VERSION)
-			if !RPC_EmergencyMode {
-				newServeMux := http.NewServeMux()
-				newServeMux.Handle("/", mainRouter)
-				http.DefaultServeMux = newServeMux
-			}
-			go http.Serve(l, nil)
+			}).Printf("Gateway started (%s)", VERSION)
+
+			go http.Serve(l, mainHandler{})
+
 			displayConfig()
 		}
 
@@ -1443,18 +1441,17 @@ func listen(l net.Listener, err error) {
 		}
 
 		if config.HttpServerOptions.OverrideDefaults {
+			defaultRouter.SkipClean(config.HttpServerOptions.SkipURLCleaning)
+
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
-				ReadTimeout:  time.Duration(ReadTimeout) * time.Second,
-				WriteTimeout: time.Duration(WriteTimeout) * time.Second,
+				ReadTimeout:  time.Duration(readTimeout) * time.Second,
+				WriteTimeout: time.Duration(writeTimeout) * time.Second,
+				Handler:      mainHandler{},
 			}
-
-			newServeMux := http.NewServeMux()
-			newServeMux.Handle("/", defaultRouter)
-			http.DefaultServeMux = newServeMux
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1467,11 +1464,7 @@ func listen(l net.Listener, err error) {
 			}).Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
 
-			newServeMux := http.NewServeMux()
-			newServeMux.Handle("/", mainRouter)
-			http.DefaultServeMux = newServeMux
-
-			go http.Serve(l, nil)
+			go http.Serve(l, mainHandler{})
 		}
 
 		log.WithFields(logrus.Fields{
