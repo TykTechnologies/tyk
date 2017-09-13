@@ -13,10 +13,11 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
+	"path/filepath"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/grpcproxy"
-	"path/filepath"
 )
 
 type ChainObject struct {
