@@ -10,6 +10,9 @@ import (
 )
 
 func requestIP(r *http.Request) string {
+	if real := r.Header.Get("X-Real-IP"); real != "" {
+		return real
+	}
 	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
 		// X-Forwarded-For has no port
 		if i := strings.IndexByte(fw, ','); i >= 0 {
