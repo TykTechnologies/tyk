@@ -185,6 +185,12 @@
 			"revisionTime": "2016-07-11T12:47:28Z"
 		},
 		{
+			"checksumSHA1": "HmbftipkadrLlCfzzVQ+iFHbl6g=",
+			"path": "github.com/golang/glog",
+			"revision": "23def4e6c14b4da8ac2ed8007337bc5eb5007998",
+			"revisionTime": "2016-01-25T20:49:56Z"
+		},
+		{
 			"checksumSHA1": "X2LnRUNy+EG1/YManJYmaTFTj+s=",
 			"path": "github.com/golang/protobuf/jsonpb",
 			"revision": "17ce1425424ab154092bbb43af630bd647f3bb0d",
