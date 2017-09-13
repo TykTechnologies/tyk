@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -118,7 +119,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	}
 }
 
-var warnedOnce bool
+var redisInsecureWarn sync.Once
 var notificationVerifier goverify.Verifier
 
 func isPayloadSignatureValid(notification Notification) bool {
@@ -129,12 +130,11 @@ func isPayloadSignatureValid(notification Notification) bool {
 	}
 
 	if notification.Signature == "" && globalConf.AllowInsecureConfigs {
-		if !warnedOnce {
+		redisInsecureWarn.Do(func() {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
 			}).Warning("Insecure configuration detected (allowing)!")
-			warnedOnce = true
-		}
+		})
 		return true
 	}
 
