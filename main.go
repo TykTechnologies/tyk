@@ -63,7 +63,6 @@ var (
 	policiesByID = map[string]Policy{}
 
 	mainRouter    *mux.Router
-	defaultRouter *mux.Router
 	controlRouter *mux.Router
 	LE_MANAGER    letsencrypt.Manager
 	LE_FIRSTRUN   bool
@@ -94,8 +93,6 @@ func getApiSpec(apiID string) *APISpec {
 // Create all globals and init connection handlers
 func setupGlobals() {
 	mainRouter = mux.NewRouter()
-	defaultRouter = mainRouter
-
 	controlRouter = mux.NewRouter()
 
 	if globalConf.EnableAnalytics && globalConf.Storage.Type != "redis" {
@@ -1046,7 +1043,7 @@ func start(arguments map[string]interface{}) {
 			"prefix": "main",
 		}).Debug("Adding pprof endpoints")
 
-		defaultRouter.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
+		mainRouter.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
 	// Set up a default org manager so we can traverse non-live paths
@@ -1061,7 +1058,7 @@ func start(arguments map[string]interface{}) {
 	}
 
 	if globalConf.ControlAPIPort == 0 {
-		loadAPIEndpoints(defaultRouter)
+		loadAPIEndpoints(mainRouter)
 	}
 
 	// Start listening for reload messages
@@ -1225,7 +1222,7 @@ func listen(l, controlListener net.Listener, err error) {
 		if !rpcEmergencyMode {
 			specs := getAPISpecs()
 			if specs != nil {
-				loadApps(specs, defaultRouter)
+				loadApps(specs, mainRouter)
 				getPolicies()
 			}
 
@@ -1236,7 +1233,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// Use a custom server so we can control keepalives
 		if globalConf.HttpServerOptions.OverrideDefaults {
-			defaultRouter.SkipClean(globalConf.HttpServerOptions.SkipURLCleaning)
+			mainRouter.SkipClean(globalConf.HttpServerOptions.SkipURLCleaning)
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1301,7 +1298,7 @@ func listen(l, controlListener net.Listener, err error) {
 		if !rpcEmergencyMode {
 			specs := getAPISpecs()
 			if specs != nil {
-				loadApps(specs, defaultRouter)
+				loadApps(specs, mainRouter)
 				getPolicies()
 			}
 
@@ -1313,7 +1310,7 @@ func listen(l, controlListener net.Listener, err error) {
 		}
 
 		if globalConf.HttpServerOptions.OverrideDefaults {
-			defaultRouter.SkipClean(globalConf.HttpServerOptions.SkipURLCleaning)
+			mainRouter.SkipClean(globalConf.HttpServerOptions.SkipURLCleaning)
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
