@@ -139,7 +139,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	var copiedRequest *http.Request
 	if RecordDetail(r) {
-		copiedRequest = CopyHttpRequest(r)
+		copiedRequest = copyRequest(r)
 	}
 
 	key := m.CreateCheckSum(r, token)

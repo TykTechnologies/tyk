@@ -26,7 +26,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		return nil, 200
 	}
 
-	copiedRequest := CopyHttpRequest(r)
+	copiedRequest := copyRequest(r)
 	contextDataObject := make(map[string]interface{})
 
 	copiedRequest.ParseForm()

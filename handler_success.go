@@ -330,7 +330,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	var copiedRequest *http.Request
 	if RecordDetail(r) {
-		copiedRequest = CopyHttpRequest(r)
+		copiedRequest = copyRequest(r)
 	}
 
 	t1 := time.Now()
@@ -343,7 +343,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	if resp != nil {
 		var copiedResponse *http.Response
 		if RecordDetail(r) {
-			copiedResponse = CopyHttpResponse(resp)
+			copiedResponse = copyResponse(resp)
 		}
 		s.RecordHit(r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
@@ -362,7 +362,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	var copiedRequest *http.Request
 	if RecordDetail(r) {
-		copiedRequest = CopyHttpRequest(r)
+		copiedRequest = copyRequest(r)
 	}
 
 	t1 := time.Now()
@@ -371,7 +371,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 
 	var copiedResponse *http.Response
 	if RecordDetail(r) {
-		copiedResponse = CopyHttpResponse(inRes)
+		copiedResponse = copyResponse(inRes)
 	}
 
 	millisec := float64(t2.UnixNano()-t1.UnixNano()) * 0.000001
