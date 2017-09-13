@@ -26,8 +26,6 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-var apiCountByListenHash map[string]int
-
 func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
@@ -77,13 +75,12 @@ func generateDomainPath(hostname, listenPath string) string {
 	return hostname + listenPath
 }
 
-func generateListenPathMap(apiSpecs []*APISpec) {
+func countApisByListenHash(specs []*APISpec) map[string]int {
+	count := make(map[string]int, len(specs))
 	// We must track the hostname no matter what
-	for _, spec := range apiSpecs {
+	for _, spec := range specs {
 		domainHash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
-		count := apiCountByListenHash[domainHash]
-		apiCountByListenHash[domainHash]++
-		if count == 0 {
+		if count[domainHash] == 0 {
 			dN := spec.Domain
 			if dN == "" {
 				dN = "(no host)"
@@ -94,10 +91,12 @@ func generateListenPathMap(apiSpecs []*APISpec) {
 				"domain":   dN,
 			}).Info("Tracking hostname")
 		}
+		count[domainHash]++
 	}
+	return count
 }
 
-func processSpec(spec *APISpec,
+func processSpec(spec *APISpec, apisByListen map[string]int,
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore StorageHandler,
 	subrouter *mux.Router) *ChainObject {
 
@@ -121,7 +120,7 @@ func processSpec(spec *APISpec,
 	pathModified := false
 	for {
 		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
-		if apiCountByListenHash[hash] < 2 {
+		if apisByListen[hash] < 2 {
 			// not a duplicate
 			break
 		}
@@ -524,7 +523,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
+func loadApps(specs []*APISpec, muxer *mux.Router) {
 	hostname := globalConf.HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
@@ -532,7 +531,6 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("API hostname set: ", hostname)
 	}
-	apiCountByListenHash = make(map[string]int, len(apiSpecs))
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -545,16 +543,16 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
-	sort.Slice(apiSpecs, func(i, j int) bool {
-		return len(apiSpecs[i].Proxy.ListenPath) > len(apiSpecs[j].Proxy.ListenPath)
+	sort.Slice(specs, func(i, j int) bool {
+		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
 	})
 
 	chainChannel := make(chan *ChainObject)
 
 	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(apiSpecs))
-	generateListenPathMap(apiSpecs)
-	for i, spec := range apiSpecs {
+	loadList := make([]*ChainObject, len(specs))
+	apisByListen := countApisByListenHash(specs)
+	for i, spec := range specs {
 		go func(spec *APISpec, i int) {
 			subrouter := muxer
 			// Handle custom domains
@@ -566,7 +564,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 				}).Info("Custom Domain set.")
 				subrouter = mainRouter.Host(spec.Domain).Subrouter()
 			}
-			chainObj := processSpec(spec, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
+			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
 		}(spec, i)
@@ -575,7 +573,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 		tmpSpecRegister[spec.APIID] = spec
 	}
 
-	for range apiSpecs {
+	for range specs {
 		chObj := <-chainChannel
 		loadList[chObj.Index] = chObj
 	}

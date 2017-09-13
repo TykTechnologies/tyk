@@ -64,7 +64,7 @@ func handleNewConfiguration(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if configPayload.ForHostname != HostDetails.Hostname && configPayload.ForNodeID != NodeID {
+	if configPayload.ForHostname != hostDetails.Hostname && configPayload.ForNodeID != NodeID {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Info("Configuration update received, no NodeID/Hostname match found")
@@ -100,7 +100,7 @@ func handleNewConfiguration(payload string) {
 }
 
 func reloadConfiguration() {
-	myPID := HostDetails.PID
+	myPID := hostDetails.PID
 	if myPID == 0 {
 		log.Error("No PID found, cannot reload")
 		return

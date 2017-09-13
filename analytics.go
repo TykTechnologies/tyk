@@ -142,14 +142,14 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 	a.ExpireAt = t2
 }
 
-var AnalyticsPool *tunny.WorkPool
-
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
 	Store   StorageHandler
 	Clean   Purger
 	GeoIPDB *maxminddb.Reader
+
+	AnalyticsPool *tunny.WorkPool
 }
 
 func (r *RedisAnalyticsHandler) Init() {
@@ -170,7 +170,7 @@ func (r *RedisAnalyticsHandler) Init() {
 		ps = 50
 	}
 
-	AnalyticsPool, err = tunny.CreatePoolGeneric(ps).Open()
+	r.AnalyticsPool, err = tunny.CreatePoolGeneric(ps).Open()
 	if err != nil {
 		log.Error("Failed to init analytics pool")
 	}
@@ -179,7 +179,7 @@ func (r *RedisAnalyticsHandler) Init() {
 // RecordHit will store an AnalyticsRecord in Redis
 func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 
-	AnalyticsPool.SendWork(func() {
+	r.AnalyticsPool.SendWork(func() {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 		record.APIKey = publicHash(record.APIKey)
 

@@ -26,9 +26,11 @@ const (
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
-type SessionLimiter struct{}
+type SessionLimiter struct {
+	bucketStore leakybucket.Storage
+}
 
-func (SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) bool {
+func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	var ratePerPeriodNow int
@@ -72,7 +74,7 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) sessionFailReason {
 	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
 
@@ -92,8 +94,8 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 			}
 		} else {
 			// In-memory limiter
-			if BucketStore == nil {
-				BucketStore = memorycache.New()
+			if l.bucketStore == nil {
+				l.bucketStore = memorycache.New()
 			}
 
 			// If a token has been updated, we must ensure we dont use
@@ -106,7 +108,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				rate = uint(DRLManager.CurrentTokenValue)
 			}
 
-			userBucket, err := BucketStore.Create(bucketKey,
+			userBucket, err := l.bucketStore.Create(bucketKey,
 				rate,
 				time.Duration(currentSession.Per)*time.Second)
 			if err != nil {
@@ -137,9 +139,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 
 }
 
-var BucketStore leakybucket.Storage
-
-func (SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
+func (l *SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
 
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {
