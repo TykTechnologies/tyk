@@ -11,7 +11,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 	"github.com/satori/go.uuid"
 
 	"github.com/Sirupsen/logrus"

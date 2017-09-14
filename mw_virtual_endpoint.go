@@ -102,7 +102,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	var copiedRequest *http.Request
-	if RecordDetail(r) {
+	if recordDetail(r) {
 		copiedRequest = copyRequest(r)
 	}
 
