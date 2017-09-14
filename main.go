@@ -1162,17 +1162,7 @@ func handleDashboardRegistration() {
 		log.Fatal("Registration failed: ", err)
 	}
 
-	startHeartBeat()
-}
-
-func startHeartBeat() {
-	if globalConf.UseDBAppConfigs {
-		if DashService == nil {
-			DashService = &HTTPDashboardHandler{}
-			DashService.Init()
-		}
-		go DashService.StartBeating()
-	}
+	go DashService.StartBeating()
 }
 
 func startDRL() {
@@ -1307,7 +1297,9 @@ func listen(l, controlListener net.Listener, err error) {
 				loadAPIEndpoints(controlRouter)
 			}
 
-			startHeartBeat()
+			if globalConf.UseDBAppConfigs {
+				go DashService.StartBeating()
+			}
 		}
 
 		if globalConf.HttpServerOptions.OverrideDefaults {
