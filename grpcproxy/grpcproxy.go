@@ -48,20 +48,18 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	// Instantiate a copy of the module registered by the plug-in.
 	modGo := lib.NewModule("register")
 
-	ctx := context.Background()
-
 	endpoint := strings.Replace(targetURL, "http://", "", 1)
 	endpoint = strings.Replace(endpoint, "https://", "", 1)
 
 	// Create a new v2 config
 	config := &v2Config{
-		ctx:        ctx,
+		ctx:        context.Background(), // used by the grpC Proxy registration func
 		mux:        gRPCProxyMux,
 		entrypoint: endpoint,
 	}
 
 	// Initialize mod_go with a v2 config implementation
-	if err := modGo.Init(ctx, config); err != nil {
+	if err := modGo.Init(nil, config); err != nil {
 		return err
 	}
 
