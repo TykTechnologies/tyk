@@ -12,7 +12,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )

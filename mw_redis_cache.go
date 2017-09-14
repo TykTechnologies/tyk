@@ -138,7 +138,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	var copiedRequest *http.Request
-	if RecordDetail(r) {
+	if recordDetail(r) {
 		copiedRequest = copyRequest(r)
 	}
 
