@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -38,14 +39,18 @@ func reLogin() {
 		"prefix": "main",
 	}).Info("Registering node (again).")
 	DashService.StopBeating()
-	DashService.DeRegister()
+	if err := DashService.DeRegister(); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Error("Could not deregister: ", err)
+	}
 
 	time.Sleep(30 * time.Second)
 
 	if err := DashService.Register(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Error(err)
+		}).Error("Could not register: ", err)
 	} else {
 		go DashService.StartBeating()
 	}
@@ -69,31 +74,12 @@ func (h *HTTPDashboardHandler) Init() error {
 }
 
 func (h *HTTPDashboardHandler) Register() error {
-	// Get the definitions
+	req := h.newRequest(h.RegistrationEndpoint)
 
-	endpoint := h.RegistrationEndpoint
-	secret := h.Secret
-
-	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
-	}
-
-	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-hostname", HostDetails.Hostname)
-
-	c := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := c.Do(newRequest)
-	if err != nil {
-		log.Error("Request failed: ", err)
-		time.Sleep(time.Second * 5)
-		return h.Register()
-	}
-	if resp.StatusCode != 200 {
-		log.Error("Failed to register node, retrying in 5s")
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		log.Errorf("Request failed with code %d and error %v; retrying in 5s", resp.StatusCode, err)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
@@ -101,7 +87,6 @@ func (h *HTTPDashboardHandler) Register() error {
 	defer resp.Body.Close()
 	val := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		log.Error("Failed to decode body: ", err)
 		return err
 	}
 
@@ -128,9 +113,8 @@ func (h *HTTPDashboardHandler) Register() error {
 
 func (h *HTTPDashboardHandler) StartBeating() error {
 	for !h.heartBeatStopSentinel {
-		failure := h.SendHeartBeat(h.HeartBeatEndpoint, h.Secret)
-		if failure != nil {
-			log.Warning(failure)
+		if err := h.sendHeartBeat(); err != nil {
+			log.Warning(err)
 		}
 		time.Sleep(time.Second * 2)
 	}
@@ -144,26 +128,23 @@ func (h *HTTPDashboardHandler) StopBeating() {
 	h.heartBeatStopSentinel = true
 }
 
-func (h *HTTPDashboardHandler) SendHeartBeat(endpoint, secret string) error {
-	// Get the definitions
-	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("GET", endpoint, nil)
+func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
+	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		log.Error("Failed to create request: ", err)
+		panic(err)
 	}
+	req.Header.Set("authorization", h.Secret)
+	req.Header.Set("x-tyk-hostname", HostDetails.Hostname)
+	return req
+}
 
-	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", NodeID)
-	newRequest.Header.Set("x-tyk-hostname", HostDetails.Hostname)
+func (h *HTTPDashboardHandler) sendHeartBeat() error {
+	req := h.newRequest(h.HeartBeatEndpoint)
+	req.Header.Set("x-tyk-nodeid", NodeID)
+	req.Header.Set("x-tyk-nonce", ServiceNonce)
 
-	log.Debug("Sending Heartbeat as: ", NodeID)
-
-	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
-
-	c := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := c.Do(newRequest)
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return errors.New("dashboard is down? Heartbeat is failing")
 	}
@@ -171,7 +152,6 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint, secret string) error {
 	defer resp.Body.Close()
 	val := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		log.Error("Failed to decode body: ", err)
 		return err
 	}
 
@@ -183,43 +163,20 @@ func (h *HTTPDashboardHandler) SendHeartBeat(endpoint, secret string) error {
 }
 
 func (h *HTTPDashboardHandler) DeRegister() error {
-	// Get the definitions
+	req := h.newRequest(h.DeRegistrationEndpoint)
 
-	endpoint := h.DeRegistrationEndpoint
-	secret := h.Secret
+	req.Header.Set("x-tyk-nodeid", NodeID)
+	req.Header.Set("x-tyk-nonce", ServiceNonce)
 
-	log.Debug("Calling: ", endpoint)
-	newRequest, err := http.NewRequest("DELETE", endpoint, nil)
-	if err != nil {
-		log.Error("Failed to create request: ", err)
-	}
-
-	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", NodeID)
-	newRequest.Header.Set("x-tyk-hostname", HostDetails.Hostname)
-
-	log.Info("De-registering: ", NodeID)
-
-	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
-
-	c := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := c.Do(newRequest)
-	if err != nil {
-		log.Error("Dashboard is down? Failed fo de-register: ", err)
-		return err
-	}
-
-	if resp.StatusCode != 200 {
-		log.Error("Dashboard is down? Failed fo de-register, incorrect status: ", resp.StatusCode)
-		return errors.New("Incorrect status code")
+	c := &http.Client{Timeout: 5 * time.Second}
+	resp, err := c.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return fmt.Errorf("request failed with code %d and error %v", resp.StatusCode, err)
 	}
 
 	defer resp.Body.Close()
 	val := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
-		log.Error("Failed to decode body: ", err)
 		return err
 	}
 
