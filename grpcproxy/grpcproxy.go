@@ -7,6 +7,8 @@ import (
 	"plugin"
 	"strings"
 
+	"errors"
+
 	"github.com/akutz/gpds/lib"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -47,6 +49,9 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 
 	// Instantiate a copy of the module registered by the plug-in.
 	modGo := lib.NewModule("register")
+	if modGo == nil {
+		return errors.New("No module called 'register' found!")
+	}
 
 	endpoint := strings.Replace(targetURL, "http://", "", 1)
 	endpoint = strings.Replace(endpoint, "https://", "", 1)
@@ -59,7 +64,7 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	}
 
 	// Initialize mod_go with a v2 config implementation
-	if err := modGo.Init(context.Background(), config); err != nil {
+	if err := modGo.Init(nil, config); err != nil {
 		return err
 	}
 
