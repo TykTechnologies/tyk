@@ -3,10 +3,10 @@ package grpcproxy
 import (
 	"fmt"
 	"plugin"
-	gr "runtime"
+	"runtime"
 	"strings"
 
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	rt "github.com/grpc-ecosystem/grpc-gateway/runtime"
 
 	"errors"
 
@@ -15,9 +15,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.ServeMux) error {
+func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *rt.ServeMux) error {
 
-	if strings.Contains(gr.Version(), "go1.8") {
+	if strings.Contains(runtime.Version(), "go1.8") {
 		return errors.New("Plugins not supported with go runtime v1.8, please use v1.9 or newer")
 	}
 
@@ -79,7 +79,7 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 
 type v2Config struct {
 	ctx        context.Context
-	mux        *runtime.ServeMux
+	mux        *rt.ServeMux
 	entrypoint string
 	opts       []grpc.DialOption
 }
@@ -106,7 +106,7 @@ func (c *v2Config) Set(ctx context.Context, key string, val interface{}) {
 	case "ctx":
 		c.ctx = val.(context.Context)
 	case "mux":
-		c.mux = val.(*runtime.ServeMux)
+		c.mux = val.(*rt.ServeMux)
 	case "e":
 		c.entrypoint = val.(string)
 	case "opts":

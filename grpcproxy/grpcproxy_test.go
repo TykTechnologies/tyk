@@ -4,7 +4,6 @@ package grpcproxy
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	gr "runtime"
@@ -16,32 +15,24 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-var buildScript string = `#!/bin/bash
-cd ../plugin_build
-go build --tags="dummy" --buildmode=plugin -o $1.so
-`
-
 func generatePlugin() (string, error) {
-	scriptName := "build_plugin.sh"
-	defer os.Remove(scriptName)
-	err := ioutil.WriteFile(scriptName, []byte(buildScript), 0755)
+	pName := fmt.Sprintf("%v.so", uuid.NewV4().String())
+	fileArg := fmt.Sprintf("-o=%v", pName)
+
+	cmd := exec.Command("go", "build", "--tags='dummy'", "--buildmode=plugin", fileArg)
+	cmd.Dir = "../plugin_build"
+
+	err := cmd.Run()
 	if err != nil {
 		return "", err
 	}
 
-	uid := uuid.NewV4().String()
-	cmd := exec.Command(fmt.Sprintf("./%v", scriptName), uid)
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-
-	return uid, nil
+	return pName, nil
 }
 
 func TestLoadGRPCPRoxy(t *testing.T) {
 	f, err := generatePlugin()
-	pluginPath := fmt.Sprintf("../plugin_build/%v.so", f)
+	pluginPath := fmt.Sprintf("../plugin_build/%v", f)
 	defer os.Remove(pluginPath)
 	if err != nil {
 		t.Fatal(err)

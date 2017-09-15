@@ -34,18 +34,19 @@ go get -u github.com/golang/protobuf/protoc-gen-go
 
 ## Step 2. Define your service in gRPC
 
-   your_service.proto:
-   ```protobuf
-   syntax = "proto3";
-   package example;
-   message StringMessage {
-     string value = 1;
-   }
+your_service.proto:
 
-   service YourService {
-     rpc Echo(StringMessage) returns (StringMessage) {}
-   }
-   ```
+```protobuf
+syntax = "proto3";
+package example;
+message StringMessage {
+ string value = 1;
+}
+
+service YourService {
+ rpc Echo(StringMessage) returns (StringMessage) {}
+}
+```
 ## Step 3: Add a [custom option](https://cloud.google.com/service-management/reference/rpc/google.api#http) to the .proto file
 
    your_service.proto:
@@ -116,10 +117,10 @@ header for all files should read:
 
 Now you must edit the `opts.go` file:
 
-1. For specific gRPC options, edit the `getOpts()`` return value with the gRPC Options you need for your gateway
+1. For specific gRPC options, edit the `getOpts()` return value with the gRPC Options you need for your gateway
 2. Change the name of `var doRegister = changeMe` to whatever is in the `*.pb.gw.go` file, it will be something like:
 
-    ```RegisterYourServiceHandlerFromEndpoint```
+    RegisterYourServiceHandlerFromEndpoint
 
 Save the files
 
