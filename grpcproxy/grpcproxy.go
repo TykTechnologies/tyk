@@ -1,11 +1,12 @@
 package grpcproxy
 
 import (
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
-
 	"fmt"
 	"plugin"
+	gr "runtime"
 	"strings"
+
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
 	"errors"
 
@@ -15,6 +16,11 @@ import (
 )
 
 func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.ServeMux) error {
+
+	if strings.Contains(gr.Version(), "go1.8") {
+		return errors.New("Plugins not supported with go runtime v1.8, please use v1.9 or newer")
+	}
+
 	// Load our plugin
 	p, err := plugin.Open(path)
 	if err != nil {

@@ -5,7 +5,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	gr "runtime"
 	"testing"
+
+	"strings"
 
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/satori/go.uuid"
@@ -44,7 +47,14 @@ func TestLoadGRPCPRoxy(t *testing.T) {
 
 	testMux := runtime.NewServeMux()
 	err = LoadGRPCProxyPlugin(pluginPath, "http://localhost", testMux)
-	if err != nil {
-		t.Fatal(err)
+	if strings.Contains(gr.Version(), "go1.8") {
+		if err == nil {
+			t.Fatal("Load should have thrown error, but it passed")
+		}
+	} else {
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
+
 }
