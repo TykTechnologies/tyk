@@ -420,29 +420,6 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 	return statusObj, 200
 }
 
-func handleURLReload(fn func()) (interface{}, int) {
-	reloadURLStructure(fn)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api"}).Info("Reload URL Structure - Scheduled")
-
-	return apiOk(""), 200
-}
-
-func signalGroupReload() (interface{}, int) {
-	notice := Notification{
-		Command: NoticeGroupReload,
-	}
-
-	// Signal to the group via redis
-	MainNotifier.Notify(notice)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api"}).Info("Reloaded URL Structure - Success")
-
-	return apiOk(""), 200
-}
-
 func handleGetAPIList() (interface{}, int) {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
@@ -856,8 +833,14 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 	}).Info("Group reload accepted.")
 
-	obj, code := signalGroupReload()
-	doJSONWrite(w, code, obj)
+	// Signal to the group via redis
+	MainNotifier.Notify(Notification{Command: NoticeGroupReload})
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+	}).Info("Reloaded URL Structure - Success")
+
+	doJSONWrite(w, 200, apiOk(""))
 }
 
 // resetHandler will try to queue a reload. If fn is nil and block=true
@@ -871,9 +854,14 @@ func resetHandler(fn func()) http.HandlerFunc {
 			wg.Add(1)
 			fn = wg.Done
 		}
-		obj, code := handleURLReload(fn)
+		reloadURLStructure(fn)
+
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+		}).Info("Reload URL Structure - Scheduled")
+
 		wg.Wait()
-		doJSONWrite(w, code, obj)
+		doJSONWrite(w, 200, apiOk(""))
 	}
 }
 
@@ -1008,7 +996,7 @@ type NewClientRequest struct {
 	ClientSecret      string `json:"secret"`
 }
 
-func createOauthClientStorageID(clientID string) string {
+func oauthClientStorageID(clientID string) string {
 	return prefixClient + clientID
 }
 
@@ -1046,7 +1034,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		PolicyID:          newOauthClient.PolicyID,
 	}
 
-	storageID := createOauthClientStorageID(newClient.GetId())
+	storageID := oauthClientStorageID(newClient.GetId())
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 	}).Debug("Created storage ID: ", storageID)
@@ -1073,7 +1061,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reportableClientData := NewClientRequest{
+	clientData := NewClientRequest{
 		ClientID:          newClient.GetId(),
 		ClientSecret:      newClient.GetSecret(),
 		ClientRedirectURI: newClient.GetRedirectUri(),
@@ -1083,12 +1071,12 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix":            "api",
 		"apiID":             newOauthClient.APIID,
-		"clientID":          reportableClientData.ClientID,
-		"clientRedirectURI": reportableClientData.ClientRedirectURI,
+		"clientID":          clientData.ClientID,
+		"clientRedirectURI": clientData.ClientRedirectURI,
 		"status":            "ok",
 	}).Info("Created OAuth client")
 
-	doJSONWrite(w, 200, reportableClientData)
+	doJSONWrite(w, 200, clientData)
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
@@ -1183,7 +1171,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 
 // Get client details
 func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
-	storageID := createOauthClientStorageID(keyName)
+	storageID := oauthClientStorageID(keyName)
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -1219,7 +1207,7 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 
 // Delete Client
 func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
-	storageID := createOauthClientStorageID(keyName)
+	storageID := oauthClientStorageID(keyName)
 
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
@@ -1350,13 +1338,16 @@ func UserRatesCheck() http.HandlerFunc {
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
-	spec := getApiSpec(apiID)
-	var orgid string
-	if spec != nil {
-		orgid = spec.OrgID
-	}
+	keyPrefix := "cache-" + apiID
+	matchPattern := keyPrefix + "*"
+	store := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
 
-	if err := handleInvalidateAPICache(apiID); err != nil {
+	if ok := store.DeleteScanMatch(matchPattern); !ok {
+		err := errors.New("scan/delete failed")
+		var orgid string
+		if spec := getApiSpec(apiID); spec != nil {
+			orgid = spec.OrgID
+		}
 		log.WithFields(logrus.Fields{
 			"prefix":      "api",
 			"api_id":      apiID,
@@ -1374,17 +1365,6 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, 200, apiOk("cache invalidated"))
-}
-
-func handleInvalidateAPICache(apiID string) error {
-	keyPrefix := "cache-" + apiID
-	matchPattern := keyPrefix + "*"
-	store := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
-
-	if ok := store.DeleteScanMatch(matchPattern); !ok {
-		return errors.New("scan/delete failed")
-	}
-	return nil
 }
 
 // TODO: Don't modify http.Request values in-place. We must right now

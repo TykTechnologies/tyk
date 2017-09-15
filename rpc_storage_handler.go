@@ -648,16 +648,13 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 			r.ReConnect()
 		}
-	} else {
-		log.Debug("[RPC STORE] CheckReload: Received response")
-		if reload == true {
-			// Do the reload!
-			log.Warning("[RPC STORE] Received Reload instruction!")
-			go signalGroupReload()
-			//go reloadURLStructure()
-		}
+	} else if reload == true {
+		// Do the reload!
+		log.Warning("[RPC STORE] Received Reload instruction!")
+		go func() {
+			MainNotifier.Notify(Notification{Command: NoticeGroupReload})
+		}()
 	}
-
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
