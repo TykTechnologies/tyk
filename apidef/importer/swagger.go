@@ -1,10 +1,9 @@
-package main
+package importer
 
 import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/satori/go.uuid"
@@ -76,11 +75,7 @@ type SwaggerAST struct {
 }
 
 func (s *SwaggerAST) LoadFrom(r io.Reader) error {
-	if err := json.NewDecoder(r).Decode(&s); err != nil {
-		log.Error("Unmarshalling failed: ", err)
-		return err
-	}
-	return nil
+	return json.NewDecoder(r).Decode(&s)
 }
 
 func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
@@ -98,7 +93,6 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 		return versionInfo, errors.New("no paths defined in swagger file")
 	}
 	for pathName, pathSpec := range s.Paths {
-		log.Debug("path: %s", pathName)
 		newEndpointMeta := apidef.EndPointMeta{}
 		newEndpointMeta.MethodActions = make(map[string]apidef.EndpointMethodMeta)
 		newEndpointMeta.Path = pathName
@@ -135,76 +129,7 @@ func (s *SwaggerAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionInfo
 	return nil
 }
 
-// Comand mode stuff
-
-func handleSwaggerMode(arguments map[string]interface{}) {
-	doCreate := arguments["--create-api"]
-	inputFile := arguments["--import-swagger"]
-	if doCreate == true {
-		upstreamVal := arguments["--upstream-target"]
-		orgId := arguments["--org-id"]
-		if upstreamVal != nil && orgId != nil {
-			// Create the API with the blueprint
-			s, err := swaggerLoadFile(inputFile.(string))
-			if err != nil {
-				log.Error("File load error: ", err)
-				return
-			}
-
-			def, err := createDefFromSwagger(s, orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
-			if err != nil {
-				log.Error("Failed to create API Defintition from file")
-				return
-			}
-
-			printDef(def)
-			return
-		}
-
-		log.Error("No upstream target or org ID defined, these are both required")
-
-	} else {
-		// Different branch, here we need an API Definition to modify
-		forApiPath := arguments["--for-api"]
-		if forApiPath == nil {
-			log.Error("If ading to an API, the path to the defintiton must be listed")
-			return
-		}
-
-		versionName := arguments["--as-version"]
-		if versionName == nil {
-			log.Error("No version defined for this import operation, please set an import ID using the --as-version flag")
-			return
-		}
-
-		defFromFile, err := apiDefLoadFile(forApiPath.(string))
-		if err != nil {
-			log.Error("failed to load and decode file data for API Definition: ", err)
-			return
-		}
-
-		s, err := swaggerLoadFile(inputFile.(string))
-		if err != nil {
-			log.Error("File load error: ", err)
-			return
-		}
-
-		versionData, err := s.ConvertIntoApiVersion(arguments["--as-mock"].(bool))
-		if err != nil {
-			log.Error("Conversion into API Def failed: ", err)
-		}
-
-		if err := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string)); err != nil {
-			log.Error("Insertion failed: ", err)
-			return
-		}
-
-		printDef(defFromFile)
-
-	}
-}
-
-func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
+func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*apidef.APIDefinition, error) {
 	ad := apidef.APIDefinition{
 		Name:             s.Info.Title,
 		Active:           true,
@@ -224,32 +149,10 @@ func createDefFromSwagger(s *SwaggerAST, orgId, upstreamURL string, as_mock bool
 	}
 	versionData, err := s.ConvertIntoApiVersion(false)
 	if err != nil {
-		log.Error("Conversion into API Def failed: ", err)
+		return nil, err
 	}
 
 	s.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(s.Info.Version, " "))
 
 	return &ad, nil
-}
-
-func swaggerLoadFile(path string) (*SwaggerAST, error) {
-	swagger, err := GetImporterForSource(SwaggerSource)
-	if err != nil {
-		log.Error("Couldn't get swagger importer: ", err)
-		return nil, err
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		log.Error("Couldn't open swagger file: ", err)
-		return nil, err
-	}
-	defer f.Close()
-
-	if err := swagger.LoadFrom(f); err != nil {
-		log.Error("Failed to load swagger object: ", err)
-		return nil, err
-	}
-
-	return swagger.(*SwaggerAST), nil
 }

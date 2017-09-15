@@ -1,35 +1,18 @@
-package main
+package importer
 
 import (
 	"encoding/json"
 	"errors"
 	"io"
 	"strconv"
+	"strings"
+
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type APIImporterSource string
-
 const ApiaryBluePrint APIImporterSource = "blueprint"
-
-type APIImporter interface {
-	LoadFrom(io.Reader) error
-	ConvertIntoApiVersion(bool) (apidef.VersionInfo, error)
-	InsertIntoAPIDefinitionAsVersion(apidef.VersionInfo, *apidef.APIDefinition, string) error
-}
-
-func GetImporterForSource(source APIImporterSource) (APIImporter, error) {
-	// Extend to add new importers
-	switch source {
-	case ApiaryBluePrint:
-		return &BluePrintAST{}, nil
-	case SwaggerSource:
-		return &SwaggerAST{}, nil
-	default:
-		return nil, errors.New("source not matched, failing")
-	}
-}
 
 type BluePrintAST struct {
 	Version     string `json:"_version"`
@@ -112,11 +95,7 @@ type BluePrintAST struct {
 }
 
 func (b *BluePrintAST) LoadFrom(r io.Reader) error {
-	if err := json.NewDecoder(r).Decode(&b); err != nil {
-		log.Error("Unmarshalling failed: ", err)
-		return err
-	}
-	return nil
+	return json.NewDecoder(r).Decode(&b)
 }
 
 func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, error) {
@@ -178,4 +157,28 @@ func (b *BluePrintAST) InsertIntoAPIDefinitionAsVersion(version apidef.VersionIn
 	def.VersionData.NotVersioned = false
 	def.VersionData.Versions[versionName] = version
 	return nil
+}
+
+func (b *BluePrintAST) ToAPIDefinition(orgID, upstreamURL string, asMock bool) (*apidef.APIDefinition, error) {
+	ad := apidef.APIDefinition{
+		Name:             b.Name,
+		Active:           true,
+		UseKeylessAccess: true,
+		APIID:            uuid.NewV4().String(),
+		OrgID:            orgID,
+	}
+	ad.VersionDefinition.Key = "version"
+	ad.VersionDefinition.Location = "header"
+	ad.VersionData.Versions = make(map[string]apidef.VersionInfo)
+	ad.Proxy.ListenPath = "/" + ad.APIID + "/"
+	ad.Proxy.StripListenPath = true
+	ad.Proxy.TargetURL = upstreamURL
+
+	versionData, err := b.ConvertIntoApiVersion(asMock)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.InsertIntoAPIDefinitionAsVersion(versionData, &ad, strings.Trim(b.Name, " "))
+	return &ad, err
 }
