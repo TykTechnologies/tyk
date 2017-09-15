@@ -35,6 +35,9 @@ func (m *RedisCacheMiddleware) Init() {
 }
 
 func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
+	if !m.Spec.CacheOptions.EnableCache {
+		return false
+	}
 	for _, version := range m.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Cached) > 0 {
 			return true
@@ -102,10 +105,6 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	// Allow global cache disabe
-	if !m.Spec.CacheOptions.EnableCache {
-		return nil, 200
-	}
 	// Only allow idempotent (safe) methods
 	if r.Method != "GET" && r.Method != "HEAD" {
 		return nil, 200

@@ -282,25 +282,25 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
-		appendMiddleware(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &RequestSizeLimitMiddleware{baseMid})
-		appendMiddleware(&chainArray, &TrackEndpointMiddleware{baseMid})
-		appendMiddleware(&chainArray, &TransformMiddleware{baseMid})
-		appendMiddleware(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
-		appendMiddleware(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != apidef.OttoDriver {
@@ -308,7 +308,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
@@ -330,19 +330,19 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
-		appendMiddleware(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &RequestSizeLimitMiddleware{baseMid})
-		appendMiddleware(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &TrackEndpointMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
 		// Select the keying method to use for setting session states
 		var authArray []alice.Constructor
@@ -352,8 +352,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: OAuth")
-			authArray = append(authArray, createMiddleware(&Oauth2KeyExists{baseMid}))
-
+			mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid})
 		}
 
 		useCoProcessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
@@ -365,7 +364,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: Basic")
-			authArray = append(authArray, createMiddleware(&BasicAuthKeyIsValid{baseMid}))
+			mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid})
 		}
 
 		if spec.EnableSignatureChecking {
@@ -374,7 +373,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: HMAC")
-			authArray = append(authArray, createMiddleware(&HMACMiddleware{BaseMiddleware: baseMid}))
+			mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid})
 		}
 
 		if spec.EnableJWT {
@@ -383,7 +382,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: JWT")
-			authArray = append(authArray, createMiddleware(&JWTMiddleware{baseMid}))
+			mwAppendEnabled(&authArray, &JWTMiddleware{baseMid})
 		}
 
 		if spec.UseOpenID {
@@ -394,7 +393,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			}).Info("Checking security policy: OpenID")
 
 			// initialise the OID configuration on this reference Spec
-			authArray = append(authArray, createMiddleware(&OpenIDMW{BaseMiddleware: baseMid}))
+			mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid})
 		}
 
 		if useCoProcessAuth {
@@ -411,7 +410,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 			if useCoProcessAuth {
 				newExtractor(spec, baseMid)
-				appendMiddleware(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
+				mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
 			}
 		}
 
@@ -439,19 +438,19 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				"prefix":   "coprocess",
 				"api_name": spec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
 		}
 
-		appendMiddleware(&chainArray, &KeyExpired{baseMid})
-		appendMiddleware(&chainArray, &AccessRightsCheck{baseMid})
-		appendMiddleware(&chainArray, &RateLimitAndQuotaCheck{baseMid})
-		appendMiddleware(&chainArray, &GranularAccessMiddleware{baseMid})
-		appendMiddleware(&chainArray, &TransformMiddleware{baseMid})
-		appendMiddleware(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
-		appendMiddleware(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
-		appendMiddleware(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
+		mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})
+		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
+		mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != apidef.OttoDriver {
@@ -459,7 +458,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
@@ -476,12 +475,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		log.Debug("Chain completed")
 
 		var simpleArray []alice.Constructor
-		simpleArray = append(simpleArray, createMiddleware(&IPWhiteListMiddleware{baseMid}))
-		simpleArray = append(simpleArray, createMiddleware(&OrganizationMonitor{BaseMiddleware: baseMid}))
-		simpleArray = append(simpleArray, createMiddleware(&VersionCheck{BaseMiddleware: baseMid}))
+		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
+		mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
-		simpleArray = append(simpleArray, createMiddleware(&KeyExpired{baseMid}))
-		simpleArray = append(simpleArray, createMiddleware(&AccessRightsCheck{baseMid}))
+		mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
+		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
 		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
 		log.WithFields(logrus.Fields{

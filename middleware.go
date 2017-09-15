@@ -89,10 +89,18 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	}
 }
 
-func appendMiddleware(chain *[]alice.Constructor, mw TykMiddleware) {
+func mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) {
 	if mw.IsEnabledForSpec() {
 		*chain = append(*chain, createMiddleware(mw))
 	}
+}
+
+func mwList(mws ...TykMiddleware) []alice.Constructor {
+	var list []alice.Constructor
+	for _, mw := range mws {
+		mwAppendEnabled(&list, mw)
+	}
+	return list
 }
 
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a

@@ -288,16 +288,16 @@ func getChain(spec *APISpec) http.Handler {
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		createMiddleware(&IPWhiteListMiddleware{baseMid}),
-		createMiddleware(&MiddlewareContextVars{BaseMiddleware: baseMid}),
-		createMiddleware(&AuthKey{baseMid}),
-		createMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		createMiddleware(&KeyExpired{baseMid}),
-		createMiddleware(&AccessRightsCheck{baseMid}),
-		createMiddleware(&RateLimitAndQuotaCheck{baseMid}),
-		createMiddleware(&TransformHeaders{baseMid})).Then(proxyHandler)
-
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&MiddlewareContextVars{BaseMiddleware: baseMid},
+		&AuthKey{baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+		&TransformHeaders{baseMid},
+	)...).Then(proxyHandler)
 	return chain
 }
 
