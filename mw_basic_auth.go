@@ -14,7 +14,7 @@ import (
 
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (k *BasicAuthKeyIsValid) Name() string {

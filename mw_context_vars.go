@@ -8,7 +8,7 @@ import (
 )
 
 type MiddlewareContextVars struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (m *MiddlewareContextVars) Name() string {

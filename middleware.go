@@ -9,6 +9,8 @@ import (
 	"github.com/justinas/alice"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const mwStatusRespond = 666
@@ -17,14 +19,14 @@ var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddleware interface {
 	Init()
-	Base() *BaseMiddleware
+	Base() BaseMiddleware
 	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	IsEnabledForSpec() bool
 	Name() string
 }
 
-func createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
+func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,
@@ -110,17 +112,17 @@ type BaseMiddleware struct {
 	Proxy ReturningHttpHandler
 }
 
-func (t *BaseMiddleware) Base() *BaseMiddleware { return t }
+func (t BaseMiddleware) Base() BaseMiddleware { return t }
 
-func (t *BaseMiddleware) Init() {}
-func (t *BaseMiddleware) IsEnabledForSpec() bool {
+func (t BaseMiddleware) Init() {}
+func (t BaseMiddleware) IsEnabledForSpec() bool {
 	return true
 }
-func (t *BaseMiddleware) Config() (interface{}, error) {
+func (t BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
 }
 
-func (t *BaseMiddleware) OrgSession(key string) (SessionState, bool) {
+func (t BaseMiddleware) OrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.SessionDetail(key)
 	if found && globalConf.EnforceOrgDataAge {
@@ -132,11 +134,11 @@ func (t *BaseMiddleware) OrgSession(key string) (SessionState, bool) {
 	return session, found
 }
 
-func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
+func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 	ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
-func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
+func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	log.Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
@@ -149,7 +151,7 @@ func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 }
 
 // ApplyPolicyIfExists will check if a policy is loaded, if it is, it will overwrite the session state to use the policy values
-func (t *BaseMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
+func (t BaseMiddleware) ApplyPolicyIfExists(key string, session *SessionState) {
 	if session.ApplyPolicyID == "" {
 		return
 	}
@@ -219,7 +221,7 @@ func (t *BaseMiddleware) ApplyPolicyIfExists(key string, session *SessionState) 
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
 	// Check in-memory cache
@@ -267,6 +269,11 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (Session
 	}
 
 	return session, found
+}
+
+// FireEvent is added to the BaseMiddleware object so it is available across the entire stack
+func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
+	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
 type TykResponseHandler interface {

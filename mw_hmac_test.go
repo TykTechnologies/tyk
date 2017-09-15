@@ -57,7 +57,7 @@ func getHMACAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&HMACMiddleware{BaseMiddleware: baseMid},

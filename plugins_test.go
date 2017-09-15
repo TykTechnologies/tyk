@@ -67,7 +67,7 @@ rawlog('{"x": "y"}')
 
 func TestJSVMBody(t *testing.T) {
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: &BaseMiddleware{
+		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 		},
 		MiddlewareClassName: "leakMid",
@@ -104,7 +104,7 @@ leakMid.NewProcessRequest(function(request, session) {
 
 func TestJSVMProcessTimeout(t *testing.T) {
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: &BaseMiddleware{
+		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 		},
 		MiddlewareClassName: "leakMid",
@@ -155,7 +155,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      &BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{spec, nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
@@ -191,7 +191,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      &BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{spec, nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
@@ -237,7 +237,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      &BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{spec, nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}

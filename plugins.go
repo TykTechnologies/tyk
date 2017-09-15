@@ -50,7 +50,7 @@ type VMReturnObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type DynamicMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool

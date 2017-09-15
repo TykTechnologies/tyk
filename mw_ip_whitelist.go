@@ -8,7 +8,7 @@ import (
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream
 type IPWhiteListMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (i *IPWhiteListMiddleware) Name() string {
