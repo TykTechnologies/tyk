@@ -21,11 +21,6 @@ func (i *IPWhiteListMiddleware) IsEnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	// Disabled, pass through
-	if !i.Spec.EnableIpWhiteListing {
-		return nil, 200
-	}
-
 	remoteIP := net.ParseIP(requestIP(r))
 
 	// Enabled, check incoming IP address

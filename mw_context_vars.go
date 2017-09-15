@@ -22,10 +22,6 @@ func (m *MiddlewareContextVars) IsEnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
-	if !m.Spec.EnableContextVars {
-		return nil, 200
-	}
-
 	copiedRequest := copyRequest(r)
 	contextDataObject := make(map[string]interface{})
 

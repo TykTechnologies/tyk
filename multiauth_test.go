@@ -66,15 +66,15 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		createMiddleware(&IPWhiteListMiddleware{baseMid}),
-		createMiddleware(&BasicAuthKeyIsValid{baseMid}),
-		createMiddleware(&AuthKey{baseMid}),
-		createMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		createMiddleware(&KeyExpired{baseMid}),
-		createMiddleware(&AccessRightsCheck{baseMid}),
-		createMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
-
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&BasicAuthKeyIsValid{baseMid},
+		&AuthKey{baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+	)...).Then(proxyHandler)
 	return chain
 }
 
