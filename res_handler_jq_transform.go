@@ -69,7 +69,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		res.ContentLength = int64(bodyBuffer.Len())
 		res.Body = ioutil.NopCloser(bodyBuffer)
 	} else {
-		errors.New("Error while applying JQ filter to upstream response")
+		return errors.New("Error while applying JQ filter to upstream response")
 	}
 
 	// Second optional element is an object like:
@@ -87,6 +87,8 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		for hName, hValue := range opts.OutputHeaders {
 			res.Header.Set(hName, hValue)
 		}
+	} else {
+		return errors.New("Options for jq transformation were specified, but are invalid")
 	}
 
 	return nil
