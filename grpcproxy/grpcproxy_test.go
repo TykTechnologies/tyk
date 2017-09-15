@@ -8,35 +8,36 @@ import (
 	"testing"
 
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"github.com/satori/go.uuid"
 )
 
 var buildScript string = `#!/bin/bash
 cd ../plugin_build
-go build --tags="dummy" --buildmode=plugin -o plugin.so
+go build --tags="dummy" --buildmode=plugin -o $1.so
 `
 
-func generatePlugin() error {
+func generatePlugin() (string, error) {
 	scriptName := "build_plugin.sh"
 	defer os.Remove(scriptName)
 	err := ioutil.WriteFile(scriptName, []byte(buildScript), 0755)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	cmd := exec.Command(fmt.Sprintf("./%v", scriptName), "")
+	uid := uuid.NewV4().String()
+	cmd := exec.Command(fmt.Sprintf("./%v", scriptName), uid)
 	_, err = cmd.CombinedOutput()
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return uid, nil
 }
 
 func TestLoadGRPCPRoxy(t *testing.T) {
-	pluginPath := "../plugin_build/plugin.so"
+	f, err := generatePlugin()
+	pluginPath := fmt.Sprintf("../plugin_build/%v.so", f)
 	defer os.Remove(pluginPath)
-
-	err := generatePlugin()
 	if err != nil {
 		t.Fatal(err)
 	}

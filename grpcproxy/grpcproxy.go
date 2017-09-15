@@ -59,7 +59,7 @@ func LoadGRPCProxyPlugin(path string, targetURL string, gRPCProxyMux *runtime.Se
 	}
 
 	// Initialize mod_go with a v2 config implementation
-	if err := modGo.Init(nil, config); err != nil {
+	if err := modGo.Init(context.Background(), config); err != nil {
 		return err
 	}
 
