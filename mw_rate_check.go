@@ -3,7 +3,7 @@ package main
 import "net/http"
 
 type RateCheckMW struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (m *RateCheckMW) Name() string {

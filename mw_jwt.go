@@ -18,7 +18,7 @@ import (
 )
 
 type JWTMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (k *JWTMiddleware) Name() string {

@@ -102,7 +102,7 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&VersionCheck{BaseMiddleware: baseMid},
 		&Oauth2KeyExists{baseMid},

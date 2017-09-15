@@ -38,7 +38,7 @@ type ReturningHttpHandler interface {
 
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {

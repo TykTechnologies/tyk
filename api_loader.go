@@ -249,7 +249,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors
 	creeateResponseMiddlewareChain(spec)
 
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
 			baseMid.Spec.CircuitBreakerEnabled = true

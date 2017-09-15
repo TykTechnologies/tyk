@@ -22,7 +22,7 @@ const altHeaderSpec = "x-aux-date"
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 	lowercasePattern *regexp.Regexp
 }
 

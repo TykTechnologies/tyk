@@ -19,7 +19,7 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 	spec := createSpecTest(t, idExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 
 	newExtractor(spec, baseMid)
 
@@ -52,7 +52,7 @@ func TestValueExtractorFormSource(t *testing.T) {
 	spec := createSpecTest(t, valueExtractorFormSource)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 
 	newExtractor(spec, baseMid)
 
@@ -91,7 +91,7 @@ func TestValueExtractorHeaderSourceValidation(t *testing.T) {
 	spec := createSpecTest(t, idExtractorCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 
 	newExtractor(spec, baseMid)
 
@@ -121,7 +121,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 	spec := createSpecTest(t, regexExtractorDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 
 	newExtractor(spec, baseMid)
 
@@ -151,7 +151,7 @@ func TestRegexExtractorHeaderSource(t *testing.T) {
 
 }
 
-func computeSessionID(input []byte, baseMid *BaseMiddleware) (sessionID string) {
+func computeSessionID(input []byte, baseMid BaseMiddleware) (sessionID string) {
 	tokenID := fmt.Sprintf("%x", md5.Sum(input))
 	return baseMid.Spec.OrgID + tokenID
 }
