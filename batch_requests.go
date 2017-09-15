@@ -36,31 +36,8 @@ type BatchRequestHandler struct {
 	API *APISpec
 }
 
-// doAsyncRequest runs an async request and replies to a channel
-func (b *BatchRequestHandler) doAsyncRequest(req *http.Request, relURL string, out chan BatchReplyUnit) {
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Error("Webhook request failed: ", err)
-		return
-	}
-
-	defer resp.Body.Close()
-	content, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Warning("Body read failure! ", err)
-		return
-	}
-
-	out <- BatchReplyUnit{
-		RelativeURL: relURL,
-		Code:        resp.StatusCode,
-		Headers:     resp.Header,
-		Body:        string(content),
-	}
-}
-
-// doSyncRequest will make the same request but return a BatchReplyUnit
-func (b *BatchRequestHandler) doSyncRequest(req *http.Request, relURL string) BatchReplyUnit {
+// doRequest will make the same request but return a BatchReplyUnit
+func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchReplyUnit {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Error("Webhook request failed: ", err)
@@ -128,16 +105,19 @@ func (b *BatchRequestHandler) MakeRequests(batchRequest BatchRequestStructure, r
 
 	if !batchRequest.SuppressParallelExecution {
 		replies := make(chan BatchReplyUnit)
-		for index, req := range requestSet {
-			go b.doAsyncRequest(req, batchRequest.Requests[index].RelativeURL, replies)
+		for i, req := range requestSet {
+			go func(i int, req *http.Request) {
+				reply := b.doRequest(req, batchRequest.Requests[i].RelativeURL)
+				replies <- reply
+			}(i, req)
 		}
 
 		for range batchRequest.Requests {
 			replySet = append(replySet, <-replies)
 		}
 	} else {
-		for index, req := range requestSet {
-			reply := b.doSyncRequest(req, batchRequest.Requests[index].RelativeURL)
+		for i, req := range requestSet {
+			reply := b.doRequest(req, batchRequest.Requests[i].RelativeURL)
 			replySet = append(replySet, reply)
 		}
 	}
@@ -174,20 +154,17 @@ func (b *BatchRequestHandler) HandleBatchRequest(w http.ResponseWriter, r *http.
 }
 
 // HandleBatchRequest is the actual http handler for a batch request on an API definition
-func (b *BatchRequestHandler) ManualBatchRequest(requestObject []byte) []byte {
-
+func (b *BatchRequestHandler) ManualBatchRequest(requestObject []byte) ([]byte, error) {
 	// Decode request
 	var batchRequest BatchRequestStructure
 	if err := json.Unmarshal(requestObject, &batchRequest); err != nil {
-		log.Error("Could not decode batch request, decoding failed: ", err)
-		return nil
+		return nil, fmt.Errorf("Could not decode batch request, decoding failed: %v", err)
 	}
 
 	// Construct the unsafe requests
 	requestSet, err := b.ConstructRequests(batchRequest, true)
 	if err != nil {
-		log.Error("Batch request creation failed , request structure malformed: ", err)
-		return nil
+		return nil, fmt.Errorf("Batch request creation failed , request structure malformed: %v", err)
 	}
 
 	// Run requests and collate responses
@@ -196,9 +173,8 @@ func (b *BatchRequestHandler) ManualBatchRequest(requestObject []byte) []byte {
 	// Encode responses
 	replyMessage, err := json.Marshal(&replySet)
 	if err != nil {
-		log.Error("Couldn't encode response to string! ", err)
-		return nil
+		return nil, fmt.Errorf("Couldn't encode response to string: %v", err)
 	}
 
-	return replyMessage
+	return replyMessage, nil
 }

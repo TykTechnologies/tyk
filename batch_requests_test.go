@@ -87,7 +87,7 @@ func TestBatchSuccess(t *testing.T) {
 
 }
 
-func TestMakeSyncRequest(t *testing.T) {
+func TestMakeRequest(t *testing.T) {
 	spec := createSpecTest(t, batchTestDef)
 	batchHandler := BatchRequestHandler{API: spec}
 
@@ -97,33 +97,7 @@ func TestMakeSyncRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	replyUnit := batchHandler.doSyncRequest(req, relURL)
-
-	if replyUnit.RelativeURL != relURL {
-		t.Error("Relativce URL in reply is wrong")
-	}
-	if replyUnit.Code != 200 {
-		t.Error("Response reported a non-200 response")
-	}
-	if len(replyUnit.Body) < 1 {
-		t.Error("Reply body is too short, should be larger than 1!")
-	}
-}
-
-func TestMakeASyncRequest(t *testing.T) {
-	spec := createSpecTest(t, batchTestDef)
-	batchHandler := BatchRequestHandler{API: spec}
-
-	relURL := "/"
-	req, err := http.NewRequest("GET", testHttpGet, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	replies := make(chan BatchReplyUnit)
-	go batchHandler.doAsyncRequest(req, relURL, replies)
-	replyUnit := BatchReplyUnit{}
-	replyUnit = <-replies
+	replyUnit := batchHandler.doRequest(req, relURL)
 
 	if replyUnit.RelativeURL != relURL {
 		t.Error("Relativce URL in reply is wrong")
