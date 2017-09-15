@@ -114,6 +114,8 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		}
 
 		ctxSetData(r, contextDataObject)
+	} else {
+		return errors.New("Options for jq transformation were specified, but are invalid")
 	}
 
 	return nil
