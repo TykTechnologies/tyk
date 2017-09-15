@@ -1,4 +1,5 @@
 // +build dummy
+// +build !race
 
 package main
 
