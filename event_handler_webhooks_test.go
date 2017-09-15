@@ -93,12 +93,7 @@ func TestBuildRequest(t *testing.T) {
 		t.Error("Method hould be GET")
 	}
 
-	hVal, ok := req.Header["User-Agent"]
-	if !ok {
-		t.Error("Header was not set")
-	}
-
-	if hVal[0] != "Tyk-Hookshot" {
+	if got := req.Header.Get("User-Agent"); got != "Tyk-Hookshot" {
 		t.Error("Header User Agent is not correct!")
 	}
 }
