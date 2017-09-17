@@ -20,7 +20,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/gw_api"
+	"github.com/TykTechnologies/tyk/jsvm"
+	"github.com/TykTechnologies/tyk/tykctx"
 )
+
+var APIHandle jsvm.APIFuncs
 
 // APIModifyKeySuccess represents when a Key modification was successful
 type APIModifyKeySuccess struct {
@@ -29,11 +34,7 @@ type APIModifyKeySuccess struct {
 	Action string `json:"action"`
 }
 
-// APIStatusMessage represents an API status message
-type APIStatusMessage struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
+type APIStatusMessage = gw_api.APIStatusMessage
 
 func apiOk(msg string) APIStatusMessage {
 	return APIStatusMessage{"ok", msg}
@@ -1394,101 +1395,64 @@ func handleInvalidateAPICache(apiID string) error {
 // If we ever redesign middlewares - or if we find another workaround -
 // revisit this.
 func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
+	tykctx.SetContext(r, ctx)
 }
 func setCtxValue(r *http.Request, key, val interface{}) {
 	setContext(r, context.WithValue(r.Context(), key, val))
 }
 
 func ctxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(ContextData); v != nil {
-		return v.(map[string]interface{})
-	}
-	return nil
+	return tykctx.CtxGetData(r)
 }
 
 func ctxSetData(r *http.Request, m map[string]interface{}) {
-	if m == nil {
-		panic("setting a nil context ContextData")
-	}
-	setCtxValue(r, ContextData, m)
+	tykctx.CtxSetData(r, m)
 }
 
 func ctxGetSession(r *http.Request) *SessionState {
-	if v := r.Context().Value(SessionData); v != nil {
-		return v.(*SessionState)
-	}
-	return nil
+	return tykctx.CtxGetSession(r)
 }
 
 func ctxSetSession(r *http.Request, s *SessionState) {
-	if s == nil {
-		panic("setting a nil context SessionData")
-	}
-	setCtxValue(r, SessionData, s)
+	tykctx.CtxSetSession(r, s)
 }
 
 func ctxGetAuthToken(r *http.Request) string {
-	if v := r.Context().Value(AuthHeaderValue); v != nil {
-		return v.(string)
-	}
-	return ""
+	return tykctx.CtxGetAuthToken(r)
 }
 
 func ctxSetAuthToken(r *http.Request, t string) {
-	if t == "" {
-		panic("setting a nil context AuthHeaderValue")
-	}
-	setCtxValue(r, AuthHeaderValue, t)
+	tykctx.CtxSetAuthToken(r, t)
 }
 
 func ctxGetTrackedPath(r *http.Request) string {
-	if v := r.Context().Value(TrackThisEndpoint); v != nil {
-		return v.(string)
-	}
-	return ""
+	return tykctx.CtxGetTrackedPath(r)
 }
 
 func ctxSetTrackedPath(r *http.Request, p string) {
-	if p == "" {
-		panic("setting a nil context TrackThisEndpoint")
-	}
-	setCtxValue(r, TrackThisEndpoint, p)
+	tykctx.CtxSetTrackedPath(r, p)
 }
 
 func ctxGetDoNotTrack(r *http.Request) bool {
-	return r.Context().Value(DoNotTrackThisEndpoint) == true
+	return tykctx.CtxGetDoNotTrack(r)
 }
 
 func ctxSetDoNotTrack(r *http.Request, b bool) {
-	setCtxValue(r, DoNotTrackThisEndpoint, b)
+	tykctx.CtxSetDoNotTrack(r, b)
 }
 
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
-	if v := r.Context().Value(VersionData); v != nil {
-		return v.(*apidef.VersionInfo)
-	}
-	return nil
+	return tykctx.CtxGetVersionInfo(r)
 }
 
 func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
-	if v == nil {
-		panic("setting a nil context VersionData")
-	}
-	setCtxValue(r, VersionData, v)
+	tykctx.CtxSetVersionInfo(r, v)
 }
 
 func ctxGetVersionKey(r *http.Request) string {
-	if v := r.Context().Value(VersionKeyContext); v != nil {
-		return v.(string)
-	}
-	return ""
+	return tykctx.CtxGetVersionKey(r)
 }
 
 func ctxSetVersionKey(r *http.Request, k string) {
-	if k == "" {
-		panic("setting a nil context VersionKeyContext")
-	}
-	setCtxValue(r, VersionKeyContext, k)
+	tykctx.CtxSetVersionKey(r, k)
 }

@@ -11,6 +11,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apispec"
 )
 
 const mwStatusRespond = 666
@@ -276,10 +277,7 @@ func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
-type TykResponseHandler interface {
-	Init(interface{}, *APISpec) error
-	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *SessionState) error
-}
+type TykResponseHandler = apispec.TykResponseHandler
 
 func responseProcessorByName(name string) TykResponseHandler {
 	switch name {

@@ -56,7 +56,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		token := ctxGetAuthToken(r)
 
 		// Track version data
-		version := s.Spec.getVersionFromRequest(r)
+		version := s.Spec.GetVersionFromRequest(r)
 		if version == "" {
 			version = "Non Versioned"
 		}

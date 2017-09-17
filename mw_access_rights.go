@@ -20,7 +20,7 @@ func (a *AccessRightsCheck) Name() string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	accessingVersion := a.Spec.getVersionFromRequest(r)
+	accessingVersion := a.Spec.GetVersionFromRequest(r)
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 

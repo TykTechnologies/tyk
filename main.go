@@ -132,7 +132,7 @@ func setupGlobals() {
 
 	// Set up global JSVM
 	if globalConf.EnableJSVM {
-		GlobalEventsJSVM.Init()
+		GlobalEventsJSVM.Init(&globalConf, &APIHandle)
 	}
 
 	if globalConf.CoProcessOptions.EnableCoProcess {
@@ -369,7 +369,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 
 	osinServer := TykOsinNewServer(serverConfig, osinStorage)
 
-	oauthManager := OAuthManager{spec, osinServer}
+	oauthManager := OAuthManager{spec, osinServer, &globalConf}
 	oauthHandlers := OAuthHandlers{oauthManager}
 
 	muxer.Handle(apiAuthorizePath, checkIsAPIOwner(allowMethods(oauthHandlers.HandleGenerateAuthCodeData, "POST")))
@@ -384,7 +384,7 @@ func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
 		"prefix": "main",
 	}).Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
-	batchHandler := BatchRequestHandler{API: spec}
+	batchHandler := BatchRequestHandler{API: spec.APIDefinition, Instrument: instrument, Conf: &globalConf}
 	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
 }
 
@@ -558,7 +558,7 @@ func doReload() {
 
 	// Reset the JSVM
 	if globalConf.EnableJSVM {
-		GlobalEventsJSVM.Init()
+		GlobalEventsJSVM.Init(&globalConf, &APIHandle)
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1047,9 +1047,9 @@ func start(arguments map[string]interface{}) {
 			"prefix": "main",
 		}).Debug("Initialising default org store")
 		//DefaultOrgStore.Init(&RedisClusterStorageManager{KeyPrefix: "orgkey."})
-		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false), &globalConf)
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
-		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false), &globalConf)
 	}
 
 	if globalConf.ControlAPIPort == 0 {
@@ -1080,6 +1080,12 @@ func start(arguments map[string]interface{}) {
 	// interval counts from the start of one reload to the next.
 	go reloadLoop(time.Tick(time.Second))
 	go reloadQueueLoop()
+	setupAPIHandles()
+}
+
+func setupAPIHandles() {
+	APIHandle.AddOrUpdateKey = doAddOrUpdate
+	APIHandle.GetSession = GetKeyDetail
 }
 
 func generateListener(listenPort int) (net.Listener, error) {

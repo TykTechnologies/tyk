@@ -33,7 +33,7 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
 
-	FallbackKeySesionManager.Init(&redisStore)
+	FallbackKeySesionManager.Init(&redisStore, &globalConf)
 
 	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
@@ -173,7 +173,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
-	spec.Init(authStore, sessionStore, healthStore, orgStore)
+	spec.Init(authStore, sessionStore, healthStore, orgStore, &globalConf)
 
 	//Set up all the JSVM middleware
 	var mwAuthCheckFunc apidef.MiddlewareDefinition
@@ -234,7 +234,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	// Already vetted
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 
-	spec.target = remote
+	spec.Target = remote
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
 		log.WithFields(logrus.Fields{
@@ -530,6 +530,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("API hostname set: ", hostname)
 	}
+
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -553,6 +554,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	apisByListen := countApisByListenHash(specs)
 	for i, spec := range specs {
 		go func(spec *APISpec, i int) {
+			spec.FireEventFunc = fireEvent
 			subrouter := muxer
 			// Handle custom domains
 			if globalConf.EnableCustomDomains && spec.Domain != "" {
