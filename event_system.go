@@ -170,10 +170,6 @@ func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEv
 	}
 }
 
-func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, s.EventPaths)
-}
-
 func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, globalConf.EventTriggers)
 }

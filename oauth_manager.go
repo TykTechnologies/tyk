@@ -2,15 +2,16 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
 	osin "github.com/lonelycode/osin"
-	"github.com/satori/go.uuid"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/TykTechnologies/tyk/apispec"
+	"github.com/TykTechnologies/tyk/session"
+	"github.com/TykTechnologies/tyk/session_handler"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 /*
@@ -81,6 +82,41 @@ type NewOAuthNotification struct {
 	RefreshToken     string                `json:"refresh_token"`
 	OldRefreshToken  string                `json:"old_refresh_token"`
 	NotificationType OAuthNotificationType `json:"notification_type"`
+}
+
+// These enums fix the prefix to use when storing various OAuth keys and data, since we
+// delegate everything to the osin framework
+const (
+	prefixAuth      = "oauth-authorize."
+	prefixClient    = "oauth-clientid."
+	prefixAccess    = "oauth-access."
+	prefixRefresh   = "oauth-refresh."
+	prefixClientset = "oauth-clientset."
+)
+
+// Refactors
+type ExtendedOsinStorageInterface = apispec.ExtendedOsinStorageInterface
+type TykOsinServer = apispec.TykOsinServer
+type OAuthManager = apispec.OAuthManager
+
+// TykOsinNewServer creates a new server instance, but uses an extended interface so we can SetClient() too.
+func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
+
+	tokenGen := AccessTokenGenTyk{keyGen, generateSessionFromPolicy}
+
+	overrideServer := TykOsinServer{
+		Config:            config,
+		Storage:           storage,
+		AuthorizeTokenGen: &osin.AuthorizeTokenGenDefault{},
+		AccessTokenGen:    tokenGen,
+	}
+
+	overrideServer.Server.Config = config
+	overrideServer.Server.Storage = storage
+	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
+	overrideServer.Server.AccessTokenGen = tokenGen
+
+	return &overrideServer
 }
 
 // OAuthHandlers are the HTTP Handlers that manage the Tyk OAuth flow
@@ -211,235 +247,12 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 	w.Write(msg)
 }
 
-// OAuthManager handles and wraps osin OAuth2 functions to handle authorise and access requests
-type OAuthManager struct {
-	API        *APISpec
-	OsinServer *TykOsinServer
-}
-
-// HandleAuthorisation creates the authorisation data for the request
-func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessionState string) *osin.Response {
-	resp := o.OsinServer.NewResponse()
-
-	if ar := o.OsinServer.HandleAuthorizeRequest(resp, r); ar != nil {
-		// Since this is called by the Reource provider (proxied API), we assume it has been approved
-		ar.Authorized = true
-
-		if complete {
-			ar.UserData = sessionState
-			o.OsinServer.FinishAuthorizeRequest(resp, r, ar)
-		}
-	}
-	if resp.IsError && resp.InternalError != nil {
-		log.Error(resp.InternalError)
-	}
-
-	return resp
-}
-
-// HandleAccess wraps an access request with osin's primitives
-func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
-	resp := o.OsinServer.NewResponse()
-	var username string
-	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
-
-		var session *SessionState
-		if ar.Type == osin.PASSWORD {
-			username = r.Form.Get("username")
-			password := r.Form.Get("password")
-			keyName := o.API.OrgID + username
-			if globalConf.HashKeys {
-				// HASHING? FIX THE KEY
-				keyName = doHash(keyName)
-			}
-			searchKey := "apikey-" + keyName
-			log.Debug("Getting: ", searchKey)
-
-			var err error
-			session, err = o.OsinServer.Storage.GetUser(searchKey)
-			if err != nil {
-				log.Warning("Attempted access with non-existent user (OAuth password flow).")
-			} else {
-				var passMatch bool
-				if session.BasicAuthData.Hash == HashBCrypt {
-					err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(password))
-					if err == nil {
-						passMatch = true
-					}
-				}
-
-				if session.BasicAuthData.Hash == HashPlainText &&
-					session.BasicAuthData.Password == password {
-					passMatch = true
-				}
-
-				if passMatch {
-					log.Info("Here we are")
-					ar.Authorized = true
-					// not ideal, but we need to copy the session state across
-					pw := session.BasicAuthData.Password
-					hs := session.BasicAuthData.Hash
-
-					session.BasicAuthData.Password = ""
-					session.BasicAuthData.Hash = ""
-					asString, _ := json.Marshal(session)
-					ar.UserData = string(asString)
-
-					session.BasicAuthData.Password = pw
-					session.BasicAuthData.Hash = hs
-
-					//log.Warning("Old Keys: ", session.OauthKeys)
-				}
-			}
-		} else {
-			// Using a manual flow
-			ar.Authorized = true
-		}
-
-		// Does the user have an old OAuth token for this client?
-		if session != nil && session.OauthKeys != nil {
-			log.Debug("There's keys here bill...")
-			oldToken, foundKey := session.OauthKeys[ar.Client.GetId()]
-			if foundKey {
-				log.Info("Found old token, revoking: ", oldToken)
-
-				o.API.SessionManager.RemoveSession(oldToken)
-			}
-		}
-
-		log.Debug("[OAuth] Finishing access request ")
-		o.OsinServer.FinishAccessRequest(resp, r, ar)
-
-		new_token, foundNewToken := resp.Output["access_token"]
-		if username != "" && foundNewToken {
-			log.Debug("Updating token data in key")
-			if session.OauthKeys == nil {
-				session.OauthKeys = make(map[string]string)
-			}
-			session.OauthKeys[ar.Client.GetId()] = new_token.(string)
-			log.Debug("New token: ", new_token.(string))
-			log.Debug("Keys: ", session.OauthKeys)
-
-			keyName := o.API.OrgID + username
-
-			log.Debug("Updating user:", keyName)
-			err := o.API.SessionManager.UpdateSession(keyName, session, getLifetime(o.API, session))
-			if err != nil {
-				log.Error(err)
-			}
-		}
-
-	}
-	if resp.IsError && resp.InternalError != nil {
-		log.Error("ERROR: ", resp.InternalError)
-	}
-
-	return resp
-}
-
-// These enums fix the prefix to use when storing various OAuth keys and data, since we
-// delegate everything to the osin framework
-const (
-	prefixAuth      = "oauth-authorize."
-	prefixClient    = "oauth-clientid."
-	prefixAccess    = "oauth-access."
-	prefixRefresh   = "oauth-refresh."
-	prefixClientset = "oauth-clientset."
-)
-
-type ExtendedOsinStorageInterface interface {
-	// Create OAuth clients
-	SetClient(id string, client osin.Client, ignorePrefix bool) error
-
-	// Custom getter to handle prefixing issues in Redis
-	GetClientNoPrefix(id string) (osin.Client, error)
-
-	GetClients(filter string, ignorePrefix bool) ([]osin.Client, error)
-
-	DeleteClient(id string, ignorePrefix bool) error
-
-	// Clone the storage if needed. For example, using mgo, you can clone the session with session.Clone
-	// to avoid concurrent access problems.
-	// This is to avoid cloning the connection at each method access.
-	// Can return itself if not a problem.
-	Clone() osin.Storage
-
-	// Close the resources the Storate potentially holds (using Clone for example)
-	Close()
-
-	// GetClient loads the client by id (client_id)
-	GetClient(id string) (osin.Client, error)
-
-	// SaveAuthorize saves authorize data.
-	SaveAuthorize(*osin.AuthorizeData) error
-
-	// LoadAuthorize looks up AuthorizeData by a code.
-	// Client information MUST be loaded together.
-	// Optionally can return error if expired.
-	LoadAuthorize(code string) (*osin.AuthorizeData, error)
-
-	// RemoveAuthorize revokes or deletes the authorization code.
-	RemoveAuthorize(code string) error
-
-	// SaveAccess writes AccessData.
-	// If RefreshToken is not blank, it must save in a way that can be loaded using LoadRefresh.
-	SaveAccess(*osin.AccessData) error
-
-	// LoadAccess retrieves access data by token. Client information MUST be loaded together.
-	// AuthorizeData and AccessData DON'T NEED to be loaded if not easily available.
-	// Optionally can return error if expired.
-	LoadAccess(token string) (*osin.AccessData, error)
-
-	// RemoveAccess revokes or deletes an AccessData.
-	RemoveAccess(token string) error
-
-	// LoadRefresh retrieves refresh AccessData. Client information MUST be loaded together.
-	// AuthorizeData and AccessData DON'T NEED to be loaded if not easily available.
-	// Optionally can return error if expired.
-	LoadRefresh(token string) (*osin.AccessData, error)
-
-	// RemoveRefresh revokes or deletes refresh AccessData.
-	RemoveRefresh(token string) error
-
-	// GetUser retrieves a Basic Access user token type from the key store
-	GetUser(string) (*SessionState, error)
-
-	// SetUser updates a Basic Access user token type in the key store
-	SetUser(string, *SessionState, int64) error
-}
-
-// TykOsinServer subclasses osin.Server so we can add the SetClient method without wrecking the lbrary
-type TykOsinServer struct {
-	osin.Server
-	Config            *osin.ServerConfig
-	Storage           ExtendedOsinStorageInterface
-	AuthorizeTokenGen osin.AuthorizeTokenGen
-	AccessTokenGen    osin.AccessTokenGen
-}
-
-// TykOsinNewServer creates a new server instance, but uses an extended interface so we can SetClient() too.
-func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInterface) *TykOsinServer {
-
-	overrideServer := TykOsinServer{
-		Config:            config,
-		Storage:           storage,
-		AuthorizeTokenGen: &osin.AuthorizeTokenGenDefault{},
-		AccessTokenGen:    AccessTokenGenTyk{},
-	}
-
-	overrideServer.Server.Config = config
-	overrideServer.Server.Storage = storage
-	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
-	overrideServer.Server.AccessTokenGen = AccessTokenGenTyk{}
-
-	return &overrideServer
-}
 
 // TODO: Refactor this to move prefix handling into a checker method, then it can be an unexported setting in the struct.
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
 type RedisOsinStorageInterface struct {
-	store          StorageHandler
-	sessionManager SessionHandler
+	store          storage.StorageHandler
+	sessionManager session_handler.SessionHandler
 }
 
 func (r *RedisOsinStorageInterface) Clone() osin.Storage {
@@ -625,7 +438,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
 
 	// Create a SessionState object and register it with the authmanager
-	var newSession SessionState
+	var newSession session.SessionState
 
 	// ------
 	checkPolicy := true
@@ -741,43 +554,6 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 	return nil
 }
 
-// AccessTokenGenTyk is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
-type AccessTokenGenTyk struct{}
-
-// GenerateAccessToken generates base64-encoded UUID access and refresh tokens
-func (AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
-	log.Info("[OAuth] Generating new token")
-
-	var newSession SessionState
-	checkPolicy := true
-	if data.UserData != nil {
-		checkPolicy = false
-		err := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
-		if err != nil {
-			log.Info("[GenerateAccessToken] Couldn't decode SessionState from UserData, checking policy: ", err)
-			checkPolicy = true
-		}
-	}
-
-	if checkPolicy {
-		// defined in JWT middleware
-		sessionFromPolicy, err := generateSessionFromPolicy(data.Client.GetPolicyID(), "", false)
-		if err != nil {
-			return "", "", errors.New("Couldn't use policy or key rules to create token, failing")
-		}
-
-		newSession = sessionFromPolicy
-	}
-
-	accesstoken = keyGen.GenerateAuthKey(newSession.OrgID)
-
-	if generaterefresh {
-		u6 := uuid.NewV4()
-		refreshtoken = base64.StdEncoding.EncodeToString([]byte(u6.String()))
-	}
-	return
-}
-
 // LoadRefresh will load access data from Redis
 func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, error) {
 	key := username
@@ -790,14 +566,14 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, err
 	}
 
 	// new interface means having to make this nested... ick.
-	session := SessionState{}
-	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
+	sess := session.SessionState{}
+	if err := json.Unmarshal([]byte(accessJSON), &sess); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)
 		return nil, err
 	}
 
-	return &session, nil
+	return &sess, nil
 }
 
 func (r *RedisOsinStorageInterface) SetUser(username string, session *SessionState, timeout int64) error {
@@ -815,3 +591,6 @@ func (r *RedisOsinStorageInterface) SetUser(username string, session *SessionSta
 	return nil
 
 }
+
+// AccessTokenGenTyk is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
+type AccessTokenGenTyk = apispec.AccessTokenGenTyk

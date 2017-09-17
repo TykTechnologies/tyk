@@ -5,6 +5,7 @@ import (
 
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
+	"github.com/TykTechnologies/tyk/session_handler"
 )
 
 type PublicSessionState struct {
@@ -20,8 +21,8 @@ type PublicSessionState struct {
 }
 
 const (
-	QuotaKeyPrefix     = "quota-"
-	RateLimitKeyPrefix = "rate-limit-"
+	QuotaKeyPrefix     = session_handler.QuotaKeyPrefix
+	RateLimitKeyPrefix = session_handler.RateLimitKeyPrefix
 )
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to

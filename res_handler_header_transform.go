@@ -46,15 +46,15 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 		}
 		// Replace scheme
 		newHeaderValue := strings.Replace(
-			res.Header[v][0], h.Spec.target.Scheme, target_url.Scheme, -1)
+			res.Header[v][0], h.Spec.Target.Scheme, target_url.Scheme, -1)
 		// Replace host
 		newHeaderValue = strings.Replace(
-			newHeaderValue, h.Spec.target.Host, target_url.Host, -1)
+			newHeaderValue, h.Spec.Target.Host, target_url.Host, -1)
 		// Transform path
 		if h.Spec.Proxy.StripListenPath {
-			if len(h.Spec.target.Path) != 0 {
+			if len(h.Spec.Target.Path) != 0 {
 				newHeaderValue = strings.Replace(
-					newHeaderValue, h.Spec.target.Path,
+					newHeaderValue, h.Spec.Target.Path,
 					h.Spec.Proxy.ListenPath, -1)
 			} else {
 				newHeaderValue = strings.Replace(
@@ -62,9 +62,9 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 					h.Spec.Proxy.ListenPath+req.URL.Path, -1)
 			}
 		} else {
-			if len(h.Spec.target.Path) != 0 {
+			if len(h.Spec.Target.Path) != 0 {
 				newHeaderValue = strings.Replace(
-					newHeaderValue, h.Spec.target.Path,
+					newHeaderValue, h.Spec.Target.Path,
 					"/", -1)
 			}
 		}
