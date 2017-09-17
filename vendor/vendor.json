@@ -313,6 +313,12 @@
 			"revisionTime": "2017-07-24T00:48:29Z"
 		},
 		{
+			"checksumSHA1": "tP/Ohi+jei+mhMoXH5iEGav3ZTE=",
+			"path": "github.com/jeffail/tunny",
+			"revision": "c757dde1c2969a4756e8a99622e2f2ddbab35b10",
+			"revisionTime": "2016-10-22T00:10:56Z"
+		},
+		{
 			"checksumSHA1": "OBvAHqWjdI4NQVAqTkcQAdTuCFY=",
 			"path": "github.com/justinas/alice",
 			"revision": "1051eaf52fcafdd87ead59d28b065f1fcb8274ec",
