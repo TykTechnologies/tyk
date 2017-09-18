@@ -134,21 +134,19 @@ func TestRequestIP(t *testing.T) {
 }
 
 func TestCheckHeaderAllowed(t *testing.T) {
-	rp := &ReverseProxy{}
-	r := new(http.Request)
 	tests := []struct {
 		header   string
-		spec     *APISpec
+		spec     string
 		expected bool
 	}{
 		{
 			header:   "X-Forwarded-For",
-			spec:     &APISpec{APIDefinition: &apidef.APIDefinition{}},
+			spec:     "",
 			expected: true,
 		},
 		{
 			header: "X-Forwarded-For",
-			spec: createSpecTest(t, `{
+			spec: `{
 				"api_id": "1",
 				"version_data": {
 					"not_versioned": true,
@@ -156,18 +154,113 @@ func TestCheckHeaderAllowed(t *testing.T) {
 						"Default": {
 							"name": "Default",
 							"use_extended_paths": true,
+							"global_headers_remove": [ "X-Random-Header" ]
+						}
+					}
+				}
+			}`,
+			expected: true,
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: `{
+				"api_id": "2",
+				"version_data": {
+					"not_versioned": true,
+					"versions": {
+						"Default": {
+							"name": "Default",
+							"use_extended_paths": true,
+							"extended_paths": {
+								"transform_headers": [{
+									"delete_headers": ["X-Random-Header"],
+									"path": "test",
+									"method": "GET"
+								}]
+							}
+						}
+					}
+				}
+			}`,
+			expected: true,
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: `{
+				"api_id": "3",
+				"version_data": {
+					"not_versioned": true,
+					"versions": {
+						"Default": {
+							"name": "Default",
+							"use_extended_paths": false,
 							"global_headers_remove": [ "X-Forwarded-For" ]
 						}
 					}
 				}
-			}`),
+			}`,
+			expected: false,
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: `{
+				"api_id": "4",
+				"version_data": {
+					"not_versioned": true,
+					"versions": {
+						"Default": {
+							"name": "Default",
+							"use_extended_paths": true,
+							"global_headers_remove": [ "X-Random-Header" ],
+							"extended_paths": {
+								"transform_headers": [{
+									"path": "test",
+									"method": "GET",
+									"delete_headers": ["X-Forwarded-For"]
+								}]
+							}
+						}
+					}
+				}
+			}`,
+			expected: false,
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: `{
+				"api_id": "5",
+				"version_data": {
+					"not_versioned": true,
+					"versions": {
+						"Default": {
+							"name": "Default",
+							"use_extended_paths": true,
+							"global_headers_remove": [ "X-Forwarded-For" ],
+							"extended_paths": {
+								"transform_headers": [{
+									"path": "test",
+									"method": "GET",
+									"delete_headers": ["X-Forwarded-For"]
+								}]
+							}
+						}
+					}
+				}
+			}`,
 			expected: false,
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run(fmt.Sprintf("%s: %t", tc.header, tc.expected), func(t *testing.T) {
-			actual := rp.CheckHeaderAllowed(tc.header, tc.spec, r)
+		t.Run(fmt.Sprintf("%s:%t", tc.header, tc.expected), func(t *testing.T) {
+			rp := &ReverseProxy{}
+			r := new(http.Request)
+			r.Method = "GET"
+			r.URL = &url.URL{Path: "test"}
+
+			spec := createSpecTest(t, tc.spec)
+			//fmt.Printf("SPEC: %+v\n", spec.APIDefinition.VersionData)
+			actual := rp.CheckHeaderAllowed(tc.header, spec, r)
 			if actual != tc.expected {
 				t.Fatalf("want %t, got %t", tc.expected, actual)
 			}

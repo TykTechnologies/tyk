@@ -372,9 +372,16 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 }
 
 func (p *ReverseProxy) CheckHeaderAllowed(hdr string, spec *APISpec, req *http.Request) bool {
-	vInfo, _, _, _ := spec.Version(req)
-	for _, gdKey := range vInfo.GlobalHeadersRemove {
-		log.Debug("Checking if header allowed: ", gdKey)
+	log.Debug("Checking if header allowed: ", hdr)
+	vInfo, versionPaths, _, _ := spec.Version(req)
+	deleteHeaders := vInfo.GlobalHeadersRemove
+
+	if found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjected); found {
+		hmeta := meta.(*apidef.HeaderInjectionMeta)
+		deleteHeaders = append(deleteHeaders, hmeta.DeleteHeaders...)
+	}
+
+	for _, gdKey := range deleteHeaders {
 		if strings.ToLower(gdKey) == strings.ToLower(hdr) {
 			return false
 		}
