@@ -76,8 +76,8 @@ const (
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) sessionFailReason {
-	rateLimiterKey := RateLimitKeyPrefix + publicHash(key)
-	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
+	rateLimiterKey := RateLimitKeyPrefix + hashKey(key)
+	rateLimiterSentinelKey := RateLimitKeyPrefix + hashKey(key) + ".BLOCKED"
 
 	if enableRL {
 		if config.Global.EnableSentinelRateLImiter {
@@ -150,7 +150,7 @@ func (l *SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key 
 
 	// Create the key
 	log.Debug("[QUOTA] Inbound raw key is: ", key)
-	rawKey := QuotaKeyPrefix + publicHash(key)
+	rawKey := QuotaKeyPrefix + hashKey(key)
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	log.Debug("Renewing with TTL: ", currentSession.QuotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)

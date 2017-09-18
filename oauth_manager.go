@@ -16,7 +16,6 @@ import (
 )
 
 /*
-
 Sample Oaut Flow:
 -----------------
 
@@ -34,7 +33,6 @@ Effort required by Resource Owner:
 1. Create a login & approve/deny page
 2. Send an API request to Tyk to generate an auth_code
 3. Create endpoint to accept key change notifications
-
 */
 
 // OAuthClient is a representation within an APISpec of a client
@@ -249,12 +247,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
-			keyName := o.API.OrgID + username
-			if config.Global.HashKeys {
-				// HASHING? FIX THE KEY
-				keyName = doHash(keyName)
-			}
-			searchKey := "apikey-" + keyName
+			searchKey := "apikey-" + hashKey(o.API.OrgID+username)
 			log.Debug("Getting: ", searchKey)
 
 			var err error

@@ -46,7 +46,7 @@ func doHash(in string) string {
 }
 
 //Public function for use in classes that bypass elements of the storage manager
-func publicHash(in string) string {
+func hashKey(in string) string {
 	if !config.Global.HashKeys {
 		// Not hashing? Return the raw key
 		return in
