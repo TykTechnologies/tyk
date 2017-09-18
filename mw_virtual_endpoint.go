@@ -82,7 +82,7 @@ func (d *VirtualEndpoint) Init() {
 	d.sh = SuccessHandler{d.BaseMiddleware}
 }
 
-func (d *VirtualEndpoint) IsEnabledForSpec() bool {
+func (d *VirtualEndpoint) EnabledForSpec() bool {
 	if !config.Global.EnableJSVM {
 		return false
 	}

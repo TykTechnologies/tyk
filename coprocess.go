@@ -160,8 +160,8 @@ func CoProcessInit() error {
 	return err
 }
 
-// IsEnabledForSpec checks if this middleware should be enabled for a given API.
-func (m *CoProcessMiddleware) IsEnabledForSpec() bool {
+// EnabledForSpec checks if this middleware should be enabled for a given API.
+func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
 	enableCoProcess := config.Global.CoProcessOptions.EnableCoProcess && EnableCoProcess
 	// This flag indicates if the current spec specifies any CP custom middleware.

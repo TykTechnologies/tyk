@@ -34,7 +34,7 @@ func (k *OrganizationMonitor) Name() string {
 	return "OrganizationMonitor"
 }
 
-func (k *OrganizationMonitor) IsEnabledForSpec() bool {
+func (k *OrganizationMonitor) EnabledForSpec() bool {
 	// If false, we aren't enforcing quotas so skip this mw
 	// altogether
 	return config.Global.EnforceOrgQuotas

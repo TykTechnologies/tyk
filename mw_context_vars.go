@@ -15,7 +15,7 @@ func (m *MiddlewareContextVars) Name() string {
 	return "MiddlewareContextVars"
 }
 
-func (m *MiddlewareContextVars) IsEnabledForSpec() bool {
+func (m *MiddlewareContextVars) EnabledForSpec() bool {
 	return m.Spec.EnableContextVars
 }
 

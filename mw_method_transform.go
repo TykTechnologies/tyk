@@ -17,7 +17,7 @@ func (t *TransformMethod) Name() string {
 	return "TransformMethod"
 }
 
-func (t *TransformMethod) IsEnabledForSpec() bool {
+func (t *TransformMethod) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.MethodTransforms) > 0 {
 			return true
