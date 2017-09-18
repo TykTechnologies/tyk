@@ -259,7 +259,6 @@ func TestCheckHeaderAllowed(t *testing.T) {
 			r.URL = &url.URL{Path: "test"}
 
 			spec := createSpecTest(t, tc.spec)
-			//fmt.Printf("SPEC: %+v\n", spec.APIDefinition.VersionData)
 			actual := rp.CheckHeaderAllowed(tc.header, spec, r)
 			if actual != tc.expected {
 				t.Fatalf("want %t, got %t", tc.expected, actual)
