@@ -34,7 +34,7 @@ func (m *RedisCacheMiddleware) Init() {
 	m.sh = SuccessHandler{m.BaseMiddleware}
 }
 
-func (m *RedisCacheMiddleware) IsEnabledForSpec() bool {
+func (m *RedisCacheMiddleware) EnabledForSpec() bool {
 	if !m.Spec.CacheOptions.EnableCache {
 		return false
 	}

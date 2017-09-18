@@ -22,7 +22,7 @@ func (k *RateLimitAndQuotaCheck) Name() string {
 	return "RateLimitAndQuotaCheck"
 }
 
-func (k *RateLimitAndQuotaCheck) IsEnabledForSpec() bool {
+func (k *RateLimitAndQuotaCheck) EnabledForSpec() bool {
 	return !k.Spec.DisableRateLimit || !k.Spec.DisableQuota
 }
 

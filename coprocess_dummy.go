@@ -39,7 +39,7 @@ func (m *CoProcessMiddleware) Name() string {
 	return "CoProcessMiddlewareDummy"
 }
 
-func (m *CoProcessMiddleware) IsEnabledForSpec() bool { return false }
+func (m *CoProcessMiddleware) EnabledForSpec() bool { return false }
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	return nil, 200
 }

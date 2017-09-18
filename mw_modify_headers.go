@@ -22,7 +22,7 @@ func (t *TransformHeaders) Name() string {
 	return "TransformHeaders"
 }
 
-func (t *TransformHeaders) IsEnabledForSpec() bool {
+func (t *TransformHeaders) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.TransformHeader) > 0 ||
 			len(version.GlobalHeaders) > 0 ||
