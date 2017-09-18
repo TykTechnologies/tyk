@@ -374,6 +374,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 func (p *ReverseProxy) CheckHeaderAllowed(hdr string, spec *APISpec, req *http.Request) bool {
 	vInfo, _, _, _ := spec.Version(req)
 	for _, gdKey := range vInfo.GlobalHeadersRemove {
+		log.Debug("Checking if header allowed: ", gdKey)
 		if strings.ToLower(gdKey) == strings.ToLower(hdr) {
 			return false
 		}
@@ -500,7 +501,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	addrs := requestIPHops(req)
 	forwadedForHdr := "X-Forwarded-For"
 	if p.CheckHeaderAllowed(forwadedForHdr, p.TykAPISpec, req) {
+		log.Debug("Setting HDR: ", forwadedForHdr)
 		outreq.Header.Set(forwadedForHdr, addrs)
+	} else {
+		log.Debug("Header not allowed: ", forwadedForHdr)
+		outreq.Header.Del(forwadedForHdr)
 	}
 
 	// Circuit breaker
