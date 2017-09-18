@@ -13,6 +13,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -84,12 +86,12 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 
 	var redirectURI string
 	// If separator is not set that means multiple redirect uris not supported
-	if globalConf.OauthRedirectUriSeparator == "" {
+	if config.Global.OauthRedirectUriSeparator == "" {
 		redirectURI = "http://client.oauth.com"
 
 		// If separator config is set that means multiple redirect uris are supported
 	} else {
-		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, globalConf.OauthRedirectUriSeparator)
+		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.Global.OauthRedirectUriSeparator)
 	}
 	testClient := OAuthClient{
 		ClientID:          "1234",
@@ -139,7 +141,7 @@ func TestAuthCodeRedirect(t *testing.T) {
 
 func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 	// Enable multiple Redirect URIs
-	globalConf.OauthRedirectUriSeparator = ","
+	config.Global.OauthRedirectUriSeparator = ","
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
@@ -166,7 +168,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 	// Disable multiple Redirect URIs
-	globalConf.OauthRedirectUriSeparator = ""
+	config.Global.OauthRedirectUriSeparator = ""
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()

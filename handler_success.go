@@ -11,6 +11,8 @@ import (
 	"time"
 
 	cache "github.com/pmylund/go-cache"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Enums for keys to be stored in a session context - this is how gorilla expects
@@ -48,7 +50,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 	}
 
 	ip := requestIP(r)
-	if globalConf.StoreAnalytics(ip) {
+	if config.Global.StoreAnalytics(ip) {
 
 		t := time.Now()
 
@@ -125,7 +127,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		record.GetGeo(ip)
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
-		if globalConf.EnforceOrgDataAge {
+		if config.Global.EnforceOrgDataAge {
 			orgExpireDataTime := s.OrgSessionExpiry(s.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -135,7 +137,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		record.SetExpiry(expiresAfter)
 
-		if globalConf.AnalyticsConfig.NormaliseUrls.Enabled {
+		if config.Global.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 
@@ -152,15 +154,15 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 func recordDetail(r *http.Request) bool {
 	// Are we even checking?
-	if !globalConf.EnforceOrgDataDeailLogging {
-		return globalConf.AnalyticsConfig.EnableDetailedRecording
+	if !config.Global.EnforceOrgDataDeailLogging {
+		return config.Global.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// We are, so get session data
 	ses := r.Context().Value(OrgSessionContext)
 	if ses == nil {
 		// no session found, use global config
-		return globalConf.AnalyticsConfig.EnableDetailedRecording
+		return config.Global.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// Session found

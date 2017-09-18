@@ -175,7 +175,7 @@ func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
 }
 
 func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, globalConf.EventTriggers)
+	fireEvent(name, meta, config.Global.EventTriggers)
 }
 
 // LogMessageEventHandler is a sample Event Handler

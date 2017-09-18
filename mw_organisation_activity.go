@@ -7,6 +7,8 @@ import (
 	"errors"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var orgChanMap = make(map[string]chan bool)
@@ -35,11 +37,11 @@ func (k *OrganizationMonitor) Name() string {
 func (k *OrganizationMonitor) IsEnabledForSpec() bool {
 	// If false, we aren't enforcing quotas so skip this mw
 	// altogether
-	return globalConf.EnforceOrgQuotas
+	return config.Global.EnforceOrgQuotas
 }
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
-	if globalConf.ExperimentalProcessOrgOffThread {
+	if config.Global.ExperimentalProcessOrgOffThread {
 		return k.ProcessRequestOffThread(r)
 	}
 	return k.ProcessRequestLive(r)
@@ -94,7 +96,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
 	}
 
-	if globalConf.Monitor.MonitorOrgKeys {
+	if config.Global.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}
@@ -186,7 +188,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 		//return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
 		orgChan <- false
 
-		if globalConf.Monitor.MonitorOrgKeys {
+		if config.Global.Monitor.MonitorOrgKeys {
 			// Run the trigger monitor
 			k.mon.Check(&session, "")
 		}
@@ -194,7 +196,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 		return
 	}
 
-	if globalConf.Monitor.MonitorOrgKeys {
+	if config.Global.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}

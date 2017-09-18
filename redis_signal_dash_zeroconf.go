@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type DashboardConfigPayload struct {
@@ -44,23 +46,23 @@ func handleDashboardZeroConfMessage(payload string) {
 		return
 	}
 
-	if !globalConf.UseDBAppConfigs {
+	if !config.Global.UseDBAppConfigs {
 		return
 	}
 
-	if globalConf.DisableDashboardZeroConf {
+	if config.Global.DisableDashboardZeroConf {
 		return
 	}
 
 	hostname := createConnectionStringFromDashboardObject(dashPayload)
 	setHostname := false
-	if globalConf.DBAppConfOptions.ConnectionString == "" {
-		globalConf.DBAppConfOptions.ConnectionString = hostname
+	if config.Global.DBAppConfOptions.ConnectionString == "" {
+		config.Global.DBAppConfOptions.ConnectionString = hostname
 		setHostname = true
 	}
 
-	if globalConf.Policies.PolicyConnectionString == "" {
-		globalConf.Policies.PolicyConnectionString = hostname
+	if config.Global.Policies.PolicyConnectionString == "" {
+		config.Global.Policies.PolicyConnectionString = hostname
 		setHostname = true
 	}
 

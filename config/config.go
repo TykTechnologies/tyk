@@ -16,6 +16,8 @@ import (
 
 var log = logger.Get()
 
+var Global Config
+
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
 	PolicyConnectionString string `json:"policy_connection_string"`

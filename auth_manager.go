@@ -8,6 +8,8 @@ import (
 
 	"github.com/satori/go.uuid"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -114,7 +116,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *SessionSt
 	v, _ := json.Marshal(session)
 
 	// Keep the TTL
-	if globalConf.UseAsyncSessionWrite {
+	if config.Global.UseAsyncSessionWrite {
 		go b.store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
 	}

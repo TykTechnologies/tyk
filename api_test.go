@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const apiTestDef = `{
@@ -47,9 +48,9 @@ type testAPIDefinition struct {
 
 func TestHealthCheckEndpoint(t *testing.T) {
 	uri := "/tyk/health/?api_id=1"
-	old := globalConf.HealthCheck.EnableHealthChecks
-	globalConf.HealthCheck.EnableHealthChecks = true
-	defer func() { globalConf.HealthCheck.EnableHealthChecks = old }()
+	old := config.Global.HealthCheck.EnableHealthChecks
+	config.Global.HealthCheck.EnableHealthChecks = true
+	defer func() { config.Global.HealthCheck.EnableHealthChecks = old }()
 
 	recorder := httptest.NewRecorder()
 	loadSampleAPI(t, apiTestDef)
@@ -208,8 +209,8 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 func TestApiHandlerPostDbConfig(t *testing.T) {
 	uri := "/tyk/apis/1"
 
-	globalConf.UseDBAppConfigs = true
-	defer func() { globalConf.UseDBAppConfigs = false }()
+	config.Global.UseDBAppConfigs = true
+	defer func() { config.Global.UseDBAppConfigs = false }()
 
 	recorder := httptest.NewRecorder()
 

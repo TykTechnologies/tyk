@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var sessionLimiter = SessionLimiter{}
@@ -98,7 +100,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		return errors.New("Access denied"), 403
 	}
 	// Run the trigger monitor
-	if globalConf.Monitor.MonitorUserKeys {
+	if config.Global.Monitor.MonitorUserKeys {
 		sessionMonitor.Check(session, token)
 	}
 

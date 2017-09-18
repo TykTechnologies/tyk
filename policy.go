@@ -10,6 +10,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type Policy struct {
@@ -167,7 +169,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 	var dbPolicyList []Policy
 
-	store := &RPCStorageHandler{UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
+	store := &RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 	store.Connect()
 
 	rpcPolicies := store.GetPolicies(orgId)

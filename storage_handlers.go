@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/spaolacci/murmur3"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // errKeyNotFound is a standard error for when a key is not found in the storage engine
@@ -45,7 +47,7 @@ func doHash(in string) string {
 
 //Public function for use in classes that bypass elements of the storage manager
 func publicHash(in string) string {
-	if !globalConf.HashKeys {
+	if !config.Global.HashKeys {
 		// Not hashing? Return the raw key
 		return in
 	}

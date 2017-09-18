@@ -11,6 +11,8 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -19,8 +21,8 @@ const BackupKeyBase = "node-definition-backup:"
 
 func getTagListAsString() string {
 	tagList := ""
-	if len(globalConf.DBAppConfOptions.Tags) > 0 {
-		tagList = strings.Join(globalConf.DBAppConfOptions.Tags, "-")
+	if len(config.Global.DBAppConfOptions.Tags) > 0 {
+		tagList = strings.Join(config.Global.DBAppConfOptions.Tags, "-")
 	}
 
 	return tagList
@@ -42,7 +44,7 @@ func saveRPCDefinitionsBackup(list string) {
 		return
 	}
 
-	secret := rightPad2Len(globalConf.Secret, "=", 32)
+	secret := rightPad2Len(config.Global.Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupKeyBase+tagList, cryptoText, -1)
 	if err != nil {
@@ -64,7 +66,7 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 		return nil
 	}
 
-	secret := rightPad2Len(globalConf.Secret, "=", 32)
+	secret := rightPad2Len(config.Global.Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
