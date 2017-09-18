@@ -732,7 +732,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(keyName, newSession)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-		rawKey := QuotaKeyPrefix + publicHash(keyName)
+		rawKey := QuotaKeyPrefix + hashKey(keyName)
 
 		// manage quotas separately
 		DefaultQuotaStore.RemoveSession(rawKey)

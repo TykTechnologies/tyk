@@ -181,7 +181,7 @@ func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 
 	r.AnalyticsPool.SendWork(func() {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-		record.APIKey = publicHash(record.APIKey)
+		record.APIKey = hashKey(record.APIKey)
 
 		if config.Global.SlaveOptions.UseRPC {
 			// Extend tag list to include this data so wecan segment by node if necessary
