@@ -16,6 +16,8 @@ import (
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -286,7 +288,7 @@ func (j *JSVM) Init() {
 	vm := otto.New()
 
 	// Init TykJS namespace, constructors etc.
-	f, err := os.Open(globalConf.TykJSPath)
+	f, err := os.Open(config.Global.TykJSPath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",

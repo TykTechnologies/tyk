@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func canonicalAddr(url *url.URL) string {
@@ -30,7 +32,7 @@ type WSDialer struct {
 
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
-	if !globalConf.HttpServerOptions.EnableWebSockets {
+	if !config.Global.HttpServerOptions.EnableWebSockets {
 		return nil, errors.New("WebSockets has been disabled on this host")
 	}
 
@@ -116,7 +118,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func IsWebsocket(req *http.Request) bool {
-	if !globalConf.HttpServerOptions.EnableWebSockets {
+	if !config.Global.HttpServerOptions.EnableWebSockets {
 		return false
 	}
 

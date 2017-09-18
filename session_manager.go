@@ -5,6 +5,7 @@ import (
 
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type PublicSessionState struct {
@@ -34,7 +35,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	var ratePerPeriodNow int
-	if globalConf.EnableNonTransactionalRateLimiter {
+	if config.Global.EnableNonTransactionalRateLimiter {
 		ratePerPeriodNow, _ = store.SetRollingWindowPipeline(rateLimiterKey, int64(currentSession.Per), "-1")
 	} else {
 		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), "-1")
@@ -44,7 +45,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
-	if globalConf.EnableSentinelRateLImiter {
+	if config.Global.EnableSentinelRateLImiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
@@ -53,7 +54,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	if ratePerPeriodNow > int(currentSession.Rate)-subtractor {
 		// Set a sentinel value with expire
-		if globalConf.EnableSentinelRateLImiter {
+		if config.Global.EnableSentinelRateLImiter {
 			store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
 		}
 		return true
@@ -79,7 +80,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(key) + ".BLOCKED"
 
 	if enableRL {
-		if globalConf.EnableSentinelRateLImiter {
+		if config.Global.EnableSentinelRateLImiter {
 			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
 
 			// Check sentinel
@@ -88,7 +89,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 				// Sentinel is set, fail
 				return sessionFailRateLimit
 			}
-		} else if globalConf.EnableRedisRollingLimiter {
+		} else if config.Global.EnableRedisRollingLimiter {
 			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
 				return sessionFailRateLimit
 			}
@@ -126,7 +127,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 	}
 
 	if enableQ {
-		if globalConf.LegacyEnableAllowanceCountdown {
+		if config.Global.LegacyEnableAllowanceCountdown {
 			currentSession.Allowance--
 		}
 

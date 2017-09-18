@@ -7,6 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var DRLManager = &drl.DRL{}
@@ -20,7 +21,7 @@ func setupDRL() {
 }
 
 func startRateLimitNotifications() {
-	notificationFreq := globalConf.DRLNotificationFrequency
+	notificationFreq := config.Global.DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
 	}
@@ -41,7 +42,7 @@ func startRateLimitNotifications() {
 
 func getTagHash() string {
 	th := ""
-	for _, tag := range globalConf.DBAppConfOptions.Tags {
+	for _, tag := range config.Global.DBAppConfOptions.Tags {
 		th += tag
 	}
 	return th

@@ -41,7 +41,6 @@ import (
 var (
 	log                      = logger.Get()
 	rawLog                   = logger.GetRaw()
-	globalConf               config.Config
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
 	GlobalEventsJSVM         JSVM
@@ -95,7 +94,7 @@ func setupGlobals() {
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
 
-	if globalConf.EnableAnalytics && globalConf.Storage.Type != "redis" {
+	if config.Global.EnableAnalytics && config.Global.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
@@ -105,8 +104,8 @@ func setupGlobals() {
 	healthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(healthCheckStore)
 
-	if globalConf.EnableAnalytics && analytics.Store == nil {
-		globalConf.LoadIgnoredIPs()
+	if config.Global.EnableAnalytics && analytics.Store == nil {
+		config.Global.LoadIgnoredIPs()
 		analyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -115,7 +114,7 @@ func setupGlobals() {
 		analytics.Store = &analyticsStore
 		analytics.Init()
 
-		if globalConf.AnalyticsConfig.Type == "rpc" {
+		if config.Global.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
 
 			purger := RPCPurger{Store: &analyticsStore}
@@ -127,15 +126,15 @@ func setupGlobals() {
 	}
 
 	// Load all the files that have the "error" prefix.
-	templatesDir := filepath.Join(globalConf.TemplatePath, "error*")
+	templatesDir := filepath.Join(config.Global.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
 
 	// Set up global JSVM
-	if globalConf.EnableJSVM {
+	if config.Global.EnableJSVM {
 		GlobalEventsJSVM.Init()
 	}
 
-	if globalConf.CoProcessOptions.EnableCoProcess {
+	if config.Global.CoProcessOptions.EnableCoProcess {
 		CoProcessInit()
 	}
 
@@ -147,9 +146,9 @@ func setupGlobals() {
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
 
-	if globalConf.Monitor.EnableTriggerMonitors {
+	if config.Global.Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{}
-		if err := h.Init(globalConf.Monitor.Config); err != nil {
+		if err := h.Init(config.Global.Monitor.Config); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Error("Failed to initialise monitor! ", err)
@@ -158,68 +157,68 @@ func setupGlobals() {
 		}
 	}
 
-	if globalConf.AnalyticsConfig.NormaliseUrls.Enabled {
+	if config.Global.AnalyticsConfig.NormaliseUrls.Enabled {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Setting up analytics normaliser")
-		globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+		config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
 	}
 
 }
 
 func buildConnStr(resource string) string {
 
-	if globalConf.DBAppConfOptions.ConnectionString == "" && globalConf.DisableDashboardZeroConf {
+	if config.Global.DBAppConfOptions.ConnectionString == "" && config.Global.DisableDashboardZeroConf {
 		log.Fatal("Connection string is empty, failing.")
 	}
 
-	if !globalConf.DisableDashboardZeroConf && globalConf.DBAppConfOptions.ConnectionString == "" {
+	if !config.Global.DisableDashboardZeroConf && config.Global.DBAppConfOptions.ConnectionString == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Waiting for zeroconf signal...")
-		for globalConf.DBAppConfOptions.ConnectionString == "" {
+		for config.Global.DBAppConfOptions.ConnectionString == "" {
 			time.Sleep(1 * time.Second)
 		}
 	}
 
-	return globalConf.DBAppConfOptions.ConnectionString + resource
+	return config.Global.DBAppConfOptions.ConnectionString + resource
 }
 
 func getAPISpecs() []*APISpec {
 	loader := APIDefinitionLoader{}
 	var apiSpecs []*APISpec
 
-	if globalConf.UseDBAppConfigs {
+	if config.Global.UseDBAppConfigs {
 
 		connStr := buildConnStr("/system/apis")
-		apiSpecs = loader.FromDashboardService(connStr, globalConf.NodeSecret)
+		apiSpecs = loader.FromDashboardService(connStr, config.Global.NodeSecret)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Downloading API Configurations from Dashboard Service")
-	} else if globalConf.SlaveOptions.UseRPC {
+	} else if config.Global.SlaveOptions.UseRPC {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using RPC Configuration")
 
-		apiSpecs = loader.FromRPC(globalConf.SlaveOptions.RPCKey)
+		apiSpecs = loader.FromRPC(config.Global.SlaveOptions.RPCKey)
 	} else {
-		apiSpecs = loader.FromDir(globalConf.AppPath)
+		apiSpecs = loader.FromDir(config.Global.AppPath)
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Printf("Detected %v APIs", len(apiSpecs))
 
-	if globalConf.AuthOverride.ForceAuthProvider {
+	if config.Global.AuthOverride.ForceAuthProvider {
 		for i := range apiSpecs {
-			apiSpecs[i].AuthProvider = globalConf.AuthOverride.AuthProvider
+			apiSpecs[i].AuthProvider = config.Global.AuthOverride.AuthProvider
 		}
 	}
 
-	if globalConf.AuthOverride.ForceSessionProvider {
+	if config.Global.AuthOverride.ForceSessionProvider {
 		for i := range apiSpecs {
-			apiSpecs[i].SessionProvider = globalConf.AuthOverride.SessionProvider
+			apiSpecs[i].SessionProvider = config.Global.AuthOverride.SessionProvider
 		}
 	}
 
@@ -232,36 +231,36 @@ func getPolicies() {
 		"prefix": "main",
 	}).Info("Loading policies")
 
-	switch globalConf.Policies.PolicySource {
+	switch config.Global.Policies.PolicySource {
 	case "service":
-		if globalConf.Policies.PolicyConnectionString == "" {
+		if config.Global.Policies.PolicyConnectionString == "" {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Fatal("No connection string or node ID present. Failing.")
 		}
-		connStr := globalConf.Policies.PolicyConnectionString
+		connStr := config.Global.Policies.PolicyConnectionString
 		connStr = connStr + "/system/policies"
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Using Policies from Dashboard Service")
 
-		pols = LoadPoliciesFromDashboard(connStr, globalConf.NodeSecret, globalConf.Policies.AllowExplicitPolicyID)
+		pols = LoadPoliciesFromDashboard(connStr, config.Global.NodeSecret, config.Global.Policies.AllowExplicitPolicyID)
 
 	case "rpc":
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Using Policies from RPC")
-		pols = LoadPoliciesFromRPC(globalConf.SlaveOptions.RPCKey)
+		pols = LoadPoliciesFromRPC(config.Global.SlaveOptions.RPCKey)
 	default:
 		// this is the only case now where we need a policy record name
-		if globalConf.Policies.PolicyRecordName == "" {
+		if config.Global.Policies.PolicyRecordName == "" {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("No policy record name defined, skipping...")
 			return
 		}
-		pols = LoadPoliciesFromFile(globalConf.Policies.PolicyRecordName)
+		pols = LoadPoliciesFromFile(config.Global.Policies.PolicyRecordName)
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -281,9 +280,9 @@ func getPolicies() {
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(muxer *mux.Router) {
-	hostname := globalConf.HostName
-	if globalConf.ControlAPIHostname != "" {
-		hostname = globalConf.ControlAPIHostname
+	hostname := config.Global.HostName
+	if config.Global.ControlAPIHostname != "" {
+		hostname = config.Global.ControlAPIHostname
 	}
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
@@ -335,7 +334,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 func checkIsAPIOwner(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
-		if tykAuthKey != globalConf.Secret {
+		if tykAuthKey != config.Global.Secret {
 			// Error
 			log.Warning("Attempted administrative access with invalid or missing key!")
 
@@ -360,7 +359,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	serverConfig.ErrorStatusCode = 403
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
-	serverConfig.RedirectUriSeparator = globalConf.OauthRedirectUriSeparator
+	serverConfig.RedirectUriSeparator = config.Global.OauthRedirectUriSeparator
 
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := getGlobalStorageHandler(prefix, false)
@@ -432,7 +431,7 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 		{name: "post_auth", slice: &mwPostKeyAuthFuncs},
 		{name: "post", slice: &mwPostFuncs},
 	} {
-		globPath := filepath.Join(globalConf.MiddlewarePath, spec.APIID, folder.name, "*.js")
+		globPath := filepath.Join(config.Global.MiddlewarePath, spec.APIID, folder.name, "*.js")
 		paths, _ := filepath.Glob(globPath)
 		for _, path := range paths {
 			log.WithFields(logrus.Fields{
@@ -531,8 +530,8 @@ func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 }
 
 func isRPCMode() bool {
-	return globalConf.AuthOverride.ForceAuthProvider &&
-		globalConf.AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
+	return config.Global.AuthOverride.ForceAuthProvider &&
+		config.Global.AuthOverride.AuthProvider.StorageEngine == RPCStorageEngine
 }
 
 func rpcReloadLoop(rpcKey string) {
@@ -557,7 +556,7 @@ func doReload() {
 	// We have updated specs, lets load those...
 
 	// Reset the JSVM
-	if globalConf.EnableJSVM {
+	if config.Global.EnableJSVM {
 		GlobalEventsJSVM.Init()
 	}
 
@@ -565,11 +564,11 @@ func doReload() {
 		"prefix": "main",
 	}).Info("Preparing new router")
 	mainRouter = mux.NewRouter()
-	if globalConf.HttpServerOptions.OverrideDefaults {
-		mainRouter.SkipClean(globalConf.HttpServerOptions.SkipURLCleaning)
+	if config.Global.HttpServerOptions.OverrideDefaults {
+		mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 	}
 
-	if globalConf.ControlAPIPort == 0 {
+	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
 	loadApps(specs, mainRouter)
@@ -649,11 +648,11 @@ func reloadURLStructure(done func()) {
 }
 
 func setupLogger() {
-	if globalConf.UseSentry {
+	if config.Global.UseSentry {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Sentry support")
-		hook, err := logrus_sentry.NewSentryHook(globalConf.SentryCode, []logrus.Level{
+		hook, err := logrus_sentry.NewSentryHook(config.Global.SentryCode, []logrus.Level{
 			logrus.PanicLevel,
 			logrus.FatalLevel,
 			logrus.ErrorLevel,
@@ -670,12 +669,12 @@ func setupLogger() {
 		}).Debug("Sentry hook active")
 	}
 
-	if globalConf.UseSyslog {
+	if config.Global.UseSyslog {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Syslog support")
-		hook, err := logrus_syslog.NewSyslogHook(globalConf.SyslogTransport,
-			globalConf.SyslogNetworkAddr,
+		hook, err := logrus_syslog.NewSyslogHook(config.Global.SyslogTransport,
+			config.Global.SyslogNetworkAddr,
 			syslog.LOG_INFO, "")
 
 		if err == nil {
@@ -687,11 +686,11 @@ func setupLogger() {
 		}).Debug("Syslog hook active")
 	}
 
-	if globalConf.UseGraylog {
+	if config.Global.UseGraylog {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Graylog support")
-		hook := graylog.NewGraylogHook(globalConf.GraylogNetworkAddr,
+		hook := graylog.NewGraylogHook(config.Global.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
@@ -702,12 +701,12 @@ func setupLogger() {
 		}).Debug("Graylog hook active")
 	}
 
-	if globalConf.UseLogstash {
+	if config.Global.UseLogstash {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Logstash support")
-		hook, err := logrus_logstash.NewHook(globalConf.LogstashTransport,
-			globalConf.LogstashNetworkAddr,
+		hook, err := logrus_logstash.NewHook(config.Global.LogstashTransport,
+			config.Global.LogstashNetworkAddr,
 			"tyk-gateway")
 
 		if err == nil {
@@ -719,7 +718,7 @@ func setupLogger() {
 		}).Debug("Logstash hook active")
 	}
 
-	if globalConf.UseRedisLog {
+	if config.Global.UseRedisLog {
 		hook := newRedisHook()
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
@@ -767,13 +766,13 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	}
 
 	if !runningTests {
-		if err := config.Load(confPaths, &globalConf); err != nil {
+		if err := config.Load(confPaths, &config.Global); err != nil {
 			return err
 		}
-		afterConfSetup(&globalConf)
+		afterConfSetup(&config.Global)
 	}
 
-	if globalConf.Storage.Type != "redis" {
+	if config.Global.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
@@ -788,22 +787,22 @@ func initialiseSystem(arguments map[string]interface{}) error {
 				"prefix": "main",
 			}).Error("Port specified in flags must be a number: ", err)
 		} else {
-			globalConf.ListenPort = portNum
+			config.Global.ListenPort = portNum
 		}
 	}
 
 	// Enable all the loggers
 	setupLogger()
 
-	if globalConf.PIDFileLocation == "" {
-		globalConf.PIDFileLocation = "/var/run/tyk-gateway.pid"
+	if config.Global.PIDFileLocation == "" {
+		config.Global.PIDFileLocation = "/var/run/tyk-gateway.pid"
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("PIDFile location set to: ", globalConf.PIDFileLocation)
+	}).Info("PIDFile location set to: ", config.Global.PIDFileLocation)
 
-	pidfile.SetPidfilePath(globalConf.PIDFileLocation)
+	pidfile.SetPidfilePath(config.Global.PIDFileLocation)
 	if err := pidfile.Write(); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -813,7 +812,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	getHostDetails()
 	setupInstrumentation(arguments)
 
-	if globalConf.HttpServerOptions.UseLE_SSL {
+	if config.Global.HttpServerOptions.UseLE_SSL {
 		go StartPeriodicStateBackup(&LE_MANAGER)
 	}
 
@@ -915,8 +914,8 @@ func startRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 }
 
 func getGlobalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
-	if globalConf.SlaveOptions.UseRPC {
-		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
+	if config.Global.SlaveOptions.UseRPC {
+		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 	}
 	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
@@ -928,7 +927,7 @@ func main() {
 	amForked := false
 
 	onFork := func() {
-		if globalConf.UseDBAppConfigs {
+		if config.Global.UseDBAppConfigs {
 			log.Info("Stopping heartbeat")
 			DashService.StopBeating()
 			log.Info("Waiting to de-register")
@@ -957,8 +956,8 @@ func main() {
 			}).Fatalf("Error starting listener: %s", err)
 		}
 
-		if globalConf.ControlAPIPort > 0 {
-			if controlListener, err = generateListener(globalConf.ControlAPIPort); err != nil {
+		if config.Global.ControlAPIPort > 0 {
+			if controlListener, err = generateListener(config.Global.ControlAPIPort); err != nil {
 				log.WithFields(logrus.Fields{
 					"prefix": "main",
 				}).Fatalf("Error starting control API listener: %s", err)
@@ -996,7 +995,7 @@ func main() {
 	if !amForked {
 		log.Info("Stop signal received.")
 
-		if globalConf.UseDBAppConfigs {
+		if config.Global.UseDBAppConfigs {
 			log.Info("Stopping heartbeat...")
 			DashService.StopBeating()
 			time.Sleep(2 * time.Second)
@@ -1042,7 +1041,7 @@ func start(arguments map[string]interface{}) {
 	}
 
 	// Set up a default org manager so we can traverse non-live paths
-	if !globalConf.SupressDefaultOrgStore {
+	if !config.Global.SupressDefaultOrgStore {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Initialising default org store")
@@ -1052,28 +1051,28 @@ func start(arguments map[string]interface{}) {
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
-	if globalConf.ControlAPIPort == 0 {
+	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
 
 	// Start listening for reload messages
-	if !globalConf.SuppressRedisSignalReload {
+	if !config.Global.SuppressRedisSignalReload {
 		go startPubSubLoop()
 	}
 
-	if globalConf.SlaveOptions.UseRPC {
+	if config.Global.SlaveOptions.UseRPC {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Starting RPC reload listener")
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
-			UserKey:          globalConf.SlaveOptions.APIKey,
-			Address:          globalConf.SlaveOptions.ConnectionString,
+			UserKey:          config.Global.SlaveOptions.APIKey,
+			Address:          config.Global.SlaveOptions.ConnectionString,
 			SuppressRegister: true,
 		}
 		RPCListener.Connect()
-		go rpcReloadLoop(globalConf.SlaveOptions.RPCKey)
-		go RPCListener.StartRPCLoopCheck(globalConf.SlaveOptions.RPCKey)
+		go rpcReloadLoop(config.Global.SlaveOptions.RPCKey)
+		go RPCListener.StartRPCLoopCheck(config.Global.SlaveOptions.RPCKey)
 	}
 
 	// 1s is the minimum amount of time between hot reloads. The
@@ -1083,20 +1082,20 @@ func start(arguments map[string]interface{}) {
 }
 
 func generateListener(listenPort int) (net.Listener, error) {
-	listenAddress := globalConf.ListenAddress
+	listenAddress := config.Global.ListenAddress
 	if listenPort == 0 {
-		listenPort = globalConf.ListenPort
+		listenPort = config.Global.ListenPort
 	}
 
 	targetPort := fmt.Sprintf("%s:%d", listenAddress, listenPort)
 
-	if globalConf.HttpServerOptions.UseSSL {
+	if config.Global.HttpServerOptions.UseSSL {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("--> Using SSL (https)")
-		certs := make([]tls.Certificate, len(globalConf.HttpServerOptions.Certificates))
+		certs := make([]tls.Certificate, len(config.Global.HttpServerOptions.Certificates))
 		certNameMap := make(map[string]*tls.Certificate)
-		for i, certData := range globalConf.HttpServerOptions.Certificates {
+		for i, certData := range config.Global.HttpServerOptions.Certificates {
 			cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
 			if err != nil {
 				log.WithFields(logrus.Fields{
@@ -1110,13 +1109,13 @@ func generateListener(listenPort int) (net.Listener, error) {
 		config := tls.Config{
 			Certificates:       certs,
 			NameToCertificate:  certNameMap,
-			ServerName:         globalConf.HttpServerOptions.ServerName,
-			MinVersion:         globalConf.HttpServerOptions.MinVersion,
-			InsecureSkipVerify: globalConf.HttpServerOptions.SSLInsecureSkipVerify,
+			ServerName:         config.Global.HttpServerOptions.ServerName,
+			MinVersion:         config.Global.HttpServerOptions.MinVersion,
+			InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
 		}
 		return tls.Listen("tcp", targetPort, &config)
 
-	} else if globalConf.HttpServerOptions.UseLE_SSL {
+	} else if config.Global.HttpServerOptions.UseLE_SSL {
 
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1138,7 +1137,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 }
 
 func handleDashboardRegistration() {
-	if !globalConf.UseDBAppConfigs {
+	if !config.Global.UseDBAppConfigs {
 		return
 	}
 
@@ -1161,9 +1160,9 @@ func handleDashboardRegistration() {
 
 func startDRL() {
 	switch {
-	case globalConf.ManagementNode,
-		globalConf.EnableSentinelRateLImiter,
-		globalConf.EnableRedisRollingLimiter:
+	case config.Global.ManagementNode,
+		config.Global.EnableSentinelRateLImiter,
+		config.Global.EnableRedisRollingLimiter:
 		return
 	}
 	log.WithFields(logrus.Fields{
@@ -1183,13 +1182,13 @@ func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func listen(l, controlListener net.Listener, err error) {
 	readTimeout := 120
 	writeTimeout := 120
-	targetPort := fmt.Sprintf("%s:%d", globalConf.ListenAddress, globalConf.ListenPort)
-	if globalConf.HttpServerOptions.ReadTimeout > 0 {
-		readTimeout = globalConf.HttpServerOptions.ReadTimeout
+	targetPort := fmt.Sprintf("%s:%d", config.Global.ListenAddress, config.Global.ListenPort)
+	if config.Global.HttpServerOptions.ReadTimeout > 0 {
+		readTimeout = config.Global.HttpServerOptions.ReadTimeout
 	}
 
-	if globalConf.HttpServerOptions.WriteTimeout > 0 {
-		writeTimeout = globalConf.HttpServerOptions.WriteTimeout
+	if config.Global.HttpServerOptions.WriteTimeout > 0 {
+		writeTimeout = config.Global.HttpServerOptions.WriteTimeout
 	}
 
 	// Handle reload when SIGUSR2 is received
@@ -1211,14 +1210,14 @@ func listen(l, controlListener net.Listener, err error) {
 				getPolicies()
 			}
 
-			if globalConf.ControlAPIPort > 0 {
+			if config.Global.ControlAPIPort > 0 {
 				loadAPIEndpoints(controlRouter)
 			}
 		}
 
 		// Use a custom server so we can control keepalives
-		if globalConf.HttpServerOptions.OverrideDefaults {
-			mainRouter.SkipClean(globalConf.HttpServerOptions.SkipURLCleaning)
+		if config.Global.HttpServerOptions.OverrideDefaults {
+			mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1287,17 +1286,17 @@ func listen(l, controlListener net.Listener, err error) {
 				getPolicies()
 			}
 
-			if globalConf.ControlAPIPort > 0 {
+			if config.Global.ControlAPIPort > 0 {
 				loadAPIEndpoints(controlRouter)
 			}
 
-			if globalConf.UseDBAppConfigs {
+			if config.Global.UseDBAppConfigs {
 				go DashService.StartBeating()
 			}
 		}
 
-		if globalConf.HttpServerOptions.OverrideDefaults {
-			mainRouter.SkipClean(globalConf.HttpServerOptions.SkipURLCleaning)
+		if config.Global.HttpServerOptions.OverrideDefaults {
+			mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -1340,8 +1339,8 @@ func listen(l, controlListener net.Listener, err error) {
 			"prefix": "main",
 		}).Info("Resuming on", l.Addr())
 	}
-	address := globalConf.ListenAddress
-	if globalConf.ListenAddress == "" {
+	address := config.Global.ListenAddress
+	if config.Global.ListenAddress == "" {
 		address = "(open interface)"
 	}
 	log.WithFields(logrus.Fields{
@@ -1349,7 +1348,7 @@ func listen(l, controlListener net.Listener, err error) {
 	}).Info("--> Listening on address: ", address)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
-	}).Info("--> Listening on port: ", globalConf.ListenPort)
+	}).Info("--> Listening on port: ", config.Global.ListenPort)
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("--> PID: ", hostDetails.PID)

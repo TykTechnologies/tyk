@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -81,7 +83,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	var alias string
 
 	ip := requestIP(r)
-	if globalConf.StoreAnalytics(ip) {
+	if config.Global.StoreAnalytics(ip) {
 
 		t := time.Now()
 
@@ -159,7 +161,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		record.GetGeo(ip)
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
-		if globalConf.EnforceOrgDataAge {
+		if config.Global.EnforceOrgDataAge {
 			orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -169,7 +171,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		record.SetExpiry(expiresAfter)
-		if globalConf.AnalyticsConfig.NormaliseUrls.Enabled {
+		if config.Global.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 
@@ -180,12 +182,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 
 	//If the config option is not set or is false, add the header
-	if !globalConf.HideGeneratorHeader {
+	if !config.Global.HideGeneratorHeader {
 		w.Header().Add("X-Generator", "tyk.io")
 	}
 
 	// Close connections
-	if globalConf.CloseConnections {
+	if config.Global.CloseConnections {
 		w.Header().Add("Connection", "close")
 	}
 

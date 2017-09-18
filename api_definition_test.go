@@ -11,6 +11,8 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const sampleDefiniton = `{
@@ -302,9 +304,9 @@ func TestBlacklistLinksMulti(t *testing.T) {
 }
 
 func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
-	globalConf.SlaveOptions.UseRPC = true
-	globalConf.SlaveOptions.RPCKey = "test_org"
-	globalConf.SlaveOptions.APIKey = "test"
+	config.Global.SlaveOptions.UseRPC = true
+	config.Global.SlaveOptions.RPCKey = "test_org"
+	config.Global.SlaveOptions.APIKey = "test"
 
 	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
 	list := &customListener{}
@@ -314,16 +316,16 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	if err := server.Start(); err != nil {
 		panic(err)
 	}
-	globalConf.SlaveOptions.ConnectionString = list.L.Addr().String()
+	config.Global.SlaveOptions.ConnectionString = list.L.Addr().String()
 
 	return server
 }
 
 func stopRPCMock(server *gorpc.Server) {
-	globalConf.SlaveOptions.ConnectionString = ""
-	globalConf.SlaveOptions.RPCKey = ""
-	globalConf.SlaveOptions.APIKey = ""
-	globalConf.SlaveOptions.UseRPC = false
+	config.Global.SlaveOptions.ConnectionString = ""
+	config.Global.SlaveOptions.RPCKey = ""
+	config.Global.SlaveOptions.APIKey = ""
+	config.Global.SlaveOptions.UseRPC = false
 
 	server.Listener.Close()
 	server.Stop()
@@ -387,14 +389,14 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	globalConf.UseDBAppConfigs = true
-	globalConf.AllowInsecureConfigs = true
-	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	config.Global.UseDBAppConfigs = true
+	config.Global.AllowInsecureConfigs = true
+	config.Global.DBAppConfOptions.ConnectionString = ts.URL
 
 	defer func() {
-		globalConf.UseDBAppConfigs = false
-		globalConf.AllowInsecureConfigs = false
-		globalConf.DBAppConfOptions.ConnectionString = ""
+		config.Global.UseDBAppConfigs = false
+		config.Global.AllowInsecureConfigs = false
+		config.Global.DBAppConfOptions.ConnectionString = ""
 	}()
 
 	var wg sync.WaitGroup

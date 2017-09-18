@@ -190,9 +190,9 @@ func TestNewCustomTemplate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.missingDefault {
-				old := globalConf.TemplatePath
-				globalConf.TemplatePath = "missing-dir"
-				defer func() { globalConf.TemplatePath = old }()
+				old := config.Global.TemplatePath
+				config.Global.TemplatePath = "missing-dir"
+				defer func() { config.Global.TemplatePath = old }()
 			}
 			h := &WebHookHandler{}
 			err := h.Init(map[string]interface{}{

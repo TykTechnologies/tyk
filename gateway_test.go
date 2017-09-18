@@ -133,23 +133,23 @@ func TestMain(m *testing.M) {
 	go func() {
 		panic(testServer.ListenAndServe())
 	}()
-	config.WriteDefault("", &globalConf)
-	globalConf.Storage.Database = 1
+	config.WriteDefault("", &config.Global)
+	config.Global.Storage.Database = 1
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
 	var err error
-	globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
+	config.Global.AppPath, err = ioutil.TempDir("", "tyk-test-")
 	if err != nil {
 		panic(err)
 	}
-	globalConf.EnableAnalytics = true
-	globalConf.AnalyticsConfig.EnableGeoIP = true
-	globalConf.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
-	globalConf.EnableJSVM = true
-	globalConf.Monitor.EnableTriggerMonitors = true
-	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
-	afterConfSetup(&globalConf)
+	config.Global.EnableAnalytics = true
+	config.Global.AnalyticsConfig.EnableGeoIP = true
+	config.Global.AnalyticsConfig.GeoIPDBLocation = filepath.Join("testdata", "MaxMind-DB-test-ipv4-24.mmdb")
+	config.Global.EnableJSVM = true
+	config.Global.Monitor.EnableTriggerMonitors = true
+	config.Global.AnalyticsConfig.NormaliseUrls.Enabled = true
+	afterConfSetup(&config.Global)
 	initialiseSystem(nil)
 	// Small part of start()
 	loadAPIEndpoints(mainRouter)
@@ -179,18 +179,18 @@ func TestMain(m *testing.M) {
 
 	exitCode := m.Run()
 
-	os.RemoveAll(globalConf.AppPath)
+	os.RemoveAll(config.Global.AppPath)
 	os.Exit(exitCode)
 }
 
 func emptyRedis() error {
-	addr := globalConf.Storage.Host + ":" + strconv.Itoa(globalConf.Storage.Port)
+	addr := config.Global.Storage.Host + ":" + strconv.Itoa(config.Global.Storage.Port)
 	c, err := redis.Dial("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not connect to redis: %v", err)
 	}
 	defer c.Close()
-	dbName := strconv.Itoa(globalConf.Storage.Database)
+	dbName := strconv.Itoa(config.Global.Storage.Database)
 	if _, err := c.Do("SELECT", dbName); err != nil {
 		return err
 	}
@@ -796,18 +796,18 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			cln, _ = net.Listen("tcp", "127.0.0.1:0")
 
 			_, port, _ := net.SplitHostPort(cln.Addr().String())
-			globalConf.ControlAPIPort, _ = strconv.Atoi(port)
+			config.Global.ControlAPIPort, _ = strconv.Atoi(port)
 		} else {
-			globalConf.ControlAPIPort = 0
+			config.Global.ControlAPIPort = 0
 		}
 
-		globalConf.HttpServerOptions.OverrideDefaults = m.overrideDefaults
+		config.Global.HttpServerOptions.OverrideDefaults = m.overrideDefaults
 
 		// Ensure that no local API's installed
-		os.RemoveAll(globalConf.AppPath)
+		os.RemoveAll(config.Global.AppPath)
 
 		var err error
-		globalConf.AppPath, err = ioutil.TempDir("", "tyk-test-")
+		config.Global.AppPath, err = ioutil.TempDir("", "tyk-test-")
 		if err != nil {
 			panic(err)
 		}
@@ -815,7 +815,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 		setupGlobals()
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
-		if globalConf.ControlAPIPort == 0 {
+		if config.Global.ControlAPIPort == 0 {
 			loadAPIEndpoints(mainRouter)
 		}
 
@@ -937,9 +937,9 @@ func TestControlListener(t *testing.T) {
 
 func TestManagementNodeRedisEvents(t *testing.T) {
 	defer func() {
-		globalConf.ManagementNode = false
+		config.Global.ManagementNode = false
 	}()
-	globalConf.ManagementNode = false
+	config.Global.ManagementNode = false
 	msg := redis.Message{
 		Data: []byte(`{"Command": "NoticeGatewayDRLNotification"}`),
 	}
@@ -949,7 +949,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		}
 	}
 	handleRedisEvent(msg, shouldHandle, nil)
-	globalConf.ManagementNode = true
+	config.Global.ManagementNode = true
 	notHandle := func(got NotificationCommand) {
 		t.Fatalf("should have not handled redis event")
 	}
@@ -1030,11 +1030,11 @@ func TestProxyUserAgent(t *testing.T) {
 }
 
 func buildAndLoadAPI(apiGens ...func(spec *APISpec)) {
-	oldPath := globalConf.AppPath
-	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
+	oldPath := config.Global.AppPath
+	config.Global.AppPath, _ = ioutil.TempDir("", "apps")
 	defer func() {
-		os.RemoveAll(globalConf.AppPath)
-		globalConf.AppPath = oldPath
+		os.RemoveAll(config.Global.AppPath)
+		config.Global.AppPath = oldPath
 	}()
 
 	for i, gen := range apiGens {
@@ -1042,7 +1042,7 @@ func buildAndLoadAPI(apiGens ...func(spec *APISpec)) {
 		json.Unmarshal([]byte(sampleAPI), spec.APIDefinition)
 		gen(spec)
 		specBytes, _ := json.Marshal(spec)
-		specFilePath := filepath.Join(globalConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
+		specFilePath := filepath.Join(config.Global.AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}
@@ -1052,16 +1052,16 @@ func buildAndLoadAPI(apiGens ...func(spec *APISpec)) {
 }
 
 func TestSkipUrlCleaning(t *testing.T) {
-	globalConf.HttpServerOptions.OverrideDefaults = true
-	globalConf.HttpServerOptions.SkipURLCleaning = true
+	config.Global.HttpServerOptions.OverrideDefaults = true
+	config.Global.HttpServerOptions.SkipURLCleaning = true
 
 	ln, _ := generateListener(0)
 	baseURL := "http://" + ln.Addr().String()
 	listen(ln, nil, nil)
 
 	defer func() {
-		globalConf.HttpServerOptions.OverrideDefaults = false
-		globalConf.HttpServerOptions.SkipURLCleaning = false
+		config.Global.HttpServerOptions.OverrideDefaults = false
+		config.Global.HttpServerOptions.SkipURLCleaning = false
 		ln.Close()
 	}()
 

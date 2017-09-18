@@ -5,6 +5,8 @@ import (
 
 	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type HashType string
@@ -103,8 +105,8 @@ func (s *SessionState) HasChanged() bool {
 }
 
 func getLifetime(spec *APISpec, session *SessionState) int64 {
-	if globalConf.ForceGlobalSessionLifetime {
-		return globalConf.GlobalSessionLifetime
+	if config.Global.ForceGlobalSessionLifetime {
+		return config.Global.GlobalSessionLifetime
 	}
 	if session.SessionLifetime > 0 {
 		return session.SessionLifetime

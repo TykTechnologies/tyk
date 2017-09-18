@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type GetConfigPayload struct {
@@ -36,7 +38,7 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 }
 
 func getExistingConfig() (map[string]interface{}, error) {
-	f, err := os.Open(globalConf.OriginalPath)
+	f, err := os.Open(config.Global.OriginalPath)
 	if err != nil {
 		return nil, err
 	}

@@ -31,6 +31,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
@@ -180,8 +181,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if ServiceCache == nil {
 			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
-			if globalConf.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = globalConf.ServiceDiscovery.DefaultCacheTimeout
+			if config.Global.ServiceDiscovery.DefaultCacheTimeout > 0 {
+				expiry = config.Global.ServiceDiscovery.DefaultCacheTimeout
 			}
 			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
 		}
@@ -255,7 +256,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 	proxy := &ReverseProxy{
 		Director:      director,
 		TykAPISpec:    spec,
-		FlushInterval: time.Duration(globalConf.HttpServerOptions.FlushInterval) * time.Millisecond,
+		FlushInterval: time.Duration(config.Global.HttpServerOptions.FlushInterval) * time.Millisecond,
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{spec, proxy}
 	return proxy
@@ -300,7 +301,7 @@ func defaultTransport() *http.Transport {
 			DualStack: true,
 		}).DialContext,
 		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: globalConf.MaxIdleConnsPerHost, // default is 100
+		MaxIdleConnsPerHost: config.Global.MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
 }
@@ -357,7 +358,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
 	if !spec.EnforcedTimeoutEnabled {
-		return false, globalConf.ProxyDefaultTimeout
+		return false, config.Global.ProxyDefaultTimeout
 	}
 
 	_, versionPaths, _, _ := spec.Version(req)
@@ -368,7 +369,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 		return true, *intMeta
 	}
 
-	return false, globalConf.ProxyDefaultTimeout
+	return false, config.Global.ProxyDefaultTimeout
 }
 
 func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Request) (bool, *ExtendedCircuitBreakerMeta) {
@@ -389,7 +390,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport() // modifies a newly created transport
-	if globalConf.ProxySSLInsecureSkipVerify {
+	if config.Global.ProxySSLInsecureSkipVerify {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
@@ -613,7 +614,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	defer res.Body.Close()
 
 	// Close connections
-	if globalConf.CloseConnections {
+	if config.Global.CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 

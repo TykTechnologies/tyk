@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -143,7 +144,7 @@ func doAddOrUpdate(keyName string, newSession *SessionState, dontReset bool) err
 		}
 	} else {
 		// nothing defined, add key to ALL
-		if !globalConf.AllowMasterKeys {
+		if !config.Global.AllowMasterKeys {
 			log.Error("Master keys disallowed in configuration, key not added.")
 			return errors.New("Master keys not allowed")
 		}
@@ -305,7 +306,7 @@ type APIAllKeys struct {
 }
 
 func handleGetAllKeys(filter, apiID string) (interface{}, int) {
-	if globalConf.HashKeys {
+	if config.Global.HashKeys {
 		return apiError("Configuration is secured, key listings not available in hashed configurations"), 400
 	}
 
@@ -445,7 +446,7 @@ func handleGetAPI(apiID string) (interface{}, int) {
 }
 
 func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
-	if globalConf.UseDBAppConfigs {
+	if config.Global.UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), 500
 	}
@@ -462,7 +463,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 	}
 
 	// Create a filename
-	defFilePath := filepath.Join(globalConf.AppPath, newDef.APIID+".json")
+	defFilePath := filepath.Join(config.Global.AppPath, newDef.APIID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err == nil {
@@ -497,7 +498,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 
 func handleDeleteAPI(apiID string) (interface{}, int) {
 	// Generate a filename
-	defFilePath := filepath.Join(globalConf.AppPath, apiID+".json")
+	defFilePath := filepath.Join(config.Global.AppPath, apiID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -720,7 +721,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 
 	if spec == nil {
 		log.Warning("Couldn't find org session store in active API list")
-		if globalConf.SupressDefaultOrgStore {
+		if config.Global.SupressDefaultOrgStore {
 			return apiError("No such organisation found in Active API list"), 404
 		}
 		sessionManager = &DefaultOrgStore
@@ -913,7 +914,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		if globalConf.AllowMasterKeys {
+		if config.Global.AllowMasterKeys {
 			// nothing defined, add key to ALL
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
@@ -1298,7 +1299,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 }
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
-	if !globalConf.HealthCheck.EnableHealthChecks {
+	if !config.Global.HealthCheck.EnableHealthChecks {
 		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 		return
 	}

@@ -11,6 +11,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const mwStatusRespond = 666
@@ -125,7 +126,7 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 func (t BaseMiddleware) OrgSession(key string) (SessionState, bool) {
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.SessionDetail(key)
-	if found && globalConf.EnforceOrgDataAge {
+	if found && config.Global.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		log.Debug("Setting data expiry: ", session.OrgID)
@@ -225,7 +226,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
 	// Check in-memory cache
-	if !globalConf.LocalSessionCache.DisableCacheSessionState {
+	if !config.Global.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(key)
 		if found {
 			log.Debug("--> Key found in local cache")

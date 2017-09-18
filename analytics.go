@@ -63,7 +63,7 @@ type GeoData struct {
 const analyticsKeyName = "tyk-system-analytics"
 
 func (a *AnalyticsRecord) GetGeo(ipStr string) {
-	if !globalConf.AnalyticsConfig.EnableGeoIP {
+	if !config.Global.AnalyticsConfig.EnableGeoIP {
 		return
 	}
 	// Not great, tightly coupled
@@ -108,7 +108,7 @@ func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
 	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
-	for _, pattern := range globalConf.AnalyticsConfig.NormaliseUrls.Custom {
+	for _, pattern := range config.Global.AnalyticsConfig.NormaliseUrls.Custom {
 		if patRe, err := regexp.Compile(pattern); err != nil {
 			log.Error("failed to compile custom pattern: ", err)
 		} else {
@@ -119,13 +119,13 @@ func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 }
 
 func (a *AnalyticsRecord) NormalisePath() {
-	if globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+	if config.Global.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+		a.Path = config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
 	}
-	if globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-		a.Path = globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
+	if config.Global.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+		a.Path = config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
 	}
-	for _, r := range globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
+	for _, r := range config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
 		a.Path = r.ReplaceAllString(a.Path, "{var}")
 	}
 }
@@ -154,8 +154,8 @@ type RedisAnalyticsHandler struct {
 
 func (r *RedisAnalyticsHandler) Init() {
 	var err error
-	if globalConf.AnalyticsConfig.EnableGeoIP {
-		db, err := maxminddb.Open(globalConf.AnalyticsConfig.GeoIPDBLocation)
+	if config.Global.AnalyticsConfig.EnableGeoIP {
+		db, err := maxminddb.Open(config.Global.AnalyticsConfig.GeoIPDBLocation)
 		if err != nil {
 			log.Error("Failed to init GeoIP Database: ", err)
 		} else {
@@ -165,7 +165,7 @@ func (r *RedisAnalyticsHandler) Init() {
 
 	analytics.Store.Connect()
 
-	ps := globalConf.AnalyticsConfig.PoolSize
+	ps := config.Global.AnalyticsConfig.PoolSize
 	if ps == 0 {
 		ps = 50
 	}
@@ -183,14 +183,14 @@ func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 		record.APIKey = publicHash(record.APIKey)
 
-		if globalConf.SlaveOptions.UseRPC {
+		if config.Global.SlaveOptions.UseRPC {
 			// Extend tag list to include this data so wecan segment by node if necessary
 			record.Tags = append(record.Tags, "tyk-hybrid-rpc")
 		}
 
-		if globalConf.DBAppConfOptions.NodeIsSegmented {
+		if config.Global.DBAppConfOptions.NodeIsSegmented {
 			// Extend tag list to include this data so wecan segment by node if necessary
-			record.Tags = append(record.Tags, globalConf.DBAppConfOptions.Tags...)
+			record.Tags = append(record.Tags, config.Global.DBAppConfOptions.Tags...)
 		}
 
 		// Lets add some metadata
