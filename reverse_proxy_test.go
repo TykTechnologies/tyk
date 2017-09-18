@@ -132,3 +132,45 @@ func TestRequestIP(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckHeaderAllowed(t *testing.T) {
+	rp := &ReverseProxy{}
+	r := new(http.Request)
+	tests := []struct {
+		header   string
+		spec     *APISpec
+		expected bool
+	}{
+		{
+			header:   "X-Forwarded-For",
+			spec:     &APISpec{APIDefinition: &apidef.APIDefinition{}},
+			expected: true,
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: createSpecTest(t, `{
+				"api_id": "1",
+				"version_data": {
+					"not_versioned": true,
+					"versions": {
+						"Default": {
+							"name": "Default",
+							"use_extended_paths": true,
+							"global_headers_remove": [ "X-Forwarded-For" ]
+						}
+					}
+				}
+			}`),
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %t", tc.header, tc.expected), func(t *testing.T) {
+			actual := rp.CheckHeaderAllowed(tc.header, tc.spec, r)
+			if actual != tc.expected {
+				t.Fatalf("want %t, got %t")
+			}
+		})
+	}
+}
