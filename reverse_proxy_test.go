@@ -169,7 +169,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 		t.Run(fmt.Sprintf("%s: %t", tc.header, tc.expected), func(t *testing.T) {
 			actual := rp.CheckHeaderAllowed(tc.header, tc.spec, r)
 			if actual != tc.expected {
-				t.Fatalf("want %t, got %t")
+				t.Fatalf("want %t, got %t", tc.expected, actual)
 			}
 		})
 	}
