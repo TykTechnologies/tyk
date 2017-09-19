@@ -89,7 +89,7 @@ func (d *GRPCDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePat
 func NewCoProcessDispatcher() (coprocess.Dispatcher, error) {
 	var err error
 
-	if globalConf.CoProcessOptions.CoProcessGRPCServer == "" {
+	if config.Global.CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set, feature is disabled.")
 	}
 
