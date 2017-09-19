@@ -3,12 +3,6 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "9BfDgevpBgdiP4B6DT9SvcuVyLs=",
-			"path": "github.com/Jeffail/gabs",
-			"revision": "2a3aa15961d5fee6047b8151b67ac2f08ba2c48c",
-			"revisionTime": "2016-11-16T21:39:02Z"
-		},
-		{
 			"checksumSHA1": "NRonvQTe073YVead6//CQ5oVgK4=",
 			"path": "github.com/Sirupsen/logrus",
 			"revision": "1deb2db2a6fff8a35532079061b903c3a25eed52",
@@ -309,6 +303,12 @@
 			"path": "github.com/grpc-ecosystem/grpc-gateway/utilities",
 			"revision": "f2862b476edcef83412c7af8687c9cd8e4097c0f",
 			"revisionTime": "2017-07-24T00:48:29Z"
+		},
+		{
+			"checksumSHA1": "evt412m3td9zzMovO7aE5sJMjFQ=",
+			"path": "github.com/jeffail/gabs",
+			"revision": "44ad915e1baa36caddb7db85303c3406042f7187",
+			"revisionTime": "2017-09-12T13:33:11Z"
 		},
 		{
 			"checksumSHA1": "tP/Ohi+jei+mhMoXH5iEGav3ZTE=",

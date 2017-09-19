@@ -24,6 +24,7 @@ THE SOFTWARE.
 package gabs
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -72,6 +73,9 @@ type Container struct {
 
 // Data - Return the contained data as an interface{}.
 func (g *Container) Data() interface{} {
+	if g == nil {
+		return nil
+	}
 	return g.object
 }
 
@@ -89,25 +93,28 @@ func (g *Container) Path(path string) *Container {
 func (g *Container) Search(hierarchy ...string) *Container {
 	var object interface{}
 
-	object = g.object
+	object = g.Data()
 	for target := 0; target < len(hierarchy); target++ {
 		if mmap, ok := object.(map[string]interface{}); ok {
-			object = mmap[hierarchy[target]]
+			object, ok = mmap[hierarchy[target]]
+			if !ok {
+				return nil
+			}
 		} else if marray, ok := object.([]interface{}); ok {
 			tmpArray := []interface{}{}
 			for _, val := range marray {
 				tmpGabs := &Container{val}
-				res := tmpGabs.Search(hierarchy[target:]...).Data()
+				res := tmpGabs.Search(hierarchy[target:]...)
 				if res != nil {
-					tmpArray = append(tmpArray, res)
+					tmpArray = append(tmpArray, res.Data())
 				}
 			}
 			if len(tmpArray) == 0 {
-				return &Container{nil}
+				return nil
 			}
 			return &Container{tmpArray}
 		} else {
-			return &Container{nil}
+			return nil
 		}
 	}
 	return &Container{object}
@@ -120,7 +127,7 @@ func (g *Container) S(hierarchy ...string) *Container {
 
 // Exists - Checks whether a path exists.
 func (g *Container) Exists(hierarchy ...string) bool {
-	return g.Search(hierarchy...).Data() != nil
+	return g.Search(hierarchy...) != nil
 }
 
 // ExistsP - Checks whether a dot notation path exists.
@@ -283,9 +290,11 @@ func (g *Container) Delete(path ...string) error {
 	for target := 0; target < len(path); target++ {
 		if mmap, ok := object.(map[string]interface{}); ok {
 			if target == len(path)-1 {
-				delete(mmap, path[target])
-			} else if mmap[path[target]] == nil {
-				return ErrNotObj
+				if _, ok := mmap[path[target]]; ok {
+					delete(mmap, path[target])
+				} else {
+					return ErrNotObj
+				}
 			}
 			object = mmap[path[target]]
 		} else {
@@ -383,7 +392,7 @@ func (g *Container) ArrayCountP(path string) (int, error) {
 
 // Bytes - Converts the contained object back to a JSON []byte blob.
 func (g *Container) Bytes() []byte {
-	if g.object != nil {
+	if g.Data() != nil {
 		if bytes, err := json.Marshal(g.object); err == nil {
 			return bytes
 		}
@@ -409,6 +418,44 @@ func (g *Container) String() string {
 // StringIndent - Converts the contained object back to a JSON formatted string with prefix, indent.
 func (g *Container) StringIndent(prefix string, indent string) string {
 	return string(g.BytesIndent(prefix, indent))
+}
+
+// EncodeOpt is a functional option for the EncodeJSON method.
+type EncodeOpt func(e *json.Encoder)
+
+// EncodeOptHTMLEscape sets the encoder to escape the JSON for html.
+func EncodeOptHTMLEscape(doEscape bool) EncodeOpt {
+	return func(e *json.Encoder) {
+		e.SetEscapeHTML(doEscape)
+	}
+}
+
+// EncodeOptIndent sets the encoder to indent the JSON output.
+func EncodeOptIndent(prefix string, indent string) EncodeOpt {
+	return func(e *json.Encoder) {
+		e.SetIndent(prefix, indent)
+	}
+}
+
+// EncodeJSON - Encodes the contained object back to a JSON formatted []byte
+// using a variant list of modifier functions for the encoder being used.
+// Functions for modifying the output are prefixed with EncodeOpt, e.g.
+// EncodeOptHTMLEscape.
+func (g *Container) EncodeJSON(encodeOpts ...EncodeOpt) []byte {
+	var b bytes.Buffer
+	encoder := json.NewEncoder(&b)
+	encoder.SetEscapeHTML(false) // Do not escape by default.
+	for _, opt := range encodeOpts {
+		opt(encoder)
+	}
+	if err := encoder.Encode(g.object); err != nil {
+		return []byte("{}")
+	}
+	result := b.Bytes()
+	if len(result) > 0 {
+		result = result[:len(result)-1]
+	}
+	return result
 }
 
 // New - Create a new gabs JSON object.

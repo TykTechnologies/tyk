@@ -19,7 +19,7 @@ func generatePlugin() (string, error) {
 	pName := fmt.Sprintf("%v.so", uuid.NewV4().String())
 	fileArg := fmt.Sprintf("-o=%v", pName)
 
-	cmd := exec.Command("go", "build", "--tags='dummy'", "--buildmode=plugin", fileArg)
+	cmd := exec.Command("go", "build", "--tags=dummy", "--buildmode=plugin", fileArg)
 	cmd.Dir = "../plugin_build"
 
 	err := cmd.Run()
