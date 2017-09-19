@@ -120,7 +120,7 @@ func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
-func (m *URLRewriteMiddleware) IsEnabledForSpec() bool {
+func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 	for _, version := range m.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.URLRewrite) > 0 {
 			m.Spec.URLRewriteEnabled = true

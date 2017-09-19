@@ -15,7 +15,7 @@ func (i *IPWhiteListMiddleware) Name() string {
 	return "IPWhiteListMiddleware"
 }
 
-func (i *IPWhiteListMiddleware) IsEnabledForSpec() bool {
+func (i *IPWhiteListMiddleware) EnabledForSpec() bool {
 	return i.Spec.EnableIpWhiteListing && len(i.Spec.AllowedIPs) > 0
 }
 

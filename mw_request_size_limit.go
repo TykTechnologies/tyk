@@ -19,7 +19,7 @@ func (t *RequestSizeLimitMiddleware) Name() string {
 	return "RequestSizeLimitMiddleware"
 }
 
-func (t *RequestSizeLimitMiddleware) IsEnabledForSpec() bool {
+func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.SizeLimit) > 0 {
 			return true

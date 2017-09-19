@@ -8,6 +8,8 @@ import (
 
 	"github.com/satori/go.uuid"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -89,14 +91,14 @@ func (b *DefaultSessionManager) Store() StorageHandler {
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *SessionState) {
 
-	rawKey := QuotaKeyPrefix + publicHash(keyName)
+	rawKey := QuotaKeyPrefix + hashKey(keyName)
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
 		"inbound-key": ObfuscateKeyString(keyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
 
-	rateLimiterSentinelKey := RateLimitKeyPrefix + publicHash(keyName) + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + hashKey(keyName) + ".BLOCKED"
 	// Clear the rate limiter
 	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
@@ -114,7 +116,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *SessionSt
 	v, _ := json.Marshal(session)
 
 	// Keep the TTL
-	if globalConf.UseAsyncSessionWrite {
+	if config.Global.UseAsyncSessionWrite {
 		go b.store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
 	}

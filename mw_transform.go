@@ -28,7 +28,7 @@ func (t *TransformMiddleware) Name() string {
 	return "TransformMiddleware"
 }
 
-func (t *TransformMiddleware) IsEnabledForSpec() bool {
+func (t *TransformMiddleware) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.Transform) > 0 {
 			return true

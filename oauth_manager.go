@@ -11,10 +11,11 @@ import (
 	osin "github.com/lonelycode/osin"
 	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 /*
-
 Sample Oaut Flow:
 -----------------
 
@@ -32,7 +33,6 @@ Effort required by Resource Owner:
 1. Create a login & approve/deny page
 2. Send an API request to Tyk to generate an auth_code
 3. Create endpoint to accept key change notifications
-
 */
 
 // OAuthClient is a representation within an APISpec of a client
@@ -247,12 +247,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
-			keyName := o.API.OrgID + username
-			if globalConf.HashKeys {
-				// HASHING? FIX THE KEY
-				keyName = doHash(keyName)
-			}
-			searchKey := "apikey-" + keyName
+			searchKey := "apikey-" + hashKey(o.API.OrgID+username)
 			log.Debug("Getting: ", searchKey)
 
 			var err error
@@ -497,7 +492,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	}
 
 	var clientJSON map[string]string
-	if !globalConf.Storage.EnableCluster {
+	if !config.Global.Storage.EnableCluster {
 		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
 	} else {
 		keyForSet := prefixClientset + prefixClient // Org ID
@@ -618,8 +613,8 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
-	if globalConf.OauthTokenExpire != 0 {
-		accessData.ExpiresIn = globalConf.OauthTokenExpire
+	if config.Global.OauthTokenExpire != 0 {
+		accessData.ExpiresIn = config.Global.OauthTokenExpire
 	}
 
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
@@ -668,8 +663,8 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		key := prefixRefresh + accessData.RefreshToken
 		log.Debug("Saving REFRESH key: ", key)
 		refreshExpire := int64(1209600) // 14 days
-		if globalConf.OauthRefreshExpire != 0 {
-			refreshExpire = globalConf.OauthRefreshExpire
+		if config.Global.OauthRefreshExpire != 0 {
+			refreshExpire = config.Global.OauthRefreshExpire
 		}
 		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
 		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))

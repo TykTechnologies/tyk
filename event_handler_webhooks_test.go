@@ -93,12 +93,7 @@ func TestBuildRequest(t *testing.T) {
 		t.Error("Method hould be GET")
 	}
 
-	hVal, ok := req.Header["User-Agent"]
-	if !ok {
-		t.Error("Header was not set")
-	}
-
-	if hVal[0] != "Tyk-Hookshot" {
+	if got := req.Header.Get("User-Agent"); got != "Tyk-Hookshot" {
 		t.Error("Header User Agent is not correct!")
 	}
 }
@@ -195,9 +190,9 @@ func TestNewCustomTemplate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.missingDefault {
-				old := globalConf.TemplatePath
-				globalConf.TemplatePath = "missing-dir"
-				defer func() { globalConf.TemplatePath = old }()
+				old := config.Global.TemplatePath
+				config.Global.TemplatePath = "missing-dir"
+				defer func() { config.Global.TemplatePath = old }()
 			}
 			h := &WebHookHandler{}
 			err := h.Init(map[string]interface{}{

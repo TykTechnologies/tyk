@@ -39,36 +39,31 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 		return err
 	}
 
-	for _, v := range h.config.RevProxyTransform.Headers {
+	for _, name := range h.config.RevProxyTransform.Headers {
 		// check if header is present and its value is not empty
-		if len(res.Header[v]) == 0 || len(res.Header[v][0]) == 0 {
+		val := res.Header.Get(name)
+		if val == "" {
 			continue
 		}
 		// Replace scheme
-		newHeaderValue := strings.Replace(
-			res.Header[v][0], h.Spec.target.Scheme, target_url.Scheme, -1)
+		val = strings.Replace(val, h.Spec.target.Scheme, target_url.Scheme, -1)
 		// Replace host
-		newHeaderValue = strings.Replace(
-			newHeaderValue, h.Spec.target.Host, target_url.Host, -1)
+		val = strings.Replace(val, h.Spec.target.Host, target_url.Host, -1)
 		// Transform path
 		if h.Spec.Proxy.StripListenPath {
 			if len(h.Spec.target.Path) != 0 {
-				newHeaderValue = strings.Replace(
-					newHeaderValue, h.Spec.target.Path,
+				val = strings.Replace(val, h.Spec.target.Path,
 					h.Spec.Proxy.ListenPath, -1)
 			} else {
-				newHeaderValue = strings.Replace(
-					newHeaderValue, req.URL.Path,
+				val = strings.Replace(val, req.URL.Path,
 					h.Spec.Proxy.ListenPath+req.URL.Path, -1)
 			}
 		} else {
 			if len(h.Spec.target.Path) != 0 {
-				newHeaderValue = strings.Replace(
-					newHeaderValue, h.Spec.target.Path,
-					"/", -1)
+				val = strings.Replace(val, h.Spec.target.Path, "/", -1)
 			}
 		}
-		res.Header[v][0] = newHeaderValue
+		res.Header.Set(name, val)
 	}
 	return nil
 }

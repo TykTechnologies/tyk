@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -57,7 +58,7 @@ func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 		}
 		src = f
 	case "blob":
-		if globalConf.DisableVirtualPathBlobs {
+		if config.Global.DisableVirtualPathBlobs {
 			log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
@@ -81,8 +82,8 @@ func (d *VirtualEndpoint) Init() {
 	d.sh = SuccessHandler{d.BaseMiddleware}
 }
 
-func (d *VirtualEndpoint) IsEnabledForSpec() bool {
-	if !globalConf.EnableJSVM {
+func (d *VirtualEndpoint) EnabledForSpec() bool {
+	if !config.Global.EnableJSVM {
 		return false
 	}
 	for _, version := range d.Spec.VersionData.Versions {
@@ -247,7 +248,7 @@ func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *Sessi
 	defer res.Body.Close()
 
 	// Close connections
-	if globalConf.CloseConnections {
+	if config.Global.CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 

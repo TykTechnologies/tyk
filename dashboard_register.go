@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type NodeResponseOK struct {
@@ -69,7 +71,7 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
 
-	h.Secret = globalConf.NodeSecret
+	h.Secret = config.Global.NodeSecret
 	return nil
 }
 

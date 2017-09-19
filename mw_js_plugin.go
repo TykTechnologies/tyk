@@ -16,6 +16,8 @@ import (
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -286,7 +288,7 @@ func (j *JSVM) Init() {
 	vm := otto.New()
 
 	// Init TykJS namespace, constructors etc.
-	f, err := os.Open(globalConf.TykJSPath)
+	f, err := os.Open(config.Global.TykJSPath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -372,14 +374,14 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to base64 decode: ", err)
+			}).Error("Failed to base64 decode: ", err)
 			return otto.Value{}
 		}
 		returnVal, err := j.VM.ToValue(string(out))
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to base64 decode: ", err)
+			}).Error("Failed to base64 decode: ", err)
 			return otto.Value{}
 		}
 		return returnVal
@@ -391,7 +393,7 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to base64 encode: ", err)
+			}).Error("Failed to base64 encode: ", err)
 			return otto.Value{}
 		}
 		return returnVal
@@ -445,7 +447,7 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Request failed: ", err)
+			}).Error("Request failed: ", err)
 			return otto.Value{}
 		}
 
@@ -461,7 +463,7 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to encode return value: ", err)
+			}).Error("Failed to encode return value: ", err)
 			return otto.Value{}
 		}
 
@@ -480,7 +482,7 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to encode return value: ", err)
+			}).Error("Failed to encode return value: ", err)
 			return otto.Value{}
 		}
 
@@ -497,7 +499,7 @@ func (j *JSVM) LoadTykJSApi() {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to decode the sesison data")
+			}).Error("Failed to decode the sesison data")
 			return otto.Value{}
 		}
 
@@ -514,13 +516,19 @@ func (j *JSVM) LoadTykJSApi() {
 			"prefix": "jsvm",
 		}).Debug("Batch input is: ", requestSet)
 
-		byteArray := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
-
-		returnVal, err := j.VM.ToValue(string(byteArray))
+		bs, err := unsafeBatchHandler.ManualBatchRequest([]byte(requestSet))
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("[JSVM]: Failed to encode return value: ", err)
+			}).Error(err)
+			return otto.Value{}
+		}
+
+		returnVal, err := j.VM.ToValue(string(bs))
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("Failed to encode return value: ", err)
 			return otto.Value{}
 		}
 

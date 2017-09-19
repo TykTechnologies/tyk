@@ -10,6 +10,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type NotificationCommand string
@@ -93,7 +94,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	case NoticeDashboardConfigRequest:
 		handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		if globalConf.ManagementNode {
+		if config.Global.ManagementNode {
 			// DRL is not initialized, going through would
 			// be mostly harmless but would flood the log
 			// with warnings since DRLManager.Ready == false
@@ -129,7 +130,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if notification.Signature == "" && globalConf.AllowInsecureConfigs {
+	if notification.Signature == "" && config.Global.AllowInsecureConfigs {
 		redisInsecureWarn.Do(func() {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
@@ -138,9 +139,9 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if globalConf.PublicKeyPath != "" && notificationVerifier == nil {
+	if config.Global.PublicKeyPath != "" && notificationVerifier == nil {
 		var err error
-		notificationVerifier, err = goverify.LoadPublicKeyFromFile(globalConf.PublicKeyPath)
+		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global.PublicKeyPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",

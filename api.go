@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -143,7 +144,7 @@ func doAddOrUpdate(keyName string, newSession *SessionState, dontReset bool) err
 		}
 	} else {
 		// nothing defined, add key to ALL
-		if !globalConf.AllowMasterKeys {
+		if !config.Global.AllowMasterKeys {
 			log.Error("Master keys disallowed in configuration, key not added.")
 			return errors.New("Master keys not allowed")
 		}
@@ -305,7 +306,7 @@ type APIAllKeys struct {
 }
 
 func handleGetAllKeys(filter, apiID string) (interface{}, int) {
-	if globalConf.HashKeys {
+	if config.Global.HashKeys {
 		return apiError("Configuration is secured, key listings not available in hashed configurations"), 400
 	}
 
@@ -420,29 +421,6 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 	return statusObj, 200
 }
 
-func handleURLReload(fn func()) (interface{}, int) {
-	reloadURLStructure(fn)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api"}).Info("Reload URL Structure - Scheduled")
-
-	return apiOk(""), 200
-}
-
-func signalGroupReload() (interface{}, int) {
-	notice := Notification{
-		Command: NoticeGroupReload,
-	}
-
-	// Signal to the group via redis
-	MainNotifier.Notify(notice)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api"}).Info("Reloaded URL Structure - Success")
-
-	return apiOk(""), 200
-}
-
 func handleGetAPIList() (interface{}, int) {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
@@ -468,7 +446,7 @@ func handleGetAPI(apiID string) (interface{}, int) {
 }
 
 func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
-	if globalConf.UseDBAppConfigs {
+	if config.Global.UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), 500
 	}
@@ -485,7 +463,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 	}
 
 	// Create a filename
-	defFilePath := filepath.Join(globalConf.AppPath, newDef.APIID+".json")
+	defFilePath := filepath.Join(config.Global.AppPath, newDef.APIID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err == nil {
@@ -520,7 +498,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 
 func handleDeleteAPI(apiID string) (interface{}, int) {
 	// Generate a filename
-	defFilePath := filepath.Join(globalConf.AppPath, apiID+".json")
+	defFilePath := filepath.Join(config.Global.AppPath, apiID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -743,7 +721,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 
 	if spec == nil {
 		log.Warning("Couldn't find org session store in active API list")
-		if globalConf.SupressDefaultOrgStore {
+		if config.Global.SupressDefaultOrgStore {
 			return apiError("No such organisation found in Active API list"), 404
 		}
 		sessionManager = &DefaultOrgStore
@@ -754,7 +732,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(keyName, newSession)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-		rawKey := QuotaKeyPrefix + publicHash(keyName)
+		rawKey := QuotaKeyPrefix + hashKey(keyName)
 
 		// manage quotas separately
 		DefaultQuotaStore.RemoveSession(rawKey)
@@ -856,8 +834,14 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 	}).Info("Group reload accepted.")
 
-	obj, code := signalGroupReload()
-	doJSONWrite(w, code, obj)
+	// Signal to the group via redis
+	MainNotifier.Notify(Notification{Command: NoticeGroupReload})
+
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+	}).Info("Reloaded URL Structure - Success")
+
+	doJSONWrite(w, 200, apiOk(""))
 }
 
 // resetHandler will try to queue a reload. If fn is nil and block=true
@@ -871,9 +855,14 @@ func resetHandler(fn func()) http.HandlerFunc {
 			wg.Add(1)
 			fn = wg.Done
 		}
-		obj, code := handleURLReload(fn)
+		reloadURLStructure(fn)
+
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+		}).Info("Reload URL Structure - Scheduled")
+
 		wg.Wait()
-		doJSONWrite(w, code, obj)
+		doJSONWrite(w, 200, apiOk(""))
 	}
 }
 
@@ -925,7 +914,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		if globalConf.AllowMasterKeys {
+		if config.Global.AllowMasterKeys {
 			// nothing defined, add key to ALL
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
@@ -1008,7 +997,7 @@ type NewClientRequest struct {
 	ClientSecret      string `json:"secret"`
 }
 
-func createOauthClientStorageID(clientID string) string {
+func oauthClientStorageID(clientID string) string {
 	return prefixClient + clientID
 }
 
@@ -1046,7 +1035,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		PolicyID:          newOauthClient.PolicyID,
 	}
 
-	storageID := createOauthClientStorageID(newClient.GetId())
+	storageID := oauthClientStorageID(newClient.GetId())
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 	}).Debug("Created storage ID: ", storageID)
@@ -1073,7 +1062,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reportableClientData := NewClientRequest{
+	clientData := NewClientRequest{
 		ClientID:          newClient.GetId(),
 		ClientSecret:      newClient.GetSecret(),
 		ClientRedirectURI: newClient.GetRedirectUri(),
@@ -1083,12 +1072,12 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix":            "api",
 		"apiID":             newOauthClient.APIID,
-		"clientID":          reportableClientData.ClientID,
-		"clientRedirectURI": reportableClientData.ClientRedirectURI,
+		"clientID":          clientData.ClientID,
+		"clientRedirectURI": clientData.ClientRedirectURI,
 		"status":            "ok",
 	}).Info("Created OAuth client")
 
-	doJSONWrite(w, 200, reportableClientData)
+	doJSONWrite(w, 200, clientData)
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
@@ -1183,7 +1172,7 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 
 // Get client details
 func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
-	storageID := createOauthClientStorageID(keyName)
+	storageID := oauthClientStorageID(keyName)
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
 		log.WithFields(logrus.Fields{
@@ -1219,7 +1208,7 @@ func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 
 // Delete Client
 func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
-	storageID := createOauthClientStorageID(keyName)
+	storageID := oauthClientStorageID(keyName)
 
 	apiSpec := getApiSpec(apiID)
 	if apiSpec == nil {
@@ -1310,7 +1299,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 }
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
-	if !globalConf.HealthCheck.EnableHealthChecks {
+	if !config.Global.HealthCheck.EnableHealthChecks {
 		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 		return
 	}
@@ -1350,13 +1339,16 @@ func UserRatesCheck() http.HandlerFunc {
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
-	spec := getApiSpec(apiID)
-	var orgid string
-	if spec != nil {
-		orgid = spec.OrgID
-	}
+	keyPrefix := "cache-" + apiID
+	matchPattern := keyPrefix + "*"
+	store := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
 
-	if err := handleInvalidateAPICache(apiID); err != nil {
+	if ok := store.DeleteScanMatch(matchPattern); !ok {
+		err := errors.New("scan/delete failed")
+		var orgid string
+		if spec := getApiSpec(apiID); spec != nil {
+			orgid = spec.OrgID
+		}
 		log.WithFields(logrus.Fields{
 			"prefix":      "api",
 			"api_id":      apiID,
@@ -1374,17 +1366,6 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, 200, apiOk("cache invalidated"))
-}
-
-func handleInvalidateAPICache(apiID string) error {
-	keyPrefix := "cache-" + apiID
-	matchPattern := keyPrefix + "*"
-	store := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
-
-	if ok := store.DeleteScanMatch(matchPattern); !ok {
-		return errors.New("scan/delete failed")
-	}
-	return nil
 }
 
 // TODO: Don't modify http.Request values in-place. We must right now

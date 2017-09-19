@@ -9,6 +9,8 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/redigocluster/rediscluster"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
@@ -37,9 +39,9 @@ type RedisClusterStorageManager struct {
 
 func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 	// redisSingletonMu is locked and we know the singleton is nil
-	cfg := globalConf.Storage
-	if isCache && globalConf.EnableSeperateCacheStore {
-		cfg = globalConf.CacheStorage
+	cfg := config.Global.Storage
+	if isCache && config.Global.EnableSeperateCacheStore {
+		cfg = config.Global.CacheStorage
 	}
 
 	log.Debug("Creating new Redis connection pool")
