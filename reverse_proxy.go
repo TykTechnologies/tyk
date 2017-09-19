@@ -530,7 +530,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			res = rec.Result()
 		}
 
-
 	} else {
 		// Not gRPC, use normal round trip
 		if breakerEnforced {

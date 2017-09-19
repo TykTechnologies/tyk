@@ -24,7 +24,6 @@ import (
 
 //var tykBundlePath string
 
-
 func getTykBundlePath() string {
 	return filepath.Join(config.Global.MiddlewarePath, "bundles")
 }
