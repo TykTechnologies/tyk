@@ -131,7 +131,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 			currentSession.Allowance--
 		}
 
-		if l.IsRedisQuotaExceeded(currentSession, key, store) {
+		if l.RedisQuotaExceeded(currentSession, key, store) {
 			return sessionFailQuota
 		}
 	}
@@ -140,7 +140,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 
 }
 
-func (l *SessionLimiter) IsRedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
 
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {

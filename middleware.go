@@ -252,7 +252,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 
 	log.Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
-	session, found = t.Spec.AuthManager.IsKeyAuthorised(key)
+	session, found = t.Spec.AuthManager.KeyAuthorised(key)
 	if found {
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		log.Info("Recreating session for key: ", key)

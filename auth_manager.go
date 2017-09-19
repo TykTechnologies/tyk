@@ -14,13 +14,13 @@ import (
 )
 
 // AuthorisationHandler is used to validate a session key,
-// implementing IsKeyAuthorised() to validate if a key exists or
+// implementing KeyAuthorised() to validate if a key exists or
 // is valid in any way (e.g. cryptographic signing etc.). Returns
 // a SessionState object (deserialised JSON)
 type AuthorisationHandler interface {
 	Init(StorageHandler)
-	IsKeyAuthorised(string) (SessionState, bool)
-	IsKeyExpired(*SessionState) bool
+	KeyAuthorised(string) (SessionState, bool)
+	KeyExpired(*SessionState) bool
 }
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
@@ -50,8 +50,8 @@ func (b *DefaultAuthorisationManager) Init(store StorageHandler) {
 	b.store.Connect()
 }
 
-// IsKeyAuthorised checks if key exists and can be read into a SessionState object
-func (b *DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionState, bool) {
+// KeyAuthorised checks if key exists and can be read into a SessionState object
+func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (SessionState, bool) {
 	jsonKeyVal, err := b.store.GetKey(keyName)
 	var newSession SessionState
 	if err != nil {
@@ -72,8 +72,8 @@ func (b *DefaultAuthorisationManager) IsKeyAuthorised(keyName string) (SessionSt
 	return newSession, true
 }
 
-// IsKeyExpired checks if a key has expired, if the value of SessionState.Expires is 0, it will be ignored
-func (b *DefaultAuthorisationManager) IsKeyExpired(newSession *SessionState) bool {
+// KeyExpired checks if a key has expired, if the value of SessionState.Expires is 0, it will be ignored
+func (b *DefaultAuthorisationManager) KeyExpired(newSession *SessionState) bool {
 	if newSession.Expires >= 1 {
 		return time.Now().After(time.Unix(newSession.Expires, 0))
 	}

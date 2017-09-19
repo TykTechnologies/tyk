@@ -277,7 +277,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	}
 
 	// Verify the token is correct
-	session, ok := spec.AuthManager.IsKeyAuthorised(token)
+	session, ok := spec.AuthManager.KeyAuthorised(token)
 	if !ok {
 		t.Error("Key was not created (Can't find it)!")
 	}

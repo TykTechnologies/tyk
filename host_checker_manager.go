@@ -271,7 +271,7 @@ func (hc *HostCheckerManager) OnHostBackUp(report HostHealthReport) {
 	}).Warning("[HOST CHECKER MANAGER] Host is UP:   ", report.CheckURL)
 }
 
-func (hc *HostCheckerManager) IsHostDown(urlStr string) bool {
+func (hc *HostCheckerManager) HostDown(urlStr string) bool {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		log.WithFields(logrus.Fields{

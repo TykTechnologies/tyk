@@ -213,7 +213,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 
 	spec := createDefinitionFromString(nonExpiringExtendedDefNoWhitelist)
 
-	ok, status, _ := spec.IsRequestValid(req)
+	ok, status, _ := spec.RequestValid(req)
 	if ok {
 		t.Error("Request should fail as URL is blacklisted!")
 	}
@@ -227,7 +227,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	req = testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 
-	ok, status, _ = spec.IsRequestValid(req)
+	ok, status, _ = spec.RequestValid(req)
 	if ok {
 		t.Error("Request should fail as URL (with dynamic ID) is blacklisted!")
 	}
@@ -242,7 +242,7 @@ func TestExtendedBlacklistLinks(t *testing.T) {
 	req = testReq(t, "POST", uri, nil)
 	req.Header.Set("version", "v1")
 
-	ok, status, _ = spec.IsRequestValid(req)
+	ok, status, _ = spec.RequestValid(req)
 	if !ok {
 		t.Error("Request should fail as URL (with dynamic ID) is blacklisted!")
 	}
@@ -260,7 +260,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := spec.IsRequestValid(req)
+	ok, status, _ := spec.RequestValid(req)
 	if !ok {
 		t.Error("Request should be OK as URL is whitelisted!")
 	}
@@ -274,7 +274,7 @@ func TestExtendedWhiteLIstLinks(t *testing.T) {
 	req = testReq(t, "GET", uri, nil)
 	req.Header.Set("version", "v1")
 
-	ok, status, _ = spec.IsRequestValid(req)
+	ok, status, _ = spec.RequestValid(req)
 	if !ok {
 		t.Error("Request should be OK as URL is whitelisted (regex)!")
 	}
@@ -292,7 +292,7 @@ func TestExtendedWhiteListBlock(t *testing.T) {
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := spec.IsRequestValid(req)
+	ok, status, _ := spec.RequestValid(req)
 	if ok {
 		t.Error("Request should fail as things not in whitelist should be rejected!")
 	}
@@ -310,7 +310,7 @@ func TestExtendedIgnored(t *testing.T) {
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := spec.IsRequestValid(req)
+	ok, status, _ := spec.RequestValid(req)
 	if !ok {
 		t.Error("Request should pass, URL is ignored")
 	}
@@ -328,7 +328,7 @@ func TestExtendedWhiteListWithRedirectedReply(t *testing.T) {
 
 	spec := createDefinitionFromString(nonExpiringExtendedDef)
 
-	ok, status, _ := spec.IsRequestValid(req)
+	ok, status, _ := spec.RequestValid(req)
 	if !ok {
 		t.Error("Request should be OK as URL is whitelisted! Status was: ", status)
 	}

@@ -115,11 +115,11 @@ func TestHostChecker(t *testing.T) {
 	hostCheckTicker <- struct{}{}
 	eventWG.Wait()
 
-	if GlobalHostChecker.IsHostDown(testHttpAny) {
+	if GlobalHostChecker.HostDown(testHttpAny) {
 		t.Error("Should not mark as down")
 	}
 
-	if !GlobalHostChecker.IsHostDown(testHttpFailureAny) {
+	if !GlobalHostChecker.HostDown(testHttpFailureAny) {
 		t.Error("Should mark as down")
 	}
 
