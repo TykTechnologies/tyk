@@ -371,23 +371,25 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	return false, globalConf.ProxyDefaultTimeout
 }
 
-func (p *ReverseProxy) CheckHeaderAllowed(hdr string, spec *APISpec, req *http.Request) bool {
-	log.Debug("Checking if header allowed: ", hdr)
+func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
 	vInfo, versionPaths, _, _ := spec.Version(req)
-	deleteHeaders := vInfo.GlobalHeadersRemove
-
-	if found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjected); found {
-		hmeta := meta.(*apidef.HeaderInjectionMeta)
-		deleteHeaders = append(deleteHeaders, hmeta.DeleteHeaders...)
-	}
-
-	for _, gdKey := range deleteHeaders {
+	for _, gdKey := range vInfo.GlobalHeadersRemove {
 		if strings.ToLower(gdKey) == strings.ToLower(hdr) {
-			return false
+			return true
 		}
 	}
 
-	return true
+	// Check path config
+	if found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjected); found {
+		hmeta := meta.(*apidef.HeaderInjectionMeta)
+		for _, gdKey := range hmeta.DeleteHeaders {
+			if strings.ToLower(gdKey) == strings.ToLower(hdr) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Request) (bool, *ExtendedCircuitBreakerMeta) {
@@ -506,13 +508,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	addrs := requestIPHops(req)
-	forwadedForHdr := "X-Forwarded-For"
-	if p.CheckHeaderAllowed(forwadedForHdr, p.TykAPISpec, req) {
-		log.Debug("Setting HDR: ", forwadedForHdr)
-		outreq.Header.Set(forwadedForHdr, addrs)
-	} else {
-		log.Debug("Header not allowed: ", forwadedForHdr)
-		outreq.Header.Del(forwadedForHdr)
+	if !p.CheckHeaderInRemoveList("X-Forwarded-For", p.TykAPISpec, req) {
+		outreq.Header.Set("X-Forwarded-For", addrs)
 	}
 
 	// Circuit breaker

@@ -133,7 +133,7 @@ func TestRequestIP(t *testing.T) {
 	}
 }
 
-func TestCheckHeaderAllowed(t *testing.T) {
+func TestCheckHeaderInRemoveList(t *testing.T) {
 	tests := []struct {
 		header   string
 		spec     string
@@ -142,7 +142,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 		{
 			header:   "X-Forwarded-For",
 			spec:     "",
-			expected: true,
+			expected: false,
 		},
 		{
 			header: "X-Forwarded-For",
@@ -159,7 +159,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 					}
 				}
 			}`,
-			expected: true,
+			expected: false,
 		},
 		{
 			header: "X-Forwarded-For",
@@ -182,7 +182,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 					}
 				}
 			}`,
-			expected: true,
+			expected: false,
 		},
 		{
 			header: "X-Forwarded-For",
@@ -199,7 +199,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 					}
 				}
 			}`,
-			expected: false,
+			expected: true,
 		},
 		{
 			header: "X-Forwarded-For",
@@ -223,7 +223,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 					}
 				}
 			}`,
-			expected: false,
+			expected: true,
 		},
 		{
 			header: "X-Forwarded-For",
@@ -247,7 +247,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 					}
 				}
 			}`,
-			expected: false,
+			expected: true,
 		},
 	}
 
@@ -259,7 +259,7 @@ func TestCheckHeaderAllowed(t *testing.T) {
 			r.URL = &url.URL{Path: "test"}
 
 			spec := createSpecTest(t, tc.spec)
-			actual := rp.CheckHeaderAllowed(tc.header, spec, r)
+			actual := rp.CheckHeaderInRemoveList(tc.header, spec, r)
 			if actual != tc.expected {
 				t.Fatalf("want %t, got %t", tc.expected, actual)
 			}
