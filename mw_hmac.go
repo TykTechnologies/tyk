@@ -22,7 +22,7 @@ const altHeaderSpec = "x-aux-date"
 
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 	lowercasePattern *regexp.Regexp
 }
 
@@ -168,7 +168,7 @@ func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 	log.WithFields(logrus.Fields{
 		"prefix": "hmac",
 		"path":   r.URL.Path,
-		"origin": r.RemoteAddr,
+		"origin": requestIP(r),
 	}).Info("Authorization field missing or malformed")
 
 	AuthFailed(hm, r, r.Header.Get("Authorization"))

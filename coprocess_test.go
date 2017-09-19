@@ -47,7 +47,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 
 	meta := EventAuthFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
@@ -132,7 +132,7 @@ func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.Hook
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy}
 	mw := CreateCoProcessMiddleware(hookName, hookType, driver, baseMid)
 	return alice.New(mw).Then(proxyHandler)
 }
@@ -266,36 +266,23 @@ func TestCoProcessReturnOverridesErrorMessage(t *testing.T) {
 
 const basicCoProcessDef = `{
 	"api_id": "1",
-	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"v1": {
-				"name": "v1"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"event_handlers": {
-		"events": {
-			"AuthFailure": [
-				{
-					"handler_name":"cp_dynamic_handler",
-					"handler_meta": {
-						"name": "my_handler"
-					}
-				}
-			]
-		}
+		"events": {"AuthFailure": [{
+			"handler_name":"cp_dynamic_handler",
+			"handler_meta": {
+				"name": "my_handler"
+			}
+		}]}
 	},
 	"custom_middleware": {
-		"pre": [
-		{
-			"name": "MyPreMiddleware"
-		}
-		],
+		"pre": [{"name": "MyPreMiddleware"}],
 		"driver": "python"
 	},
 	"proxy": {
@@ -306,30 +293,21 @@ const basicCoProcessDef = `{
 
 const protectedCoProcessDef = `{
 	"api_id": "1",
-	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"enable_coprocess_auth": true,
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"v1": {
-				"name": "v1"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"event_handlers": {
-		"events": {
-			"AuthFailure": [
-				{
-					"handler_name":"cp_dynamic_handler",
-					"handler_meta": {
-						"name": "my_handler"
-					}
-				}
-			]
-		}
+		"events": {"AuthFailure": [{
+			"handler_name":"cp_dynamic_handler",
+			"handler_meta": {
+				"name": "my_handler"
+			}
+		}]}
 	},
 	"custom_middleware": {
 		"auth_check": {

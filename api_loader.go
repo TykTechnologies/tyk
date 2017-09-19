@@ -31,8 +31,6 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-var apiCountByListenHash map[string]int
-
 func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
 	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys}
 	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
@@ -82,13 +80,12 @@ func generateDomainPath(hostname, listenPath string) string {
 	return hostname + listenPath
 }
 
-func generateListenPathMap(apiSpecs []*APISpec) {
+func countApisByListenHash(specs []*APISpec) map[string]int {
+	count := make(map[string]int, len(specs))
 	// We must track the hostname no matter what
-	for _, spec := range apiSpecs {
+	for _, spec := range specs {
 		domainHash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
-		count := apiCountByListenHash[domainHash]
-		apiCountByListenHash[domainHash]++
-		if count == 0 {
+		if count[domainHash] == 0 {
 			dN := spec.Domain
 			if dN == "" {
 				dN = "(no host)"
@@ -99,10 +96,12 @@ func generateListenPathMap(apiSpecs []*APISpec) {
 				"domain":   dN,
 			}).Info("Tracking hostname")
 		}
+		count[domainHash]++
 	}
+	return count
 }
 
-func processSpec(spec *APISpec,
+func processSpec(spec *APISpec, apisByListen map[string]int,
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore StorageHandler,
 	subrouter *mux.Router) *ChainObject {
 
@@ -126,7 +125,7 @@ func processSpec(spec *APISpec,
 	pathModified := false
 	for {
 		hash := generateDomainPath(spec.Domain, spec.Proxy.ListenPath)
-		if apiCountByListenHash[hash] < 2 {
+		if apisByListen[hash] < 2 {
 			// not a duplicate
 			break
 		}
@@ -159,30 +158,23 @@ func processSpec(spec *APISpec,
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
-	var authStore, sessionStore, orgStore StorageHandler
-
+	authStore := redisStore
+	orgStore := redisOrgStore
 	switch spec.AuthProvider.StorageEngine {
 	case LDAPStorageEngine:
 		storageEngine := LDAPStorageHandler{}
 		storageEngine.LoadConfFromMeta(spec.AuthProvider.Meta)
 		authStore = &storageEngine
-		orgStore = redisOrgStore
 	case RPCStorageEngine:
-		storageEngine := rpcAuthStore
-		authStore = storageEngine
+		authStore = rpcAuthStore
 		orgStore = rpcOrgStore
 		globalConf.EnforceOrgDataAge = true
-
-	default:
-		authStore = redisStore
-		orgStore = redisOrgStore
 	}
 
+	sessionStore := redisStore
 	switch spec.SessionProvider.StorageEngine {
 	case RPCStorageEngine:
-		sessionStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: globalConf.HashKeys, UserKey: globalConf.SlaveOptions.APIKey, Address: globalConf.SlaveOptions.ConnectionString}
-	default:
-		sessionStore = redisStore
+		sessionStore = rpcAuthStore
 	}
 
 	// Health checkers are initialised per spec so that each API handler has it's own connection and redis sotorage pool
@@ -225,7 +217,7 @@ func processSpec(spec *APISpec,
 
 	if spec.UseOauth2 {
 		log.Debug("Loading OAuth Manager")
-		if !RPC_EmergencyMode {
+		if !rpcEmergencyMode {
 			oauthManager := addOAuthHandlers(spec, subrouter)
 			log.Debug("-- Added OAuth Handlers")
 
@@ -262,9 +254,15 @@ func processSpec(spec *APISpec,
 	// Create the response processors
 	creeateResponseMiddlewareChain(spec)
 
-	baseMid := &BaseMiddleware{spec, proxy}
-	CheckCBEnabled(baseMid)
-	CheckETEnabled(baseMid)
+	baseMid := BaseMiddleware{spec, proxy}
+	for _, v := range baseMid.Spec.VersionData.Versions {
+		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
+			baseMid.Spec.CircuitBreakerEnabled = true
+		}
+		if len(v.ExtendedPaths.HardTimeouts) > 0 {
+			baseMid.Spec.EnforcedTimeoutEnabled = true
+		}
+	}
 
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
@@ -283,36 +281,31 @@ func processSpec(spec *APISpec,
 		chainArray := []alice.Constructor{}
 		handleCORS(&chainArray, spec)
 
-		baseChainArray := []alice.Constructor{}
-		AppendMiddleware(&baseChainArray, &RateCheckMW{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &VersionCheck{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &RequestSizeLimitMiddleware{baseMid})
-		AppendMiddleware(&baseChainArray, &TrackEndpointMiddleware{baseMid})
-		AppendMiddleware(&baseChainArray, &TransformMiddleware{baseMid})
-		AppendMiddleware(&baseChainArray, &TransformHeaders{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
-		AppendMiddleware(&baseChainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray, &TransformMethod{BaseMiddleware: baseMid})
-
-		log.Debug(spec.Name, " - CHAIN SIZE: ", len(baseChainArray))
-
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
-		chainArray = append(chainArray, baseChainArray...)
+		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != apidef.OttoDriver {
@@ -320,9 +313,9 @@ func processSpec(spec *APISpec,
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -335,15 +328,6 @@ func processSpec(spec *APISpec,
 
 		handleCORS(&chainArray, spec)
 
-		var baseChainArray_PreAuth []alice.Constructor
-		AppendMiddleware(&baseChainArray_PreAuth, &RateCheckMW{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PreAuth, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PreAuth, &OrganizationMonitor{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PreAuth, &VersionCheck{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PreAuth, &RequestSizeLimitMiddleware{baseMid})
-		AppendMiddleware(&baseChainArray_PreAuth, &MiddlewareContextVars{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PreAuth, &TrackEndpointMiddleware{baseMid})
-
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
@@ -351,13 +335,19 @@ func processSpec(spec *APISpec,
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
 			}
 		}
 
-		chainArray = append(chainArray, baseChainArray_PreAuth...)
+		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
 		// Select the keying method to use for setting session states
 		var authArray []alice.Constructor
@@ -367,16 +357,11 @@ func processSpec(spec *APISpec,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: OAuth")
-			authArray = append(authArray, CreateMiddleware(&Oauth2KeyExists{baseMid}))
-
+			mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid})
 		}
 
 		useCoProcessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
-
-		useOttoAuth := false
-		if !useCoProcessAuth {
-			useOttoAuth = mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
-		}
+		useOttoAuth := !useCoProcessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 
 		if spec.UseBasicAuth {
 			// Basic Auth
@@ -384,7 +369,7 @@ func processSpec(spec *APISpec,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: Basic")
-			authArray = append(authArray, CreateMiddleware(&BasicAuthKeyIsValid{baseMid}))
+			mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid})
 		}
 
 		if spec.EnableSignatureChecking {
@@ -393,7 +378,7 @@ func processSpec(spec *APISpec,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: HMAC")
-			authArray = append(authArray, CreateMiddleware(&HMACMiddleware{BaseMiddleware: baseMid}))
+			mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid})
 		}
 
 		if spec.EnableJWT {
@@ -402,7 +387,7 @@ func processSpec(spec *APISpec,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: JWT")
-			authArray = append(authArray, CreateMiddleware(&JWTMiddleware{baseMid}))
+			mwAppendEnabled(&authArray, &JWTMiddleware{baseMid})
 		}
 
 		if spec.UseOpenID {
@@ -413,7 +398,7 @@ func processSpec(spec *APISpec,
 			}).Info("Checking security policy: OpenID")
 
 			// initialise the OID configuration on this reference Spec
-			authArray = append(authArray, CreateMiddleware(&OpenIDMW{BaseMiddleware: baseMid}))
+			mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid})
 		}
 
 		if useCoProcessAuth {
@@ -430,7 +415,7 @@ func processSpec(spec *APISpec,
 
 			if useCoProcessAuth {
 				newExtractor(spec, baseMid)
-				AppendMiddleware(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
+				mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
 			}
 		}
 
@@ -439,7 +424,7 @@ func processSpec(spec *APISpec,
 				"prefix": "main",
 			}).Info("----> Checking security policy: JS Plugin")
 
-			authArray = append(authArray, CreateDynamicAuthMiddleware(mwAuthCheckFunc.Name, baseMid))
+			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
 		}
 
 		if spec.UseStandardAuth || (!spec.UseOpenID && !spec.EnableJWT && !spec.EnableSignatureChecking && !spec.UseBasicAuth && !spec.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
@@ -448,7 +433,7 @@ func processSpec(spec *APISpec,
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: Token")
-			authArray = append(authArray, CreateMiddleware(&AuthKey{baseMid}))
+			authArray = append(authArray, createMiddleware(&AuthKey{baseMid}))
 		}
 
 		chainArray = append(chainArray, authArray...)
@@ -458,22 +443,19 @@ func processSpec(spec *APISpec,
 				"prefix":   "coprocess",
 				"api_name": spec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
+			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
 		}
 
-		var baseChainArray_PostAuth []alice.Constructor
-		AppendMiddleware(&baseChainArray_PostAuth, &KeyExpired{baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &AccessRightsCheck{baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &RateLimitAndQuotaCheck{baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &GranularAccessMiddleware{baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &TransformMiddleware{baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &TransformHeaders{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
-		AppendMiddleware(&baseChainArray_PostAuth, &TransformMethod{BaseMiddleware: baseMid})
-		AppendMiddleware(&baseChainArray_PostAuth, &VirtualEndpoint{BaseMiddleware: baseMid})
-
-		chainArray = append(chainArray, baseChainArray_PostAuth...)
+		mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
+		mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})
+		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
+		mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
+		mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != apidef.OttoDriver {
@@ -481,9 +463,9 @@ func processSpec(spec *APISpec,
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-				AppendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
+				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
 		}
 
@@ -492,43 +474,32 @@ func processSpec(spec *APISpec,
 			"api_name": spec.Name,
 		}).Debug("Custom middleware completed processing")
 
-		// Use CreateMiddleware(&ModifiedMiddleware{baseMid})  to run custom middleware
+		// Use createMiddleware(&ModifiedMiddleware{baseMid})  to run custom middleware
 		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
 		log.Debug("Chain completed")
 
-		userCheckHandler := UserRatesCheck()
-		simpleChain_PreAuth := []alice.Constructor{
-			CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
-			CreateMiddleware(&OrganizationMonitor{BaseMiddleware: baseMid}),
-			CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid})}
-
-		simpleChain_PostAuth := []alice.Constructor{
-			CreateMiddleware(&KeyExpired{baseMid}),
-			CreateMiddleware(&AccessRightsCheck{baseMid})}
-
-		var fullSimpleChain []alice.Constructor
-		fullSimpleChain = append(fullSimpleChain, simpleChain_PreAuth...)
-		fullSimpleChain = append(fullSimpleChain, authArray...)
-		fullSimpleChain = append(fullSimpleChain, simpleChain_PostAuth...)
-
-		simpleChain := alice.New(fullSimpleChain...).Then(userCheckHandler)
+		var simpleArray []alice.Constructor
+		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
+		mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
+		mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
+		simpleArray = append(simpleArray, authArray...)
+		mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
+		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
 		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": spec.Name,
 		}).Debug("Rate limit endpoint is: ", rateLimitPath)
-		//subrouter.Handle(rateLimitPath, simpleChain)
 		chainDef.RateLimitPath = rateLimitPath
-		chainDef.RateLimitChain = simpleChain
+		chainDef.RateLimitChain = alice.New(simpleArray...).Then(UserRatesCheck())
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix":   "main",
 		"api_name": spec.Name,
 	}).Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
-	//subrouter.Handle(spec.Proxy.ListenPath+"{rest:.*}", chain)
 
 	chainDef.ThisHandler = chain
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
@@ -567,7 +538,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
+func loadApps(specs []*APISpec, muxer *mux.Router) {
 	hostname := globalConf.HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
@@ -575,7 +546,6 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("API hostname set: ", hostname)
 	}
-	apiCountByListenHash = make(map[string]int, len(apiSpecs))
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -588,16 +558,16 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
-	sort.Slice(apiSpecs, func(i, j int) bool {
-		return len(apiSpecs[i].Proxy.ListenPath) > len(apiSpecs[j].Proxy.ListenPath)
+	sort.Slice(specs, func(i, j int) bool {
+		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
 	})
 
 	chainChannel := make(chan *ChainObject)
 
 	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(apiSpecs))
-	generateListenPathMap(apiSpecs)
-	for i, spec := range apiSpecs {
+	loadList := make([]*ChainObject, len(specs))
+	apisByListen := countApisByListenHash(specs)
+	for i, spec := range specs {
 		go func(spec *APISpec, i int) {
 			subrouter := muxer
 			// Handle custom domains
@@ -609,7 +579,7 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 				}).Info("Custom Domain set.")
 				subrouter = mainRouter.Host(spec.Domain).Subrouter()
 			}
-			chainObj := processSpec(spec, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
+			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
 		}(spec, i)
@@ -618,22 +588,23 @@ func loadApps(apiSpecs []*APISpec, muxer *mux.Router) {
 		tmpSpecRegister[spec.APIID] = spec
 	}
 
-	for range apiSpecs {
+	for range specs {
 		chObj := <-chainChannel
 		loadList[chObj.Index] = chObj
 	}
 
 	for _, chainObj := range loadList {
-		if !chainObj.Skip {
-			if !chainObj.Open {
-				chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
-			}
-
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Processed and listening on: ", chainObj.ListenOn)
-			chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
+		if chainObj.Skip {
+			continue
 		}
+		if !chainObj.Open {
+			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Processed and listening on: ", chainObj.ListenOn)
+		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 	}
 
 	// All APIs processed, now we can healthcheck

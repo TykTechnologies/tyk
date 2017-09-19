@@ -25,7 +25,7 @@ type APIError struct {
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
 // the ErrorHandler if something is wrong with the request and halt the request processing through the chain
 type ErrorHandler struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
@@ -112,8 +112,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		rawRequest := ""
 		rawResponse := ""
-		if RecordDetail(r) {
-			requestCopy := CopyHttpRequest(r)
+		if recordDetail(r) {
+			requestCopy := copyRequest(r)
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
 			requestCopy.Write(&wireFormatReq)
@@ -177,7 +177,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 
 	// Report in health check
-	ReportHealthCheckValue(e.Spec.Health, BlockedRequestLog, "-1")
+	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 
 	//If the config option is not set or is false, add the header
 	if !globalConf.HideGeneratorHeader {

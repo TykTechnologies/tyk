@@ -26,10 +26,6 @@
     "purge_delay": -1,
     "ignored_ips": []
   },
-  "health_check": {
-    "enable_health_checks": true,
-    "health_check_value_timeouts": 60
-  },
   "optimisations_use_async_session_write": true,
   "allow_master_keys": false,
   "policies": {

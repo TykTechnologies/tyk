@@ -14,7 +14,7 @@ var DRLManager = &drl.DRL{}
 func setupDRL() {
 	drlManager := &drl.DRL{}
 	drlManager.Init()
-	drlManager.ThisServerID = NodeID + "|" + HostDetails.Hostname
+	drlManager.ThisServerID = NodeID + "|" + hostDetails.Hostname
 	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
 	DRLManager = drlManager
 }
@@ -58,7 +58,7 @@ func NotifyCurrentServerStatus() {
 	}
 
 	server := drl.Server{
-		HostName:   HostDetails.Hostname,
+		HostName:   hostDetails.Hostname,
 		ID:         NodeID,
 		LoadPerSec: rate,
 		TagHash:    getTagHash(),

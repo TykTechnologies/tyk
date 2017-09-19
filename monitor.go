@@ -16,7 +16,7 @@ func (Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64)
 	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Quota trigger reached", OriginatingRequest: ""},
+			EventMetaDefault: EventMetaDefault{Message: "Quota trigger reached"},
 			Org:              sessionData.OrgID,
 			Key:              key,
 			TriggerLimit:     int64(triggerLimit),

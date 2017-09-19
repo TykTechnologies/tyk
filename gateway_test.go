@@ -22,6 +22,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -275,8 +276,8 @@ type tykErrorResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tm := BaseMiddleware{apiSpec, p}
-		handler := SuccessHandler{&tm}
+		baseMid := BaseMiddleware{apiSpec, p}
+		handler := SuccessHandler{baseMid}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
 	})
@@ -286,30 +287,27 @@ func getChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
-		CreateMiddleware(&MiddlewareContextVars{BaseMiddleware: baseMid}),
-		CreateMiddleware(&AuthKey{baseMid}),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		CreateMiddleware(&KeyExpired{baseMid}),
-		CreateMiddleware(&AccessRightsCheck{baseMid}),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid}),
-		CreateMiddleware(&TransformHeaders{baseMid})).Then(proxyHandler)
-
+	baseMid := BaseMiddleware{spec, proxy}
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&MiddlewareContextVars{BaseMiddleware: baseMid},
+		&AuthKey{baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+		&TransformHeaders{baseMid},
+	)...).Then(proxyHandler)
 	return chain
 }
 
 const nonExpiringDefNoWhiteList = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
@@ -349,19 +347,14 @@ const nonExpiringDefNoWhiteList = `{
 
 const versionedDefinition = `{
 	"api_id": "9991",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
-			"v1": {
-				"name": "v1"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"event_handlers": {
@@ -394,7 +387,6 @@ const versionedDefinition = `{
 
 const pathBasedDefinition = `{
 	"api_id": "9992",
-	"org_id": "default",
 	"auth": {
 		"use_param": true,
 		"auth_header_name": "authorization"
@@ -415,19 +407,16 @@ const pathBasedDefinition = `{
 
 const extendedPathGatewaySetup = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default",
+			"v1": {
+				"name": "v1",
 				"use_extended_paths": true,
 				"extended_paths": {
 					"ignored": [
@@ -801,10 +790,10 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 	for _, m := range testMatrix {
 		var ln, cln net.Listener
 
-		ln, _ = net.Listen("tcp", ":0")
+		ln, _ = net.Listen("tcp", "127.0.0.1:0")
 
 		if separateControlPort {
-			cln, _ = net.Listen("tcp", ":0")
+			cln, _ = net.Listen("tcp", "127.0.0.1:0")
 
 			_, port, _ := net.SplitHostPort(cln.Addr().String())
 			globalConf.ControlAPIPort, _ = strconv.Atoi(port)
@@ -827,7 +816,7 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
 		if globalConf.ControlAPIPort == 0 {
-			loadAPIEndpoints(defaultRouter)
+			loadAPIEndpoints(mainRouter)
 		}
 
 		if m.goagain {
@@ -835,8 +824,6 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 		} else {
 			listen(ln, cln, fmt.Errorf("Without goagain"))
 		}
-
-		client := &http.Client{}
 
 		for ti, tc := range tests {
 			tPrefix := ""
@@ -870,11 +857,12 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 				req = withAuth(req)
 			}
 
-			resp, err := client.Do(req)
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Error(err)
 				continue
 			}
+			resp.Body.Close()
 
 			if resp.StatusCode != tc.code {
 				t.Errorf("[%d]%s%s %s Status %d, want %d", ti, tPrefix, tc.method, tc.path, resp.StatusCode, tc.code)
@@ -890,22 +878,18 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 }
 
 const sampleAPI = `{
-	"slug": "api",
 	"api_id": "test",
 	"use_keyless": true,
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
 		"listen_path": "/sample",
 		"target_url": "` + testHttpAny + `"
-	},
-	"active": true
+	}
 }`
 
 func TestListener(t *testing.T) {
@@ -977,13 +961,12 @@ const apiWithTykListenPathPrefix = `{
 	"use_keyless": true,
 	"version_data": {
 		"not_versioned": true,
-		"versions": {"Default": {"name": "Default"}}
+		"versions": {"v1": {"name": "v1"}}
 	},
 	"proxy": {
 		"listen_path": "/tyk-foo/",
 		"target_url": "` + testHttpAny + `"
-	},
-	"active": true
+	}
 }`
 
 func TestListenPathTykPrefix(t *testing.T) {
@@ -1043,5 +1026,58 @@ func TestProxyUserAgent(t *testing.T) {
 		if got := resp.Headers["User-Agent"]; !rx.MatchString(got) {
 			t.Errorf("Wanted agent to match %q, got %q\n", tc.wantRe, got)
 		}
+	}
+}
+
+func buildAndLoadAPI(apiGens ...func(spec *APISpec)) {
+	oldPath := globalConf.AppPath
+	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
+	defer func() {
+		os.RemoveAll(globalConf.AppPath)
+		globalConf.AppPath = oldPath
+	}()
+
+	for i, gen := range apiGens {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		json.Unmarshal([]byte(sampleAPI), spec.APIDefinition)
+		gen(spec)
+		specBytes, _ := json.Marshal(spec)
+		specFilePath := filepath.Join(globalConf.AppPath, spec.APIID+strconv.Itoa(i)+".json")
+		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
+			panic(err)
+		}
+	}
+
+	doReload()
+}
+
+func TestSkipUrlCleaning(t *testing.T) {
+	globalConf.HttpServerOptions.OverrideDefaults = true
+	globalConf.HttpServerOptions.SkipURLCleaning = true
+
+	ln, _ := generateListener(0)
+	baseURL := "http://" + ln.Addr().String()
+	listen(ln, nil, nil)
+
+	defer func() {
+		globalConf.HttpServerOptions.OverrideDefaults = false
+		globalConf.HttpServerOptions.SkipURLCleaning = false
+		ln.Close()
+	}()
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(r.URL.Path))
+	}))
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = s.URL
+	})
+
+	resp, _ := http.Get(baseURL + "/http://example.com")
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	if string(body) != "/http://example.com" {
+		t.Error("Should not strip URL", string(body))
 	}
 }

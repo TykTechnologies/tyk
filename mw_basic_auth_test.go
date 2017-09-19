@@ -17,15 +17,11 @@ const basicAuthDef = `{
 	"api_id": "1",
 	"org_id": "default",
 	"use_basic_auth": true,
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -52,15 +48,15 @@ func getBasicAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
-		CreateMiddleware(&BasicAuthKeyIsValid{baseMid}),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		CreateMiddleware(&KeyExpired{baseMid}),
-		CreateMiddleware(&AccessRightsCheck{baseMid}),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
-
+	baseMid := BaseMiddleware{spec, proxy}
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&BasicAuthKeyIsValid{baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+	)...).Then(proxyHandler)
 	return chain
 }
 

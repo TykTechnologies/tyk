@@ -8,15 +8,11 @@ import (
 const batchTestDef = `{
 	"api_id": "987999",
 	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

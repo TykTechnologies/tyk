@@ -108,20 +108,12 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Calling dashboard service for policy list")
-	response, err := c.Do(newRequest)
+	resp, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Policy request failed: ", err)
 		return nil
 	}
-
-	defer response.Body.Close()
-	retBody, err := ioutil.ReadAll(response.Body)
-
-	if err != nil {
-		log.Error("Failed to read policy body: ", err)
-
-		return nil
-	}
+	defer resp.Body.Close()
 
 	// Extract Policies
 	type NodeResponseOK struct {
@@ -130,17 +122,17 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 		Nonce   string
 	}
 
-	if response.StatusCode == 403 {
-		log.Error("Policy request login failure, Response was: ", string(retBody))
+	if resp.StatusCode == 403 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Error("Policy request login failure, Response was: ", string(body))
 		reLogin()
 		return nil
 	}
 
 	list := NodeResponseOK{}
 
-	if err := json.Unmarshal(retBody, &list); err != nil {
-		log.Error("Failed to decode policy body: ", err, "Returned: ", string(retBody))
-
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		log.Error("Failed to decode policy body: ", err)
 		return nil
 	}
 
@@ -158,20 +150,15 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 			id = p.ID
 		}
 		p.ID = id
-		_, foundP := policies[id]
-		if !foundP {
-			policies[id] = p.ToRegularPolicy()
-			log.WithFields(logrus.Fields{
-				"prefix": "policy",
-			}).Info("--> Processing policy ID: ", p.ID)
-			log.Debug("POLICY ACCESS RIGHTS: ", p.AccessRights)
-		} else {
+		if _, ok := policies[id]; ok {
 			log.WithFields(logrus.Fields{
 				"prefix":   "policy",
 				"policyID": p.ID,
 				"OrgID":    p.OrgID,
 			}).Warning("--> Skipping policy, new item has a duplicate ID!")
+			continue
 		}
+		policies[id] = p.ToRegularPolicy()
 	}
 
 	return policies
@@ -196,15 +183,9 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 
 	policies := make(map[string]Policy, len(dbPolicyList))
 
-	log.WithFields(logrus.Fields{
-		"prefix": "policy",
-	}).Info("Policies found: ", len(dbPolicyList))
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Info("--> Processing policy ID: ", p.ID)
 	}
 
 	return policies

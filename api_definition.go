@@ -131,7 +131,6 @@ type APISpec struct {
 	URLRewriteEnabled        bool
 	CircuitBreakerEnabled    bool
 	EnforcedTimeoutEnabled   bool
-	ResponseHandlersActive   bool
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
@@ -207,11 +206,6 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 	return spec
 }
 
-func (a APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) {
-	defer response.Body.Close()
-	return ioutil.ReadAll(response.Body)
-}
-
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*APISpec {
 	// Get the definitions
@@ -230,26 +224,21 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	c := &http.Client{
 		Timeout: 120 * time.Second,
 	}
-	response, err := c.Do(newRequest)
+	resp, err := c.Do(newRequest)
 	if err != nil {
 		log.Error("Request failed: ", err)
 		return nil
 	}
+	defer resp.Body.Close()
 
-	retBody, err := a.readBody(response)
-	if err != nil {
-		log.Error("Failed to read body: ", err)
-		return nil
-	}
-
-	if response.StatusCode == 403 {
-		log.Error("Login failure, Response was: ", string(retBody))
+	if resp.StatusCode == 403 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Error("Login failure, Response was: ", string(body))
 		reLogin()
 		return nil
 	}
 
 	// Extract tagged APIs#
-
 	type ResponseStruct struct {
 		ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
 	}
@@ -260,8 +249,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 
 	list := NodeResponseOK{}
-	if err := json.Unmarshal(retBody, &list); err != nil {
-		log.Error("Failed to decode body: ", err, "Response was: ", string(retBody))
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		log.Error("Failed to decode body: ", err)
 		log.Info("--> Retrying in 5s")
 		return nil
 	}
@@ -324,7 +313,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 
 	//store.Disconnect()
 
-	if RPC_LoadCount > 0 {
+	if rpcLoadCount > 0 {
 		saveRPCDefinitionsBackup(apiCollection)
 	}
 
@@ -373,21 +362,18 @@ func (a APIDefinitionLoader) ParseDefinition(apiDef []byte) *apidef.APIDefinitio
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	var apiSpecs []*APISpec
 	// Grab json files from directory
-	files, _ := ioutil.ReadDir(dir)
-	for _, f := range files {
-		if strings.Contains(f.Name(), ".json") {
-			filePath := filepath.Join(dir, f.Name())
-			log.Info("Loading API Specification from ", filePath)
-			defBody, err := ioutil.ReadFile(filePath)
-			if err != nil {
-				log.Error("Couldn't load app configuration file: ", err)
-			}
-			def := a.ParseDefinition(defBody)
-			spec := a.MakeSpec(def)
-			apiSpecs = append(apiSpecs, spec)
+	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	for _, path := range paths {
+		log.Info("Loading API Specification from ", path)
+		defBody, err := ioutil.ReadFile(path)
+		if err != nil {
+			log.Error("Couldn't load app configuration file: ", err)
+			continue
 		}
+		def := a.ParseDefinition(defBody)
+		spec := a.MakeSpec(def)
+		apiSpecs = append(apiSpecs, spec)
 	}
-
 	return apiSpecs
 }
 
@@ -686,7 +672,7 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 		// Extend with method actions
 		newSpec.VirtualPathSpec = stringSpec
 
-		PreLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
+		preLoadVirtualMetaCode(&newSpec.VirtualPathSpec, &apiSpec.JSVM)
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -943,20 +929,12 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 
 	case "url":
 		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
-		if len(url) == 0 {
-			return ""
+		// First non-empty part of the path is the version ID
+		for _, part := range strings.Split(url, "/") {
+			if part != "" {
+				return part
+			}
 		}
-		if url[:1] == "/" {
-			url = url[1:]
-		}
-
-		// Assume first param is the version ID
-		firstParamEndsAt := strings.Index(url, "/")
-		if firstParamEndsAt == -1 {
-			return ""
-		}
-
-		return url[:firstParamEndsAt]
 	}
 	return ""
 }

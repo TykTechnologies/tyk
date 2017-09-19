@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -49,7 +50,7 @@ type VMReturnObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type DynamicMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool
@@ -91,15 +92,14 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	requestData := MiniRequestObject{
 		Headers:        r.Header,
-		SetHeaders:     make(map[string]string),
-		DeleteHeaders:  make([]string, 0),
+		SetHeaders:     map[string]string{},
+		DeleteHeaders:  []string{},
 		Body:           originalBody,
 		URL:            r.URL.Path,
 		Params:         r.URL.Query(),
-		AddParams:      make(map[string]string),
-		ExtendedParams: make(map[string][]string),
-		DeleteParams:   make([]string, 0),
-		IgnoreBody:     false,
+		AddParams:      map[string]string{},
+		ExtendedParams: map[string][]string{},
+		DeleteParams:   []string{},
 	}
 
 	asJsonRequestObj, err := json.Marshal(requestData)
@@ -138,6 +138,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// buffered, leaving no chance of a goroutine leak since the
 	// spawned goroutine will send 0 or 1 values.
 	ret := make(chan otto.Value, 1)
+	errRet := make(chan error, 1)
 	go func() {
 		defer func() {
 			// the VM executes the panic func that gets it
@@ -145,13 +146,20 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// the whole Go program.
 			recover()
 		}()
-		returnRaw, _ := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
 		ret <- returnRaw
+		errRet <- err
 	}()
 	var returnRaw otto.Value
 	t := time.NewTimer(d.Spec.JSVM.Timeout)
 	select {
 	case returnRaw = <-ret:
+		if err := <-errRet; err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("Failed to run JS middleware: ", err)
+			return nil, 200
+		}
 		t.Stop()
 	case <-t.C:
 		t.Stop()
@@ -278,8 +286,20 @@ func (j *JSVM) Init() {
 	vm := otto.New()
 
 	// Init TykJS namespace, constructors etc.
-	jscore, _ := ioutil.ReadFile(globalConf.TykJSPath)
-	vm.Run(jscore)
+	f, err := os.Open(globalConf.TykJSPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Could not open TykJS: ", err)
+		return
+	}
+	if _, err := vm.Run(f); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("Could not load TykJS: ", err)
+		return
+	}
+	f.Close()
 
 	j.VM = vm
 
@@ -297,18 +317,22 @@ func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
 		if pathPrefix != "" {
 			mwPath = filepath.Join(getTykBundlePath(), pathPrefix, mwPath)
 		}
-		js, err := ioutil.ReadFile(mwPath)
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Info("Loading JS File: ", mwPath)
+		f, err := os.Open(mwPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Error("Failed to load Middleware JS: ", err)
-		} else {
-			// No error, load the JS into the VM
+			}).Error("Failed to open JS middleware file: ", err)
+			continue
+		}
+		if _, err := j.VM.Run(f); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
-			}).Info("Loading JS File: ", mwPath)
-			j.VM.Run(js)
+			}).Error("Failed to load JS middleware: ", err)
 		}
+		f.Close()
 	}
 }
 
@@ -400,8 +424,6 @@ func (j *JSVM) LoadTykJSApi() {
 		u.Path = hro.Resource
 		urlStr := u.String() // "https://api.com/user/"
 
-		client := &http.Client{}
-
 		var d string
 		if hro.Body != "" {
 			d = hro.Body
@@ -419,7 +441,7 @@ func (j *JSVM) LoadTykJSApi() {
 			r.Header.Set(k, v)
 		}
 		r.Close = true
-		resp, err := client.Do(r)
+		resp, err := http.DefaultClient.Do(r)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
@@ -447,7 +469,6 @@ func (j *JSVM) LoadTykJSApi() {
 	})
 
 	// Expose Setters and Getters in the REST API for a key:
-
 	j.VM.Set("TykGetKeyData", func(call otto.FunctionCall) otto.Value {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
@@ -506,11 +527,7 @@ func (j *JSVM) LoadTykJSApi() {
 		return returnVal
 	})
 
-	tykReturnFunc := `
-	function TykJsResponse(response, session_meta) {
+	j.VM.Run(`function TykJsResponse(response, session_meta) {
 		return JSON.stringify({Response: response, SessionMeta: session_meta})
-	};`
-
-	j.VM.Run(tykReturnFunc)
-
+	}`)
 }

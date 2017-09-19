@@ -90,7 +90,7 @@ const cmdChanBuffSize = 8192 // random-ass-guess
 const maxUdpBytes = 1440     // 1500(Ethernet MTU) - 60(Max UDP header size
 
 func NewStatsDSink(addr string, options *StatsDSinkOptions) (*StatsDSink, error) {
-	c, err := net.ListenPacket("udp", ":0")
+	c, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func NewStatsDSink(addr string, options *StatsDSinkOptions) (*StatsDSink, error)
 		drainDoneChan: make(chan struct{}),
 		stopDoneChan:  make(chan struct{}),
 		flushPeriod:   100 * time.Millisecond,
-		prefixBuffers: make(map[eventKey]prefixBuffer),
+		prefixBuffers: map[eventKey]prefixBuffer{},
 	}
 
 	if options != nil {

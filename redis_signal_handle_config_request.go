@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -22,7 +22,6 @@ type ReturnConfigPayload struct {
 }
 
 func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
-
 	sanitzeFields := []string{
 		"secret",
 		"node_secret",
@@ -30,22 +29,20 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 		"slave_options",
 		"auth_override",
 	}
-
 	for _, field_name := range sanitzeFields {
 		delete(mc, field_name)
 	}
-
 	return mc
 }
 
 func getExistingConfig() (map[string]interface{}, error) {
-	var microConfig map[string]interface{}
-	dat, err := ioutil.ReadFile(globalConf.OriginalPath)
+	f, err := os.Open(globalConf.OriginalPath)
 	if err != nil {
-		return microConfig, err
+		return nil, err
 	}
-	if err := json.Unmarshal(dat, &microConfig); err != nil {
-		return microConfig, err
+	var microConfig map[string]interface{}
+	if err := json.NewDecoder(f).Decode(&microConfig); err != nil {
+		return nil, err
 	}
 	return sanitizeConfig(microConfig), nil
 }
@@ -62,7 +59,7 @@ func handleSendMiniConfig(payload string) {
 	}
 
 	// Make sure payload matches nodeID and hostname
-	if configPayload.FromHostname != HostDetails.Hostname && configPayload.FromNodeID != NodeID {
+	if configPayload.FromHostname != hostDetails.Hostname && configPayload.FromNodeID != NodeID {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Debug("Configuration request received, no NodeID/Hostname match found, ignoring")
@@ -78,7 +75,7 @@ func handleSendMiniConfig(payload string) {
 	}
 
 	returnPayload := ReturnConfigPayload{
-		FromHostname:  HostDetails.Hostname,
+		FromHostname:  hostDetails.Hostname,
 		FromNodeID:    NodeID,
 		Configuration: config,
 		TimeStamp:     time.Now().Unix(),

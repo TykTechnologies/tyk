@@ -19,15 +19,11 @@ const multiAuthDev = `{
 	"use_basic_auth": true,
 	"use_standard_auth": true,
 	"base_identity_provided_by": "auth_token",
-	"auth": {
-		"auth_header_name": "x-standard-auth"
-	},
+	"auth": {"auth_header_name": "x-standard-auth"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -69,16 +65,16 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
-		CreateMiddleware(&BasicAuthKeyIsValid{baseMid}),
-		CreateMiddleware(&AuthKey{baseMid}),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		CreateMiddleware(&KeyExpired{baseMid}),
-		CreateMiddleware(&AccessRightsCheck{baseMid}),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
-
+	baseMid := BaseMiddleware{spec, proxy}
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&BasicAuthKeyIsValid{baseMid},
+		&AuthKey{baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+	)...).Then(proxyHandler)
 	return chain
 }
 

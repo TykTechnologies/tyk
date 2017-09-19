@@ -13,13 +13,12 @@ import (
 var applicationGCStats = debug.GCStats{}
 var instrument = health.NewStream()
 
-// SetupInstrumentation handles all the intialisation of the instrumentation handler
-func SetupInstrumentation(enabled bool) {
-	if os.Getenv("TYK_INSTRUMENTATION") == "1" {
-		enabled = true
-	}
-
-	if !enabled {
+// setupInstrumentation handles all the intialisation of the instrumentation handler
+func setupInstrumentation(arguments map[string]interface{}) {
+	switch {
+	case arguments["--log-instrumentation"] == true:
+	case os.Getenv("TYK_INSTRUMENTATION") == "1":
+	default:
 		return
 	}
 
@@ -34,7 +33,6 @@ func SetupInstrumentation(enabled bool) {
 
 	if err != nil {
 		log.Fatal("Failed to start StatsD check: ", err)
-		return
 	}
 
 	log.Info("StatsD instrumentation sink started")
@@ -50,7 +48,7 @@ func InstrumentationMW(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 		job.EventKv("called", health.Kvs{
-			"from_ip":  r.RemoteAddr,
+			"from_ip":  requestIP(r),
 			"method":   r.Method,
 			"endpoint": r.URL.Path,
 			"raw_url":  r.URL.String(),
@@ -65,7 +63,7 @@ func MonitorApplicationInstrumentation() {
 	go func() {
 		job := instrument.NewJob("GCActivity")
 		job_rl := instrument.NewJob("Load")
-		metadata := health.Kvs{"host": HostDetails.Hostname}
+		metadata := health.Kvs{"host": hostDetails.Hostname}
 		applicationGCStats.PauseQuantiles = make([]time.Duration, 5)
 
 		for {

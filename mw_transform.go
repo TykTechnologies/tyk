@@ -21,7 +21,7 @@ func WrappedCharsetReader(s string, i io.Reader) (io.Reader, error) {
 
 // TransformMiddleware is a middleware that will apply a template to a request body to transform it's contents ready for an upstream API
 type TransformMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (t *TransformMiddleware) Name() string {
@@ -59,10 +59,6 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) error {
 	// Read the body:
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
 
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
@@ -70,12 +66,14 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 	case apidef.RequestXML:
 		mxj.XmlCharsetReader = WrappedCharsetReader
 		var err error
-		bodyData, err = mxj.NewMapXml(body) // unmarshal
+		bodyData, err = mxj.NewMapXmlReader(r.Body) // unmarshal
 		if err != nil {
 			return fmt.Errorf("error unmarshalling XML: %v", err)
 		}
 	case apidef.RequestJSON:
-		json.Unmarshal(body, &bodyData)
+		if err := json.NewDecoder(r.Body).Decode(&bodyData); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
 	}

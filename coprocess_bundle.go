@@ -65,14 +65,17 @@ func (b *Bundle) Verify() error {
 	var bundleData bytes.Buffer
 
 	for _, f := range b.Manifest.FileList {
-		extractedFilePath := filepath.Join(b.Path, f)
+		extractedPath := filepath.Join(b.Path, f)
 
-		data, err := ioutil.ReadFile(extractedFilePath)
+		f, err := os.Open(extractedPath)
 		if err != nil {
-			break
+			return err
 		}
-
-		bundleData.Write(data)
+		_, err = io.Copy(&bundleData, f)
+		f.Close()
+		if err != nil {
+			return err
+		}
 	}
 
 	checksum := fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))

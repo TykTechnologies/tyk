@@ -25,7 +25,7 @@ var (
 
 // CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 	HookType         coprocess.HookType
 	HookName         string
 	MiddlewareDriver apidef.MiddlewareDriver
@@ -36,7 +36,7 @@ func (mw *CoProcessMiddleware) Name() string {
 }
 
 // CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
-func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		BaseMiddleware:   baseMid,
 		HookType:         hookType,
@@ -44,7 +44,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		MiddlewareDriver: mwDriver,
 	}
 
-	return CreateMiddleware(dMiddleware)
+	return createMiddleware(dMiddleware)
 }
 
 func doCoprocessReload() {
@@ -76,17 +76,16 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	miniRequestObject := &coprocess.MiniRequestObject{
 		Headers:        ProtoMap(r.Header),
-		SetHeaders:     make(map[string]string),
-		DeleteHeaders:  make([]string, 0),
+		SetHeaders:     map[string]string{},
+		DeleteHeaders:  []string{},
 		Body:           body,
 		Url:            r.URL.Path,
 		Params:         ProtoMap(r.URL.Query()),
-		AddParams:      make(map[string]string),
+		AddParams:      map[string]string{},
 		ExtendedParams: ProtoMap(nil),
-		DeleteParams:   make([]string, 0),
+		DeleteParams:   []string{},
 		ReturnOverrides: &coprocess.ReturnOverrides{
-			ResponseCode:  -1,
-			ResponseError: "",
+			ResponseCode: -1,
 		},
 	}
 
@@ -262,7 +261,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		AuthFailed(m, r, token)
 
 		// Report in health check
-		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
+		reportHealthValue(m.Spec, KeyFailure, "1")
 
 		errorMsg := "Key not authorised"
 		if returnObject.Request.ReturnOverrides.ResponseError != "" {

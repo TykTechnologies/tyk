@@ -30,15 +30,15 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
-		CreateMiddleware(&AuthKey{baseMid}),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		CreateMiddleware(&KeyExpired{baseMid}),
-		CreateMiddleware(&AccessRightsCheck{baseMid}),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
-
+	baseMid := BaseMiddleware{spec, proxy}
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&AuthKey{baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+	)...).Then(proxyHandler)
 	return chain
 }
 
@@ -66,15 +66,11 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 const authKeyDef = `{
 	"api_id": "31",
 	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -112,9 +108,7 @@ const multiAuthBackwardsCompatible = `{
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -189,9 +183,7 @@ const multiAuthDef = `{
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

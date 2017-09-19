@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -22,7 +23,7 @@ func canonicalAddr(url *url.URL) string {
 }
 
 type WSDialer struct {
-	*TykTransporter
+	*http.Transport
 	RW        http.ResponseWriter
 	TLSConfig *tls.Config
 }
@@ -36,9 +37,10 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	target := canonicalAddr(req.URL)
 
 	// TLS
-	dial := ws.Dial
+	dial := ws.DialContext
 	if dial == nil {
-		dial = net.Dial
+		var d net.Dialer
+		dial = d.DialContext
 	}
 
 	// We do not get this WSS scheme, need another way to identify it
@@ -50,12 +52,12 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		} else {
 			tlsConfig = ws.TLSClientConfig
 		}
-		dial = func(network, address string) (net.Conn, error) {
+		dial = func(_ context.Context, network, address string) (net.Conn, error) {
 			return tls.Dial("tcp", target, tlsConfig)
 		}
 	}
 
-	d, err := dial("tcp", target)
+	d, err := dial(context.TODO(), "tcp", target)
 	if err != nil {
 		http.Error(ws.RW, "Error contacting backend server.", 500)
 		log.WithFields(logrus.Fields{

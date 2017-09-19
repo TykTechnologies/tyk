@@ -17,13 +17,13 @@ type orgActiveMapMu struct {
 }
 
 var orgActiveMap = orgActiveMapMu{
-	OrgMap: make(map[string]bool),
+	OrgMap: map[string]bool{},
 }
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type OrganizationMonitor struct {
-	*BaseMiddleware
+	BaseMiddleware
 	sessionlimiter SessionLimiter
 	mon            Monitor
 }
@@ -40,21 +40,15 @@ func (k *OrganizationMonitor) IsEnabledForSpec() bool {
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	if globalConf.ExperimentalProcessOrgOffThread {
-		return k.ProcessRequestOffThread(w, r, conf)
+		return k.ProcessRequestOffThread(r)
 	}
-	return k.ProcessRequestLive(w, r, conf)
+	return k.ProcessRequestLive(r)
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *OrganizationMonitor) ProcessRequestLive(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
-	if !globalConf.EnforceOrgQuotas {
-		// We aren;t enforcing quotas, so skip this altogether
-		return nil, 200
-	}
+func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 
 	session, found := k.OrgSession(k.Spec.OrgID)
-
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
 		return nil, 200
@@ -121,12 +115,7 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	}
 }
 
-func (k *OrganizationMonitor) ProcessRequestOffThread(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
-	if !globalConf.EnforceOrgQuotas {
-		// We aren't enforcing quotas, so skip this altogether
-		return nil, 200
-	}
+func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, int) {
 
 	orgChan, ok := orgChanMap[k.Spec.OrgID]
 	if !ok {

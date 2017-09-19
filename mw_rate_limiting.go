@@ -13,7 +13,7 @@ var sessionMonitor = Monitor{}
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (k *RateLimitAndQuotaCheck) Name() string {
@@ -40,7 +40,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 	})
 
 	// Report in health check
-	ReportHealthCheckValue(k.Spec.Health, Throttle, "-1")
+	reportHealthValue(k.Spec, Throttle, "-1")
 
 	return errors.New("Rate limit exceeded"), 429
 }
@@ -61,7 +61,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	})
 
 	// Report in health check
-	ReportHealthCheckValue(k.Spec.Health, QuotaViolation, "-1")
+	reportHealthValue(k.Spec, QuotaViolation, "-1")
 
 	return errors.New("Quota exceeded"), 403
 }

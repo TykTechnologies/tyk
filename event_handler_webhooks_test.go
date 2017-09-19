@@ -36,7 +36,7 @@ func TestNewValid(t *testing.T) {
 	}
 }
 
-func TestNewInvlalid(t *testing.T) {
+func TestNewInvalid(t *testing.T) {
 	h := &WebHookHandler{}
 	err := h.Init(map[string]interface{}{
 		"method":        123,
@@ -175,5 +175,43 @@ func TestPost(t *testing.T) {
 
 	if wasFired := eventHandler.WasHookFired(checksum); !wasFired {
 		t.Error("Checksum should have matched, event did not fire!")
+	}
+}
+
+func TestNewCustomTemplate(t *testing.T) {
+	tests := []struct {
+		name           string
+		missingDefault bool
+		templatePath   string
+		wantErr        bool
+	}{
+		{"UseDefault", false, "", false},
+		{"FallbackToDefault", false, "missing_webhook.json", false},
+		{"UseCustom", false, "templates/breaker_webhook.json", false},
+		{"MissingDefault", true, "", true},
+		{"MissingDefaultFallback", true, "missing_webhook.json", true},
+		{"MissingDefaultNotNeeded", true, "templates/breaker_webhook.json", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.missingDefault {
+				old := globalConf.TemplatePath
+				globalConf.TemplatePath = "missing-dir"
+				defer func() { globalConf.TemplatePath = old }()
+			}
+			h := &WebHookHandler{}
+			err := h.Init(map[string]interface{}{
+				"target_path":   testHttpPost,
+				"template_path": tc.templatePath,
+			})
+			if tc.wantErr && err == nil {
+				t.Fatalf("wanted error, got nil")
+			} else if !tc.wantErr && err != nil {
+				t.Fatalf("didn't want error, got: %v", err)
+			}
+			if err == nil && h.template == nil {
+				t.Fatalf("didn't get an error but template is nil")
+			}
+		})
 	}
 }

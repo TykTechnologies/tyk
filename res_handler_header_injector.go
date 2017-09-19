@@ -21,7 +21,6 @@ type HeaderInjector struct {
 func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
 	h.Spec = spec
 	if err := mapstructure.Decode(c, &h.config); err != nil {
-		log.Error(err)
 		return err
 	}
 	return nil

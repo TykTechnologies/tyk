@@ -19,19 +19,14 @@ import (
 
 const apiTestDef = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -52,6 +47,9 @@ type testAPIDefinition struct {
 
 func TestHealthCheckEndpoint(t *testing.T) {
 	uri := "/tyk/health/?api_id=1"
+	old := globalConf.HealthCheck.EnableHealthChecks
+	globalConf.HealthCheck.EnableHealthChecks = true
+	defer func() { globalConf.HealthCheck.EnableHealthChecks = old }()
 
 	recorder := httptest.NewRecorder()
 	loadSampleAPI(t, apiTestDef)
@@ -78,7 +76,7 @@ func createSampleSession() *SessionState {
 			"1": {
 				APIName:  "Test",
 				APIID:    "1",
-				Versions: []string{"Default"},
+				Versions: []string{"v1"},
 			},
 		},
 	}
@@ -417,7 +415,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 }
 
 func TestAPIAuthFail(t *testing.T) {
-	uri := "/tyk/health/?api_id=1"
+	uri := "/tyk/apis/"
 	loadSampleAPI(t, apiTestDef)
 
 	recorder := httptest.NewRecorder()
@@ -432,7 +430,7 @@ func TestAPIAuthFail(t *testing.T) {
 }
 
 func TestAPIAuthOk(t *testing.T) {
-	uri := "/tyk/health/?api_id=1"
+	uri := "/tyk/apis/"
 
 	recorder := httptest.NewRecorder()
 	req := withAuth(testReq(t, "GET", uri, nil))
@@ -639,20 +637,15 @@ func TestHotReloadMany(t *testing.T) {
 
 const apiBenchDef = `{
 	"api_id": "REPLACE",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {

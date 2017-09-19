@@ -67,7 +67,7 @@ rawlog('{"x": "y"}')
 
 func TestJSVMBody(t *testing.T) {
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: &BaseMiddleware{
+		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 		},
 		MiddlewareClassName: "leakMid",
@@ -104,7 +104,7 @@ leakMid.NewProcessRequest(function(request, session) {
 
 func TestJSVMProcessTimeout(t *testing.T) {
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: &BaseMiddleware{
+		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 		},
 		MiddlewareClassName: "leakMid",
@@ -121,9 +121,9 @@ func TestJSVMProcessTimeout(t *testing.T) {
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({});
 
 leakMid.NewProcessRequest(function(request, session) {
-       while (true) {
-       }
-       return leakMid.ReturnData(request, session.meta_data);
+	while (true) {
+	}
+	return leakMid.ReturnData(request, session.meta_data);
 });`
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -155,7 +155,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      &BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{spec, nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
@@ -191,7 +191,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      &BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{spec, nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
@@ -237,7 +237,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {});
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      &BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{spec, nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}

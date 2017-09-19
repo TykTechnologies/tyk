@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"net/http/httptest"
 
@@ -162,7 +162,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "all hosts are down", http.StatusServiceUnavailable)
 		}
-		listener, err := net.Listen("tcp", ":0")
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
 			panic(err)
 		}
@@ -259,13 +259,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(globalConf.HttpServerOptions.FlushInterval) * time.Millisecond,
 	}
-	proxy.ErrorHandler.BaseMiddleware = &BaseMiddleware{spec, proxy}
+	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{spec, proxy}
 	return proxy
 }
-
-// onExitFlushLoop is a callback set by tests to detect the state of the
-// flushLoop() goroutine.
-var onExitFlushLoop func()
 
 // ReverseProxy is an HTTP Handler that takes an incoming request and
 // sends it to another server, proxying the response back to the
@@ -295,66 +291,29 @@ type ReverseProxy struct {
 	ErrorHandler ErrorHandler
 }
 
-type TykTransporter struct {
-	http.Transport
-}
-
-func (t *TykTransporter) SetTimeout(timeOut int) {
-	//t.Dial.Timeout = time.Duration(timeOut) * time.Second
-	t.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
-}
-
-func getMaxIdleConns() int {
-	return globalConf.MaxIdleConnsPerHost
-}
-
-var TykDefaultTransport = &TykTransporter{http.Transport{
-	Proxy:               http.ProxyFromEnvironment,
-	MaxIdleConnsPerHost: getMaxIdleConns(),
-	Dial: (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).Dial,
-	TLSHandshakeTimeout: 10 * time.Second,
-	TLSClientConfig:     &tls.Config{},
-}}
-
-func cleanSlashes(a string) string {
-	endSlash := strings.HasSuffix(a, "//")
-	startSlash := strings.HasPrefix(a, "//")
-
-	if startSlash {
-		a = "/" + strings.TrimPrefix(a, "//")
+func defaultTransport() *http.Transport {
+	// allocate a new one every time for now, to avoid modifying a
+	// global variable for each request's needs (e.g. timeouts).
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: globalConf.MaxIdleConnsPerHost, // default is 100
+		TLSHandshakeTimeout: 10 * time.Second,
 	}
-
-	if endSlash {
-		a = strings.TrimSuffix(a, "//") + "/"
-	}
-
-	return a
 }
 
 func singleJoiningSlash(a, b string) string {
-	a = cleanSlashes(a)
-	b = cleanSlashes(b)
-
-	aslash := strings.HasSuffix(a, "/")
-	bslash := strings.HasPrefix(b, "/")
-
-	switch {
-	case aslash && bslash:
-		log.Debug(a + b)
-		return a + b[1:]
-	case !aslash && !bslash:
-		if len(b) > 0 {
-			log.Debug(a + b)
-			return a + "/" + b
-		}
-		log.Debug(a + b)
-		return a
+	a = strings.TrimRight(a, "/")
+	b = strings.TrimLeft(b, "/")
+	if len(b) > 0 {
+		return a + "/" + b
 	}
-	log.Debug(a + b)
-	return a + b
+	return a
 }
 
 func copyHeader(dst, src http.Header) {
@@ -390,7 +349,7 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, RecordDetail(req))
+	return p.WrappedServeHTTP(rw, req, recordDetail(req))
 	// return nil
 }
 
@@ -431,8 +390,10 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 }
 
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
-	transport := TykDefaultTransport
-	transport.TLSClientConfig.InsecureSkipVerify = globalConf.ProxySSLInsecureSkipVerify
+	transport := defaultTransport() // modifies a newly created transport
+	if globalConf.ProxySSLInsecureSkipVerify {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
@@ -441,8 +402,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 			Timeout:   time.Duration(timeOut) * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext
-		transport.SetTimeout(timeOut)
-
+		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}
 
 	if IsWebsocket(req) {
@@ -569,6 +529,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			res = rec.Result()
 		}
 
+
 	} else {
 		// Not gRPC, use normal round trip
 		if breakerEnforced {
@@ -657,12 +618,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		ses = session
 	}
 
-	if p.TykAPISpec.ResponseHandlersActive {
-		// Middleware chain handling here - very simple, but should do the trick
-		err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses)
-		if err != nil {
-			log.Error("Response chain failed! ", err)
-		}
+	// Middleware chain handling here - very simple, but should do
+	// the trick. Chain can be empty, in which case this is a no-op.
+	if err := handleResponseChain(p.TykAPISpec.ResponseChain, rw, res, req, ses); err != nil {
+		log.Error("Response chain failed! ", err)
 	}
 
 	// We should at least copy the status code in
@@ -783,9 +742,6 @@ func (m *maxLatencyWriter) flushLoop() {
 	for {
 		select {
 		case <-m.done:
-			if onExitFlushLoop != nil {
-				onExitFlushLoop()
-			}
 			return
 		case <-t.C:
 			m.mu.Lock()
@@ -796,3 +752,67 @@ func (m *maxLatencyWriter) flushLoop() {
 }
 
 func (m *maxLatencyWriter) stop() { m.done <- true }
+
+func requestIP(r *http.Request) string {
+	if real := r.Header.Get("X-Real-IP"); real != "" {
+		return real
+	}
+	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
+		// X-Forwarded-For has no port
+		if i := strings.IndexByte(fw, ','); i >= 0 {
+			return fw[:i]
+		}
+		return fw
+	}
+
+	// From net/http.Request.RemoteAddr:
+	//   The HTTP server in this package sets RemoteAddr to an
+	//   "IP:port" address before invoking a handler.
+	// So we can ignore the case of the port missing.
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return host
+}
+
+func requestIPHops(r *http.Request) string {
+	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return ""
+	}
+	// If we aren't the first proxy retain prior
+	// X-Forwarded-For information as a comma+space
+	// separated list and fold multiple headers into one.
+	if prior, ok := r.Header["X-Forwarded-For"]; ok {
+		clientIP = strings.Join(prior, ", ") + ", " + clientIP
+	}
+	return clientIP
+}
+
+func copyRequest(r *http.Request) *http.Request {
+	r2 := *r
+	if r.Body != nil {
+		defer r.Body.Close()
+
+		var buf1, buf2 bytes.Buffer
+		io.Copy(&buf1, r.Body)
+		buf2 = buf1
+
+		r.Body = ioutil.NopCloser(&buf1)
+		r2.Body = ioutil.NopCloser(&buf2)
+	}
+	return &r2
+}
+
+func copyResponse(r *http.Response) *http.Response {
+	r2 := *r
+	if r.Body != nil {
+		defer r.Body.Close()
+
+		var buf1, buf2 bytes.Buffer
+		io.Copy(&buf1, r.Body)
+		buf2 = buf1
+
+		r.Body = ioutil.NopCloser(&buf1)
+		r2.Body = ioutil.NopCloser(&buf2)
+	}
+	return &r2
+}

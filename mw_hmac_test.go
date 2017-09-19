@@ -25,15 +25,11 @@ const hmacAuthDef = `{
 	"org_id": "default",
 	"enable_signature_checking": true,
 	"hmac_allowed_clock_skew": 5000,
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -61,15 +57,15 @@ func getHMACAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		CreateMiddleware(&IPWhiteListMiddleware{baseMid}),
-		CreateMiddleware(&HMACMiddleware{BaseMiddleware: baseMid}),
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		CreateMiddleware(&KeyExpired{baseMid}),
-		CreateMiddleware(&AccessRightsCheck{baseMid}),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
-
+	baseMid := BaseMiddleware{spec, proxy}
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&HMACMiddleware{BaseMiddleware: baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+	)...).Then(proxyHandler)
 	return chain
 }
 

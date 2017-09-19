@@ -134,12 +134,11 @@ func ProtoSessionState(session *SessionState) *coprocess.SessionState {
 		DataExpires:             session.DataExpires,
 		Monitor:                 monitor,
 		EnableDetailedRecording: session.EnableDetailedRecording,
-		Metadata:                "",
-		Tags:                    session.Tags,
-		Alias:                   session.Alias,
-		LastUpdated:             session.LastUpdated,
-		IdExtractorDeadline:     session.IdExtractorDeadline,
-		SessionLifetime:         session.SessionLifetime,
+		Tags:                session.Tags,
+		Alias:               session.Alias,
+		LastUpdated:         session.LastUpdated,
+		IdExtractorDeadline: session.IdExtractorDeadline,
+		SessionLifetime:     session.SessionLifetime,
 	}
 }
 

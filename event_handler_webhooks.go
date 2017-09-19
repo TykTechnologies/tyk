@@ -34,21 +34,8 @@ const (
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
 	conf     config.WebHookHandlerConf
-	template *template.Template
+	template *template.Template // non-nil if Init is run without error
 	store    StorageHandler
-}
-
-// Not Pretty, but will avoi dmillions of connections
-var WebHookRedisStorePointer *RedisClusterStorageManager
-
-// GetRedisInterfacePointer creates a reference to a redis connection pool that can be shared across all webhook instances
-func GetRedisInterfacePointer() *RedisClusterStorageManager {
-	if WebHookRedisStorePointer == nil {
-		WebHookRedisStorePointer = &RedisClusterStorageManager{KeyPrefix: "webhook.cache."}
-		WebHookRedisStorePointer.Connect()
-	}
-
-	return WebHookRedisStorePointer
 }
 
 // createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
@@ -78,35 +65,37 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return err
 	}
 
-	// Get a storage reference
-	w.store = GetRedisInterfacePointer()
+	w.store = &RedisClusterStorageManager{KeyPrefix: "webhook.cache."}
+	w.store.Connect()
 
 	// Pre-load template on init
-	var webHookTemplate *template.Template
-	var templateLoaded bool
 	if w.conf.TemplatePath != "" {
-		webHookTemplate, err = template.ParseFiles(w.conf.TemplatePath)
+		w.template, err = template.ParseFiles(w.conf.TemplatePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
 				"target": w.conf.TargetPath,
 			}).Warning("Custom template load failure, using default: ", err)
-			defaultPath := filepath.Join(globalConf.TemplatePath, "default_webhook.json")
-			webHookTemplate, _ = template.ParseFiles(defaultPath)
-			templateLoaded = true
 		}
 	}
 
-	if w.conf.TemplatePath == "" && templateLoaded {
+	// We use the default if TemplatePath was empty or if we failed
+	// to load it.
+	if w.template == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(globalConf.TemplatePath, "default_webhook.json")
-		webHookTemplate, _ = template.ParseFiles(defaultPath)
+		w.template, err = template.ParseFiles(defaultPath)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "webhooks",
+			}).Error("Could not load the default template: ", err)
+			return err
+		}
 	}
 
-	w.template = webHookTemplate
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Timeout set to: ", w.conf.EventTimeout)
@@ -221,8 +210,7 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	}
 	// Fire web hook routine (setHookFired())
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",

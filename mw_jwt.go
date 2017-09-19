@@ -6,20 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/pmylund/go-cache"
+	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type JWTMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (k *JWTMiddleware) Name() string {
@@ -55,21 +54,15 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 	if !found {
 		// Get the JWK
 		log.Debug("Pulling JWK")
-		response, err := http.Get(url)
+		resp, err := http.Get(url)
 		if err != nil {
 			log.Error("Failed to get resource URL: ", err)
 			return nil, err
 		}
+		defer resp.Body.Close()
 
 		// Decode it
-		defer response.Body.Close()
-		contents, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			log.Error("Failed to read body data: ", err)
-			return nil, err
-		}
-
-		if err := json.Unmarshal(contents, &jwkSet); err != nil {
+		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
 			log.Error("Failed to decode body JWK: ", err)
 			return nil, err
 		}
@@ -271,7 +264,7 @@ func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
 	AuthFailed(k, r, tykId)
 
 	// Report in health check
-	ReportHealthCheckValue(k.Spec.Health, KeyFailure, "1")
+	reportHealthValue(k.Spec, KeyFailure, "1")
 }
 
 func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Token) (error, int) {

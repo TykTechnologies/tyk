@@ -24,7 +24,6 @@ type HeaderTransform struct {
 
 func (h *HeaderTransform) Init(c interface{}, spec *APISpec) error {
 	if err := mapstructure.Decode(c, &h.config); err != nil {
-		log.Error(err)
 		return err
 	}
 	h.Spec = spec
@@ -37,7 +36,6 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 	// Parse target_host parameter from configuration
 	target_url, err := url.Parse(h.config.RevProxyTransform.Target_host)
 	if err != nil {
-		log.Error(err)
 		return err
 	}
 

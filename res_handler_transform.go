@@ -9,28 +9,16 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
-	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type ResponsetransformOptions struct {
-	//FlushInterval time.Duration
-}
-
 type ResponseTransformMiddleware struct {
-	Spec   *APISpec
-	config ResponsetransformOptions
+	Spec *APISpec
 }
 
 func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
-	handler := ResponseTransformMiddleware{}
-
-	if err := mapstructure.Decode(c, &h.config); err != nil {
-		log.Error(err)
-		return err
-	}
-	handler.Spec = spec
+	h.Spec = spec
 	return nil
 }
 
@@ -44,17 +32,14 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 
 	// Read the body:
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
 
 	// Put into an interface:
 	var bodyData map[string]interface{}
 	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
 		mxj.XmlCharsetReader = WrappedCharsetReader
-		bodyData, err = mxj.NewMapXml(body) // unmarshal
+		var err error
+		bodyData, err = mxj.NewMapXmlReader(res.Body) // unmarshal
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "outbound-transform",
@@ -64,12 +49,19 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 			}).Error("Error unmarshalling XML: ", err)
 		}
 	default: // apidef.RequestJSON
-		json.Unmarshal(body, &bodyData)
+		if err := json.NewDecoder(res.Body).Decode(&bodyData); err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix":      "outbound-transform",
+				"server_name": h.Spec.Proxy.TargetURL,
+				"api_id":      h.Spec.APIID,
+				"path":        req.URL.Path,
+			}).Error("Error unmarshalling JSON: ", err)
+		}
 	}
 
 	// Apply to template
 	var bodyBuffer bytes.Buffer
-	if err = tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "outbound-transform",
 			"server_name": h.Spec.Proxy.TargetURL,

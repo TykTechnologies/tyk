@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -34,7 +35,7 @@ type VMResponseObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
-	*BaseMiddleware
+	BaseMiddleware
 	sh SuccessHandler
 }
 
@@ -42,40 +43,37 @@ func (d *VirtualEndpoint) Name() string {
 	return "VirtualEndpoint"
 }
 
-func PreLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
-	if j == nil {
-		log.Error("No JSVM loaded, cannot init methods")
-		return
-	}
-	if meta == nil {
-		return
-	}
+func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
+	// the only call site uses (&foo, &bar) so meta and j won't be
+	// nil.
+	var src interface{}
 	switch meta.FunctionSourceType {
 	case "file":
-		js, err := ioutil.ReadFile(meta.FunctionSourceURI)
+		log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+		f, err := os.Open(meta.FunctionSourceURI)
 		if err != nil {
-			log.Error("Failed to load Endpoint JS: ", err)
-		} else {
-			// No error, load the JS into the VM
-			log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
-			j.VM.Run(js)
-		}
-	case "blob":
-		if globalConf.DisableVirtualPathBlobs {
-			log.Error("[JSVM] Blobs not allowerd on this node")
+			log.Error("Failed to open Endpoint JS: ", err)
 			return
 		}
-
+		src = f
+	case "blob":
+		if globalConf.DisableVirtualPathBlobs {
+			log.Error("[JSVM] Blobs not allowed on this node")
+			return
+		}
+		log.Debug("Loading JS blob")
 		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 		if err != nil {
 			log.Error("Failed to load blob JS: ", err)
-		} else {
-			// No error, load the JS into the VM
-			log.Debug("Loading JS blob")
-			j.VM.Run(js)
+			return
 		}
+		src = js
 	default:
 		log.Error("Type must be either file or blob (base64)!")
+		return
+	}
+	if _, err := j.VM.Run(src); err != nil {
+		log.Error("Could not load virtual endpoint JS: ", err)
 	}
 }
 
@@ -104,8 +102,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	var copiedRequest *http.Request
-	if RecordDetail(r) {
-		copiedRequest = CopyHttpRequest(r)
+	if recordDetail(r) {
+		copiedRequest = copyRequest(r)
 	}
 
 	t1 := time.Now().UnixNano()
@@ -155,7 +153,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Run the middleware
 	vm := d.Spec.JSVM.VM.Copy()
-	returnRaw, _ := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+	returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+	if err != nil {
+		log.Error("Failed to run virtual endpoint JS code:", err)
+		return nil
+	}
 	returnDataStr, _ := returnRaw.ToString()
 
 	// Decode the return object
@@ -216,7 +218,7 @@ func forceResponse(w http.ResponseWriter,
 	}
 
 	// Clone the response so we can save it
-	copiedRes := CopyHttpResponse(newResponse)
+	copiedRes := copyResponse(newResponse)
 
 	handleForcedResponse(w, newResponse, session)
 

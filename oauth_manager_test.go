@@ -36,9 +36,7 @@ const keyRules = `{
 const oauthDefinition = `{
 	"api_id": "999999",
 	"org_id": "default",
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"use_oauth2": true,
 	"oauth_meta": {
 		"allowed_access_types": [
@@ -59,9 +57,7 @@ const oauthDefinition = `{
 	"version_data": {
 		"not_versioned": true,
 		"versions": {
-			"Default": {
-				"name": "Default"
-			}
+			"v1": {"name": "v1"}
 		}
 	},
 	"proxy": {
@@ -106,14 +102,14 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{spec, proxy}
-	chain := alice.New(
-		CreateMiddleware(&VersionCheck{BaseMiddleware: baseMid}),
-		CreateMiddleware(&Oauth2KeyExists{baseMid}),
-		CreateMiddleware(&KeyExpired{baseMid}),
-		CreateMiddleware(&AccessRightsCheck{baseMid}),
-		CreateMiddleware(&RateLimitAndQuotaCheck{baseMid})).Then(proxyHandler)
-
+	baseMid := BaseMiddleware{spec, proxy}
+	chain := alice.New(mwList(
+		&VersionCheck{BaseMiddleware: baseMid},
+		&Oauth2KeyExists{baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+	)...).Then(proxyHandler)
 	muxer.Handle(spec.Proxy.ListenPath, chain)
 }
 

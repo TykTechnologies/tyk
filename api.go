@@ -253,7 +253,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		}
 
 	}
-	suppressReset := r.FormValue("suppress_reset") == "1"
+	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 	if err := doAddOrUpdate(keyName, &newSession, suppressReset); err != nil {
 		return apiError("Failed to create key, ensure security settings are correct."), 500
 	}
@@ -265,12 +265,9 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		event = EventTokenCreated
 	}
 	FireSystemEvent(event, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            "Key modified.",
-			OriginatingRequest: "",
-		},
-		Org: newSession.OrgID,
-		Key: keyName,
+		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
+		Org:              newSession.OrgID,
+		Key:              keyName,
 	})
 
 	response := APIModifyKeySuccess{
@@ -321,7 +318,7 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
-		if !strings.Contains(s, QuotaKeyPrefix) && !strings.Contains(s, RateLimitKeyPrefix) {
+		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
 			fixed_sessions = append(fixed_sessions, s)
 		}
 	}
@@ -368,12 +365,9 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
 
 	FireSystemEvent(EventTokenDeleted, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            "Key deleted.",
-			OriginatingRequest: "",
-		},
-		Org: orgID,
-		Key: keyName,
+		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
+		Org:              orgID,
+		Key:              keyName,
 	})
 
 	log.WithFields(logrus.Fields{
@@ -583,8 +577,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
-	filter := r.FormValue("filter")
-	apiID := r.FormValue("api_id")
+	filter := r.URL.Query().Get("filter")
+	apiID := r.URL.Query().Get("api_id")
 	var obj interface{}
 	var code int
 
@@ -602,7 +596,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "DELETE":
-		hashed := r.FormValue("hashed")
+		hashed := r.URL.Query().Get("hashed")
 		// Remove a key
 		if hashed == "" {
 			obj, code = handleDeleteKey(keyName, apiID)
@@ -628,7 +622,7 @@ func policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keyName := mux.Vars(r)["keyName"]
-	apiID := r.FormValue("api_id")
+	apiID := r.URL.Query().Get("api_id")
 	obj, code := handleUpdateHashedKey(keyName, apiID, policRecord.Policy)
 
 	doJSONWrite(w, code, obj)
@@ -710,7 +704,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 
 func orgHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
-	filter := r.FormValue("filter")
+	filter := r.URL.Query().Get("filter")
 	var obj interface{}
 	var code int
 
@@ -757,7 +751,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		sessionManager = spec.OrgSessionManager
 	}
 
-	if r.FormValue("reset_quota") == "1" {
+	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(keyName, newSession)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 		rawKey := QuotaKeyPrefix + publicHash(keyName)
@@ -824,7 +818,7 @@ func handleGetAllOrgKeys(filter string) (interface{}, int) {
 	sessions := spec.OrgSessionManager.Sessions(filter)
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {
-		if !strings.Contains(s, QuotaKeyPrefix) && !strings.Contains(s, RateLimitKeyPrefix) {
+		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
 			fixed_sessions = append(fixed_sessions, s)
 		}
 	}
@@ -985,12 +979,9 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	FireSystemEvent(EventTokenCreated, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            "Key generated.",
-			OriginatingRequest: "",
-		},
-		Org: newSession.OrgID,
-		Key: newKey,
+		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
+		Org:              newSession.OrgID,
+		Key:              newKey,
 	})
 
 	log.WithFields(logrus.Fields{
@@ -1101,7 +1092,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
-	apiID := r.FormValue("api_id")
+	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {
 		doJSONWrite(w, 400, apiError("Missing parameter api_id"))
 		return
@@ -1323,7 +1314,7 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 		return
 	}
-	apiID := r.FormValue("api_id")
+	apiID := r.URL.Query().Get("api_id")
 	if apiID == "" {
 		doJSONWrite(w, 400, apiError("missing api_id parameter"))
 		return
@@ -1388,7 +1379,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 func handleInvalidateAPICache(apiID string) error {
 	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
-	store := getGlobalLocalCacheStorageHandler(keyPrefix, false)
+	store := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		return errors.New("scan/delete failed")

@@ -10,7 +10,7 @@ import (
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
-	*BaseMiddleware
+	BaseMiddleware
 	sh SuccessHandler
 }
 
@@ -44,7 +44,6 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           requestIP(r),
-			Key:              "",
 			Reason:           string(stat),
 		})
 		return errors.New(string(stat)), 403

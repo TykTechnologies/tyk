@@ -23,13 +23,13 @@ import (
 type IdExtractor interface {
 	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
 	PostProcess(*http.Request, *SessionState, string)
-	GenerateSessionID(string, *BaseMiddleware) string
+	GenerateSessionID(string, BaseMiddleware) string
 }
 
 // BaseExtractor is the base structure for an ID extractor, it implements the IdExtractor interface. Other extractors may override some of its methods.
 type BaseExtractor struct {
 	Config  *apidef.MiddlewareIdExtractor
-	BaseMid *BaseMiddleware
+	BaseMid BaseMiddleware
 	Spec    *APISpec
 }
 
@@ -93,7 +93,7 @@ func (e *BaseExtractor) Error(r *http.Request, err error, message string) (retur
 }
 
 // GenerateSessionID is a helper for generating session IDs, it takes an input (usually the extractor output) and a middleware pointer.
-func (e *BaseExtractor) GenerateSessionID(input string, mw *BaseMiddleware) (sessionID string) {
+func (e *BaseExtractor) GenerateSessionID(input string, mw BaseMiddleware) (sessionID string) {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
 	sessionID = mw.Spec.OrgID + tokenID
@@ -301,7 +301,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 }
 
 // newExtractor is called from the CP middleware for every API that specifies extractor settings.
-func newExtractor(referenceSpec *APISpec, mw *BaseMiddleware) {
+func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {
 	var extractor IdExtractor
 
 	baseExtractor := BaseExtractor{&referenceSpec.CustomMiddleware.IdExtractor, mw, referenceSpec}

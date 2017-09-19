@@ -8,7 +8,7 @@ import (
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream
 type IPWhiteListMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (i *IPWhiteListMiddleware) Name() string {
@@ -21,11 +21,6 @@ func (i *IPWhiteListMiddleware) IsEnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	// Disabled, pass through
-	if !i.Spec.EnableIpWhiteListing {
-		return nil, 200
-	}
-
 	remoteIP := net.ParseIP(requestIP(r))
 
 	// Enabled, check incoming IP address
@@ -52,7 +47,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	// Fire Authfailed Event
 	AuthFailed(i, r, remoteIP.String())
 	// Report in health check
-	ReportHealthCheckValue(i.Spec.Health, KeyFailure, "-1")
+	reportHealthValue(i.Spec, KeyFailure, "-1")
 
 	// Not matched, fail
 	return errors.New("Access from this IP has been disallowed"), 403

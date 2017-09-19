@@ -15,14 +15,11 @@ import (
 
 const sampleDefiniton = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
 			"v1": {
@@ -44,14 +41,11 @@ const sampleDefiniton = `{
 
 const nonExpiringDef = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
 			"v1": {
@@ -73,14 +67,11 @@ const nonExpiringDef = `{
 
 const nonExpiringMultiDef = `{
 	"api_id": "1",
-	"org_id": "default",
 	"definition": {
 		"location": "header",
 		"key": "version"
 	},
-	"auth": {
-		"auth_header_name": "authorization"
-	},
+	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
 		"versions": {
 			"v1": {
@@ -315,7 +306,7 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	globalConf.SlaveOptions.RPCKey = "test_org"
 	globalConf.SlaveOptions.APIKey = "test"
 
-	server := gorpc.NewTCPServer(":0", dispatcher.NewHandlerFunc())
+	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
 	list := &customListener{}
 	server.Listener = list
 	server.LogError = gorpc.NilErrorLogger

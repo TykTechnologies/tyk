@@ -13,7 +13,7 @@ import (
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type Oauth2KeyExists struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (k *Oauth2KeyExists) Name() string {
@@ -57,7 +57,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// Fire Authfailed Event
 		AuthFailed(k, r, accessToken)
 		// Report in health check
-		ReportHealthCheckValue(k.Spec.Health, KeyFailure, "-1")
+		reportHealthValue(k.Spec, KeyFailure, "-1")
 
 		return errors.New("Key not authorised"), 403
 	}
