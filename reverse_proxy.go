@@ -123,7 +123,7 @@ func nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
 			}
-			if !GlobalHostChecker.IsHostDown(host) {
+			if !GlobalHostChecker.HostDown(host) {
 				return host, nil // we do care and it's up
 			}
 			// if the host is down, keep trying all the rest

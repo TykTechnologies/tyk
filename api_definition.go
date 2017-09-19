@@ -793,8 +793,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 	}
 }
 
-// IsURLAllowedAndIgnored checks if a url is allowed and ignored.
-func (a *APISpec) IsURLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+// URLAllowedAndIgnored checks if a url is allowed and ignored.
+func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	// Check if ignored
 	for _, v := range rxPaths {
 		if !v.Spec.MatchString(strings.ToLower(r.URL.Path)) {
@@ -936,10 +936,10 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	return ""
 }
 
-// IsThisAPIVersionExpired checks if an API version (during a proxied
+// VersionExpired checks if an API version (during a proxied
 // request) is expired. If it isn't and the configured time was valid,
 // it also returns the expiration time.
-func (a *APISpec) IsThisAPIVersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Time) {
+func (a *APISpec) VersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Time) {
 	// Never expires
 	if versionDef.Expires == "" || versionDef.Expires == "-1" {
 		return false, nil
@@ -957,10 +957,10 @@ func (a *APISpec) IsThisAPIVersionExpired(versionDef *apidef.VersionInfo) (bool,
 	return time.Since(t) >= 0, &t
 }
 
-// IsRequestValid will check if an incoming request has valid version
+// RequestValid will check if an incoming request has valid version
 // data and return a RequestStatus that describes the status of the
 // request
-func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
+func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
 	versionMetaData, versionPaths, whiteListStatus, stat := a.Version(r)
 
 	// Screwed up version info - fail and pass through
@@ -971,15 +971,15 @@ func (a *APISpec) IsRequestValid(r *http.Request) (bool, RequestStatus, interfac
 	// Is the API version expired?
 	// TODO: Don't abuse the interface{} return value for both
 	// *apidef.EndpointMethodMeta and *time.Time. Probably need to
-	// redesign or entirely remove IsRequestValid. See discussion on
+	// redesign or entirely remove RequestValid. See discussion on
 	// https://github.com/TykTechnologies/tyk/pull/776
-	expired, expTime := a.IsThisAPIVersionExpired(versionMetaData)
+	expired, expTime := a.VersionExpired(versionMetaData)
 	if expired {
 		return false, VersionExpired, nil
 	}
 
 	// not expired, let's check path info
-	requestStatus, meta := a.IsURLAllowedAndIgnored(r, versionPaths, whiteListStatus)
+	requestStatus, meta := a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 
 	switch requestStatus {
 	case EndPointNotAllowed:

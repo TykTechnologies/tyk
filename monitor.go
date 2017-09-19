@@ -8,7 +8,7 @@ import (
 
 type Monitor struct{}
 
-func (Monitor) IsMonitorEnabled() bool {
+func (Monitor) Enabled() bool {
 	return config.Global.Monitor.EnableTriggerMonitors
 }
 
@@ -28,7 +28,7 @@ func (Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64)
 }
 
 func (m Monitor) Check(sessionData *SessionState, key string) {
-	if !m.IsMonitorEnabled() || sessionData.QuotaMax == -1 {
+	if !m.Enabled() || sessionData.QuotaMax == -1 {
 		return
 	}
 

@@ -45,7 +45,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		return errors.New("Key is inactive, please renew"), 403
 	}
 
-	if !k.Spec.AuthManager.IsKeyExpired(session) {
+	if !k.Spec.AuthManager.KeyExpired(session) {
 		return nil, 200
 	}
 	log.WithFields(logrus.Fields{
