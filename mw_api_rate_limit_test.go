@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/justinas/alice"
-	"github.com/satori/go.uuid"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/justinas/alice"
+	"github.com/satori/go.uuid"
 )
 
 func createRLSession() *SessionState {

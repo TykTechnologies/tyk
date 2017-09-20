@@ -3,8 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/Sirupsen/logrus"
 	"net/http"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
