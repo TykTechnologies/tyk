@@ -113,7 +113,7 @@ func TestRLClosed(t *testing.T) {
 }
 
 const openRLDefSmall = `{
-	"api_id": "31",
+	"api_id": "313232",
 	"org_id": "default",
 	"auth": {"auth_header_name": "authorization"},
 	"use_keyless": true,
@@ -134,7 +134,7 @@ const openRLDefSmall = `{
 }`
 
 const closedRLDefSmall = `{
-	"api_id": "31",
+	"api_id": "31445455",
 	"org_id": "default",
 	"auth": {"auth_header_name": "authorization"},
 	"version_data": {
