@@ -110,6 +110,15 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"api_name": spec.Name,
 	}).Info("Loading API")
 
+	if len(spec.TagHeaders) > 0 {
+		// Ensure all headers marked for tagging are lowercase
+		lowerCaseHeaders := make(map[string]interface{})
+		for k, v := range spec.TagHeaders {
+			lowerCaseHeaders[strings.ToLower(k)] = v
+		}
+		spec.TagHeaders = lowerCaseHeaders
+	}
+
 	if skipSpecBecauseInvalid(spec) {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",

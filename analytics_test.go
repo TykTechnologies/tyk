@@ -103,23 +103,21 @@ func TestTagHeaders(t *testing.T) {
 		t.Fatalf("Wrong number of tags, got %v, wanted %v", len(existingTags), 5)
 	}
 
-	check := []string{
-		"x-tag-me-1",
-		"x-tag-me2-2",
-		"x-tag-me3-3",
+	check := map[string]bool{
+		"x-tag-me-1":  true,
+		"x-tag-me2-2": true,
+		"x-tag-me3-3": true,
 	}
 
-	found := 0
 	for _, t := range existingTags {
-		for _, c := range check {
-			if t == c {
-				found += 1
-			}
+		_, ok := check[t]
+		if ok {
+			delete(check, t)
 		}
 	}
 
-	if found != 3 {
-		t.Fatalf("Header values not proerly set, got: %v", existingTags)
+	if len(check) != 0 {
+		t.Fatalf("Header values not proerly set, got: %v, remnainder: %v", existingTags, check)
 	}
 
 }
