@@ -1,7 +1,8 @@
 # GRPC Proxy How To
 
 To make this easier, use the `tykio/bakery` container, it will generate a plugin file from your proto
-files without any additional steps.
+files without any additional steps except for annotating your proto files with the instructions for the proxy
+(see steps 2 & 3 below) and ensure that the proto file is available to the bakery.
 
 If you do not want to use the bakery, please use the following steps...
 
