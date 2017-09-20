@@ -117,7 +117,6 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 				return sessionFailRateLimit
 			}
 
-			//log.Info("Add is: ", DRLManager.CurrentTokenValue)
 			_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
 
 			if errF != nil {
