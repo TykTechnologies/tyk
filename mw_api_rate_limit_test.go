@@ -79,6 +79,9 @@ func TestRLOpen(t *testing.T) {
 			}
 		}
 	}
+
+	DRLManager.CurrentTokenValue = 0
+	DRLManager.RequestTokenValue = 0
 }
 
 func TestRLClosed(t *testing.T) {
@@ -111,6 +114,9 @@ func TestRLClosed(t *testing.T) {
 			}
 		}
 	}
+
+	DRLManager.CurrentTokenValue = 0
+	DRLManager.RequestTokenValue = 0
 }
 
 const openRLDefSmall = `{
