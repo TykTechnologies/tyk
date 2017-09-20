@@ -79,3 +79,47 @@ func TestURLReplacer(t *testing.T) {
 		t.Error(recordCust.Path)
 	}
 }
+
+func TestTagHeaders(t *testing.T) {
+	req := testReq(t, "GET", "/tagmeplease", nil)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tag-Me", "1")
+	req.Header.Set("X-Tag-Me2", "2")
+	req.Header.Set("X-Tag-Me3", "3")
+	req.Header.Set("X-Ignore-Me", "4")
+
+	existingTags := []string{"first", "second"}
+	existingTags = tagHeaders(req, map[string]interface{}{
+		"x-tag-me":  0,
+		"x-tag-me2": 0,
+		"x-tag-me3": 0},
+		existingTags)
+
+	if len(existingTags) == 2 {
+		t.Fatal("Existing tags have not been expanded")
+	}
+
+	if len(existingTags) != 5 {
+		t.Fatalf("Wrong number of tags, got %v, wanted %v", len(existingTags), 5)
+	}
+
+	check := []string{
+		"x-tag-me-1",
+		"x-tag-me2-2",
+		"x-tag-me3-3",
+	}
+
+	found := 0
+	for _, t := range existingTags {
+		for _, c := range check {
+			if t == c {
+				found += 1
+			}
+		}
+	}
+
+	if found != 3 {
+		t.Fatalf("Header values not proerly set, got: %v", existingTags)
+	}
+
+}
