@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"testing"
 	"time"
+	"github.com/satori/go.uuid"
 )
 
 func createRLSession() *SessionState {
@@ -20,7 +21,7 @@ func createRLSession() *SessionState {
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
-	session.AccessRights = map[string]AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
+	session.AccessRights = map[string]AccessDefinition{"31445455": {APIName: "Tyk Auth Key Test", APIID: "31445455", Versions: []string{"default"}}}
 	return session
 }
 
@@ -86,7 +87,7 @@ func TestRLClosed(t *testing.T) {
 	req := testReq(t, "GET", "/rl_closed_test/", nil)
 
 	session := createRLSession()
-	customToken := "54321111"
+	customToken := uuid.NewV4().String()
 	// AuthKey sessions are stored by {token}
 	spec.SessionManager.UpdateSession(customToken, session, 60)
 	req.Header.Set("authorization", "Bearer "+customToken)
