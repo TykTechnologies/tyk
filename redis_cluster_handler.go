@@ -540,7 +540,7 @@ func (r *RedisClusterStorageManager) RemoveFromSet(keyName, value string) {
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
-func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, value_override string) (int, []interface{}) {
+func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
 
 	log.Debug("Incrementing raw key: ", keyName)
 	r.ensureConnection()
@@ -571,61 +571,13 @@ func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64,
 	EXPIRE.Cmd = "EXPIRE"
 	EXPIRE.Args = []interface{}{keyName, per}
 
-	redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
-	if err != nil {
-		log.Error("Multi command failed: ", err)
-		return 0, nil
-	}
-
-	if len(redVal) < 2 {
-		log.Error("Multi command failed: return index is out of range")
-		return 0, nil
-	}
-
-	// Check actual value
-	if redVal[1] == nil {
-		return 0, nil
-	}
-
-	intVal := len(redVal[1].([]interface{}))
-
-	log.Debug("Returned: ", intVal)
-
-	return intVal, redVal[1].([]interface{})
-}
-
-func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, per int64, value_override string) (int, []interface{}) {
-
-	log.Debug("Incrementing raw key: ", keyName)
-	r.ensureConnection()
-	log.Debug("keyName is: ", keyName)
-	now := time.Now()
-	log.Debug("Now is:", now)
-	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
-	log.Debug("Then is: ", onePeriodAgo)
-
-	ZREMRANGEBYSCORE := rediscluster.ClusterTransaction{}
-	ZREMRANGEBYSCORE.Cmd = "ZREMRANGEBYSCORE"
-	ZREMRANGEBYSCORE.Args = []interface{}{keyName, "-inf", onePeriodAgo.UnixNano()}
-
-	ZRANGE := rediscluster.ClusterTransaction{}
-	ZRANGE.Cmd = "ZRANGE"
-	ZRANGE.Args = []interface{}{keyName, 0, -1}
-
-	ZADD := rediscluster.ClusterTransaction{}
-	ZADD.Cmd = "ZADD"
-
-	if value_override != "-1" {
-		ZADD.Args = []interface{}{keyName, now.UnixNano(), value_override}
+	var redVal []interface{}
+	var err error
+	if pipeline {
+		redVal, err = redis.Values(GetRelevantClusterReference(r.IsCache).DoPipeline([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
 	} else {
-		ZADD.Args = []interface{}{keyName, now.UnixNano(), strconv.Itoa(int(now.UnixNano()))}
+		redVal, err = redis.Values(GetRelevantClusterReference(r.IsCache).DoTransaction([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
 	}
-
-	EXPIRE := rediscluster.ClusterTransaction{}
-	EXPIRE.Cmd = "EXPIRE"
-	EXPIRE.Args = []interface{}{keyName, per}
-
-	redVal, err := redis.Values(GetRelevantClusterReference(r.IsCache).DoPipeline([]rediscluster.ClusterTransaction{ZREMRANGEBYSCORE, ZRANGE, ZADD, EXPIRE}))
 	if err != nil {
 		log.Error("Multi command failed: ", err)
 		return 0, nil
@@ -641,8 +593,8 @@ func (r *RedisClusterStorageManager) SetRollingWindowPipeline(keyName string, pe
 		return 0, nil
 	}
 
-	// All clear
 	intVal := len(redVal[1].([]interface{}))
+
 	log.Debug("Returned: ", intVal)
 
 	return intVal, redVal[1].([]interface{})

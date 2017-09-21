@@ -34,12 +34,8 @@ type SessionLimiter struct {
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
-	var ratePerPeriodNow int
-	if config.Global.EnableNonTransactionalRateLimiter {
-		ratePerPeriodNow, _ = store.SetRollingWindowPipeline(rateLimiterKey, int64(currentSession.Per), "-1")
-	} else {
-		ratePerPeriodNow, _ = store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), "-1")
-	}
+	pipeline := config.Global.EnableNonTransactionalRateLimiter
+	ratePerPeriodNow, _ := store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), "-1", pipeline)
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
 
