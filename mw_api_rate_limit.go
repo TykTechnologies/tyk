@@ -44,7 +44,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 	}).Info("API rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventRateLimitExceededMeta{
+	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "API Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           requestIP(r),

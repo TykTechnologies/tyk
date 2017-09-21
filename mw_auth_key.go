@@ -117,7 +117,7 @@ func stripBearer(token string) string {
 }
 
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
-	m.Base().FireEvent(EventAuthFailure, EventAuthFailureMeta{
+	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           requestIP(r),

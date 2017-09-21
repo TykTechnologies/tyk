@@ -86,7 +86,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		}).Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
-		k.FireEvent(EventOrgQuotaExceeded, EventQuotaExceededMeta{
+		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           requestIP(r),
@@ -178,7 +178,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 		}).Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
-		k.FireEvent(EventOrgQuotaExceeded, EventQuotaExceededMeta{
+		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           requestIP(r),

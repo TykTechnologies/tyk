@@ -121,7 +121,7 @@ func TestGet(t *testing.T) {
 
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
-		Meta: EventAuthFailureMeta{
+		Meta: EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
 			Path:             "/banana",
 			Origin:           "tyk.io",
@@ -155,7 +155,7 @@ func TestPost(t *testing.T) {
 
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
-		Meta: EventAuthFailureMeta{
+		Meta: EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
 			Path:             "/banana",
 			Origin:           "tyk.io",
