@@ -153,12 +153,7 @@ func (l *LDAPStorageHandler) notifyReadOnly() bool {
 	return false
 }
 
-func (l *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, val string) (int, []interface{}) {
-	log.Warning("Not Implemented!")
-	return 0, nil
-}
-
-func (l *LDAPStorageHandler) SetRollingWindowPipeline(keyName string, per int64, val string) (int, []interface{}) {
+func (l *LDAPStorageHandler) SetRollingWindow(keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
 	log.Warning("Not Implemented!")
 	return 0, nil
 }
