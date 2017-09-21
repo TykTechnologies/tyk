@@ -49,7 +49,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	baseMid := BaseMiddleware{spec, proxy}
 
-	meta := EventAuthFailureMeta{
+	meta := EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
 		Path:             "/",
 		Origin:           "127.0.0.1",

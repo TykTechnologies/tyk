@@ -34,7 +34,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 	}).Info("Key rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventRateLimitExceededMeta{
+	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           requestIP(r),
@@ -55,7 +55,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	}).Info("Key quota limit exceeded.")
 
 	// Fire a quota exceeded event
-	k.FireEvent(EventQuotaExceeded, EventQuotaExceededMeta{
+	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           requestIP(r),

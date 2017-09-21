@@ -46,24 +46,9 @@ type EventHostStatusMeta struct {
 	HostInfo HostHealthReport
 }
 
-// EventQuotaExceededMeta is the metadata structure for a quota exceeded event (EventQuotaExceeded)
-type EventQuotaExceededMeta struct {
-	EventMetaDefault
-	Path   string
-	Origin string
-	Key    string
-}
-
-// EventRateLimitExceededMeta is the metadata structure for a rate limit exceeded event (EventRateLimitExceeded)
-type EventRateLimitExceededMeta struct {
-	EventMetaDefault
-	Path   string
-	Origin string
-	Key    string
-}
-
-// EventAuthFailureMeta is the metadata structure for an auth failure (EventAuthFailure)
-type EventAuthFailureMeta struct {
+// EventKeyFailureMeta is the metadata structure for any failure related
+// to a key, such as quota or auth failures.
+type EventKeyFailureMeta struct {
 	EventMetaDefault
 	Path   string
 	Origin string
@@ -78,14 +63,6 @@ type EventCurcuitBreakerMeta struct {
 	CircuitEvent circuit.BreakerEvent
 }
 
-// EventKeyExpiredMeta is the metadata structure for an auth failure (EventKeyExpired)
-type EventKeyExpiredMeta struct {
-	EventMetaDefault
-	Path   string
-	Origin string
-	Key    string
-}
-
 // EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
 type EventVersionFailureMeta struct {
 	EventMetaDefault
@@ -95,7 +72,6 @@ type EventVersionFailureMeta struct {
 	Reason string
 }
 
-// EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
 type EventTriggerExceededMeta struct {
 	EventMetaDefault
 	Org          string
@@ -103,7 +79,6 @@ type EventTriggerExceededMeta struct {
 	TriggerLimit int64
 }
 
-// EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
 type EventTokenMeta struct {
 	EventMetaDefault
 	Org string
@@ -195,7 +170,7 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 
 	// We can handle specific event types easily
 	if em.Type == EventQuotaExceeded {
-		msgConf := em.Meta.(EventQuotaExceededMeta)
+		msgConf := em.Meta.(EventKeyFailureMeta)
 		formattedMsgString = fmt.Sprintf("%s:%s:%s:%s", formattedMsgString, msgConf.Key, msgConf.Origin, msgConf.Path)
 	}
 
