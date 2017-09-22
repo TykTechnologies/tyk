@@ -129,6 +129,7 @@ type StringRegexMap struct {
 type RoutingTriggerOptions struct {
 	HeaderMatches   map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
 	QueryValMatches map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
+	PathPartMatches map[string]StringRegexMap `bson:"path_part_matches" json:"path_part_matches"`
 	PayloadMatches  StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
 }
 

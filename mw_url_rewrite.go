@@ -68,6 +68,17 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 				}
 			}
 
+			// Check path parts
+			if len(triggerOpts.Options.PathPartMatches) > 0 {
+				if checkPathParts(r, triggerOpts.Options.PathPartMatches, checkAny, tn) {
+					setCount += 1
+					if checkAny {
+						rewriteToPath = triggerOpts.RewriteTo
+						break
+					}
+				}
+			}
+
 			// Check payload
 			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
 				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
@@ -86,6 +97,9 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 					total += 1
 				}
 				if len(triggerOpts.Options.QueryValMatches) > 0 {
+					total += 1
+				}
+				if len(triggerOpts.Options.PathPartMatches) > 0 {
 					total += 1
 				}
 				if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
@@ -129,7 +143,7 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 
 	contextData := ctxGetData(r)
 
-	dollarMatch := regexp.MustCompile(`\$tyk_context.(.+)`)
+	dollarMatch := regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
 	replace_slice := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 	for _, v := range replace_slice {
 		contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
@@ -285,7 +299,7 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 			return true
 		}
 
-		return len(options) == fCount
+		return len(options) <= fCount
 	}
 
 	return false
@@ -315,7 +329,35 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 			return true
 		}
 
-		return len(options) == fCount
+		return len(options) <= fCount
+	}
+
+	return false
+}
+
+func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
+	contextData := ctxGetData(r)
+	fCount := 0
+	for mv, mr := range options {
+		pathParts := strings.Split(r.URL.Path, "/")
+
+		for _, part := range pathParts {
+			b := mr.Check(part)
+			if len(b) > 0 {
+				kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, fCount)
+				contextData[kn] = b
+				fCount++
+			}
+		}
+	}
+
+	if fCount > 0 {
+		ctxSetData(r, contextData)
+		if any {
+			return true
+		}
+
+		return len(options) <= fCount
 	}
 
 	return false

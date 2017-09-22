@@ -414,6 +414,52 @@ func TestRewriterTriggers(t *testing.T) {
 				r,
 			}
 		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
+			hOpt.Init()
+
+			return TestDef{
+				"PathPart Single",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/foo",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite/foo", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
+			hOpt.Init()
+
+			return TestDef{
+				"PathPart MoreParts",
+				"/test/foo/rewrite/foo", "/change/to/me/ignore",
+				"/test/foo/rewrite/foo", "/change/to/me/foo/biz/foo",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0/biz/$tyk_context.trigger-0-pathpart-1",
+					},
+				},
+				r,
+			}
+		},
 	}
 	for _, tf := range tests {
 		tc := tf()
