@@ -112,9 +112,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
-		lowerCaseHeaders := make(map[string]interface{})
-		for k, v := range spec.TagHeaders {
-			lowerCaseHeaders[strings.ToLower(k)] = v
+		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
+		for i, k := range spec.TagHeaders {
+			lowerCaseHeaders[i] = strings.ToLower(k)
+
 		}
 		spec.TagHeaders = lowerCaseHeaders
 	}

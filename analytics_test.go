@@ -89,10 +89,10 @@ func TestTagHeaders(t *testing.T) {
 	req.Header.Set("X-Ignore-Me", "4")
 
 	existingTags := []string{"first", "second"}
-	existingTags = tagHeaders(req, map[string]interface{}{
-		"x-tag-me":  0,
-		"x-tag-me2": 0,
-		"x-tag-me3": 0},
+	existingTags = tagHeaders(req, []string{
+		"x-tag-me",
+		"x-tag-me2",
+		"x-tag-me3"},
 		existingTags)
 
 	if len(existingTags) == 2 {

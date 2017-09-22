@@ -45,10 +45,17 @@ type SuccessHandler struct {
 	BaseMiddleware
 }
 
-func tagHeaders(r *http.Request, th map[string]interface{}, tags []string) []string {
+func tagHeaders(r *http.Request, th []string, tags []string) []string {
 	for k, v := range r.Header {
 		cleanK := strings.ToLower(k)
-		_, ok := th[cleanK]
+		ok := false
+		for _, hname := range th {
+			if hname == cleanK {
+				ok = true
+				break
+			}
+		}
+
 		if ok {
 			for _, val := range v {
 				tagName := fmt.Sprintf("%s-%s", cleanK, val)
