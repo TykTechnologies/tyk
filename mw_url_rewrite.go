@@ -79,6 +79,20 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 				}
 			}
 
+			// Check session meta
+
+			if session := ctxGetSession(r); session != nil {
+				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
+					if checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
+						setCount += 1
+						if checkAny {
+							rewriteToPath = triggerOpts.RewriteTo
+							break
+						}
+					}
+				}
+			}
+
 			// Check payload
 			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
 				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
@@ -347,6 +361,36 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 				kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, fCount)
 				contextData[kn] = b
 				fCount++
+			}
+		}
+	}
+
+	if fCount > 0 {
+		ctxSetData(r, contextData)
+		if any {
+			return true
+		}
+
+		return len(options) <= fCount
+	}
+
+	return false
+}
+
+func checkSessionTrigger(r *http.Request, sess *SessionState, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
+	contextData := ctxGetData(r)
+	fCount := 0
+	for mh, mr := range options {
+		rawVal, ok := sess.MetaData[mh]
+		if ok {
+			val, valOk := rawVal.(string)
+			if valOk {
+				b := mr.Check(val)
+				if len(b) > 0 {
+					kn := fmt.Sprintf("trigger-%d-%s", triggernum, mh)
+					contextData[kn] = b
+					fCount++
+				}
 			}
 		}
 	}

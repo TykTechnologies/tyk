@@ -460,6 +460,29 @@ func TestRewriterTriggers(t *testing.T) {
 				r,
 			}
 		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt.Init()
+
+			return TestDef{
+				"Meta Simple",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/bar",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							SessionMetaMatches: map[string]apidef.StringRegexMap{
+								"rewrite": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-rewrite",
+					},
+				},
+				r,
+			}
+		},
 	}
 	for _, tf := range tests {
 		tc := tf()
@@ -469,6 +492,13 @@ func TestRewriterTriggers(t *testing.T) {
 				RewriteTo:    tc.to,
 				Triggers:     tc.triggerConf,
 			}
+
+			ctxSetSession(tc.req, &SessionState{
+				MetaData: map[string]interface{}{
+					"rewrite": "bar",
+				},
+			})
+
 			got, err := urlRewrite(&testConf, tc.req)
 			if err != nil {
 				t.Error("compile failed:", err)
