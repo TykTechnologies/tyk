@@ -49,8 +49,7 @@ type GeoData struct {
 	} `maxminddb:"country"`
 
 	City struct {
-		GeoNameID uint              `maxminddb:"geoname_id"`
-		Names     map[string]string `maxminddb:"names"`
+		Names map[string]string `maxminddb:"names"`
 	} `maxminddb:"city"`
 
 	Location struct {
