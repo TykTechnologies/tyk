@@ -219,10 +219,12 @@
 			"versionExact": "v1.3.0"
 		},
 		{
-			"checksumSHA1": "ypvLaN7/mVm3i/KN72AzXygyqkk=",
+			"checksumSHA1": "tWYZ1bTwy01ZNk6WGmU3FPPqJWo=",
 			"path": "github.com/klyr/go-jq",
-			"revision": "6f915c7d523de62d2dbec8099795eb50ebe4f7ed",
-			"revisionTime": "2017-07-27T14:43:42Z"
+			"revision": "ab8e1ef60a97c2d2cb3d01a3d00a8e5550235074",
+			"revisionTime": "2017-07-27T14:43:42Z",
+			"version": "check-compile-error",
+			"versionExact": "check-compile-error"
 		},
 		{
 			"checksumSHA1": "Zgi7LCXXiFQYL84rwInvfJHEOQM=",

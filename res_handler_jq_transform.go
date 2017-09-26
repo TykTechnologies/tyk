@@ -44,20 +44,17 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 
 	t := meta.(*TransformJQSpec)
 
-	reqContextJson, _ := json.Marshal(ctxGetData(req))
+	var bodyObj map[string]interface{}
+	if err := json.Unmarshal(body, &bodyObj); err != nil {
+		return err
+	}
+	jqObj := map[string]interface{}{
+		"body":       bodyObj,
+		"reqContext": ctxGetData(req),
+		"resHeaders": res.Header,
+	}
 
-	resHeadersJson, _ := json.Marshal(res.Header)
-
-	bodyBuffer := bytes.NewBufferString("[")
-	bodyBuffer.Write(reqContextJson)
-	bodyBuffer.WriteString(",")
-	bodyBuffer.Write(resHeadersJson)
-	bodyBuffer.WriteString(",")
-	bodyBuffer.Write(body)
-	bodyBuffer.WriteString("]")
-
-	err = t.JQFilter.HandleJson(string(bodyBuffer.String()))
-	if err != nil {
+	if err = t.JQFilter.Handle(jqObj); err != nil {
 		return errors.New("Response returned by upstream server is not a valid JSON")
 	}
 
@@ -87,8 +84,6 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		for hName, hValue := range opts.OutputHeaders {
 			res.Header.Set(hName, hValue)
 		}
-	} else {
-		return errors.New("Options for jq transformation were specified, but are invalid")
 	}
 
 	return nil
