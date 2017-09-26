@@ -26,8 +26,13 @@ func NewJQ(program string) (*JQ, error) {
 	return jq, nil
 }
 
-func (jq *JQ) Handle(value interface{}) {
-	jq.start(goToJv(value))
+func (jq *JQ) Handle(value interface{}) error {
+	jv := goToJv(value)
+	if C.jv_is_valid(jv) == 0 {
+		return errors.New("Invalid JSON")
+	}
+	jq.start(jv)
+	return nil
 }
 
 func (jq *JQ) HandleJson(text string) error {

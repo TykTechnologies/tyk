@@ -60,29 +60,25 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		return err
 	}
 
-	var contextJson []byte
-	if contextVars {
-		contextJson, _ = json.Marshal(ctxGetData(r))
-	} else {
-		contextJson = []byte("{}")
+	var bodyObj map[string]interface{}
+	if err := json.Unmarshal(body, &bodyObj); err != nil {
+		return err
 	}
 
-	bodyBuffer := bytes.NewBufferString("[")
-	bodyBuffer.Write(contextJson)
-	bodyBuffer.WriteString(",")
-	bodyBuffer.Write(body)
-	bodyBuffer.WriteString("]")
+	jqObj := map[string]interface{}{
+		"body":       bodyObj,
+		"reqContext": ctxGetData(r),
+	}
 
-	err = t.JQFilter.HandleJson(bodyBuffer.String())
-	if err != nil {
-		return errors.New("Input is not a valid JSON")
+	if err = t.JQFilter.Handle(jqObj); err != nil {
+		return err
 	}
 
 	// First element is the transformed body
 	if t.JQFilter.Next() {
 		transformed, _ := json.Marshal(t.JQFilter.Value())
 
-		bodyBuffer := bytes.NewBuffer(transformed)
+		var bodyBuffer = bytes.NewBuffer(transformed)
 		r.Body = ioutil.NopCloser(bodyBuffer)
 		r.ContentLength = int64(bodyBuffer.Len())
 	} else {
@@ -92,7 +88,7 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 	// Second optional element is an object like:
 	// { "output_headers": {"header_name": "header_value", ...},
 	//   "outputs_vars":   {"var_name_1": "var_value_1", ...}
-	//}
+	// }
 	if t.JQFilter.Next() {
 		options := t.JQFilter.Value()
 
@@ -110,13 +106,10 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		// Set variables in context vars
 		contextDataObject := ctxGetData(r)
 		for k, v := range opts.OutputVars {
-			contextDataObject["jq_output_var_" + k] = v
+			contextDataObject["jq_output_var_"+k] = v
 		}
 
 		ctxSetData(r, contextDataObject)
-	} else {
-		return errors.New("Options for jq transformation were specified, but are invalid")
 	}
-
 	return nil
 }

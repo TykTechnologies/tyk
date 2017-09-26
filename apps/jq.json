@@ -25,16 +25,24 @@
                     "transform_jq": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ". as [$context, $body] | $body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: $context.path, user_agent: $context.headers_User_Agent}, . as [$context, $body] | {\"output_headers\": {\"X-M2M-Origin\": \"CSE3219/C9886\", \"DEVICE\": $body.DEVICEID}}"
+                        "filter": ".body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: .reqContext.path, user_agent: .reqContext.headers_User_Agent}, {\"output_vars\": {\"m2m_origin\": \"CSE3219/C9886\", \"deviceid\": .body.DEVICEID}}"
                     }],
-                    "transform_jq_response": [{
+		    "transform_headers": [
+			{
+			    "path": "/post",
+			    "method": "POST",
+			    "add_headers": {"X-added-by-transform_headers": "$tyk_context.jq_output_var_deviceid",
+					    "X-M2M-Origin": "$tyk_context.jq_output_var_m2m_origin"}
+			}
+		    ],
+		    "transform_jq_response": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ". as [$reqContext, $resHeaders, $body] | $body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": $resHeaders}, . as [$context, $resHeaders, $body] | {\"output_headers\": {\"JQ-Response-header\": $body.origin}}"
-                    }]
-                }
+                        "filter": ".body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": .resHeaders}, {\"output_headers\": {\"JQ-Response-header\": .body.origin}}"
+		    }]
+		}
             }
-        }
+	}
     },
     "proxy": {
         "listen_path": "/jq/",
@@ -44,9 +52,6 @@
     "do_not_track": true,
 
     "response_processors": [
-        {
-            "name": "response_body_transform_jq",
-            "options": {}
-        }
+        { "name": "response_body_transform_jq", "options": {}}
     ]
 }
