@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
+	"text/template"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -130,5 +132,101 @@ func TestRequestIP(t *testing.T) {
 			t.Errorf("requestIP({%q, %q, %q}) got %q, want %q",
 				tc.remote, tc.real, tc.forwarded, got, tc.want)
 		}
+	}
+}
+
+func TestCheckHeaderInRemoveList(t *testing.T) {
+	type TestSpec struct {
+		UseExtendedPaths      bool
+		GlobalHeadersRemove   []string
+		ExtendedDeleteHeaders []string
+	}
+	tpl, err := template.New("test_tpl").Parse(`{
+		"api_id": "1",
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"Default": {
+					"name": "Default",
+					"use_extended_paths": {{ .UseExtendedPaths }},
+					"global_headers_remove": [{{ range $index, $hdr := .GlobalHeadersRemove }}{{if $index}}, {{end}}{{print "\"" . "\"" }}{{end}}],
+					"extended_paths": {
+						"transform_headers": [{
+							"delete_headers": [{{range $index, $hdr := .ExtendedDeleteHeaders}}{{if $index}}, {{end}}{{print "\"" . "\""}}{{end}}],
+							"path": "test",
+							"method": "GET"
+						}]
+					}
+				}
+			}
+		}
+	}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		header   string
+		spec     TestSpec
+		expected bool
+	}{
+		{
+			header: "X-Forwarded-For",
+		},
+		{
+			header: "X-Forwarded-For",
+			spec:   TestSpec{GlobalHeadersRemove: []string{"X-Random-Header"}},
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: TestSpec{
+				UseExtendedPaths:      true,
+				ExtendedDeleteHeaders: []string{"X-Random-Header"},
+			},
+		},
+		{
+			header:   "X-Forwarded-For",
+			spec:     TestSpec{GlobalHeadersRemove: []string{"X-Forwarded-For"}},
+			expected: true,
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: TestSpec{
+				UseExtendedPaths:      true,
+				GlobalHeadersRemove:   []string{"X-Random-Header"},
+				ExtendedDeleteHeaders: []string{"X-Forwarded-For"},
+			},
+			expected: true,
+		},
+		{
+			header: "X-Forwarded-For",
+			spec: TestSpec{
+				UseExtendedPaths:      true,
+				GlobalHeadersRemove:   []string{"X-Forwarded-For"},
+				ExtendedDeleteHeaders: []string{"X-Forwarded-For"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s:%t", tc.header, tc.expected), func(t *testing.T) {
+			rp := &ReverseProxy{}
+			r, err := http.NewRequest("GET", "http://test/test", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var specOutput bytes.Buffer
+			if err := tpl.Execute(&specOutput, tc.spec); err != nil {
+				t.Fatal(err)
+			}
+
+			spec := createSpecTest(t, specOutput.String())
+			actual := rp.CheckHeaderInRemoveList(tc.header, spec, r)
+			if actual != tc.expected {
+				t.Fatalf("want %t, got %t", tc.expected, actual)
+			}
+		})
 	}
 }

@@ -372,6 +372,27 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 	return false, config.Global.ProxyDefaultTimeout
 }
 
+func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
+	vInfo, versionPaths, _, _ := spec.Version(req)
+	for _, gdKey := range vInfo.GlobalHeadersRemove {
+		if strings.ToLower(gdKey) == strings.ToLower(hdr) {
+			return true
+		}
+	}
+
+	// Check path config
+	if found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjected); found {
+		hmeta := meta.(*apidef.HeaderInjectionMeta)
+		for _, gdKey := range hmeta.DeleteHeaders {
+			if strings.ToLower(gdKey) == strings.ToLower(hdr) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Request) (bool, *ExtendedCircuitBreakerMeta) {
 	if !spec.CircuitBreakerEnabled {
 		return false, nil
@@ -488,7 +509,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	addrs := requestIPHops(req)
-	outreq.Header.Set("X-Forwarded-For", addrs)
+	if !p.CheckHeaderInRemoveList("X-Forwarded-For", p.TykAPISpec, req) {
+		outreq.Header.Set("X-Forwarded-For", addrs)
+	}
 
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
