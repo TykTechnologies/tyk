@@ -80,8 +80,13 @@ func (h *HTTPDashboardHandler) Register() error {
 
 	c := &http.Client{Timeout: 5 * time.Second}
 	resp, err := c.Do(req)
-	if err != nil || resp.StatusCode != 200 {
-		log.Errorf("Request failed with code %d and error %v; retrying in 5s", resp.StatusCode, err)
+
+	if err != nil {
+		log.Errorf("Request failed with error %v; retrying in 5s", err)
+		time.Sleep(time.Second * 5)
+		return h.Register()
+	} else if resp != nil && resp.StatusCode != 200 {
+		log.Errorf("Response failed with code %d; retrying in 5s", resp.StatusCode)
 		time.Sleep(time.Second * 5)
 		return h.Register()
 	}
