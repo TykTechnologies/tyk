@@ -29,7 +29,7 @@ func (h *ResponseTransformJQMiddleware) Init(c interface{}, spec *APISpec) error
 }
 
 func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
-	_, versionPaths, _, _ := h.Spec.GetVersionData(req)
+	_, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedJQResponse)
 	if !found {
 		return nil
