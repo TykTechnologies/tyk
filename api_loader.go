@@ -310,6 +310,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
 		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
