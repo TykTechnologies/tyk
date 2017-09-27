@@ -226,7 +226,7 @@ func getAPISpecs() []*APISpec {
 }
 
 func getPolicies() {
-	pols := make(map[string]Policy)
+	var pols map[string]Policy
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")

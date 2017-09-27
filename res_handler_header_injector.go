@@ -20,10 +20,7 @@ type HeaderInjector struct {
 
 func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
 	h.Spec = spec
-	if err := mapstructure.Decode(c, &h.config); err != nil {
-		return err
-	}
-	return nil
+	return mapstructure.Decode(c, &h.config)
 }
 
 func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
