@@ -32,7 +32,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		}).Info("Attempted access from inactive key.")
 
 		// Fire a key expired event
-		k.FireEvent(EventKeyExpired, EventKeyExpiredMeta{
+		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           requestIP(r),

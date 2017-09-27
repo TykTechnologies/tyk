@@ -29,8 +29,7 @@ type StorageHandler interface {
 	DeleteKeys([]string) bool
 	Decrement(string)
 	IncrememntWithExpire(string, int64) int64
-	SetRollingWindow(string, int64, string) (int, []interface{})
-	SetRollingWindowPipeline(string, int64, string) (int, []interface{})
+	SetRollingWindow(key string, per int64, val string, pipeline bool) (int, []interface{})
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	AppendToSet(string, string)
