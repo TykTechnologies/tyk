@@ -586,11 +586,6 @@ func (d *Schema) parseSchema(documentNode interface{}, currentSchema *subSchema)
 		formatString, ok := m[KEY_FORMAT].(string)
 		if ok && FormatCheckers.Has(formatString) {
 			currentSchema.format = formatString
-		} else {
-			return errors.New(formatErrorDescription(
-				Locale.MustBeValidFormat(),
-				ErrorDetails{"key": KEY_FORMAT, "given": m[KEY_FORMAT]},
-			))
 		}
 	}
 
