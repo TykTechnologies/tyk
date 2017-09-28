@@ -551,18 +551,28 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 
 	chainChannel := make(chan *ChainObject)
 
-	// Create a new handler for each API spec
-	loadList := make([]*ChainObject, len(specs))
-	apisByListen := countApisByListenHash(specs)
-	for i, spec := range specs {
+	// Remove inactive APIs from the specs
+	i := 0 // output index
+	for _, spec := range specs {
 		if !spec.Active {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 				"domain":   spec.Domain,
 			}).Info("Skipping Inactive.")
+
 			continue
 		}
+		// copy & increment index
+		specs[i] = spec
+		i++
+	}
+	specs = specs[:i]
+
+	// Create a new handler for each API spec
+	loadList := make([]*ChainObject, len(specs))
+	apisByListen := countApisByListenHash(specs)
+	for i, spec := range specs {
 
 		go func(spec *APISpec, i int) {
 			subrouter := muxer
