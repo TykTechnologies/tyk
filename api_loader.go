@@ -555,6 +555,15 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	loadList := make([]*ChainObject, len(specs))
 	apisByListen := countApisByListenHash(specs)
 	for i, spec := range specs {
+		if !spec.Active {
+			log.WithFields(logrus.Fields{
+				"prefix":   "main",
+				"api_name": spec.Name,
+				"domain":   spec.Domain,
+			}).Info("Skipping Inactive.")
+			continue
+		}
+
 		go func(spec *APISpec, i int) {
 			subrouter := muxer
 			// Handle custom domains
