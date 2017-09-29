@@ -48,11 +48,11 @@ All the documentation can be found at http://tyk.io/docs/.
 
 ### License
 
-Tyk is released under the MPL v2.0; please see [LICENSE.md] for a full version of the license.
+Tyk is released under the MPL v2.0; please see [LICENSE.md](LICENSE.md) for a full version of the license.
 
 ### Contributing
 
-For more information about contributing PRs and issues, see [CONTRIBUTING.md].
+For more information about contributing PRs and issues, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Roadmap
 
