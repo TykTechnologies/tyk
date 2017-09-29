@@ -8,12 +8,11 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
 )
 
 type ChainObject struct {
@@ -40,6 +39,16 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 }
 
 func filterSpec(spec *APISpec) bool {
+
+	// Remove inactive APIs from the specs
+	if !spec.Active {
+		log.WithFields(logrus.Fields{
+			"prefix":   "main",
+			"api_name": spec.Name,
+			"domain":   spec.Domain,
+		}).Info("Skipping Inactive.")
+		return true
+	}
 
 	if spec.Proxy.ListenPath == "" {
 		log.WithFields(logrus.Fields{
@@ -550,24 +559,6 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	})
 
 	chainChannel := make(chan *ChainObject)
-
-	// Remove inactive APIs from the specs
-	i := 0 // output index
-	for _, spec := range specs {
-		if !spec.Active {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-				"domain":   spec.Domain,
-			}).Info("Skipping Inactive.")
-
-			continue
-		}
-		// copy & increment index
-		specs[i] = spec
-		i++
-	}
-	specs = specs[:i]
 
 	// Create a new handler for each API spec
 	loadList := make([]*ChainObject, len(specs))
