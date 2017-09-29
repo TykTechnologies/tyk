@@ -889,7 +889,8 @@ const sampleAPI = `{
 	"proxy": {
 		"listen_path": "/sample",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 func TestListener(t *testing.T) {
@@ -966,7 +967,8 @@ const apiWithTykListenPathPrefix = `{
 	"proxy": {
 		"listen_path": "/tyk-foo/",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 func TestListenPathTykPrefix(t *testing.T) {

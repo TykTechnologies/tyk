@@ -38,7 +38,8 @@ const sampleDefiniton = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 const nonExpiringDef = `{
@@ -64,7 +65,8 @@ const nonExpiringDef = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 const nonExpiringMultiDef = `{
@@ -98,7 +100,8 @@ const nonExpiringMultiDef = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 func createDefinitionFromString(defStr string) *APISpec {
