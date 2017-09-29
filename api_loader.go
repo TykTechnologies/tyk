@@ -39,7 +39,7 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
-func filterSpec(spec *APISpec) bool {
+func skipSpec(spec *APISpec) bool {
 
 	// Remove inactive APIs from the specs
 	if !spec.Active {
@@ -119,7 +119,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"api_name": spec.Name,
 	}).Info("Loading API")
 
-	if filterSpec(spec) {
+	if skipSpec(spec) {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": spec.Name,
