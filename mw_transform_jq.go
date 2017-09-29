@@ -60,7 +60,7 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		return err
 	}
 
-	var bodyObj map[string]interface{}
+	var bodyObj interface{}
 	if err := json.Unmarshal(body, &bodyObj); err != nil {
 		return err
 	}

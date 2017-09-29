@@ -44,7 +44,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 
 	t := meta.(*TransformJQSpec)
 
-	var bodyObj map[string]interface{}
+	var bodyObj interface{}
 	if err := json.Unmarshal(body, &bodyObj); err != nil {
 		return err
 	}
