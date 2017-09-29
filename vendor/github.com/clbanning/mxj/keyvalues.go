@@ -42,6 +42,7 @@ func SetArraySize(size int) int {
 //             - The subkey can be wildcarded - "key:*" - to require that it's there with some value.
 //             - If a subkey is preceeded with the '!' character, the key:value[:type] entry is treated as an
 //               exclusion critera - e.g., "!author:William T. Gaddis".
+//             - If val contains ":" symbol, use SetFieldSeparator to a unused symbol, perhaps "|".
 func (mv Map) ValuesForKey(key string, subkeys ...string) ([]interface{}, error) {
 	m := map[string]interface{}(mv)
 	var subKeyMap map[string]interface{}
@@ -151,6 +152,7 @@ func hasKey(iv interface{}, key string, ret *[]interface{}, cnt *int, subkeys ma
 //             - The subkey can be wildcarded - "key:*" - to require that it's there with some value.
 //             - If a subkey is preceeded with the '!' character, the key:value[:type] entry is treated as an
 //               exclusion critera - e.g., "!author:William T. Gaddis".
+//             - If val contains ":" symbol, use SetFieldSeparator to a unused symbol, perhaps "|".
 func (mv Map) ValuesForPath(path string, subkeys ...string) ([]interface{}, error) {
 	// If there are no array indexes in path, use legacy ValuesForPath() logic.
 	if strings.Index(path, "[") < 0 {
@@ -499,12 +501,12 @@ func getSubKeyMap(kv ...string) (map[string]interface{}, error) {
 	}
 	m := make(map[string]interface{}, 0)
 	for _, v := range kv {
-		vv := strings.Split(v, ":")
+		vv := strings.Split(v, fieldSep)
 		switch len(vv) {
 		case 2:
 			m[vv[0]] = interface{}(vv[1])
 		case 3:
-			switch vv[3] {
+			switch vv[2] {
 			case "string", "char", "text":
 				m[vv[0]] = interface{}(vv[1])
 			case "bool", "boolean":
@@ -593,13 +595,14 @@ func hasKeyPath(crumbs string, iv interface{}, key string, basket map[string]boo
 	case map[string]interface{}:
 		vv := iv.(map[string]interface{})
 		if _, ok := vv[key]; ok {
+			// create a new breadcrumb, intialized with the one we have
+			var nbc string
 			if crumbs == "" {
-				crumbs = key
+				nbc = key
 			} else {
-				crumbs += "." + key
+				nbc = crumbs + "." + key
 			}
-			// *basket = append(*basket, crumb)
-			basket[crumbs] = true
+			basket[nbc] = true
 		}
 		// walk on down the path, key could occur again at deeper node
 		for k, v := range vv {
