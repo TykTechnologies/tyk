@@ -39,7 +39,7 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
-func skipSpecBecauseInvalid(spec *APISpec) bool {
+func filterSpec(spec *APISpec) bool {
 
 	if spec.Proxy.ListenPath == "" {
 		log.WithFields(logrus.Fields{
@@ -109,7 +109,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"api_name": spec.Name,
 	}).Info("Loading API")
 
-	if skipSpecBecauseInvalid(spec) {
+	if filterSpec(spec) {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": spec.Name,
