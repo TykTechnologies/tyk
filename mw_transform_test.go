@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/ioutil"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -29,5 +30,18 @@ func TestTransformNonAscii(t *testing.T) {
 	}
 	if got := string(gotBs); got != want {
 		t.Fatalf("wanted body %q, got %q", want, got)
+	}
+}
+
+func TestTransformXMLCrash(t *testing.T) {
+	// mxj.NewMapXmlReader used to take forever and crash the
+	// process by eating up all the memory.
+	in := strings.NewReader("")
+	r := testReq(t, "GET", "/", in)
+	tmeta := &TransformSpec{}
+	tmeta.TemplateData.Input = apidef.RequestXML
+	tmeta.Template = template.Must(template.New("blob").Parse(""))
+	if err := transformBody(r, tmeta, false); err == nil {
+		t.Fatalf("wanted error, got nil")
 	}
 }

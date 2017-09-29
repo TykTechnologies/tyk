@@ -24,7 +24,7 @@ import (
 // ------------------- NewMapXml & NewMapXmlReader ... -------------------------
 
 // If XmlCharsetReader != nil, it will be used to decode the XML, if required.
-// Note: if CustomDeocder != nil, then XmlCharsetReader is ignored;
+// Note: if CustomDecoder != nil, then XmlCharsetReader is ignored;
 // set the CustomDecoder attribute instead.
 //   import (
 //	     charset "code.google.com/p/go-charset/charset"
@@ -54,6 +54,7 @@ var XmlCharsetReader func(charset string, input io.Reader) (io.Reader, error)
 //	   1. The 'xmlVal' will be parsed looking for an xml.StartElement, so BOM and other
 //	      extraneous xml.CharData will be ignored unless io.EOF is reached first.
 //	   2. If CoerceKeysToLower() has been called, then all key values will be lower case.
+//	   3. If CoerceKeysToSnakeCase() has been called, then all key values will be converted to snake case.
 func NewMapXml(xmlVal []byte, cast ...bool) (Map, error) {
 	var r bool
 	if len(cast) == 1 {
@@ -67,6 +68,7 @@ func NewMapXml(xmlVal []byte, cast ...bool) (Map, error) {
 //	   1. The 'xmlReader' will be parsed looking for an xml.StartElement, so BOM and other
 //	      extraneous xml.CharData will be ignored unless io.EOF is reached first.
 //	   2. If CoerceKeysToLower() has been called, then all key values will be lower case.
+//	   3. If CoerceKeysToSnakeCase() has been called, then all key values will be converted to snake case.
 func NewMapXmlReader(xmlReader io.Reader, cast ...bool) (Map, error) {
 	var r bool
 	if len(cast) == 1 {
@@ -84,12 +86,6 @@ func NewMapXmlReader(xmlReader io.Reader, cast ...bool) (Map, error) {
 	return xmlReaderToMap(xmlReader, r)
 }
 
-// XmlWriterBufSize - set the size of io.Writer for the TeeReader used by NewMapXmlReaderRaw()
-// and HandleXmlReaderRaw().  This reduces repeated memory allocations and copy() calls in most cases.
-//	NOTE: the 'xmlVal' will be parsed looking for an xml.StartElement, so BOM and other
-//	      extraneous xml.CharData will be ignored unless io.EOF is reached first.
-var XmlWriterBufSize int = 512
-
 // Get next XML doc from an io.Reader as a Map value.  Returns Map value and slice with the raw XML.
 //	NOTES:
 //	   1. Due to the implementation of xml.Decoder, the raw XML off the reader is buffered to []byte
@@ -101,22 +97,21 @@ var XmlWriterBufSize int = 512
 //	   3. The 'xmlReader' will be parsed looking for an xml.StartElement, so BOM and other
 //	      extraneous xml.CharData will be ignored unless io.EOF is reached first.
 //	   4. If CoerceKeysToLower() has been called, then all key values will be lower case.
+//	   5. If CoerceKeysToSnakeCase() has been called, then all key values will be converted to snake case.
 func NewMapXmlReaderRaw(xmlReader io.Reader, cast ...bool) (Map, []byte, error) {
 	var r bool
 	if len(cast) == 1 {
 		r = cast[0]
 	}
 	// create TeeReader so we can retrieve raw XML
-	buf := make([]byte, XmlWriterBufSize)
+	buf := make([]byte, 0)
 	wb := bytes.NewBuffer(buf)
 	trdr := myTeeReader(xmlReader, wb) // see code at EOF
 
-	// build the node tree
 	m, err := xmlReaderToMap(trdr, r)
 
 	// retrieve the raw XML that was decoded
-	b := make([]byte, wb.Len())
-	_, _ = wb.Read(b)
+	b := wb.Bytes()
 
 	if err != nil {
 		return nil, b, err
@@ -225,14 +220,10 @@ var lowerCase bool
 //	NOTE: only recognized by NewMapXml, NewMapXmlReader, and NewMapXmlReaderRaw functions as well as
 //	      the associated HandleXmlReader and HandleXmlReaderRaw.
 func CoerceKeysToLower(b ...bool) {
-	if len(b) == 1 {
+	if len(b) == 0 {
+		lowerCase = !lowerCase
+	} else if len(b) == 1 {
 		lowerCase = b[0]
-		return
-	}
-	if !lowerCase {
-		lowerCase = true
-	} else {
-		lowerCase = false
 	}
 }
 
@@ -251,12 +242,51 @@ func SetAttrPrefix(s string) {
 	lenAttrPrefix = len(attrPrefix)
 }
 
+// 18jan17: Allows user to specify if the map keys should be in snake case instead
+// of the default hyphenated notation.
+var snakeCaseKeys bool
+
+// CoerceKeysToSnakeCase changes the default, false, to the specified value, b.
+// Note: the attribute prefix will be a hyphen, '-', or what ever string value has
+// been specified using SetAttrPrefix.
+func CoerceKeysToSnakeCase(b ...bool) {
+	if len(b) == 0 {
+		snakeCaseKeys = !snakeCaseKeys
+	} else if len(b) == 1 {
+		snakeCaseKeys = b[0]
+	}
+}
+
+// 05feb17: support processing XMPP streams (issue #36)
+var handleXMPPStreamTag bool
+
+// HandleXMPPStreamTag causes decoder to parse XMPP <stream:stream> elements.
+// If called with no argument, XMPP stream element handling is toggled on/off.
+// (See xmppStream_test.go for example.)
+//	If called with NewMapXml, NewMapXmlReader, New MapXmlReaderRaw the "stream"
+//	element will be  returned as:
+//		map["stream"]interface{}{map[-<attrs>]interface{}}.
+//	If called with NewMapSeq, NewMapSeqReader, NewMapSeqReaderRaw the "stream"
+//	element will be returned as:
+//		map["stream:stream"]interface{}{map["#attr"]interface{}{map[string]interface{}}}
+//		where the "#attr" values have "#text" and "#seq" keys. (See NewMapXmlSeq.)
+func HandleXMPPStreamTag(b ...bool) {
+	if len(b) == 0 {
+		handleXMPPStreamTag = !handleXMPPStreamTag
+	} else if len(b) == 1 {
+		handleXMPPStreamTag = b[0]
+	}
+}
+
 // xmlToMapParser (2015.11.12) - load a 'clean' XML doc into a map[string]interface{} directly.
 // A refactoring of xmlToTreeParser(), markDuplicate() and treeToMap() - here, all-in-one.
 // We've removed the intermediate *node tree with the allocation and subsequent rescanning.
 func xmlToMapParser(skey string, a []xml.Attr, p *xml.Decoder, r bool) (map[string]interface{}, error) {
 	if lowerCase {
 		skey = strings.ToLower(skey)
+	}
+	if snakeCaseKeys {
+		skey = strings.Replace(skey, "-", "_", -1)
 	}
 
 	// NOTE: all attributes and sub-elements parsed into 'na', 'na' is returned as value for 'skey' in 'n'.
@@ -273,6 +303,9 @@ func xmlToMapParser(skey string, a []xml.Attr, p *xml.Decoder, r bool) (map[stri
 		na = make(map[string]interface{}) // old n.nodes
 		if len(a) > 0 {
 			for _, v := range a {
+				if snakeCaseKeys {
+					v.Name.Local = strings.Replace(v.Name.Local, "-", "_", -1)
+				}
 				var key string
 				key = attrPrefix + v.Name.Local
 				if lowerCase {
@@ -282,6 +315,12 @@ func xmlToMapParser(skey string, a []xml.Attr, p *xml.Decoder, r bool) (map[stri
 			}
 		}
 	}
+	// Return XMPP <stream:stream> message.
+	if handleXMPPStreamTag && skey == "stream" {
+		n[skey] = na
+		return n, nil
+	}
+
 	for {
 		t, err := p.Token()
 		if err != nil {
@@ -316,7 +355,9 @@ func xmlToMapParser(skey string, a []xml.Attr, p *xml.Decoder, r bool) (map[stri
 			// We need to see if nn_key already exists - means we're parsing a list.
 			// This may require converting na[nn_key] value into []interface{} type.
 			// First, extract the key:val for the map - it's a singleton.
-			// Note: if CoerceKeysToLower() called, then key will be lower case.
+			// Note:
+			// * if CoerceKeysToLower() called, then key will be lower case.
+			// * if CoerceKeysToSnakeCase() called, then key will be converted to snake case.
 			var key string
 			var val interface{}
 			for key, val = range nn {
@@ -690,15 +731,16 @@ func myByteReader(r io.Reader) io.Reader {
 	return &byteReader{r, b}
 }
 
-// need for io.Reader - but we don't use it ...
+// Need for io.Reader interface ...
+// Needed if reading a malformed http.Request.Body - issue #38.
 func (b *byteReader) Read(p []byte) (int, error) {
-	return 0, nil
+	return b.r.Read(p)
 }
 
 func (b *byteReader) ReadByte() (byte, error) {
 	_, err := b.r.Read(b.b)
 	if len(b.b) > 0 {
-		return b.b[0], nil
+		return b.b[0], err
 	}
 	var c byte
 	return c, err
@@ -782,7 +824,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		var n int
 		var ss string
 		for k, v := range vv {
-			if k[:lenAttrPrefix] == attrPrefix {
+			if lenAttrPrefix > 0 && lenAttrPrefix < len(k) && k[:lenAttrPrefix] == attrPrefix {
 				switch v.(type) {
 				case string:
 					if xmlEscapeChars {
@@ -833,7 +875,14 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 			elen = 1
 			isSimple = true
 			break
+		} else if ok {
+			// Handle edge case where simple element with attributes
+			// is unmarshal'd using NewMapXml() where attribute prefix
+			// has been set to "".
+			// TODO(clb): should probably scan all keys for invalid chars.
+			return fmt.Errorf("invalid attribute key label: #text - due to attributes not being prefixed")
 		}
+
 		// close tag with possible attributes
 		*s += ">"
 		if doIndent {
@@ -845,7 +894,7 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		elemlist := make([][2]interface{}, len(vv))
 		n = 0
 		for k, v := range vv {
-			if k[:lenAttrPrefix] == attrPrefix {
+			if lenAttrPrefix > 0 && lenAttrPrefix < len(k) && k[:lenAttrPrefix] == attrPrefix {
 				continue
 			}
 			elemlist[n][0] = k
@@ -864,7 +913,9 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 				}
 			}
 			i++
-			mapToXmlIndent(doIndent, s, v[0].(string), v[1], p)
+			if err := mapToXmlIndent(doIndent, s, v[0].(string), v[1], p); err != nil {
+				return err
+			}
 			switch v[1].(type) {
 			case []interface{}: // handled in []interface{} case
 			default:
@@ -892,7 +943,37 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 			if doIndent {
 				p.Indent()
 			}
-			mapToXmlIndent(doIndent, s, key, v, p)
+			if err := mapToXmlIndent(doIndent, s, key, v, p); err != nil {
+				return err
+			}
+			if doIndent {
+				p.Outdent()
+			}
+		}
+		return nil
+	case []string:
+		// This was added by https://github.com/slotix ... not a type that
+		// would be encountered if mv generated from NewMapXml, NewMapJson.
+		// Could be encountered in AnyXml(), so we'll let it stay, though
+		// it should be merged with case []interface{}, above.
+		//quick fix for []string type 
+		//[]string should be treated exaclty as []interface{}
+		if len(value.([]string)) == 0 {
+			if doIndent {
+				*s += p.padding + p.indent
+			}
+			*s += "<" + key
+			elen = 0
+			endTag = true
+			break
+		}
+		for _, v := range value.([]string) {
+			if doIndent {
+				p.Indent()
+			}
+			if err := mapToXmlIndent(doIndent, s, key, v, p); err != nil {
+				return err
+			}
 			if doIndent {
 				p.Outdent()
 			}
@@ -900,7 +981,11 @@ func mapToXmlIndent(doIndent bool, s *string, key string, value interface{}, pp 
 		return nil
 	case nil:
 		// terminate the tag
+		if doIndent {
+			*s += p.padding
+		}
 		*s += "<" + key
+		endTag, isSimple = true, true
 		break
 	default: // handle anything - even goofy stuff
 		elen = 0

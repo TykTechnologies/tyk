@@ -3,6 +3,10 @@ Decode/encode XML to/from map[string]interface{} (or JSON) values, and extract/m
 
 mxj supplants the legacy x2j and j2x packages. If you want the old syntax, use mxj/x2j and mxj/j2x packages.
 
+<h4>Related Packages</h4>
+
+https://github.com/clbanning/checkxml provides functions for validating XML data.
+
 <h4>Refactor Decoder - 2015.11.15</h4>
 For over a year I've wanted to refactor the XML-to-map[string]interface{} decoder to make it more performant.  I recently took the time to do that, since we were using github.com/clbanning/mxj in a production system that could be deployed on a Raspberry Pi.  Now the decoder is comparable to the stdlib JSON-to-map[string]interface{} decoder in terms of its additional processing overhead relative to decoding to a structure value.  As shown by:
 
@@ -16,6 +20,10 @@ For over a year I've wanted to refactor the XML-to-map[string]interface{} decode
 	BenchmarkNewStructJsonBooks-4	  100000	     15309 ns/op
 
 <h4>Notices</h4>
+
+	2017.02.22: LeafNode paths can use ".N" syntax rather than "[N]" for list member indexing.
+	2017.02.10: SetFieldSeparator changes field separator for args in UpdateValuesForPath, ValuesFor... methods.
+	2017.02.06: Support XMPP stream processing - HandleXMPPStreamTag().
 	2016.11.07: Preserve name space prefix syntax in XmlSeq parser - NewMapXmlSeq(), etc.
 	2016.06.25: Support overriding default XML attribute prefix, "-", in Map keys - SetAttrPrefix().
 	2016.05.26: Support customization of xml.Decoder by exposing CustomDecoder variable.
@@ -92,7 +100,7 @@ newJson, err := newMap.Json() // ditto</pre>
 
 <h4>Usage</h4>
 
-The package is fairly well self-documented with examples. (http://godoc.org/github.com/clbanning/mxj)
+The package is fairly well [self-documented with examples](http://godoc.org/github.com/clbanning/mxj).
 
 Also, the subdirectory "examples" contains a wide range of examples, several taken from golang-nuts discussions.
 
@@ -101,7 +109,8 @@ Also, the subdirectory "examples" contains a wide range of examples, several tak
 Using NewMapXml()
 
    - Attributes are parsed to `map[string]interface{}` values by prefixing a hyphen, `-`,
-     to the attribute label. (Unless overridden by `PrependAttrWithHyphen(false)`.)
+     to the attribute label. (Unless overridden by `PrependAttrWithHyphen(false)` or
+     `SetAttrPrefix()`.)
    - If the element is a simple element and has attributes, the element value
      is given the key `#text` for its `map[string]interface{}` representation.  (See
      the 'atomFeedString.xml' test data, below.)
@@ -118,8 +127,8 @@ Using NewMapXmlSeq()
      keys "#comment", "#directive", and "#procinst", respectively. (See documentation for more
      specifics.)
    - Name space syntax is preserved: 
-      - `<ns:key>something</ns.key>` parses to `map["ns:key"]interface{}("something")`
-      - `xmlns:ns="http://myns.com/ns"` parses to `map["xmlns:ns"]interface{}("http://myns.com/ns")`
+      - `<ns:key>something</ns.key>` parses to `map["ns:key"]interface{}{"something"}`
+      - `xmlns:ns="http://myns.com/ns"` parses to `map["xmlns:ns"]interface{}{"http://myns.com/ns"}`
 
 Both
 
