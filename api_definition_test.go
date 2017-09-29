@@ -38,7 +38,8 @@ const sampleDefiniton = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 const nonExpiringDef = `{
@@ -64,7 +65,8 @@ const nonExpiringDef = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 const nonExpiringMultiDef = `{
@@ -98,7 +100,8 @@ const nonExpiringMultiDef = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	}
+	},
+	"active": true
 }`
 
 func createDefinitionFromString(defStr string) *APISpec {
@@ -378,7 +381,7 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	// Mock Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
-			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {"active": true}}]}`))
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}

@@ -39,7 +39,17 @@ func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager,
 	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
-func skipSpecBecauseInvalid(spec *APISpec) bool {
+func skipSpec(spec *APISpec) bool {
+
+	// Remove inactive APIs from the specs
+	if !spec.Active {
+		log.WithFields(logrus.Fields{
+			"prefix":   "main",
+			"api_name": spec.Name,
+			"domain":   spec.Domain,
+		}).Info("Skipping Inactive.")
+		return true
+	}
 
 	if spec.Proxy.ListenPath == "" {
 		log.WithFields(logrus.Fields{
@@ -109,7 +119,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"api_name": spec.Name,
 	}).Info("Loading API")
 
-	if skipSpecBecauseInvalid(spec) {
+	if skipSpec(spec) {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": spec.Name,
@@ -555,6 +565,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	loadList := make([]*ChainObject, len(specs))
 	apisByListen := countApisByListenHash(specs)
 	for i, spec := range specs {
+
 		go func(spec *APISpec, i int) {
 			subrouter := muxer
 			// Handle custom domains
