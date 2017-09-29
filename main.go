@@ -284,16 +284,22 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	if config.Global.ControlAPIHostname != "" {
 		hostname = config.Global.ControlAPIHostname
 	}
-	r := mux.NewRouter()
-	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		checkIsAPIOwner(InstrumentationMW(r)),
-	))
+	var subr *mux.Router
 	if hostname != "" {
-		r = r.Host(hostname).Subrouter()
+		subr = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
+	} else {
+		subr = muxer.NewRoute().Subrouter()
 	}
+	if httpProfile {
+		subr.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
+	}
+	r := mux.NewRouter()
+	subr.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
+		checkIsAPIOwner(InstrumentationMW(r)),
+	))
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising Tyk REST API Endpoints")
@@ -1010,7 +1016,10 @@ func main() {
 	time.Sleep(time.Second)
 }
 
+var httpProfile = false
+
 func start(arguments map[string]interface{}) {
+	httpProfile = arguments["--httpprofile"] == true
 	if arguments["--memprofile"] == true {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -1032,13 +1041,6 @@ func start(arguments map[string]interface{}) {
 		pprof.StartCPUProfile(cpuProfFile)
 		defer pprof.StopCPUProfile()
 	}
-	if arguments["--httpprofile"] == true {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Adding pprof endpoints")
-
-		mainRouter.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
-	}
 
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global.SupressDefaultOrgStore {
@@ -1050,7 +1052,6 @@ func start(arguments map[string]interface{}) {
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
-
 	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}

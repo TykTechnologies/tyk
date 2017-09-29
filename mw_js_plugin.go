@@ -295,13 +295,13 @@ func (j *JSVM) Init() {
 		}).Error("Could not open TykJS: ", err)
 		return
 	}
+	defer f.Close()
 	if _, err := vm.Run(f); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Error("Could not load TykJS: ", err)
 		return
 	}
-	f.Close()
 
 	j.VM = vm
 
