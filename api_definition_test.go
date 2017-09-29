@@ -381,7 +381,7 @@ func TestGetAPISpecsDashboardSuccess(t *testing.T) {
 	// Mock Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/system/apis" {
-			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+			w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {"active":true}}]}`))
 		} else {
 			t.Fatal("Unknown dashboard API request", r)
 		}
