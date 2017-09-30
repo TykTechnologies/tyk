@@ -233,9 +233,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Already vetted
-	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	spec.target, _ = url.Parse(spec.Proxy.TargetURL)
 
-	spec.target = remote
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
 		log.WithFields(logrus.Fields{
@@ -244,7 +243,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}).Info("Multi target enabled")
 		proxy = NewMultiTargetProxy(spec)
 	} else {
-		proxy = TykNewSingleHostReverseProxy(remote, spec)
+		proxy = TykNewSingleHostReverseProxy(spec.target, spec)
 	}
 
 	// Create the response processors

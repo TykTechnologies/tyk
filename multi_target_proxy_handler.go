@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -10,43 +9,30 @@ import (
 )
 
 type MultiTargetProxy struct {
-	VersionProxyMap map[string]*ReverseProxy
-	specReference   *APISpec
-	defaultProxy    *ReverseProxy
+	versionProxies map[string]*ReverseProxy
+	specReference  *APISpec
+	defaultProxy   *ReverseProxy
 }
 
-func (m *MultiTargetProxy) getProxyForRequest(r *http.Request) (*ReverseProxy, error) {
+func (m *MultiTargetProxy) proxyForRequest(r *http.Request) *ReverseProxy {
 	version, _, _, _ := m.specReference.Version(r)
-	proxy, found := m.VersionProxyMap[version.Name]
-
-	if !found {
-		return nil, errors.New("proxy not found")
+	if proxy := m.versionProxies[version.Name]; proxy != nil {
+		return proxy
 	}
-
-	return proxy, nil
+	log.WithFields(logrus.Fields{
+		"prefix": "multi-target",
+	}).Warning("No proxy found, using default")
+	return m.defaultProxy
 }
 
-func (m *MultiTargetProxy) ServeHTTP(rw http.ResponseWriter, r *http.Request) *http.Response {
+func (m *MultiTargetProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.WithFields(logrus.Fields{
 		"prefix": "multi-target",
 	}).Debug("Serving Multi-target...")
-	proxy, err := m.getProxyForRequest(r)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "multi-target",
-		}).Warning("No proxy found, using default")
-		return m.defaultProxy.ServeHTTP(rw, r)
-	}
-
-	return proxy.ServeHTTP(rw, r)
+	return m.proxyForRequest(r).ServeHTTP(w, r)
 }
-func (m *MultiTargetProxy) ServeHTTPForCache(rw http.ResponseWriter, r *http.Request) *http.Response {
-	proxy, err := m.getProxyForRequest(r)
-	if err != nil {
-		return m.defaultProxy.ServeHTTPForCache(rw, r)
-	}
-
-	return proxy.ServeHTTPForCache(rw, r)
+func (m *MultiTargetProxy) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
+	return m.proxyForRequest(r).ServeHTTPForCache(w, r)
 }
 
 func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {
@@ -55,42 +41,34 @@ func (m *MultiTargetProxy) CopyResponse(dst io.Writer, src io.Reader) {
 
 func NewMultiTargetProxy(spec *APISpec) *MultiTargetProxy {
 	m := &MultiTargetProxy{}
-	m.VersionProxyMap = make(map[string]*ReverseProxy)
+	m.versionProxies = make(map[string]*ReverseProxy)
 	m.specReference = spec
+	m.defaultProxy = TykNewSingleHostReverseProxy(spec.target, spec)
 
-	remote, err := url.Parse(spec.Proxy.TargetURL)
-	if err != nil {
+	for vname, vdata := range spec.VersionData.Versions {
+		if vdata.OverrideTarget == "" {
+			log.WithFields(logrus.Fields{
+				"prefix": "multi-target",
+			}).Info("----> Version ", vname, " has no override target")
+			m.versionProxies[vname] = m.defaultProxy
+			continue
+		}
+		remote, err := url.Parse(vdata.OverrideTarget)
 		log.WithFields(logrus.Fields{
 			"prefix": "multi-target",
-		}).Error("Couldn't parse default target URL in MultiTarget: ", err)
-	}
-	m.defaultProxy = TykNewSingleHostReverseProxy(remote, spec)
-
-	for versionName, versionData := range spec.VersionData.Versions {
-		if versionData.OverrideTarget == "" {
+		}).Info("----> Version ", vname, " has '", vdata.OverrideTarget, "' for override target")
+		log.WithFields(logrus.Fields{
+			"prefix": "multi-target",
+		}).Debug("Multi-target URL: ", vdata.OverrideTarget)
+		log.WithFields(logrus.Fields{
+			"prefix": "multi-target",
+		}).Debug("Multi-target URL (obj): ", remote)
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "multi-target",
-			}).Info("----> Version ", versionName, " has no override target")
-			m.VersionProxyMap[versionName] = m.defaultProxy
-		} else {
-			versionRemote, err := url.Parse(versionData.OverrideTarget)
-			log.WithFields(logrus.Fields{
-				"prefix": "multi-target",
-			}).Info("----> Version ", versionName, " has '", versionData.OverrideTarget, "' for override target")
-			log.WithFields(logrus.Fields{
-				"prefix": "multi-target",
-			}).Debug("Multi-target URL: ", versionData.OverrideTarget)
-			log.WithFields(logrus.Fields{
-				"prefix": "multi-target",
-			}).Debug("Multi-target URL (obj): ", versionRemote)
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "multi-target",
-				}).Error("Couldn't parse version target URL in MultiTarget: ", err)
-			}
-			versionProxy := TykNewSingleHostReverseProxy(versionRemote, spec)
-			m.VersionProxyMap[versionName] = versionProxy
+			}).Error("Couldn't parse version target URL in MultiTarget: ", err)
 		}
+		m.versionProxies[vname] = TykNewSingleHostReverseProxy(remote, spec)
 	}
-	return nil
+	return m
 }
