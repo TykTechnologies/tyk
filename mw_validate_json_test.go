@@ -59,3 +59,5 @@ func TestValidateSchema(t *testing.T) {
 
 	}
 }
+
+// TODO Test with routes
