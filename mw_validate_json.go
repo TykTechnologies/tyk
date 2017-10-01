@@ -23,6 +23,11 @@ func (k *ValidateJSON) Name() string {
 }
 
 func (k *ValidateJSON) EnabledForSpec() bool {
+	for _, v := range k.Spec.VersionData.Versions {
+		if len(v.ExtendedPaths.ValidateJSON) > 0 {
+			return true
+		}
+	}
 	return false
 }
 
