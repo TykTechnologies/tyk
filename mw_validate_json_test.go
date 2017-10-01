@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/base64"
-	"testing"
-	"net/http/httptest"
-	"time"
-	"strings"
-	"net/url"
-	"github.com/justinas/alice"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/justinas/alice"
 )
 
 var schema string = `{
