@@ -37,6 +37,10 @@ type HTTPDashboardHandler struct {
 }
 
 func reLogin() {
+	if !config.Global.UseDBAppConfigs {
+		return
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Registering node (again).")
