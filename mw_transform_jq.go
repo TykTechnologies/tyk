@@ -53,15 +53,11 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 }
 
 func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) error {
-	// Read the body:
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
 
 	var bodyObj interface{}
-	if err := json.Unmarshal(body, &bodyObj); err != nil {
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&bodyObj); err != nil {
 		return err
 	}
 
@@ -70,46 +66,49 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		"reqContext": ctxGetData(r),
 	}
 
-	if err = t.JQFilter.Handle(jqObj); err != nil {
+	if err := t.JQFilter.Handle(jqObj); err != nil {
 		return err
 	}
 
 	// First element is the transformed body
-	if t.JQFilter.Next() {
-		transformed, _ := json.Marshal(t.JQFilter.Value())
-
-		var bodyBuffer = bytes.NewBuffer(transformed)
-		r.Body = ioutil.NopCloser(bodyBuffer)
-		r.ContentLength = int64(bodyBuffer.Len())
-	} else {
+	if !t.JQFilter.Next() {
 		return errors.New("Errors while applying JQ filter to input")
 	}
+
+	transformed, _ := json.Marshal(t.JQFilter.Value())
+
+	var bodyBuffer = bytes.NewBuffer(transformed)
+	r.Body = ioutil.NopCloser(bodyBuffer)
+	r.ContentLength = int64(bodyBuffer.Len())
 
 	// Second optional element is an object like:
 	// { "output_headers": {"header_name": "header_value", ...},
 	//   "outputs_vars":   {"var_name_1": "var_value_1", ...}
 	// }
-	if t.JQFilter.Next() {
-		options := t.JQFilter.Value()
-
-		var opts JQTransformOptions
-		err := mapstructure.Decode(options, &opts)
-		if err != nil {
-			return errors.New("Errors while reading JQ filter transform options")
-		}
-
-		// Replace header in the request
-		for hName, hValue := range opts.OutputHeaders {
-			r.Header.Set(hName, hValue)
-		}
-
-		// Set variables in context vars
-		contextDataObject := ctxGetData(r)
-		for k, v := range opts.OutputVars {
-			contextDataObject["jq_output_var_"+k] = v
-		}
-
-		ctxSetData(r, contextDataObject)
+	if !t.JQFilter.Next() {
+		return nil
 	}
+
+	options := t.JQFilter.Value()
+
+	var opts JQTransformOptions
+	err := mapstructure.Decode(options, &opts)
+	if err != nil {
+		return errors.New("Errors while reading JQ filter transform options")
+	}
+
+	// Replace header in the request
+	for hName, hValue := range opts.OutputHeaders {
+		r.Header.Set(hName, hValue)
+	}
+
+	// Set variables in context vars
+	contextDataObject := ctxGetData(r)
+	for k, v := range opts.OutputVars {
+		contextDataObject["jq_output_var_"+k] = v
+	}
+
+	ctxSetData(r, contextDataObject)
+
 	return nil
 }
