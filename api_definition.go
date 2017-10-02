@@ -515,11 +515,6 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 	return urlSpec
 }
 
-func (a *APIDefinitionLoader) compileJQFilter(filter string) (*jq.JQ, error) {
-	v, err := jq.NewJQ(filter)
-	return v, err
-}
-
 func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -530,7 +525,7 @@ func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.Transfor
 		newTransformSpec := TransformJQSpec{TransformJQMeta: stringSpec}
 
 		var err error
-		newTransformSpec.JQFilter, err = a.compileJQFilter(stringSpec.Filter)
+		newTransformSpec.JQFilter, err = jq.NewJQ(stringSpec.Filter)
 
 		if stat == TransformedJQ {
 			newSpec.TransformJQAction = newTransformSpec
