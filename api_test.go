@@ -33,8 +33,7 @@ const apiTestDef = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpAny + `"
-	},
-	"active": true
+	}
 }`
 
 func loadSampleAPI(t *testing.T, def string) {

@@ -65,8 +65,7 @@ const oauthDefinition = `{
 	"proxy": {
 		"listen_path": "/APIID/",
 		"target_url": "` + testHttpAny + `"
-	},
-	"active": true
+	}
 }`
 
 func getOAuthChain(spec *APISpec, muxer *mux.Router) {

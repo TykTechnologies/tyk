@@ -58,6 +58,5 @@
         ]
       }
     },
-    "enable_batch_request_support": true,
-    "active": true
+    "enable_batch_request_support": true
 }
