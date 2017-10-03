@@ -347,75 +347,53 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		// Select the keying method to use for setting session states
 		var authArray []alice.Constructor
-		if spec.UseOauth2 {
-			// Oauth2
+		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: OAuth")
-			mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid})
 		}
 
-		useCoProcessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
-		useOttoAuth := !useCoProcessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
-
-		if spec.UseBasicAuth {
-			// Basic Auth
+		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: Basic")
-			mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid})
 		}
-
-		if spec.EnableSignatureChecking {
-			// HMAC Auth
+		if mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: HMAC")
-			mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid})
 		}
-
-		if spec.EnableJWT {
-			// JWT Auth
+		if mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: JWT")
-			mwAppendEnabled(&authArray, &JWTMiddleware{baseMid})
 		}
-
-		if spec.UseOpenID {
-			// JWT Auth
+		if mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: OpenID")
-
-			// initialise the OID configuration on this reference Spec
-			mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid})
 		}
 
-		if useCoProcessAuth {
-			// TODO: check if mwAuthCheckFunc is available/valid
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: CoProcess Plugin")
+		coprocessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
+		ottoAuth := !coprocessAuth && mwDriver == apidef.OttoDriver && spec.EnableCoProcessAuth
 
+		if coprocessAuth {
+			// TODO: check if mwAuthCheckFunc is available/valid
 			log.WithFields(logrus.Fields{
 				"prefix":   "coprocess",
 				"api_name": spec.Name,
 			}).Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
-			if useCoProcessAuth {
-				newExtractor(spec, baseMid)
-				mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
-			}
+			newExtractor(spec, baseMid)
+			mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
 		}
 
-		if useOttoAuth {
+		if ottoAuth {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("----> Checking security policy: JS Plugin")
@@ -423,8 +401,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
 		}
 
-		if spec.UseStandardAuth || (!spec.UseOpenID && !spec.EnableJWT && !spec.EnableSignatureChecking && !spec.UseBasicAuth && !spec.UseOauth2 && !useCoProcessAuth && !useOttoAuth) {
-			// Auth key
+		if spec.UseStandardAuth || len(authArray) == 0 {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,

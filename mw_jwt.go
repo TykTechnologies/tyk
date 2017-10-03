@@ -25,6 +25,10 @@ func (k *JWTMiddleware) Name() string {
 	return "JWTMiddleware"
 }
 
+func (k *JWTMiddleware) EnabledForSpec() bool {
+	return k.Spec.EnableJWT
+}
+
 var JWKCache *cache.Cache
 
 type JWK struct {

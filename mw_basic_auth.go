@@ -21,6 +21,10 @@ func (k *BasicAuthKeyIsValid) Name() string {
 	return "BasicAuthKeyIsValid"
 }
 
+func (k *BasicAuthKeyIsValid) EnabledForSpec() bool {
+	return k.Spec.UseBasicAuth
+}
+
 // requestForBasicAuth sends error code and message along with WWW-Authenticate header to client.
 func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg string) (error, int) {
 	authReply := "Basic realm=\"" + k.Spec.Name + "\""

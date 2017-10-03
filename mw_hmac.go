@@ -30,6 +30,10 @@ func (hm *HMACMiddleware) Name() string {
 	return "HMAC"
 }
 
+func (k *HMACMiddleware) EnabledForSpec() bool {
+	return k.Spec.EnableSignatureChecking
+}
+
 func (hm *HMACMiddleware) Init() {
 	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
