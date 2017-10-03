@@ -28,6 +28,10 @@ func (k *OpenIDMW) Name() string {
 	return "OpenIDMW"
 }
 
+func (k *OpenIDMW) EnabledForSpec() bool {
+	return k.Spec.UseOpenID
+}
+
 func (k *OpenIDMW) Init() {
 	k.provider_client_policymap = make(map[string]map[string]string)
 	// Create an OpenID Configuration and store

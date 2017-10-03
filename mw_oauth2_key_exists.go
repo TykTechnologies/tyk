@@ -20,6 +20,10 @@ func (k *Oauth2KeyExists) Name() string {
 	return "Oauth2KeyExists"
 }
 
+func (k *Oauth2KeyExists) EnabledForSpec() bool {
+	return k.Spec.UseOauth2
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 

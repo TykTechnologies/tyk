@@ -92,10 +92,12 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	}
 }
 
-func mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) {
+func mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
 	if mw.EnabledForSpec() {
 		*chain = append(*chain, createMiddleware(mw))
+		return true
 	}
+	return false
 }
 
 func mwList(mws ...TykMiddleware) []alice.Constructor {
