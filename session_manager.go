@@ -138,7 +138,6 @@ func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key s
 }
 
 func (l *SessionLimiter) RedisQuotaExceeded(currentSession *user.SessionState, key string, store storage.Handler) bool {
-
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {
 		// No quota set

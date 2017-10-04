@@ -1127,7 +1127,6 @@ func start(arguments map[string]interface{}) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Initialising default org store")
-		//DefaultOrgStore.Init(storage.RedisCluster{KeyPrefix: "orgkey."})
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
