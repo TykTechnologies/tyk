@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -346,9 +348,9 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APIS
 	return apiSpecs
 }
 
-func (a APIDefinitionLoader) ParseDefinition(apiDef []byte) *apidef.APIDefinition {
+func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition {
 	def := &apidef.APIDefinition{}
-	if err := json.Unmarshal(apiDef, def); err != nil {
+	if err := json.NewDecoder(r).Decode(def); err != nil {
 		log.Error("[RPC] --> Couldn't unmarshal api configuration: ", err)
 	}
 	return def
@@ -362,12 +364,13 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
 		log.Info("Loading API Specification from ", path)
-		defBody, err := ioutil.ReadFile(path)
+		f, err := os.Open(path)
 		if err != nil {
-			log.Error("Couldn't load app configuration file: ", err)
+			log.Error("Couldn't open api configuration file: ", err)
 			continue
 		}
-		def := a.ParseDefinition(defBody)
+		def := a.ParseDefinition(f)
+		f.Close()
 		spec := a.MakeSpec(def)
 		apiSpecs = append(apiSpecs, spec)
 	}
@@ -961,11 +964,11 @@ func (a *APISpec) VersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Ti
 // data and return a RequestStatus that describes the status of the
 // request
 func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus, interface{}) {
-	versionMetaData, versionPaths, whiteListStatus, stat := a.Version(r)
+	versionMetaData, versionPaths, whiteListStatus, vstat := a.Version(r)
 
 	// Screwed up version info - fail and pass through
-	if stat != StatusOk {
-		return false, stat, nil
+	if vstat != StatusOk {
+		return false, vstat, nil
 	}
 
 	// Is the API version expired?
@@ -979,87 +982,68 @@ func (a *APISpec) RequestValid(r *http.Request) (bool, RequestStatus, interface{
 	}
 
 	// not expired, let's check path info
-	requestStatus, meta := a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
-
-	switch requestStatus {
+	status, meta := a.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
+	switch status {
 	case EndPointNotAllowed:
-		return false, EndPointNotAllowed, expTime
-	case StatusOkAndIgnore:
-		return true, StatusOkAndIgnore, expTime
+		return false, status, expTime
 	case StatusRedirectFlowByReply:
-		return true, StatusRedirectFlowByReply, meta
-	case StatusCached:
-		return true, StatusCached, expTime
-	case StatusTransform:
-		return true, StatusTransform, expTime
-	case StatusHeaderInjected:
-		return true, StatusHeaderInjected, expTime
-	case StatusMethodTransformed:
-		return true, StatusMethodTransformed, expTime
+		return true, status, meta
+	case StatusOkAndIgnore, StatusCached, StatusTransform,
+		StatusHeaderInjected, StatusMethodTransformed:
+		return true, status, expTime
 	default:
 		return true, StatusOk, expTime
 	}
-
 }
 
 // Version attempts to extract the version data from a request, depending on where it is stored in the
 // request (currently only "header" is supported)
 func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool, RequestStatus) {
 	var version apidef.VersionInfo
-	var versionRxPaths []URLSpec
-	var versionWLStatus bool
 
 	// try the context first
-	versionKey := ctxGetVersionKey(r)
 	if v := ctxGetVersionInfo(r); v != nil {
 		version = *v
 	} else {
 		// Are we versioned?
 		if a.VersionData.NotVersioned {
 			// Get the first one in the list
-			for k, v := range a.VersionData.Versions {
-				versionKey = k
+			for _, v := range a.VersionData.Versions {
 				version = v
 				break
 			}
 		} else {
 			// Extract Version Info
-			versionKey = a.getVersionFromRequest(r)
-			if versionKey == "" {
-				return &version, versionRxPaths, versionWLStatus, VersionNotFound
+			vname := a.getVersionFromRequest(r)
+			if vname == "" {
+				return &version, nil, false, VersionNotFound
+			}
+			// Load Version Data - General
+			var ok bool
+			if version, ok = a.VersionData.Versions[vname]; !ok {
+				return &version, nil, false, VersionDoesNotExist
 			}
 		}
 
-		// Load Version Data - General
-		var ok bool
-		version, ok = a.VersionData.Versions[versionKey]
-		if !ok {
-			return &version, versionRxPaths, versionWLStatus, VersionDoesNotExist
-		}
-
-		// Lets save this for the future
+		// cache for the future
 		ctxSetVersionInfo(r, &version)
-		ctxSetVersionKey(r, versionKey)
 	}
 
 	// Load path data and whitelist data for version
-	rxPaths, rxOk := a.RxPaths[versionKey]
-	whiteListStatus, wlOk := a.WhiteListEnabled[versionKey]
+	rxPaths, rxOk := a.RxPaths[version.Name]
+	whiteListStatus, wlOk := a.WhiteListEnabled[version.Name]
 
 	if !rxOk {
-		log.Error("no RX Paths found for version ", versionKey)
-		return &version, versionRxPaths, versionWLStatus, VersionDoesNotExist
+		log.Error("no RX Paths found for version ", version.Name)
+		return &version, nil, false, VersionDoesNotExist
 	}
 
 	if !wlOk {
 		log.Error("No whitelist data found")
-		return &version, versionRxPaths, versionWLStatus, VersionWhiteListStatusNotFound
+		return &version, nil, false, VersionWhiteListStatusNotFound
 	}
 
-	versionRxPaths = rxPaths
-	versionWLStatus = whiteListStatus
-
-	return &version, versionRxPaths, versionWLStatus, StatusOk
+	return &version, rxPaths, whiteListStatus, StatusOk
 
 }
 

@@ -1459,17 +1459,3 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	}
 	setCtxValue(r, VersionData, v)
 }
-
-func ctxGetVersionKey(r *http.Request) string {
-	if v := r.Context().Value(VersionKeyContext); v != nil {
-		return v.(string)
-	}
-	return ""
-}
-
-func ctxSetVersionKey(r *http.Request, k string) {
-	if k == "" {
-		panic("setting a nil context VersionKeyContext")
-	}
-	setCtxValue(r, VersionKeyContext, k)
-}

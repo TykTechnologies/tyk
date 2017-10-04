@@ -21,7 +21,6 @@ const (
 	SessionData = iota
 	AuthHeaderValue
 	VersionData
-	VersionKeyContext
 	OrgSessionContext
 	ContextData
 	RetainHost
