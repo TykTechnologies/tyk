@@ -47,12 +47,6 @@ func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
-type InterfaceNotification struct {
-	Type      string
-	Message   string
-	OrgID     string
-	Timestamp time.Time
-}
 
 func (hook *redisChannelHook) Levels() []logrus.Level {
 	return []logrus.Level{
