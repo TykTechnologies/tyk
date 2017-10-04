@@ -1102,30 +1102,6 @@ func TestSkipUrlCleaning(t *testing.T) {
 	}
 }
 
-const multiTargetDef = `{
-	"api_id": "1",
-	"use_keyless": true,
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"version_data": {
-		"versions": {
-			"vdef": {
-				"name": "vdef"
-			},
-			"vother": {
-				"name": "vother",
-				"override_target": "` + testHttpAny + `/vother"
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
 func TestMultiTargetProxy(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

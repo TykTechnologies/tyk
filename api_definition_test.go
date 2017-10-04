@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -103,7 +104,7 @@ const nonExpiringMultiDef = `{
 
 func createDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
-	def := loader.ParseDefinition([]byte(defStr))
+	def := loader.ParseDefinition(strings.NewReader(defStr))
 	spec := loader.MakeSpec(def)
 	spec.APIDefinition = def
 	return spec
