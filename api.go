@@ -21,6 +21,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -732,7 +733,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(keyName, newSession)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-		rawKey := QuotaKeyPrefix + hashKey(keyName)
+		rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
 
 		// manage quotas separately
 		DefaultQuotaStore.RemoveSession(rawKey)
@@ -1341,7 +1342,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
-	store := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
+	store := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		err := errors.New("scan/delete failed")

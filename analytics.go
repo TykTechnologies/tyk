@@ -11,6 +11,7 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // AnalyticsRecord encodes the details of a request
@@ -144,7 +145,7 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store   StorageHandler
+	Store   storage.Handler
 	Clean   Purger
 	GeoIPDB *maxminddb.Reader
 
@@ -180,7 +181,7 @@ func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 
 	r.AnalyticsPool.SendWork(func() {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-		record.APIKey = hashKey(record.APIKey)
+		record.APIKey = storage.HashKey(record.APIKey)
 
 		if config.Global.SlaveOptions.UseRPC {
 			// Extend tag list to include this data so wecan segment by node if necessary

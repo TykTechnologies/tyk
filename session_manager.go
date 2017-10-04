@@ -6,6 +6,7 @@ import (
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type PublicSessionState struct {
@@ -31,7 +32,7 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store StorageHandler) bool {
+func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store storage.Handler) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := config.Global.EnableNonTransactionalRateLimiter
@@ -71,9 +72,9 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) sessionFailReason {
-	rateLimiterKey := RateLimitKeyPrefix + hashKey(key)
-	rateLimiterSentinelKey := RateLimitKeyPrefix + hashKey(key) + ".BLOCKED"
+func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store storage.Handler, enableRL, enableQ bool) sessionFailReason {
+	rateLimiterKey := RateLimitKeyPrefix + storage.HashKey(key)
+	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(key) + ".BLOCKED"
 
 	if enableRL {
 		if config.Global.EnableSentinelRateLImiter {
@@ -135,7 +136,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(currentSession *SessionState, key string, store StorageHandler) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(currentSession *SessionState, key string, store storage.Handler) bool {
 
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {
@@ -145,7 +146,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(currentSession *SessionState, key st
 
 	// Create the key
 	log.Debug("[QUOTA] Inbound raw key is: ", key)
-	rawKey := QuotaKeyPrefix + hashKey(key)
+	rawKey := QuotaKeyPrefix + storage.HashKey(key)
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	log.Debug("Renewing with TTL: ", currentSession.QuotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)

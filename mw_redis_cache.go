@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 const (
@@ -22,7 +24,7 @@ const (
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
 	BaseMiddleware
-	CacheStore StorageHandler
+	CacheStore storage.Handler
 	sh         SuccessHandler
 }
 
