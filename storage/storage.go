@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"encoding/hex"
@@ -7,14 +7,17 @@ import (
 	"github.com/spaolacci/murmur3"
 
 	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
-// errKeyNotFound is a standard error for when a key is not found in the storage engine
-var errKeyNotFound = errors.New("key not found")
+var log = logger.Get()
 
-// StorageHandler is a standard interface to a storage backend,
-// used by AuthorisationManager to read and write key values to the backend
-type StorageHandler interface {
+// ErrKeyNotFound is a standard error for when a key is not found in the storage engine
+var ErrKeyNotFound = errors.New("key not found")
+
+// Handler is a standard interface to a storage backend, used by
+// AuthorisationManager to read and write key values to the backend
+type Handler interface {
 	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
 	GetRawKey(string) (string, error)
 	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (SessionState)
@@ -38,18 +41,16 @@ type StorageHandler interface {
 	DeleteScanMatch(string) bool
 }
 
-func doHash(in string) string {
+func HashStr(in string) string {
 	h := murmur3.New32()
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-//Public function for use in classes that bypass elements of the storage manager
-func hashKey(in string) string {
+func HashKey(in string) string {
 	if !config.Global.HashKeys {
 		// Not hashing? Return the raw key
 		return in
 	}
-
-	return doHash(in)
+	return HashStr(in)
 }

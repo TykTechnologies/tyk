@@ -20,6 +20,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 const (
@@ -749,7 +750,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore StorageHandler) {
+func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
 	a.AuthManager.Init(authStore)
 	a.SessionManager.Init(sessionStore)
 	a.Health.Init(healthStore)

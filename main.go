@@ -36,6 +36,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 var (
@@ -101,12 +102,12 @@ func setupGlobals() {
 	}
 
 	// Initialise our Host Checker
-	healthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
+	healthCheckStore := &storage.RedisCluster{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(healthCheckStore)
 
 	if config.Global.EnableAnalytics && analytics.Store == nil {
 		config.Global.LoadIgnoredIPs()
-		analyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Setting up analytics DB connection")
@@ -142,7 +143,7 @@ func setupGlobals() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := RedisClusterStorageManager{}
+	mainNotifierStore := storage.RedisCluster{}
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
 
@@ -919,11 +920,11 @@ func startRPCKeepaliveWatcher(engine *RPCStorageHandler) {
 	}()
 }
 
-func getGlobalStorageHandler(keyPrefix string, hashKeys bool) StorageHandler {
+func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	if config.Global.SlaveOptions.UseRPC {
 		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 	}
-	return &RedisClusterStorageManager{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
 func main() {
@@ -1047,7 +1048,7 @@ func start(arguments map[string]interface{}) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Initialising default org store")
-		//DefaultOrgStore.Init(&RedisClusterStorageManager{KeyPrefix: "orgkey."})
+		//DefaultOrgStore.Init(&storage.RedisCluster{KeyPrefix: "orgkey."})
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))

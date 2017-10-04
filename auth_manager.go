@@ -9,6 +9,7 @@ import (
 	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -18,7 +19,7 @@ import (
 // is valid in any way (e.g. cryptographic signing etc.). Returns
 // a SessionState object (deserialised JSON)
 type AuthorisationHandler interface {
-	Init(StorageHandler)
+	Init(storage.Handler)
 	KeyAuthorised(string) (SessionState, bool)
 	KeyExpired(*SessionState) bool
 }
@@ -26,26 +27,26 @@ type AuthorisationHandler interface {
 // SessionHandler handles all update/create/access session functions and deals exclusively with
 // SessionState objects, not identity
 type SessionHandler interface {
-	Init(store StorageHandler)
+	Init(store storage.Handler)
 	UpdateSession(keyName string, session *SessionState, resetTTLTo int64) error
 	RemoveSession(keyName string)
 	SessionDetail(keyName string) (SessionState, bool)
 	Sessions(filter string) []string
-	Store() StorageHandler
+	Store() storage.Handler
 	ResetQuota(string, *SessionState)
 }
 
 // DefaultAuthorisationManager implements AuthorisationHandler,
-// requires a StorageHandler to interact with key store
+// requires a storage.Handler to interact with key store
 type DefaultAuthorisationManager struct {
-	store StorageHandler
+	store storage.Handler
 }
 
 type DefaultSessionManager struct {
-	store StorageHandler
+	store storage.Handler
 }
 
-func (b *DefaultAuthorisationManager) Init(store StorageHandler) {
+func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
 	b.store = store
 	b.store.Connect()
 }
@@ -80,25 +81,25 @@ func (b *DefaultAuthorisationManager) KeyExpired(newSession *SessionState) bool 
 	return false
 }
 
-func (b *DefaultSessionManager) Init(store StorageHandler) {
+func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.store = store
 	b.store.Connect()
 }
 
-func (b *DefaultSessionManager) Store() StorageHandler {
+func (b *DefaultSessionManager) Store() storage.Handler {
 	return b.store
 }
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *SessionState) {
 
-	rawKey := QuotaKeyPrefix + hashKey(keyName)
+	rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
 		"inbound-key": ObfuscateKeyString(keyName),
 		"key":         rawKey,
 	}).Info("Reset quota for key.")
 
-	rateLimiterSentinelKey := RateLimitKeyPrefix + hashKey(keyName) + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(keyName) + ".BLOCKED"
 	// Clear the rate limiter
 	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key

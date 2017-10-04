@@ -24,6 +24,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 func init() {
@@ -517,9 +518,9 @@ const extendedPathGatewaySetup = `{
 func createSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	tname := t.Name()
-	redisStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apikey."}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apihealth."}
-	orgStore := &RedisClusterStorageManager{KeyPrefix: tname + "-orgKey."}
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }

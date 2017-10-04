@@ -15,6 +15,7 @@ import (
 	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -217,7 +218,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 		// Not hashing? Return the raw key
 		return in
 	}
-	return doHash(in)
+	return storage.HashStr(in)
 }
 
 func (r *RPCStorageHandler) fixKey(keyName string) string {
@@ -335,7 +336,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 		}
 
 		log.Debug("Error trying to get value:", err)
-		return "", errKeyNotFound
+		return "", storage.ErrKeyNotFound
 	}
 	elapsed := time.Since(start)
 	log.Debug("GetKey took ", elapsed)
@@ -362,7 +363,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 			return r.GetExp(keyName)
 		}
 		log.Error("Error trying to get TTL: ", err)
-		return 0, errKeyNotFound
+		return 0, storage.ErrKeyNotFound
 	}
 	return value.(int64), nil
 }

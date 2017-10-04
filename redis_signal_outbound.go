@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type InterfaceNotification struct {
@@ -15,7 +17,7 @@ type InterfaceNotification struct {
 }
 
 type RedisNotificationHandler struct {
-	CacheStore *RedisClusterStorageManager
+	CacheStore *storage.RedisCluster
 }
 
 const (
@@ -40,7 +42,7 @@ func (u *RedisNotificationHandler) Notify(n InterfaceNotification) error {
 }
 
 func (u *RedisNotificationHandler) StartUIPubSubConn() {
-	u.CacheStore = &RedisClusterStorageManager{KeyPrefix: "gateway-notifications:"}
+	u.CacheStore = &storage.RedisCluster{KeyPrefix: "gateway-notifications:"}
 	u.CacheStore.Connect()
 	// On message, synchronize
 	for {

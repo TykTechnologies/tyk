@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // Purger is an interface that will define how the in-memory store will be purged
@@ -17,7 +19,7 @@ type Purger interface {
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type RPCPurger struct {
-	Store StorageHandler
+	Store storage.Handler
 }
 
 // Connect Connects to RPC

@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"errors"
@@ -30,8 +30,8 @@ func GetRelevantClusterReference(cache bool) *rediscluster.RedisCluster {
 	return redisClusterSingleton
 }
 
-// RedisClusterStorageManager is a storage manager that uses the redis database.
-type RedisClusterStorageManager struct {
+// RedisCluster is a storage manager that uses the redis database.
+type RedisCluster struct {
 	KeyPrefix string
 	HashKeys  bool
 	IsCache   bool
@@ -83,7 +83,7 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 }
 
 // Connect will establish a connection to the GetRelevantClusterReference(r.IsCache)
-func (r *RedisClusterStorageManager) Connect() bool {
+func (r *RedisCluster) Connect() bool {
 	redisSingletonMu.Lock()
 	defer redisSingletonMu.Unlock()
 	disconnected := redisClusterSingleton == nil
@@ -104,15 +104,15 @@ func (r *RedisClusterStorageManager) Connect() bool {
 	return true
 }
 
-func (r *RedisClusterStorageManager) hashKey(in string) string {
+func (r *RedisCluster) hashKey(in string) string {
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
 		return in
 	}
-	return doHash(in)
+	return HashStr(in)
 }
 
-func (r *RedisClusterStorageManager) fixKey(keyName string) string {
+func (r *RedisCluster) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
 	log.Debug("Input key was: ", setKeyName)
@@ -120,12 +120,12 @@ func (r *RedisClusterStorageManager) fixKey(keyName string) string {
 	return setKeyName
 }
 
-func (r *RedisClusterStorageManager) cleanKey(keyName string) string {
+func (r *RedisCluster) cleanKey(keyName string) string {
 	setKeyName := strings.Replace(keyName, r.KeyPrefix, "", 1)
 	return setKeyName
 }
 
-func (r *RedisClusterStorageManager) ensureConnection() {
+func (r *RedisCluster) ensureConnection() {
 	if GetRelevantClusterReference(r.IsCache) != nil {
 		// already connected
 		return
@@ -142,50 +142,50 @@ func (r *RedisClusterStorageManager) ensureConnection() {
 }
 
 // GetKey will retrieve a key from the database
-func (r *RedisClusterStorageManager) GetKey(keyName string) (string, error) {
+func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	r.ensureConnection()
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 	value, err := redis.String(GetRelevantClusterReference(r.IsCache).Do("GET", r.fixKey(keyName)))
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
-		return "", errKeyNotFound
+		return "", ErrKeyNotFound
 	}
 
 	return value, nil
 }
 
-func (r *RedisClusterStorageManager) GetKeyTTL(keyName string) (ttl int64, err error) {
+func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
 	r.ensureConnection()
 	return redis.Int64(GetRelevantClusterReference(r.IsCache).Do("TTL", r.fixKey(keyName)))
 }
 
-func (r *RedisClusterStorageManager) GetRawKey(keyName string) (string, error) {
+func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	r.ensureConnection()
 	value, err := redis.String(GetRelevantClusterReference(r.IsCache).Do("GET", keyName))
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
-		return "", errKeyNotFound
+		return "", ErrKeyNotFound
 	}
 
 	return value, nil
 }
 
-func (r *RedisClusterStorageManager) GetExp(keyName string) (int64, error) {
+func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 	log.Debug("Getting exp for key: ", r.fixKey(keyName))
 	r.ensureConnection()
 
 	value, err := redis.Int64(GetRelevantClusterReference(r.IsCache).Do("TTL", r.fixKey(keyName)))
 	if err != nil {
 		log.Error("Error trying to get TTL: ", err)
-		return 0, errKeyNotFound
+		return 0, ErrKeyNotFound
 	}
 	return value, nil
 
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RedisClusterStorageManager) SetKey(keyName, sessionState string, timeout int64) error {
+func (r *RedisCluster) SetKey(keyName, sessionState string, timeout int64) error {
 	log.Debug("[STORE] SET Raw key is: ", keyName)
 	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
@@ -205,7 +205,7 @@ func (r *RedisClusterStorageManager) SetKey(keyName, sessionState string, timeou
 	return nil
 }
 
-func (r *RedisClusterStorageManager) SetRawKey(keyName, sessionState string, timeout int64) error {
+func (r *RedisCluster) SetRawKey(keyName, sessionState string, timeout int64) error {
 
 	r.ensureConnection()
 	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", keyName, sessionState)
@@ -224,7 +224,7 @@ func (r *RedisClusterStorageManager) SetRawKey(keyName, sessionState string, tim
 }
 
 // Decrement will decrement a key in redis
-func (r *RedisClusterStorageManager) Decrement(keyName string) {
+func (r *RedisCluster) Decrement(keyName string) {
 
 	keyName = r.fixKey(keyName)
 	log.Debug("Decrementing key: ", keyName)
@@ -236,7 +236,7 @@ func (r *RedisClusterStorageManager) Decrement(keyName string) {
 }
 
 // IncrementWithExpire will increment a key in redis
-func (r *RedisClusterStorageManager) IncrememntWithExpire(keyName string, expire int64) int64 {
+func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 
 	log.Debug("Incrementing raw key: ", keyName)
 	r.ensureConnection()
@@ -255,7 +255,7 @@ func (r *RedisClusterStorageManager) IncrememntWithExpire(keyName string, expire
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
-func (r *RedisClusterStorageManager) GetKeys(filter string) []string {
+func (r *RedisCluster) GetKeys(filter string) []string {
 	r.ensureConnection()
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
@@ -272,7 +272,7 @@ func (r *RedisClusterStorageManager) GetKeys(filter string) []string {
 }
 
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
-func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) map[string]string {
+func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	r.ensureConnection()
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
@@ -298,7 +298,7 @@ func (r *RedisClusterStorageManager) GetKeysAndValuesWithFilter(filter string) m
 }
 
 // GetKeysAndValues will return all keys and their values - not to be used lightly
-func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
+func (r *RedisCluster) GetKeysAndValues() map[string]string {
 	r.ensureConnection()
 	searchStr := r.KeyPrefix + "*"
 	sessionsInterface, err := GetRelevantClusterReference(r.IsCache).Do("KEYS", searchStr)
@@ -322,7 +322,7 @@ func (r *RedisClusterStorageManager) GetKeysAndValues() map[string]string {
 }
 
 // DeleteKey will remove a key from the database
-func (r *RedisClusterStorageManager) DeleteKey(keyName string) bool {
+func (r *RedisCluster) DeleteKey(keyName string) bool {
 	r.ensureConnection()
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
@@ -335,7 +335,7 @@ func (r *RedisClusterStorageManager) DeleteKey(keyName string) bool {
 }
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
-func (r *RedisClusterStorageManager) DeleteRawKey(keyName string) bool {
+func (r *RedisCluster) DeleteRawKey(keyName string) bool {
 	r.ensureConnection()
 	_, err := GetRelevantClusterReference(r.IsCache).Do("DEL", keyName)
 	if err != nil {
@@ -346,7 +346,7 @@ func (r *RedisClusterStorageManager) DeleteRawKey(keyName string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk
-func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
+func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	r.ensureConnection()
 	log.Debug("Deleting: ", pattern)
 
@@ -384,14 +384,14 @@ func (r *RedisClusterStorageManager) DeleteScanMatch(pattern string) bool {
 		}
 		log.Info("Deleted: ", len(keys), " records")
 	} else {
-		log.Debug("RedisClusterStorageManager called DEL - Nothing to delete")
+		log.Debug("RedisCluster called DEL - Nothing to delete")
 	}
 
 	return true
 }
 
 // DeleteKeys will remove a group of keys in bulk
-func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
+func (r *RedisCluster) DeleteKeys(keys []string) bool {
 	r.ensureConnection()
 	if len(keys) > 0 {
 		asInterface := make([]interface{}, len(keys))
@@ -405,7 +405,7 @@ func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
 			log.Error("Error trying to delete keys: ", err)
 		}
 	} else {
-		log.Debug("RedisClusterStorageManager called DEL - Nothing to delete")
+		log.Debug("RedisCluster called DEL - Nothing to delete")
 	}
 
 	return true
@@ -413,7 +413,7 @@ func (r *RedisClusterStorageManager) DeleteKeys(keys []string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
-func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback func(interface{})) error {
+func (r *RedisCluster) StartPubSubHandler(channel string, callback func(interface{})) error {
 	if GetRelevantClusterReference(r.IsCache) == nil {
 		return errors.New("Redis connection failed")
 	}
@@ -444,7 +444,7 @@ func (r *RedisClusterStorageManager) StartPubSubHandler(channel string, callback
 	}
 }
 
-func (r *RedisClusterStorageManager) Publish(channel, message string) error {
+func (r *RedisCluster) Publish(channel, message string) error {
 	r.ensureConnection()
 	_, err := GetRelevantClusterReference(r.IsCache).Do("PUBLISH", channel, message)
 	if err != nil {
@@ -454,7 +454,7 @@ func (r *RedisClusterStorageManager) Publish(channel, message string) error {
 	return nil
 }
 
-func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface{} {
+func (r *RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 	log.Debug("Getting raw key set: ", keyName)
 	r.ensureConnection()
 	log.Debug("keyName is: ", keyName)
@@ -487,7 +487,7 @@ func (r *RedisClusterStorageManager) GetAndDeleteSet(keyName string) []interface
 	return vals
 }
 
-func (r *RedisClusterStorageManager) AppendToSet(keyName, value string) {
+func (r *RedisCluster) AppendToSet(keyName, value string) {
 	log.Debug("Pushing to raw key list: ", keyName)
 	log.Debug("Appending to fixed key list: ", r.fixKey(keyName))
 	r.ensureConnection()
@@ -498,7 +498,7 @@ func (r *RedisClusterStorageManager) AppendToSet(keyName, value string) {
 	}
 }
 
-func (r *RedisClusterStorageManager) GetSet(keyName string) (map[string]string, error) {
+func (r *RedisCluster) GetSet(keyName string) (map[string]string, error) {
 	log.Debug("Getting from key set: ", keyName)
 	log.Debug("Getting from fixed key set: ", r.fixKey(keyName))
 	r.ensureConnection()
@@ -517,7 +517,7 @@ func (r *RedisClusterStorageManager) GetSet(keyName string) (map[string]string, 
 	return vals, nil
 }
 
-func (r *RedisClusterStorageManager) AddToSet(keyName, value string) {
+func (r *RedisCluster) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))
 	r.ensureConnection()
@@ -528,7 +528,7 @@ func (r *RedisClusterStorageManager) AddToSet(keyName, value string) {
 	}
 }
 
-func (r *RedisClusterStorageManager) RemoveFromSet(keyName, value string) {
+func (r *RedisCluster) RemoveFromSet(keyName, value string) {
 	log.Debug("Removing from raw key set: ", keyName)
 	log.Debug("Removing from fixed key set: ", r.fixKey(keyName))
 	r.ensureConnection()
@@ -540,7 +540,7 @@ func (r *RedisClusterStorageManager) RemoveFromSet(keyName, value string) {
 }
 
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
-func (r *RedisClusterStorageManager) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
+func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
 
 	log.Debug("Incrementing raw key: ", keyName)
 	r.ensureConnection()

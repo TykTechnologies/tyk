@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -34,7 +35,7 @@ func saveRPCDefinitionsBackup(list string) {
 
 	log.Info("--> Connecting to DB")
 
-	store := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix}
+	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -56,7 +57,7 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 	tagList := getTagListAsString()
 	checkKey := BackupKeyBase + tagList
 
-	store := &RedisClusterStorageManager{KeyPrefix: RPCKeyPrefix}
+	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
 
 	connected := store.Connect()
 	log.Info("[RPC] --> Connected to DB")

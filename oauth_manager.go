@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 /*
@@ -247,7 +248,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
-			searchKey := "apikey-" + hashKey(o.API.OrgID+username)
+			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username)
 			log.Debug("Getting: ", searchKey)
 
 			var err error
@@ -433,7 +434,7 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 // TODO: Refactor this to move prefix handling into a checker method, then it can be an unexported setting in the struct.
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
 type RedisOsinStorageInterface struct {
-	store          StorageHandler
+	store          storage.Handler
 	sessionManager SessionHandler
 }
 

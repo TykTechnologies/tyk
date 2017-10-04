@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 const apiTestDef = `{
@@ -541,7 +542,7 @@ func TestResetHandlerBlock(t *testing.T) {
 func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool)
 	didReload := make(chan bool)
-	cacheStore := RedisClusterStorageManager{}
+	cacheStore := storage.RedisCluster{}
 	cacheStore.Connect()
 
 	go func() {
