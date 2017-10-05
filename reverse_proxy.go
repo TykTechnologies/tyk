@@ -775,17 +775,30 @@ func requestIPHops(r *http.Request) string {
 	return clientIP
 }
 
+// nopCloser is just like ioutil's, but here to let us fetch the
+// underlying io.Reader.
+type nopCloser struct {
+	io.Reader
+}
+
+func (nopCloser) Close() error { return nil }
+
 func copyRequest(r *http.Request) *http.Request {
 	r2 := *r
 	if r.Body != nil {
-		defer r.Body.Close()
+		if nc, ok := r.Body.(nopCloser); ok {
+			buf := *(nc.Reader.(*bytes.Buffer))
+			r2.Body = nopCloser{&buf}
+		} else {
+			defer r.Body.Close()
 
-		var buf1, buf2 bytes.Buffer
-		io.Copy(&buf1, r.Body)
-		buf2 = buf1
+			var buf1, buf2 bytes.Buffer
+			io.Copy(&buf1, r.Body)
+			buf2 = buf1
 
-		r.Body = ioutil.NopCloser(&buf1)
-		r2.Body = ioutil.NopCloser(&buf2)
+			r.Body = nopCloser{&buf1}
+			r2.Body = nopCloser{&buf2}
+		}
 	}
 	return &r2
 }
@@ -793,14 +806,19 @@ func copyRequest(r *http.Request) *http.Request {
 func copyResponse(r *http.Response) *http.Response {
 	r2 := *r
 	if r.Body != nil {
-		defer r.Body.Close()
+		if nc, ok := r.Body.(nopCloser); ok {
+			buf := *(nc.Reader.(*bytes.Buffer))
+			r2.Body = nopCloser{&buf}
+		} else {
+			defer r.Body.Close()
 
-		var buf1, buf2 bytes.Buffer
-		io.Copy(&buf1, r.Body)
-		buf2 = buf1
+			var buf1, buf2 bytes.Buffer
+			io.Copy(&buf1, r.Body)
+			buf2 = buf1
 
-		r.Body = ioutil.NopCloser(&buf1)
-		r2.Body = ioutil.NopCloser(&buf2)
+			r.Body = nopCloser{&buf1}
+			r2.Body = nopCloser{&buf2}
+		}
 	}
 	return &r2
 }
