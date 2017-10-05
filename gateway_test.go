@@ -135,7 +135,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		panic(testServer.ListenAndServe())
 	}()
-	config.WriteDefault("", &config.Global)
+	config.Global = config.Default
 	config.Global.Storage.Database = 1
 	if err := emptyRedis(); err != nil {
 		panic(err)

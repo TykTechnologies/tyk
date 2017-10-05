@@ -12,13 +12,13 @@ func TestWriteDefaultConf(t *testing.T) {
 	conf := &Config{}
 	os.Unsetenv("TYK_GW_LISTENPORT")
 	defer os.Unsetenv("TYK_GW_LISTENPORT")
-	WriteDefault("", conf)
+	writeDefault("", conf)
 	if conf.ListenPort != 8080 {
 		t.Fatalf("Expected ListenPort to be set to its default")
 	}
 	*conf = Config{}
 	os.Setenv("TYK_GW_LISTENPORT", "9090")
-	WriteDefault("", conf)
+	writeDefault("", conf)
 	if conf.ListenPort != 9090 {
 		t.Fatalf("Expected ListenPort to be set to 9090")
 	}
@@ -34,7 +34,7 @@ func TestConfigFiles(t *testing.T) {
 	path1 := filepath.Join(dir, "tyk1.conf")
 	path2 := filepath.Join(dir, "tyk2.conf")
 
-	WriteDefault(path1, conf)
+	writeDefault(path1, conf)
 	if conf.ListenPort != 8080 {
 		t.Fatalf("Expected ListenPort to be set to its default")
 	}

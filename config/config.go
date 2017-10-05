@@ -162,51 +162,51 @@ type Config struct {
 	// was written.
 	OriginalPath string `json:"-"`
 
-	ListenAddress                     string                 `json:"listen_address"`
-	ListenPort                        int                    `json:"listen_port"`
-	Secret                            string                 `json:"secret"`
-	NodeSecret                        string                 `json:"node_secret"`
-	TemplatePath                      string                 `json:"template_path"`
-	TykJSPath                         string                 `json:"tyk_js_path"`
-	MiddlewarePath                    string                 `json:"middleware_path"`
-	Policies                          PoliciesConfig         `json:"policies"`
-	UseDBAppConfigs                   bool                   `json:"use_db_app_configs"`
-	DBAppConfOptions                  DBAppConfOptionsConfig `json:"db_app_conf_options"`
-	DisableDashboardZeroConf          bool                   `json:"disable_dashboard_zeroconf"`
-	AppPath                           string                 `json:"app_path"`
-	Storage                           StorageOptionsConf     `json:"storage"`
-	EnableSeperateCacheStore          bool                   `json:"enable_separate_cache_store"`
-	CacheStorage                      StorageOptionsConf     `json:"cache_storage"`
-	EnableAnalytics                   bool                   `json:"enable_analytics"`
-	AnalyticsConfig                   AnalyticsConfigConfig  `json:"analytics_config"`
-	HealthCheck                       HealthCheckConfig      `json:"health_check"`
-	UseAsyncSessionWrite              bool                   `json:"optimisations_use_async_session_write"`
-	AllowMasterKeys                   bool                   `json:"allow_master_keys"`
-	HashKeys                          bool                   `json:"hash_keys"`
-	SuppressRedisSignalReload         bool                   `json:"suppress_redis_signal_reload"`
-	SupressDefaultOrgStore            bool                   `json:"suppress_default_org_store"`
-	UseRedisLog                       bool                   `json:"use_redis_log"`
-	SentryCode                        string                 `json:"sentry_code"`
-	UseSentry                         bool                   `json:"use_sentry"`
-	UseSyslog                         bool                   `json:"use_syslog"`
-	UseGraylog                        bool                   `json:"use_graylog"`
-	UseLogstash                       bool                   `json:"use_logstash"`
-	GraylogNetworkAddr                string                 `json:"graylog_network_addr"`
-	LogstashNetworkAddr               string                 `json:"logstash_network_addr"`
-	SyslogTransport                   string                 `json:"syslog_transport"`
-	LogstashTransport                 string                 `json:"logstash_transport"`
-	SyslogNetworkAddr                 string                 `json:"syslog_network_addr"`
-	StatsdConnectionString            string                 `json:"statsd_connection_string"`
-	StatsdPrefix                      string                 `json:"statsd_prefix"`
-	EnforceOrgDataAge                 bool                   `json:"enforce_org_data_age"`
-	EnforceOrgDataDeailLogging        bool                   `json:"enforce_org_data_detail_logging"`
-	EnforceOrgQuotas                  bool                   `json:"enforce_org_quotas"`
-	ExperimentalProcessOrgOffThread   bool                   `json:"experimental_process_org_off_thread"`
-	EnableNonTransactionalRateLimiter bool                   `json:"enable_non_transactional_rate_limiter"`
-	EnableSentinelRateLImiter         bool                   `json:"enable_sentinel_rate_limiter"`
-	EnableRedisRollingLimiter         bool                   `json:"enable_redis_rolling_limiter"`
-	ManagementNode                    bool                   `json:"management_node"`
-	Monitor                           MonitorConfig
+	ListenAddress                     string                                `json:"listen_address"`
+	ListenPort                        int                                   `json:"listen_port"`
+	Secret                            string                                `json:"secret"`
+	NodeSecret                        string                                `json:"node_secret"`
+	TemplatePath                      string                                `json:"template_path"`
+	TykJSPath                         string                                `json:"tyk_js_path"`
+	MiddlewarePath                    string                                `json:"middleware_path"`
+	Policies                          PoliciesConfig                        `json:"policies"`
+	UseDBAppConfigs                   bool                                  `json:"use_db_app_configs"`
+	DBAppConfOptions                  DBAppConfOptionsConfig                `json:"db_app_conf_options"`
+	DisableDashboardZeroConf          bool                                  `json:"disable_dashboard_zeroconf"`
+	AppPath                           string                                `json:"app_path"`
+	Storage                           StorageOptionsConf                    `json:"storage"`
+	EnableSeperateCacheStore          bool                                  `json:"enable_separate_cache_store"`
+	CacheStorage                      StorageOptionsConf                    `json:"cache_storage"`
+	EnableAnalytics                   bool                                  `json:"enable_analytics"`
+	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
+	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
+	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
+	AllowMasterKeys                   bool                                  `json:"allow_master_keys"`
+	HashKeys                          bool                                  `json:"hash_keys"`
+	SuppressRedisSignalReload         bool                                  `json:"suppress_redis_signal_reload"`
+	SupressDefaultOrgStore            bool                                  `json:"suppress_default_org_store"`
+	UseRedisLog                       bool                                  `json:"use_redis_log"`
+	SentryCode                        string                                `json:"sentry_code"`
+	UseSentry                         bool                                  `json:"use_sentry"`
+	UseSyslog                         bool                                  `json:"use_syslog"`
+	UseGraylog                        bool                                  `json:"use_graylog"`
+	UseLogstash                       bool                                  `json:"use_logstash"`
+	GraylogNetworkAddr                string                                `json:"graylog_network_addr"`
+	LogstashNetworkAddr               string                                `json:"logstash_network_addr"`
+	SyslogTransport                   string                                `json:"syslog_transport"`
+	LogstashTransport                 string                                `json:"logstash_transport"`
+	SyslogNetworkAddr                 string                                `json:"syslog_network_addr"`
+	StatsdConnectionString            string                                `json:"statsd_connection_string"`
+	StatsdPrefix                      string                                `json:"statsd_prefix"`
+	EnforceOrgDataAge                 bool                                  `json:"enforce_org_data_age"`
+	EnforceOrgDataDeailLogging        bool                                  `json:"enforce_org_data_detail_logging"`
+	EnforceOrgQuotas                  bool                                  `json:"enforce_org_quotas"`
+	ExperimentalProcessOrgOffThread   bool                                  `json:"experimental_process_org_off_thread"`
+	EnableNonTransactionalRateLimiter bool                                  `json:"enable_non_transactional_rate_limiter"`
+	EnableSentinelRateLImiter         bool                                  `json:"enable_sentinel_rate_limiter"`
+	EnableRedisRollingLimiter         bool                                  `json:"enable_redis_rolling_limiter"`
+	ManagementNode                    bool                                  `json:"management_node"`
+	Monitor                           MonitorConfig                         `json:"monitor"`
 	OauthRefreshExpire                int64                                 `json:"oauth_refresh_token_expire"`
 	OauthTokenExpire                  int32                                 `json:"oauth_token_expire"`
 	OauthRedirectUriSeparator         string                                `json:"oauth_redirect_uri_separator"`
@@ -267,26 +267,27 @@ type TykEventHandler interface {
 
 const envPrefix = "TYK_GW"
 
-// WriteDefault will create a default configuration file and set the
-// storage type to "memory"
-func WriteDefault(path string, conf *Config) {
-	*conf = Config{
-		ListenPort:     8080,
-		Secret:         "352d20ee67be67f6340b4c0605b044b7",
-		TemplatePath:   "templates",
-		TykJSPath:      "js/tyk.js",
-		MiddlewarePath: "middleware",
-		AppPath:        "apps/",
-		Storage: StorageOptionsConf{
-			Type:    "redis",
-			Host:    "localhost",
-			MaxIdle: 100,
-			Port:    6379,
-		},
-		AnalyticsConfig: AnalyticsConfigConfig{
-			IgnoredIPs: make([]string, 0),
-		},
-	}
+var Default = Config{
+	ListenPort:     8080,
+	Secret:         "352d20ee67be67f6340b4c0605b044b7",
+	TemplatePath:   "templates",
+	TykJSPath:      "js/tyk.js",
+	MiddlewarePath: "middleware",
+	AppPath:        "apps/",
+	Storage: StorageOptionsConf{
+		Type:    "redis",
+		Host:    "localhost",
+		MaxIdle: 100,
+		Port:    6379,
+	},
+	AnalyticsConfig: AnalyticsConfigConfig{
+		IgnoredIPs: make([]string, 0),
+	},
+}
+
+// writeDefault will create a default configuration file
+func writeDefault(path string, conf *Config) {
+	*conf = Default
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		log.Error("Failed to process environment variables: ", err)
 	}
@@ -326,14 +327,13 @@ func Load(paths []string, conf *Config) error {
 	if r == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
-		WriteDefault(path, conf)
+		writeDefault(path, conf)
 		log.Info("Loading default configuration...")
 		return Load([]string{path}, conf)
 	}
 	if err := json.NewDecoder(r).Decode(&conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
-
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}
