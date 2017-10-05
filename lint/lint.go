@@ -17,7 +17,6 @@ func Run(paths []string) (string, []string, error) {
 		return "", nil, err
 	}
 	schemaLoader := schema.NewBytesLoader([]byte(confSchema))
-	var warns []string
 
 	absPath, err := filepath.Abs(conf.OriginalPath)
 	if err != nil {
@@ -28,11 +27,8 @@ func Run(paths []string) (string, []string, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	// this will pick up unknown fields and other errors unavailable
-	// in encoding/json
-	warns = append(warns, resultWarns(result)...)
 
-	return conf.OriginalPath, warns, nil
+	return conf.OriginalPath, resultWarns(result), nil
 }
 
 func resultWarns(result *schema.Result) []string {

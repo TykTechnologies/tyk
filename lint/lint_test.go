@@ -1,10 +1,13 @@
 package lint
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestMain(m *testing.M) {
@@ -12,6 +15,19 @@ func TestMain(m *testing.M) {
 	// files required to run the gateway are.
 	os.Chdir("..")
 	os.Exit(m.Run())
+}
+
+// onDefaults overlays src as a JSON string on top of the default config
+// as a JSON. This can be useful to change the default config in ways
+// that would not be possible via the config.Config struct, such as
+// using invalid types or adding extra fields.
+func onDefaults(src string) string {
+	conf := map[string]interface{}{}
+	defBytes, _ := json.Marshal(config.Default)
+	json.Unmarshal(defBytes, &conf)
+	json.Unmarshal([]byte(src), &conf)
+	resBytes, _ := json.Marshal(conf)
+	return string(resBytes)
 }
 
 var tests = []struct {
@@ -27,7 +43,12 @@ var tests = []struct {
 		"WrongType", `{"enable_jsvm": 3}`,
 		"cannot unmarshal number into Go struct field Config.enable_jsvm of type bool",
 	},
+	{
+		"FieldTypo", `{"enable_jsvmm": true}`,
+		"Additional property enable_jsvmm is not allowed",
+	},
 	{"Empty", `{}`, nil},
+	{"Default", onDefaults(`{}`), nil},
 	{"NullObject", `{"event_handlers": null}`, nil},
 }
 
