@@ -3,6 +3,7 @@ package lint
 const confSchema = `{
 "$schema": "http://json-schema.org/draft-04/schema#",
 "type": "object",
+"additionalProperties": false,
 "properties": {
 	"allow_insecure_configs": {
 		"type": "boolean"
@@ -10,8 +11,12 @@ const confSchema = `{
 	"allow_master_keys": {
 		"type": "boolean"
 	},
+	"allow_remote_config": {
+		"type": "boolean"
+	},
 	"analytics_config": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"enable_detailed_recording": {
 				"type": "boolean"
@@ -27,6 +32,7 @@ const confSchema = `{
 			},
 			"normalise_urls": {
 				"type": ["object", "null"],
+				"additionalProperties": false,
 				"properties": {
 					"custom_patterns": {
 						"type": ["array", "null"]
@@ -42,6 +48,9 @@ const confSchema = `{
 					}
 				}
 			},
+			"pool_size": {
+				"type": "integer"
+			},
 			"type": {
 				"type": "string"
 			}
@@ -50,14 +59,117 @@ const confSchema = `{
 	"app_path": {
 		"type": "string"
 	},
+	"auth_override": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"auth_provider": {
+				"type": ["object", "null"],
+				"additionalProperties": false,
+				"properties": {
+					"meta": {
+						"type": ["array", "null"]
+					},
+					"name": {
+						"type": "string"
+					},
+					"storage_engine": {
+						"type": "string"
+					}
+				}
+			},
+			"force_auth_provider": {
+				"type": "boolean"
+			},
+			"force_session_provider": {
+				"type": "boolean"
+			},
+			"session_provider": {
+				"type": ["object", "null"],
+				"additionalProperties": false,
+				"properties": {
+					"meta": {
+						"type": ["array", "null"]
+					},
+					"name": {
+						"type": "string"
+					},
+					"storage_engine": {
+						"type": "string"
+					}
+				}
+			}
+		}
+	},
+	"bundle_base_url": {
+		"type": "string"
+	},
+	"cache_storage": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"database": {
+				"type": "integer"
+			},
+			"enable_cluster": {
+				"type": "boolean"
+			},
+			"host": {
+				"type": "string"
+			},
+			"hosts": {
+				"type": ["array", "null"]
+			},
+			"optimisation_max_active": {
+				"type": "integer"
+			},
+			"optimisation_max_idle": {
+				"type": "integer"
+			},
+			"password": {
+				"type": "string"
+			},
+			"port": {
+				"type": "integer"
+			},
+			"type": {
+				"type": "string"
+			},
+			"username": {
+				"type": "string"
+			}
+		}
+	},
 	"close_connections": {
+		"type": "boolean"
+	},
+	"close_idle_connections": {
 		"type": "boolean"
 	},
 	"control_api_hostname": {
 		"type": "string"
 	},
+	"control_api_port": {
+		"type": "integer"
+	},
+	"coprocess_options": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"coprocess_grpc_server": {
+				"type": "string"
+			},
+			"enable_coprocess": {
+				"type": "boolean"
+			},
+			"python_path_prefix": {
+				"type": "string"
+			}
+		}
+	},
 	"db_app_conf_options": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"connection_string": {
 				"type": "string"
@@ -79,13 +191,16 @@ const confSchema = `{
 	"disable_virtual_path_blobs": {
 		"type": "boolean"
 	},
+	"drl_notification_frequency": {
+		"type": "integer"
+	},
 	"enable_analytics": {
 		"type": "boolean"
 	},
 	"enable_api_segregation": {
 		"type": "boolean"
 	},
-	"enable_coprocess": {
+	"enable_bundle_downloader": {
 		"type": "boolean"
 	},
 	"enable_custom_domains": {
@@ -97,7 +212,13 @@ const confSchema = `{
 	"enable_non_transactional_rate_limiter": {
 		"type": "boolean"
 	},
+	"enable_redis_rolling_limiter": {
+		"type": "boolean"
+	},
 	"enable_sentinel_rate_limiter": {
+		"type": "boolean"
+	},
+	"enable_separate_cache_store": {
 		"type": "boolean"
 	},
 	"enforce_org_data_age": {
@@ -111,14 +232,25 @@ const confSchema = `{
 	},
 	"event_handlers": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"events": {
-				"type": ["object", "null"]
+				"type": ["object", "null"],
+				"additionalProperties": false
 			}
 		}
 	},
+	"event_trigers_defunct": {
+		"type": ["array", "null"]
+	},
 	"experimental_process_org_off_thread": {
 		"type": "boolean"
+	},
+	"force_global_session_lifetime": {
+		"type": "boolean"
+	},
+	"global_session_lifetime": {
+		"type": "integer"
 	},
 	"graylog_network_addr": {
 		"type": "string"
@@ -128,6 +260,7 @@ const confSchema = `{
 	},
 	"health_check": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"enable_health_checks": {
 				"type": "boolean"
@@ -145,11 +278,13 @@ const confSchema = `{
 	},
 	"http_server_options": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"certificates": {
 				"type": ["array", "null"],
 				"items": {
 					"type": ["object", "null"],
+					"additionalProperties": false,
 					"properties": {
 						"domain_name": {
 							"type": "string"
@@ -181,13 +316,25 @@ const confSchema = `{
 			"server_name": {
 				"type": "string"
 			},
+			"skip_url_cleaning": {
+				"type": "boolean"
+			},
+			"ssl_insecure_skip_verify": {
+				"type": "boolean"
+			},
 			"use_ssl": {
+				"type": "boolean"
+			},
+			"use_ssl_le": {
 				"type": "boolean"
 			},
 			"write_timeout": {
 				"type": "integer"
 			}
 		}
+	},
+	"legacy_enable_allowance_countdown": {
+		"type": "boolean"
 	},
 	"listen_address": {
 		"type": "string"
@@ -197,6 +344,7 @@ const confSchema = `{
 	},
 	"local_session_cache": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"cached_session_eviction": {
 				"type": "integer"
@@ -209,24 +357,38 @@ const confSchema = `{
 			}
 		}
 	},
+	"log_level": {
+		"type": "string"
+	},
 	"logstash_network_addr": {
 		"type": "string"
 	},
 	"logstash_transport": {
 		"type": "string"
 	},
+	"management_node": {
+		"type": "boolean"
+	},
+	"max_idle_connections_per_host": {
+		"type": "integer"
+	},
 	"middleware_path": {
 		"type": "string"
 	},
 	"monitor": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
-			"enable_trigger_monitors": {
-				"type": "boolean"
-			},
 			"configuration": {
 				"type": ["object", "null"],
+				"additionalProperties": false,
 				"properties": {
+					"event_timeout": {
+						"type": "integer"
+					},
+					"header_map": {
+						"type": ["array", "null"]
+					},
 					"method": {
 						"type": "string"
 					},
@@ -235,30 +397,25 @@ const confSchema = `{
 					},
 					"template_path": {
 						"type": "string"
-					},
-					"header_map": {
-						"type": ["object", "null"],
-						"properties": {
-							"x-tyk-monitor-secret": {
-								"type": "string"
-							}
-						}
-					},
-					"event_timeout": {
-						"type": "integer"
 					}
 				}
+			},
+			"enable_trigger_monitors": {
+				"type": "boolean"
 			},
 			"global_trigger_limit": {
 				"type": "integer"
 			},
-			"monitor_user_keys": {
+			"monitor_org_keys": {
 				"type": "boolean"
 			},
-			"monitor_org_keys": {
+			"monitor_user_keys": {
 				"type": "boolean"
 			}
 		}
+	},
+	"node_secret": {
+		"type": "string"
 	},
 	"oauth_redirect_uri_separator": {
 		"type": "string"
@@ -277,6 +434,7 @@ const confSchema = `{
 	},
 	"policies": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"allow_explicit_policy_id": {
 				"type": "boolean"
@@ -292,7 +450,19 @@ const confSchema = `{
 			}
 		}
 	},
+	"proxy_default_timeout": {
+		"type": "integer"
+	},
+	"proxy_ssl_insecure_skip_verify": {
+		"type": "boolean"
+	},
 	"public_key_path": {
+		"type": "string"
+	},
+	"reload_wait_time": {
+		"type": "integer"
+	},
+	"secret": {
 		"type": "string"
 	},
 	"sentry_code": {
@@ -300,9 +470,94 @@ const confSchema = `{
 	},
 	"service_discovery": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"default_cache_timeout": {
 				"type": "integer"
+			}
+		}
+	},
+	"slave_options": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"api_key": {
+				"type": "string"
+			},
+			"bind_to_slugs": {
+				"type": "boolean"
+			},
+			"call_timeout": {
+				"type": "integer"
+			},
+			"connection_string": {
+				"type": "string"
+			},
+			"disable_keyspace_sync": {
+				"type": "boolean"
+			},
+			"enable_rpc_cache": {
+				"type": "boolean"
+			},
+			"group_id": {
+				"type": "string"
+			},
+			"ping_timeout": {
+				"type": "integer"
+			},
+			"rpc_key": {
+				"type": "string"
+			},
+			"ssl_insecure_skip_verify": {
+				"type": "boolean"
+			},
+			"use_rpc": {
+				"type": "boolean"
+			},
+			"use_ssl": {
+				"type": "boolean"
+			}
+		}
+	},
+	"statsd_connection_string": {
+		"type": "string"
+	},
+	"statsd_prefix": {
+		"type": "string"
+	},
+	"storage": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"database": {
+				"type": "integer"
+			},
+			"enable_cluster": {
+				"type": "boolean"
+			},
+			"host": {
+				"type": "string"
+			},
+			"hosts": {
+				"type": ["array", "null"]
+			},
+			"optimisation_max_active": {
+				"type": "integer"
+			},
+			"optimisation_max_idle": {
+				"type": "integer"
+			},
+			"password": {
+				"type": "string"
+			},
+			"port": {
+				"type": "integer"
+			},
+			"type": {
+				"type": "string"
+			},
+			"username": {
+				"type": "string"
 			}
 		}
 	},
@@ -326,9 +581,11 @@ const confSchema = `{
 	},
 	"uptime_tests": {
 		"type": ["object", "null"],
+		"additionalProperties": false,
 		"properties": {
 			"config": {
 				"type": ["object", "null"],
+				"additionalProperties": false,
 				"properties": {
 					"checker_pool_size": {
 						"type": "integer"
