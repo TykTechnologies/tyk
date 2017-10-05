@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -89,8 +90,9 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		orgID := r.URL.Query().Get("org_id")
 		var certID string
-		if certID, err = CertificateManager.Add(content); err != nil {
+		if certID, err = CertificateManager.Add(content, orgID); err != nil {
 			doJSONWrite(w, 403, apiError(err.Error()))
 			return
 		}
@@ -103,14 +105,26 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		cert := CertificateManager.List([]string{certID}, certs.CertificateAny)
+		certIDs := strings.Split(certID, ",")
+		certificates := CertificateManager.List(certIDs, certs.CertificateAny)
 
-		if len(cert) == 0 {
-			doJSONWrite(w, 404, apiError("Certificate with given SHA256 fingerprint not found"))
+		if len(certIDs) == 1 {
+			if len(certificates) == 0 {
+				doJSONWrite(w, 404, apiError("Certificate with given SHA256 fingerprint not found"))
+				return
+			}
+
+			doJSONWrite(w, 200, certs.ExtractCertificateMeta(certificates[0]))
+			return
+		} else {
+			var meta []certs.CertificateMeta
+			for _, cert := range certificates {
+				meta = append(meta, certs.ExtractCertificateMeta(cert))
+			}
+
+			doJSONWrite(w, 200, meta)
 			return
 		}
-
-		doJSONWrite(w, 200, certs.ExtractCertificateMeta(cert[0]))
 	case "DELETE":
 		CertificateManager.Delete(certID)
 		doJSONWrite(w, 200, &apiStatusMessage{"ok", "removed"})

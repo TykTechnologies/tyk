@@ -256,14 +256,15 @@ func (c *CertificateManager) GetRaw(certID string) (string, error) {
 	return c.storage.GetKey("raw-" + certID)
 }
 
-func (c *CertificateManager) Add(certData []byte) (string, error) {
+func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) {
 	var certBlocks [][]byte
 	var keyPEM, keyRaw []byte
-	var block *pem.Block
 
 	rest := certData
 
 	for {
+		var block *pem.Block
+
 		block, rest = pem.Decode(rest)
 		if block == nil {
 			break
@@ -325,7 +326,7 @@ func (c *CertificateManager) Add(certData []byte) (string, error) {
 		certID = HexSHA256(cert.Raw)
 	}
 
-	if err := c.storage.SetKey("raw-"+certID, string(certChainPEM), 0); err != nil {
+	if err := c.storage.SetKey("raw-"+orgID+certID, string(certChainPEM), 0); err != nil {
 		c.logger.Error(err)
 		return "", err
 	}

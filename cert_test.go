@@ -166,7 +166,7 @@ func TestGatewayTLS(t *testing.T) {
 	})
 
 	t.Run("Redis certificate", func(t *testing.T) {
-		certID, err := CertificateManager.Add(combinedPEM)
+		certID, err := CertificateManager.Add(combinedPEM, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -218,7 +218,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	clientWithoutCert := getTLSClient(nil, nil)
 
 	t.Run("Separate domain", func(t *testing.T) {
-		certID, _ := CertificateManager.Add(combinedPEM)
+		certID, _ := CertificateManager.Add(combinedPEM, "")
 		defer CertificateManager.Delete(certID)
 
 		config.Global.ControlAPIHostname = "localhost"
@@ -248,7 +248,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			t.Error("Should raise error for for unknown certificate")
 		}
 
-		clientCertID, _ := CertificateManager.Add(clientCertPem)
+		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 		defer CertificateManager.Delete(clientCertID)
 
 		config.Global.Security.Certificates.ControlAPI = []string{clientCertID}
@@ -259,7 +259,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Same domain", func(t *testing.T) {
-		certID, _ := CertificateManager.Add(combinedPEM)
+		certID, _ := CertificateManager.Add(combinedPEM, "")
 		defer CertificateManager.Delete(certID)
 
 		config.Global.ControlAPIHostname = "localhost"
@@ -308,7 +308,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			}
 		}
 
-		clientCertID, _ := CertificateManager.Add(clientCertPem)
+		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 
 		config.Global.Security.Certificates.ControlAPI = []string{clientCertID}
 
@@ -339,7 +339,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 func TestAPIMutualTLS(t *testing.T) {
 	// Configure server
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
-	certID, _ := CertificateManager.Add(combinedPEM)
+	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID)
 
 	config.Global.HttpServerOptions.UseSSL = true
@@ -395,7 +395,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 		t.Run("Client certificate match", func(t *testing.T) {
 			client := getTLSClient(&clientCert, serverCertPem)
-			clientCertID, _ := CertificateManager.Add(clientCertPem)
+			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 
 			buildAndLoadAPI(func(spec *APISpec) {
 				spec.Domain = "localhost"
@@ -422,7 +422,7 @@ func TestAPIMutualTLS(t *testing.T) {
 			client := getTLSClient(&clientCert, serverCertPem)
 
 			clientCertPem2, _, _, _ := genCertificate(&x509.Certificate{})
-			clientCertID2, _ := CertificateManager.Add(clientCertPem2)
+			clientCertID2, _ := CertificateManager.Add(clientCertPem2, "")
 			defer CertificateManager.Delete(clientCertID2)
 
 			buildAndLoadAPI(func(spec *APISpec) {
@@ -439,7 +439,7 @@ func TestAPIMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Multiple APIs on same domain", func(t *testing.T) {
-		clientCertID, _ := CertificateManager.Add(clientCertPem)
+		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 		defer CertificateManager.Delete(clientCertID)
 
 		loadAPIS := func(certs ...string) {
@@ -546,7 +546,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Upstream API", func(t *testing.T) {
-		clientCertID, _ := CertificateManager.Add(combinedClientPEM)
+		clientCertID, _ := CertificateManager.Add(combinedClientPEM, "")
 		defer CertificateManager.Delete(clientCertID)
 
 		pool.AddCert(clientCert.Leaf)
@@ -578,7 +578,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 func TestKeyWithCertificateTLS(t *testing.T) {
 	_, _, combinedPEM, _ := genServerCertificate()
-	serverCertID, _ := CertificateManager.Add(combinedPEM)
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(serverCertID)
 
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
@@ -743,6 +743,22 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 			if apiResp.DNSNames[0] != "localhost" {
 				t.Error("Should fill all the fields", apiResp)
+			}
+		}
+
+		req, _ = http.NewRequest("GET", baseURL+clientCertID+","+serverCertID, nil)
+		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
+			t.Error(resp)
+		} else {
+			var apiResp []certs.CertificateMeta
+			json.NewDecoder(resp.Body).Decode(&apiResp)
+
+			if apiResp[0].ID != clientCertID {
+				t.Error("Should return valid meta:", apiResp[0].ID, clientCertID)
+			}
+
+			if apiResp[1].ID != serverCertID {
+				t.Error("Should return valid meta:", apiResp[1].ID, serverCertID)
 			}
 		}
 	})
