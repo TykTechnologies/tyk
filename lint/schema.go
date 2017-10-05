@@ -4,6 +4,44 @@ const confSchema = `{
 "$schema": "http://json-schema.org/draft-04/schema#",
 "type": "object",
 "additionalProperties": false,
+"definitions": {
+	"StorageOptions": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"database": {
+				"type": "integer"
+			},
+			"enable_cluster": {
+				"type": "boolean"
+			},
+			"host": {
+				"type": "string"
+			},
+			"hosts": {
+				"type": ["array", "null"]
+			},
+			"optimisation_max_active": {
+				"type": "integer"
+			},
+			"optimisation_max_idle": {
+				"type": "integer"
+			},
+			"password": {
+				"type": "string"
+			},
+			"port": {
+				"type": "integer"
+			},
+			"type": {
+				"type": "string"
+			},
+			"username": {
+				"type": "string"
+			}
+		}
+	}
+},
 "properties": {
 	"allow_insecure_configs": {
 		"type": "boolean"
@@ -105,40 +143,7 @@ const confSchema = `{
 		"type": "string"
 	},
 	"cache_storage": {
-		"type": ["object", "null"],
-		"additionalProperties": false,
-		"properties": {
-			"database": {
-				"type": "integer"
-			},
-			"enable_cluster": {
-				"type": "boolean"
-			},
-			"host": {
-				"type": "string"
-			},
-			"hosts": {
-				"type": ["array", "null"]
-			},
-			"optimisation_max_active": {
-				"type": "integer"
-			},
-			"optimisation_max_idle": {
-				"type": "integer"
-			},
-			"password": {
-				"type": "string"
-			},
-			"port": {
-				"type": "integer"
-			},
-			"type": {
-				"type": "string"
-			},
-			"username": {
-				"type": "string"
-			}
-		}
+		"$ref": "#/definitions/StorageOptions"
 	},
 	"close_connections": {
 		"type": "boolean"
@@ -526,40 +531,7 @@ const confSchema = `{
 		"type": "string"
 	},
 	"storage": {
-		"type": ["object", "null"],
-		"additionalProperties": false,
-		"properties": {
-			"database": {
-				"type": "integer"
-			},
-			"enable_cluster": {
-				"type": "boolean"
-			},
-			"host": {
-				"type": "string"
-			},
-			"hosts": {
-				"type": ["array", "null"]
-			},
-			"optimisation_max_active": {
-				"type": "integer"
-			},
-			"optimisation_max_idle": {
-				"type": "integer"
-			},
-			"password": {
-				"type": "string"
-			},
-			"port": {
-				"type": "integer"
-			},
-			"type": {
-				"type": "string"
-			},
-			"username": {
-				"type": "string"
-			}
-		}
+		"$ref": "#/definitions/StorageOptions"
 	},
 	"suppress_default_org_store": {
 		"type": "boolean"
