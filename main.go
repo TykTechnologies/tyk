@@ -35,6 +35,7 @@ import (
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/lint"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -892,6 +893,7 @@ func getCmdArguments() map[string]interface{} {
 
 	Usage:
 		tyk [options]
+		tyk lint
 
 	Options:
 		-h --help                    Show this screen
@@ -961,6 +963,22 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 
 func main() {
 	arguments := getCmdArguments()
+	if arguments["lint"] == true {
+		path, lines, err := lint.Run(confPaths)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if len(lines) == 0 {
+			fmt.Printf("found no issues in %s\n", path)
+			return
+		}
+		fmt.Printf("issues found in %s:\n", path)
+		for _, line := range lines {
+			fmt.Println(line)
+		}
+		os.Exit(1)
+	}
 	NodeID = "solo-" + uuid.NewV4().String()
 
 	amForked := false
