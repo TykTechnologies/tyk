@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -228,5 +230,19 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 				t.Fatalf("want %t, got %t", tc.expected, actual)
 			}
 		})
+	}
+}
+
+func BenchmarkCopyRequestResponse(b *testing.B) {
+	str := strings.Repeat("very long body line that is repeated", 128)
+	req := &http.Request{}
+	res := &http.Response{}
+	for i := 0; i < b.N; i++ {
+		req.Body = ioutil.NopCloser(strings.NewReader(str))
+		res.Body = ioutil.NopCloser(strings.NewReader(str))
+		for j := 0; j < 10; j++ {
+			req = copyRequest(req)
+			res = copyResponse(res)
+		}
 	}
 }
