@@ -16,14 +16,14 @@ type JSVMContextGlobal struct {
 
 // JSVMEventHandler is a scriptable event handler
 type JSVMEventHandler struct {
-	conf     map[string]interface{}
-	Spec     *APISpec
-	SpecJSON string
+	methodName string
+	Spec       *APISpec
+	SpecJSON   string
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
 func (l *JSVMEventHandler) Init(handlerConf interface{}) error {
-	l.conf = handlerConf.(map[string]interface{})
+	l.methodName = handlerConf.(map[string]interface{})["name"].(string)
 
 	// Set the VM globals
 	globalVals := JSVMContextGlobal{
@@ -42,16 +42,13 @@ func (l *JSVMEventHandler) Init(handlerConf interface{}) error {
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l *JSVMEventHandler) HandleEvent(em config.EventMessage) {
-	// 1. Get the methodName for the Event Handler
-	methodName := l.conf["name"].(string)
-
-	// 2. JSON-encode the event data object
+	// JSON-encode the event data object
 	msgAsJSON, err := json.Marshal(em)
 	if err != nil {
 		log.Error("Failed to encode event data: ", err)
 		return
 	}
 
-	// 3. Execute the method name with the JSON object
-	GlobalEventsJSVM.VM.Run(methodName + `.DoProcessEvent(` + string(msgAsJSON) + `,` + l.SpecJSON + `);`)
+	// Execute the method name with the JSON object
+	GlobalEventsJSVM.VM.Run(l.methodName + `.DoProcessEvent(` + string(msgAsJSON) + `,` + l.SpecJSON + `);`)
 }

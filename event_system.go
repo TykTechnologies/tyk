@@ -155,31 +155,31 @@ func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
-	conf map[string]interface{}
+	prefix string
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
 func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
-	l.conf = handlerConf.(map[string]interface{})
+	l.prefix = handlerConf.(map[string]interface{})["prefix"].(string)
 	return nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
-	formattedMsgString := fmt.Sprintf("%s:%s", l.conf["prefix"].(string), em.Type)
+	logMsg := fmt.Sprintf("%s:%s", l.prefix, em.Type)
 
 	// We can handle specific event types easily
 	if em.Type == EventQuotaExceeded {
 		msgConf := em.Meta.(EventKeyFailureMeta)
-		formattedMsgString = fmt.Sprintf("%s:%s:%s:%s", formattedMsgString, msgConf.Key, msgConf.Origin, msgConf.Path)
+		logMsg = fmt.Sprintf("%s:%s:%s:%s", logMsg, msgConf.Key, msgConf.Origin, msgConf.Path)
 	}
 
 	if em.Type == EventBreakerTriggered {
 		msgConf := em.Meta.(EventCurcuitBreakerMeta)
-		formattedMsgString = fmt.Sprintf("%s:%s:%s: [STATUS] %v", formattedMsgString, msgConf.APIID, msgConf.Path, msgConf.CircuitEvent)
+		logMsg = fmt.Sprintf("%s:%s:%s: [STATUS] %v", logMsg, msgConf.APIID, msgConf.Path, msgConf.CircuitEvent)
 	}
 
-	log.Warning(formattedMsgString)
+	log.Warning(logMsg)
 }
 
 func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]config.TykEventHandler {
