@@ -11,14 +11,20 @@ import (
 func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 	accessDefinitions := make(map[string]user.AccessDefinition, len(session.AccessRights))
 
-	for key, protoAccessDefinition := range session.AccessRights {
-		allowedUrls := make([]user.AccessSpec, len(protoAccessDefinition.AllowedUrls))
-		for _, protoAllowedURL := range protoAccessDefinition.AllowedUrls {
-			allowedURL := user.AccessSpec{protoAllowedURL.Url, protoAllowedURL.Methods}
-			allowedUrls = append(allowedUrls, allowedURL)
+	for key, protoAccDef := range session.AccessRights {
+		allowedUrls := make([]user.AccessSpec, len(protoAccDef.AllowedUrls))
+		for _, protoAllowedURL := range protoAccDef.AllowedUrls {
+			allowedUrls = append(allowedUrls, user.AccessSpec{
+				URL:     protoAllowedURL.Url,
+				Methods: protoAllowedURL.Methods,
+			})
 		}
-		accessDefinition := user.AccessDefinition{protoAccessDefinition.ApiName, protoAccessDefinition.ApiId, protoAccessDefinition.Versions, allowedUrls}
-		accessDefinitions[key] = accessDefinition
+		accessDefinitions[key] = user.AccessDefinition{
+			APIName:     protoAccDef.ApiName,
+			APIID:       protoAccDef.ApiId,
+			Versions:    protoAccDef.Versions,
+			AllowedURLs: allowedUrls,
+		}
 	}
 
 	var basicAuthData struct {
@@ -46,36 +52,34 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 	}
 
 	return &user.SessionState{
-		session.LastCheck,
-		session.Allowance,
-		session.Rate,
-		session.Per,
-		session.Expires,
-		session.QuotaMax,
-		session.QuotaRenews,
-		session.QuotaRemaining,
-		session.QuotaRenewalRate,
-		accessDefinitions,
-		session.OrgId,
-		session.OauthClientId,
-		session.OauthKeys,
-		basicAuthData,
-		jwtData,
-		session.HmacEnabled,
-		session.HmacSecret,
-		session.IsInactive,
-		session.ApplyPolicyId,
-		session.ApplyPolicies,
-		session.DataExpires,
-		monitor,
-		session.EnableDetailedRecording,
-		nil,
-		session.Tags,
-		session.Alias,
-		session.LastUpdated,
-		session.IdExtractorDeadline,
-		session.SessionLifetime,
-		"",
+		LastCheck:               session.LastCheck,
+		Allowance:               session.Allowance,
+		Rate:                    session.Rate,
+		Per:                     session.Per,
+		Expires:                 session.Expires,
+		QuotaMax:                session.QuotaMax,
+		QuotaRenews:             session.QuotaRenews,
+		QuotaRemaining:          session.QuotaRemaining,
+		QuotaRenewalRate:        session.QuotaRenewalRate,
+		AccessRights:            accessDefinitions,
+		OrgID:                   session.OrgId,
+		OauthClientID:           session.OauthClientId,
+		OauthKeys:               session.OauthKeys,
+		BasicAuthData:           basicAuthData,
+		JWTData:                 jwtData,
+		HMACEnabled:             session.HmacEnabled,
+		HmacSecret:              session.HmacSecret,
+		IsInactive:              session.IsInactive,
+		ApplyPolicyID:           session.ApplyPolicyId,
+		ApplyPolicies:           session.ApplyPolicies,
+		DataExpires:             session.DataExpires,
+		Monitor:                 monitor,
+		EnableDetailedRecording: session.EnableDetailedRecording,
+		Tags:                session.Tags,
+		Alias:               session.Alias,
+		LastUpdated:         session.LastUpdated,
+		IdExtractorDeadline: session.IdExtractorDeadline,
+		SessionLifetime:     session.SessionLifetime,
 	}
 }
 
