@@ -322,7 +322,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		var chainArray []alice.Constructor
 
-		handleCORS(&chainArray, spec)
+		if spec.CORS.Enable && !spec.CORS.OptionsPassthrough {
+			handleCORS(&chainArray, spec)
+		}
 
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
