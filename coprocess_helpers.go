@@ -4,29 +4,30 @@ package main
 
 import (
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // TykSessionState takes a coprocess.SessionState (as returned by the Protocol Buffer binding), and outputs a standard Tyk SessionState.
-func TykSessionState(session *coprocess.SessionState) *SessionState {
-	accessDefinitions := make(map[string]AccessDefinition, len(session.AccessRights))
+func TykSessionState(session *coprocess.SessionState) *user.SessionState {
+	accessDefinitions := make(map[string]user.AccessDefinition, len(session.AccessRights))
 
 	for key, protoAccessDefinition := range session.AccessRights {
-		allowedUrls := make([]AccessSpec, len(protoAccessDefinition.AllowedUrls))
+		allowedUrls := make([]user.AccessSpec, len(protoAccessDefinition.AllowedUrls))
 		for _, protoAllowedURL := range protoAccessDefinition.AllowedUrls {
-			allowedURL := AccessSpec{protoAllowedURL.Url, protoAllowedURL.Methods}
+			allowedURL := user.AccessSpec{protoAllowedURL.Url, protoAllowedURL.Methods}
 			allowedUrls = append(allowedUrls, allowedURL)
 		}
-		accessDefinition := AccessDefinition{protoAccessDefinition.ApiName, protoAccessDefinition.ApiId, protoAccessDefinition.Versions, allowedUrls}
+		accessDefinition := user.AccessDefinition{protoAccessDefinition.ApiName, protoAccessDefinition.ApiId, protoAccessDefinition.Versions, allowedUrls}
 		accessDefinitions[key] = accessDefinition
 	}
 
 	var basicAuthData struct {
-		Password string   `json:"password" msg:"password"`
-		Hash     HashType `json:"hash_type" msg:"hash_type"`
+		Password string        `json:"password" msg:"password"`
+		Hash     user.HashType `json:"hash_type" msg:"hash_type"`
 	}
 	if session.BasicAuthData != nil {
 		basicAuthData.Password = session.BasicAuthData.Password
-		basicAuthData.Hash = HashType(session.BasicAuthData.Hash)
+		basicAuthData.Hash = user.HashType(session.BasicAuthData.Hash)
 	}
 
 	var jwtData struct {
@@ -44,7 +45,7 @@ func TykSessionState(session *coprocess.SessionState) *SessionState {
 		monitor.TriggerLimits = session.Monitor.TriggerLimits
 	}
 
-	return &SessionState{
+	return &user.SessionState{
 		session.LastCheck,
 		session.Allowance,
 		session.Rate,
@@ -79,7 +80,7 @@ func TykSessionState(session *coprocess.SessionState) *SessionState {
 }
 
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
-func ProtoSessionState(session *SessionState) *coprocess.SessionState {
+func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 
 	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
 

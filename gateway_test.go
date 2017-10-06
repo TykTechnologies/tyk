@@ -25,6 +25,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func init() {
@@ -199,8 +200,8 @@ func emptyRedis() error {
 	return err
 }
 
-func createNonThrottledSession() *SessionState {
-	session := new(SessionState)
+func createNonThrottledSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 100.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -213,8 +214,8 @@ func createNonThrottledSession() *SessionState {
 	return session
 }
 
-func createQuotaSession() *SessionState {
-	session := new(SessionState)
+func createQuotaSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -226,8 +227,8 @@ func createQuotaSession() *SessionState {
 	return session
 }
 
-func createVersionedSession() *SessionState {
-	session := new(SessionState)
+func createVersionedSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -237,12 +238,12 @@ func createVersionedSession() *SessionState {
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
-	session.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v1"}}}
 	return session
 }
 
-func createParamAuthSession() *SessionState {
-	session := new(SessionState)
+func createParamAuthSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -252,12 +253,12 @@ func createParamAuthSession() *SessionState {
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
 	session.QuotaMax = -1
-	session.AccessRights = map[string]AccessDefinition{"9992": {APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"9992": {APIName: "Tyk Test API", APIID: "9992", Versions: []string{"default"}}}
 	return session
 }
 
-func createStandardSession() *SessionState {
-	session := new(SessionState)
+func createStandardSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 10000
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -621,7 +622,7 @@ func TestVersioningRequestOK(t *testing.T) {
 func TestVersioningRequestFail(t *testing.T) {
 	spec := createSpecTest(t, versionedDefinition)
 	session := createVersionedSession()
-	session.AccessRights = map[string]AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"9991": {APIName: "Tyk Test API", APIID: "9991", Versions: []string{"v2"}}}
 
 	// no version allowed
 	spec.SessionManager.UpdateSession("zz1234", session, 60)

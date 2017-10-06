@@ -11,6 +11,7 @@ import (
 	"github.com/clbanning/mxj"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type ResponseTransformMiddleware struct {
@@ -22,7 +23,7 @@ func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 	return nil
 }
 
-func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	_, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedResponse)
 	if !found {

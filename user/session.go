@@ -1,4 +1,4 @@
-package main
+package user
 
 import (
 	"fmt"
@@ -7,7 +7,10 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
 )
+
+var log = logger.Get()
 
 type HashType string
 
@@ -69,13 +72,13 @@ type SessionState struct {
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
 
-	firstSeenHash string
+	FirstSeenHash string `bson:"-" json:"-"`
 }
 
 var murmurHasher = murmur3.New32()
 
 func (s *SessionState) SetFirstSeenHash() {
-	s.firstSeenHash = s.Hash()
+	s.FirstSeenHash = s.Hash()
 }
 
 func (s *SessionState) Hash() string {
@@ -84,19 +87,11 @@ func (s *SessionState) Hash() string {
 		log.Error("Error encoding session data: ", err)
 		return ""
 	}
-
 	return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
 func (s *SessionState) HasChanged() bool {
-	if s.firstSeenHash == "" {
-		return true
-	}
-	if s.firstSeenHash == s.Hash() {
-		return false
-	}
-	// log.Debug("s.firstSeenHash: ", s.firstSeenHash, " current hash: ", s.Hash())
-	return true
+	return s.FirstSeenHash == "" || s.FirstSeenHash != s.Hash()
 }
 
 func (s *SessionState) Lifetime(fallback int64) int64 {

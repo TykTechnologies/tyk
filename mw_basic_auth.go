@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // BasicAuthKeyIsValid uses a username instead of
@@ -101,12 +102,12 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Ensure that the username and password match up
 	var passMatch bool
 	switch session.BasicAuthData.Hash {
-	case HashBCrypt:
+	case user.HashBCrypt:
 		err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(authValues[1]))
 		if err == nil {
 			passMatch = true
 		}
-	case HashPlainText:
+	case user.HashPlainText:
 		if session.BasicAuthData.Password == authValues[1] {
 			passMatch = true
 		}

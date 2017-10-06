@@ -117,12 +117,12 @@ func (l *LDAPStorageHandler) GetKeysAndValuesWithFilter(filter string) map[strin
 	return s
 }
 
-func (l *LDAPStorageHandler) SetKey(cn, sessionState string, timeout int64) error {
+func (l *LDAPStorageHandler) SetKey(cn, session string, timeout int64) error {
 	l.notifyReadOnly()
 	return nil
 }
 
-func (l *LDAPStorageHandler) SetRawKey(cn, sessionState string, timeout int64) error {
+func (l *LDAPStorageHandler) SetRawKey(cn, session string, timeout int64) error {
 	l.notifyReadOnly()
 	return nil
 }

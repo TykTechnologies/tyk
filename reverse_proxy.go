@@ -32,6 +32,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const defaultUserAgent = "Tyk/" + VERSION
@@ -601,7 +602,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		inres.Body = ioutil.NopCloser(bodyBuffer2)
 	}
 
-	ses := new(SessionState)
+	ses := new(user.SessionState)
 	if session != nil {
 		ses = session
 	}
@@ -619,7 +620,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	return inres
 }
 
-func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) error {
+func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) error {
 
 	// Remove hop-by-hop headers listed in the
 	// "Connection" header of the response.

@@ -13,6 +13,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // Enums for keys to be stored in a session context - this is how gorilla expects
@@ -165,7 +166,7 @@ func recordDetail(r *http.Request) bool {
 	}
 
 	// Session found
-	return ses.(SessionState).EnableDetailedRecording
+	return ses.(user.SessionState).EnableDetailedRecording
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's

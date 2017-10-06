@@ -87,7 +87,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		ctxSetSession(r, session)
 	}
 
-	log.Debug("SessionState: ", session)
+	log.Debug("user.SessionState: ", session)
 
 	switch reason {
 	case sessionFailNone:

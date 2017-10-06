@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const mwStatusRespond = 666
@@ -126,7 +127,7 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
 }
 
-func (t BaseMiddleware) OrgSession(key string) (SessionState, bool) {
+func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.SessionDetail(key)
 	if found && config.Global.EnforceOrgDataAge {
@@ -156,7 +157,7 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
-func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) error {
+func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) error {
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
 	policies := session.PolicyIDs()
@@ -254,7 +255,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *SessionState) error {
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionState, bool) {
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.SessionState, bool) {
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
 	// Check in-memory cache
@@ -262,7 +263,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (SessionS
 		cachedVal, found := SessionCache.Get(key)
 		if found {
 			log.Debug("--> Key found in local cache")
-			session := cachedVal.(SessionState)
+			session := cachedVal.(user.SessionState)
 			if err := t.ApplyPolicies(key, &session); err != nil {
 				log.Error(err)
 			}
@@ -317,7 +318,7 @@ func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 
 type TykResponseHandler interface {
 	Init(interface{}, *APISpec) error
-	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *SessionState) error
+	HandleResponse(http.ResponseWriter, *http.Response, *http.Request, *user.SessionState) error
 }
 
 func responseProcessorByName(name string) TykResponseHandler {
@@ -332,7 +333,7 @@ func responseProcessorByName(name string) TykResponseHandler {
 	return nil
 }
 
-func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	for _, rh := range chain {
 		if err := rh.HandleResponse(rw, res, req, ses); err != nil {
 			return err
