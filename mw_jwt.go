@@ -237,7 +237,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			session.Alias = baseFieldData
 
 			// Update the session in the session manager in case it gets called again
-			k.Spec.SessionManager.UpdateSession(sessionID, &session, getLifetime(k.Spec, &session))
+			k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime))
 			log.Debug("Policy applied to key")
 
 			switch k.Spec.BaseIdentityProvidedBy {
