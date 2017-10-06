@@ -135,7 +135,7 @@ func doAddOrUpdate(keyName string, newSession *SessionState, dontReset bool) err
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 
-				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, getLifetime(apiSpec, newSession))
+				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, newSession.Lifetime(apiSpec.SessionLifetime))
 				if err != nil {
 					return err
 				}
@@ -156,7 +156,7 @@ func doAddOrUpdate(keyName string, newSession *SessionState, dontReset bool) err
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
 			checkAndApplyTrialPeriod(keyName, spec.APIID, newSession)
-			err := spec.SessionManager.UpdateSession(keyName, newSession, getLifetime(spec, newSession))
+			err := spec.SessionManager.UpdateSession(keyName, newSession, newSession.Lifetime(spec.SessionLifetime))
 			if err != nil {
 				return err
 			}
@@ -895,7 +895,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					apiSpec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, getLifetime(apiSpec, newSession))
+				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, newSession.Lifetime(apiSpec.SessionLifetime))
 				if err != nil {
 					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
@@ -935,7 +935,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					spec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := spec.SessionManager.UpdateSession(newKey, newSession, getLifetime(spec, newSession))
+				err := spec.SessionManager.UpdateSession(newKey, newSession, newSession.Lifetime(spec.SessionLifetime))
 				if err != nil {
 					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return

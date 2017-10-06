@@ -75,13 +75,7 @@ type SessionState struct {
 var murmurHasher = murmur3.New32()
 
 func (s *SessionState) SetFirstSeenHash() {
-	encoded, err := msgpack.Marshal(s)
-	if err != nil {
-		log.Error("Error encoding session data: ", err)
-		return
-	}
-
-	s.firstSeenHash = fmt.Sprintf("%x", murmurHasher.Sum(encoded))
+	s.firstSeenHash = s.Hash()
 }
 
 func (s *SessionState) Hash() string {
@@ -105,15 +99,15 @@ func (s *SessionState) HasChanged() bool {
 	return true
 }
 
-func getLifetime(spec *APISpec, session *SessionState) int64 {
+func (s *SessionState) Lifetime(fallback int64) int64 {
 	if config.Global.ForceGlobalSessionLifetime {
 		return config.Global.GlobalSessionLifetime
 	}
-	if session.SessionLifetime > 0 {
-		return session.SessionLifetime
+	if s.SessionLifetime > 0 {
+		return s.SessionLifetime
 	}
-	if spec.SessionLifetime > 0 {
-		return spec.SessionLifetime
+	if fallback > 0 {
+		return fallback
 	}
 	return 0
 }
