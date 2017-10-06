@@ -15,6 +15,7 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type JWTMiddleware struct {
@@ -219,7 +220,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
-		session = SessionState{}
+		session = user.SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy := k.getBasePolicyID(token)
@@ -420,11 +421,11 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 	}
 }
 
-func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (SessionState, error) {
+func generateSessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
 	policiesMu.RLock()
 	policy, ok := policiesByID[policyID]
 	policiesMu.RUnlock()
-	session := SessionState{}
+	session := user.SessionState{}
 	if !ok {
 		return session, errors.New("Policy not found")
 	}

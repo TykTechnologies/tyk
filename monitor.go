@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type Monitor struct{}
@@ -12,7 +13,7 @@ func (Monitor) Enabled() bool {
 	return config.Global.Monitor.EnableTriggerMonitors
 }
 
-func (Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64) {
+func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit float64) {
 	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
@@ -27,7 +28,7 @@ func (Monitor) Fire(sessionData *SessionState, key string, triggerLimit float64)
 	go MonitoringHandler.HandleEvent(em)
 }
 
-func (m Monitor) Check(sessionData *SessionState, key string) {
+func (m Monitor) Check(sessionData *user.SessionState, key string) {
 	if !m.Enabled() || sessionData.QuotaMax == -1 {
 		return
 	}

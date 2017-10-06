@@ -185,12 +185,12 @@ func (r *RedisCluster) GetExp(keyName string) (int64, error) {
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RedisCluster) SetKey(keyName, sessionState string, timeout int64) error {
+func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
 	log.Debug("[STORE] SET Raw key is: ", keyName)
 	log.Debug("[STORE] Setting key: ", r.fixKey(keyName))
 
 	r.ensureConnection()
-	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", r.fixKey(keyName), sessionState)
+	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", r.fixKey(keyName), session)
 	if timeout > 0 {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", r.fixKey(keyName), timeout)
 		if err != nil {
@@ -205,10 +205,10 @@ func (r *RedisCluster) SetKey(keyName, sessionState string, timeout int64) error
 	return nil
 }
 
-func (r *RedisCluster) SetRawKey(keyName, sessionState string, timeout int64) error {
+func (r *RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 
 	r.ensureConnection()
-	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", keyName, sessionState)
+	_, err := GetRelevantClusterReference(r.IsCache).Do("SET", keyName, session)
 	if timeout > 0 {
 		_, err := GetRelevantClusterReference(r.IsCache).Do("EXPIRE", keyName, timeout)
 		if err != nil {

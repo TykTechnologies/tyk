@@ -17,6 +17,7 @@ import (
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -46,7 +47,7 @@ type MiniRequestObject struct {
 type VMReturnObject struct {
 	Request     MiniRequestObject
 	SessionMeta map[string]string
-	Session     SessionState
+	Session     user.SessionState
 	AuthValue   string
 }
 
@@ -114,7 +115,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	confData := jsonConfigData(d.Spec)
 
-	session := new(SessionState)
+	session := new(user.SessionState)
 	token := ctxGetAuthToken(r)
 
 	// Encode the session object (if not a pre-process)
@@ -265,7 +266,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 func mapStrsToIfaces(m map[string]string) map[string]interface{} {
 	// TODO: do we really need this conversion? note that we can't
-	// make SessionState.MetaData a map[string]string, however.
+	// make user.SessionState.MetaData a map[string]string, however.
 	m2 := make(map[string]interface{}, len(m))
 	for k, v := range m {
 		m2[k] = v
@@ -494,7 +495,7 @@ func (j *JSVM) LoadTykJSApi() {
 		encoddedSession := call.Argument(1).String()
 		suppressReset := call.Argument(2).String()
 
-		newSession := SessionState{}
+		newSession := user.SessionState{}
 		err := json.Unmarshal([]byte(encoddedSession), &newSession)
 		if err != nil {
 			log.WithFields(logrus.Fields{

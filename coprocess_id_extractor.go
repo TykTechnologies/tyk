@@ -17,12 +17,13 @@ import (
 	"gopkg.in/xmlpath.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // IdExtractor is the base interface for an ID extractor.
 type IdExtractor interface {
 	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
-	PostProcess(*http.Request, *SessionState, string)
+	PostProcess(*http.Request, *user.SessionState, string)
 	GenerateSessionID(string, BaseMiddleware) string
 }
 
@@ -42,7 +43,7 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 }
 
 // PostProcess sets context variables and updates the storage.
-func (e *BaseExtractor) PostProcess(r *http.Request, session *SessionState, sessionID string) {
+func (e *BaseExtractor) PostProcess(r *http.Request, session *user.SessionState, sessionID string) {
 	sessionLifetime := session.Lifetime(e.Spec.SessionLifetime)
 	e.Spec.SessionManager.UpdateSession(sessionID, session, sessionLifetime)
 

@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const apiTestDef = `{
@@ -64,8 +65,8 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	}
 }
 
-func createSampleSession() *SessionState {
-	return &SessionState{
+func createSampleSession() *user.SessionState {
+	return &user.SessionState{
 		Rate:             5.0,
 		Allowance:        5.0,
 		LastCheck:        time.Now().Unix(),
@@ -74,7 +75,7 @@ func createSampleSession() *SessionState {
 		QuotaRenews:      time.Now().Unix(),
 		QuotaRemaining:   10,
 		QuotaMax:         10,
-		AccessRights: map[string]AccessDefinition{
+		AccessRights: map[string]user.AccessDefinition{
 			"1": {
 				APIName:  "Test",
 				APIID:    "1",
@@ -695,7 +696,7 @@ func TestContextSession(t *testing.T) {
 	if ctxGetSession(r) != nil {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
-	ctxSetSession(r, &SessionState{})
+	ctxSetSession(r, &user.SessionState{})
 	if ctxGetSession(r) == nil {
 		t.Fatal("expected ctxGetSession to return non-nil")
 	}

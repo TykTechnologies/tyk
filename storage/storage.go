@@ -18,9 +18,9 @@ var ErrKeyNotFound = errors.New("key not found")
 // Handler is a standard interface to a storage backend, used by
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {
-	GetKey(string) (string, error) // Returned string is expected to be a JSON object (SessionState)
+	GetKey(string) (string, error) // Returned string is expected to be a JSON object (user.SessionState)
 	GetRawKey(string) (string, error)
-	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (SessionState)
+	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
 	SetRawKey(string, string, int64) error
 	GetExp(string) (int64, error) // Returns expiry of a key
 	GetKeys(string) []string

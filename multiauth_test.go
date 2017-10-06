@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const multiAuthDev = `{
@@ -32,8 +34,8 @@ const multiAuthDev = `{
 	}
 }`
 
-func createMultiAuthKeyAuthSession() *SessionState {
-	session := new(SessionState)
+func createMultiAuthKeyAuthSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 100.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -42,12 +44,12 @@ func createMultiAuthKeyAuthSession() *SessionState {
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 900
 	session.QuotaMax = 10
-	session.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 	return session
 }
 
-func createMultiBasicAuthSession() *SessionState {
-	session := new(SessionState)
+func createMultiBasicAuthSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()
@@ -57,7 +59,7 @@ func createMultiBasicAuthSession() *SessionState {
 	session.QuotaRemaining = 1
 	session.QuotaMax = -1
 	session.BasicAuthData.Password = "TEST"
-	session.AccessRights = map[string]AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 	return session
 }
 

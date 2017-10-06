@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/openid2go/openid"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const OIDPREFIX = "openid"
@@ -97,7 +98,7 @@ func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Req
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// 1. Validate the JWT
-	user, token, halt := openid.AuthenticateOIDWithUser(k.providerConfiguration, w, r)
+	ouser, token, halt := openid.AuthenticateOIDWithUser(k.providerConfiguration, w, r)
 
 	// 2. Generate the internal representation for the key
 	if halt {
@@ -158,7 +159,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		return errors.New("Key not authorised"), 403
 	}
 
-	data := []byte(user.ID)
+	data := []byte(ouser.ID)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
 	sessionID := k.Spec.OrgID + tokenID
 	if k.Spec.OpenIDOptions.SegregateByClient {
@@ -173,7 +174,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
-		session = SessionState{}
+		session = user.SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		newSession, err := generateSessionFromPolicy(policyID,
@@ -190,7 +191,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 		session = newSession
 		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID, "ClientID": clientID}
-		session.Alias = clientID + ":" + user.ID
+		session.Alias = clientID + ":" + ouser.ID
 
 		// Update the session in the session manager in case it gets called again
 		k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime))

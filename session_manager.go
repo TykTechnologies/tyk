@@ -7,9 +7,10 @@ import (
 	"github.com/TykTechnologies/leakybucket/memorycache"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
-type PublicSessionState struct {
+type PublicSession struct {
 	Quota struct {
 		QuotaMax       int64 `json:"quota_max"`
 		QuotaRemaining int64 `json:"quota_remaining"`
@@ -32,7 +33,7 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *SessionState, store storage.Handler) bool {
+func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *user.SessionState, store storage.Handler) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := config.Global.EnableNonTransactionalRateLimiter
@@ -72,7 +73,7 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store storage.Handler, enableRL, enableQ bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool) sessionFailReason {
 	rateLimiterKey := RateLimitKeyPrefix + storage.HashKey(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(key) + ".BLOCKED"
 
@@ -136,7 +137,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *SessionState, key string
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(currentSession *SessionState, key string, store storage.Handler) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(currentSession *user.SessionState, key string, store storage.Handler) bool {
 
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {

@@ -8,7 +8,7 @@ import (
 )
 
 // AccessRightsCheck is a middleware that will check if the key bing used to access the API has
-// permission to access the specific version. If no permission data is in the SessionState, then
+// permission to access the specific version. If no permission data is in the user.SessionState, then
 // it is assumed that the user can go through.
 type AccessRightsCheck struct {
 	BaseMiddleware

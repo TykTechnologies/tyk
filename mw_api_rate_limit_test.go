@@ -9,10 +9,12 @@ import (
 
 	"github.com/justinas/alice"
 	"github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
-func createRLSession() *SessionState {
-	session := new(SessionState)
+func createRLSession() *user.SessionState {
+	session := new(user.SessionState)
 	// essentially non-throttled
 	session.Rate = 100.0
 	session.Allowance = session.Rate
@@ -22,7 +24,7 @@ func createRLSession() *SessionState {
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
-	session.AccessRights = map[string]AccessDefinition{"31445455": {APIName: "Tyk Auth Key Test", APIID: "31445455", Versions: []string{"default"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"31445455": {APIName: "Tyk Auth Key Test", APIID: "31445455", Versions: []string{"default"}}}
 	return session
 }
 

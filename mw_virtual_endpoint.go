@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -138,7 +139,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Encode the configuration data too
 	confData := jsonConfigData(d.Spec)
 
-	session := new(SessionState)
+	session := new(user.SessionState)
 	token := ctxGetAuthToken(r)
 
 	// Encode the session object (if not a pre-process)
@@ -189,7 +190,7 @@ func forceResponse(w http.ResponseWriter,
 	r *http.Request,
 	newResponseData *VMResponseObject,
 	spec *APISpec,
-	session *SessionState, isPre bool) *http.Response {
+	session *user.SessionState, isPre bool) *http.Response {
 	responseMessage := []byte(newResponseData.Response.Body)
 
 	// Create an http.Response object so we can send it tot he cache middleware
@@ -239,12 +240,12 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return nil, mwStatusRespond
 }
 
-func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
+func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
 	// Externalising this from the MW so we can re-use it elsewhere
 	handleForcedResponse(rw, res, ses)
 }
 
-func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *SessionState) {
+func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
 	defer res.Body.Close()
 
 	// Close connections

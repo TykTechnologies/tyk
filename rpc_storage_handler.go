@@ -21,12 +21,12 @@ import (
 )
 
 type InboundData struct {
-	KeyName      string
-	Value        string
-	SessionState string
-	Timeout      int64
-	Per          int64
-	Expire       int64
+	KeyName string
+	Value   string
+	Session string
+	Timeout int64
+	Per     int64
+	Expire  int64
 }
 
 type DefRequest struct {
@@ -369,18 +369,18 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RPCStorageHandler) SetKey(keyName, sessionState string, timeout int64) error {
+func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error {
 	start := time.Now() // get current time
 	ibd := InboundData{
-		KeyName:      r.fixKey(keyName),
-		SessionState: sessionState,
-		Timeout:      timeout,
+		KeyName: r.fixKey(keyName),
+		Session: session,
+		Timeout: timeout,
 	}
 
 	_, err := RPCFuncClientSingleton.CallTimeout("SetKey", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
-		return r.SetKey(keyName, sessionState, timeout)
+		return r.SetKey(keyName, session, timeout)
 	}
 
 	elapsed := time.Since(start)
@@ -389,7 +389,7 @@ func (r *RPCStorageHandler) SetKey(keyName, sessionState string, timeout int64) 
 
 }
 
-func (r *RPCStorageHandler) SetRawKey(keyName, sessionState string, timeout int64) error {
+func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) error {
 	return nil
 }
 

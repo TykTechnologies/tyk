@@ -6,6 +6,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type HeaderInjectorOptions struct {
@@ -23,7 +24,7 @@ func (h *HeaderInjector) Init(c interface{}, spec *APISpec) error {
 	return mapstructure.Decode(c, &h.config)
 }
 
-func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	// TODO: This should only target specific paths
 
 	_, versionPaths, _, _ := h.Spec.Version(req)

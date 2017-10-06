@@ -10,6 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
@@ -37,7 +38,7 @@ type dummySessionManager struct {
 	DefaultSessionManager
 }
 
-func (dummySessionManager) UpdateSession(key string, sess *SessionState, ttl int64) error {
+func (dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64) error {
 	return nil
 }
 
@@ -75,11 +76,11 @@ func TestApplyPolicies(t *testing.T) {
 		"rate2": {Partitions: PolicyPartitions{RateLimit: true}},
 		"acl1": {
 			Partitions:   PolicyPartitions{Acl: true},
-			AccessRights: map[string]AccessDefinition{"a": {}},
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"acl2": {
 			Partitions:   PolicyPartitions{Acl: true},
-			AccessRights: map[string]AccessDefinition{"b": {}},
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
 	}
 	policiesMu.RUnlock()
@@ -90,8 +91,8 @@ func TestApplyPolicies(t *testing.T) {
 	tests := []struct {
 		name      string
 		policies  []string
-		errMatch  string                          // substring
-		sessMatch func(*testing.T, *SessionState) // ignored if nil
+		errMatch  string                               // substring
+		sessMatch func(*testing.T, *user.SessionState) // ignored if nil
 	}{
 		{
 			"Empty", nil,
@@ -119,7 +120,7 @@ func TestApplyPolicies(t *testing.T) {
 		},
 		{
 			"TagMerge", []string{"tags1", "tags2"},
-			"", func(t *testing.T, s *SessionState) {
+			"", func(t *testing.T, s *user.SessionState) {
 				want := []string{"tagA", "tagX", "tagY"}
 				sort.Strings(s.Tags)
 				if !reflect.DeepEqual(want, s.Tags) {
@@ -129,7 +130,7 @@ func TestApplyPolicies(t *testing.T) {
 		},
 		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
-			"", func(t *testing.T, s *SessionState) {
+			"", func(t *testing.T, s *user.SessionState) {
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
@@ -137,7 +138,7 @@ func TestApplyPolicies(t *testing.T) {
 		},
 		{
 			"InactiveMergeAll", []string{"inactive1", "inactive2"},
-			"", func(t *testing.T, s *SessionState) {
+			"", func(t *testing.T, s *user.SessionState) {
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
@@ -145,7 +146,7 @@ func TestApplyPolicies(t *testing.T) {
 		},
 		{
 			"QuotaPart", []string{"quota1"},
-			"", func(t *testing.T, s *SessionState) {
+			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != 2 {
 					t.Fatalf("want QuotaMax to be 2")
 				}
@@ -157,7 +158,7 @@ func TestApplyPolicies(t *testing.T) {
 		},
 		{
 			"RatePart", []string{"rate1"},
-			"", func(t *testing.T, s *SessionState) {
+			"", func(t *testing.T, s *user.SessionState) {
 				if s.Rate != 3 {
 					t.Fatalf("want Rate to be 3")
 				}
@@ -169,8 +170,8 @@ func TestApplyPolicies(t *testing.T) {
 		},
 		{
 			"AclPart", []string{"acl1"},
-			"", func(t *testing.T, s *SessionState) {
-				want := map[string]AccessDefinition{"a": {}}
+			"", func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{"a": {}}
 				if !reflect.DeepEqual(want, s.AccessRights) {
 					t.Fatalf("want %v got %v", want, s.AccessRights)
 				}
@@ -178,8 +179,8 @@ func TestApplyPolicies(t *testing.T) {
 		},
 		{
 			"AclPart", []string{"acl1", "acl2"},
-			"", func(t *testing.T, s *SessionState) {
-				want := map[string]AccessDefinition{"a": {}, "b": {}}
+			"", func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{"a": {}, "b": {}}
 				if !reflect.DeepEqual(want, s.AccessRights) {
 					t.Fatalf("want %v got %v", want, s.AccessRights)
 				}
@@ -188,7 +189,7 @@ func TestApplyPolicies(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			sess := &SessionState{}
+			sess := &user.SessionState{}
 			sess.SetPolicies(tc.policies...)
 			errStr := ""
 			if err := bmid.ApplyPolicies("", sess); err != nil {
