@@ -1162,9 +1162,11 @@ func handleDashboardRegistration() {
 
 func startDRL() {
 	switch {
-	case config.Global.ManagementNode,
-		config.Global.EnableSentinelRateLImiter,
+	case config.Global.ManagementNode:
+		return
+	case config.Global.EnableSentinelRateLImiter,
 		config.Global.EnableRedisRollingLimiter:
+		log.Warning("The old, non-distributed rate limiter is deprecated and we no longer recommend its use.")
 		return
 	}
 	log.WithFields(logrus.Fields{
