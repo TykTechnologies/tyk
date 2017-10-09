@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
@@ -13,7 +15,7 @@ import (
 type RateLimitForAPI struct {
 	BaseMiddleware
 	keyName string
-	apiSess *SessionState
+	apiSess *user.SessionState
 }
 
 func (k *RateLimitForAPI) Name() string {
@@ -27,7 +29,7 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 
 	// We'll init here
 	k.keyName = fmt.Sprintf("apilimiter-%s%s", k.Spec.OrgID, k.Spec.APIID)
-	k.apiSess = &SessionState{
+	k.apiSess = &user.SessionState{
 		Rate:        k.Spec.GlobalRateLimit.Rate,
 		Per:         k.Spec.GlobalRateLimit.Per,
 		LastUpdated: "na",

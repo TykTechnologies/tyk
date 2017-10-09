@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const basicAuthDef = `{
@@ -30,8 +32,8 @@ const basicAuthDef = `{
 	}
 }`
 
-func createBasicAuthSession() *SessionState {
-	session := new(SessionState)
+func createBasicAuthSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()

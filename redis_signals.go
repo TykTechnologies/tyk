@@ -11,6 +11,7 @@ import (
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type NotificationCommand string
@@ -39,7 +40,7 @@ type Notification struct {
 }
 
 func startPubSubLoop() {
-	cacheStore := RedisClusterStorageManager{}
+	cacheStore := storage.RedisCluster{}
 	cacheStore.Connect()
 	// On message, synchronise
 	for {
@@ -174,7 +175,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 // RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
-	store   *RedisClusterStorageManager
+	store   *storage.RedisCluster
 	channel string
 }
 

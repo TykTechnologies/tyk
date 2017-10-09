@@ -4,29 +4,36 @@ package main
 
 import (
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // TykSessionState takes a coprocess.SessionState (as returned by the Protocol Buffer binding), and outputs a standard Tyk SessionState.
-func TykSessionState(session *coprocess.SessionState) *SessionState {
-	accessDefinitions := make(map[string]AccessDefinition, len(session.AccessRights))
+func TykSessionState(session *coprocess.SessionState) *user.SessionState {
+	accessDefinitions := make(map[string]user.AccessDefinition, len(session.AccessRights))
 
-	for key, protoAccessDefinition := range session.AccessRights {
-		allowedUrls := make([]AccessSpec, len(protoAccessDefinition.AllowedUrls))
-		for _, protoAllowedURL := range protoAccessDefinition.AllowedUrls {
-			allowedURL := AccessSpec{protoAllowedURL.Url, protoAllowedURL.Methods}
-			allowedUrls = append(allowedUrls, allowedURL)
+	for key, protoAccDef := range session.AccessRights {
+		allowedUrls := make([]user.AccessSpec, len(protoAccDef.AllowedUrls))
+		for _, protoAllowedURL := range protoAccDef.AllowedUrls {
+			allowedUrls = append(allowedUrls, user.AccessSpec{
+				URL:     protoAllowedURL.Url,
+				Methods: protoAllowedURL.Methods,
+			})
 		}
-		accessDefinition := AccessDefinition{protoAccessDefinition.ApiName, protoAccessDefinition.ApiId, protoAccessDefinition.Versions, allowedUrls}
-		accessDefinitions[key] = accessDefinition
+		accessDefinitions[key] = user.AccessDefinition{
+			APIName:     protoAccDef.ApiName,
+			APIID:       protoAccDef.ApiId,
+			Versions:    protoAccDef.Versions,
+			AllowedURLs: allowedUrls,
+		}
 	}
 
 	var basicAuthData struct {
-		Password string   `json:"password" msg:"password"`
-		Hash     HashType `json:"hash_type" msg:"hash_type"`
+		Password string        `json:"password" msg:"password"`
+		Hash     user.HashType `json:"hash_type" msg:"hash_type"`
 	}
 	if session.BasicAuthData != nil {
 		basicAuthData.Password = session.BasicAuthData.Password
-		basicAuthData.Hash = HashType(session.BasicAuthData.Hash)
+		basicAuthData.Hash = user.HashType(session.BasicAuthData.Hash)
 	}
 
 	var jwtData struct {
@@ -44,42 +51,40 @@ func TykSessionState(session *coprocess.SessionState) *SessionState {
 		monitor.TriggerLimits = session.Monitor.TriggerLimits
 	}
 
-	return &SessionState{
-		session.LastCheck,
-		session.Allowance,
-		session.Rate,
-		session.Per,
-		session.Expires,
-		session.QuotaMax,
-		session.QuotaRenews,
-		session.QuotaRemaining,
-		session.QuotaRenewalRate,
-		accessDefinitions,
-		session.OrgId,
-		session.OauthClientId,
-		session.OauthKeys,
-		basicAuthData,
-		jwtData,
-		session.HmacEnabled,
-		session.HmacSecret,
-		session.IsInactive,
-		session.ApplyPolicyId,
-		session.ApplyPolicies,
-		session.DataExpires,
-		monitor,
-		session.EnableDetailedRecording,
-		nil,
-		session.Tags,
-		session.Alias,
-		session.LastUpdated,
-		session.IdExtractorDeadline,
-		session.SessionLifetime,
-		"",
+	return &user.SessionState{
+		LastCheck:               session.LastCheck,
+		Allowance:               session.Allowance,
+		Rate:                    session.Rate,
+		Per:                     session.Per,
+		Expires:                 session.Expires,
+		QuotaMax:                session.QuotaMax,
+		QuotaRenews:             session.QuotaRenews,
+		QuotaRemaining:          session.QuotaRemaining,
+		QuotaRenewalRate:        session.QuotaRenewalRate,
+		AccessRights:            accessDefinitions,
+		OrgID:                   session.OrgId,
+		OauthClientID:           session.OauthClientId,
+		OauthKeys:               session.OauthKeys,
+		BasicAuthData:           basicAuthData,
+		JWTData:                 jwtData,
+		HMACEnabled:             session.HmacEnabled,
+		HmacSecret:              session.HmacSecret,
+		IsInactive:              session.IsInactive,
+		ApplyPolicyID:           session.ApplyPolicyId,
+		ApplyPolicies:           session.ApplyPolicies,
+		DataExpires:             session.DataExpires,
+		Monitor:                 monitor,
+		EnableDetailedRecording: session.EnableDetailedRecording,
+		Tags:                session.Tags,
+		Alias:               session.Alias,
+		LastUpdated:         session.LastUpdated,
+		IdExtractorDeadline: session.IdExtractorDeadline,
+		SessionLifetime:     session.SessionLifetime,
 	}
 }
 
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
-func ProtoSessionState(session *SessionState) *coprocess.SessionState {
+func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 
 	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
 

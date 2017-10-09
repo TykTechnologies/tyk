@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type ChainObject struct {
@@ -27,10 +28,10 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys}
-	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
+func prepareStorage() (*storage.RedisCluster, *storage.RedisCluster, *storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys}
+	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
+	healthStore := &storage.RedisCluster{KeyPrefix: "apihealth."}
 	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 
@@ -98,7 +99,7 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 }
 
 func processSpec(spec *APISpec, apisByListen map[string]int,
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore StorageHandler,
+	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler,
 	subrouter *mux.Router) *ChainObject {
 
 	var chainDef ChainObject
@@ -260,7 +261,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
+	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
 	cacheStore.Connect()
 
 	var chain http.Handler

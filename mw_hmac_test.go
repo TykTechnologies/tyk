@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/justinas/alice"
 )
@@ -38,8 +39,8 @@ const hmacAuthDef = `{
 	}
 }`
 
-func createHMACAuthSession() *SessionState {
-	session := new(SessionState)
+func createHMACAuthSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 8.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix()

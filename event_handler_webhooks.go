@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type WebHookRequestMethod string
@@ -35,7 +36,7 @@ const (
 type WebHookHandler struct {
 	conf     config.WebHookHandlerConf
 	template *template.Template // non-nil if Init is run without error
-	store    StorageHandler
+	store    storage.Handler
 }
 
 // createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
@@ -65,7 +66,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return err
 	}
 
-	w.store = &RedisClusterStorageManager{KeyPrefix: "webhook.cache."}
+	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache."}
 	w.store.Connect()
 
 	// Pre-load template on init

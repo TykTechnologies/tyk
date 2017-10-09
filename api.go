@@ -21,6 +21,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -83,7 +85,7 @@ func GetSpecForOrg(apiID string) *APISpec {
 	return apisByID[aKey]
 }
 
-func checkAndApplyTrialPeriod(keyName, apiId string, newSession *SessionState) {
+func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionState) {
 	// Check the policies to see if we are forcing an expiry on the key
 	for _, polID := range newSession.PolicyIDs() {
 		policiesMu.RLock()
@@ -104,7 +106,7 @@ func checkAndApplyTrialPeriod(keyName, apiId string, newSession *SessionState) {
 	}
 }
 
-func doAddOrUpdate(keyName string, newSession *SessionState, dontReset bool) error {
+func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool) error {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 	if len(newSession.AccessRights) > 0 {
@@ -134,7 +136,7 @@ func doAddOrUpdate(keyName string, newSession *SessionState, dontReset bool) err
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 
-				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, getLifetime(apiSpec, newSession))
+				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, newSession.Lifetime(apiSpec.SessionLifetime))
 				if err != nil {
 					return err
 				}
@@ -155,7 +157,7 @@ func doAddOrUpdate(keyName string, newSession *SessionState, dontReset bool) err
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
 			checkAndApplyTrialPeriod(keyName, spec.APIID, newSession)
-			err := spec.SessionManager.UpdateSession(keyName, newSession, getLifetime(spec, newSession))
+			err := spec.SessionManager.UpdateSession(keyName, newSession, newSession.Lifetime(spec.SessionLifetime))
 			if err != nil {
 				return err
 			}
@@ -191,19 +193,19 @@ func ObfuscateKeyString(keyName string) string {
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
-func SetSessionPassword(session *SessionState) {
-	session.BasicAuthData.Hash = HashBCrypt
+func SetSessionPassword(session *user.SessionState) {
+	session.BasicAuthData.Hash = user.HashBCrypt
 	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
 	if err != nil {
 		log.Error("Could not hash password, setting to plaintext, error was: ", err)
-		session.BasicAuthData.Hash = HashPlainText
+		session.BasicAuthData.Hash = user.HashPlainText
 		return
 	}
 
 	session.BasicAuthData.Password = string(newPass)
 }
 
-func GetKeyDetail(key, apiID string) (SessionState, bool) {
+func GetKeyDetail(key, apiID string) (user.SessionState, bool) {
 	sessionManager := FallbackKeySesionManager
 	if spec := getApiSpec(apiID); spec != nil {
 		sessionManager = spec.SessionManager
@@ -213,7 +215,7 @@ func GetKeyDetail(key, apiID string) (SessionState, bool) {
 }
 
 func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
-	var newSession SessionState
+	var newSession user.SessionState
 	if err := json.NewDecoder(r.Body).Decode(&newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
 		return apiError("Request malformed"), 400
@@ -230,7 +232,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 			SetSessionPassword(&newSession)
 		case "PUT":
 			// Ge the session
-			var originalKey SessionState
+			var originalKey user.SessionState
 			var found bool
 			for apiID := range newSession.AccessRights {
 				originalKey, found = GetKeyDetail(keyName, apiID)
@@ -338,7 +340,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 		apisMu.RLock()
 		for _, spec := range apisByID {
 			spec.SessionManager.RemoveSession(keyName)
-			spec.SessionManager.ResetQuota(keyName, &SessionState{})
+			spec.SessionManager.ResetQuota(keyName, &user.SessionState{})
 		}
 		apisMu.RUnlock()
 
@@ -359,7 +361,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	}
 
 	sessionManager.RemoveSession(keyName)
-	sessionManager.ResetQuota(keyName, &SessionState{})
+	sessionManager.ResetQuota(keyName, &user.SessionState{})
 
 	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
 
@@ -628,7 +630,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 		return apiError("Key not found"), 404
 	}
 
-	sess := SessionState{}
+	sess := user.SessionState{}
 	if err := json.Unmarshal([]byte(rawSessionData), &sess); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -706,7 +708,7 @@ func orgHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
-	newSession := new(SessionState)
+	newSession := new(user.SessionState)
 
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
@@ -730,7 +732,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(keyName, newSession)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-		rawKey := QuotaKeyPrefix + hashKey(keyName)
+		rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
 
 		// manage quotas separately
 		DefaultQuotaStore.RemoveSession(rawKey)
@@ -865,7 +867,7 @@ func resetHandler(fn func()) http.HandlerFunc {
 }
 
 func createKeyHandler(w http.ResponseWriter, r *http.Request) {
-	newSession := new(SessionState)
+	newSession := new(user.SessionState)
 	if err := json.NewDecoder(r.Body).Decode(newSession); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -894,7 +896,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					apiSpec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, getLifetime(apiSpec, newSession))
+				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, newSession.Lifetime(apiSpec.SessionLifetime))
 				if err != nil {
 					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
@@ -934,7 +936,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					spec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := spec.SessionManager.UpdateSession(newKey, newSession, getLifetime(spec, newSession))
+				err := spec.SessionManager.UpdateSession(newKey, newSession, newSession.Lifetime(spec.SessionLifetime))
 				if err != nil {
 					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
@@ -1323,7 +1325,7 @@ func UserRatesCheck() http.HandlerFunc {
 			return
 		}
 
-		returnSession := PublicSessionState{}
+		returnSession := PublicSession{}
 		returnSession.Quota.QuotaRenews = session.QuotaRenews
 		returnSession.Quota.QuotaRemaining = session.QuotaRemaining
 		returnSession.Quota.QuotaMax = session.QuotaMax
@@ -1339,7 +1341,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
-	store := &RedisClusterStorageManager{KeyPrefix: keyPrefix, IsCache: true}
+	store := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		err := errors.New("scan/delete failed")
@@ -1394,14 +1396,14 @@ func ctxSetData(r *http.Request, m map[string]interface{}) {
 	setCtxValue(r, ContextData, m)
 }
 
-func ctxGetSession(r *http.Request) *SessionState {
+func ctxGetSession(r *http.Request) *user.SessionState {
 	if v := r.Context().Value(SessionData); v != nil {
-		return v.(*SessionState)
+		return v.(*user.SessionState)
 	}
 	return nil
 }
 
-func ctxSetSession(r *http.Request, s *SessionState) {
+func ctxSetSession(r *http.Request, s *user.SessionState) {
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}

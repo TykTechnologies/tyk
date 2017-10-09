@@ -15,6 +15,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const dateHeaderSpec = "Date"
@@ -228,7 +229,7 @@ type HMACFieldValues struct {
 	Signature string
 }
 
-func (hm *HMACMiddleware) getSecretAndSessionForKeyID(keyId string) (string, SessionState, error) {
+func (hm *HMACMiddleware) getSecretAndSessionForKeyID(keyId string) (string, user.SessionState, error) {
 	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")

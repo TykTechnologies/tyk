@@ -19,6 +19,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
@@ -33,7 +34,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
 
-	store := &RedisClusterStorageManager{KeyPrefix: CoProcessDefaultKeyPrefix}
+	store := &storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
 	store.SetKey(key, value, ttl)
 }
 
@@ -42,7 +43,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
-	store := &RedisClusterStorageManager{KeyPrefix: CoProcessDefaultKeyPrefix}
+	store := &storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
 	// TODO: return error
 	val, _ := store.GetKey(key)
 	return C.CString(val)

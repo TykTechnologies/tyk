@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type HealthPrefix string
@@ -20,7 +21,7 @@ const (
 )
 
 type HealthChecker interface {
-	Init(StorageHandler)
+	Init(storage.Handler)
 	ApiHealthValues() (HealthCheckValues, error)
 	StoreCounterVal(HealthPrefix, string)
 }
@@ -34,13 +35,13 @@ type HealthCheckValues struct {
 }
 
 type DefaultHealthChecker struct {
-	storage StorageHandler
+	storage storage.Handler
 	APIID   string
 }
 
 var healthWarn sync.Once
 
-func (h *DefaultHealthChecker) Init(storeType StorageHandler) {
+func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
 	if config.Global.HealthCheck.EnableHealthChecks {
 		log.Debug("Health Checker initialised.")
 		healthWarn.Do(func() {

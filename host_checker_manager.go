@@ -14,13 +14,14 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
 	Id                string
-	store             StorageHandler
+	store             storage.Handler
 	checkerMu         sync.Mutex
 	checker           *HostUptimeChecker
 	stopLoop          bool
@@ -70,7 +71,7 @@ const (
 	UptimeAnalytics_KEYNAME = "tyk-uptime-analytics"
 )
 
-func (hc *HostCheckerManager) Init(store StorageHandler) {
+func (hc *HostCheckerManager) Init(store storage.Handler) {
 	hc.store = store
 	hc.unhealthyHostList = make(map[string]bool)
 	hc.resetsInitiated = make(map[string]bool)
@@ -493,7 +494,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func InitHostCheckManager(store StorageHandler) {
+func InitHostCheckManager(store storage.Handler) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return

@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
-func createAuthKeyAuthSession() *SessionState {
-	session := new(SessionState)
+func createAuthKeyAuthSession() *user.SessionState {
+	session := new(user.SessionState)
 	// essentially non-throttled
 	session.Rate = 100.0
 	session.Allowance = session.Rate
@@ -22,7 +24,7 @@ func createAuthKeyAuthSession() *SessionState {
 	session.QuotaRenews = time.Now().Unix()
 	session.QuotaRemaining = 10
 	session.QuotaMax = 10
-	session.AccessRights = map[string]AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
 	return session
 }
 

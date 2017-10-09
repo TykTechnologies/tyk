@@ -9,6 +9,8 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/justinas/alice"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const jwtDef = `{
@@ -137,8 +139,8 @@ jQIDAQAB
 -----END PUBLIC KEY-----
 `
 
-func createJWTSession() *SessionState {
-	session := new(SessionState)
+func createJWTSession() *user.SessionState {
+	session := new(user.SessionState)
 	session.Rate = 1000000.0
 	session.Allowance = session.Rate
 	session.LastCheck = time.Now().Unix() - 10
@@ -151,13 +153,13 @@ func createJWTSession() *SessionState {
 	return session
 }
 
-func createJWTSessionWithRSA() *SessionState {
+func createJWTSessionWithRSA() *user.SessionState {
 	session := createJWTSession()
 	session.JWTData.Secret = jwtRSAPubKey
 	return session
 }
 
-func createJWTSessionWithRSAWithPolicy() *SessionState {
+func createJWTSessionWithRSAWithPolicy() *user.SessionState {
 	session := createJWTSessionWithRSA()
 	session.SetPolicies("987654321")
 	return session
@@ -499,7 +501,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 		Per:              1.0,
 		QuotaMax:         -1,
 		QuotaRenewalRate: -1,
-		AccessRights: map[string]AccessDefinition{"76": {
+		AccessRights: map[string]user.AccessDefinition{"76": {
 			APIName:  "Test",
 			APIID:    "76",
 			Versions: []string{"default"},
@@ -551,7 +553,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 		Per:              1.0,
 		QuotaMax:         -1,
 		QuotaRenewalRate: -1,
-		AccessRights:     map[string]AccessDefinition{},
+		AccessRights:     map[string]user.AccessDefinition{},
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
@@ -601,7 +603,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 		Per:              1.0,
 		QuotaMax:         -1,
 		QuotaRenewalRate: -1,
-		AccessRights:     map[string]AccessDefinition{},
+		AccessRights:     map[string]user.AccessDefinition{},
 		Active:           true,
 		KeyExpiresIn:     60,
 	}
@@ -651,7 +653,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 		Per:              1.0,
 		QuotaMax:         -1,
 		QuotaRenewalRate: -1,
-		AccessRights:     map[string]AccessDefinition{},
+		AccessRights:     map[string]user.AccessDefinition{},
 		Active:           true,
 		KeyExpiresIn:     60,
 	}

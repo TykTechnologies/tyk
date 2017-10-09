@@ -13,6 +13,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 /*
@@ -117,13 +119,13 @@ func (o *OAuthHandlers) notifyClientOfNewOauth(notification NewOAuthNotification
 // HandleGenerateAuthCodeData handles a resource provider approving an OAuth request from a client
 func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *http.Request) {
 	// On AUTH grab session state data and add to UserData (not validated, not good!)
-	sessionStateJSONData := r.FormValue("key_rules")
-	if sessionStateJSONData == "" {
+	sessionJSONData := r.FormValue("key_rules")
+	if sessionJSONData == "" {
 		log.Warning("Authorise request is missing key_rules in params, policy will be required!")
 	}
 
 	// Handle the authorisation and write the JSON output to the resource provider
-	resp := o.Manager.HandleAuthorisation(r, true, sessionStateJSONData)
+	resp := o.Manager.HandleAuthorisation(r, true, sessionJSONData)
 	code := 200
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
 	if resp.IsError {
@@ -218,7 +220,7 @@ type OAuthManager struct {
 }
 
 // HandleAuthorisation creates the authorisation data for the request
-func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessionState string) *osin.Response {
+func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, session string) *osin.Response {
 	resp := o.OsinServer.NewResponse()
 
 	if ar := o.OsinServer.HandleAuthorizeRequest(resp, r); ar != nil {
@@ -226,7 +228,7 @@ func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, sessi
 		ar.Authorized = true
 
 		if complete {
-			ar.UserData = sessionState
+			ar.UserData = session
 			o.OsinServer.FinishAuthorizeRequest(resp, r, ar)
 		}
 	}
@@ -243,11 +245,11 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 	var username string
 	if ar := o.OsinServer.HandleAccessRequest(resp, r); ar != nil {
 
-		var session *SessionState
+		var session *user.SessionState
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
-			searchKey := "apikey-" + hashKey(o.API.OrgID+username)
+			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username)
 			log.Debug("Getting: ", searchKey)
 
 			var err error
@@ -256,14 +258,14 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 				log.Warning("Attempted access with non-existent user (OAuth password flow).")
 			} else {
 				var passMatch bool
-				if session.BasicAuthData.Hash == HashBCrypt {
+				if session.BasicAuthData.Hash == user.HashBCrypt {
 					err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(password))
 					if err == nil {
 						passMatch = true
 					}
 				}
 
-				if session.BasicAuthData.Hash == HashPlainText &&
+				if session.BasicAuthData.Hash == user.HashPlainText &&
 					session.BasicAuthData.Password == password {
 					passMatch = true
 				}
@@ -318,7 +320,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := o.API.OrgID + username
 
 			log.Debug("Updating user:", keyName)
-			err := o.API.SessionManager.UpdateSession(keyName, session, getLifetime(o.API, session))
+			err := o.API.SessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime))
 			if err != nil {
 				log.Error(err)
 			}
@@ -397,10 +399,10 @@ type ExtendedOsinStorageInterface interface {
 	RemoveRefresh(token string) error
 
 	// GetUser retrieves a Basic Access user token type from the key store
-	GetUser(string) (*SessionState, error)
+	GetUser(string) (*user.SessionState, error)
 
 	// SetUser updates a Basic Access user token type in the key store
-	SetUser(string, *SessionState, int64) error
+	SetUser(string, *user.SessionState, int64) error
 }
 
 // TykOsinServer subclasses osin.Server so we can add the SetClient method without wrecking the lbrary
@@ -433,7 +435,7 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 // TODO: Refactor this to move prefix handling into a checker method, then it can be an unexported setting in the struct.
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
 type RedisOsinStorageInterface struct {
-	store          StorageHandler
+	store          storage.Handler
 	sessionManager SessionHandler
 }
 
@@ -619,8 +621,8 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
 
-	// Create a SessionState object and register it with the authmanager
-	var newSession SessionState
+	// Create a user.SessionState object and register it with the authmanager
+	var newSession user.SessionState
 
 	// ------
 	checkPolicy := true
@@ -628,7 +630,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		checkPolicy = false
 		err := json.Unmarshal([]byte(accessData.UserData.(string)), &newSession)
 		if err != nil {
-			log.Info("Couldn't decode SessionState from UserData, checking policy: ", err)
+			log.Info("Couldn't decode user.SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
 		}
 	}
@@ -743,13 +745,13 @@ type AccessTokenGenTyk struct{}
 func (AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
 	log.Info("[OAuth] Generating new token")
 
-	var newSession SessionState
+	var newSession user.SessionState
 	checkPolicy := true
 	if data.UserData != nil {
 		checkPolicy = false
 		err := json.Unmarshal([]byte(data.UserData.(string)), &newSession)
 		if err != nil {
-			log.Info("[GenerateAccessToken] Couldn't decode SessionState from UserData, checking policy: ", err)
+			log.Info("[GenerateAccessToken] Couldn't decode user.SessionState from UserData, checking policy: ", err)
 			checkPolicy = true
 		}
 	}
@@ -774,7 +776,7 @@ func (AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefr
 }
 
 // LoadRefresh will load access data from Redis
-func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, error) {
+func (r *RedisOsinStorageInterface) GetUser(username string) (*user.SessionState, error) {
 	key := username
 	log.Debug("Loading User key: ", key)
 	accessJSON, err := r.store.GetRawKey(key)
@@ -785,7 +787,7 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, err
 	}
 
 	// new interface means having to make this nested... ick.
-	session := SessionState{}
+	session := user.SessionState{}
 	if err := json.Unmarshal([]byte(accessJSON), &session); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)
@@ -795,7 +797,7 @@ func (r *RedisOsinStorageInterface) GetUser(username string) (*SessionState, err
 	return &session, nil
 }
 
-func (r *RedisOsinStorageInterface) SetUser(username string, session *SessionState, timeout int64) error {
+func (r *RedisOsinStorageInterface) SetUser(username string, session *user.SessionState, timeout int64) error {
 	key := username
 	authDataJSON, err := json.Marshal(session)
 	if err != nil {

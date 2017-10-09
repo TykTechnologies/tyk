@@ -4,20 +4,19 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
 // Constant for event system.
-const (
-	EH_CoProcessHandler apidef.TykEventHandlerName = "cp_dynamic_handler"
-)
+const EH_CoProcessHandler apidef.TykEventHandlerName = "cp_dynamic_handler"
 
 type CoProcessEventHandler struct {
-	conf     map[string]interface{}
-	Spec     *APISpec
-	SpecJSON json.RawMessage
+	methodName string
+	Spec       *APISpec
+	SpecJSON   json.RawMessage
 }
 
 type CoProcessEventWrapper struct {
@@ -27,7 +26,7 @@ type CoProcessEventWrapper struct {
 }
 
 func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
-	l.conf = handlerConf.(map[string]interface{})
+	l.methodName = handlerConf.(map[string]interface{})["name"].(string)
 
 	// Set the VM globals
 	globalVals := JSVMContextGlobal{
@@ -37,7 +36,7 @@ func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
 
 	gValAsJSON, err := json.Marshal(globalVals)
 	if err != nil {
-		log.Error("Failed to marshal globals! ", err)
+		return fmt.Errorf("failed to marshal globals: %v", err)
 	}
 
 	l.SpecJSON = json.RawMessage(gValAsJSON)
@@ -45,23 +44,20 @@ func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
 }
 
 func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {
-	// 1. Get the methodName for the Event Handler
-	methodName := l.conf["name"].(string)
-
+	if GlobalDispatcher == nil {
+		return
+	}
 	eventWrapper := CoProcessEventWrapper{
 		Event:    em,
-		Handler:  methodName,
+		Handler:  l.methodName,
 		SpecJSON: &l.SpecJSON,
 	}
 
-	// 2. JSON-encode the event data object
+	// JSON-encode the event data object
 	msgAsJSON, err := json.Marshal(eventWrapper)
 	if err != nil {
 		log.Error("Failed to encode event data: ", err)
 		return
 	}
-
-	if GlobalDispatcher != nil {
-		GlobalDispatcher.DispatchEvent(msgAsJSON)
-	}
+	GlobalDispatcher.DispatchEvent(msgAsJSON)
 }

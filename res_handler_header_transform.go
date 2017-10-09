@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type RevProxyTransform struct {
@@ -31,7 +33,7 @@ func (h *HeaderTransform) Init(c interface{}, spec *APISpec) error {
 }
 
 func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
-	res *http.Response, req *http.Request, ses *SessionState) error {
+	res *http.Response, req *http.Request, ses *user.SessionState) error {
 
 	// Parse target_host parameter from configuration
 	target_url, err := url.Parse(h.config.RevProxyTransform.Target_host)

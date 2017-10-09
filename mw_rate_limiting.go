@@ -83,11 +83,11 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	// If either are disabled, save the write roundtrip
 	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
 		// Ensure quota and rate data for this session are recorded
-		k.Spec.SessionManager.UpdateSession(token, session, getLifetime(k.Spec, session))
+		k.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(k.Spec.SessionLifetime))
 		ctxSetSession(r, session)
 	}
 
-	log.Debug("SessionState: ", session)
+	log.Debug("user.SessionState: ", session)
 
 	switch reason {
 	case sessionFailNone:

@@ -15,17 +15,18 @@ import (
 	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/Sirupsen/logrus"
 )
 
 type InboundData struct {
-	KeyName      string
-	Value        string
-	SessionState string
-	Timeout      int64
-	Per          int64
-	Expire       int64
+	KeyName string
+	Value   string
+	Session string
+	Timeout int64
+	Per     int64
+	Expire  int64
 }
 
 type DefRequest struct {
@@ -217,7 +218,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 		// Not hashing? Return the raw key
 		return in
 	}
-	return doHash(in)
+	return storage.HashStr(in)
 }
 
 func (r *RPCStorageHandler) fixKey(keyName string) string {
@@ -335,7 +336,7 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 		}
 
 		log.Debug("Error trying to get value:", err)
-		return "", errKeyNotFound
+		return "", storage.ErrKeyNotFound
 	}
 	elapsed := time.Since(start)
 	log.Debug("GetKey took ", elapsed)
@@ -362,24 +363,24 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 			return r.GetExp(keyName)
 		}
 		log.Error("Error trying to get TTL: ", err)
-		return 0, errKeyNotFound
+		return 0, storage.ErrKeyNotFound
 	}
 	return value.(int64), nil
 }
 
 // SetKey will create (or update) a key value in the store
-func (r *RPCStorageHandler) SetKey(keyName, sessionState string, timeout int64) error {
+func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error {
 	start := time.Now() // get current time
 	ibd := InboundData{
-		KeyName:      r.fixKey(keyName),
-		SessionState: sessionState,
-		Timeout:      timeout,
+		KeyName: r.fixKey(keyName),
+		Session: session,
+		Timeout: timeout,
 	}
 
 	_, err := RPCFuncClientSingleton.CallTimeout("SetKey", ibd, GlobalRPCCallTimeout)
 	if r.IsAccessError(err) {
 		r.Login()
-		return r.SetKey(keyName, sessionState, timeout)
+		return r.SetKey(keyName, session, timeout)
 	}
 
 	elapsed := time.Since(start)
@@ -388,7 +389,7 @@ func (r *RPCStorageHandler) SetKey(keyName, sessionState string, timeout int64) 
 
 }
 
-func (r *RPCStorageHandler) SetRawKey(keyName, sessionState string, timeout int64) error {
+func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) error {
 	return nil
 }
 
