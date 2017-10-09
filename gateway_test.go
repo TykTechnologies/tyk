@@ -519,9 +519,9 @@ const extendedPathGatewaySetup = `{
 func createSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	tname := t.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
+	redisStore := storage.RedisCluster{KeyPrefix: tname + "-apikey."}
+	healthStore := storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
+	orgStore := storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }

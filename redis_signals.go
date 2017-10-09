@@ -175,7 +175,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 // RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
-	store   *storage.RedisCluster
+	store   storage.RedisCluster
 	channel string
 }
 

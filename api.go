@@ -1341,7 +1341,7 @@ func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
-	store := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
+	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
 		err := errors.New("scan/delete failed")
