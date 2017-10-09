@@ -28,16 +28,16 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (*storage.RedisCluster, *storage.RedisCluster, *storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
+func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys}
 	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
-	healthStore := &storage.RedisCluster{KeyPrefix: "apihealth."}
+	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
 	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 
 	FallbackKeySesionManager.Init(&redisStore)
 
-	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
+	return redisStore, redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
 func skipSpecBecauseInvalid(spec *APISpec) bool {
@@ -261,7 +261,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
+	cacheStore := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true}
 	cacheStore.Connect()
 
 	var chain http.Handler

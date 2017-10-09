@@ -35,7 +35,7 @@ func saveRPCDefinitionsBackup(list string) {
 
 	log.Info("--> Connecting to DB")
 
-	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -57,7 +57,7 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 	tagList := getTagListAsString()
 	checkKey := BackupKeyBase + tagList
 
-	store := &storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
 
 	connected := store.Connect()
 	log.Info("[RPC] --> Connected to DB")

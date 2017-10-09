@@ -102,7 +102,7 @@ func setupGlobals() {
 	}
 
 	// Initialise our Host Checker
-	healthCheckStore := &storage.RedisCluster{KeyPrefix: "host-checker:"}
+	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(healthCheckStore)
 
 	if config.Global.EnableAnalytics && analytics.Store == nil {
@@ -145,7 +145,7 @@ func setupGlobals() {
 	}).Debug("Notifier will not work in hybrid mode")
 	mainNotifierStore := storage.RedisCluster{}
 	mainNotifierStore.Connect()
-	MainNotifier = RedisNotifier{&mainNotifierStore, RedisPubSubChannel}
+	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
 	if config.Global.Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{}
@@ -924,7 +924,7 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	if config.Global.SlaveOptions.UseRPC {
 		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 	}
-	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
+	return storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
 }
 
 func main() {
@@ -1048,7 +1048,7 @@ func start(arguments map[string]interface{}) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Initialising default org store")
-		//DefaultOrgStore.Init(&storage.RedisCluster{KeyPrefix: "orgkey."})
+		//DefaultOrgStore.Init(storage.RedisCluster{KeyPrefix: "orgkey."})
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
