@@ -33,11 +33,10 @@ func getRLOpenChain(spec *APISpec) http.Handler {
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{spec, proxy}
-	rlMW := &RateLimitForAPI{BaseMiddleware: baseMid}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
-		rlMW,
+		&RateLimitForAPI{BaseMiddleware: baseMid},
 	)...).Then(proxyHandler)
 	return chain
 }
@@ -47,14 +46,13 @@ func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{spec, proxy}
-	rlMW := &RateLimitForAPI{BaseMiddleware: baseMid}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&AuthKey{baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&KeyExpired{baseMid},
 		&AccessRightsCheck{baseMid},
-		rlMW,
+		&RateLimitForAPI{BaseMiddleware: baseMid},
 		&RateLimitAndQuotaCheck{baseMid},
 	)...).Then(proxyHandler)
 	return chain
