@@ -17,7 +17,7 @@ type InterfaceNotification struct {
 }
 
 type RedisNotificationHandler struct {
-	CacheStore *storage.RedisCluster
+	CacheStore storage.RedisCluster
 }
 
 const (
@@ -25,7 +25,9 @@ const (
 )
 
 func (u *RedisNotificationHandler) Start() {
-	go u.StartUIPubSubConn()
+	u.CacheStore = storage.RedisCluster{KeyPrefix: "gateway-notifications:"}
+	u.CacheStore.Connect()
+	go u.PubSubLoop()
 }
 
 func (u *RedisNotificationHandler) Notify(n InterfaceNotification) error {
@@ -33,17 +35,11 @@ func (u *RedisNotificationHandler) Notify(n InterfaceNotification) error {
 	if err != nil {
 		return err
 	}
-
-	if u.CacheStore != nil {
-		u.CacheStore.Publish(UIChanName, string(jsonError))
-	}
-
+	u.CacheStore.Publish(UIChanName, string(jsonError))
 	return nil
 }
 
-func (u *RedisNotificationHandler) StartUIPubSubConn() {
-	u.CacheStore = &storage.RedisCluster{KeyPrefix: "gateway-notifications:"}
-	u.CacheStore.Connect()
+func (u *RedisNotificationHandler) PubSubLoop() {
 	// On message, synchronize
 	for {
 		err := u.CacheStore.StartPubSubHandler(UIChanName, u.HandleIncommingRedisEvent)
