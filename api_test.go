@@ -333,7 +333,8 @@ func TestKeyHandlerGetKey(t *testing.T) {
 			mainRouter.ServeHTTP(recorder, req)
 
 			if recorder.Code != 200 {
-				t.Error("key not requested, status error:\n", recorder.Body.String())
+				t.Errorf("key not requested, path %s status error %s",
+					req.URL.Path, recorder.Body.String())
 			}
 		}
 	}

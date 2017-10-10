@@ -279,52 +279,66 @@ func getPolicies() {
 	}
 }
 
+// stripSlashes removes any trailing slashes from the request's URL
+// path.
+func stripSlashes(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if trim := strings.TrimRight(path, "/"); trim != path {
+			r2 := *r
+			r2.URL.Path = trim
+			r = &r2
+		}
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(fn)
+}
+
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global.HostName
 	if config.Global.ControlAPIHostname != "" {
 		hostname = config.Global.ControlAPIHostname
 	}
-	var subr *mux.Router
 	if hostname != "" {
-		subr = muxer.Host(hostname).Subrouter()
+		muxer = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
-	} else {
-		subr = muxer.NewRoute().Subrouter()
 	}
 	if httpProfile {
-		subr.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
+		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 	r := mux.NewRouter()
-	subr.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		checkIsAPIOwner(InstrumentationMW(r)),
+	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
+		stripSlashes(checkIsAPIOwner(InstrumentationMW(r))),
 	))
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	r.HandleFunc("/reload/group{_:/?}", allowMethods(groupResetHandler, "GET"))
-	r.HandleFunc("/reload{_:/?}", allowMethods(resetHandler(nil), "GET"))
+	r.HandleFunc("/reload/group", allowMethods(groupResetHandler, "GET"))
+	r.HandleFunc("/reload", allowMethods(resetHandler(nil), "GET"))
 
 	if !isRPCMode() {
+		r.HandleFunc("/org/keys", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
 		r.HandleFunc("/keys/policy/{keyName}", allowMethods(policyUpdateHandler, "POST"))
-		r.HandleFunc("/keys/create{_:/?}", allowMethods(createKeyHandler, "POST"))
-		r.HandleFunc("/apis{_:/?}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
+		r.HandleFunc("/keys/create", allowMethods(createKeyHandler, "POST"))
+		r.HandleFunc("/apis", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
 		r.HandleFunc("/apis/{apiID}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
-		r.HandleFunc("/health{_:/?}", allowMethods(healthCheckhandler, "GET"))
-		r.HandleFunc("/oauth/clients/create{_:/?}", allowMethods(createOauthClient, "POST"))
+		r.HandleFunc("/health", allowMethods(healthCheckhandler, "GET"))
+		r.HandleFunc("/oauth/clients/create", allowMethods(createOauthClient, "POST"))
 		r.HandleFunc("/oauth/refresh/{keyName}", allowMethods(invalidateOauthRefresh, "DELETE"))
-		r.HandleFunc("/cache/{apiID}{_:/?}", allowMethods(invalidateCacheHandler, "DELETE"))
+		r.HandleFunc("/cache/{apiID}", allowMethods(invalidateCacheHandler, "DELETE"))
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Node is slaved, REST API minimised")
 	}
 
+	r.HandleFunc("/keys", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
 	r.HandleFunc("/keys/{keyName:[^/]*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
