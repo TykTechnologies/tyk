@@ -468,7 +468,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			"api_name": spec.Name,
 		}).Debug("Rate limit endpoint is: ", rateLimitPath)
 		chainDef.RateLimitPath = rateLimitPath
-		chainDef.RateLimitChain = alice.New(simpleArray...).Then(UserRatesCheck())
+		chainDef.RateLimitChain = alice.New(simpleArray...).
+			Then(http.HandlerFunc(userRatesCheck))
 	}
 
 	log.WithFields(logrus.Fields{
