@@ -4,17 +4,20 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type redisChannelHook struct {
-	Notifier  RedisNotificationHandler
+	notifier  RedisNotifier
 	formatter logrus.Formatter
 }
 
 func newRedisHook() *redisChannelHook {
 	hook := &redisChannelHook{}
 	hook.formatter = new(logrus.JSONFormatter)
-	hook.Notifier.Start()
+	hook.notifier.store = storage.RedisCluster{KeyPrefix: "gateway-notifications:"}
+	hook.notifier.channel = "dashboard.ui.messages"
 	return hook
 }
 
@@ -40,13 +43,18 @@ func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
 		Timestamp: time.Now(),
 	}
 
-	go hook.Notifier.Notify(n)
-
+	go hook.notifier.Notify(n)
 	return nil
 }
 
-func (hook *redisChannelHook) Levels() []logrus.Level {
+type InterfaceNotification struct {
+	Type      string
+	Message   string
+	OrgID     string
+	Timestamp time.Time
+}
 
+func (hook *redisChannelHook) Levels() []logrus.Level {
 	return []logrus.Level{
 		logrus.InfoLevel,
 		logrus.ErrorLevel,

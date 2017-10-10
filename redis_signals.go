@@ -180,13 +180,13 @@ type RedisNotifier struct {
 }
 
 // Notify will send a notification to a channel
-func (r *RedisNotifier) Notify(notification Notification) bool {
-	toSend, err := json.Marshal(notification)
+func (r *RedisNotifier) Notify(notif interface{}) bool {
+	toSend, err := json.Marshal(notif)
 	if err != nil {
 		log.Error("Problem marshalling notification: ", err)
 		return false
 	}
-	log.Debug("Sending notification", notification)
+	log.Debug("Sending notification", notif)
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
 		log.Error("Could not send notification: ", err)
 		return false
