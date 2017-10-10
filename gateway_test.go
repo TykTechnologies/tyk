@@ -954,6 +954,7 @@ func TestHttpPprof(t *testing.T) {
 	testHttp(t, []tykHttpTest{
 		{method: "GET", path: "/debug/pprof/", code: 404},
 		{method: "GET", path: "/debug/pprof/", code: 200, controlRequest: true},
+		{method: "GET", path: "/debug/pprof/heap", code: 200, controlRequest: true},
 	}, true)
 }
 
