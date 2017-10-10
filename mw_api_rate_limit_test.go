@@ -35,8 +35,8 @@ func getRLOpenChain(spec *APISpec) http.Handler {
 	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
-		&RateLimitForAPI{BaseMiddleware: baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
+		&RateLimitForAPI{BaseMiddleware: baseMid},
 	)...).Then(proxyHandler)
 	return chain
 }
@@ -114,6 +114,54 @@ func TestRLClosed(t *testing.T) {
 		if a > 7 {
 			if recorder.Code != 429 {
 				t.Fatalf("Rate limit did not activate, code was: %v", recorder.Code)
+			}
+		}
+	}
+
+	DRLManager.CurrentTokenValue = 0
+	DRLManager.RequestTokenValue = 0
+}
+
+func TestRLOpenWithReload(t *testing.T) {
+	spec := createSpecTest(t, openRLDefSmall)
+
+	req := testReq(t, "GET", "/rl_test/", nil)
+
+	DRLManager.CurrentTokenValue = 1
+	DRLManager.RequestTokenValue = 1
+
+	chain := getRLOpenChain(spec)
+	for a := 0; a <= 10; a++ {
+		recorder := httptest.NewRecorder()
+		chain.ServeHTTP(recorder, req)
+		if a < 3 {
+			if recorder.Code != 200 {
+				t.Fatalf("Rate limit (pre change) kicked in too early, after only %v requests", a)
+			}
+		}
+
+		if a > 7 {
+			if recorder.Code != 429 {
+				t.Fatalf("Rate limit (pre change) did not activate, code was: %v", recorder.Code)
+			}
+		}
+	}
+
+	// CHange rate and emulate a reload
+	spec.GlobalRateLimit.Rate = 20
+	chain = getRLOpenChain(spec)
+	for a := 0; a <= 30; a++ {
+		recorder := httptest.NewRecorder()
+		chain.ServeHTTP(recorder, req)
+		if a < 20 {
+			if recorder.Code != 200 {
+				t.Fatalf("Rate limit (post change) kicked in too early, after only %v requests", a)
+			}
+		}
+
+		if a > 23 {
+			if recorder.Code != 429 {
+				t.Fatalf("Rate limit (post change) did not activate, code was: %v", recorder.Code)
 			}
 		}
 	}

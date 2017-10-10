@@ -7,6 +7,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"strconv"
+	"time"
+
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -29,10 +32,12 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 
 	// We'll init here
 	k.keyName = fmt.Sprintf("apilimiter-%s%s", k.Spec.OrgID, k.Spec.APIID)
+
+	// Set last updated on each load to ensure we always use a new rate limit bucket
 	k.apiSess = &user.SessionState{
 		Rate:        k.Spec.GlobalRateLimit.Rate,
 		Per:         k.Spec.GlobalRateLimit.Per,
-		LastUpdated: "na",
+		LastUpdated: strconv.Itoa(int(time.Now().UnixNano())),
 	}
 
 	return true
