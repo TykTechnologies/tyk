@@ -47,7 +47,6 @@ func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
-
 func (hook *redisChannelHook) Levels() []logrus.Level {
 	return []logrus.Level{
 		logrus.InfoLevel,
