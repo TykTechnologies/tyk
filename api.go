@@ -70,19 +70,20 @@ func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	}
 }
 
-func GetSpecForOrg(apiID string) *APISpec {
+func getSpecForOrg(apiID string) *APISpec {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
-	var aKey string
-	for k, v := range apisByID {
+	for _, v := range apisByID {
 		if v.OrgID == apiID {
 			return v
 		}
-		aKey = k
 	}
 
 	// If we can't find a spec, it doesn;t matter, because we default to Redis anyway, grab whatever you can find
-	return apisByID[aKey]
+	for _, v := range apisByID {
+		return v
+	}
+	return nil
 }
 
 func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionState) {
@@ -97,7 +98,7 @@ func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionSta
 		// Are we foring an expiry?
 		if policy.KeyExpiresIn > 0 {
 			// We are, does the key exist?
-			_, found := GetKeyDetail(keyName, apiId)
+			_, found := getKeyDetail(keyName, apiId)
 			if !found {
 				// this is a new key, lets expire it
 				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
@@ -166,7 +167,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 
 	log.WithFields(logrus.Fields{
 		"prefix":      "api",
-		"key":         ObfuscateKeyString(keyName),
+		"key":         obfuscateKey(keyName),
 		"expires":     newSession.Expires,
 		"org_id":      newSession.OrgID,
 		"api_id":      "--",
@@ -178,14 +179,11 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 	return nil
 }
 
-func ObfuscateKeyString(keyName string) string {
-	obfuscated := "--"
-
+func obfuscateKey(keyName string) string {
 	if len(keyName) > 4 {
-		obfuscated = "****" + keyName[len(keyName)-4:]
+		return "****" + keyName[len(keyName)-4:]
 	}
-
-	return obfuscated
+	return "--"
 }
 
 // ---- TODO: This changes the URL structure of the API completely ----
@@ -193,7 +191,7 @@ func ObfuscateKeyString(keyName string) string {
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
 // need to be managed by API, but only for GetDetail, GetList, UpdateKey and DeleteKey
 
-func SetSessionPassword(session *user.SessionState) {
+func setSessionPassword(session *user.SessionState) {
 	session.BasicAuthData.Hash = user.HashBCrypt
 	newPass, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
 	if err != nil {
@@ -205,7 +203,7 @@ func SetSessionPassword(session *user.SessionState) {
 	session.BasicAuthData.Password = string(newPass)
 }
 
-func GetKeyDetail(key, apiID string) (user.SessionState, bool) {
+func getKeyDetail(key, apiID string) (user.SessionState, bool) {
 	sessionManager := FallbackKeySesionManager
 	if spec := getApiSpec(apiID); spec != nil {
 		sessionManager = spec.SessionManager
@@ -229,13 +227,13 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		case "POST":
 			keyName = newSession.OrgID + keyName
 			// It's a create, so lets hash the password
-			SetSessionPassword(&newSession)
+			setSessionPassword(&newSession)
 		case "PUT":
 			// Ge the session
 			var originalKey user.SessionState
 			var found bool
 			for apiID := range newSession.AccessRights {
-				originalKey, found = GetKeyDetail(keyName, apiID)
+				originalKey, found = getKeyDetail(keyName, apiID)
 				if found {
 					break
 				}
@@ -249,7 +247,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
 				log.Debug("New: newSession.BasicAuthData.Password")
 				log.Debug("Changing password")
-				SetSessionPassword(&newSession)
+				setSessionPassword(&newSession)
 			}
 		}
 
@@ -293,7 +291,7 @@ func handleGetDetail(sessionKey, apiID string) (interface{}, int) {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
-		"key":    ObfuscateKeyString(sessionKey),
+		"key":    obfuscateKey(sessionKey),
 		"status": "ok",
 	}).Info("Retrieved key detail.")
 
@@ -716,7 +714,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	}
 	// Update our session object (create it)
 
-	spec := GetSpecForOrg(keyName)
+	spec := getSpecForOrg(keyName)
 	var sessionManager SessionHandler
 
 	if spec == nil {
@@ -764,7 +762,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 }
 
 func handleGetOrgDetail(orgID string) (interface{}, int) {
-	spec := GetSpecForOrg(orgID)
+	spec := getSpecForOrg(orgID)
 	if spec == nil {
 		return apiError("Org not found"), 404
 	}
@@ -788,7 +786,7 @@ func handleGetOrgDetail(orgID string) (interface{}, int) {
 }
 
 func handleGetAllOrgKeys(filter string) (interface{}, int) {
-	spec := GetSpecForOrg("")
+	spec := getSpecForOrg("")
 	if spec == nil {
 		return apiError("ORG not found"), 404
 	}
@@ -805,7 +803,7 @@ func handleGetAllOrgKeys(filter string) (interface{}, int) {
 }
 
 func handleDeleteOrgKey(orgID string) (interface{}, int) {
-	spec := GetSpecForOrg(orgID)
+	spec := getSpecForOrg(orgID)
 	if spec == nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -975,7 +973,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.WithFields(logrus.Fields{
 		"prefix":      "api",
-		"key":         ObfuscateKeyString(newKey),
+		"key":         obfuscateKey(newKey),
 		"status":      "ok",
 		"api_id":      "--",
 		"org_id":      newSession.OrgID,
@@ -983,7 +981,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		"user_ip":     requestIPHops(r),
 		"path":        "--",
 		"server_name": "system",
-	}).Info("Generated new key: (", ObfuscateKeyString(newKey), ")")
+	}).Info("Generated new key: (", obfuscateKey(newKey), ")")
 
 	doJSONWrite(w, 200, obj)
 }
@@ -1317,23 +1315,21 @@ func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, 200, health)
 }
 
-func UserRatesCheck() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session := ctxGetSession(r)
-		if session == nil {
-			doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
-			return
-		}
-
-		returnSession := PublicSession{}
-		returnSession.Quota.QuotaRenews = session.QuotaRenews
-		returnSession.Quota.QuotaRemaining = session.QuotaRemaining
-		returnSession.Quota.QuotaMax = session.QuotaMax
-		returnSession.RateLimit.Rate = session.Rate
-		returnSession.RateLimit.Per = session.Per
-
-		doJSONWrite(w, 200, returnSession)
+func userRatesCheck(w http.ResponseWriter, r *http.Request) {
+	session := ctxGetSession(r)
+	if session == nil {
+		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
+		return
 	}
+
+	returnSession := PublicSession{}
+	returnSession.Quota.QuotaRenews = session.QuotaRenews
+	returnSession.Quota.QuotaRemaining = session.QuotaRemaining
+	returnSession.Quota.QuotaMax = session.QuotaMax
+	returnSession.RateLimit.Rate = session.Rate
+	returnSession.RateLimit.Per = session.Per
+
+	doJSONWrite(w, 200, returnSession)
 }
 
 func invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
