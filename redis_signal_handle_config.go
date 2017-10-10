@@ -27,8 +27,7 @@ func backupConfiguration() error {
 	now := time.Now()
 	asStr := now.Format("Mon-Jan-_2-15-04-05-2006")
 	fName := asStr + ".tyk.conf"
-	ioutil.WriteFile(fName, oldConfig, 0644)
-	return nil
+	return ioutil.WriteFile(fName, oldConfig, 0644)
 }
 
 func writeNewConfiguration(payload ConfigPayload) error {
@@ -36,15 +35,7 @@ func writeNewConfiguration(payload ConfigPayload) error {
 	if err != nil {
 		return err
 	}
-
-	ioutil.WriteFile(confPaths[0], newConfig, 0644)
-	return nil
-}
-
-func getExistingRawConfig() config.Config {
-	existingConfig := config.Config{}
-	config.Load(confPaths, &existingConfig)
-	return existingConfig
+	return ioutil.WriteFile(confPaths[0], newConfig, 0644)
 }
 
 func handleNewConfiguration(payload string) {
@@ -53,7 +44,7 @@ func handleNewConfiguration(payload string) {
 
 	// We actually want to merge into the existing configuration
 	// so as not to lose data through automatic defaults
-	configPayload.Configuration = getExistingRawConfig()
+	config.Load(confPaths, &configPayload.Configuration)
 
 	err := json.Unmarshal([]byte(payload), &configPayload)
 	if err != nil {
@@ -96,10 +87,6 @@ func handleNewConfiguration(payload string) {
 		"prefix": "pub-sub",
 	}).Info("Initiating configuration reload")
 
-	reloadConfiguration()
-}
-
-func reloadConfiguration() {
 	myPID := hostDetails.PID
 	if myPID == 0 {
 		log.Error("No PID found, cannot reload")
