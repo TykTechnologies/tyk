@@ -341,6 +341,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/keys/{keyName:[^/]*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
+	r.HandleFunc("/certs", allowMethods(certHandler, "POST", "GET", "DELETE"))
 	r.HandleFunc("/certs/{certID:[^/]*}", allowMethods(certHandler, "POST", "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
