@@ -17,7 +17,7 @@ type Server struct {
 
 type DRL struct {
 	Servers           *Cache
-	mutex             sync.RWMutex
+	mutex             sync.Mutex
 	serverIndex       map[string]Server
 	ThisServerID      string
 	CurrentTotal      int64
@@ -29,13 +29,15 @@ type DRL struct {
 func (d *DRL) Init() {
 	d.Servers = NewCache(4 * time.Second)
 	d.RequestTokenValue = 100
-	d.mutex = sync.RWMutex{}
+	d.mutex = sync.Mutex{}
 	d.serverIndex = make(map[string]Server)
 	d.Ready = true
 
 	go func() {
 		for {
+			d.mutex.Lock()
 			d.cleanServerList()
+			d.mutex.Unlock()
 			time.Sleep(5 * time.Second)
 		}
 	}()
@@ -48,8 +50,6 @@ func (d *DRL) uniqueID(s Server) string {
 
 func (d *DRL) totalLoadAcrossServers() int64 {
 	var total int64
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
 	for sID, _ := range d.serverIndex {
 		_, found := d.Servers.GetNoExtend(sID)
 		if found {
@@ -79,8 +79,6 @@ func (d *DRL) cleanServerList() {
 }
 
 func (d *DRL) percentagesAcrossServers() {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
 	for sID, _ := range d.serverIndex {
 		_, found := d.Servers.GetNoExtend(sID)
 		if found {
@@ -118,17 +116,16 @@ func (d *DRL) calculateTokenBucketValue() error {
 func (d *DRL) AddOrUpdateServer(s Server) error {
 	// Add or update the cache
 	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	if d.uniqueID(s) != d.ThisServerID {
 		thisServer, found := d.Servers.GetNoExtend(d.ThisServerID)
 		if found {
 			if thisServer.TagHash != s.TagHash {
-				d.mutex.Unlock()
 				return errors.New("Node notification from different tag group, ignoring.")
 			}
 		} else {
 			// We don't know enough about our own host, so let's skip for now until we do
-			d.mutex.Unlock()
 			return errors.New("DRL has no information on current host, waiting...")
 		}
 	}
@@ -136,7 +133,6 @@ func (d *DRL) AddOrUpdateServer(s Server) error {
 	if d.serverIndex != nil {
 		d.serverIndex[d.uniqueID(s)] = s
 	}
-	d.mutex.Unlock()
 	d.Servers.Set(d.uniqueID(s), s)
 
 	// Recalculate totals
