@@ -242,6 +242,7 @@ type Config struct {
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
+	LogLevel                          string                                `json:"log_level"`
 }
 
 type CertData struct {

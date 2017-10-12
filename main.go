@@ -779,6 +779,24 @@ func initialiseSystem(arguments map[string]interface{}) error {
 		afterConfSetup(&config.Global)
 	}
 
+	if os.Getenv("TYK_LOGLEVEL") == "" && arguments["--debug"] == false {
+		level := strings.ToLower(config.Global.LogLevel)
+		switch level {
+		case "", "info":
+			// default, do nothing
+		case "error":
+			log.Level = logrus.ErrorLevel
+		case "warn":
+			log.Level = logrus.WarnLevel
+		case "debug":
+			log.Level = logrus.DebugLevel
+		default:
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
+		}
+	}
+
 	if config.Global.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
