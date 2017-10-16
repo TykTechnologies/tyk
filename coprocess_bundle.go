@@ -339,7 +339,7 @@ func loadBundle(spec *APISpec) {
 		return
 	}
 
-	err = os.Mkdir(destPath, 0755)
+	err = os.MkdirAll(destPath, 0755)
 
 	if err != nil {
 		bundleError(spec, err, "Couldn't create bundle directory")
