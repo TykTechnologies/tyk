@@ -163,7 +163,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Run the middleware
 	middlewareClassname := d.MiddlewareClassName
 
-    vm := d.Spec.JSVM.VM.Copy()
+	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
 	log.WithFields(logrus.Fields{
 		"prefix": "jsvm",
@@ -314,6 +314,7 @@ func (j *JSVM) Init() {
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
 func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
+	tykBundlePath := filepath.Join(config.MiddlewarePath, "bundles")
 	for _, mwPath := range paths {
 		if pathPrefix != "" {
 			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
@@ -359,7 +360,7 @@ func (j *JSVM) LoadTykJSApi() {
 	})
 
 	j.VM.Set("rawlog", func(call otto.FunctionCall) otto.Value {
-        rawLog.Print(call.Argument(0).String() + "\n")
+		rawLog.Print(call.Argument(0).String() + "\n")
 		return otto.Value{}
 	})
 
