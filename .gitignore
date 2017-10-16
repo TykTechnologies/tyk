@@ -3,6 +3,7 @@
 temp/
 middleware/e1d21f942ec746ed416ab97fe1bf07e8/
 middleware/e1d21f942ec746ed416ab97fe1bf07e8_IGNORED/
+middleware/bundles
 testapps/
 vendor/github.com/TykTechnologies_hotfix/
 vendor/github.com/dgrijalva_hotfix/
