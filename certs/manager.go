@@ -78,10 +78,6 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 }
 
 func isSHA256(value string) bool {
-	if hex.DecodedLen(len(value)) != sha256.Size {
-		return false
-	}
-
 	// check if hex encoded
 	if _, err := hex.DecodeString(value); err != nil {
 		return false
