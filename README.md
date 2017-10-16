@@ -12,10 +12,10 @@ development version. Tyk is officially supported on `linux/amd64`,
 
 ## What is an API Gateway?
 
-An API Gateway sits in front of your application(s) and manages the heavy lifting of authorisation, access control and throughput limiting to your services. Ideally, 
+An API Gateway sits in front of your application(s) and manages the heavy lifting of authorization, access control and throughput limiting to your services. Ideally, 
 it should mean that you can focus on creating services instead of implementing management infrastructure. For example if you have written a really awesome web service
 that provides geolocation data for all the cats in NYC, and you want to make it public, integrating an API gateway is a faster, more secure route than writing your own 
-authorisation middleware.
+authorization middleware.
 
 ## Key Features of Tyk
 
