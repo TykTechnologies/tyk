@@ -152,6 +152,7 @@ type ServiceDiscoveryConf struct {
 type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
+	PythonPathPrefix    string `json:"python_path_prefix"`
 }
 
 // Config is the configuration object used by tyk to set up various parameters.
