@@ -49,6 +49,7 @@ var tests = []struct {
 	},
 	{"Empty", `{}`, nil},
 	{"Default", onDefaults(`{}`), nil},
+	{"OldMonitor", `{"Monitor": {}}`, nil},
 	{"NullObject", `{"event_handlers": null}`, nil},
 }
 

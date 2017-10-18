@@ -285,7 +285,16 @@ var Default = Config{
 	},
 }
 
-// writeDefault will create a default configuration file
+func WriteConf(path string, conf *Config) error {
+	bs, err := json.MarshalIndent(conf, "", "    ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(path, bs, 0644)
+}
+
+// writeDefault will set conf to the default config and write it to disk
+// in path, if the path is non-empty.
 func writeDefault(path string, conf *Config) {
 	*conf = Default
 	if err := envconfig.Process(envPrefix, conf); err != nil {
@@ -294,11 +303,8 @@ func writeDefault(path string, conf *Config) {
 	if path == "" {
 		return
 	}
-	newConfig, err := json.MarshalIndent(conf, "", "    ")
-	if err != nil {
-		log.Error("Problem marshalling default configuration: ", err)
-	} else {
-		ioutil.WriteFile(path, newConfig, 0644)
+	if err := WriteConf(path, conf); err != nil {
+		log.Error("Problem saving the default configuration: ", err)
 	}
 }
 
