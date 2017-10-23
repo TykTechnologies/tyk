@@ -16,7 +16,7 @@ func (m *CertificateCheckMW) Name() string {
 }
 
 func (m *CertificateCheckMW) EnabledForSpec() bool {
-    return m.Spec.UseMutualTLSAuth
+	return m.Spec.UseMutualTLSAuth
 }
 
 func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
