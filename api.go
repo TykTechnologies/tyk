@@ -25,25 +25,25 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// APIModifyKeySuccess represents when a Key modification was successful
-type APIModifyKeySuccess struct {
+// apiModifyKeySuccess represents when a Key modification was successful
+type apiModifyKeySuccess struct {
 	Key    string `json:"key"`
 	Status string `json:"status"`
 	Action string `json:"action"`
 }
 
-// APIStatusMessage represents an API status message
-type APIStatusMessage struct {
+// apiStatusMessage represents an API status message
+type apiStatusMessage struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
-func apiOk(msg string) APIStatusMessage {
-	return APIStatusMessage{"ok", msg}
+func apiOk(msg string) apiStatusMessage {
+	return apiStatusMessage{"ok", msg}
 }
 
-func apiError(msg string) APIStatusMessage {
-	return APIStatusMessage{"error", msg}
+func apiError(msg string) apiStatusMessage {
+	return apiStatusMessage{"error", msg}
 }
 
 func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
@@ -269,7 +269,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		Key:              keyName,
 	})
 
-	response := APIModifyKeySuccess{
+	response := apiModifyKeySuccess{
 		keyName,
 		"ok",
 		action,
@@ -298,8 +298,8 @@ func handleGetDetail(sessionKey, apiID string) (interface{}, int) {
 	return session, 200
 }
 
-// APIAllKeys represents a list of keys in the memory store
-type APIAllKeys struct {
+// apiAllKeys represents a list of keys in the memory store
+type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
@@ -322,7 +322,7 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 		}
 	}
 
-	sessionsObj := APIAllKeys{fixed_sessions}
+	sessionsObj := apiAllKeys{fixed_sessions}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -361,7 +361,7 @@ func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	sessionManager.RemoveSession(keyName)
 	sessionManager.ResetQuota(keyName, &user.SessionState{})
 
-	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
+	statusObj := apiModifyKeySuccess{keyName, "ok", "deleted"}
 
 	FireSystemEvent(EventTokenDeleted, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
@@ -408,7 +408,7 @@ func handleDeleteHashedKey(keyName, apiID string) (interface{}, int) {
 	setKeyName := "apikey-" + keyName
 	sessStore.DeleteRawKey(setKeyName)
 
-	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
+	statusObj := apiModifyKeySuccess{keyName, "ok", "deleted"}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -486,7 +486,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 		action = "added"
 	}
 
-	response := APIModifyKeySuccess{
+	response := apiModifyKeySuccess{
 		newDef.APIID,
 		"ok",
 		action}
@@ -506,7 +506,7 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 
 	os.Remove(defFilePath)
 
-	response := APIModifyKeySuccess{
+	response := apiModifyKeySuccess{
 		apiID,
 		"ok",
 		"deleted"}
@@ -667,7 +667,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 		return apiError("Could not write key data"), 500
 	}
 
-	statusObj := APIModifyKeySuccess{keyName, "ok", "updated"}
+	statusObj := apiModifyKeySuccess{keyName, "ok", "updated"}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -752,7 +752,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		action = "added"
 	}
 
-	response := APIModifyKeySuccess{
+	response := apiModifyKeySuccess{
 		keyName,
 		"ok",
 		action,
@@ -798,7 +798,7 @@ func handleGetAllOrgKeys(filter string) (interface{}, int) {
 			fixed_sessions = append(fixed_sessions, s)
 		}
 	}
-	sessionsObj := APIAllKeys{fixed_sessions}
+	sessionsObj := apiAllKeys{fixed_sessions}
 	return sessionsObj, 200
 }
 
@@ -822,7 +822,7 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 		"status": "ok",
 	}).Info("Org key deleted.")
 
-	statusObj := APIModifyKeySuccess{orgID, "ok", "deleted"}
+	statusObj := apiModifyKeySuccess{orgID, "ok", "deleted"}
 	return statusObj, 200
 }
 
@@ -959,7 +959,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	obj := APIModifyKeySuccess{
+	obj := apiModifyKeySuccess{
 		Action: "added",
 		Key:    newKey,
 		Status: "ok",
@@ -1129,7 +1129,7 @@ func invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	success := APIModifyKeySuccess{
+	success := apiModifyKeySuccess{
 		Key:    keyName,
 		Status: "ok",
 		Action: "deleted",
@@ -1226,7 +1226,7 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 		return apiError("Delete failed"), 500
 	}
 
-	statusObj := APIModifyKeySuccess{keyName, "ok", "deleted"}
+	statusObj := apiModifyKeySuccess{keyName, "ok", "deleted"}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
