@@ -698,7 +698,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		// Should list 2 newly created certificates
 		req, _ = http.NewRequest("GET", baseURL, nil)
 		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Error(resp)
+			t.Fatal(resp)
 		} else {
 			var apiResp APIAllCertificates
 			json.NewDecoder(resp.Body).Decode(&apiResp)
