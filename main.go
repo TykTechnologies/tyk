@@ -38,6 +38,7 @@ import (
 	"github.com/TykTechnologies/tyk/lint"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 var (
@@ -61,7 +62,7 @@ var (
 	keyGen DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
-	policiesByID = map[string]Policy{}
+	policiesByID = map[string]user.Policy{}
 
 	mainRouter    *mux.Router
 	controlRouter *mux.Router
@@ -228,7 +229,7 @@ func getAPISpecs() []*APISpec {
 }
 
 func getPolicies() {
-	var pols map[string]Policy
+	var pols map[string]user.Policy
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")

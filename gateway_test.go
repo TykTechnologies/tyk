@@ -168,7 +168,7 @@ func TestMain(m *testing.M) {
 		// racy way like the policies and api specs maps.
 		for {
 			policiesMu.Lock()
-			policiesByID["_"] = Policy{}
+			policiesByID["_"] = user.Policy{}
 			delete(policiesByID, "_")
 			policiesMu.Unlock()
 			apisMu.Lock()

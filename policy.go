@@ -7,37 +7,11 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/mgo.v2/bson"
-
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
-
-type Policy struct {
-	MID              bson.ObjectId                    `bson:"_id,omitempty" json:"_id"`
-	ID               string                           `bson:"id,omitempty" json:"id"`
-	OrgID            string                           `bson:"org_id" json:"org_id"`
-	Rate             float64                          `bson:"rate" json:"rate"`
-	Per              float64                          `bson:"per" json:"per"`
-	QuotaMax         int64                            `bson:"quota_max" json:"quota_max"`
-	QuotaRenewalRate int64                            `bson:"quota_renewal_rate" json:"quota_renewal_rate"`
-	AccessRights     map[string]user.AccessDefinition `bson:"access_rights" json:"access_rights"`
-	HMACEnabled      bool                             `bson:"hmac_enabled" json:"hmac_enabled"`
-	Active           bool                             `bson:"active" json:"active"`
-	IsInactive       bool                             `bson:"is_inactive" json:"is_inactive"`
-	Tags             []string                         `bson:"tags" json:"tags"`
-	KeyExpiresIn     int64                            `bson:"key_expires_in" json:"key_expires_in"`
-	Partitions       PolicyPartitions                 `bson:"partitions" json:"partitions"`
-	LastUpdated      string                           `bson:"last_updated" json:"last_updated"`
-}
-
-type PolicyPartitions struct {
-	Quota     bool `bson:"quota" json:"quota"`
-	RateLimit bool `bson:"rate_limit" json:"rate_limit"`
-	Acl       bool `bson:"acl" json:"acl"`
-}
 
 type DBAccessDefinition struct {
 	APIName     string            `json:"apiname"`
@@ -56,11 +30,11 @@ func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 }
 
 type DBPolicy struct {
-	Policy
+	user.Policy
 	AccessRights map[string]DBAccessDefinition `bson:"access_rights" json:"access_rights"`
 }
 
-func (d *DBPolicy) ToRegularPolicy() Policy {
+func (d *DBPolicy) ToRegularPolicy() user.Policy {
 	policy := d.Policy
 	policy.AccessRights = make(map[string]user.AccessDefinition)
 
@@ -70,7 +44,7 @@ func (d *DBPolicy) ToRegularPolicy() Policy {
 	return policy
 }
 
-func LoadPoliciesFromFile(filePath string) map[string]Policy {
+func LoadPoliciesFromFile(filePath string) map[string]user.Policy {
 	f, err := os.Open(filePath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -80,7 +54,7 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 	}
 	defer f.Close()
 
-	var policies map[string]Policy
+	var policies map[string]user.Policy
 	if err := json.NewDecoder(f).Decode(&policies); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
@@ -90,7 +64,7 @@ func LoadPoliciesFromFile(filePath string) map[string]Policy {
 }
 
 // LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
-func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]Policy {
+func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[string]user.Policy {
 
 	// Get the definitions
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -141,7 +115,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	ServiceNonce = list.Nonce
 	log.Debug("Loading Policies Finished: Nonce Set: ", ServiceNonce)
 
-	policies := make(map[string]Policy, len(list.Message))
+	policies := make(map[string]user.Policy, len(list.Message))
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
@@ -166,8 +140,8 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	return policies
 }
 
-func LoadPoliciesFromRPC(orgId string) map[string]Policy {
-	var dbPolicyList []Policy
+func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
+	var dbPolicyList []user.Policy
 
 	store := &RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
 	store.Connect()
@@ -183,7 +157,7 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 		return nil
 	}
 
-	policies := make(map[string]Policy, len(dbPolicyList))
+	policies := make(map[string]user.Policy, len(dbPolicyList))
 
 	for _, p := range dbPolicyList {
 		p.ID = p.MID.Hex()
