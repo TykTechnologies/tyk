@@ -327,7 +327,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r))),
+		stripSlashes(checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r)))),
 	))
 
 	if hostname != "" {
@@ -340,9 +340,6 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
-	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
-		stripSlashes(checkIsAPIOwner(InstrumentationMW(r))),
-	))
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Initialising Tyk REST API Endpoints")
@@ -370,6 +367,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 
 	r.HandleFunc("/keys", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
 	r.HandleFunc("/keys/{keyName:[^/]*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
+	r.HandleFunc("/certs", allowMethods(certHandler, "POST", "GET"))
 	r.HandleFunc("/certs/{certID:[^/]*}", allowMethods(certHandler, "POST", "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
