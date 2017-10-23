@@ -570,7 +570,9 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 		client := getTLSClient(nil, nil)
 
-		if resp, _ := client.Get(baseURL); resp.StatusCode != 200 {
+		if resp, err := client.Get(baseURL); err != nil {
+			t.Error(err)
+		} else if resp.StatusCode != 200 {
 			t.Error("Should pass pass request with valid upstream certificate", resp)
 		}
 	})
