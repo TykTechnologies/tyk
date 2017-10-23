@@ -9,12 +9,13 @@ from tyk.event import TykEvent, TykEventHandler
 
 from gateway import TykGateway as tyk
 
+from importlib.machinery import SourceFileLoader
+
 class TykDispatcher:
     '''A simple dispatcher'''
 
     def __init__(self, middleware_path, event_handler_path, bundle_paths):
         tyk.log( "Initializing dispatcher", "info" )
-
         self.event_handler_path = path.join(event_handler_path, '*.py')
         self.event_handlers = {}
         self.load_event_handlers()
@@ -42,18 +43,10 @@ class TykDispatcher:
         return found_middleware
 
     def load_bundle(self, base_bundle_path):
-        bundle_path = path.join(base_bundle_path, '*.py')
-        bundle_modules = self.get_modules(bundle_path)
-        sys.path.append(base_bundle_path)
-        for module_name in bundle_modules:
-            middleware = self.find_middleware(module_name)
-            if middleware:
-                middleware.reload()
-            else:
-                middleware = TykMiddleware(module_name)
-                self.middlewares.append(middleware)
+        bundle_path = path.join(base_bundle_path, 'middleware.py')
+        middleware = TykMiddleware(bundle_path)
+        self.middlewares.append(middleware)
         self.update_hook_table()
-
 
     def load_middlewares(self):
         tyk.log( "Loading middlewares.", "debug" )
@@ -142,9 +135,7 @@ class TykDispatcher:
 
     def reload(self):
         tyk.log( "Reloading event handlers and middlewares.", "info" )
-
         self.purge_event_handlers()
         self.load_event_handlers()
 
-        self.purge_middlewares()
         self.load_middlewares()

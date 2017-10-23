@@ -1,6 +1,7 @@
-from importlib import import_module
 from importlib import reload as reload_module
 from importlib import invalidate_caches as invalidate_caches
+
+from importlib.machinery import SourceFileLoader
 
 import inspect, sys
 import tyk.decorators as decorators
@@ -16,7 +17,8 @@ class TykMiddleware:
         self.handlers = {}
 
         try:
-            self.module = import_module(filepath)
+            source = SourceFileLoader('middleware', self.filepath)
+            self.module = source.load_module()
             self.register_handlers()
         except:
             tyk.log_error( "Middleware initialization error:" )
