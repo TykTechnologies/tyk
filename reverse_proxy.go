@@ -784,22 +784,23 @@ type nopCloser struct {
 
 func (nopCloser) Close() error { return nil }
 
+func copyBody(body io.ReadCloser) (b1, b2 io.ReadCloser) {
+	if nc, ok := body.(nopCloser); ok {
+		buf := *(nc.Reader.(*bytes.Buffer))
+		return body, nopCloser{&buf}
+	}
+	defer body.Close()
+
+	var buf1, buf2 bytes.Buffer
+	io.Copy(&buf1, body)
+	buf2 = buf1
+	return nopCloser{&buf1}, nopCloser{&buf2}
+}
+
 func copyRequest(r *http.Request) *http.Request {
 	r2 := *r
 	if r.Body != nil {
-		if nc, ok := r.Body.(nopCloser); ok {
-			buf := *(nc.Reader.(*bytes.Buffer))
-			r2.Body = nopCloser{&buf}
-		} else {
-			defer r.Body.Close()
-
-			var buf1, buf2 bytes.Buffer
-			io.Copy(&buf1, r.Body)
-			buf2 = buf1
-
-			r.Body = nopCloser{&buf1}
-			r2.Body = nopCloser{&buf2}
-		}
+		r.Body, r2.Body = copyBody(r.Body)
 	}
 	return &r2
 }
@@ -807,19 +808,7 @@ func copyRequest(r *http.Request) *http.Request {
 func copyResponse(r *http.Response) *http.Response {
 	r2 := *r
 	if r.Body != nil {
-		if nc, ok := r.Body.(nopCloser); ok {
-			buf := *(nc.Reader.(*bytes.Buffer))
-			r2.Body = nopCloser{&buf}
-		} else {
-			defer r.Body.Close()
-
-			var buf1, buf2 bytes.Buffer
-			io.Copy(&buf1, r.Body)
-			buf2 = buf1
-
-			r.Body = nopCloser{&buf1}
-			r2.Body = nopCloser{&buf2}
-		}
+		r.Body, r2.Body = copyBody(r.Body)
 	}
 	return &r2
 }
