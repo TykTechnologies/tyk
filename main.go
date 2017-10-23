@@ -325,12 +325,12 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		hostname = config.Global.ControlAPIHostname
 	}
 
-    r := mux.NewRouter()
+	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		checkIsAPIOwner(controlAPICheckClientCertificate("/gateway/client", InstrumentationMW(r))),
 	))
 
-    if hostname != "" {
+	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -340,7 +340,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
-    muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
+	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
 		stripSlashes(checkIsAPIOwner(InstrumentationMW(r))),
 	))
 	log.WithFields(logrus.Fields{

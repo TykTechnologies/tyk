@@ -370,7 +370,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 
 		if mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid}) {
-		    log.WithFields(logrus.Fields{
+			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: Mutual TLS")
