@@ -1,8 +1,8 @@
 package main
 
 import (
-	"time"
 	"math"
+	"time"
 )
 
 type PublicSessionState struct {
@@ -58,8 +58,9 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 	return false
 }
 
+// Adjusts the DRL weight slightly to nsure slightly less conservative throttling.
 func (l SessionLimiter) fixDRLRate(numServers int, rate float64, current int) int {
-	adjustWith := 100 * math.Log(math.Pow(float64(numServers), math.Sqrt(float64(numServers)))) / rate
+	adjustWith := (100 * math.Log(math.Pow(float64(numServers), math.Sqrt(float64(numServers)))) / rate) * float64(numServers)
 	adjustment := current - int(adjustWith)
 	return adjustment
 }
@@ -109,9 +110,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				return false, 1
 			}
 
-			log.Info("Add was: ", DRLManager.CurrentTokenValue)
 			fixedValue := l.fixDRLRate(DRLManager.Servers.Count(), currentSession.Rate, DRLManager.CurrentTokenValue)
-			log.Info("Add is adjusted to: ", fixedValue, ", Server count is: ", DRLManager.Servers.Count())
 			_, errF := thisUserBucket.Add(uint(fixedValue))
 
 			if errF != nil {
