@@ -110,7 +110,12 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				return false, 1
 			}
 
-			fixedValue := l.fixDRLRate(DRLManager.Servers.Count(), currentSession.Rate, DRLManager.CurrentTokenValue)
+			serverCount := 1
+			if DRLManager.Servers != nil {
+				serverCount = DRLManager.Servers.Count()
+			}
+
+			fixedValue := l.fixDRLRate(serverCount, currentSession.Rate, DRLManager.CurrentTokenValue)
 			_, errF := thisUserBucket.Add(uint(fixedValue))
 
 			if errF != nil {
