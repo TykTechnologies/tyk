@@ -136,7 +136,7 @@ func setupGlobals() {
 
 	// Set up global JSVM
 	if config.Global.EnableJSVM {
-		GlobalEventsJSVM.Init()
+		GlobalEventsJSVM.Init(nil)
 	}
 
 	if config.Global.CoProcessOptions.EnableCoProcess {
@@ -607,7 +607,7 @@ func doReload() {
 
 	// Reset the JSVM
 	if config.Global.EnableJSVM {
-		GlobalEventsJSVM.Init()
+		GlobalEventsJSVM.Init(nil)
 	}
 
 	log.WithFields(logrus.Fields{

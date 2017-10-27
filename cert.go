@@ -22,6 +22,42 @@ type APIAllCertificates struct {
 	CertIDs []string `json:"certs"`
 }
 
+func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
+	var certID string
+
+	certMaps := []map[string]string{config.Global.Security.Certificates.Upstream}
+
+	if spec != nil && spec.UpstreamCertificates != nil {
+		certMaps = append(certMaps, spec.UpstreamCertificates)
+	}
+
+	for _, m := range certMaps {
+		if len(m) == 0 {
+			continue
+		}
+
+		if id, ok := m["*"]; ok {
+			certID = id
+		}
+
+		if id, ok := m[host]; ok {
+			certID = id
+		}
+	}
+
+	if certID == "" {
+		return nil
+	}
+
+	certs := CertificateManager.List([]string{certID}, certs.CertificatePrivate)
+
+	if len(certs) == 0 {
+		return nil
+	}
+
+	return certs[0]
+}
+
 // dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overriden by `getTLSConfigForClient`
 func dummyGetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return nil, nil
