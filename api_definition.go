@@ -164,7 +164,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 
 	// Create and init the virtual Machine
 	if config.Global.EnableJSVM {
-		spec.JSVM.Init()
+		spec.JSVM.Init(spec)
 	}
 
 	// Set up Event Handlers

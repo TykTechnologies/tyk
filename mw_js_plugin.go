@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -277,6 +278,7 @@ func mapStrsToIfaces(m map[string]string) map[string]interface{} {
 // --- Utility functions during startup to ensure a sane VM is present for each API Def ----
 
 type JSVM struct {
+	Spec    *APISpec
 	VM      *otto.Otto
 	Timeout time.Duration
 	Log     *logrus.Logger // logger used by the JS code
@@ -285,7 +287,7 @@ type JSVM struct {
 
 // Init creates the JSVM with the core library and sets up a default
 // timeout.
-func (j *JSVM) Init() {
+func (j *JSVM) Init(spec *APISpec) {
 	vm := otto.New()
 
 	// Init TykJS namespace, constructors etc.
@@ -312,6 +314,7 @@ func (j *JSVM) Init() {
 	}
 
 	j.VM = vm
+	j.Spec = spec
 
 	// Add environment API
 	j.LoadTykJSApi()
@@ -452,7 +455,15 @@ func (j *JSVM) LoadTykJSApi() {
 			r.Header.Set(k, v)
 		}
 		r.Close = true
-		resp, err := http.DefaultClient.Do(r)
+
+		tr := &http.Transport{TLSClientConfig: &tls.Config{}}
+		if cert := getUpstreamCertificate(r.Host, j.Spec); cert != nil {
+			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
+		}
+
+		// using new Client each time should be ok, since we closing connection every time
+		client := &http.Client{Transport: tr}
+		resp, err := client.Do(r)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
