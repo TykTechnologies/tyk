@@ -120,13 +120,6 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 	defer resp.Body.Close()
 
-	// Extract Policies
-	type NodeResponseOK struct {
-		Status  string
-		Message []DBPolicy
-		Nonce   string
-	}
-
 	if resp.StatusCode == 403 {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
@@ -134,8 +127,12 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 		return nil
 	}
 
-	list := NodeResponseOK{}
-
+	// Extract Policies
+	var list struct {
+		Status  string
+		Message []DBPolicy
+		Nonce   string
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode policy body: ", err)
 		return nil

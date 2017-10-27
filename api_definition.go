@@ -239,16 +239,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 
 	// Extract tagged APIs#
-	type ResponseStruct struct {
-		ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
-	}
-	type NodeResponseOK struct {
-		Status  string
-		Message []ResponseStruct
-		Nonce   string
-	}
 
-	list := NodeResponseOK{}
+	var list struct {
+		Status  string
+		Message []struct {
+			ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
+		}
+		Nonce string
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode body: ", err)
 		log.Info("--> Retrying in 5s")
