@@ -2,6 +2,7 @@ package main
 
 import (
 	"time"
+	"math"
 )
 
 type PublicSessionState struct {
@@ -57,6 +58,12 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 	return false
 }
 
+func (l SessionLimiter) fixDRLRate(numServers int, rate float64, current int) int {
+	adjustWith := 100 * math.Log(math.Pow(float64(numServers), math.Sqrt(float64(numServers)))) / rate
+	adjustment := current - int(adjustWith)
+	return adjustment
+}
+
 // ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) (bool, int) {
@@ -102,8 +109,10 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				return false, 1
 			}
 
-			//log.Info("Add is: ", DRLManager.CurrentTokenValue)
-			_, errF := thisUserBucket.Add(uint(DRLManager.CurrentTokenValue))
+			log.Info("Add was: ", DRLManager.CurrentTokenValue)
+			fixedValue := l.fixDRLRate(DRLManager.Servers.Count(), currentSession.Rate, DRLManager.CurrentTokenValue)
+			log.Info("Add is adjusted to: ", fixedValue, ", Server count is: ", DRLManager.Servers.Count())
+			_, errF := thisUserBucket.Add(uint(fixedValue))
 
 			if errF != nil {
 				return false, 1
