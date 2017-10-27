@@ -136,7 +136,9 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 		doJSONWrite(w, 200, &APICertificateStatusMessage{certID, "ok", "Certificate added"})
 	case "GET":
 		if certID == "" {
-			certIds := CertificateManager.ListAllIds()
+			orgID := r.URL.Query().Get("org_id")
+
+			certIds := CertificateManager.ListAllIds(orgID)
 			doJSONWrite(w, 200, &APIAllCertificates{certIds})
 			return
 		}
