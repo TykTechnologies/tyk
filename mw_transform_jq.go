@@ -39,6 +39,7 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	if !found {
 		return nil, 200
 	}
+
 	err := transformJQBody(r, meta.(*TransformJQSpec), t.Spec.EnableContextVars)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -66,6 +67,8 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		"reqContext": ctxGetData(r),
 	}
 
+	t.Lock()
+	defer t.Unlock()
 	if err := t.JQFilter.Handle(jqObj); err != nil {
 		return err
 	}

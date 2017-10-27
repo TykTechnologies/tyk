@@ -42,6 +42,8 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		"resHeaders": res.Header,
 	}
 
+	t.Lock()
+	defer t.Unlock()
 	if err := t.JQFilter.Handle(jqObj); err != nil {
 		return errors.New("Response returned by upstream server is not a valid JSON")
 	}
