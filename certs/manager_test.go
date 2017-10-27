@@ -125,7 +125,7 @@ func TestAddCertificate(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		_, err := m.Add(tc.data)
+		_, err := m.Add(tc.data, "")
 		if tc.err != "" {
 			if err == nil {
 				t.Error("Should error with", tc.err)
@@ -155,10 +155,10 @@ func TestCertificateStorage(t *testing.T) {
 	ioutil.WriteFile(certPath, certPem, 0666)
 
 	privateCertPEM, keyCertPEM := genCertificateFromCommonName("private")
-	privateCertID, _ := m.Add(append(privateCertPEM, keyCertPEM...))
+	privateCertID, _ := m.Add(append(privateCertPEM, keyCertPEM...), "")
 
 	storageCert, _ := genCertificateFromCommonName("dummy")
-	storageCertID, _ := m.Add(storageCert)
+	storageCertID, _ := m.Add(storageCert, "")
 
 	t.Run("File certificates", func(t *testing.T) {
 		certs := m.List([]string{certPath, "wrong"}, CertificatePublic)
