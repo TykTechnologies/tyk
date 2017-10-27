@@ -102,13 +102,16 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		r.Header.Set(hName, hValue)
 	}
 
-	// Set variables in context vars
-	contextDataObject := ctxGetData(r)
-	for k, v := range opts.OutputVars {
-		contextDataObject["jq_output_var_"+k] = v
+	if contextVars {
+		// Set variables in context vars
+		contextDataObject := ctxGetData(r)
+		for k, v := range opts.OutputVars {
+			contextDataObject["jq_output_var_"+k] = v
+		}
+		ctxSetData(r, contextDataObject)
+	} else {
+		log.Warn("You specified a JQ filter returning output variables, but enable_context_vars is false")
 	}
-
-	ctxSetData(r, contextDataObject)
 
 	return nil
 }
