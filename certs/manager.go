@@ -244,8 +244,8 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 	return out
 }
 
-func (c *CertificateManager) ListAllIds() []string {
-	return c.storage.GetKeys("*")
+func (c *CertificateManager) ListAllIds(prefix string) []string {
+	return c.storage.GetKeys(prefix + "*")
 }
 
 func (c *CertificateManager) GetRaw(certID string) (string, error) {
