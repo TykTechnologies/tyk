@@ -239,9 +239,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 
 	// Extract tagged APIs#
-
 	var list struct {
-		Status  string
 		Message []struct {
 			ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
 		}
