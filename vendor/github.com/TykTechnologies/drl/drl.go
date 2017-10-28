@@ -83,11 +83,10 @@ func (d *DRL) percentagesAcrossServers() {
 		_, found := d.Servers.GetNoExtend(sID)
 		if found {
 			thisServerObject := d.serverIndex[sID]
-			curTot := d.CurrentTotal
-			if d.CurrentTotal == 0 {
-				curTot = 1
-			}
-			thisServerObject.Percentage = float64(thisServerObject.LoadPerSec) / float64(curTot)
+
+			// The compensation should be flat out based on servers,
+			// not on current load, it tends to skew too conservative
+			thisServerObject.Percentage = 1 / float64(d.Servers.Count())
 			d.serverIndex[sID] = thisServerObject
 		}
 	}
