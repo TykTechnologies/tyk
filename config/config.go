@@ -295,17 +295,15 @@ func WriteConf(path string, conf *Config) error {
 
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
-func writeDefault(path string, conf *Config) {
+func WriteDefault(path string, conf *Config) error {
 	*conf = Default
 	if err := envconfig.Process(envPrefix, conf); err != nil {
-		log.Error("Failed to process environment variables: ", err)
+		return err
 	}
 	if path == "" {
-		return
+		return nil
 	}
-	if err := WriteConf(path, conf); err != nil {
-		log.Error("Problem saving the default configuration: ", err)
-	}
+	return WriteConf(path, conf)
 }
 
 // Load will load a configuration file, trying each of the paths given
@@ -333,7 +331,9 @@ func Load(paths []string, conf *Config) error {
 	if r == nil {
 		path := paths[0]
 		log.Warnf("No config file found, writing default to %s", path)
-		writeDefault(path, conf)
+		if err := WriteDefault(path, conf); err != nil {
+			return err
+		}
 		log.Info("Loading default configuration...")
 		return Load([]string{path}, conf)
 	}
