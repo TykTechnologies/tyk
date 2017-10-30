@@ -51,6 +51,14 @@ var tests = []struct {
 	{"Default", onDefaults(`{}`), nil},
 	{"OldMonitor", `{"Monitor": {}}`, nil},
 	{"NullObject", `{"event_handlers": null}`, nil},
+	{
+		"MissingPath", `{"app_path": "missing-path"}`,
+		"app_path: Path does not exist or is not accessible",
+	},
+	{
+		"ExtraPort", `{"listen_address": "foo.com:8080"}`,
+		"listen_address: Address should only be the host, not the port",
+	},
 }
 
 func allContains(got, want []string) bool {
