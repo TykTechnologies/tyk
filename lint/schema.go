@@ -63,7 +63,8 @@ const confSchema = `{
 				"type": "boolean"
 			},
 			"geo_ip_db_path": {
-				"type": "string"
+				"type": "string",
+				"format": "path"
 			},
 			"ignored_ips": {
 				"type": ["array", "null"]
@@ -95,7 +96,8 @@ const confSchema = `{
 		}
 	},
 	"app_path": {
-		"type": "string"
+		"type": "string",
+		"format": "path"
 	},
 	"auth_override": {
 		"type": ["object", "null"],
@@ -342,7 +344,8 @@ const confSchema = `{
 		"type": "boolean"
 	},
 	"listen_address": {
-		"type": "string"
+		"type": "string",
+		"format": "host-no-port"
 	},
 	"listen_port": {
 		"type": "integer"
@@ -378,7 +381,8 @@ const confSchema = `{
 		"type": "integer"
 	},
 	"middleware_path": {
-		"type": "string"
+		"type": "string",
+		"format": "path"
 	},
 	"monitor": {
 		"type": ["object", "null"],
@@ -401,7 +405,8 @@ const confSchema = `{
 						"type": "string"
 					},
 					"template_path": {
-						"type": "string"
+						"type": "string",
+						"format": "path"
 					}
 				}
 			},
@@ -462,7 +467,8 @@ const confSchema = `{
 		"type": "boolean"
 	},
 	"public_key_path": {
-		"type": "string"
+		"type": "string",
+		"format": "path"
 	},
 	"reload_wait_time": {
 		"type": "integer"
@@ -546,10 +552,12 @@ const confSchema = `{
 		"type": "string"
 	},
 	"template_path": {
-		"type": "string"
+		"type": "string",
+		"format": "path"
 	},
 	"tyk_js_path": {
-		"type": "string"
+		"type": "string",
+		"format": "path"
 	},
 	"uptime_tests": {
 		"type": ["object", "null"],
