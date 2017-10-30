@@ -3,6 +3,8 @@
 package main
 
 import (
+	"encoding/json"
+
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -51,6 +53,14 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		monitor.TriggerLimits = session.Monitor.TriggerLimits
 	}
 
+	metadata := make(map[string]interface{})
+	if session.Metadata != "" {
+		err := json.Unmarshal([]byte(session.Metadata), &metadata)
+		if err != nil {
+			log.Error("Error interpreting metadata: ", err)
+		}
+	}
+
 	return &user.SessionState{
 		LastCheck:               session.LastCheck,
 		Allowance:               session.Allowance,
@@ -73,6 +83,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		ApplyPolicyID:           session.ApplyPolicyId,
 		ApplyPolicies:           session.ApplyPolicies,
 		DataExpires:             session.DataExpires,
+		Metadata:                metadata,
 		Monitor:                 monitor,
 		EnableDetailedRecording: session.EnableDetailedRecording,
 		Tags:                session.Tags,
