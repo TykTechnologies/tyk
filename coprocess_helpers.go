@@ -83,7 +83,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		ApplyPolicyID:           session.ApplyPolicyId,
 		ApplyPolicies:           session.ApplyPolicies,
 		DataExpires:             session.DataExpires,
-		Metadata:                metadata,
+		MetaData:                metadata,
 		Monitor:                 monitor,
 		EnableDetailedRecording: session.EnableDetailedRecording,
 		Tags:                session.Tags,
