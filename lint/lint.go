@@ -2,6 +2,8 @@ package lint
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
 	"os"
 
 	schema "github.com/xeipuuv/gojsonschema"
@@ -13,6 +15,7 @@ import (
 // config file that was checked, a list of warnings and an error, if any
 // happened.
 func Run(paths []string) (string, []string, error) {
+	addFormats(&schema.FormatCheckers)
 	var conf config.Config
 	if err := config.Load(paths, &conf); err != nil {
 		return "", nil, err
@@ -50,11 +53,47 @@ func Run(paths []string) (string, []string, error) {
 	return conf.OriginalPath, resultWarns(result), nil
 }
 
+type stringFormat func(string) bool
+
+func (f stringFormat) IsFormat(v interface{}) bool {
+	s := v.(string)
+	if s == "" {
+		return true // empty string is ok
+	}
+	return f(s)
+}
+
+func addFormats(chain *schema.FormatCheckerChain) {
+	chain.Add("path", stringFormat(func(path string) bool {
+		_, err := os.Stat(path)
+		return err == nil // must be accessible
+	}))
+	chain.Add("host-no-port", stringFormat(func(host string) bool {
+		_, port, err := net.SplitHostPort(host)
+		return err == nil && port == "" // valid host with no port
+	}))
+}
+
 func resultWarns(result *schema.Result) []string {
 	warns := result.Errors()
 	strs := make([]string, len(warns))
 	for i, warn := range warns {
-		strs[i] = warn.String()
+		ferr, ok := warn.(*schema.DoesNotMatchFormatError)
+		if !ok {
+			strs[i] = warn.String()
+			continue
+		}
+		// We need this since formats can only return bools, not
+		// custom errors/messages.
+		switch format := ferr.Details()["format"].(string); format {
+		case "path":
+			ferr.SetDescription("Path does not exist or is not accessible")
+		case "host-no-port":
+			ferr.SetDescription("Address should only be the host, not the port")
+		default:
+			panic(fmt.Sprintf("unexpected format type: %q", format))
+		}
+		strs[i] = ferr.String()
 	}
 	return strs
 }
