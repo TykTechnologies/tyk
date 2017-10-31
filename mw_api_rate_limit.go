@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-    "github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and

@@ -166,8 +166,16 @@ func TestCertificateStorage(t *testing.T) {
 
 	t.Run("File certificates", func(t *testing.T) {
 		certs := m.List([]string{certPath, "wrong"}, CertificatePublic)
-		if len(certs) != 1 || leafSubjectName(certs[0]) != "file" {
-			t.Error("Should contain 1 cert", len(certs))
+		if len(certs) != 2 {
+			t.Fatal("Should contain 1 cert", len(certs))
+		}
+
+		if certs[1] != nil {
+			t.Fatal("Wrong certificate should be returned as nil")
+		}
+
+		if leafSubjectName(certs[0]) != "file" {
+			t.Fatal("Should return valid cert")
 		}
 	})
 
