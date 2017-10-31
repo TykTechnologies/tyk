@@ -308,7 +308,7 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 		}
 		certChainPEM = append(certChainPEM, pem.EncodeToMemory(encryptedKeyPEMBlock)...)
 
-		certID = HexSHA256(cert.Certificate[0])
+		certID = orgID + HexSHA256(cert.Certificate[0])
 	} else {
 		// Get first cert
 		certRaw, _ := pem.Decode(certChainPEM)
@@ -319,10 +319,14 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 			return "", err
 		}
 
-		certID = HexSHA256(cert.Raw)
+		certID = orgID + HexSHA256(cert.Raw)
 	}
 
-	if err := c.storage.SetKey("raw-"+orgID+certID, string(certChainPEM), 0); err != nil {
+	if cert, err := c.storage.GetKey("raw-" + certID); err == nil && cert != "" {
+		return "", errors.New("Certificate with " + certID + " id already exists")
+	}
+
+	if err := c.storage.SetKey("raw-" + certID, string(certChainPEM), 0); err != nil {
 		c.logger.Error(err)
 		return "", err
 	}

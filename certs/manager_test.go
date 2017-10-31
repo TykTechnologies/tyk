@@ -112,6 +112,9 @@ func TestAddCertificate(t *testing.T) {
 	combinedPem := append(cert2Pem, key2Pem...)
 	combinedPemWrongPrivate := append(cert2Pem, keyPem...)
 
+	certRaw, _ := pem.Decode(cert2Pem)
+	certID := HexSHA256(certRaw.Bytes)
+
 	tests := [...]struct {
 		data []byte
 		err  string
@@ -122,6 +125,7 @@ func TestAddCertificate(t *testing.T) {
 		{certPem, ""},
 		{combinedPemWrongPrivate, "tls: private key does not match public key"},
 		{combinedPem, ""},
+		{combinedPem, "Certificate with " + certID + " id already exists"},
 	}
 
 	for _, tc := range tests {
