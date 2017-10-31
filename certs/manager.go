@@ -179,6 +179,7 @@ func isCertCanBeListed(cert *tls.Certificate, mode CertificateType) bool {
 
 type CertificateMeta struct {
 	ID            string    `json:"id"`
+	Fingerprint   string    `json:"fingerprint"`
 	HasPrivateKey bool      `json:"has_private"`
 	Issuer        pkix.Name `json:"issuer,omitempty"`
 	Subject       pkix.Name `json:"subject,omitempty"`
@@ -187,9 +188,10 @@ type CertificateMeta struct {
 	DNSNames      []string  `json:"dns_names,omitempty"`
 }
 
-func ExtractCertificateMeta(cert *tls.Certificate) CertificateMeta {
-	return CertificateMeta{
-		ID:            string(cert.Leaf.Extensions[0].Value),
+func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMeta {
+	return &CertificateMeta{
+		ID:            certID,
+		Fingerprint:   string(cert.Leaf.Extensions[0].Value),
 		HasPrivateKey: !isPrivateKeyEmpty(cert),
 		Issuer:        cert.Leaf.Issuer,
 		Subject:       cert.Leaf.Subject,
@@ -217,6 +219,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			val, err = c.storage.GetKey("raw-" + id)
 			if err != nil {
 				c.logger.Warn("Can't retrieve certificate from Redis:", id, err)
+				out = append(out, nil)
 				continue
 			}
 			rawCert = []byte(val)
@@ -224,6 +227,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			rawCert, err = ioutil.ReadFile(id)
 			if err != nil {
 				c.logger.Error("Error while reading certificate from file:", id, err)
+				out = append(out, nil)
 				continue
 			}
 		}
@@ -231,6 +235,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 		cert, err = parsePEM(rawCert, c.secret)
 		if err != nil {
 			c.logger.Error("Error while parsing certificate: ", id, " ", err)
+			out = append(out, nil)
 			continue
 		}
 
@@ -244,8 +249,14 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 	return out
 }
 
-func (c *CertificateManager) ListAllIds(prefix string) []string {
-	return c.storage.GetKeys(prefix + "*")
+func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
+	keys := c.storage.GetKeys(prefix + "*")
+
+	for _, key := range keys {
+		out = append(out, strings.TrimPrefix(key, "raw-"))
+	}
+
+	return out
 }
 
 func (c *CertificateManager) GetRaw(certID string) (string, error) {
@@ -261,7 +272,7 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 	for {
 		var block *pem.Block
 
-        block, rest = pem.Decode(rest)
+		block, rest = pem.Decode(rest)
 		if block == nil {
 			break
 		}
@@ -326,7 +337,7 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 		return "", errors.New("Certificate with " + certID + " id already exists")
 	}
 
-	if err := c.storage.SetKey("raw-" + certID, string(certChainPEM), 0); err != nil {
+	if err := c.storage.SetKey("raw-"+certID, string(certChainPEM), 0); err != nil {
 		c.logger.Error(err)
 		return "", err
 	}

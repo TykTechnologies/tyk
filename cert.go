@@ -147,17 +147,21 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 		certificates := CertificateManager.List(certIDs, certs.CertificateAny)
 
 		if len(certIDs) == 1 {
-			if len(certificates) == 0 {
+			if certificates[0] == nil {
 				doJSONWrite(w, 404, apiError("Certificate with given SHA256 fingerprint not found"))
 				return
 			}
 
-			doJSONWrite(w, 200, certs.ExtractCertificateMeta(certificates[0]))
+			doJSONWrite(w, 200, certs.ExtractCertificateMeta(certificates[0], certIDs[0]))
 			return
 		} else {
-			var meta []certs.CertificateMeta
-			for _, cert := range certificates {
-				meta = append(meta, certs.ExtractCertificateMeta(cert))
+			var meta []*certs.CertificateMeta
+			for ci, cert := range certificates {
+				if cert != nil {
+					meta = append(meta, certs.ExtractCertificateMeta(cert, certIDs[ci]))
+				} else {
+					meta = append(meta, nil)
+				}
 			}
 
 			doJSONWrite(w, 200, meta)
