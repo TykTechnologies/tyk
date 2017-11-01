@@ -259,7 +259,7 @@ type Config struct {
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
 	LogLevel                          string                                `json:"log_level"`
-	Security                          SecurityConfig                        `json:"secuity"`
+	Security                          SecurityConfig                        `json:"security"`
 }
 
 type CertData struct {
