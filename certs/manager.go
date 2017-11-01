@@ -250,7 +250,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 }
 
 func (c *CertificateManager) ListAllIds(prefix string) (out []string) {
-	keys := c.storage.GetKeys(prefix + "*")
+	keys := c.storage.GetKeys("raw-" + prefix + "*")
 
 	for _, key := range keys {
 		out = append(out, strings.TrimPrefix(key, "raw-"))
