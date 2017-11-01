@@ -16,7 +16,8 @@ const confSchema = `{
 				"type": "boolean"
 			},
 			"host": {
-				"type": "string"
+				"type": "string",
+				"format": "host-no-port"
 			},
 			"hosts": {
 				"type": ["array", "null"]
