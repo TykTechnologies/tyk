@@ -288,7 +288,10 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 }
 
 func getChain(spec *APISpec) http.Handler {
-	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	remote, err := url.Parse(spec.Proxy.TargetURL)
+	if err != nil {
+		panic(err)
+	}
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
 	baseMid := BaseMiddleware{spec, proxy}
@@ -1013,7 +1016,10 @@ func TestListenPathTykPrefix(t *testing.T) {
 
 func TestProxyUserAgent(t *testing.T) {
 	spec := createSpecTest(t, sampleAPI)
-	remote, _ := url.Parse(spec.Proxy.TargetURL)
+	remote, err := url.Parse(spec.Proxy.TargetURL)
+	if err != nil {
+		t.Fatal(err)
+	}
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
 
@@ -1077,6 +1083,10 @@ func buildAndLoadAPI(apiGens ...func(spec *APISpec)) {
 }
 
 func TestSkipUrlCleaning(t *testing.T) {
+	// force ipv4 for now, to work around the docker bug affecting
+	// Go 1.8 and ealier
+	config.Global.ListenAddress = "127.0.0.1"
+
 	config.Global.HttpServerOptions.OverrideDefaults = true
 	config.Global.HttpServerOptions.SkipURLCleaning = true
 
@@ -1085,6 +1095,7 @@ func TestSkipUrlCleaning(t *testing.T) {
 	listen(ln, nil, nil)
 
 	defer func() {
+		config.Global.ListenAddress = ""
 		config.Global.HttpServerOptions.OverrideDefaults = false
 		config.Global.HttpServerOptions.SkipURLCleaning = false
 		ln.Close()
@@ -1099,8 +1110,14 @@ func TestSkipUrlCleaning(t *testing.T) {
 		spec.Proxy.TargetURL = s.URL
 	})
 
-	resp, _ := http.Get(baseURL + "/http://example.com")
-	body, _ := ioutil.ReadAll(resp.Body)
+	resp, err := http.Get(baseURL + "/http://example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if string(body) != "/http://example.com" {
 		t.Error("Should not strip URL", string(body))
