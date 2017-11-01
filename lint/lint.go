@@ -70,6 +70,10 @@ func addFormats(chain *schema.FormatCheckerChain) {
 	}))
 	chain.Add("host-no-port", stringFormat(func(host string) bool {
 		_, port, err := net.SplitHostPort(host)
+		if a, ok := err.(*net.AddrError); ok && a.Err == "missing port in address" {
+			// port being missing is ok
+			err = nil
+		}
 		return err == nil && port == "" // valid host with no port
 	}))
 }
@@ -89,7 +93,7 @@ func resultWarns(result *schema.Result) []string {
 		case "path":
 			ferr.SetDescription("Path does not exist or is not accessible")
 		case "host-no-port":
-			ferr.SetDescription("Address should only be the host, not the port")
+			ferr.SetDescription("Address should be a host without port")
 		default:
 			panic(fmt.Sprintf("unexpected format type: %q", format))
 		}

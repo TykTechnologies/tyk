@@ -57,7 +57,11 @@ var tests = []struct {
 	},
 	{
 		"ExtraPort", `{"listen_address": "foo.com:8080"}`,
-		"listen_address: Address should only be the host, not the port",
+		"listen_address: Address should be a host without port",
+	},
+	{
+		"BadHost", `{"storage": {"host": "::::"}}`,
+		"storage.host: Address should be a host without port",
 	},
 }
 
