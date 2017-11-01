@@ -91,10 +91,8 @@ func HexSHA256(cert []byte) string {
 	return hex.EncodeToString(certSHA[:])
 }
 
-func parsePEM(data []byte, secret string) (*tls.Certificate, error) {
-	var cert tls.Certificate
-	var decrypted []byte
-	var err error
+func ParsePEM(data []byte, secret string) ([]*pem.Block, error) {
+	var pemBlocks []*pem.Block
 
 	for {
 		var block *pem.Block
@@ -104,25 +102,39 @@ func parsePEM(data []byte, secret string) (*tls.Certificate, error) {
 			break
 		}
 
-		switch block.Type {
-		case "CERTIFICATE":
-			cert.Certificate = append(cert.Certificate, block.Bytes)
-		case "ENCRYPTED PRIVATE KEY":
-			decrypted, err = x509.DecryptPEMBlock(block, []byte(secret))
-			if err != nil {
-				return nil, err
-			}
+		if x509.IsEncryptedPEMBlock(block) {
+			var err error
+			block.Bytes, err = x509.DecryptPEMBlock(block, []byte(secret))
 
-			cert.PrivateKey, err = parsePrivateKey(decrypted)
 			if err != nil {
 				return nil, err
 			}
-		default:
-			if strings.HasSuffix(block.Type, "PRIVATE KEY") {
-				cert.PrivateKey, err = parsePrivateKey(block.Bytes)
-				if err != nil {
-					return nil, err
-				}
+		}
+
+		pemBlocks = append(pemBlocks, block)
+	}
+
+	return pemBlocks, nil
+}
+
+func ParsePEMCertificate(data []byte, secret string) (*tls.Certificate, error) {
+	var cert tls.Certificate
+
+	blocks, err := ParsePEM(data, secret)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, block := range blocks {
+		if block.Type == "CERTIFICATE" {
+			cert.Certificate = append(cert.Certificate, block.Bytes)
+			continue
+		}
+
+		if strings.HasSuffix(block.Type, "PRIVATE KEY") {
+			cert.PrivateKey, err = parsePrivateKey(block.Bytes)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -232,7 +244,7 @@ func (c *CertificateManager) List(certIDs []string, mode CertificateType) (out [
 			}
 		}
 
-		cert, err = parsePEM(rawCert, c.secret)
+		cert, err = ParsePEMCertificate(rawCert, c.secret)
 		if err != nil {
 			c.logger.Error("Error while parsing certificate: ", id, " ", err)
 			out = append(out, nil)
@@ -317,6 +329,8 @@ func (c *CertificateManager) Add(certData []byte, orgID string) (string, error) 
 			c.logger.Error("Failed to encode private key", err)
 			return "", err
 		}
+
+		certChainPEM = append(certChainPEM, []byte("\n")...)
 		certChainPEM = append(certChainPEM, pem.EncodeToMemory(encryptedKeyPEMBlock)...)
 
 		certID = orgID + HexSHA256(cert.Certificate[0])
@@ -354,7 +368,9 @@ func (c *CertificateManager) CertPool(certIDs []string) *x509.CertPool {
 	pool := x509.NewCertPool()
 
 	for _, cert := range c.List(certIDs, CertificatePublic) {
-		pool.AddCert(cert.Leaf)
+		if cert != nil {
+			pool.AddCert(cert.Leaf)
+		}
 	}
 
 	return pool
@@ -374,7 +390,7 @@ func (c *CertificateManager) ValidateRequestCertificate(certIDs []string, r *htt
 	certID := HexSHA256(leaf.Raw)
 	for _, cert := range c.List(certIDs, CertificatePublic) {
 		// Extensions[0] contains cache of certificate SHA256
-		if string(cert.Leaf.Extensions[0].Value) == certID {
+		if cert == nil || string(cert.Leaf.Extensions[0].Value) == certID {
 			return nil
 		}
 	}
