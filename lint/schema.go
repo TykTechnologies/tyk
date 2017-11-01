@@ -335,6 +335,12 @@ const confSchema = `{
 			},
 			"write_timeout": {
 				"type": "integer"
+			},
+			"ssl_certificates": {
+				"type": ["array", "null"],
+				"items": {
+					"type": "string"
+				}
 			}
 		}
 	},
@@ -595,6 +601,51 @@ const confSchema = `{
 	},
 	"use_syslog": {
 		"type": "boolean"
+	},
+	"security": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"private_certificate_encoding_secret": {
+				"type": "string"
+			},
+			"control_api_use_mutual_tls": {
+				"type": "boolean"
+			},
+			"certificates": {
+				"type": ["object", "null"],
+				"additionalProperties": false,
+				"properties": {
+					"upstream": {
+						"type": ["object", "null"]
+					},
+					"apis": {
+						"type": ["array", "null"],
+						"items": {
+							"type": "string"
+						}
+					},
+					"control_api": {
+						"type": ["array", "null"],
+						"items": {
+							"type": "string"
+						}
+					},
+					"dashboard_api": {
+						"type": ["array", "null"],
+						"items": {
+							"type": "string"
+						}
+					},
+					"mdcb_api": {
+						"type": ["array", "null"],
+						"items": {
+							"type": "string"
+						}
+					}
+				}
+			}
+		}
 	}
 }
 }`
