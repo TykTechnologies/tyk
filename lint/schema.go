@@ -35,7 +35,8 @@ const confSchema = `{
 				"type": "integer"
 			},
 			"type": {
-				"type": "string"
+				"type": "string",
+				"enum": ["", "redis"]
 			},
 			"username": {
 				"type": "string"
@@ -367,7 +368,8 @@ const confSchema = `{
 		}
 	},
 	"log_level": {
-		"type": "string"
+		"type": "string",
+		"enum": ["", "debug", "info", "warn", "error"]
 	},
 	"logstash_network_addr": {
 		"type": "string"
@@ -457,7 +459,8 @@ const confSchema = `{
 				"type": "string"
 			},
 			"policy_source": {
-				"type": "string"
+				"type": "string",
+				"enum": ["", "service", "rpc"]
 			}
 		}
 	},

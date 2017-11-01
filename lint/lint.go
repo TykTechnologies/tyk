@@ -89,14 +89,16 @@ func resultWarns(result *schema.Result) []string {
 		}
 		// We need this since formats can only return bools, not
 		// custom errors/messages.
+		var desc string
 		switch format := ferr.Details()["format"].(string); format {
 		case "path":
-			ferr.SetDescription("Path does not exist or is not accessible")
+			desc = "Path does not exist or is not accessible"
 		case "host-no-port":
-			ferr.SetDescription("Address should be a host without port")
+			desc = "Address should be a host without port"
 		default:
 			panic(fmt.Sprintf("unexpected format type: %q", format))
 		}
+		ferr.SetDescription(desc)
 		strs[i] = ferr.String()
 	}
 	return strs
