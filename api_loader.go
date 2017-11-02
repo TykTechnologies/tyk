@@ -110,6 +110,16 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"api_name": spec.Name,
 	}).Info("Loading API")
 
+	if len(spec.TagHeaders) > 0 {
+		// Ensure all headers marked for tagging are lowercase
+		lowerCaseHeaders := make([]string, len(spec.TagHeaders))
+		for i, k := range spec.TagHeaders {
+			lowerCaseHeaders[i] = strings.ToLower(k)
+
+		}
+		spec.TagHeaders = lowerCaseHeaders
+	}
+
 	if skipSpecBecauseInvalid(spec) {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
@@ -468,7 +478,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			"api_name": spec.Name,
 		}).Debug("Rate limit endpoint is: ", rateLimitPath)
 		chainDef.RateLimitPath = rateLimitPath
-		chainDef.RateLimitChain = alice.New(simpleArray...).Then(UserRatesCheck())
+		chainDef.RateLimitChain = alice.New(simpleArray...).
+			Then(http.HandlerFunc(userRatesCheck))
 	}
 
 	log.WithFields(logrus.Fields{

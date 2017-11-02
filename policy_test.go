@@ -44,42 +44,42 @@ func (dummySessionManager) UpdateSession(key string, sess *user.SessionState, tt
 
 func TestApplyPolicies(t *testing.T) {
 	policiesMu.RLock()
-	policiesByID = map[string]Policy{
+	policiesByID = map[string]user.Policy{
 		"nonpart1": {},
 		"nonpart2": {},
 		"difforg":  {OrgID: "different"},
 		"tags1": {
-			Partitions: PolicyPartitions{Quota: true},
+			Partitions: user.PolicyPartitions{Quota: true},
 			Tags:       []string{"tagA"},
 		},
 		"tags2": {
-			Partitions: PolicyPartitions{RateLimit: true},
+			Partitions: user.PolicyPartitions{RateLimit: true},
 			Tags:       []string{"tagX", "tagY"},
 		},
 		"inactive1": {
-			Partitions: PolicyPartitions{RateLimit: true},
+			Partitions: user.PolicyPartitions{RateLimit: true},
 			IsInactive: true,
 		},
 		"inactive2": {
-			Partitions: PolicyPartitions{Quota: true},
+			Partitions: user.PolicyPartitions{Quota: true},
 			IsInactive: true,
 		},
 		"quota1": {
-			Partitions: PolicyPartitions{Quota: true},
+			Partitions: user.PolicyPartitions{Quota: true},
 			QuotaMax:   2,
 		},
-		"quota2": {Partitions: PolicyPartitions{Quota: true}},
+		"quota2": {Partitions: user.PolicyPartitions{Quota: true}},
 		"rate1": {
-			Partitions: PolicyPartitions{RateLimit: true},
+			Partitions: user.PolicyPartitions{RateLimit: true},
 			Rate:       3,
 		},
-		"rate2": {Partitions: PolicyPartitions{RateLimit: true}},
+		"rate2": {Partitions: user.PolicyPartitions{RateLimit: true}},
 		"acl1": {
-			Partitions:   PolicyPartitions{Acl: true},
+			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"acl2": {
-			Partitions:   PolicyPartitions{Acl: true},
+			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
 	}

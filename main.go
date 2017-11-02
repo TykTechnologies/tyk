@@ -35,8 +35,10 @@ import (
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/lint"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 var (
@@ -60,7 +62,7 @@ var (
 	keyGen DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
-	policiesByID = map[string]Policy{}
+	policiesByID = map[string]user.Policy{}
 
 	mainRouter    *mux.Router
 	controlRouter *mux.Router
@@ -72,6 +74,7 @@ var (
 	runningTests = false
 
 	help               = kingpin.CommandLine.HelpFlag.Short('h')
+	linter             = kingpin.Flag("lint", "enable linter check").Bool()
 	conf               = kingpin.Flag("conf", "load a named configuration file").PlaceHolder("FILE").String()
 	port               = kingpin.Flag("port", "listen on PORT (overrides config file)").String()
 	memProfile         = kingpin.Flag("memprofile", "generate a memory profile").Bool()
@@ -244,7 +247,7 @@ func getAPISpecs() []*APISpec {
 }
 
 func getPolicies() {
-	var pols map[string]Policy
+	var pols map[string]user.Policy
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")
@@ -949,6 +952,22 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 func main() {
 	kingpin.Parse()
 
+	if *linter {
+		path, lines, err := lint.Run(confPaths)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if len(lines) == 0 {
+			fmt.Printf("found no issues in %s\n", path)
+			return
+		}
+		fmt.Printf("issues found in %s:\n", path)
+		for _, line := range lines {
+			fmt.Println(line)
+		}
+		os.Exit(1)
+	}
 	NodeID = "solo-" + uuid.NewV4().String()
 
 	amForked := false

@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"sync/atomic"
-	textTemplate "text/template"
+	"text/template"
 	"time"
 
 	"github.com/rubyist/circuitbreaker"
@@ -104,7 +104,7 @@ type URLSpec struct {
 
 type TransformSpec struct {
 	apidef.TemplateMeta
-	Template *textTemplate.Template
+	Template *template.Template
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -239,16 +239,12 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 
 	// Extract tagged APIs#
-	type ResponseStruct struct {
-		ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
+	var list struct {
+		Message []struct {
+			ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
+		}
+		Nonce string
 	}
-	type NodeResponseOK struct {
-		Status  string
-		Message []ResponseStruct
-		Nonce   string
-	}
-
-	list := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		log.Error("Failed to decode body: ", err)
 		log.Info("--> Retrying in 5s")
@@ -394,7 +390,7 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
 	apiLangIDsRegex := regexp.MustCompile(`{(.*?)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `(.*?)`)
-	asRegex := regexp.MustCompile(asRegexStr)
+	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
 }
@@ -445,18 +441,25 @@ func (a APIDefinitionLoader) compileCachedPathSpec(paths []string) []URLSpec {
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
+var apiTemplate = template.New("").Funcs(map[string]interface{}{
+	"jsonMarshal": func(v interface{}) (string, error) {
+		bs, err := json.Marshal(v)
+		return string(bs), err
+	},
+})
+
+func (a APIDefinitionLoader) loadFileTemplate(path string) (*template.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	return textTemplate.ParseFiles(path)
+	return apiTemplate.New("").ParseFiles(path)
 }
 
-func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
+func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*template.Template, error) {
 	log.Debug("-- Loading blob")
 	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
 		return nil, err
 	}
-	return textTemplate.New("blob").Parse(string(uDec))
+	return apiTemplate.New("").Parse(string(uDec))
 }
 
 func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus) []URLSpec {

@@ -494,7 +494,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	spec.SessionManager.UpdateSession(tokenID, session, 60)
 
 	policiesMu.Lock()
-	policiesByID["987654321"] = Policy{
+	policiesByID["987654321"] = user.Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,
@@ -546,7 +546,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	spec.JWTSigningMethod = "rsa"
 
 	policiesMu.Lock()
-	policiesByID["987654321"] = Policy{
+	policiesByID["987654321"] = user.Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,
@@ -596,7 +596,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	spec.JWTSigningMethod = "rsa"
 
 	policiesMu.Lock()
-	policiesByID["987654321"] = Policy{
+	policiesByID["987654321"] = user.Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,
@@ -646,7 +646,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	spec.JWTSigningMethod = "rsa"
 
 	policiesMu.Lock()
-	policiesByID["987654321"] = Policy{
+	policiesByID["987654321"] = user.Policy{
 		ID:               "987654321",
 		OrgID:            "default",
 		Rate:             1000.0,

@@ -16,6 +16,7 @@ import (
 	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -75,7 +76,7 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 	manager := addOAuthHandlers(spec, muxer)
 
 	// add a test client
-	testPolicy := Policy{}
+	testPolicy := user.Policy{}
 	testPolicy.Rate = 100
 	testPolicy.Per = 1
 	testPolicy.QuotaMax = -1
@@ -430,7 +431,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 
 	testMuxer.ServeHTTP(recorder, req)
 
-	newSuccess := APIModifyKeySuccess{}
+	newSuccess := apiModifyKeySuccess{}
 	json.NewDecoder(recorder.Body).Decode(&newSuccess)
 
 	if newSuccess.Status != "ok" {

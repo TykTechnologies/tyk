@@ -139,7 +139,7 @@ func TestApiHandlerPost(t *testing.T) {
 
 	mainRouter.ServeHTTP(recorder, req)
 
-	var success APIModifyKeySuccess
+	var success apiModifyKeySuccess
 	json.NewDecoder(recorder.Body).Decode(&success)
 
 	if success.Status != "ok" {
@@ -220,7 +220,7 @@ func TestApiHandlerPostDbConfig(t *testing.T) {
 
 	mainRouter.ServeHTTP(recorder, req)
 
-	var success APIModifyKeySuccess
+	var success apiModifyKeySuccess
 	json.NewDecoder(recorder.Body).Decode(&success)
 	if success.Status == "ok" {
 		t.Error("Response is incorrect - expected error due to use_db_app_config :\n", recorder.Body.String())
@@ -277,7 +277,7 @@ func TestKeyHandlerNewKey(t *testing.T) {
 
 		mainRouter.ServeHTTP(recorder, req)
 
-		newSuccess := APIModifyKeySuccess{}
+		newSuccess := apiModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
 		if newSuccess.Status != "ok" {
 			t.Error("key not created, status error:\n", recorder.Body.String())
@@ -303,7 +303,7 @@ func TestKeyHandlerUpdateKey(t *testing.T) {
 
 		mainRouter.ServeHTTP(recorder, req)
 
-		newSuccess := APIModifyKeySuccess{}
+		newSuccess := apiModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
 		if newSuccess.Status != "ok" {
 			t.Error("key not created, status error:\n", recorder.Body.String())
@@ -366,7 +366,7 @@ func TestKeyHandlerDeleteKey(t *testing.T) {
 
 		mainRouter.ServeHTTP(recorder, req)
 
-		newSuccess := APIModifyKeySuccess{}
+		newSuccess := apiModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
 
 		if newSuccess.Status != "ok" {
@@ -406,7 +406,7 @@ func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
 
 		mainRouter.ServeHTTP(recorder, req)
 
-		newSuccess := APIModifyKeySuccess{}
+		newSuccess := apiModifyKeySuccess{}
 		json.NewDecoder(recorder.Body).Decode(&newSuccess)
 
 		if newSuccess.Status != "ok" {

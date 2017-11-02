@@ -138,7 +138,7 @@ func TestRequestIP(t *testing.T) {
 }
 
 func TestCheckHeaderInRemoveList(t *testing.T) {
-	type TestSpec struct {
+	type testSpec struct {
 		UseExtendedPaths      bool
 		GlobalHeadersRemove   []string
 		ExtendedDeleteHeaders []string
@@ -169,7 +169,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 
 	tests := []struct {
 		header   string
-		spec     TestSpec
+		spec     testSpec
 		expected bool
 	}{
 		{
@@ -177,23 +177,23 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 		},
 		{
 			header: "X-Forwarded-For",
-			spec:   TestSpec{GlobalHeadersRemove: []string{"X-Random-Header"}},
+			spec:   testSpec{GlobalHeadersRemove: []string{"X-Random-Header"}},
 		},
 		{
 			header: "X-Forwarded-For",
-			spec: TestSpec{
+			spec: testSpec{
 				UseExtendedPaths:      true,
 				ExtendedDeleteHeaders: []string{"X-Random-Header"},
 			},
 		},
 		{
 			header:   "X-Forwarded-For",
-			spec:     TestSpec{GlobalHeadersRemove: []string{"X-Forwarded-For"}},
+			spec:     testSpec{GlobalHeadersRemove: []string{"X-Forwarded-For"}},
 			expected: true,
 		},
 		{
 			header: "X-Forwarded-For",
-			spec: TestSpec{
+			spec: testSpec{
 				UseExtendedPaths:      true,
 				GlobalHeadersRemove:   []string{"X-Random-Header"},
 				ExtendedDeleteHeaders: []string{"X-Forwarded-For"},
@@ -202,7 +202,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 		},
 		{
 			header: "X-Forwarded-For",
-			spec: TestSpec{
+			spec: testSpec{
 				UseExtendedPaths:      true,
 				GlobalHeadersRemove:   []string{"X-Forwarded-For"},
 				ExtendedDeleteHeaders: []string{"X-Forwarded-For"},
