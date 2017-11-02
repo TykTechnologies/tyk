@@ -380,13 +380,13 @@ func TykOsinNewServer(config *osin.ServerConfig, storage ExtendedOsinStorageInte
 		Config:            config,
 		Storage:           storage,
 		AuthorizeTokenGen: &osin.AuthorizeTokenGenDefault{},
-		AccessTokenGen:    AccessTokenGenTyk{},
+		AccessTokenGen:    accessTokenGen{},
 	}
 
 	overrideServer.Server.Config = config
 	overrideServer.Server.Storage = storage
 	overrideServer.Server.AuthorizeTokenGen = overrideServer.AuthorizeTokenGen
-	overrideServer.Server.AccessTokenGen = AccessTokenGenTyk{}
+	overrideServer.Server.AccessTokenGen = accessTokenGen{}
 
 	return &overrideServer
 }
@@ -697,11 +697,11 @@ func (r *RedisOsinStorageInterface) RemoveRefresh(token string) error {
 	return nil
 }
 
-// AccessTokenGenTyk is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
-type AccessTokenGenTyk struct{}
+// accessTokenGen is a modified authorization token generator that uses the same method used to generate tokens for Tyk authHandler
+type accessTokenGen struct{}
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
-func (AccessTokenGenTyk) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
+func (accessTokenGen) GenerateAccessToken(data *osin.AccessData, generaterefresh bool) (accesstoken, refreshtoken string, err error) {
 	log.Info("[OAuth] Generating new token")
 
 	var newSession user.SessionState

@@ -16,9 +16,9 @@ var applicationGCStats = debug.GCStats{}
 var instrument = health.NewStream()
 
 // setupInstrumentation handles all the intialisation of the instrumentation handler
-func setupInstrumentation(arguments map[string]interface{}) {
+func setupInstrumentation() {
 	switch {
-	case arguments["--log-instrumentation"] == true:
+	case *logInstrumentation:
 	case os.Getenv("TYK_INSTRUMENTATION") == "1":
 	default:
 		return

@@ -112,6 +112,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tags = session.Tags
 		}
 
+		if len(e.Spec.TagHeaders) > 0 {
+			tags = tagHeaders(r, e.Spec.TagHeaders, tags)
+		}
+
 		rawRequest := ""
 		rawResponse := ""
 		if recordDetail(r) {

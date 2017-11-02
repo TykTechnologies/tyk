@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -192,4 +194,60 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 		return false
 	}
 	return true
+}
+
+type dashboardConfigPayload struct {
+	DashboardConfig struct {
+		Hostname string
+		Port     int
+		UseTLS   bool
+	}
+	TimeStamp int64
+}
+
+func createConnectionStringFromDashboardObject(config dashboardConfigPayload) string {
+	hostname := "http://"
+	if config.DashboardConfig.UseTLS {
+		hostname = "https://"
+	}
+	hostname += config.DashboardConfig.Hostname
+
+	if config.DashboardConfig.Port != 0 {
+		hostname = strings.TrimRight(hostname, "/")
+		hostname += ":" + strconv.Itoa(config.DashboardConfig.Port)
+	}
+	return hostname
+}
+
+func handleDashboardZeroConfMessage(payload string) {
+	// Decode the configuration from the payload
+	dashPayload := dashboardConfigPayload{}
+	if err := json.Unmarshal([]byte(payload), &dashPayload); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "pub-sub",
+		}).Error("Failed to decode dashboard zeroconf payload")
+		return
+	}
+
+	if !config.Global.UseDBAppConfigs || config.Global.DisableDashboardZeroConf {
+		return
+	}
+
+	hostname := createConnectionStringFromDashboardObject(dashPayload)
+	setHostname := false
+	if config.Global.DBAppConfOptions.ConnectionString == "" {
+		config.Global.DBAppConfOptions.ConnectionString = hostname
+		setHostname = true
+	}
+
+	if config.Global.Policies.PolicyConnectionString == "" {
+		config.Global.Policies.PolicyConnectionString = hostname
+		setHostname = true
+	}
+
+	if setHostname {
+		log.WithFields(logrus.Fields{
+			"prefix": "pub-sub",
+		}).Info("Hostname set with dashboard zeroconf signal")
+	}
 }

@@ -12,6 +12,8 @@ import (
 
 	cache "github.com/pmylund/go-cache"
 
+	"fmt"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -41,6 +43,28 @@ type ReturningHttpHandler interface {
 // SuccessHandler represents the final ServeHTTP() request for a proxied API request
 type SuccessHandler struct {
 	BaseMiddleware
+}
+
+func tagHeaders(r *http.Request, th []string, tags []string) []string {
+	for k, v := range r.Header {
+		cleanK := strings.ToLower(k)
+		ok := false
+		for _, hname := range th {
+			if hname == cleanK {
+				ok = true
+				break
+			}
+		}
+
+		if ok {
+			for _, val := range v {
+				tagName := fmt.Sprintf("%s-%s", cleanK, val)
+				tags = append(tags, tagName)
+			}
+		}
+	}
+
+	return tags
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
@@ -73,6 +97,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			oauthClientID = session.OauthClientID
 			tags = session.Tags
 			alias = session.Alias
+		}
+
+		if len(s.Spec.TagHeaders) > 0 {
+			tags = tagHeaders(r, s.Spec.TagHeaders, tags)
 		}
 
 		rawRequest := ""

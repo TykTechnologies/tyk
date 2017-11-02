@@ -20,7 +20,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	"github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
 	"github.com/gemnasium/logrus-graylog-hook"
@@ -30,13 +29,16 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	uuid "github.com/satori/go.uuid"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/lint"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 var (
@@ -60,7 +62,7 @@ var (
 	keyGen DefaultKeyGenerator
 
 	policiesMu   sync.RWMutex
-	policiesByID = map[string]Policy{}
+	policiesByID = map[string]user.Policy{}
 
 	mainRouter    *mux.Router
 	controlRouter *mux.Router
@@ -70,6 +72,24 @@ var (
 	NodeID string
 
 	runningTests = false
+
+	help               = kingpin.CommandLine.HelpFlag.Short('h')
+	linter             = kingpin.Arg("lint", "enable linter check").Bool()
+	conf               = kingpin.Flag("conf", "load a named configuration file").PlaceHolder("FILE").String()
+	port               = kingpin.Flag("port", "listen on PORT (overrides config file)").String()
+	memProfile         = kingpin.Flag("memprofile", "generate a memory profile").Bool()
+	cpuProfile         = kingpin.Flag("cpuprofile", "generate a cpu profile").Bool()
+	httpProfile        = kingpin.Flag("httpprofile", "expose runtime profiling data via HTTP").Bool()
+	debugMode          = kingpin.Flag("debug", "enable debug mode").Bool()
+	importBlueprint    = kingpin.Flag("import-blueprint", "import an API Blueprint file").PlaceHolder("FILE").String()
+	importSwagger      = kingpin.Flag("import-swagger", "import a Swagger file").PlaceHolder("FILE").String()
+	createAPI          = kingpin.Flag("create-api", "creates a new API definition from the blueprint").Bool()
+	orgID              = kingpin.Flag("org-id", "assign the API Definition to this org_id (required with create-api").String()
+	upstreamTarget     = kingpin.Flag("upstream-target", "set the upstream target for the definition").PlaceHolder("URL").String()
+	asMock             = kingpin.Flag("as-mock", "creates the API as a mock based on example fields").Bool()
+	forAPI             = kingpin.Flag("for-api", "adds blueprint to existing API Definition as version").PlaceHolder("PATH").String()
+	asVersion          = kingpin.Flag("as-version", "the version number to use when inserting").PlaceHolder("VERSION").String()
+	logInstrumentation = kingpin.Flag("log-intrumentation", "output intrumentation output to stdout").Bool()
 
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
@@ -227,7 +247,7 @@ func getAPISpecs() []*APISpec {
 }
 
 func getPolicies() {
-	var pols map[string]Policy
+	var pols map[string]user.Policy
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")
@@ -306,7 +326,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
 	}
-	if httpProfile {
+	if *httpProfile {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 	r := mux.NewRouter()
@@ -751,13 +771,12 @@ func setupLogger() {
 
 }
 
-func initialiseSystem(arguments map[string]interface{}) error {
+func initialiseSystem() error {
 
 	// Enable command mode
 	for _, opt := range commandModeOptions {
-		v := arguments[opt]
-		if v != nil && v != false {
-			handleCommandModeArgs(arguments)
+		if opt != "" && opt != "false" {
+			handleCommandModeArgs()
 			os.Exit(0)
 		}
 	}
@@ -768,18 +787,18 @@ func initialiseSystem(arguments map[string]interface{}) error {
 		log.Level = logrus.ErrorLevel
 		log.Out = ioutil.Discard
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-	} else if arguments["--debug"] == true {
+	} else if *debugMode {
 		log.Level = logrus.DebugLevel
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling debug-level output")
 	}
 
-	if conf := arguments["--conf"]; conf != nil {
+	if *conf != "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
-		}).Debugf("Using %s for configuration", conf.(string))
-		confPaths = []string{conf.(string)}
+		}).Debugf("Using %s for configuration", *conf)
+		confPaths = []string{*conf}
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
@@ -793,7 +812,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 		afterConfSetup(&config.Global)
 	}
 
-	if os.Getenv("TYK_LOGLEVEL") == "" && arguments["--debug"] == false {
+	if os.Getenv("TYK_LOGLEVEL") == "" && !*debugMode {
 		level := strings.ToLower(config.Global.LogLevel)
 		switch level {
 		case "", "info":
@@ -819,8 +838,8 @@ func initialiseSystem(arguments map[string]interface{}) error {
 
 	setupGlobals()
 
-	if port := arguments["--port"]; port != nil {
-		portNum, err := strconv.Atoi(port.(string))
+	if *port != "" {
+		portNum, err := strconv.Atoi(*port)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
@@ -849,7 +868,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	}
 
 	getHostDetails()
-	setupInstrumentation(arguments)
+	setupInstrumentation()
 
 	if config.Global.HttpServerOptions.UseLE_SSL {
 		go StartPeriodicStateBackup(&LE_MANAGER)
@@ -885,39 +904,6 @@ func getHostDetails() {
 	if hostDetails.Hostname, err = os.Hostname(); err != nil {
 		log.Error("Failed ot get hostname: ", err)
 	}
-}
-
-func getCmdArguments() map[string]interface{} {
-	usage := `Tyk API Gateway.
-
-	Usage:
-		tyk [options]
-
-	Options:
-		-h --help                    Show this screen
-		--conf=FILE                  Load a named configuration file
-		--port=PORT                  Listen on PORT (overrides confg file)
-		--memprofile                 Generate a memory profile
-		--cpuprofile                 Generate a cpu profile
-		--httpprofile                Expose runtime profiling data via HTTP
-		--debug                      Enable Debug output
-		--import-blueprint=<file>    Import an API Blueprint file
-		--import-swagger=<file>      Import a Swagger file
-		--create-api                 Creates a new API Definition from the blueprint
-		--org-id=<id>                Assign the API Defintition to this org_id (required with create)
-		--upstream-target=<url>      Set the upstream target for the definition
-		--as-mock                    Creates the API as a mock based on example fields
-		--for-api=<path>             Adds blueprint to existing API Defintition as version
-		--as-version=<version>       The version number to use when inserting
-		--log-instrumentation        Output instrumentation data to stdout
-	`
-	arguments, err := docopt.Parse(usage, nil, true, VERSION, false)
-	if err != nil {
-		// docopt will exit on its own if there are any user
-		// errors, such as an unknown flag being used.
-		panic(err)
-	}
-	return arguments
 }
 
 var KeepaliveRunning bool
@@ -960,7 +946,26 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 }
 
 func main() {
-	arguments := getCmdArguments()
+
+	kingpin.Parse()
+
+	if *linter {
+		path, lines, err := lint.Run(confPaths)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if len(lines) == 0 {
+			fmt.Printf("found no issues in %s\n", path)
+			return
+		}
+		fmt.Printf("issues found in %s:\n", path)
+		for _, line := range lines {
+			fmt.Println(line)
+		}
+		os.Exit(1)
+	}
+
 	NodeID = "solo-" + uuid.NewV4().String()
 
 	amForked := false
@@ -980,12 +985,9 @@ func main() {
 	l, _ := goagain.Listener(onFork)
 	controlListener, goAgainErr := goagain.Listener(onFork)
 
-	if err := initialiseSystem(arguments); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatalf("Error initialising system: %v", err)
-	}
-	start(arguments)
+	initialiseSystem()
+
+	start()
 
 	if goAgainErr != nil {
 		var err error
@@ -1049,11 +1051,8 @@ func main() {
 	time.Sleep(time.Second)
 }
 
-var httpProfile = false
-
-func start(arguments map[string]interface{}) {
-	httpProfile = arguments["--httpprofile"] == true
-	if arguments["--memprofile"] == true {
+func start() {
+	if *memProfile {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Memory profiling active")
@@ -1063,7 +1062,7 @@ func start(arguments map[string]interface{}) {
 		}
 		defer memProfFile.Close()
 	}
-	if arguments["--cpuprofile"] == true {
+	if *cpuProfile {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Cpu profiling active")
