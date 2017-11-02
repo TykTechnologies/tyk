@@ -67,6 +67,24 @@
 			"revisionTime": "2016-08-17T21:35:54Z"
 		},
 		{
+			"checksumSHA1": "KmjnydoAbofMieIWm+it5OWERaM=",
+			"path": "github.com/alecthomas/template",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
+			"revisionTime": "2016-04-05T07:15:01Z"
+		},
+		{
+			"checksumSHA1": "3wt0pTXXeS+S93unwhGoLIyGX/Q=",
+			"path": "github.com/alecthomas/template/parse",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
+			"revisionTime": "2016-04-05T07:15:01Z"
+		},
+		{
+			"checksumSHA1": "fCc3grA7vIxfBru7R3SqjcW+oLI=",
+			"path": "github.com/alecthomas/units",
+			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",
+			"revisionTime": "2015-10-22T06:55:26Z"
+		},
+		{
 			"checksumSHA1": "9dh0q0rB99j2KWdfon8u6GtLf6U=",
 			"path": "github.com/bshuster-repo/logrus-logstash-hook",
 			"revision": "5f729f2fb50a301153cae84ff5c58981d51c095a",
@@ -97,12 +115,6 @@
 			"revisionTime": "2016-11-01T19:39:35Z"
 		},
 		{
-			"checksumSHA1": "r1HApCKbrFN/HIp/rVpTZPugdeY=",
-			"path": "github.com/docopt/docopt.go",
-			"revision": "784ddc588536785e7299f7272f39101f7faccc3f",
-			"revisionTime": "2016-02-16T23:20:12Z"
-		},
-		{
 			"checksumSHA1": "CycvZIDE4VWWT1jeYa8N5O9ZCd0=",
 			"path": "github.com/evalphobia/logrus_sentry",
 			"revision": "3515445f906f3bc291b78599b57b7374951cbb79",
@@ -127,12 +139,6 @@
 			"path": "github.com/facebookgo/pidfile",
 			"revision": "f242e2999868dcd267a2b86e49ce1f9cf9e15b16",
 			"revisionTime": "2015-06-12T19:16:47Z"
-		},
-		{
-			"checksumSHA1": "KCWVxG+J8SxHGlGiUghe0KBGsa8=",
-			"path": "github.com/fatih/structs",
-			"revision": "dc3312cb1a4513a366c4c9e622ad55c32df12ed3",
-			"revisionTime": "2016-08-07T23:55:29Z"
 		},
 		{
 			"checksumSHA1": "n25vuAkZbpXDMGrutoefN+b4g+M=",
@@ -727,6 +733,12 @@
 			"revisionTime": "2016-12-02T18:43:27Z",
 			"version": "v1.0.5",
 			"versionExact": "v1.0.5"
+		},
+		{
+			"checksumSHA1": "3SZTatHIy9OTKc95YlVfXKnoySg=",
+			"path": "gopkg.in/alecthomas/kingpin.v2",
+			"revision": "1087e65c9441605df944fb12c33f0fe7072d18ca",
+			"revisionTime": "2017-07-27T04:22:29Z"
 		},
 		{
 			"checksumSHA1": "YsB2DChSV9HxdzHaKATllAUKWSI=",

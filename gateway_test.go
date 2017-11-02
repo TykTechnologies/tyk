@@ -154,7 +154,7 @@ func TestMain(m *testing.M) {
 	config.Global.Monitor.EnableTriggerMonitors = true
 	config.Global.AnalyticsConfig.NormaliseUrls.Enabled = true
 	afterConfSetup(&config.Global)
-	initialiseSystem(nil)
+	initialiseSystem()
 	// Small part of start()
 	loadAPIEndpoints(mainRouter)
 	if analytics.GeoIPDB == nil {
@@ -954,7 +954,7 @@ func TestHttpPprof(t *testing.T) {
 		{method: "GET", path: "/debug/pprof/", code: 404},
 		{method: "GET", path: "/debug/pprof/", code: 404, controlRequest: true},
 	}, true)
-	httpProfile = true
+	*httpProfile = true
 	doReload()
 	testHttp(t, []tykHttpTest{
 		{method: "GET", path: "/debug/pprof/", code: 404},
