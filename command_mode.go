@@ -10,63 +10,58 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/importer"
 )
 
-var commandModeOptions = []string{
-	"--import-blueprint",
-	"--import-swagger",
-	"--create-api",
-	"--org-id",
-	"--upstream-target",
-	"--as-mock",
-	"--for-api",
-	"--as-version",
+var commandModeOptions = []interface{}{
+	importBlueprint,
+	importSwagger,
+	createAPI,
+	orgID,
+	upstreamTarget,
+	asMock,
+	forAPI,
+	asVersion,
 }
 
 // ./tyk --import-blueprint=blueprint.json --create-api --org-id=<id> --upstream-target="http://widgets.com/api/"`
-func handleCommandModeArgs(arguments map[string]interface{}) {
-	if arguments["--import-blueprint"] != nil {
-		if err := handleBluePrintMode(arguments); err != nil {
+func handleCommandModeArgs() {
+	if *importBlueprint != "" {
+		if err := handleBluePrintMode(); err != nil {
 			log.Error(err)
 		}
 	}
 
-	if arguments["--import-swagger"] != nil {
-		if err := handleSwaggerMode(arguments); err != nil {
+	if *importSwagger != "" {
+		if err := handleSwaggerMode(); err != nil {
 			log.Error(err)
 		}
 	}
 }
 
-func handleBluePrintMode(arguments map[string]interface{}) error {
-	doCreate := arguments["--create-api"].(bool)
-	inputFile := arguments["--import-blueprint"]
-	if !doCreate {
+func handleBluePrintMode() error {
+	if !*createAPI {
 		// Different branch, here we need an API Definition to modify
-		forAPIPath := arguments["--for-api"]
-		if forAPIPath == nil {
-			return fmt.Errorf("If ading to an API, the path to the defintiton must be listed")
+		if *forAPI == "" {
+			return fmt.Errorf("If adding to an API, the path to the definition must be listed")
 		}
 
-		versionName := arguments["--as-version"]
-		if versionName == nil {
+		if *asVersion == "" {
 			return fmt.Errorf("No version defined for this import operation, please set an import ID using the --as-version flag")
 		}
 
-		defFromFile, err := apiDefLoadFile(forAPIPath.(string))
+		defFromFile, err := apiDefLoadFile(*forAPI)
 		if err != nil {
 			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
 		}
 
-		bp, err := bluePrintLoadFile(inputFile.(string))
+		bp, err := bluePrintLoadFile(*importBlueprint)
 		if err != nil {
 			return fmt.Errorf("File load error: %v", err)
 		}
-
-		versionData, err := bp.ConvertIntoApiVersion(arguments["--as-mock"].(bool))
+		versionData, err := bp.ConvertIntoApiVersion(*asMock)
 		if err != nil {
 			return fmt.Errorf("onversion into API Def failed: %v", err)
 		}
 
-		if err := bp.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string)); err != nil {
+		if err := bp.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, *asVersion); err != nil {
 			return fmt.Errorf("Insertion failed: %v", err)
 		}
 
@@ -74,42 +69,35 @@ func handleBluePrintMode(arguments map[string]interface{}) error {
 
 	}
 
-	upstreamVal := arguments["--upstream-target"]
-	orgID := arguments["--org-id"]
-
-	if upstreamVal == nil && orgID == nil {
+	if *upstreamTarget == "" && *orgID == "" {
 		return fmt.Errorf("No upstream target or org ID defined, these are both required")
 	}
 
 	// Create the API with the blueprint
-	bp, err := bluePrintLoadFile(inputFile.(string))
+	bp, err := bluePrintLoadFile(*importBlueprint)
 	if err != nil {
 		return fmt.Errorf("File load error: %v", err)
 	}
 
-	def, err := bp.ToAPIDefinition(orgID.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
+	def, err := bp.ToAPIDefinition(*orgID, *upstreamTarget, *asMock)
 	if err != nil {
-		return fmt.Errorf("Failed to create API Defintition from file")
+		return fmt.Errorf("Failed to create API Definition from file")
 	}
 
 	printDef(def)
 	return nil
 }
 
-func handleSwaggerMode(arguments map[string]interface{}) error {
-	doCreate := arguments["--create-api"]
-	inputFile := arguments["--import-swagger"]
-	if doCreate == true {
-		upstreamVal := arguments["--upstream-target"]
-		orgId := arguments["--org-id"]
-		if upstreamVal != nil && orgId != nil {
+func handleSwaggerMode() error {
+	if *createAPI {
+		if *upstreamTarget != "" && *orgID != "" {
 			// Create the API with the blueprint
-			s, err := swaggerLoadFile(inputFile.(string))
+			s, err := swaggerLoadFile(*importSwagger)
 			if err != nil {
 				return fmt.Errorf("File load error: %v", err)
 			}
 
-			def, err := s.ToAPIDefinition(orgId.(string), upstreamVal.(string), arguments["--as-mock"].(bool))
+			def, err := s.ToAPIDefinition(*orgID, *upstreamTarget, *asMock)
 			if err != nil {
 				return fmt.Errorf("Failed to create API Defintition from file")
 			}
@@ -120,40 +108,38 @@ func handleSwaggerMode(arguments map[string]interface{}) error {
 
 		return fmt.Errorf("No upstream target or org ID defined, these are both required")
 
-	} else {
-		// Different branch, here we need an API Definition to modify
-		forApiPath := arguments["--for-api"]
-		if forApiPath == nil {
-			return fmt.Errorf("If ading to an API, the path to the defintiton must be listed")
-		}
-
-		versionName := arguments["--as-version"]
-		if versionName == nil {
-			return fmt.Errorf("No version defined for this import operation, please set an import ID using the --as-version flag")
-		}
-
-		defFromFile, err := apiDefLoadFile(forApiPath.(string))
-		if err != nil {
-			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
-		}
-
-		s, err := swaggerLoadFile(inputFile.(string))
-		if err != nil {
-			return fmt.Errorf("File load error: %v", err)
-		}
-
-		versionData, err := s.ConvertIntoApiVersion(arguments["--as-mock"].(bool))
-		if err != nil {
-			return fmt.Errorf("Conversion into API Def failed: %v", err)
-		}
-
-		if err := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, versionName.(string)); err != nil {
-			return fmt.Errorf("Insertion failed: %v", err)
-		}
-
-		printDef(defFromFile)
-
 	}
+
+	// Different branch, here we need an API Definition to modify
+	if *forAPI == "" {
+		return fmt.Errorf("If adding to an API, the path to the definition must be listed")
+	}
+
+	if *asVersion == "" {
+		return fmt.Errorf("No version defined for this import operation, please set an import ID using the --as-version flag")
+	}
+
+	defFromFile, err := apiDefLoadFile(*forAPI)
+	if err != nil {
+		return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+	}
+
+	s, err := swaggerLoadFile(*importSwagger)
+	if err != nil {
+		return fmt.Errorf("File load error: %v", err)
+	}
+
+	versionData, err := s.ConvertIntoApiVersion(*asMock)
+	if err != nil {
+		return fmt.Errorf("Conversion into API Def failed: %v", err)
+	}
+
+	if err := s.InsertIntoAPIDefinitionAsVersion(versionData, defFromFile, *asVersion); err != nil {
+		return fmt.Errorf("Insertion failed: %v", err)
+	}
+
+	printDef(defFromFile)
+
 	return nil
 }
 
