@@ -87,10 +87,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	encodedSignature := generateEncodedSignature(signatureString, secret)
 
 	// Compare
-	matchPass := false
-	if encodedSignature == fieldValues.Signature {
-		matchPass = true
-	}
+	matchPass := encodedSignature == fieldValues.Signature
 
 	// Check for lower case encoding (.Net issues, again)
 	if !matchPass {

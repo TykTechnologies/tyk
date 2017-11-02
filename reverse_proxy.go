@@ -44,17 +44,16 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
+		defer func() { spec.ServiceRefreshInProgress = false }()
 		sd := ServiceDiscovery{}
 		sd.Init(&spec.Proxy.ServiceDiscovery)
 		data, err := sd.Target(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
-			spec.ServiceRefreshInProgress = false
 			return nil, err
 		}
+		spec.HasRun = true
 		// Set the cached value
 		if data.Len() == 0 {
-			spec.HasRun = true
-			spec.ServiceRefreshInProgress = false
 			log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
 
 			if spec.LastGoodHostList == nil {
@@ -68,8 +67,6 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 		ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
 		// Stash it too
 		spec.LastGoodHostList = data
-		spec.HasRun = true
-		spec.ServiceRefreshInProgress = false
 		return data, nil
 	}
 

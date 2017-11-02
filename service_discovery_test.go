@@ -160,27 +160,17 @@ const mesosphere = `{
 func configureService(name string, sd *ServiceDiscovery) string {
 	switch name {
 	case "consul":
-		sd.isNested = false
 		sd.isTargetList = true
 		sd.endpointReturnsList = true
 		sd.portSeperate = true
 		sd.dataPath = "Address"
-		sd.parentPath = ""
 		sd.portPath = "ServicePort"
 		return consul
 	case "etcd":
-		sd.isNested = false
-		sd.isTargetList = false
-		sd.endpointReturnsList = false
-		sd.portSeperate = false
 		sd.dataPath = "node.value"
-		sd.parentPath = ""
-		sd.portPath = ""
 		return etcd
 	case "nested":
 		sd.isNested = true
-		sd.isTargetList = false
-		sd.endpointReturnsList = false
 		sd.portSeperate = true
 		sd.dataPath = "hostname"
 		sd.parentPath = "node.value"
@@ -189,7 +179,6 @@ func configureService(name string, sd *ServiceDiscovery) string {
 	case "nested_list":
 		sd.isNested = true
 		sd.isTargetList = true
-		sd.endpointReturnsList = false
 		sd.portSeperate = true
 		sd.dataPath = "hostname"
 		sd.parentPath = "node.value"
@@ -205,25 +194,20 @@ func configureService(name string, sd *ServiceDiscovery) string {
 		sd.portPath = "port"
 		return nested_consul
 	case "mesosphere":
-		sd.isNested = false
 		sd.isTargetList = true
-		sd.endpointReturnsList = false
 		sd.portSeperate = true
 		sd.dataPath = "host"
 		sd.parentPath = "tasks"
 		sd.portPath = "ports"
 		return mesosphere
 	case "eureka":
-		sd.isNested = false
 		sd.isTargetList = true
-		sd.endpointReturnsList = false
 		sd.portSeperate = true
 		sd.dataPath = "hostName"
 		sd.parentPath = "application.instance"
 		sd.portPath = "port.$"
 		return eureka_real
 	}
-
 	return ""
 }
 
