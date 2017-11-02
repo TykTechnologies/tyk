@@ -546,8 +546,7 @@ func (r *RedisOsinStorageInterface) LoadAuthorize(code string) (*osin.AuthorizeD
 		return nil, err
 	}
 
-	authData := osin.AuthorizeData{}
-	authData.Client = new(OAuthClient)
+	authData := osin.AuthorizeData{Client: new(OAuthClient)}
 	if err := json.Unmarshal([]byte(authJSON), &authData); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadAuthorize): ", err)
 		return nil, err
@@ -646,8 +645,7 @@ func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, 
 		return nil, err
 	}
 
-	accessData := osin.AccessData{}
-	accessData.Client = new(OAuthClient)
+	accessData := osin.AccessData{Client: new(OAuthClient)}
 	if err := json.Unmarshal([]byte(accessJSON), &accessData); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadAccess): ", err)
 		return nil, err
@@ -679,8 +677,7 @@ func (r *RedisOsinStorageInterface) LoadRefresh(token string) (*osin.AccessData,
 	}
 
 	// new interface means having to make this nested... ick.
-	accessData := osin.AccessData{}
-	accessData.Client = new(OAuthClient)
+	accessData := osin.AccessData{Client: new(OAuthClient)}
 	if err := json.Unmarshal([]byte(accessJSON), &accessData); err != nil {
 		log.Error("Couldn't unmarshal OAuth auth data object (LoadRefresh): ", err,
 			"; Decoding: ", accessJSON)

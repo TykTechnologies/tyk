@@ -461,12 +461,13 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 				"prefix": "main",
 			}).Debug("Loading file middleware from ", path)
 
-			mwDef := apidef.MiddlewareDefinition{}
-			mwDef.Name = strings.Split(filepath.Base(path), ".")[0]
+			mwDef := apidef.MiddlewareDefinition{
+				Name: strings.Split(filepath.Base(path), ".")[0],
+				Path: path,
+			}
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("-- Middleware name ", mwDef.Name)
-			mwDef.Path = path
 			mwDef.RequireSession = strings.HasSuffix(mwDef.Name, "_with_session")
 			if mwDef.RequireSession {
 				switch folder.name {
