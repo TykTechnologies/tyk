@@ -135,6 +135,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
+	HTTPTransport            http.RoundTripper
 }
 
 // APIDefinitionLoader will load an Api definition from a storage

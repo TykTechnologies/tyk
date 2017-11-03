@@ -433,8 +433,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	// 1. Check if timeouts are set for this endpoint
-	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-	transport := httpTransport(timeout, rw, req, p)
+	if p.TykAPISpec.HTTPTransport == nil {
+		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+	}
 
 	ctx := req.Context()
 	if cn, ok := rw.(http.CloseNotifier); ok {
@@ -522,14 +524,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
 			return nil
 		}
-		res, err = transport.RoundTrip(outreq)
+		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
 		if err != nil || res.StatusCode == 500 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, err = transport.RoundTrip(outreq)
+		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
 	}
 
 	if err != nil {
