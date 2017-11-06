@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/gtforge/tyk/coprocess"
 	"github.com/justinas/alice"
 	"github.com/streamrail/concurrent-map"
 )
@@ -602,7 +602,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		}).Info("API hostname set: ", hostname)
 	}
 
-    ListenPathMap = cmap.New()
+	ListenPathMap = cmap.New()
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",

@@ -78,8 +78,8 @@ import (
 	"unsafe"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gtforge/tyk/coprocess"
 )
 
 // CoProcessName specifies the driver name.

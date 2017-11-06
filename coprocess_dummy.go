@@ -5,8 +5,8 @@ package main
 import (
 	"github.com/TykTechnologies/logrus"
 
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gtforge/tyk/coprocess"
 
 	"net/http"
 )

@@ -10,8 +10,8 @@ import (
 	"github.com/gorilla/context"
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gtforge/tyk/coprocess"
 
 	"bytes"
 	"errors"
@@ -155,7 +155,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 		values.Set(p, v)
 	}
 
-    r.URL.Path = object.Request.Url
+	r.URL.Path = object.Request.Url
 	r.URL.RawQuery = values.Encode()
 }
 
@@ -297,12 +297,12 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Report in health check
 		ReportHealthCheckValue(m.Spec.Health, KeyFailure, "1")
 
-        errorMsg := "Key not authorised"
-        if returnObject.Request.ReturnOverrides.ResponseError != "" {
-            errorMsg = returnObject.Request.ReturnOverrides.ResponseError
-        }
+		errorMsg := "Key not authorised"
+		if returnObject.Request.ReturnOverrides.ResponseError != "" {
+			errorMsg = returnObject.Request.ReturnOverrides.ResponseError
+		}
 
-        return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
+		return errors.New(errorMsg), int(returnObject.Request.ReturnOverrides.ResponseCode)
 	}
 
 	if returnObject.Request.ReturnOverrides.ResponseCode > 0 {

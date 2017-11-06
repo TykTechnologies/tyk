@@ -39,8 +39,8 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/golang/protobuf/proto"
+	"github.com/gtforge/tyk/coprocess"
 )
 
 var CoProcessReload = make(chan bool)
