@@ -36,7 +36,7 @@ func (a *MWStripAuthData) IsEnabledForSpec() bool {
 func (m *MWStripAuthData) StripAuth(r *http.Request, spec *APISpec) {
 	if spec.APIDefinition.Auth.UseParam {
 		// Remove the query string value
-		copy, err := url.Parse(r.URL.String())
+		cp, err := url.Parse(r.URL.String())
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
@@ -46,14 +46,14 @@ func (m *MWStripAuthData) StripAuth(r *http.Request, spec *APISpec) {
 			return
 		}
 
-		q := copy.Query()
+		q := cp.Query()
 		n := spec.APIDefinition.Auth.ParamName
 		if n == "" {
 			n = spec.APIDefinition.Auth.AuthHeaderName
 		}
 		q.Del(n)
-		copy.RawQuery = q.Encode()
-		r.URL, err = r.URL.Parse(copy.String())
+		cp.RawQuery = q.Encode()
+		r.URL, err = r.URL.Parse(cp.String())
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"path":   r.URL.Path,
