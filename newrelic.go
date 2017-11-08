@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/TykTechnologies/logrus"
 	"github.com/gocraft/health"
 	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent"
@@ -30,7 +30,7 @@ func NewrelicRouterInstrumentation(app newrelic.Application) RouteProcessor {
 	return func(r *mux.Router) { nrgorilla.InstrumentRoutes(r, app) }
 }
 
-type newRelicLogger struct { *logrus.Entry }
+type newRelicLogger struct{ *logrus.Entry }
 
 func (l *newRelicLogger) Error(msg string, c map[string]interface{}) {
 	l.WithFields(c).Error(msg)
