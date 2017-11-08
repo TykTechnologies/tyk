@@ -708,3 +708,40 @@ func TestContextSession(t *testing.T) {
 	}()
 	ctxSetSession(r, nil)
 }
+
+func TestApiLoaderLongestPathFirst(t *testing.T) {
+	ids := []string{"abcde", "abc_x", "a", "abc", "abcd", "ab-xx", "ab"}
+	specs := func() (res []*APISpec) {
+		for _, id := range ids {
+			def := sampleAPI
+			def = strings.Replace(def, `"1"`, `"`+id+`"`, 1)
+			def = strings.Replace(def, `"/sample"`, `"/`+id+`"`, 1)
+			// put the path in the target URL too, to make
+			// sure that we're using the right API spec
+			def = strings.Replace(def, testHttpAny, testHttpAny+"/"+id, 1)
+			res = append(res, createSpecTest(t, def))
+		}
+		return res
+	}
+
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
+
+	mu := mux.NewRouter()
+	loadApps(specs(), mu)
+
+	for _, id := range ids {
+		rec := httptest.NewRecorder()
+		path := "/" + id
+		r := testReq(t, "GET", path, nil)
+		mu.ServeHTTP(rec, r)
+		var resp testHttpResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Fatal("JSON decoding failed:", err)
+		}
+		if want, got := path+path, resp.Url; want != got {
+			t.Fatalf("wanted %s, got %s", want, got)
+		}
+	}
+}
