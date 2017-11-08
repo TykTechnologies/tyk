@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/streamrail/concurrent-map"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tykcommon"
 )
 
 type ChainObject struct {
@@ -506,6 +507,7 @@ func processSpec(referenceSpec *APISpec,
 		}
 
 		var baseChainArray_PostAuth = []alice.Constructor{}
+		AppendMiddleware(&baseChainArray_PostAuth, &MWStripAuthData{tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PostAuth, &KeyExpired{tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PostAuth, &AccessRightsCheck{tykMiddleware}, tykMiddleware)
 		AppendMiddleware(&baseChainArray_PostAuth, &RateLimitAndQuotaCheck{tykMiddleware}, tykMiddleware)
@@ -602,7 +604,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		}).Info("API hostname set: ", hostname)
 	}
 
-    ListenPathMap = cmap.New()
+	ListenPathMap = cmap.New()
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
