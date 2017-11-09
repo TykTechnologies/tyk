@@ -27,10 +27,7 @@ func (m *MWStripAuthData) GetConfig() (interface{}, error) {
 }
 
 func (a *MWStripAuthData) IsEnabledForSpec() bool {
-	if a.Spec.StripAuthData {
-		return true
-	}
-	return false
+	return a.Spec.StripAuthData
 }
 
 func (m *MWStripAuthData) StripAuth(r *http.Request, spec *APISpec) {
