@@ -708,3 +708,64 @@ func TestContextSession(t *testing.T) {
 	}()
 	ctxSetSession(r, nil)
 }
+
+func TestApiLoaderLongestPathFirst(t *testing.T) {
+	config.Global.EnableCustomDomains = true
+	defer func() { config.Global.EnableCustomDomains = false }()
+	type hostAndPath struct {
+		host, path string
+	}
+	inputs := map[hostAndPath]bool{}
+	hosts := []string{"host1", "host22", "host3"}
+	paths := []string{"a", "ab", "a/b/c", "ab/c", "abc", "a/b/c"}
+	// Use a map so that we get a somewhat random order when
+	// iterating. Would be better to use math/rand.Shuffle once we
+	// need only support Go 1.10 and later.
+	for _, host := range hosts {
+		for _, path := range paths {
+			inputs[hostAndPath{host, path}] = true
+		}
+	}
+	var specs []*APISpec
+	for hp := range inputs {
+		loader := APIDefinitionLoader{}
+		def := loader.ParseDefinition(strings.NewReader(sampleAPI))
+		def.APIID = hp.path
+		def.Domain = hp.host
+		def.Proxy.ListenPath = "/" + hp.path
+		// put the path in the target URL too, to make
+		// sure that we're using the right API spec
+		def.Proxy.TargetURL = testHttpAny + "/" + hp.path
+
+		spec := loader.MakeSpec(def)
+		specs = append(specs, spec)
+	}
+
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
+
+	mu := mux.NewRouter()
+	loadApps(specs, mu)
+
+	for hp := range inputs {
+		rec := httptest.NewRecorder()
+		path := "/" + hp.path
+		r := testReq(t, "GET", path, nil)
+		r.Host = hp.host
+		mu.ServeHTTP(rec, r)
+		if rec.Code >= 400 {
+			t.Errorf("%v: code %d", hp, rec.Code)
+			continue
+		}
+		var resp testHttpResponse
+		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			t.Errorf("%v: JSON decoding failed: %v", hp, err)
+			continue
+		}
+		if want, got := path+path, resp.Url; want != got {
+			t.Errorf("%v: wanted %s, got %s", hp, want, got)
+			continue
+		}
+	}
+}
