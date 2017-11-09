@@ -552,7 +552,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 					"api_name": spec.Name,
 					"domain":   spec.Domain,
 				}).Info("Custom Domain set.")
-				subrouter = mainRouter.Host(spec.Domain).Subrouter()
+				subrouter = subrouter.Host(spec.Domain).Subrouter()
 			}
 			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
