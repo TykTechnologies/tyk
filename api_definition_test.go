@@ -106,7 +106,6 @@ func createDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
 	spec := loader.MakeSpec(def)
-	spec.APIDefinition = def
 	return spec
 }
 
