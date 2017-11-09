@@ -542,18 +542,44 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	// Create a new handler for each API spec
 	loadList := make([]*ChainObject, len(specs))
 	apisByListen := countApisByListenHash(specs)
+
+	// Set up the host sub-routers first, since we need to set up
+	// exactly one per host. If we set up one per API definition,
+	// only one of the APIs will work properly, since the router
+	// doesn't backtrack and will stop at the first host sub-router
+	// match.
+	hostRouters := map[string]*mux.Router{"": muxer}
+	var hosts []string
+	for _, spec := range specs {
+		hosts = append(hosts, spec.Domain)
+	}
+	// Decreasing sort by length and chars, so that the order of
+	// creation of the host sub-routers is deterministic and
+	// consistent with the order of the paths.
+	sort.Slice(hosts, func(i, j int) bool {
+		h1, h2 := hosts[i], hosts[j]
+		if len(h1) != len(h2) {
+			return len(h1) > len(h2)
+		}
+		return h1 > h2
+	})
+	for _, host := range hosts {
+		if !config.Global.EnableCustomDomains {
+			continue // disabled
+		}
+		if hostRouters[host] != nil {
+			continue // already set up a subrouter
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+			"domain": host,
+		}).Info("Sub-router created for domain")
+		hostRouters[host] = muxer.Host(host).Subrouter()
+	}
+
 	for i, spec := range specs {
 		go func(spec *APISpec, i int) {
-			subrouter := muxer
-			// Handle custom domains
-			if config.Global.EnableCustomDomains && spec.Domain != "" {
-				log.WithFields(logrus.Fields{
-					"prefix":   "main",
-					"api_name": spec.Name,
-					"domain":   spec.Domain,
-				}).Info("Custom Domain set.")
-				subrouter = subrouter.Host(spec.Domain).Subrouter()
-			}
+			subrouter := hostRouters[spec.Domain]
 			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
