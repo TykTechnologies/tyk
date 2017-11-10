@@ -118,3 +118,26 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 
 	return nil
 }
+
+func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResult, error) {
+	t.Lock()
+	value, err := t.JQFilter.Handle(jqObj)
+	t.Unlock()
+	if err != nil {
+		return JQResult{}, err
+	}
+	// The filter MUST return the following JSON object
+	//  {
+	//    "body": THE_TRANSFORMED_BODY,
+	//    "output_headers": {"header1_name": "header1_value", ...},
+	//    "output_vars": {"var1_name": "var1_value", ...}
+	//  }
+
+	var jq_result JQResult
+	err = mapstructure.Decode(value, &jq_result)
+	if err != nil {
+		return JQResult{}, errors.New("Invalid JSON object returned by JQ filter. Allowed field are 'body', 'output_vars' and 'output_headers'")
+	}
+
+	return jq_result, nil
+}

@@ -21,7 +21,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/klyr/go-jq"
 	"sync"
 )
 
@@ -118,7 +117,7 @@ type TransformSpec struct {
 type TransformJQSpec struct {
 	apidef.TransformJQMeta
 	sync.Mutex
-	JQFilter *jq.JQ
+	JQFilter *JQ
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -534,7 +533,7 @@ func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.Transfor
 		newTransformSpec := TransformJQSpec{TransformJQMeta: stringSpec}
 
 		var err error
-		newTransformSpec.JQFilter, err = jq.NewJQ(stringSpec.Filter)
+		newTransformSpec.JQFilter, err = NewJQ(stringSpec.Filter)
 
 		if stat == TransformedJQ {
 			newSpec.TransformJQAction = newTransformSpec

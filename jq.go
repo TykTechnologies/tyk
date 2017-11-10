@@ -1,4 +1,4 @@
-package jq
+package main
 
 // #cgo LDFLAGS: -ljq
 // #include <jq.h>
@@ -6,108 +6,47 @@ package jq
 import "C"
 import (
 	"errors"
-	"fmt"
 	"reflect"
+	"fmt"
 )
 
 type JQ struct {
-	program   string
-	state     *C.jq_state
-	lastValue C.jv
+	state   *C.jq_state
 }
 
 func NewJQ(program string) (*JQ, error) {
 	state := C.jq_init()
-	jq := &JQ{program, state, C.jv_invalid()}
-	if err := jq.compile(program); err != nil {
-		jq.Close()
-		return nil, err
+
+	if rc := C.jq_compile(state, C.CString(program)); rc == 0 {
+		C.jq_teardown(&state)
+		return nil, errors.New("Unable to compile jq filter")
 	}
-	return jq, nil
+
+	return &JQ{state}, nil
 }
 
-func (jq *JQ) Handle(value interface{}) error {
+func (jq *JQ) Handle(value interface{}) (interface{}, error) {
 	jv := goToJv(value)
-	if C.jv_is_valid(jv) == 0 {
-		return errors.New("Invalid JSON")
+	if !isValid(jv) {
+		C.jv_free(jv)
+		return nil, errors.New("Invalid JSON")
 	}
-	jq.start(jv)
-	return nil
-}
 
-func (jq *JQ) HandleJson(text string) error {
-	jv, err := parseJson(text)
-
-	if err == nil {
-		jq.start(jv)
-		return nil
-	} else {
-		return err
-	}
-}
-
-func (jq *JQ) Next() bool {
-	// FIXME this raises assertion if called before start()
-	freeJv(jq.lastValue)
-	jq.lastValue = jq.next()
-	return isValid(jq.lastValue)
-}
-
-func (jq *JQ) Value() interface{} {
-	return jvToGo(jq.lastValue)
-}
-
-func (jq *JQ) ValueJson() string {
-	return dumpJson(jq.lastValue)
-}
-
-func (jq *JQ) Close() {
-	jq.teardown()
-	freeJv(jq.lastValue)
-}
-
-// JQ APIs
-
-func (jq *JQ) compile(program string) error {
-	if rc := C.jq_compile(jq.state, C.CString(program)); rc == 0 {
-		return errors.New("Unable to compile jq filter")
-	} else {
-		return nil
-	}
-}
-
-func (jq *JQ) start(jv C.jv) {
 	C.jq_start(jq.state, jv, 0)
-}
+	jv_result := C.jq_next(jq.state)
 
-func (jq *JQ) next() C.jv {
-	return C.jq_next(jq.state)
-}
-
-func (jq *JQ) teardown() {
-	C.jq_teardown(&jq.state)
-}
-
-// JSON values
-
-func parseJson(value string) (C.jv, error) {
-	v := C.jv_parse(C.CString(value))
-	if C.jv_is_valid(v) == 0 {
-		return C.jv_null(), errors.New("Invalid JSON")
+	if isValid(jv_result) {
+		result := jvToGo(jv_result)
+		C.jv_free(jv_result)
+		return result, nil
+	} else {
+		C.jv_free(jv_result)
+		return nil, errors.New("Error while applying JQ transformation XXX: Get the error message from jv_result")
 	}
-	return v, nil
 }
 
-func dumpJson(jv C.jv) string {
-	jv = C.jv_copy(jv)
-	strJv := C.jv_dump_string(jv, 0)
-	result := C.jv_string_value(strJv)
-	freeJv(strJv)
-	return C.GoString(result)
-}
-
-func refcount(jv C.jv) int {
-	return int(C.jv_get_refcnt(jv))
+func isValid(jv C.jv) bool {
+	return C.jv_is_valid(jv) != 0
 }
 
 func goToJv(v interface{}) C.jv {
@@ -195,12 +134,4 @@ func jvToGo(value C.jv) interface{} {
 	default:
 		return errors.New("unknown type")
 	}
-}
-
-func freeJv(jv C.jv) {
-	C.jv_free(jv)
-}
-
-func isValid(jv C.jv) bool {
-	return C.jv_is_valid(jv) != 0
 }

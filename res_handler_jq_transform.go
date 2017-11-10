@@ -44,15 +44,12 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 
 	t.Lock()
 	defer t.Unlock()
-	if err := t.JQFilter.Handle(jqObj); err != nil {
+	res, err := t.JQFilter.Handle(jqObj)
+	if err != nil {
 		return errors.New("Response returned by upstream server is not a valid JSON")
 	}
 
-	if !t.JQFilter.Next() {
-		return errors.New("Error while applying JQ filter to upstream response")
-	}
-
-	transformed, _ := json.Marshal(t.JQFilter.Value())
+	transformed, _ := json.Marshal(res)
 
 	bodyBuffer := bytes.NewBuffer(transformed)
 	res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
