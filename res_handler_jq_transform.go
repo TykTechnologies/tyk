@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -42,36 +40,20 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		"resHeaders": res.Header,
 	}
 
-	t.Lock()
-	defer t.Unlock()
-	res, err := t.JQFilter.Handle(jqObj)
+	jq_result, err := lockedJQTransform(t, jqObj)
 	if err != nil {
-		return errors.New("Response returned by upstream server is not a valid JSON")
+		return err
 	}
 
-	transformed, _ := json.Marshal(res)
+	transformed, _ := json.Marshal(jq_result.Body)
 
 	bodyBuffer := bytes.NewBuffer(transformed)
 	res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
 	res.ContentLength = int64(bodyBuffer.Len())
 	res.Body = ioutil.NopCloser(bodyBuffer)
 
-	// Second optional element is an object like:
-	// { "output_headers": {"header_name": "header_value", ...}}
-	if !t.JQFilter.Next() {
-		return nil
-	}
-
-	options := t.JQFilter.Value()
-
-	var opts JQTransformOptions
-	err := mapstructure.Decode(options, &opts)
-	if err != nil {
-		return errors.New("Errors while reading JQ filter transform options")
-	}
-
 	// Replace header in the response
-	for hName, hValue := range opts.OutputHeaders {
+	for hName, hValue := range jq_result.OutputHeaders {
 		res.Header.Set(hName, hValue)
 	}
 

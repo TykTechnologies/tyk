@@ -25,7 +25,7 @@
                     "transform_jq": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ".body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: .reqContext.path, user_agent: .reqContext.headers_User_Agent}, {\"output_vars\": {\"m2m_origin\": \"CSE3219/C9886\", \"deviceid\": .body.DEVICEID}}"
+                        "filter": "{\"body\": (.body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: .reqContext.path, user_agent: .reqContext.headers_User_Agent}), \"output_vars\": {\"m2m_origin\": \"CSE3219/C9886\", \"deviceid\": .body.DEVICEID}}"
                     }],
 		    "transform_headers": [
 			{
@@ -38,7 +38,7 @@
 		    "transform_jq_response": [{
                         "path": "/post",
                         "method": "POST",
-                        "filter": ".body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": .resHeaders}, {\"output_headers\": {\"JQ-Response-header\": .body.origin}}"
+                        "filter": "{\"body\": (.body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": .resHeaders}), \"output_headers\": {\"JQ-Response-header\": .body.origin}}"
 		    }]
 		}
             }

@@ -14,7 +14,8 @@ type TransformJQMiddleware struct {
 	BaseMiddleware
 }
 
-type JQTransformOptions struct {
+type JQResult struct {
+	Body          interface{}       `mapstructure:"body"`
 	OutputHeaders map[string]string `mapstructure:"output_headers"`
 	OutputVars    map[string]string `mapstructure:"output_vars"`
 }
@@ -67,53 +68,28 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		"reqContext": ctxGetData(r),
 	}
 
-	t.Lock()
-	defer t.Unlock()
-	if err := t.JQFilter.Handle(jqObj); err != nil {
+	jq_result, err := lockedJQTransform(t, jqObj)
+	if err != nil {
 		return err
 	}
 
-	// First element is the transformed body
-	if !t.JQFilter.Next() {
-		return errors.New("Errors while applying JQ filter to input")
-	}
-
-	transformed, _ := json.Marshal(t.JQFilter.Value())
-
-	var bodyBuffer = bytes.NewBuffer(transformed)
+	transformed, _ := json.Marshal(jq_result.Body)
+	bodyBuffer := bytes.NewBuffer(transformed)
 	r.Body = ioutil.NopCloser(bodyBuffer)
 	r.ContentLength = int64(bodyBuffer.Len())
 
-	// Second optional element is an object like:
-	// { "output_headers": {"header_name": "header_value", ...},
-	//   "outputs_vars":   {"var_name_1": "var_value_1", ...}
-	// }
-	if !t.JQFilter.Next() {
-		return nil
-	}
-
-	options := t.JQFilter.Value()
-
-	var opts JQTransformOptions
-	err := mapstructure.Decode(options, &opts)
-	if err != nil {
-		return errors.New("Errors while reading JQ filter transform options")
-	}
-
 	// Replace header in the request
-	for hName, hValue := range opts.OutputHeaders {
+	for hName, hValue := range jq_result.OutputHeaders {
 		r.Header.Set(hName, hValue)
 	}
 
 	if contextVars {
 		// Set variables in context vars
 		contextDataObject := ctxGetData(r)
-		for k, v := range opts.OutputVars {
+		for k, v := range jq_result.OutputVars {
 			contextDataObject["jq_output_var_"+k] = v
 		}
 		ctxSetData(r, contextDataObject)
-	} else {
-		log.Warn("You specified a JQ filter returning output variables, but enable_context_vars is false")
 	}
 
 	return nil
