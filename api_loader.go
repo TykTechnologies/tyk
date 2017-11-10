@@ -635,7 +635,7 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						"api_name": referenceSpec.APIDefinition.Name,
 						"domain":   referenceSpec.Domain,
 					}).Info("Custom Domain set.")
-					subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
+					subrouter = Muxer.Host(referenceSpec.Domain).Subrouter()
 				} else {
 					subrouter = Muxer
 				}
