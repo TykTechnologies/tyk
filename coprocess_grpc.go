@@ -4,10 +4,10 @@
 package main
 
 import (
-	"errors"
 	"net"
 	"net/url"
 	"time"
+	"errors"
 
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/tykcommon"

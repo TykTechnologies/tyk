@@ -4,11 +4,6 @@ RUN apk add --update git vim bash && rm -rf /var/cache/apk/*
 
 RUN echo 'alias ll="ls -la"' >> ~/.bashrc
 
-ARG BUNDLE_GITHUB__COM
-RUN echo -e "machine github.com\n  login ${BUNDLE_GITHUB__COM}" >> ~/.netrc
-RUN echo -e '' > ~/.netrc
-
-ARG BUNDLE_GITHUB__COM
 ARG APP_NAME
 ENV APP_NAME ${APP_NAME:-tyk}
 
@@ -22,16 +17,14 @@ ENV TYK_PATH /opt/tyk-gateway/
 
 LABEL Description="Tyk Gateway docker image" Vendor="Tyk" Version=$TYKVERSION
 
-RUN mkdir -p /go/src/github.com/gtforge/${APP_NAME}
-RUN echo -e "machine github.com\n  login ${BUNDLE_GITHUB__COM}" >> ~/.netrc
-
-RUN echo -e '' > ~/.netrc
+RUN mkdir -p /go/src/github.com/gtforge/${APP_NAME} && mkdir -p /opt/tyk-gateway/
+COPY templates /opt/tyk-gateway/templates
 
 ADD . /go/src/github.com/gtforge/${APP_NAME}
-WORKDIR /go/src/github.com/gtforge/${APP_NAME}
-RUN go get && go build -v -i
-RUN mkdir -p /opt/tyk-gateway/ && cp ${APP_NAME} /opt/tyk-gateway/${APP_NAME}
-COPY templates /opt/tyk-gateway/templates
+RUN cd /go/src/github.com/gtforge/${APP_NAME} && \
+  go get && go build -v -i && \
+  cp ${APP_NAME} /opt/tyk-gateway/${APP_NAME} && \
+  rm -rf /go/src/github.com/gtforge/
 
 VOLUME ["/opt/tyk-gateway/"]
 
