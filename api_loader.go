@@ -622,31 +622,44 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	// Create a new handler for each API spec
 	loadList := make([]*ChainObject, len(*APISpecs))
 	generateListenPathMap(APISpecs)
-	for i, referenceSpec := range *APISpecs {
-		var subrouter *mux.Router
 
-		go func(chChan chan *ChainObject, referenceSpec *APISpec, i int, subrouter *mux.Router) {
+	// Set up the host sub-routers first, since we need to set up
+	// exactly one per host. If we set up one per API definition,
+	// only one of the APIs will work properly, since the router
+	// doesn't backtrack and will stop at the first host sub-router
+	// match.
+	hostRouters := map[string]*mux.Router{"": Muxer}
+	var hosts []string
+	for _, spec := range *APISpecs {
+		hosts = append(hosts, spec.Domain)
+	}
+	// Decreasing sort by length and chars, so that the order of
+	// creation of the host sub-routers is deterministic and
+	// consistent with the order of the paths.
+	sort.Sort(hostSort(hosts))
+	for _, host := range hosts {
+		if !config.EnableCustomDomains {
+			continue // disabled
+		}
+		if hostRouters[host] != nil {
+			continue // already set up a subrouter
+		}
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+			"domain": host,
+		}).Info("Sub-router created for domain")
+		hostRouters[host] = Muxer.Host(host).Subrouter()
+	}
+
+	for i, referenceSpec := range *APISpecs {
+		go func(chChan chan *ChainObject, referenceSpec *APISpec, i int) {
 			defer wg.Done()
-			// Handle custom domains
-			if config.EnableCustomDomains {
-				if referenceSpec.Domain != "" {
-					log.WithFields(logrus.Fields{
-						"prefix":   "main",
-						"api_name": referenceSpec.APIDefinition.Name,
-						"domain":   referenceSpec.Domain,
-					}).Info("Custom Domain set.")
-					subrouter = Muxer.Host(referenceSpec.Domain).Subrouter()
-				} else {
-					subrouter = Muxer
-				}
-			} else {
-				subrouter = Muxer
-			}
+			subrouter := hostRouters[referenceSpec.Domain]
 
 			thisChainObject := processSpec(referenceSpec, Muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			thisChainObject.Index = i
 			chChan <- thisChainObject
-		}(chainChannel, referenceSpec, i, subrouter)
+		}(chainChannel, referenceSpec, i)
 
 		// TODO: This will not deal with skipped APis well
 		tempSpecRegister[referenceSpec.APIDefinition.APIID] = referenceSpec
@@ -703,4 +716,16 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 		StartRPCKeepaliveWatcher(rpcOrgStore)
 	}
 
+}
+
+type hostSort []string
+
+func (l hostSort) Len() int           { return len(l) }
+func (l hostSort) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+func (l hostSort) Less(i, j int) bool {
+	h1, h2 := l[i], l[j]
+	if len(h1) != len(h2) {
+		return len(h1) > len(h2)
+	}
+	return h1 > h2
 }
