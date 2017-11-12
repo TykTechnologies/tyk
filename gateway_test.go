@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/justinas/alice"
 	"io/ioutil"
 	"math/rand"
@@ -11,8 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"fmt"
-)	
+)
 
 func init() {
 	fmt.Println("THIS IS THE TEST SETUP INIT")

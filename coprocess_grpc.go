@@ -10,8 +10,8 @@ import (
 	"errors"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
+	"github.com/gtforge/tyk/coprocess"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -86,7 +86,7 @@ func (d *GRPCDispatcher) Reload() {
 }
 
 // HandleMiddlewareCache isn't used by gRPC.
-func (d* GRPCDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
+func (d *GRPCDispatcher) HandleMiddlewareCache(b *tykcommon.BundleManifest, basePath string) {
 	return
 }
 

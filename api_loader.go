@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/gtforge/tyk/coprocess"
 	"github.com/justinas/alice"
 	"github.com/streamrail/concurrent-map"
 )
@@ -595,14 +595,15 @@ func processSpec(referenceSpec *APISpec,
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 	hostname := config.HostName
+	defaultMuxer := Muxer
 	if hostname != "" {
-		Muxer = Muxer.Host(hostname).Subrouter()
+		defaultMuxer = Muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("API hostname set: ", hostname)
 	}
 
-    ListenPathMap = cmap.New()
+	ListenPathMap = cmap.New()
 	// load the APi defs
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -635,12 +636,12 @@ func loadApps(APISpecs *[]*APISpec, Muxer *mux.Router) {
 						"api_name": referenceSpec.APIDefinition.Name,
 						"domain":   referenceSpec.Domain,
 					}).Info("Custom Domain set.")
-					subrouter = mainRouter.Host(referenceSpec.Domain).Subrouter()
+					subrouter = Muxer.Host(referenceSpec.Domain).Subrouter()
 				} else {
-					subrouter = Muxer
+					subrouter = defaultMuxer
 				}
 			} else {
-				subrouter = Muxer
+				subrouter = defaultMuxer
 			}
 
 			thisChainObject := processSpec(referenceSpec, Muxer, i, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)

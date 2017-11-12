@@ -61,8 +61,8 @@ var apisMu sync.RWMutex
 var ApiSpecRegister map[string]*APISpec //make(map[string]*APISpec)
 var keyGen = DefaultKeyGenerator{}
 
+var router *routerSwapper
 var mainRouter *mux.Router
-var defaultRouter *mux.Router
 var LE_MANAGER letsencrypt.Manager
 var LE_FIRSTRUN bool
 
@@ -98,8 +98,7 @@ func pingTest(w http.ResponseWriter, r *http.Request) {
 
 // Create all globals and init connection handlers
 func setupGlobals() {
-	mainRouter = mux.NewRouter()
-	defaultRouter = mainRouter
+	router = &routerSwapper{}
 
 	if (config.EnableAnalytics == true) && (config.Storage.Type != "redis") {
 		log.WithFields(logrus.Fields{
@@ -176,6 +175,9 @@ func setupGlobals() {
 		config.AnalyticsConfig.NormaliseUrls.compiledPatternSet = InitNormalisationPatterns()
 	}
 
+	if config.NewRelic.Enabled {
+		setupNewRelic()
+	}
 }
 
 func waitForZeroConf() {
@@ -345,6 +347,19 @@ func loadAPIEndpoints(Muxer *mux.Router) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Debug("Loaded API Endpoints")
+}
+
+func loadProfilingEndpoints(muxer *mux.Router) {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("Adding pprof endpoints")
+
+	r := muxer.PathPrefix("/debug/pprof").Subrouter()
+	r.HandleFunc("/{rest:.*}", pprof_http.Index)
+	r.HandleFunc("/cmdline", pprof_http.Cmdline)
+	r.HandleFunc("/profile", pprof_http.Profile)
+	r.HandleFunc("/symbol", pprof_http.Symbol)
+	r.HandleFunc("/trace", pprof_http.Trace)
 }
 
 func generateOAuthPrefix(apiID string) string {
@@ -726,13 +741,10 @@ func doReload() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Preparing new router")
-	mainRouter = mux.NewRouter()
-	if config.HttpServerOptions.OverrideDefaults {
-		mainRouter.SkipClean(config.HttpServerOptions.SkipURLCleaning)
-	}
 
-	loadAPIEndpoints(mainRouter)
-	loadApps(specs, mainRouter)
+	newRouter := router.Build()
+	loadApps(specs, newRouter)
+	router.Swap(newRouter)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -1184,16 +1196,10 @@ func start() {
 	}
 
 	if doHTTPProfile {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Adding pprof endpoints")
-
-		defaultRouter.HandleFunc("/debug/pprof/"+"{rest:.*}", http.HandlerFunc(pprof_http.Index))
-		defaultRouter.HandleFunc("/debug/pprof/cmdline", http.HandlerFunc(pprof_http.Cmdline))
-		defaultRouter.HandleFunc("/debug/pprof/profile", http.HandlerFunc(pprof_http.Profile))
-		defaultRouter.HandleFunc("/debug/pprof/symbol", http.HandlerFunc(pprof_http.Symbol))
-		defaultRouter.HandleFunc("/debug/pprof/trace", http.HandlerFunc(pprof_http.Trace))
+		router.PreProcess(loadProfilingEndpoints)
 	}
+
+	router.PreProcess(loadAPIEndpoints)
 
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.SupressDefaultOrgStore {
@@ -1205,8 +1211,6 @@ func start() {
 		//DefaultQuotaStore.Init(GetGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(GetGlobalStorageHandler("orgkey.", false))
 	}
-
-	loadAPIEndpoints(defaultRouter)
 
 	// Start listening for reload messages
 	if !config.SuppressRedisSignalReload {
@@ -1369,20 +1373,18 @@ func listen(l net.Listener, err error) {
 		StartDRL()
 
 		if !RPC_EmergencyMode {
+			newRouter := router.Build()
 			specs := getAPISpecs()
 			if specs != nil {
-				loadApps(specs, defaultRouter)
+				loadApps(specs, newRouter)
 				getPolicies()
 			}
+
+			router.Swap(newRouter)
 		}
 
 		// Use a custom server so we can control keepalives
 		if config.HttpServerOptions.OverrideDefaults {
-			defaultRouter.SkipClean(config.HttpServerOptions.SkipURLCleaning)
-
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Custom gateway started")
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
@@ -1390,18 +1392,21 @@ func listen(l net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
-				Handler:      mainHandler{},
+				Handler:      router,
 			}
 
 			// Accept connections in a new goroutine.
 			go s.Serve(l)
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Custom gateway started")
 			displayConfig()
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Printf("Gateway started (%s)", VERSION)
 
-			go http.Serve(l, mainHandler{})
+			go http.Serve(l, router)
 
 			displayConfig()
 		}
@@ -1431,18 +1436,18 @@ func listen(l net.Listener, err error) {
 
 		// Resume accepting connections in a new goroutine.
 		if !RPC_EmergencyMode {
+			newRouter := router.Build()
 			specs := getAPISpecs()
 			if specs != nil {
-				loadApps(specs, defaultRouter)
+				loadApps(specs, newRouter)
 				getPolicies()
 			}
 
+			router.Swap(newRouter)
 			startHeartBeat()
 		}
 
 		if config.HttpServerOptions.OverrideDefaults {
-			defaultRouter.SkipClean(config.HttpServerOptions.SkipURLCleaning)
-
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
@@ -1450,13 +1455,14 @@ func listen(l net.Listener, err error) {
 				Addr:         ":" + targetPort,
 				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
-				Handler:      mainHandler{},
+				Handler:      router,
 			}
 
+			go s.Serve(l)
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Info("Custom gateway started")
-			go s.Serve(l)
+
 			displayConfig()
 		} else {
 			log.WithFields(logrus.Fields{
@@ -1464,7 +1470,7 @@ func listen(l net.Listener, err error) {
 			}).Printf("Gateway resumed (%v)", VERSION)
 			displayConfig()
 
-			go http.Serve(l, mainHandler{})
+			go http.Serve(l, router)
 		}
 
 		log.WithFields(logrus.Fields{

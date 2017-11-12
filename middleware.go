@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gocraft/health"
+	"github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 )
 
@@ -56,6 +57,9 @@ func CreateMiddleware(mw TykMiddlewareImplementation, tykMwSuper *TykMiddleware)
 
 	aliceHandler := func(h http.Handler) http.Handler {
 		thisHandler := func(w http.ResponseWriter, r *http.Request) {
+			if txn, ok := w.(newrelic.Transaction); ok {
+				defer newrelic.StartSegment(txn, mw.GetName()).End()
+			}
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
 				"from_ip":  fmt.Sprint(r.RemoteAddr),

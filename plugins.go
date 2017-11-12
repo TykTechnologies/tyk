@@ -32,6 +32,7 @@ type MiniRequestObject struct {
 	DeleteHeaders   []string
 	Body            string
 	URL             string
+	RequestURI	string
 	Params          map[string][]string
 	AddParams       map[string]string
 	ExtendedParams  map[string][]string
@@ -123,6 +124,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteHeaders:  make([]string, 0),
 		Body:           string(originalBody),
 		URL:            r.URL.Path,
+		RequestURI:	r.RequestURI,
 		Params:         r.URL.Query(),
 		AddParams:      make(map[string]string),
 		ExtendedParams: make(map[string][]string),
