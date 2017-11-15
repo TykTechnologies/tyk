@@ -299,6 +299,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
+		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
@@ -307,10 +308,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
-
-		if spec.UseMutualTLSAuth {
-			mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-		}
 
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
@@ -336,6 +333,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	} else {
 		var chainArray []alice.Constructor
+		var authArray []alice.Constructor
 
 		handleCORS(&chainArray, spec)
 
@@ -352,6 +350,13 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
+		if mwAppendEnabled(&authArray, &CertificateCheckMW{BaseMiddleware: baseMid}) {
+			log.WithFields(logrus.Fields{
+				"prefix":   "main",
+				"api_name": spec.Name,
+			}).Info("Checking security policy: Mutual TLS")
+		}
+
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
@@ -361,19 +366,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
 		// Select the keying method to use for setting session states
-		var authArray []alice.Constructor
 		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: OAuth")
-		}
-
-		if mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid}) {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: Mutual TLS")
 		}
 
 		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid}) {
