@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Sirupsen/logrus"
-	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
 	"net/http"
 )
@@ -110,10 +109,13 @@ func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResu
 	//  }
 
 	var jq_result JQResult
-	err = mapstructure.Decode(value, &jq_result)
-	if err != nil {
+	values, ok := value.(map[string]interface{})
+	if !ok {
 		return JQResult{}, errors.New("Invalid JSON object returned by JQ filter. Allowed field are 'body', 'output_vars' and 'output_headers'")
 	}
+	jq_result.Body = values["body"]
+	jq_result.OutputHeaders, _ = values["output_headers"].(map[string]string)
+	jq_result.OutputVars, _ = values["output_vars"].(map[string]string)
 
 	return jq_result, nil
 }
