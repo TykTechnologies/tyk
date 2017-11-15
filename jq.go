@@ -6,12 +6,12 @@ package main
 import "C"
 import (
 	"errors"
-	"reflect"
 	"fmt"
+	"reflect"
 )
 
 type JQ struct {
-	state   *C.jq_state
+	state *C.jq_state
 }
 
 func NewJQ(program string) (*JQ, error) {

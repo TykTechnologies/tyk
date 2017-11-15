@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/user"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -18,7 +19,7 @@ func (h *ResponseTransformJQMiddleware) Init(c interface{}, spec *APISpec) error
 	return nil
 }
 
-func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *SessionState) error {
+func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	_, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedJQResponse)
 	if !found {
