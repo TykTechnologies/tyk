@@ -1176,10 +1176,11 @@ func generateListener(listenPort int) (net.Listener, error) {
 		}).Info("--> Using SSL (https)")
 
 		tlsConfig := tls.Config{
-			GetCertificate: dummyGetCertificate,
-			ServerName:     config.Global.HttpServerOptions.ServerName,
-			MinVersion:     config.Global.HttpServerOptions.MinVersion,
-			ClientAuth:     tls.RequestClientCert,
+			GetCertificate:     dummyGetCertificate,
+			ServerName:         config.Global.HttpServerOptions.ServerName,
+			MinVersion:         config.Global.HttpServerOptions.MinVersion,
+			ClientAuth:         tls.RequestClientCert,
+			InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
 		}
 
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
