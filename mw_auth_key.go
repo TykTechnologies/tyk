@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -66,6 +67,11 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		if cookieValue != "" {
 			key = cookieValue
 		}
+	}
+
+	// If key not provided in header or cookie and client certificate is provided, try to find certificate based key
+	if config.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+		key = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 	}
 
 	if key == "" {

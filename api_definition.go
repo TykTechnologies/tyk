@@ -135,6 +135,7 @@ type APISpec struct {
 	LastGoodHostList         *apidef.HostList
 	HasRun                   bool
 	ServiceRefreshInProgress bool
+	HTTPTransport            http.RoundTripper
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
@@ -163,7 +164,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 
 	// Create and init the virtual Machine
 	if config.Global.EnableJSVM {
-		spec.JSVM.Init()
+		spec.JSVM.Init(spec)
 	}
 
 	// Set up Event Handlers
@@ -239,9 +240,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 
 	// Extract tagged APIs#
-
 	var list struct {
-		Status  string
 		Message []struct {
 			ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
 		}

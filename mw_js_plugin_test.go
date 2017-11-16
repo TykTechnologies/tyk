@@ -21,7 +21,7 @@ import (
 func TestJSVMLogs(t *testing.T) {
 	var buf bytes.Buffer
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 	jsvm.Log = logrus.New()
 	jsvm.Log.Out = &buf
 	jsvm.Log.Formatter = new(prefixed.TextFormatter)
@@ -78,7 +78,7 @@ func TestJSVMBody(t *testing.T) {
 	body := "foô \uffff \u0000 \xff bàr"
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -114,7 +114,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 	jsvm.Timeout = time.Millisecond
 
 	// this js plugin just loops forever, keeping Otto at 100% CPU
@@ -162,7 +162,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -198,7 +198,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -244,7 +244,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -288,7 +288,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	config.Global.TykJSPath = tfile.Name()
 	defer func() { config.Global.TykJSPath = old }()
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}

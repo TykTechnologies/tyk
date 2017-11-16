@@ -44,17 +44,16 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 	doCacheRefresh := func() (*apidef.HostList, error) {
 		log.Debug("--> Refreshing")
 		spec.ServiceRefreshInProgress = true
+		defer func() { spec.ServiceRefreshInProgress = false }()
 		sd := ServiceDiscovery{}
 		sd.Init(&spec.Proxy.ServiceDiscovery)
 		data, err := sd.Target(spec.Proxy.ServiceDiscovery.QueryEndpoint)
 		if err != nil {
-			spec.ServiceRefreshInProgress = false
 			return nil, err
 		}
+		spec.HasRun = true
 		// Set the cached value
 		if data.Len() == 0 {
-			spec.HasRun = true
-			spec.ServiceRefreshInProgress = false
 			log.Warning("[PROXY][SD] Service Discovery returned empty host list! Returning last good set.")
 
 			if spec.LastGoodHostList == nil {
@@ -68,8 +67,6 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 		ServiceCache.Set(spec.APIID, data, cache.DefaultExpiration)
 		// Stash it too
 		spec.LastGoodHostList = data
-		spec.HasRun = true
-		spec.ServiceRefreshInProgress = false
 		return data, nil
 	}
 
@@ -412,8 +409,10 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport() // modifies a newly created transport
+	transport.TLSClientConfig = &tls.Config{}
+
 	if config.Global.ProxySSLInsecureSkipVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	// Use the default unless we've modified the timout
@@ -436,8 +435,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	// 1. Check if timeouts are set for this endpoint
-	_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-	transport := httpTransport(timeout, rw, req, p)
+	if p.TykAPISpec.HTTPTransport == nil {
+		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+	}
 
 	ctx := req.Context()
 	if cn, ok := rw.(http.CloseNotifier); ok {
@@ -517,6 +518,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
+	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{*cert}
+	} else {
+		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = nil
+	}
+
 	var res *http.Response
 	var err error
 	if breakerEnforced {
@@ -525,14 +532,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
 			return nil
 		}
-		res, err = transport.RoundTrip(outreq)
+		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
 		if err != nil || res.StatusCode == 500 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, err = transport.RoundTrip(outreq)
+		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
 	}
 
 	if err != nil {

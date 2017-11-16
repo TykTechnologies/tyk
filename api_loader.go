@@ -301,12 +301,14 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
@@ -330,8 +332,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
 	} else {
-
 		var chainArray []alice.Constructor
+		var authArray []alice.Constructor
 
 		handleCORS(&chainArray, spec)
 
@@ -350,6 +352,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
@@ -357,7 +360,6 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
 		// Select the keying method to use for setting session states
-		var authArray []alice.Constructor
 		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
@@ -371,18 +373,21 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 				"api_name": spec.Name,
 			}).Info("Checking security policy: Basic")
 		}
+
 		if mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: HMAC")
 		}
+
 		if mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",
 				"api_name": spec.Name,
 			}).Info("Checking security policy: JWT")
 		}
+
 		if mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
 			log.WithFields(logrus.Fields{
 				"prefix":   "main",

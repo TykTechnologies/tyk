@@ -120,6 +120,7 @@ type HttpServerOptionsConfig struct {
 	SSLInsecureSkipVerify bool       `json:"ssl_insecure_skip_verify"`
 	EnableWebSockets      bool       `json:"enable_websockets"`
 	Certificates          []CertData `json:"certificates"`
+	SSLCertificates       []string   `json:"ssl_certificates"`
 	ServerName            string     `json:"server_name"`
 	MinVersion            uint16     `json:"min_version"`
 	FlushInterval         int        `json:"flush_interval"`
@@ -153,6 +154,20 @@ type CoProcessConfig struct {
 	EnableCoProcess     bool   `json:"enable_coprocess"`
 	CoProcessGRPCServer string `json:"coprocess_grpc_server"`
 	PythonPathPrefix    string `json:"python_path_prefix"`
+}
+
+type CertificatesConfig struct {
+	API        []string          `json:"apis"`
+	Upstream   map[string]string `json:"upstream"`
+	ControlAPI []string          `json:"control_api"`
+	Dashboard  []string          `json:"dashboard_api"`
+	MDCB       []string          `json:"mdcb_api"`
+}
+
+type SecurityConfig struct {
+	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
+	ControlAPIUseMutualTLS           bool               `json:"control_api_use_mutual_tls"`
+	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
 // Config is the configuration object used by tyk to set up various parameters.
@@ -244,6 +259,7 @@ type Config struct {
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
 	LogLevel                          string                                `json:"log_level"`
+	Security                          SecurityConfig                        `json:"security"`
 }
 
 type CertData struct {
@@ -266,6 +282,7 @@ type TykEventHandler interface {
 }
 
 const envPrefix = "TYK_GW"
+const defaultListenPort = 8080
 
 var Default = Config{
 	ListenPort:     8080,

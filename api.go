@@ -250,9 +250,10 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 				setSessionPassword(&newSession)
 			}
 		}
-
 	}
+
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
+
 	if err := doAddOrUpdate(keyName, &newSession, suppressReset); err != nil {
 		return apiError("Failed to create key, ensure security settings are correct."), 500
 	}
@@ -879,6 +880,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newKey := keyGen.GenerateAuthKey(newSession.OrgID)
 	if newSession.HMACEnabled {
 		newSession.HmacSecret = keyGen.GenerateHMACSecret()
+	}
+
+	if newSession.Certificate != "" {
+		newKey = newSession.OrgID + newSession.Certificate
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))

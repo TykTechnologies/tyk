@@ -103,7 +103,6 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 
 	// Extract Policies
 	var list struct {
-		Status  string
 		Message []DBPolicy
 		Nonce   string
 	}

@@ -87,10 +87,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	encodedSignature := generateEncodedSignature(signatureString, secret)
 
 	// Compare
-	matchPass := false
-	if encodedSignature == fieldValues.Signature {
-		matchPass = true
-	}
+	matchPass := encodedSignature == fieldValues.Signature
 
 	// Check for lower case encoding (.Net issues, again)
 	if !matchPass {
@@ -184,7 +181,6 @@ func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	// Reference layout for parsing time: "Mon Jan 2 15:04:05 MST 2006"
 	refDate := "Mon, 02 Jan 2006 15:04:05 MST"
-
 	// Fall back to a numeric timezone, since some environments don't provide a timezone name code
 	refDateNumeric := "Mon, 02 Jan 2006 15:04:05 -07"
 
