@@ -51,6 +51,30 @@ var tests = []struct {
 	{"Default", onDefaults(`{}`), nil},
 	{"OldMonitor", `{"Monitor": {}}`, nil},
 	{"NullObject", `{"event_handlers": null}`, nil},
+	{
+		"MissingPath", `{"app_path": "missing-path"}`,
+		"app_path: Path does not exist or is not accessible",
+	},
+	{
+		"ExtraPort", `{"listen_address": "foo.com:8080"}`,
+		"listen_address: Address should be a host without port",
+	},
+	{
+		"BadHost", `{"storage": {"host": "::::"}}`,
+		"storage.host: Address should be a host without port",
+	},
+	{
+		"BadLogLevel", `{"log_level": "catastrophic"}`,
+		`log_level: log_level must be one of the following: "", "debug", "info", "warn", "error"`,
+	},
+	{
+		"BadStorageType", `{"storage": {"type": "cd-rom"}}`,
+		`storage.type: storage.type must be one of the following: "", "redis"`,
+	},
+	{
+		"BadPolicySource", `{"policies": {"policy_source": "internet"}}`,
+		`policies.policy_source: policies.policy_source must be one of the following: "", "service", "rpc"`,
+	},
 }
 
 func allContains(got, want []string) bool {
