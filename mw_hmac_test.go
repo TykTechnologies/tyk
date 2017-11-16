@@ -139,7 +139,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
-		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code, recorder.Body.String())
 	}
 
 	// Check we did not get our AuthFailure event

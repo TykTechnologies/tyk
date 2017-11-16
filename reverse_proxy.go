@@ -409,8 +409,10 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport() // modifies a newly created transport
+	transport.TLSClientConfig = &tls.Config{}
+
 	if config.Global.ProxySSLInsecureSkipVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	// Use the default unless we've modified the timout
@@ -515,6 +517,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
+
+	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
+		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{*cert}
+	} else {
+		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = nil
+	}
 
 	var res *http.Response
 	var err error

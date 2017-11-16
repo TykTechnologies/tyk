@@ -201,7 +201,6 @@ func (r RedisCluster) SetKey(keyName, session string, timeout int64) error {
 }
 
 func (r RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
-
 	r.ensureConnection()
 	_, err := r.singleton().Do("SET", keyName, session)
 	if timeout > 0 {
@@ -220,7 +219,6 @@ func (r RedisCluster) SetRawKey(keyName, session string, timeout int64) error {
 
 // Decrement will decrement a key in redis
 func (r RedisCluster) Decrement(keyName string) {
-
 	keyName = r.fixKey(keyName)
 	log.Debug("Decrementing key: ", keyName)
 	r.ensureConnection()
@@ -232,7 +230,6 @@ func (r RedisCluster) Decrement(keyName string) {
 
 // IncrementWithExpire will increment a key in redis
 func (r RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
-
 	log.Debug("Incrementing raw key: ", keyName)
 	r.ensureConnection()
 	// This function uses a raw key, so we shouldn't call fixKey
@@ -534,9 +531,22 @@ func (r RedisCluster) RemoveFromSet(keyName, value string) {
 	}
 }
 
+func (r RedisCluster) IsMemberOfSet(keyName, value string) bool {
+	r.ensureConnection()
+	val, err := redis.Int64(r.singleton().Do("SISMEMBER", r.fixKey(keyName), value))
+
+	if err != nil {
+		log.Error("Error trying to check set memeber: ", err)
+		return false
+	}
+
+	log.Debug("SISMEMBER", keyName, value, val, err)
+
+	return val == 1
+}
+
 // SetRollingWindow will append to a sorted set in redis and extract a timed window of values
 func (r RedisCluster) SetRollingWindow(keyName string, per int64, value_override string, pipeline bool) (int, []interface{}) {
-
 	log.Debug("Incrementing raw key: ", keyName)
 	r.ensureConnection()
 	log.Debug("keyName is: ", keyName)
