@@ -226,7 +226,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 
 		ln, _ := generateListener(0)
 		baseControlAPIURL := "https://" + strings.Replace(ln.Addr().String(), "[::]", "localhost", -1)
-		baseURL := "https://" + ln.Addr().String()
+		baseURL := "https://" + strings.Replace(ln.Addr().String(), "[::]", "127.0.0.1", -1)
 		listen(ln, nil, nil)
 
 		defer func() {
@@ -269,7 +269,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		ioutil.WriteFile(certPath, clientCertPem, 0666)
 
 		ln, _ := generateListener(0)
-		baseURL := "https://" + ln.Addr().String()
+		baseURL := "https://" + strings.Replace(ln.Addr().String(), "[::]", "127.0.0.1", -1)
 		listen(ln, nil, nil)
 		loadAPIEndpoints(mainRouter)
 		defer func() {
@@ -556,7 +556,7 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		pool.AddCert(clientCert.Leaf)
 
 		ln, _ := generateListener(0)
-		baseURL := "http://" + ln.Addr().String()
+		baseURL := "http://" + strings.Replace(ln.Addr().String(), "[::]", "localhost", -1)
 		listen(ln, nil, nil)
 		config.Global.ProxySSLInsecureSkipVerify = true
 		defer func() {
@@ -611,7 +611,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	baseURL := "https://" + ln.Addr().String()
+	baseURL := "https://" + strings.Replace(ln.Addr().String(), "[::]", "localhost", -1)
 
 	client := getTLSClient(&clientCert, nil)
 
@@ -653,7 +653,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		config.Global.ListenPort = defaultListenPort
 	}()
 
-	baseURL := "http://" + ln.Addr().String() + "/tyk/certs/"
+	baseURL := "http://" + strings.Replace(ln.Addr().String(), "[::]", "localhost", -1) + "/tyk/certs/"
 
 	var req *http.Request
 	client := &http.Client{}
