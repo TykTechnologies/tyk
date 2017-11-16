@@ -299,9 +299,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
-		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
@@ -340,7 +340,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
-				log.WithFields(logrus.Fields{
+				log.WithFields(logrus.Fieldws{
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
@@ -350,15 +350,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
-		if mwAppendEnabled(&authArray, &CertificateCheckMW{BaseMiddleware: baseMid}) {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: Mutual TLS")
-		}
-
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
