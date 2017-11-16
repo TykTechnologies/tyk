@@ -656,7 +656,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 	t.Run("List certificates, empty", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", baseURL, nil)
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
+		if resp, _ := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
 			t.Error(resp)
 		} else {
 			var apiResp APIAllCertificates
