@@ -288,7 +288,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	config.Global.TykJSPath = tfile.Name()
 	defer func() { config.Global.TykJSPath = old }()
 	jsvm := JSVM{}
-	jsvm.Init()
+	jsvm.Init(nil)
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
