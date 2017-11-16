@@ -1025,8 +1025,8 @@ func main() {
 		}
 	}
 
-	l, _ := goagain.Listener(onFork)
-	controlListener, goAgainErr := goagain.Listener(onFork)
+	l, goAgainErr := goagain.Listener(onFork)
+	controlListener, _ := goagain.Listener(onFork)
 
 	if err := initialiseSystem(arguments); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1164,9 +1164,6 @@ func start(arguments map[string]interface{}) {
 
 func generateListener(listenPort int) (net.Listener, error) {
 	listenAddress := config.Global.ListenAddress
-	if listenPort == 0 {
-		listenPort = config.Global.ListenPort
-	}
 
 	targetPort := fmt.Sprintf("%s:%d", listenAddress, listenPort)
 
