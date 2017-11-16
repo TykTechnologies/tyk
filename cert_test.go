@@ -660,8 +660,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 	t.Run("List certificates, empty", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", baseURL, nil)
-		if resp, _ := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
-			t.Error(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Error("Response:", resp, err)
 		} else {
 			var apiResp APIAllCertificates
 			json.NewDecoder(resp.Body).Decode(&apiResp)
@@ -675,8 +675,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	t.Run("Should add certificates with and without private keys", func(t *testing.T) {
 		// Public Certificate
 		req, _ = http.NewRequest("POST", baseURL, bytes.NewReader(clientPEM))
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Error(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Error("Response:", resp, err)
 		} else {
 			var apiResp APICertificateStatusMessage
 			json.NewDecoder(resp.Body).Decode(&apiResp)
@@ -688,8 +688,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 		// Server certificate with private key
 		req, _ = http.NewRequest("POST", baseURL, bytes.NewReader(combinedServerPEM))
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Error(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Error("Response:", resp, err)
 		} else {
 			var apiResp APICertificateStatusMessage
 			json.NewDecoder(resp.Body).Decode(&apiResp)
@@ -703,8 +703,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	t.Run("List certificates, non empty", func(t *testing.T) {
 		// Should list 2 newly created certificates
 		req, _ = http.NewRequest("GET", baseURL, nil)
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Fatal(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Fatal("Response:", resp, err)
 		} else {
 			var apiResp APIAllCertificates
 			json.NewDecoder(resp.Body).Decode(&apiResp)
@@ -717,8 +717,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 	t.Run("Certificate meta info", func(t *testing.T) {
 		req, _ = http.NewRequest("GET", baseURL+clientCertID, nil)
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Error(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Error("Response:", resp, err)
 		} else {
 			var apiResp certs.CertificateMeta
 			json.NewDecoder(resp.Body).Decode(&apiResp)
@@ -733,8 +733,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		}
 
 		req, _ = http.NewRequest("GET", baseURL+serverCertID, nil)
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Error(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Error("Response:", resp, err)
 		} else {
 			var apiResp certs.CertificateMeta
 			json.NewDecoder(resp.Body).Decode(&apiResp)
@@ -753,8 +753,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		}
 
 		req, _ = http.NewRequest("GET", baseURL+clientCertID+","+serverCertID, nil)
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Error(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Error("Response:", resp, err)
 		} else {
 			var apiResp []certs.CertificateMeta
 			json.NewDecoder(resp.Body).Decode(&apiResp)
@@ -778,8 +778,8 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 		// List certificates, empty
 		req, _ = http.NewRequest("GET", baseURL, nil)
-		if resp, _ := client.Do(withAuth(req)); resp.StatusCode != 200 {
-			t.Error(resp)
+		if resp, err := client.Do(withAuth(req)); resp == nil || resp.StatusCode != 200 {
+			t.Error("Response:", resp, err)
 		} else {
 			var apiResp APIAllCertificates
 			json.NewDecoder(resp.Body).Decode(&apiResp)
