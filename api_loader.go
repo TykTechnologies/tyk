@@ -340,7 +340,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
-				log.WithFields(logrus.Fieldws{
+				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
