@@ -519,9 +519,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
 	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
-		transport.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{*cert}
+		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{*cert}
 	} else {
-		transport.(*http.Transport).TLSClientConfig.Certificates = nil
+		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = nil
 	}
 
 	var res *http.Response

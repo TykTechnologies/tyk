@@ -342,6 +342,8 @@ func TestAPIMutualTLS(t *testing.T) {
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID)
 
+	config.Global.EnableCustomDomains = true
+	config.Global.ListenAddress = "127.0.0.1"
 	config.Global.HttpServerOptions.UseSSL = true
 	config.Global.ListenPort = 0
 	config.Global.HttpServerOptions.SSLCertificates = []string{certID}
@@ -351,6 +353,8 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	defer func() {
 		ln.Close()
+		config.Global.EnableCustomDomains = false
+		config.Global.ListenAddress = ""
 		config.Global.HttpServerOptions.SSLCertificates = nil
 		config.Global.HttpServerOptions.UseSSL = false
 		config.Global.ListenPort = defaultListenPort
@@ -361,7 +365,7 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	// Start of the tests
 	// To make SSL SNI work we need to use domains
-	baseURL := "https://" + strings.Replace(ln.Addr().String(), "[::]", "localhost", -1)
+	baseURL := "https://" + strings.Replace(ln.Addr().String(), "127.0.0.1", "localhost", -1)
 
 	t.Run("SNI and domain per API", func(t *testing.T) {
 		t.Run("API without mutual TLS", func(t *testing.T) {
