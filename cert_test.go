@@ -342,8 +342,11 @@ func TestAPIMutualTLS(t *testing.T) {
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID)
 
+<<<<<<< HEAD
 	config.Global.EnableCustomDomains = true
 	config.Global.ListenAddress = "127.0.0.1"
+=======
+>>>>>>> origin/mutual_tls
 	config.Global.HttpServerOptions.UseSSL = true
 	config.Global.ListenPort = 0
 	config.Global.HttpServerOptions.SSLCertificates = []string{certID}
@@ -353,8 +356,11 @@ func TestAPIMutualTLS(t *testing.T) {
 
 	defer func() {
 		ln.Close()
+<<<<<<< HEAD
 		config.Global.EnableCustomDomains = false
 		config.Global.ListenAddress = ""
+=======
+>>>>>>> origin/mutual_tls
 		config.Global.HttpServerOptions.SSLCertificates = nil
 		config.Global.HttpServerOptions.UseSSL = false
 		config.Global.ListenPort = defaultListenPort
