@@ -585,6 +585,15 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	for i, spec := range specs {
 		go func(spec *APISpec, i int) {
 			subrouter := hostRouters[spec.Domain]
+			if subrouter == nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+					"domain": spec.Domain,
+					"api_id": spec.APIID,
+				}).Warning("Trying to load API with Domain when custom domains are disabled.")
+				subrouter = muxer
+			}
+
 			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
