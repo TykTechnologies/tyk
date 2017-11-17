@@ -268,7 +268,19 @@ func lookPath() (argv0 string, err error) {
 
 func setEnvs(l net.Listener) (fd uintptr, err error) {
 	v := reflect.ValueOf(l).Elem().FieldByName("fd").Elem()
-	fd = uintptr(v.FieldByName("sysfd").Int())
+	fdField := v.FieldByName("sysfd")
+
+	if !fdField.IsValid() {
+		fdField = v.FieldByName("pfd").FieldByName("Sysfd")
+	}
+
+	if !fdField.IsValid() {
+		err = fmt.Errorf("Not supported by current Go version")
+		return
+	}
+
+	fd = uintptr(fdField.Int())
+
 	_, _, e1 := syscall.Syscall(syscall.SYS_FCNTL, fd, syscall.F_SETFD, 0)
 	if 0 != e1 {
 		err = e1

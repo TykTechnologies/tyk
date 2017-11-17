@@ -1011,9 +1011,30 @@ func main() {
 	}
 	NodeID = "solo-" + uuid.NewV4().String()
 
+	if err := initialiseSystem(arguments); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatalf("Error initialising system: %v", err)
+	}
+
 	amForked := false
 
+	var controlListener net.Listener
+
 	onFork := func() {
+		log.Warning("PREPARING TO FORK")
+
+		if controlListener != nil {
+			if err := controlListener.Close(); err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Error("Control listen handler exit: ", err)
+			}
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Info("Control listen closed")
+		}
+
 		if config.Global.UseDBAppConfigs {
 			log.Info("Stopping heartbeat")
 			DashService.StopBeating()
@@ -1025,30 +1046,27 @@ func main() {
 		}
 	}
 
-	l, _ := goagain.Listener(onFork)
-	controlListener, goAgainErr := goagain.Listener(onFork)
+	l, goAgainErr := goagain.Listener(onFork)
 
-	if err := initialiseSystem(arguments); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatalf("Error initialising system: %v", err)
+	if config.Global.ControlAPIPort > 0 {
+		var err error
+		if controlListener, err = generateListener(config.Global.ControlAPIPort); err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "main",
+			}).Fatalf("Error starting control API listener: %s", err)
+		} else {
+			log.Info("Starting control API listener: ", controlListener, err, config.Global.ControlAPIPort)
+		}
 	}
+
 	start(arguments)
 
 	if goAgainErr != nil {
 		var err error
-		if l, err = generateListener(0); err != nil {
+		if l, err = generateListener(config.Global.ListenPort); err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Fatalf("Error starting listener: %s", err)
-		}
-
-		if config.Global.ControlAPIPort > 0 {
-			if controlListener, err = generateListener(config.Global.ControlAPIPort); err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Fatalf("Error starting control API listener: %s", err)
-			}
 		}
 
 		listen(l, controlListener, goAgainErr)
@@ -1200,10 +1218,10 @@ func generateListener(listenPort int) (net.Listener, error) {
 		config.GetConfigForClient = getTLSConfigForClient(&config, listenPort)
 
 		return tls.Listen("tcp", targetPort, &config)
-
 	} else {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
+			"port":   targetPort,
 		}).Info("--> Standard listener (http)")
 		return net.Listen("tcp", targetPort)
 	}
@@ -1301,7 +1319,7 @@ func listen(l, controlListener net.Listener, err error) {
 				"prefix": "main",
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
-				Addr:         ":" + targetPort,
+				Addr:         targetPort,
 				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
 				Handler:      mainHandler{},
@@ -1405,6 +1423,10 @@ func listen(l, controlListener net.Listener, err error) {
 
 			if !rpcEmergencyMode {
 				if controlListener != nil {
+					log.WithFields(logrus.Fields{
+						"prefix": "main",
+					}).Info("Control API listener started: ", controlListener, controlRouter)
+
 					go http.Serve(controlListener, controlRouter)
 				}
 			}
