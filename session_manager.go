@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"time"
 )
 
@@ -58,13 +57,6 @@ func (l SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSen
 	return false
 }
 
-// Adjusts the DRL weight slightly to nsure slightly less conservative throttling.
-func (l SessionLimiter) fixDRLRate(numServers int, rate float64, current int) int {
-	adjustWith := (100 * math.Log(math.Pow(float64(numServers), math.Sqrt(float64(numServers)))) / rate) * float64(numServers)
-	adjustment := current - int(adjustWith)
-	return adjustment
-}
-
 // ForwardMessage will enforce rate limiting, returning false if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages Per 10 seconds
 func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string, store StorageHandler, enableRL, enableQ bool) (bool, int) {
@@ -110,13 +102,7 @@ func (l SessionLimiter) ForwardMessage(currentSession *SessionState, key string,
 				return false, 1
 			}
 
-			serverCount := 1
-			if DRLManager.Servers != nil {
-				serverCount = DRLManager.Servers.Count()
-			}
-
-			fixedValue := l.fixDRLRate(serverCount, currentSession.Rate, DRLManager.CurrentTokenValue)
-			_, errF := thisUserBucket.Add(uint(fixedValue))
+			_, errF := thisUserBucket.Add(uint(DRLManager.CurrentTokenValue))
 
 			if errF != nil {
 				return false, 1
