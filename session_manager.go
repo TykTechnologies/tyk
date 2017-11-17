@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
@@ -32,13 +31,6 @@ const (
 // check if a message should pass through or not
 type SessionLimiter struct {
 	bucketStore leakybucket.Storage
-}
-
-// Adjusts the DRL weight slightly to nsure slightly less conservative throttling.
-func (l SessionLimiter) fixDRLRate(numServers int, rate float64, current int) int {
-	adjustWith := (100 * math.Log(math.Pow(float64(numServers), math.Sqrt(float64(numServers)))) / rate) * float64(numServers)
-	adjustment := current - int(adjustWith)
-	return adjustment
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *user.SessionState, store storage.Handler) bool {
@@ -123,13 +115,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key s
 				return sessionFailRateLimit
 			}
 
-			serverCount := 1
-			if DRLManager.Servers != nil {
-				serverCount = DRLManager.Servers.Count()
-			}
-
-			fixedValue := l.fixDRLRate(serverCount, currentSession.Rate, DRLManager.CurrentTokenValue)
-			_, errF := userBucket.Add(uint(fixedValue))
+			_, errF := userBucket.Add(uint(DRLManager.CurrentTokenValue))
 
 			if errF != nil {
 				return sessionFailRateLimit
