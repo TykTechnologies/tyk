@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"net/http"
-
-	"github.com/Sirupsen/logrus"
 )
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.
@@ -24,13 +22,9 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	}
 
 	token := ctxGetAuthToken(r)
+	logEntry := getLogEntryForRequest(r, token, nil)
 	if session.IsInactive {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    token,
-		}).Info("Attempted access from inactive key.")
-
+		logEntry.Info("Attempted access from inactive key.")
 		// Fire a key expired event
 		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
@@ -48,11 +42,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	if !k.Spec.AuthManager.KeyExpired(session) {
 		return nil, 200
 	}
-	log.WithFields(logrus.Fields{
-		"path":   r.URL.Path,
-		"origin": requestIP(r),
-		"key":    token,
-	}).Info("Attempted access from expired key.")
+	logEntry.Info("Attempted access from expired key.")
 
 	// Report in health check
 	reportHealthValue(k.Spec, KeyFailure, "-1")

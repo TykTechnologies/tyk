@@ -6,8 +6,6 @@ import (
 
 	"errors"
 
-	"github.com/Sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -57,12 +55,9 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 	}
 
 	// Is it active?
+	logEntry := getLogEntryForRequest(r, k.Spec.OrgID, nil)
 	if session.IsInactive {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    k.Spec.OrgID,
-		}).Warning("Organisation access is disabled.")
+		logEntry.Warning("Organisation access is disabled.")
 
 		return errors.New("this organisation access has been disabled, please contact your API administrator"), 403
 	}
@@ -79,11 +74,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 	switch reason {
 	case sessionFailNone:
 	case sessionFailQuota:
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    k.Spec.OrgID,
-		}).Warning("Organisation quota has been exceeded.")
+		logEntry.Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
 		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{
@@ -153,12 +144,9 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	}
 
 	// Is it active?
+	logEntry := getLogEntryForRequest(r, k.Spec.OrgID, nil)
 	if session.IsInactive {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    k.Spec.OrgID,
-		}).Warning("Organisation access is disabled.")
+		logEntry.Warning("Organisation access is disabled.")
 
 		//return errors.New("This organisation access has been disabled, please contact your API administrator."), 403
 		orgChan <- false
@@ -171,11 +159,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime))
 
 	if isQuotaExceeded {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    k.Spec.OrgID,
-		}).Warning("Organisation quota has been exceeded.")
+		logEntry.Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
 		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
-
 	"strconv"
 	"time"
 
@@ -44,11 +42,8 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 }
 
 func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	log.WithFields(logrus.Fields{
-		"path":   r.URL.Path,
-		"origin": requestIP(r),
-		"key":    token,
-	}).Info("API rate limit exceeded.")
+	logEntry := getLogEntryForRequest(r, token, nil)
+	logEntry.Info("API rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
 	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{

@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -45,12 +43,15 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 	// Check stated size
 	if size > sizeLimit {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"size":   size,
-			"limit":  sizeLimit,
-		}).Info("Attempted access with large request size, blocked.")
+		logEntry := getLogEntryForRequest(
+			r,
+			"",
+			map[string]interface{}{
+				"size":  size,
+				"limit": sizeLimit,
+			},
+		)
+		logEntry.Info("Attempted access with large request size, blocked.")
 
 		return errors.New("Request is too large"), 400
 	}

@@ -658,6 +658,9 @@ const confSchema = `{
 				}
 			}
 		}
+	},
+	"enable_key_logging": {
+		"type": "boolean"
 	}
 }
 }`

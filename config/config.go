@@ -260,6 +260,7 @@ type Config struct {
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
 	LogLevel                          string                                `json:"log_level"`
 	Security                          SecurityConfig                        `json:"security"`
+	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
 }
 
 type CertData struct {

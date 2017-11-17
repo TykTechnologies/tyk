@@ -4,8 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
-
-	"github.com/Sirupsen/logrus"
 )
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key
@@ -54,12 +52,8 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 
 	token := ctxGetAuthToken(r)
 	// No paths matched, disallow
-	log.WithFields(logrus.Fields{
-		"path":      r.URL.Path,
-		"origin":    requestIP(r),
-		"key":       token,
-		"api_found": false,
-	}).Info("Attempted access to unauthorised endpoint (Granular).")
+	logEntry := getLogEntryForRequest(r, token, map[string]interface{}{"api_found": false})
+	logEntry.Info("Attempted access to unauthorised endpoint (Granular).")
 
 	return errors.New("Access to this resource has been disallowed"), 403
 

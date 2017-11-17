@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/clbanning/mxj"
 	"golang.org/x/net/html/charset"
 
@@ -46,12 +45,16 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 	err := transformBody(r, meta.(*TransformSpec), t.Spec.EnableContextVars)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":      "inbound-transform",
-			"server_name": t.Spec.Proxy.TargetURL,
-			"api_id":      t.Spec.APIID,
-			"path":        r.URL.Path,
-		}).Error(err)
+		logEntry := getLogEntryForRequest(
+			r,
+			"",
+			map[string]interface{}{
+				"prefix":      "inbound-transform",
+				"server_name": t.Spec.Proxy.TargetURL,
+				"api_id":      t.Spec.APIID,
+			},
+		)
+		logEntry.Error(err)
 	}
 	return nil, 200
 }
