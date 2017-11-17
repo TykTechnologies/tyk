@@ -1182,3 +1182,28 @@ func TestMultiTargetProxy(t *testing.T) {
 		}
 	}
 }
+
+func TestCustomDomain(t *testing.T) {
+	t.Run("With custom domain support", func(t *testing.T) {
+		config.Global.EnableCustomDomains = true
+		defer func() {
+			config.Global.EnableCustomDomains = false
+		}()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Domain = "localhost"
+		},
+			func(spec *APISpec) {
+				spec.Domain = ""
+			})
+	})
+
+	t.Run("Without custom domain support", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Domain = "localhost"
+		},
+			func(spec *APISpec) {
+				spec.Domain = ""
+			})
+	})
+}
