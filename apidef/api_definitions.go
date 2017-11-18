@@ -383,8 +383,14 @@ func (a *APIDefinition) EncodeForDB() {
 		v.Name = newK
 		new_version[newK] = v
 	}
-
 	a.VersionData.Versions = new_version
+
+	new_upstream_certificates := make(map[string]string)
+	for domain, cert := range a.UpstreamCertificates {
+		newD := base64.StdEncoding.EncodeToString([]byte(domain))
+		new_upstream_certificates[newD] = cert
+	}
+	a.UpstreamCertificates = new_upstream_certificates
 }
 
 func (a *APIDefinition) DecodeFromDB() {
@@ -401,4 +407,17 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 
 	a.VersionData.Versions = new_version
+
+	new_upstream_certificates := make(map[string]string)
+	for domain, cert := range a.UpstreamCertificates {
+		newD, err := base64.StdEncoding.DecodeString(domain)
+		if err != nil {
+			log.Error("Couldn't Decode, leaving as it may be legacy...")
+			new_upstream_certificates[domain] = cert
+		} else {
+			new_upstream_certificates[string(newD)] = cert
+		}
+	}
+
+	a.UpstreamCertificates = new_upstream_certificates
 }
