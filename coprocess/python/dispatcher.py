@@ -43,9 +43,17 @@ class TykDispatcher:
         return found_middleware
 
     def load_bundle(self, base_bundle_path):
-        bundle_path = path.join(base_bundle_path, 'middleware.py')
-        middleware = TykMiddleware(bundle_path)
-        self.middlewares.append(middleware)
+        bundle_path = path.join(base_bundle_path, '*.py')
+        bundle_modules = self.get_modules(bundle_path)
+        sys.path.append(base_bundle_path)
+        for module_name in bundle_modules:
+            middleware = self.find_middleware(module_name)
+            if middleware:
+                middleware.reload()
+            else:
+                middleware = TykMiddleware(module_name)
+                self.middlewares.append(middleware)
+
         self.update_hook_table()
 
     def load_middlewares(self):
