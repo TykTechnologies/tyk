@@ -948,6 +948,10 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 // request) is expired. If it isn't and the configured time was valid,
 // it also returns the expiration time.
 func (a *APISpec) VersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Time) {
+	if a.VersionData.NotVersioned {
+		return false, nil
+	}
+
 	// Never expires
 	if versionDef.Expires == "" || versionDef.Expires == "-1" {
 		return false, nil
