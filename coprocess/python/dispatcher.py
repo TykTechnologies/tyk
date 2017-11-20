@@ -146,5 +146,4 @@ class TykDispatcher:
         self.purge_event_handlers()
         self.load_event_handlers()
 
-        self.purge_middlewares()
         self.load_middlewares()
