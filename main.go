@@ -90,9 +90,14 @@ var (
 
 func getApiSpec(apiID string) *APISpec {
 	apisMu.RLock()
-	spec := apisByID[apiID]
-	apisMu.RUnlock()
-	return spec
+	defer apisMu.RUnlock()
+	return apisByID[apiID]
+}
+
+func getApiSpecLen() int {
+	apisMu.Lock()
+	defer apisMu.Unlock()
+	return len(apisByID)
 }
 
 // Create all globals and init connection handlers
@@ -599,7 +604,7 @@ func doReload() {
 
 	// skip re-loading only if dashboard service reported 0 APIs
 	// and current registry had 0 APIs
-	if len(apiSpecs) == 0 && len(apisByID) == 0 {
+	if len(apiSpecs) == 0 && getApiSpecLen() == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
