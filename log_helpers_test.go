@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
