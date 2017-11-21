@@ -921,6 +921,9 @@ func TestListener(t *testing.T) {
 		{method: "GET", path: "/sample", code: 404},
 		{method: "GET", path: "/tyk/reload/?block=true", adminAuth: true, code: 200},
 		{method: "GET", path: "/sample", code: 200},
+		{method: "GET", path: "/samplefoo", code: 200},
+		{method: "GET", path: "/sample/", code: 200},
+		{method: "GET", path: "/sample/foo", code: 200},
 	}
 
 	// have all needed reload ticks ready
