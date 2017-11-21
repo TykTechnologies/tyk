@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	stdlog "log"
 	"log/syslog"
 	"net"
 	"net/http"
@@ -799,6 +800,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 		log.Level = logrus.ErrorLevel
 		log.Out = ioutil.Discard
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
+		stdlog.SetOutput(ioutil.Discard)
 	} else if arguments["--debug"] == true {
 		log.Level = logrus.DebugLevel
 		log.WithFields(logrus.Fields{
