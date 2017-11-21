@@ -597,7 +597,9 @@ func doReload() {
 	// load the specs
 	syncAPISpecs()
 
-	if len(apiSpecs) == 0 {
+	// skip re-loading only if dashboard service reported 0 APIs
+	// and current registry had 0 APIs
+	if len(apiSpecs) == 0 && len(apisByID) == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
