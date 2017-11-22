@@ -14,9 +14,9 @@ type TransformJQMiddleware struct {
 }
 
 type JQResult struct {
-	Body          interface{}       `mapstructure:"body"`
-	OutputHeaders map[string]string `mapstructure:"output_headers"`
-	OutputVars    map[string]string `mapstructure:"output_vars"`
+	Body          interface{}            `mapstructure:"body"`
+	OutputHeaders map[string]string      `mapstructure:"output_headers"`
+	OutputVars    map[string]interface{} `mapstructure:"output_vars"`
 }
 
 func (t *TransformJQMiddleware) Name() string {
@@ -113,9 +113,10 @@ func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResu
 	if !ok {
 		return JQResult{}, errors.New("Invalid JSON object returned by JQ filter. Allowed field are 'body', 'output_vars' and 'output_headers'")
 	}
+
 	jq_result.Body = values["body"]
 	jq_result.OutputHeaders, _ = values["output_headers"].(map[string]string)
-	jq_result.OutputVars, _ = values["output_vars"].(map[string]string)
+	jq_result.OutputVars, _ = values["output_vars"].(map[string]interface{})
 
 	return jq_result, nil
 }
