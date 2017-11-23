@@ -271,7 +271,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		ln, _ := generateListener(0)
 		baseURL := "https://" + strings.Replace(ln.Addr().String(), "[::]", "127.0.0.1", -1)
 		listen(ln, nil, nil)
-		loadAPIEndpoints(mainRouter)
+		loadAPIEndpoints(mainRouter, &mainRouterMu)
 		defer func() {
 			ln.Close()
 			config.Global.HttpServerOptions.SSLCertificates = nil

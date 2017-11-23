@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -48,6 +49,7 @@ var (
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
 	GlobalEventsJSVM         JSVM
+	globalEventsJSVMMu       sync.Mutex
 	memProfFile              *os.File
 	MainNotifier             RedisNotifier
 	DefaultOrgStore          DefaultSessionManager
@@ -67,10 +69,14 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	mainRouter    *mux.Router
-	controlRouter *mux.Router
-	LE_MANAGER    letsencrypt.Manager
-	LE_FIRSTRUN   bool
+	mainRouter   *mux.Router
+	mainRouterMu sync.Mutex
+
+	controlRouter   *mux.Router
+	controlRouterMu sync.Mutex
+
+	LE_MANAGER  letsencrypt.Manager
+	LE_FIRSTRUN bool
 
 	NodeID string
 
@@ -88,13 +94,31 @@ var (
 	}
 )
 
+func initGlobalEventsJSVM(spec *APISpec) {
+	globalEventsJSVMMu.Lock()
+	defer globalEventsJSVMMu.Unlock()
+	GlobalEventsJSVM.Init(spec)
+}
+
+func resetMainRouter() {
+	mainRouterMu.Lock()
+	defer mainRouterMu.Unlock()
+	mainRouter = mux.NewRouter()
+}
+
+func resetControlRouter() {
+	controlRouterMu.Lock()
+	defer controlRouterMu.Unlock()
+	controlRouter = mux.NewRouter()
+}
+
 func getApiSpec(apiID string) *APISpec {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
 	return apisByID[apiID]
 }
 
-func getApiSpecLen() int {
+func apiSpecsLen() int {
 	apisMu.Lock()
 	defer apisMu.Unlock()
 	return len(apisByID)
@@ -102,8 +126,8 @@ func getApiSpecLen() int {
 
 // Create all globals and init connection handlers
 func setupGlobals() {
-	mainRouter = mux.NewRouter()
-	controlRouter = mux.NewRouter()
+	resetMainRouter()
+	resetControlRouter()
 
 	if config.Global.EnableAnalytics && config.Global.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
@@ -141,7 +165,7 @@ func setupGlobals() {
 
 	// Set up global JSVM
 	if config.Global.EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
+		initGlobalEventsJSVM(nil)
 	}
 
 	if config.Global.CoProcessOptions.EnableCoProcess {
@@ -324,7 +348,10 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 }
 
 // Set up default Tyk control API endpoints - these are global, so need to be added first
-func loadAPIEndpoints(muxer *mux.Router) {
+func loadAPIEndpoints(muxer *mux.Router, muxerMu *sync.Mutex) {
+	muxerMu.Lock()
+	defer muxerMu.Unlock()
+
 	hostname := config.Global.HostName
 	if config.Global.ControlAPIHostname != "" {
 		hostname = config.Global.ControlAPIHostname
@@ -604,7 +631,7 @@ func doReload() {
 
 	// skip re-loading only if dashboard service reported 0 APIs
 	// and current registry had 0 APIs
-	if len(apiSpecs) == 0 && getApiSpecLen() == 0 {
+	if len(apiSpecs) == 0 && apiSpecsLen() == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
@@ -615,30 +642,30 @@ func doReload() {
 
 	// Reset the JSVM
 	if config.Global.EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
+		initGlobalEventsJSVM(nil)
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Preparing new router")
-	mainRouter = mux.NewRouter()
+	resetMainRouter()
 	if config.Global.HttpServerOptions.OverrideDefaults {
 		mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 	}
 
 	if config.Global.ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
+		loadAPIEndpoints(mainRouter, &mainRouterMu)
 	}
 
-	loadApps(apiSpecs, mainRouter)
+	loadApps(apiSpecs, mainRouter, &mainRouterMu)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("API reload complete")
 
 	// Unset these
-	rpcEmergencyModeLoaded = false
-	rpcEmergencyMode = false
+	atomic.StoreUint32(&rpcEmergencyModeLoaded, 0)
+	atomic.StoreUint32(&rpcEmergencyMode, 0)
 }
 
 // startReloadChan and reloadDoneChan are used by the two reload loops
@@ -1158,7 +1185,7 @@ func start(arguments map[string]interface{}) {
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 	if config.Global.ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
+		loadAPIEndpoints(mainRouter, &mainRouterMu)
 	}
 
 	// Start listening for reload messages
@@ -1300,15 +1327,15 @@ func listen(l, controlListener net.Listener, err error) {
 
 		startDRL()
 
-		if !rpcEmergencyMode {
+		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 			syncAPISpecs()
 			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter)
+				loadApps(apiSpecs, mainRouter, &mainRouterMu)
 				syncPolicies()
 			}
 
 			if config.Global.ControlAPIPort > 0 {
-				loadAPIEndpoints(controlRouter)
+				loadAPIEndpoints(controlRouter, &controlRouterMu)
 			}
 		}
 
@@ -1347,7 +1374,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 			go http.Serve(l, mainHandler{})
 
-			if !rpcEmergencyMode {
+			if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 				if controlListener != nil {
 					go http.Serve(controlListener, controlRouter)
 				}
@@ -1376,15 +1403,15 @@ func listen(l, controlListener net.Listener, err error) {
 		startDRL()
 
 		// Resume accepting connections in a new goroutine.
-		if !rpcEmergencyMode {
+		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 			syncAPISpecs()
 			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter)
+				loadApps(apiSpecs, mainRouter, &mainRouterMu)
 				syncPolicies()
 			}
 
 			if config.Global.ControlAPIPort > 0 {
-				loadAPIEndpoints(controlRouter)
+				loadAPIEndpoints(controlRouter, &controlRouterMu)
 			}
 
 			if config.Global.UseDBAppConfigs {
@@ -1425,7 +1452,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 			go http.Serve(l, mainHandler{})
 
-			if !rpcEmergencyMode {
+			if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 				if controlListener != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "main",

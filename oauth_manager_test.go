@@ -15,6 +15,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"sync"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -70,9 +72,9 @@ const oauthDefinition = `{
 	}
 }`
 
-func getOAuthChain(spec *APISpec, muxer *mux.Router) {
+func getOAuthChain(spec *APISpec, muxer *mux.Router, muxerMu *sync.Mutex) {
 	// Ensure all the correct ahndlers are in place
-	loadAPIEndpoints(muxer)
+	loadAPIEndpoints(muxer, muxerMu)
 	manager := addOAuthHandlers(spec, muxer)
 
 	// add a test client
@@ -120,7 +122,9 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 func TestAuthCodeRedirect(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/authorize/"
 
@@ -147,7 +151,9 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/authorize/"
 
@@ -174,7 +180,9 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/authorize/"
 
@@ -198,7 +206,9 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -223,7 +233,9 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 func TestAPIClientAuthorizeToken(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -248,7 +260,9 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -292,7 +306,9 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 func getAuthCode(t *testing.T) map[string]string {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -322,7 +338,9 @@ func getToken(t *testing.T) tokenData {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/token/"
 
@@ -346,7 +364,9 @@ func getToken(t *testing.T) tokenData {
 func TestOAuthClientCredsGrant(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/token/"
 
@@ -385,7 +405,9 @@ func TestClientAccessRequest(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/token/"
 
@@ -415,9 +437,11 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	tokenData := getToken(t)
 
 	spec := createSpecTest(t, oauthDefinition)
-	loadApps([]*APISpec{spec}, discardMuxer)
+	loadApps([]*APISpec{spec}, discardMuxer, &discardMuxerMu)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	// Step 2 - invalidate the refresh token
 
@@ -472,7 +496,9 @@ func TestClientRefreshRequest(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/token/"
 
@@ -502,7 +528,9 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	var testMuxerMu sync.Mutex
+
+	getOAuthChain(spec, testMuxer, &testMuxerMu)
 
 	uri := "/APIID/oauth/token/"
 

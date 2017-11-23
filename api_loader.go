@@ -11,6 +11,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"sync"
+	"sync/atomic"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -224,7 +227,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if spec.UseOauth2 {
 		log.Debug("Loading OAuth Manager")
-		if !rpcEmergencyMode {
+		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 			oauthManager := addOAuthHandlers(spec, subrouter)
 			log.Debug("-- Added OAuth Handlers")
 
@@ -519,7 +522,10 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec, muxer *mux.Router) {
+func loadApps(specs []*APISpec, muxer *mux.Router, muxerMu *sync.Mutex) {
+	muxerMu.Lock()
+	defer muxerMu.Unlock()
+
 	hostname := config.Global.HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
