@@ -200,8 +200,8 @@ func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
 // DispatchEvent dispatches a Tyk event.
 func (d *PythonDispatcher) DispatchEvent(eventJSON []byte) {
 	CEventJSON := C.CString(string(eventJSON))
+	defer C.free(unsafe.Pointer(CEventJSON))
 	C.Python_DispatchEvent(CEventJSON)
-	C.free(unsafe.Pointer(CEventJSON))
 }
 
 // Reload triggers a reload affecting CP middlewares and event handlers.
@@ -213,8 +213,11 @@ func (d *PythonDispatcher) Reload() {
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
 	go func() {
 		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
 		CBundlePath := C.CString(basePath)
+		defer func() {
+			C.free(unsafe.Pointer(CBundlePath))
+			runtime.UnlockOSThread()
+		}()
 		C.Python_HandleMiddlewareCache(CBundlePath)
 	}()
 }
@@ -240,27 +243,25 @@ func PythonLoadDispatcher() error {
 // PythonNewDispatcher creates an instance of TykDispatcher.
 func PythonNewDispatcher(middlewarePath, eventHandlerPath string, bundlePaths []string) (coprocess.Dispatcher, error) {
 	CMiddlewarePath := C.CString(middlewarePath)
+	defer C.free(unsafe.Pointer(CMiddlewarePath))
 	CEventHandlerPath := C.CString(eventHandlerPath)
+	defer C.free(unsafe.Pointer(CEventHandlerPath))
 	CBundlePaths := C.CString(strings.Join(bundlePaths, ":"))
+	defer C.free(unsafe.Pointer(CBundlePaths))
 
 	result := C.Python_NewDispatcher(CMiddlewarePath, CEventHandlerPath, CBundlePaths)
 	if result == -1 {
 		return nil, errors.New("can't initialize a dispatcher")
 	}
-
 	dispatcher := &PythonDispatcher{}
-
-	C.free(unsafe.Pointer(CMiddlewarePath))
-	C.free(unsafe.Pointer(CEventHandlerPath))
-
 	return dispatcher, nil
 }
 
 // PythonSetEnv sets PYTHONPATH, it's called before initializing the interpreter.
 func PythonSetEnv(pythonPaths ...string) {
 	CPythonPath := C.CString(strings.Join(pythonPaths, ":"))
+	defer C.free(unsafe.Pointer(CPythonPath))
 	C.Python_SetEnv(CPythonPath)
-	C.free(unsafe.Pointer(CPythonPath))
 }
 
 // getBundlePaths will return an array of the available bundle directories:
