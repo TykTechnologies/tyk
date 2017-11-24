@@ -350,8 +350,9 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	defer stopRPCMock(rpc)
 
 	syncAPISpecs()
-	if len(apiSpecs) != 0 {
-		t.Error("Should return empty value for malformed rpc response", apiSpecs)
+	apiSpecsTmp := getApiSpecs()
+	if len(apiSpecsTmp) != 0 {
+		t.Error("Should return empty value for malformed rpc response", apiSpecsTmp)
 	}
 }
 
@@ -369,8 +370,9 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	defer stopRPCMock(rpc)
 
 	syncAPISpecs()
-	if len(apiSpecs) != 1 {
-		t.Error("Should return array with one spec", apiSpecs)
+	apiSpecsTmp := getApiSpecs()
+	if len(apiSpecsTmp) != 1 {
+		t.Error("Should return array with one spec", apiSpecsTmp)
 	}
 }
 
