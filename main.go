@@ -196,7 +196,7 @@ func buildConnStr(resource string) string {
 	return config.Global.DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() {
+func syncAPISpecs() int {
 	loader := APIDefinitionLoader{}
 
 	apisMu.Lock()
@@ -235,6 +235,8 @@ func syncAPISpecs() {
 			apiSpecs[i].SessionProvider = config.Global.AuthOverride.SessionProvider
 		}
 	}
+
+	return len(apiSpecs)
 }
 
 func syncPolicies() {
@@ -596,9 +598,8 @@ func doReload() {
 	// Load the API Policies
 	syncPolicies()
 	// load the specs
-	syncAPISpecs()
-
-	if len(apiSpecs) == 0 {
+	count := syncAPISpecs()
+	if count == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
@@ -624,7 +625,7 @@ func doReload() {
 		loadAPIEndpoints(mainRouter)
 	}
 
-	loadApps(apiSpecs, mainRouter)
+	loadGlobalApps()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -1296,9 +1297,9 @@ func listen(l, controlListener net.Listener, err error) {
 		startDRL()
 
 		if !rpcEmergencyMode {
-			syncAPISpecs()
-			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter)
+			count := syncAPISpecs()
+			if count > 0 {
+				loadGlobalApps()
 				syncPolicies()
 			}
 
@@ -1372,9 +1373,9 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// Resume accepting connections in a new goroutine.
 		if !rpcEmergencyMode {
-			syncAPISpecs()
-			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter)
+			count := syncAPISpecs()
+			if count > 0 {
+				loadGlobalApps()
 				syncPolicies()
 			}
 
