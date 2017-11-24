@@ -176,6 +176,9 @@ func TestMain(m *testing.M) {
 			delete(policiesByID, "_")
 			policiesMu.Unlock()
 			apisMu.Lock()
+			old := apiSpecs
+			apiSpecs = append(apiSpecs, nil)
+			apiSpecs = old
 			apisByID["_"] = nil
 			delete(apisByID, "_")
 			apisMu.Unlock()

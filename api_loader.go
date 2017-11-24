@@ -518,6 +518,16 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 }
 
+func loadGlobalApps() {
+	// we need to make a full copy of the slice, as loadApps will
+	// use in-place to sort the apis.
+	apisMu.RLock()
+	specs := make([]*APISpec, len(apiSpecs))
+	copy(specs, apiSpecs)
+	apisMu.RUnlock()
+	loadApps(specs, mainRouter)
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec, muxer *mux.Router) {
 	hostname := config.Global.HostName
