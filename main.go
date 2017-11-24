@@ -125,9 +125,7 @@ func getApiSpecs() []*APISpec {
 		return nil
 	}
 	apiSpecsTmp := make([]*APISpec, len(apiSpecs))
-	for index, val := range apiSpecs {
-		apiSpecsTmp[index] = val
-	}
+	copy(apiSpecsTmp, apiSpecs)
 	return apiSpecsTmp
 }
 
