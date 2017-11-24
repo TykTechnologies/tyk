@@ -118,10 +118,29 @@ func getApiSpec(apiID string) *APISpec {
 	return apisByID[apiID]
 }
 
-func apiSpecsLen() int {
+func getApiSpecs() []*APISpec {
+	apisMu.RLock()
+	defer apisMu.RUnlock()
+	if apiSpecs == nil {
+		return nil
+	}
+	apiSpecsTmp := make([]*APISpec, len(apiSpecs))
+	for index, val := range apiSpecs {
+		apiSpecsTmp[index] = val
+	}
+	return apiSpecsTmp
+}
+
+func apisByIDLen() int {
 	apisMu.Lock()
 	defer apisMu.Unlock()
 	return len(apisByID)
+}
+
+func apiSpecsLen() int {
+	apisMu.Lock()
+	defer apisMu.Unlock()
+	return len(apiSpecs)
 }
 
 // Create all globals and init connection handlers
@@ -631,7 +650,7 @@ func doReload() {
 
 	// skip re-loading only if dashboard service reported 0 APIs
 	// and current registry had 0 APIs
-	if len(apiSpecs) == 0 && apiSpecsLen() == 0 {
+	if apiSpecsLen() == 0 && apisByIDLen() == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
@@ -657,7 +676,8 @@ func doReload() {
 		loadAPIEndpoints(mainRouter, &mainRouterMu)
 	}
 
-	loadApps(apiSpecs, mainRouter, &mainRouterMu)
+	currApiSpecs := getApiSpecs()
+	loadApps(currApiSpecs, mainRouter, &mainRouterMu)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -1329,8 +1349,9 @@ func listen(l, controlListener net.Listener, err error) {
 
 		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 			syncAPISpecs()
-			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter, &mainRouterMu)
+			currApiSpecs := getApiSpecs()
+			if currApiSpecs != nil {
+				loadApps(currApiSpecs, mainRouter, &mainRouterMu)
 				syncPolicies()
 			}
 
@@ -1405,8 +1426,9 @@ func listen(l, controlListener net.Listener, err error) {
 		// Resume accepting connections in a new goroutine.
 		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 			syncAPISpecs()
-			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter, &mainRouterMu)
+			currApiSpecs := getApiSpecs()
+			if currApiSpecs != nil {
+				loadApps(currApiSpecs, mainRouter, &mainRouterMu)
 				syncPolicies()
 			}
 
