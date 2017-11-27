@@ -6,13 +6,12 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-
-	"sync"
-	"sync/atomic"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -524,11 +523,8 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
-	apisMu.RLock()
-	specs := make([]*APISpec, len(apiSpecs))
-	copy(specs, apiSpecs)
-	apisMu.RUnlock()
-	loadApps(specs, mainRouter)
+	specs := getApiSpecs()
+	loadApps(specs, mainRouter, &mainRouterMu)
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware

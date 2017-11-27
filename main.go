@@ -648,7 +648,7 @@ func doReload() {
 	syncPolicies()
 	// load the specs
 	count := syncAPISpecs()
-  // skip re-loading only if dashboard service reported 0 APIs
+	// skip re-loading only if dashboard service reported 0 APIs
 	// and current registry had 0 APIs
 	if count == 0 && apisByIDLen() == 0 {
 		log.WithFields(logrus.Fields{

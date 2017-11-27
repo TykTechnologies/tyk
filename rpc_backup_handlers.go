@@ -103,7 +103,8 @@ func doLoadWithBackup(specs []*APISpec) {
 	loadAPIEndpoints(mainRouter, &mainRouterMu)
 
 	log.Warning("[RPC Backup] --> Loading APIs")
-	loadApps(specs, mainRouter, &mainRouterMu)
+	currSpecs := getApiSpecs()
+	loadApps(currSpecs, mainRouter, &mainRouterMu)
 	log.Warning("[RPC Backup] --> API Load Done")
 
 	newServeMux := http.NewServeMux()
