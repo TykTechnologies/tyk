@@ -191,8 +191,13 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 				log.Warning("Upstream cache action not found, not caching")
 				cacheThisRequest = false
 			}
-			// Do we override TTL?
-			ttl := reqVal.Header.Get(upstreamCacheTTLHeader)
+
+			cacheTTLHeader := upstreamCacheTTLHeader
+			if m.Spec.CacheOptions.CacheControlTTLHeader != "" {
+				cacheTTLHeader = m.Spec.CacheOptions.CacheControlTTLHeader
+			}
+
+			ttl := reqVal.Header.Get(cacheTTLHeader)
 			if ttl != "" {
 				log.Debug("TTL Set upstream")
 				cacheAsInt, err := strconv.Atoi(ttl)
@@ -215,8 +220,8 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			go m.CacheStore.SetKey(key, toStore, cacheTTL)
 
 		}
-		return nil, mwStatusRespond
 
+		return nil, mwStatusRespond
 	}
 
 	cachedData, timestamp, err := m.decodePayload(retBlob)
