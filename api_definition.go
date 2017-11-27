@@ -281,17 +281,17 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 
 	// Process
-	var apiSpecs []*APISpec
+	var specs []*APISpec
 	for _, def := range apiDefs {
 		spec := a.MakeSpec(def)
-		apiSpecs = append(apiSpecs, spec)
+		specs = append(specs, spec)
 	}
 
 	// Set the nonce
 	ServiceNonce = list.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
-	return apiSpecs
+	return specs
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -325,7 +325,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APIS
 		return nil
 	}
 
-	var apiSpecs []*APISpec
+	var specs []*APISpec
 	for _, def := range apiDefs {
 		def.DecodeFromDB()
 
@@ -340,10 +340,10 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APIS
 		}
 
 		spec := a.MakeSpec(def)
-		apiSpecs = append(apiSpecs, spec)
+		specs = append(specs, spec)
 	}
 
-	return apiSpecs
+	return specs
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition {
@@ -357,7 +357,7 @@ func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition 
 // FromDir will load APIDefinitions from a directory on the filesystem. Definitions need
 // to be the JSON representation of APIDefinition object
 func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
-	var apiSpecs []*APISpec
+	var specs []*APISpec
 	// Grab json files from directory
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
 	for _, path := range paths {
@@ -370,9 +370,9 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		def := a.ParseDefinition(f)
 		f.Close()
 		spec := a.MakeSpec(def)
-		apiSpecs = append(apiSpecs, spec)
+		specs = append(specs, spec)
 	}
-	return apiSpecs
+	return specs
 }
 
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]URLSpec, bool) {

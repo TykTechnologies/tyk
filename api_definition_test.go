@@ -349,10 +349,9 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	syncAPISpecs()
-	apiSpecsTmp := getApiSpecs()
-	if len(apiSpecsTmp) != 0 {
-		t.Error("Should return empty value for malformed rpc response", apiSpecsTmp)
+	count := syncAPISpecs()
+	if count != 0 {
+		t.Error("Should return empty value for malformed rpc response", apiSpecs)
 	}
 }
 
@@ -369,10 +368,9 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	syncAPISpecs()
-	apiSpecsTmp := getApiSpecs()
-	if len(apiSpecsTmp) != 1 {
-		t.Error("Should return array with one spec", apiSpecsTmp)
+	count := syncAPISpecs()
+	if count != 1 {
+		t.Error("Should return array with one spec", apiSpecs)
 	}
 }
 
@@ -416,11 +414,11 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 
 	// Wait for the reload to finish, then check it worked
 	wg.Wait()
-	apisMu.Lock()
+	apisMu.RLock()
 	if len(apisByID) != 1 {
 		t.Error("Should return array with one spec", apisByID)
 	}
-	apisMu.Unlock()
+	apisMu.RUnlock()
 }
 
 func TestRoundRobin(t *testing.T) {

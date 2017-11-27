@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	stdlog "log"
 	"log/syslog"
 	"net"
 	"net/http"
@@ -241,7 +242,7 @@ func buildConnStr(resource string) string {
 	return config.Global.DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() {
+func syncAPISpecs() int {
 	loader := APIDefinitionLoader{}
 
 	apisMu.Lock()
@@ -280,6 +281,8 @@ func syncAPISpecs() {
 			apiSpecs[i].SessionProvider = config.Global.AuthOverride.SessionProvider
 		}
 	}
+
+	return len(apiSpecs)
 }
 
 func syncPolicies() {
@@ -644,11 +647,10 @@ func doReload() {
 	// Load the API Policies
 	syncPolicies()
 	// load the specs
-	syncAPISpecs()
-
-	// skip re-loading only if dashboard service reported 0 APIs
+	count := syncAPISpecs()
+  // skip re-loading only if dashboard service reported 0 APIs
 	// and current registry had 0 APIs
-	if apiSpecsLen() == 0 && apisByIDLen() == 0 {
+	if count == 0 && apisByIDLen() == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
@@ -674,8 +676,7 @@ func doReload() {
 		loadAPIEndpoints(mainRouter, &mainRouterMu)
 	}
 
-	currApiSpecs := getApiSpecs()
-	loadApps(currApiSpecs, mainRouter, &mainRouterMu)
+	loadGlobalApps()
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
@@ -851,6 +852,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 		log.Level = logrus.ErrorLevel
 		log.Out = ioutil.Discard
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
+		stdlog.SetOutput(ioutil.Discard)
 	} else if arguments["--debug"] == true {
 		log.Level = logrus.DebugLevel
 		log.WithFields(logrus.Fields{
@@ -1346,10 +1348,9 @@ func listen(l, controlListener net.Listener, err error) {
 		startDRL()
 
 		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
-			syncAPISpecs()
-			currApiSpecs := getApiSpecs()
-			if currApiSpecs != nil {
-				loadApps(currApiSpecs, mainRouter, &mainRouterMu)
+			count := syncAPISpecs()
+			if count > 0 {
+				loadGlobalApps()
 				syncPolicies()
 			}
 
@@ -1423,10 +1424,9 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// Resume accepting connections in a new goroutine.
 		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
-			syncAPISpecs()
-			currApiSpecs := getApiSpecs()
-			if currApiSpecs != nil {
-				loadApps(currApiSpecs, mainRouter, &mainRouterMu)
+			count := syncAPISpecs()
+			if count > 0 {
+				loadGlobalApps()
 				syncPolicies()
 			}
 

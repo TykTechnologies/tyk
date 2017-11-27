@@ -102,8 +102,8 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 			return newConfig, nil
 		}
 
-		currApiSpecs := getApiSpecs()
-		for _, spec := range currApiSpecs {
+		apisMu.RLock()
+		for _, spec := range apiSpecs {
 			if spec.UseMutualTLSAuth && spec.Domain == hello.ServerName {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 				certIDs := append(spec.ClientCertificates, config.Global.Security.Certificates.API...)
@@ -111,6 +111,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 				break
 			}
 		}
+		apisMu.RUnlock()
 
 		return newConfig, nil
 	}
