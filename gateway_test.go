@@ -889,32 +889,6 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			}
 			resp.Body.Close()
 
-			t.Logf(
-				"testHttp [%d]%s%s %s Status %d, want %d, apiSpecsLen=%d apisByIDLen=%d",
-				ti,
-				tPrefix,
-				tc.method,
-				tc.path,
-				resp.StatusCode,
-				tc.code,
-				apiSpecsLen(),
-				apisByIDLen(),
-			)
-			currApiSpecs := getApiSpecs()
-			currApiByID := getApisByID()
-			t.Logf("testHttp [%d]%s%s %s apiSpecs:", ti, tPrefix, tc.method, tc.path)
-			for _, val := range currApiSpecs {
-				t.Logf("%v", *val)
-			}
-			t.Logf("testHttp [%d]%s%s %s apisByID:", ti, tPrefix, tc.method, tc.path)
-			for key, val := range currApiByID {
-				if val != nil {
-					t.Logf("key=%s val=%v", key, *val)
-				} else {
-					t.Logf("key=%s val=nil", key)
-				}
-			}
-
 			if resp.StatusCode != tc.code {
 				t.Errorf("[%d]%s%s %s Status %d, want %d", ti, tPrefix, tc.method, tc.path, resp.StatusCode, tc.code)
 			}
