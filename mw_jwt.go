@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	cache "github.com/pmylund/go-cache"
 
@@ -317,10 +316,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if rawJWT == "" {
 		// No header value, fail
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Info("Attempted access with malformed header, no JWT auth header found.")
+		logEntry := getLogEntryForRequest(r, "", nil)
+		logEntry.Info("Attempted access with malformed header, no JWT auth header found.")
 
 		log.Debug("Looked in: ", config.AuthHeaderName)
 		log.Debug("Raw data was: ", rawJWT)
@@ -385,16 +382,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// No, let's try one-to-one mapping
 		return k.processOneToOneTokenMap(r, token)
 	}
-	log.WithFields(logrus.Fields{
-		"path":   r.URL.Path,
-		"origin": requestIP(r),
-	}).Info("Attempted JWT access with non-existent key.")
+	logEntry := getLogEntryForRequest(r, "", nil)
+	logEntry.Info("Attempted JWT access with non-existent key.")
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Error("JWT validation error: ", err)
+		logEntry.Error("JWT validation error: ", err)
 	}
 
 	k.reportLoginFailure(tykId, r)

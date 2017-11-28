@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -30,20 +28,15 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// We're using OAuth, start checking for access keys
 	token := r.Header.Get("Authorization")
 	parts := strings.Split(token, " ")
+	logEntry := getLogEntryForRequest(r, "", nil)
 	if len(parts) < 2 {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Info("Attempted access with malformed header, no auth header found.")
+		logEntry.Info("Attempted access with malformed header, no auth header found.")
 
 		return errors.New("Authorization field missing"), 400
 	}
 
 	if strings.ToLower(parts[0]) != "bearer" {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Info("Bearer token malformed")
+		logEntry.Info("Bearer token malformed")
 
 		return errors.New("Bearer token malformed"), 400
 	}
@@ -52,11 +45,8 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken)
 
 	if !keyExists {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    accessToken,
-		}).Info("Attempted access with non-existent key.")
+		logEntry = getLogEntryForRequest(r, accessToken, nil)
+		logEntry.Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, accessToken)

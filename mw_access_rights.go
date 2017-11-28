@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"net/http"
-
-	"github.com/Sirupsen/logrus"
 )
 
 // AccessRightsCheck is a middleware that will check if the key bing used to access the API has
@@ -29,12 +27,14 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		// Otherwise, run auth checks
 		versionList, apiExists := session.AccessRights[a.Spec.APIID]
 		if !apiExists {
-			log.WithFields(logrus.Fields{
-				"path":      r.URL.Path,
-				"origin":    requestIP(r),
-				"key":       token,
-				"api_found": false,
-			}).Info("Attempted access to unauthorised API.")
+			logEntry := getLogEntryForRequest(
+				r,
+				token,
+				map[string]interface{}{
+					"api_found": false,
+				},
+			)
+			logEntry.Info("Attempted access to unauthorised API.")
 
 			return errors.New("Access to this API has been disallowed"), 403
 		}
@@ -55,13 +55,15 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 		if !found {
 			// Not found? Bounce
-			log.WithFields(logrus.Fields{
-				"path":          r.URL.Path,
-				"origin":        requestIP(r),
-				"key":           token,
-				"api_found":     true,
-				"version_found": false,
-			}).Info("Attempted access to unauthorised API version.")
+			logEntry := getLogEntryForRequest(
+				r,
+				token,
+				map[string]interface{}{
+					"api_found":     true,
+					"version_found": false,
+				},
+			)
+			logEntry.Info("Attempted access to unauthorised API version.")
 
 			return errors.New("Access to this API has been disallowed"), 403
 		}

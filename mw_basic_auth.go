@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -37,12 +36,10 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	token := r.Header.Get("Authorization")
+	logEntry := getLogEntryForRequest(r, token, nil)
 	if token == "" {
 		// No header value, fail
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Info("Attempted access with malformed header, no auth header found.")
+		logEntry.Info("Attempted access with malformed header, no auth header found.")
 
 		return k.requestForBasicAuth(w, "Authorization field missing")
 	}
@@ -50,10 +47,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	bits := strings.Split(token, " ")
 	if len(bits) != 2 {
 		// Header malformed
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Info("Attempted access with malformed header, header not in basic auth format.")
+		logEntry.Info("Attempted access with malformed header, header not in basic auth format.")
 
 		return errors.New("Attempted access with malformed header, header not in basic auth format"), 400
 	}
@@ -61,10 +55,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Decode the username:password string
 	authvaluesStr, err := base64.StdEncoding.DecodeString(bits[1])
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Info("Base64 Decoding failed of basic auth data: ", err)
+		logEntry.Info("Base64 Decoding failed of basic auth data: ", err)
 
 		return errors.New("Attempted access with malformed header, auth data not encoded correctly"), 400
 	}
@@ -72,23 +63,17 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	authValues := strings.Split(string(authvaluesStr), ":")
 	if len(authValues) != 2 {
 		// Header malformed
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-		}).Info("Attempted access with malformed header, values not in basic auth format.")
+		logEntry.Info("Attempted access with malformed header, values not in basic auth format.")
 
 		return errors.New("Attempted access with malformed header, values not in basic auth format"), 400
 	}
 
 	// Check if API key valid
 	keyName := k.Spec.OrgID + authValues[0]
+	logEntry = getLogEntryForRequest(r, keyName, nil)
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName)
 	if !keyExists {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    keyName,
-		}).Info("Attempted access with non-existent user.")
+		logEntry.Info("Attempted access with non-existent user.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, token)
@@ -114,11 +99,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	if !passMatch {
-		log.WithFields(logrus.Fields{
-			"path":   r.URL.Path,
-			"origin": requestIP(r),
-			"key":    keyName,
-		}).Info("Attempted access with existing user but failed password check.")
+		logEntry.Info("Attempted access with existing user but failed password check.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, token)
