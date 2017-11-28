@@ -21,12 +21,12 @@ import (
 )
 
 type InboundData struct {
-	KeyName string
-	Value   string
-	Session string
-	Timeout int64
-	Per     int64
-	Expire  int64
+	KeyName      string
+	Value        string
+	SessionState string
+	Timeout      int64
+	Per          int64
+	Expire       int64
 }
 
 type DefRequest struct {
