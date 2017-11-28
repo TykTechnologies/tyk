@@ -883,6 +883,18 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			}
 			resp.Body.Close()
 
+			t.Logf(
+				"testHttp [%d]%s%s %s Status %d, want %d, apiSpecsLen=%d apisByIDLen=%d",
+				ti,
+				tPrefix,
+				tc.method,
+				tc.path,
+				resp.StatusCode,
+				tc.code,
+				apiSpecsLen(),
+				apisByIDLen(),
+			)
+
 			if resp.StatusCode != tc.code {
 				t.Errorf("[%d]%s%s %s Status %d, want %d", ti, tPrefix, tc.method, tc.path, resp.StatusCode, tc.code)
 			}
