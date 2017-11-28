@@ -119,6 +119,16 @@ func getApiSpec(apiID string) *APISpec {
 	return apisByID[apiID]
 }
 
+func getApisByID() map[string]*APISpec {
+	apisMu.RLock()
+	defer apisMu.RUnlock()
+	apisByIDTmp := map[string]*APISpec{}
+	for key, val := range apisByID {
+		apisByIDTmp[key] = val
+	}
+	return apisByIDTmp
+}
+
 func getApiSpecs() []*APISpec {
 	apisMu.RLock()
 	defer apisMu.RUnlock()
@@ -648,9 +658,15 @@ func doReload() {
 	syncPolicies()
 	// load the specs
 	count := syncAPISpecs()
+	apisByIDCount := apisByIDLen()
 	// skip re-loading only if dashboard service reported 0 APIs
 	// and current registry had 0 APIs
-	if count == 0 && apisByIDLen() == 0 {
+	log.WithFields(logrus.Fields{
+		"prefix":        "main",
+		"apisCount":     count,
+		"apisByIDCount": apisByIDCount,
+	}).Info("API specs loaded, about to re-load...")
+	if count == 0 && apisByIDCount == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
