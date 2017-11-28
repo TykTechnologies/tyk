@@ -372,9 +372,9 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error {
 	start := time.Now() // get current time
 	ibd := InboundData{
-		KeyName: r.fixKey(keyName),
-		Session: session,
-		Timeout: timeout,
+		KeyName:      r.fixKey(keyName),
+		SessionState: session,
+		Timeout:      timeout,
 	}
 
 	_, err := RPCFuncClientSingleton.CallTimeout("SetKey", ibd, GlobalRPCCallTimeout)
