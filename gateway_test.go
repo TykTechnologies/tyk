@@ -831,6 +831,12 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			panic(err)
 		}
 
+		// reset globals to initial state
+		apisMu.Lock()
+		apiSpecs = []*APISpec{}
+		apisByID = map[string]*APISpec{}
+		apisMu.Unlock()
+
 		setupGlobals()
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
