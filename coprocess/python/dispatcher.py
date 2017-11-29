@@ -9,12 +9,13 @@ from tyk.event import TykEvent, TykEventHandler
 
 from gateway import TykGateway as tyk
 
+from importlib.machinery import SourceFileLoader
+
 class TykDispatcher:
     '''A simple dispatcher'''
 
     def __init__(self, middleware_path, event_handler_path, bundle_paths):
         tyk.log( "Initializing dispatcher", "info" )
-
         self.event_handler_path = path.join(event_handler_path, '*.py')
         self.event_handlers = {}
         self.load_event_handlers()
@@ -25,7 +26,6 @@ class TykDispatcher:
 
         self.middlewares = []
         self.hook_table = {}
-        self.load_middlewares()
 
     def get_modules(self, the_path):
         files = glob(the_path)
@@ -36,7 +36,7 @@ class TykDispatcher:
         found_middleware = None
         if len(self.middlewares) > 0:
             for middleware in self.middlewares:
-                if middleware.filepath == path and not found_middleware:
+                if middleware.module_path == path and not found_middleware:
                     found_middleware = middleware
                     break
         return found_middleware
@@ -46,14 +46,16 @@ class TykDispatcher:
         bundle_modules = self.get_modules(bundle_path)
         sys.path.append(base_bundle_path)
         for module_name in bundle_modules:
+            module_filename = "{0}.py".format(module_name)
+            module_path = path.join(base_bundle_path, module_filename)
             middleware = self.find_middleware(module_name)
             if middleware:
                 middleware.reload()
             else:
-                middleware = TykMiddleware(module_name)
+                middleware = TykMiddleware(module_path, module_name)
                 self.middlewares.append(middleware)
-        self.update_hook_table()
 
+        self.update_hook_table()
 
     def load_middlewares(self):
         tyk.log( "Loading middlewares.", "debug" )
@@ -142,8 +144,6 @@ class TykDispatcher:
 
     def reload(self):
         tyk.log( "Reloading event handlers and middlewares.", "info" )
-
         self.purge_event_handlers()
         self.load_event_handlers()
-
         self.load_middlewares()
