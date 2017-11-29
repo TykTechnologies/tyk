@@ -157,16 +157,19 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	return []byte(session.JWTData.Secret), nil
 }
 
+func (k *JWTMiddleware) getPolicyIDFromToken(token *jwt.Token) (string, bool) {
+	policyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.Spec.JWTPolicyFieldName].(string)
+	if !foundPolicy {
+		log.Error("Could not identify a policy to apply to this token from field!")
+		return "", false
+	}
+
+	return policyID, true
+}
+
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 	if k.Spec.JWTPolicyFieldName != "" {
-		basePolicyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.Spec.JWTPolicyFieldName].(string)
-		if !foundPolicy {
-			log.Error("Could not identify a policy to apply to this token from field!")
-			return "", false
-		}
-
-		return basePolicyID, true
-
+		return k.getPolicyIDFromToken(token)
 	} else if k.Spec.JWTClientIDBaseField != "" {
 		clientID, clientIDFound := token.Claims.(jwt.MapClaims)[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
@@ -224,6 +227,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy := k.getBasePolicyID(token)
 		if !foundPolicy {
+			k.reportLoginFailure(baseFieldData, r)
 			return errors.New("Key not authorized: no matching policy found"), 403
 		}
 
@@ -252,6 +256,25 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		k.reportLoginFailure(baseFieldData, r)
 		log.Error("Could not find a valid policy to apply to this token!")
 		return errors.New("Key not authorized: no matching policy"), 403
+	} else if k.Spec.JWTPolicyFieldName != "" {
+		// extract policy ID from JWT token
+		policyID, foundPolicy := k.getPolicyIDFromToken(token)
+		if !foundPolicy {
+			k.reportLoginFailure(baseFieldData, r)
+			return errors.New("Key not authorized: no matching policy found"), 403
+		}
+		// check if policy in session is the same as policy set in the given token
+		pols := session.PolicyIDs()
+		if len(pols) < 1 {
+			k.reportLoginFailure(baseFieldData, r)
+			log.Error("No policies for the found session. Failing Request.")
+			return errors.New("Key not authorized: no matching policy found"), 403
+		}
+		if pols[0] != policyID {
+			k.reportLoginFailure(baseFieldData, r)
+			log.Error("Policy ID found in active session is not the same as policy in token!")
+			return errors.New("Key not authorized: no matching policy"), 403
+		}
 	}
 
 	log.Debug("Key found")
