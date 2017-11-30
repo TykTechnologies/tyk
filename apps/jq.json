@@ -31,8 +31,8 @@
 			{
 			    "path": "/post",
 			    "method": "POST",
-			    "add_headers": {"X-added-by-transform_headers": "$tyk_context.jq_output_var_deviceid",
-					    "X-M2M-Origin": "$tyk_context.jq_output_var_m2m_origin"}
+			    "add_headers": {"X-added-by-transform_headers": "$tyk_context.deviceid",
+					    "X-M2M-Origin": "$tyk_context.m2m_origin"}
 			}
 		    ],
 		    "transform_jq_response": [{
