@@ -865,7 +865,7 @@ func initialiseSystem(arguments map[string]interface{}) error {
 	setupLogger()
 
 	if config.Global.PIDFileLocation == "" {
-		config.Global.PIDFileLocation = "/var/run/tyk-gateway.pid"
+		config.Global.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 	}
 
 	log.WithFields(logrus.Fields{

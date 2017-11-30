@@ -12,7 +12,7 @@
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: 
-# Description:       no description given
+# Description:       Tyk API Gateway (Python)
 ### END INIT INFO
 
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
@@ -21,7 +21,7 @@ export PATH
 name=tyk-gateway-python
 program=/opt/tyk-gateway/tyk-python
 args='--conf=/opt/tyk-gateway/tyk.conf'
-pidfile="/var/run/$name.pid"
+pidfile="/var/run/tyk/tyk-gateway.pid"
 
 [ -r /etc/default/$name ] && . /etc/default/$name
 [ -r /etc/sysconfig/$name ] && . /etc/sysconfig/$name
