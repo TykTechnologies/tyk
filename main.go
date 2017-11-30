@@ -115,6 +115,12 @@ func getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
+func apisByIDLen() int {
+	apisMu.RLock()
+	defer apisMu.RUnlock()
+	return len(apisByID)
+}
+
 // Create all globals and init connection handlers
 func setupGlobals() {
 	mainRouter = mux.NewRouter()
@@ -618,7 +624,9 @@ func doReload() {
 	syncPolicies()
 	// load the specs
 	count := syncAPISpecs()
-	if count == 0 {
+	// skip re-loading only if dashboard service reported 0 APIs
+	// and current registry had 0 APIs
+	if count == 0 && apisByIDLen() == 0 {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("No API Definitions found, not reloading")
