@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -59,11 +60,14 @@ const (
 )
 
 type testHttpResponse struct {
+	ID      int // unique id, increasing (to detect caching, etc)
 	Method  string
 	Url     string
 	Headers map[string]string
 	Form    map[string]string
 }
+
+var testHttpResponseID uint32
 
 func testHttpHandler() http.Handler {
 	httpError := func(w http.ResponseWriter, status int) {
@@ -74,7 +78,9 @@ func testHttpHandler() http.Handler {
 			httpError(w, http.StatusInternalServerError)
 			return
 		}
+		respID := atomic.AddUint32(&testHttpResponseID, 1)
 		err := json.NewEncoder(w).Encode(testHttpResponse{
+			ID:      int(respID),
 			Method:  r.Method,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
@@ -750,7 +756,6 @@ func TestWithAnalytics(t *testing.T) {
 	if len(results) < 1 {
 		t.Error("Not enough results! Should be 1, is: ", len(results))
 	}
-
 }
 
 func TestWithAnalyticsErrorResponse(t *testing.T) {
@@ -1212,4 +1217,59 @@ func TestCustomDomain(t *testing.T) {
 				spec.Domain = ""
 			})
 	})
+}
+
+func TestWithCacheAllSafeRequests(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseURL := "http://" + ln.Addr().String()
+	listen(ln, nil, nil)
+
+	defer ln.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:         120,
+			EnableCache:          true,
+			CacheAllSafeRequests: true,
+		}
+		spec.Proxy.ListenPath = "/"
+	})
+	tests := []struct {
+		method, path string
+		wantCached   bool
+	}{
+		{"GET", "/", false}, // the first one caches
+		{"GET", "/", true},
+		{"POST", "/", false},
+		{"POST", "/", false}, // never cached
+		{"GET", "/", true},   // still cached after the POST
+	}
+	highestID := -1
+	for _, tc := range tests {
+		req, err := http.NewRequest(tc.method, baseURL+tc.path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var testResp testHttpResponse
+		if err := json.NewDecoder(resp.Body).Decode(&testResp); err != nil {
+			t.Fatal(err)
+		}
+		cached := testResp.ID <= highestID
+		if cached && !tc.wantCached {
+			t.Fatalf("wanted %s %s to not cache, but it did", tc.method, tc.path)
+		} else if !cached && tc.wantCached {
+			t.Fatalf("wanted %s %s to cache, but it didn't", tc.method, tc.path)
+		}
+		if testResp.ID > highestID {
+			highestID = testResp.ID
+		}
+	}
 }
