@@ -37,15 +37,7 @@ func (m *RedisCacheMiddleware) Init() {
 }
 
 func (m *RedisCacheMiddleware) EnabledForSpec() bool {
-	if !m.Spec.CacheOptions.EnableCache {
-		return false
-	}
-	for _, version := range m.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.Cached) > 0 {
-			return true
-		}
-	}
-	return false
+	return m.Spec.CacheOptions.EnableCache
 }
 
 func (m *RedisCacheMiddleware) CreateCheckSum(req *http.Request, keyName string) string {
