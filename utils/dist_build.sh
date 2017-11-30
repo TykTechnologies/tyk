@@ -4,9 +4,10 @@
 : ${SIGNKEY:="729EA673"}
 : ${BUILDPKGS:="1"}
 BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
+BUILDDIR=$SOURCEBINPATH/build
 
 echo "Set version number"
-export VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)
+: ${VERSION:=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)}
 
 if [ $BUILDPKGS == "1" ]; then
     echo "Importing signing key"
@@ -20,9 +21,9 @@ export CLIBIN=tyk-cli
 
 declare -A ARCHTGZDIRS
 ARCHTGZDIRS=(
-    [i386]=$SOURCEBINPATH/build/i386/tgz/tyk.linux.i386-$VERSION
-    [amd64]=$SOURCEBINPATH/build/amd64/tgz/tyk.linux.amd64-$VERSION
-    [arm64]=$SOURCEBINPATH/build/arm/tgz/tyk.linux.arm64-$VERSION
+    [i386]=$BUILDDIR/i386/tgz/tyk.linux.i386-$VERSION
+    [amd64]=$BUILDDIR/amd64/tgz/tyk.linux.amd64-$VERSION
+    [arm64]=$BUILDDIR/arm/tgz/tyk.linux.arm64-$VERSION
 )
 
 cliDIR=$ORGDIR/tyk-cli
@@ -84,7 +85,6 @@ cp $SOURCEBINPATH/templates/*.json $TEMPLATEDIR/templates
 cp -R $SOURCEBINPATH/install/* $TEMPLATEDIR/install
 cp $SOURCEBINPATH/middleware/*.js $TEMPLATEDIR/middleware
 cp $SOURCEBINPATH/event_handlers/sample/*.js $TEMPLATEDIR/event_handlers/sample
-cp $SOURCEBINPATH/js/*.js $TEMPLATEDIR/js
 cp $SOURCEBINPATH/policies/*.json $TEMPLATEDIR/policies
 cp $SOURCEBINPATH/tyk.conf.example $TEMPLATEDIR/
 cp $SOURCEBINPATH/tyk.conf.example $TEMPLATEDIR/tyk.conf
@@ -128,22 +128,29 @@ FPMCOMMON=(
     -m "<info@tyk.io>"
     --url "https://tyk.io"
     -s dir
+    --before-install $TEMPLATEDIR/install/before_install.sh
+    --after-install $TEMPLATEDIR/install/post_install.sh
+    --after-remove $TEMPLATEDIR/install/post_remove.sh
 )
+FPMRPM=(
+    --before-upgrade $TEMPLATEDIR/install/post_remove.sh
+    --after-upgrade $TEMPLATEDIR/install/post_install.sh
+)
+
+cd $BUILDDIR
+echo "Removing old packages"
+rm -f *.deb
+rm -f *.rpm
 
 for arch in ${!ARCHTGZDIRS[@]}
 do
     archDir=${ARCHTGZDIRS[$arch]}
-    cd $archDir/
-    echo "Removing old $arch packages"
-    rm -f *.deb
-    rm -f *.rpm
-
     echo "Creating DEB Package for $arch"
-    fpm "${FPMCOMMON[@]}" --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+    fpm "${FPMCOMMON[@]}" -C $archDir -a $arch -t deb "${CONFIGFILES[@]}" --deb-user tyk --deb-group tyk ./=/opt/tyk-gateway
     echo "Creating RPM Package for $arch"
-    fpm "${FPMCOMMON[@]}" -x **/*.deb --after-install $archDir/install/post_install.sh --after-remove $archDir/install/post_remove.sh -a $arch -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
+    fpm "${FPMCOMMON[@]}" "${FPMRPM[@]}" -C $archDir -a $arch -t rpm "${CONFIGFILES[@]}" --rpm-user tyk --rpm-group tyk ./=/opt/tyk-gateway
 
     rpmName="tyk-gateway-$VERSION-1.${arch/amd64/x86_64}.rpm"
     echo "Signing $arch RPM"
-    $BUILDTOOLSDIR/rpm-sign.exp $archDir/$rpmName
+    $BUILDTOOLSDIR/rpm-sign.exp $rpmName
 done
