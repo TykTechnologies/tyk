@@ -36,9 +36,9 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		return err
 	}
 	jqObj := map[string]interface{}{
-		"body":       bodyObj,
-		"reqContext": ctxGetData(req),
-		"resHeaders": res.Header,
+		"body":             bodyObj,
+		"_tyk_context":     ctxGetData(req),
+		"response_headers": res.Header,
 	}
 
 	jq_result, err := lockedJQTransform(t, jqObj)
@@ -54,7 +54,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 	res.Body = ioutil.NopCloser(bodyBuffer)
 
 	// Replace header in the response
-	for hName, hValue := range jq_result.OutputHeaders {
+	for hName, hValue := range jq_result.RewriteHeaders {
 		res.Header.Set(hName, hValue)
 	}
 

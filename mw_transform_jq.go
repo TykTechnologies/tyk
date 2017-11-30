@@ -14,9 +14,9 @@ type TransformJQMiddleware struct {
 }
 
 type JQResult struct {
-	Body          interface{}            `mapstructure:"body"`
-	OutputHeaders map[string]string      `mapstructure:"output_headers"`
-	OutputVars    map[string]interface{} `mapstructure:"output_vars"`
+	Body           interface{}            `mapstructure:"body"`
+	RewriteHeaders map[string]string      `mapstructure:"rewrite_headers"`
+	TykContext     map[string]interface{} `mapstructure:"tyk_context"`
 }
 
 func (t *TransformJQMiddleware) Name() string {
@@ -63,8 +63,8 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 	}
 
 	jqObj := map[string]interface{}{
-		"body":       bodyObj,
-		"reqContext": ctxGetData(r),
+		"body":         bodyObj,
+		"_tyk_context": ctxGetData(r),
 	}
 
 	jq_result, err := lockedJQTransform(t, jqObj)
@@ -78,15 +78,15 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 	r.ContentLength = int64(bodyBuffer.Len())
 
 	// Replace header in the request
-	for hName, hValue := range jq_result.OutputHeaders {
+	for hName, hValue := range jq_result.RewriteHeaders {
 		r.Header.Set(hName, hValue)
 	}
 
 	if contextVars {
 		// Set variables in context vars
 		contextDataObject := ctxGetData(r)
-		for k, v := range jq_result.OutputVars {
-			contextDataObject["jq_output_var_"+k] = v
+		for k, v := range jq_result.TykContext {
+			contextDataObject[k] = v
 		}
 		ctxSetData(r, contextDataObject)
 	}
@@ -104,19 +104,19 @@ func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResu
 	// The filter MUST return the following JSON object
 	//  {
 	//    "body": THE_TRANSFORMED_BODY,
-	//    "output_headers": {"header1_name": "header1_value", ...},
-	//    "output_vars": {"var1_name": "var1_value", ...}
+	//    "rewrite_headers": {"header1_name": "header1_value", ...},
+	//    "tyk_context": {"var1_name": "var1_value", ...}
 	//  }
 
 	var jq_result JQResult
 	values, ok := value.(map[string]interface{})
 	if !ok {
-		return JQResult{}, errors.New("Invalid JSON object returned by JQ filter. Allowed field are 'body', 'output_vars' and 'output_headers'")
+		return JQResult{}, errors.New("Invalid JSON object returned by JQ filter. Allowed field are 'body', 'rewrite_headers' and 'tyk_context'")
 	}
 
 	jq_result.Body = values["body"]
-	jq_result.OutputHeaders, _ = values["output_headers"].(map[string]string)
-	jq_result.OutputVars, _ = values["output_vars"].(map[string]interface{})
+	jq_result.RewriteHeaders, _ = values["rewrite_headers"].(map[string]string)
+	jq_result.TykContext, _ = values["tyk_context"].(map[string]interface{})
 
 	return jq_result, nil
 }
