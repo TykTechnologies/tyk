@@ -110,10 +110,19 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			var wireFormatReq bytes.Buffer
 			requestCopy.Write(&wireFormatReq)
 			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
-			// Get the wire format representation
-			var wireFormatRes bytes.Buffer
-			responseCopy.Write(&wireFormatRes)
-			rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+			// responseCopy, unlike requestCopy, can be nil
+			// here - if the response was cached in
+			// mw_redis_cache, RecordHit gets passed a nil
+			// response copy.
+			// TODO: pass a copy of the cached response in
+			// mw_redis_cache instead? is there a reason not
+			// to include that in the analytics?
+			if responseCopy != nil {
+				// Get the wire format representation
+				var wireFormatRes bytes.Buffer
+				responseCopy.Write(&wireFormatRes)
+				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+			}
 		}
 
 		trackEP := false
