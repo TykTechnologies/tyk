@@ -40,7 +40,7 @@ const apiTestDef = `{
 
 func loadSampleAPI(t *testing.T, def string) {
 	spec := createSpecTest(t, def)
-	loadApps([]*APISpec{spec}, discardMuxer)
+	loadApps([]*APISpec{spec}, discardMuxer, &discardMuxerMu)
 }
 
 type testAPIDefinition struct {
@@ -161,7 +161,7 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
-	loadApps(specs(), discardMuxer)
+	loadApps(specs(), discardMuxer, &discardMuxerMu)
 
 	s2 = getApiSpec("2")
 	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
@@ -177,9 +177,9 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
-	loadApps(specs()[1:], discardMuxer)
-	loadApps(specs(), discardMuxer)
-	loadApps(specs(), discardMuxer)
+	loadApps(specs()[1:], discardMuxer, &discardMuxerMu)
+	loadApps(specs(), discardMuxer, &discardMuxerMu)
+	loadApps(specs(), discardMuxer, &discardMuxerMu)
 
 	s2 = getApiSpec("2")
 	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
@@ -195,8 +195,8 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 	apisMu.Lock()
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
-	loadApps(specs(), discardMuxer)
-	loadApps(specs(), discardMuxer)
+	loadApps(specs(), discardMuxer, &discardMuxerMu)
+	loadApps(specs(), discardMuxer, &discardMuxerMu)
 
 	s2 = getApiSpec("2")
 	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
@@ -670,8 +670,9 @@ func BenchmarkApiReload(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		newMuxes := mux.NewRouter()
-		loadAPIEndpoints(newMuxes)
-		loadApps(specs, newMuxes)
+		var newMuxesMu sync.Mutex
+		loadAPIEndpoints(newMuxes, &newMuxesMu)
+		loadApps(specs, newMuxes, &newMuxesMu)
 	}
 }
 
@@ -746,7 +747,8 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 	apisMu.Unlock()
 
 	mu := mux.NewRouter()
-	loadApps(specs, mu)
+	var muMutex sync.Mutex
+	loadApps(specs, mu, &muMutex)
 
 	for hp := range inputs {
 		rec := httptest.NewRecorder()

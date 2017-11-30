@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
@@ -224,7 +226,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if spec.UseOauth2 {
 		log.Debug("Loading OAuth Manager")
-		if !rpcEmergencyMode {
+		if atomic.LoadUint32(&rpcEmergencyMode) == 0 {
 			oauthManager := addOAuthHandlers(spec, subrouter)
 			log.Debug("-- Added OAuth Handlers")
 
@@ -521,15 +523,15 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func loadGlobalApps() {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
-	apisMu.RLock()
-	specs := make([]*APISpec, len(apiSpecs))
-	copy(specs, apiSpecs)
-	apisMu.RUnlock()
-	loadApps(specs, mainRouter)
+	specs := getApiSpecs()
+	loadApps(specs, mainRouter, &mainRouterMu)
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
-func loadApps(specs []*APISpec, muxer *mux.Router) {
+func loadApps(specs []*APISpec, muxer *mux.Router, muxerMu *sync.Mutex) {
+	muxerMu.Lock()
+	defer muxerMu.Unlock()
+
 	hostname := config.Global.HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()

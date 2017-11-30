@@ -23,6 +23,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"sync"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -35,7 +37,8 @@ func init() {
 
 var (
 	// to register to, but never used
-	discardMuxer = mux.NewRouter()
+	discardMuxer   = mux.NewRouter()
+	discardMuxerMu sync.Mutex
 
 	// to simulate time ticks for tests that do reloads
 	reloadTick = make(chan time.Time)
@@ -164,7 +167,7 @@ func TestMain(m *testing.M) {
 	afterConfSetup(&config.Global)
 	initialiseSystem()
 	// Small part of start()
-	loadAPIEndpoints(mainRouter)
+	loadAPIEndpoints(mainRouter, &mainRouterMu)
 	if analytics.GeoIPDB == nil {
 		panic("GeoIPDB was not initialized")
 	}
@@ -833,11 +836,17 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			panic(err)
 		}
 
+		// reset globals to initial state
+		apisMu.Lock()
+		apiSpecs = []*APISpec{}
+		apisByID = map[string]*APISpec{}
+		apisMu.Unlock()
+
 		setupGlobals()
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
 		if config.Global.ControlAPIPort == 0 {
-			loadAPIEndpoints(mainRouter)
+			loadAPIEndpoints(mainRouter, &mainRouterMu)
 		}
 
 		if m.goagain {

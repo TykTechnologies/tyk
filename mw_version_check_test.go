@@ -7,7 +7,7 @@ import (
 
 func TestVersionMwExpiresHeader(t *testing.T) {
 	spec := createSpecTest(t, nonExpiringDef)
-	loadApps([]*APISpec{spec}, discardMuxer)
+	loadApps([]*APISpec{spec}, discardMuxer, &discardMuxerMu)
 
 	session := createNonThrottledSession()
 	spec.SessionManager.UpdateSession("1234xyz", session, 60)

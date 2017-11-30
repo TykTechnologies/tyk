@@ -310,7 +310,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 
 	//store.Disconnect()
 
-	if rpcLoadCount > 0 {
+	if atomic.LoadUint32(&rpcLoadCount) > 0 {
 		saveRPCDefinitionsBackup(apiCollection)
 	}
 

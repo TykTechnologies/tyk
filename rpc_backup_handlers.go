@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+
+	"sync/atomic"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -92,19 +92,19 @@ func doLoadWithBackup(specs []*APISpec) {
 	}
 
 	// Reset the JSVM
-	GlobalEventsJSVM.Init(nil)
+	initGlobalEventsJSVM(nil)
 	log.Warning("[RPC Backup] --> Initialised JSVM")
 
-	newRouter := mux.NewRouter()
-	mainRouter = newRouter
+	resetMainRouter()
 
 	log.Warning("[RPC Backup] --> Set up routers")
 	log.Warning("[RPC Backup] --> Loading endpoints")
 
-	loadAPIEndpoints(newRouter)
+	loadAPIEndpoints(mainRouter, &mainRouterMu)
 
 	log.Warning("[RPC Backup] --> Loading APIs")
-	loadApps(specs, newRouter)
+	currSpecs := getApiSpecs()
+	loadApps(currSpecs, mainRouter, &mainRouterMu)
 	log.Warning("[RPC Backup] --> API Load Done")
 
 	newServeMux := http.NewServeMux()
@@ -118,7 +118,7 @@ func doLoadWithBackup(specs []*APISpec) {
 	}).Info("API backup load complete")
 
 	log.Warning("[RPC Backup] --> Ready to listen")
-	rpcEmergencyModeLoaded = true
+	atomic.StoreUint32(&rpcEmergencyModeLoaded, 1)
 
 	l, err := generateListener(0)
 	if err != nil {

@@ -17,6 +17,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 
+	"sync/atomic"
+
 	"github.com/Sirupsen/logrus"
 )
 
@@ -51,9 +53,9 @@ type GroupKeySpaceRequest struct {
 
 var (
 	// rpcLoadCount is a counter to check if this is a cold boot
-	rpcLoadCount           int
-	rpcEmergencyMode       bool
-	rpcEmergencyModeLoaded bool
+	rpcLoadCount           uint32
+	rpcEmergencyMode       uint32
+	rpcEmergencyModeLoaded uint32
 
 	GlobalRPCCallTimeout time.Duration
 	GlobalRPCPingTimeout time.Duration
@@ -237,12 +239,12 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 func (r *RPCStorageHandler) ReAttemptLogin(err error) {
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
 
-	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
+	if atomic.LoadUint32(&rpcLoadCount) == 0 && atomic.LoadUint32(&rpcEmergencyModeLoaded) == 0 {
 		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
 		apiList := LoadDefinitionsFromRPCBackup()
 		log.Warning("[RPC Store] --> Done")
 		if apiList != nil {
-			rpcEmergencyMode = true
+			atomic.StoreUint32(&rpcEmergencyMode, 1)
 			log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
 			doLoadWithBackup(apiList)
 		}
@@ -276,7 +278,7 @@ func (r *RPCStorageHandler) GroupLogin() {
 		return
 	}
 	log.Debug("[RPC Store] Group Login complete")
-	rpcLoadCount++
+	atomic.AddUint32(&rpcLoadCount, 1)
 }
 
 func (r *RPCStorageHandler) Login() {
@@ -305,7 +307,7 @@ func (r *RPCStorageHandler) Login() {
 		return
 	}
 	log.Debug("[RPC Store] Login complete")
-	rpcLoadCount++
+	atomic.AddUint32(&rpcLoadCount, 1)
 }
 
 // GetKey will retrieve a key from the database

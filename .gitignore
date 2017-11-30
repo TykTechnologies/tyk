@@ -64,3 +64,4 @@ session_state_gen_test.go
 __pycache__/
 
 tyk_linux_*
+*.cov
