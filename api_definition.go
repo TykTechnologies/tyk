@@ -1032,8 +1032,13 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 			}
 		} else {
 			// Extract Version Info
+			// First checking for if default version is set
 			vname := a.getVersionFromRequest(r)
-			if vname == "" {
+			if vname == "" && a.VersionData.DefaultVersion != "" {
+				vname = a.VersionData.DefaultVersion
+				ctxSetDefaultVersion(r)
+			}
+			if vname == "" && a.VersionData.DefaultVersion == "" {
 				return &version, nil, false, VersionNotFound
 			}
 			// Load Version Data - General
@@ -1045,6 +1050,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 
 		// cache for the future
 		ctxSetVersionInfo(r, &version)
+
 	}
 
 	// Load path data and whitelist data for version

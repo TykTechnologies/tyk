@@ -1479,3 +1479,10 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	}
 	return ""
 }
+func ctxGetDefaultVersion(r *http.Request) bool {
+	return r.Context().Value(VersionDefault) != nil
+}
+
+func ctxSetDefaultVersion(r *http.Request) {
+	setCtxValue(r, VersionDefault, true)
+}

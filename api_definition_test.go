@@ -377,3 +377,34 @@ func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, 
 func (ln *customListener) Close() error {
 	return ln.L.Close()
 }
+
+func TestDefaultVersion(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		v1 := apidef.VersionInfo{Name: "v1"}
+		v1.Name = "v1"
+		v1.Paths.WhiteList = []string{"/foo"}
+
+		v2 := apidef.VersionInfo{Name: "v2"}
+		v2.Paths.WhiteList = []string{"/bar"}
+
+		spec.VersionDefinition.Location = "url-param"
+		spec.VersionDefinition.Key = "v"
+		spec.VersionData.NotVersioned = false
+
+		spec.VersionData.Versions["v1"] = v1
+		spec.VersionData.Versions["v2"] = v2
+		spec.VersionData.DefaultVersion = "v2"
+		spec.Proxy.ListenPath = "/"
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/foo", Code: 403},      // Not whitelisted for default v2
+		{Path: "/bar", Code: 200},      // Whitelisted for default v2
+		{Path: "/foo?v=v1", Code: 200}, // Allowed for v1
+		{Path: "/bar?v=v1", Code: 403}, // Not allowed for v1
+	}...)
+
+}
