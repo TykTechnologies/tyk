@@ -2,12 +2,10 @@ package main
 
 import (
 	"encoding/base64"
-	"io/ioutil"
-	"net/http"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 const virtTestJS = `
@@ -25,15 +23,8 @@ function testVirtData(request, session, config) {
 `
 
 func TestVirtualEndpoint(t *testing.T) {
-	config.Global.ListenAddress = "127.0.0.1"
-
-	ln, _ := generateListener(0)
-	baseURL := "http://" + ln.Addr().String()
-	listen(ln, nil, nil)
-	defer func() {
-		config.Global.ListenAddress = ""
-		ln.Close()
-	}()
+	ts := newTykTestServer()
+	defer ts.Close()
 
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -66,25 +57,13 @@ func TestVirtualEndpoint(t *testing.T) {
 		}
 	})
 
-	resp, err := http.Get(baseURL + "/virt")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if want := 202; resp.StatusCode != 202 {
-		t.Fatalf("wanted code to be %d, got %d", want, resp.StatusCode)
-	}
-
-	wantBody := "foobar"
-	gotBody, _ := ioutil.ReadAll(resp.Body)
-
-	if wantBody != string(gotBody) {
-		t.Fatalf("wanted body to be %q, got %q", wantBody, string(gotBody))
-	}
-	if want, got := "x", resp.Header.Get("data-foo"); got != want {
-		t.Fatalf("wanted header to be %q, got %q", want, got)
-	}
-	if want, got := "3", resp.Header.Get("data-bar-y"); got != want {
-		t.Fatalf("wanted header to be %q, got %q", want, got)
-	}
+	ts.Run(t, test.TestCase{
+		Path:      "/virt",
+		Code:      202,
+		BodyMatch: "foobar",
+		HeadersMatch: map[string]string{
+			"data-foo":   "x",
+			"data-bar-y": "3",
+		},
+	})
 }

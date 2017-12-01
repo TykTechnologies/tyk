@@ -20,7 +20,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/justinas/alice"
+	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -196,242 +196,6 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	})
 }
 
-func getChain(spec *APISpec) http.Handler {
-	remote, err := url.Parse(spec.Proxy.TargetURL)
-	if err != nil {
-		panic(err)
-	}
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	proxyHandler := ProxyHandler(proxy, spec)
-	creeateResponseMiddlewareChain(spec)
-	baseMid := BaseMiddleware{spec, proxy}
-	chain := alice.New(mwList(
-		&IPWhiteListMiddleware{baseMid},
-		&MiddlewareContextVars{BaseMiddleware: baseMid},
-		&AuthKey{baseMid},
-		&VersionCheck{BaseMiddleware: baseMid},
-		&KeyExpired{baseMid},
-		&AccessRightsCheck{baseMid},
-		&RateLimitAndQuotaCheck{baseMid},
-		&TransformHeaders{baseMid},
-		&URLRewriteMiddleware{baseMid},
-	)...).Then(proxyHandler)
-	return chain
-}
-
-const nonExpiringDefNoWhiteList = `{
-	"api_id": "1",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "3000-01-02 15:04"
-			}
-		}
-	},
-	"event_handlers": {
-		"events": {
-			"QuotaExceeded": [
-				{
-					"handler_name":"eh_log_handler",
-					"handler_meta": {
-						"prefix": "LOG-HANDLER-PREFIX"
-					}
-				},
-				{
-					"handler_name":"eh_web_hook_handler",
-					"handler_meta": {
-						"method": "POST",
-						"target_path": "` + testHttpPost + `",
-						"template_path": "templates/default_webhook.json",
-						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
-						"event_timeout": 10
-					}
-				}
-			]
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
-const versionedDefinition = `{
-	"api_id": "9991",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"versions": {
-			"v1": {"name": "v1"}
-		}
-	},
-	"event_handlers": {
-		"events": {
-			"QuotaExceeded": [
-				{
-					"handler_name":"eh_log_handler",
-					"handler_meta": {
-						"prefix": "LOG-HANDLER-PREFIX"
-					}
-				},
-				{
-					"handler_name":"eh_web_hook_handler",
-					"handler_meta": {
-						"method": "POST",
-						"target_path": "` + testHttpPost + `",
-						"template_path": "templates/default_webhook.json",
-						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
-						"event_timeout": 10
-					}
-				}
-			]
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
-const pathBasedDefinition = `{
-	"api_id": "9992",
-	"auth": {
-		"use_param": true,
-		"auth_header_name": "authorization"
-	},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"default": {
-				"name": "default"
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/pathBased/",
-		"target_url": "` + testHttpGet + `"
-	}
-}`
-
-const extendedPathGatewaySetup = `{
-	"api_id": "1",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"use_extended_paths": true,
-				"extended_paths": {
-					"ignored": [
-						{
-							"path": "/v1/ignored/noregex",
-							"method_actions": {
-								"GET": {
-									"action": "no_action",
-									"code": 200,
-									"headers": {
-										"x-tyk-override-test": "tyk-override",
-										"x-tyk-override-test-2": "tyk-override-2"
-									}
-								}
-							}
-						},
-						{
-							"path": "/v1/ignored/with_id/{id}",
-							"method_actions": {
-								"GET": {
-									"action": "no_action",
-									"code": 200,
-									"headers": {
-										"x-tyk-override-test": "tyk-override",
-										"x-tyk-override-test-2": "tyk-override-2"
-									}
-								}
-							}
-						}
-					],
-					"white_list": [
-						{
-							"path": "/v1/allowed/whitelist/literal",
-							"method_actions": {
-								"GET": {
-									"action": "no_action",
-									"code": 200,
-									"headers": {
-										"x-tyk-override-test": "tyk-override",
-										"x-tyk-override-test-2": "tyk-override-2"
-									}
-								}
-							}
-						},
-						{
-							"path": "/v1/allowed/whitelist/reply/{id}",
-							"method_actions": {
-								"GET": {
-									"action": "reply",
-									"code": 200,
-									"data": "flump",
-									"headers": {
-										"x-tyk-override-test": "tyk-override",
-										"x-tyk-override-test-2": "tyk-override-2"
-									}
-								}
-							}
-						},
-						{
-							"path": "/v1/allowed/whitelist/{id}",
-							"method_actions": {
-								"GET": {
-									"action": "no_action",
-									"code": 200,
-									"headers": {
-										"x-tyk-override-test": "tyk-override",
-										"x-tyk-override-test-2": "tyk-override-2"
-									}
-								}
-							}
-						}
-					],
-					"black_list": [
-						{
-							"path": "/v1/disallowed/blacklist/literal",
-							"method_actions": {
-								"GET": {
-									"action": "no_action",
-									"code": 200,
-									"headers": {
-										"x-tyk-override-test": "tyk-override",
-										"x-tyk-override-test-2": "tyk-override-2"
-									}
-								}
-							}
-						}
-					]
-				}
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
 func createSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	tname := t.Name()
@@ -585,26 +349,11 @@ func TestQuota(t *testing.T) {
 	webhookWG.Wait()
 }
 
-type tykHttpTest struct {
-	method, path string
-	code         int
-	body         interface{}
-	headers      map[string]string
-
-	adminAuth      bool
-	controlRequest bool
-}
-
-func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
-	var testMatrix = []struct {
-		goagain          bool
-		overrideDefaults bool
-	}{
-		{false, false},
-		{false, true},
-		{true, true},
-		{true, false},
-	}
+func TestAnalytics(t *testing.T) {
+	ts := newTykTestServer(tykTestServerConfig{
+		delay: 20 * time.Millisecond,
+	})
+	defer ts.Close()
 
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -639,48 +388,9 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 			"authorization": key,
 		}
 
-		for ti, tc := range tests {
-			tPrefix := ""
-			if m.goagain {
-				tPrefix += "[Goagain]"
-			}
-			if m.overrideDefaults {
-				tPrefix += "[OverrideDefaults]"
-			}
-			if tc.adminAuth {
-				tPrefix += "[Auth]"
-			}
-			if tc.controlRequest {
-				tPrefix += "[Control]"
-			}
-
-			baseUrl := "http://" + ln.Addr().String()
-
-			if tc.controlRequest {
-				baseUrl = "http://" + cln.Addr().String()
-			}
-
-			bodyReader := testReqBody(t, tc.body)
-			req, err := http.NewRequest(tc.method, baseUrl+tc.path, bodyReader)
-			if err != nil {
-				t.Error(err)
-				continue
-			}
-
-			for key, val := range tc.headers {
-				req.Header.Add(key, val)
-			}
-
-			if tc.adminAuth {
-				req = withAuth(req)
-			}
-
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Error(err)
-				continue
-			}
-			resp.Body.Close()
+		ts.Run(t, test.TestCase{
+			Path: "/", Headers: authHeaders, Code: 200,
+		})
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
@@ -950,129 +660,6 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
-func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
-	// setup spec and do test HTTP upgrade-request
-	config.Global.HttpServerOptions.EnableWebSockets = true
-	defer resetTestConfig()
-
-	ts := newTykTestServer()
-	defer ts.Close()
-
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	ts.Run(t, test.TestCase{
-		Path: "/ws",
-		Headers: map[string]string{
-			"Connection":            "Upgrade",
-			"Upgrade":               "websocket",
-			"Sec-Websocket-Version": "13",
-			"Sec-Websocket-Key":     "abc",
-		},
-		Code: http.StatusSwitchingProtocols,
-	})
-}
-
-func TestWebsocketsSeveralOpenClose(t *testing.T) {
-	config.Global.HttpServerOptions.EnableWebSockets = true
-	defer resetTestConfig()
-
-	ts := newTykTestServer()
-	defer ts.Close()
-
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-	})
-
-	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
-
-	// connect 1st time, send and read message, close connection
-	conn1, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
-	if err != nil {
-		t.Fatalf("cannot make websocket connection: %v", err)
-	}
-	err = conn1.WriteMessage(websocket.BinaryMessage, []byte("test message 1"))
-	if err != nil {
-		t.Fatalf("cannot write message: %v", err)
-	}
-	_, p, err := conn1.ReadMessage()
-	if err != nil {
-		t.Fatalf("cannot read message: %v", err)
-	}
-	if string(p) != "reply to message: test message 1" {
-		t.Error("Unexpected reply:", string(p))
-	}
-	conn1.Close()
-
-	// connect 2nd time, send and read message, but don't close yet
-	conn2, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
-	if err != nil {
-		t.Fatalf("cannot make websocket connection: %v", err)
-	}
-	err = conn2.WriteMessage(websocket.BinaryMessage, []byte("test message 2"))
-	if err != nil {
-		t.Fatalf("cannot write message: %v", err)
-	}
-	_, p, err = conn2.ReadMessage()
-	if err != nil {
-		t.Fatalf("cannot read message: %v", err)
-	}
-	if string(p) != "reply to message: test message 2" {
-		t.Error("Unexpected reply:", string(p))
-	}
-
-	// connect 3d time having one connection already open before, send and read message
-	conn3, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
-	if err != nil {
-		t.Fatalf("cannot make websocket connection: %v", err)
-	}
-	err = conn3.WriteMessage(websocket.BinaryMessage, []byte("test message 3"))
-	if err != nil {
-		t.Fatalf("cannot write message: %v", err)
-	}
-	_, p, err = conn3.ReadMessage()
-	if err != nil {
-		t.Fatalf("cannot read message: %v", err)
-	}
-	if string(p) != "reply to message: test message 3" {
-		t.Error("Unexpected reply:", string(p))
-	}
-
-		if cached && !tc.wantCached {
-			t.Fatalf("wanted %s %s to not cache, but it did", tc.method, tc.path)
-		} else if !cached && tc.wantCached {
-			t.Fatalf("wanted %s %s to cache, but it didn't", tc.method, tc.path)
-		}
-
-		time.Sleep(10 * time.Millisecond)
-	}
-	_, p, err = conn2.ReadMessage()
-	if err != nil {
-		t.Fatalf("cannot read message: %v", err)
-	}
-	if string(p) != "reply to message: new test message 2" {
-		t.Error("Unexpected reply:", string(p))
-	}
-
-	// check that we still can interact via 3d connection we did before
-	err = conn3.WriteMessage(websocket.BinaryMessage, []byte("new test message 3"))
-	if err != nil {
-		t.Fatalf("cannot write message: %v", err)
-	}
-	_, p, err = conn3.ReadMessage()
-	if err != nil {
-		t.Fatalf("cannot read message: %v", err)
-	}
-	if string(p) != "reply to message: new test message 3" {
-		t.Error("Unexpected reply:", string(p))
-	}
-
-	// clean up connections
-	conn2.Close()
-	conn3.Close()
-}
-
 func TestWebsocketsUpstream(t *testing.T) {
 	// setup and run web socket upstream
 	var upgrader = websocket.Upgrader{
@@ -1098,67 +685,26 @@ func TestWebsocketsUpstream(t *testing.T) {
 	u, _ := url.Parse(wsServer.URL)
 	u.Scheme = "ws"
 	targetUrl := u.String()
-	t.Log("upstream target URL:", targetUrl)
 
 	// setup spec and do test HTTP upgrade-request
 	config.Global.HttpServerOptions.EnableWebSockets = true
+	defer resetTestConfig()
 
-	apiSpec := `{
-		"api_id": "1",
-		"use_keyless": true,
-		"definition": {
-			"location": "header",
-			"key": "version"
-		},
-		"auth": {"auth_header_name": "authorization"},
-		"version_data": {
-			"not_versioned": true,
-			"versions": {
-				"v1": {
-					"name": "v1",
-					"expires": "3000-01-02 15:04"
-				}
-			}
-		},
-		"proxy": {
-			"listen_path": "/v1",
-			"strip_listen_path": true,
-			"target_url": "` + targetUrl + `"
-		}
-	}`
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	tests := []tykHttpTest{
-		{
-			method:    http.MethodPost,
-			path:      "/tyk/apis",
-			body:      apiSpec,
-			adminAuth: true,
-			code:      http.StatusOK,
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = targetUrl
+	})
+
+	ts.Run(t, test.TestCase{
+		Code: http.StatusSwitchingProtocols,
+		Headers: map[string]string{
+			"Connection":            "Upgrade",
+			"Upgrade":               "websocket",
+			"Sec-Websocket-Version": "13",
+			"Sec-Websocket-Key":     "abc",
 		},
-		{
-			method:    http.MethodGet,
-			path:      "/tyk/reload/?block=true",
-			adminAuth: true,
-			code:      http.StatusOK,
-		},
-		{
-			method: http.MethodGet,
-			path:   "/v1",
-			code:   http.StatusSwitchingProtocols,
-			headers: map[string]string{
-				"Connection":            "Upgrade",
-				"Upgrade":               "websocket",
-				"Sec-Websocket-Version": "13",
-				"Sec-Websocket-Key":     "abc",
-			},
-		},
-	}
-	// have all needed reload ticks ready
-	go func() {
-		// two calls to testHttp, each loops over tests 4 times
-		for i := 0; i < 2*4; i++ {
-			reloadTick <- time.Time{}
-		}
-	}()
-	testHttp(t, tests, false)
+	})
 }
