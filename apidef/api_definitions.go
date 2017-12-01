@@ -326,8 +326,9 @@ type APIDefinition struct {
 		Key      string `bson:"key" json:"key"`
 	} `bson:"definition" json:"definition"`
 	VersionData struct {
-		NotVersioned bool                   `bson:"not_versioned" json:"not_versioned"`
-		Versions     map[string]VersionInfo `bson:"versions" json:"versions"`
+		NotVersioned   bool                   `bson:"not_versioned" json:"not_versioned"`
+		DefaultVersion string                 `bson:"default_version" json:"default_version"`
+		Versions       map[string]VersionInfo `bson:"versions" json:"versions"`
 	} `bson:"version_data" json:"version_data"`
 	UptimeTests struct {
 		CheckList []HostCheckObject `bson:"check_list" json:"check_list"`

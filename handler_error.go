@@ -87,6 +87,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		t := time.Now()
 
+		addVersionHeader(w, r)
+
 		version := e.Spec.getVersionFromRequest(r)
 		if version == "" {
 			version = "Non Versioned"

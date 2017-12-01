@@ -269,6 +269,7 @@ type Config struct {
 	Security                          SecurityConfig                        `json:"security"`
 	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
 	NewRelic                          NewRelicConfig                        `json:"newrelic"`
+	VersionHeader                     string                                `json:"version_header"`
 }
 
 type CertData struct {
