@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -13,94 +14,10 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 )
-
-const sampleDefiniton = `{
-	"api_id": "1",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "2006-01-02 15:04",
-				"paths": {
-					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"],
-					"black_list": ["/v1/disallowed/whitelist/literal", "/v1/disallowed/whitelist/{id}"]
-				}
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
-const nonExpiringDef = `{
-	"api_id": "1",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": ["/v1/allowed/whitelist/literal", "/v1/allowed/whitelist/{id}"],
-					"black_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"]
-				}
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
-const nonExpiringMultiDef = `{
-	"api_id": "1",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": ["/v1/allowed/whitelist/literal", "/v1/allowed/whitelist/{id}"],
-					"black_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"]
-				}
-			},
-			"v2": {
-				"name": "v2",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"black_list": ["/v1/disallowed/blacklist/literal"]
-				}
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
 
 func createDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
@@ -109,201 +26,175 @@ func createDefinitionFromString(defStr string) *APISpec {
 	return spec
 }
 
-func TestExpiredRequest(t *testing.T) {
-	req := testReq(t, "GET", "/v1/bananaphone", nil)
-	req.Header.Set("version", "v1")
+func TestWhitelist(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	spec := createDefinitionFromString(sampleDefiniton)
+	t.Run("Extended Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+					{
+						"path": "/reply/{id}",
+						"method_actions": {
+							"GET": {"action": "reply", "code": 200, "data": "flump"}
+						}
+					},
+					{
+						"path": "/get",
+						"method_actions": {"GET": {"action": "no_action"}}
+					}
+				]`), &v.ExtendedPaths.WhiteList)
+			})
 
-	ok, status, _ := spec.RequestValid(req)
-	if ok {
-		t.Error("Request should fail as expiry date is in the past!")
-	}
+			spec.Proxy.ListenPath = "/"
+		})
 
-	if status != VersionExpired {
-		t.Error("Request should return expired status!")
-		t.Error(status)
-	}
+		ts.Run(t, []test.TestCase{
+			// Should mock path
+			{Path: "/reply/", Code: 200, BodyMatch: "flump"},
+			{Path: "/reply/123", Code: 200, BodyMatch: "flump"},
+			// Should get original upstream response
+			{Path: "/get", Code: 200, BodyMatch: `"Url":"/get"`},
+			// Reject not whitelisted (but know by upstream) path
+			{Method: "POST", Path: "/post", Code: 403},
+		}...)
+	})
+
+	t.Run("Simple Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.WhiteList = []string{"/simple", "/regex/{id}/test"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			// Should mock path
+			{Path: "/simple", Code: 200},
+			{Path: "/regex/123/test", Code: 200},
+			{Path: "/regex/123/differ", Code: 403},
+			{Path: "/", Code: 403},
+		}...)
+	})
 }
 
-func TestNotVersioned(t *testing.T) {
-	req := testReq(t, "GET", "/v1/allowed/whitelist/literal", nil)
+func TestBlacklist(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	spec := createDefinitionFromString(nonExpiringDef)
-	spec.VersionData.NotVersioned = true
+	t.Run("Extended Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+					{
+						"path": "/blacklist/literal",
+						"method_actions": {"GET": {"action": "no_action"}}
+					},
+					{
+						"path": "/blacklist/{id}/test",
+						"method_actions": {"GET": {"action": "no_action"}}
+					}
+				]`), &v.ExtendedPaths.BlackList)
+			})
 
-	//	writeDefToFile(spec.APIDefinition)
+			spec.Proxy.ListenPath = "/"
+		})
 
-	ok, status, _ := spec.RequestValid(req)
-	if !ok {
-		t.Error("Request should pass as versioning not in play!")
-	}
+		ts.Run(t, []test.TestCase{
+			{Path: "/blacklist/literal", Code: 403},
+			{Path: "/blacklist/123/test", Code: 403},
 
-	if status != StatusOk {
-		t.Error("Request should return StatusOk status!")
-		t.Error(status)
-	}
-}
+			{Path: "/blacklist/123/different", Code: 200},
+			// POST method not blacklisted
+			{Method: "POST", Path: "/blacklist/literal", Code: 200},
+		}...)
+	})
 
-func TestMissingVersion(t *testing.T) {
-	req := testReq(t, "GET", "/v1/bananaphone", nil)
+	t.Run("Simple Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.BlackList = []string{"/blacklist/literal", "/blacklist/{id}/test"}
+				v.UseExtendedPaths = false
+			})
 
-	spec := createDefinitionFromString(sampleDefiniton)
+			spec.Proxy.ListenPath = "/"
+		})
 
-	ok, status, _ := spec.RequestValid(req)
-	if ok {
-		t.Error("Request should fail as there is no version number!")
-	}
+		ts.Run(t, []test.TestCase{
+			{Path: "/blacklist/literal", Code: 403},
+			{Path: "/blacklist/123/test", Code: 403},
 
-	if status != VersionNotFound {
-		t.Error("Request should return version not found status!")
-		t.Error(status)
-	}
-}
-
-func TestWrongVersion(t *testing.T) {
-	req := testReq(t, "GET", "/v1/bananaphone", nil)
-	req.Header.Set("version", "v2")
-
-	spec := createDefinitionFromString(sampleDefiniton)
-
-	ok, status, _ := spec.RequestValid(req)
-	if ok {
-		t.Error("Request should fail as version number is wrong!")
-	}
-
-	if status != VersionDoesNotExist {
-		t.Error("Request should return version doesn't exist status!")
-		t.Error(status)
-	}
-}
-
-func TestBlacklistLinks(t *testing.T) {
-	req := testReq(t, "GET", "/v1/disallowed/blacklist/literal", nil)
-	req.Header.Set("version", "v1")
-
-	spec := createDefinitionFromString(nonExpiringDef)
-
-	ok, status, _ := spec.RequestValid(req)
-	if ok {
-		t.Error("Request should fail as URL is blacklisted!")
-	}
-
-	if status != EndPointNotAllowed {
-		t.Error("Request should return endpoint disallowed status!")
-		t.Error(status)
-	}
-
-	req = testReq(t, "GET", "/v1/disallowed/blacklist/abacab12345", nil)
-	req.Header.Set("version", "v1")
-
-	ok, status, _ = spec.RequestValid(req)
-	if ok {
-		t.Error("Request should fail as URL (with dynamic ID) is blacklisted!")
-	}
-
-	if status != EndPointNotAllowed {
-		t.Error("Request should return endpoint disallowed status for regex blacklists too!")
-		t.Error(status)
-	}
-}
-
-func TestWhiteLIstLinks(t *testing.T) {
-	req := testReq(t, "GET", "/v1/allowed/whitelist/literal", nil)
-	req.Header.Set("version", "v1")
-
-	spec := createDefinitionFromString(nonExpiringDef)
-
-	ok, status, _ := spec.RequestValid(req)
-	if !ok {
-		t.Error("Request should be OK as URL is whitelisted!")
-	}
-
-	if status != StatusOk {
-		t.Error("Request should return StatusOk!")
-		t.Error(status)
-	}
-
-	req = testReq(t, "GET", "/v1/allowed/whitelist/12345abans", nil)
-	req.Header.Set("version", "v1")
-
-	ok, status, _ = spec.RequestValid(req)
-	if !ok {
-		t.Error("Request should be OK as URL is whitelisted (regex)!")
-	}
-
-	if status != StatusOk {
-		t.Error("Regex whitelist Request should return StatusOk!")
-		t.Error(status)
-	}
-}
-
-func TestWhiteListBlock(t *testing.T) {
-	req := testReq(t, "GET", "/v1/allowed/bananaphone", nil)
-	req.Header.Set("version", "v1")
-
-	spec := createDefinitionFromString(nonExpiringDef)
-
-	ok, status, _ := spec.RequestValid(req)
-	if ok {
-		t.Error("Request should fail as things not in whitelist should be rejected!")
-	}
-
-	if status != EndPointNotAllowed {
-		t.Error("Request should return EndPointNotAllowed!")
-		t.Error(status)
-	}
+			{Path: "/blacklist/123/different", Code: 200},
+			// POST method also blacklisted
+			{Method: "POST", Path: "/blacklist/literal", Code: 403},
+		}...)
+	})
 }
 
 func TestIgnored(t *testing.T) {
-	req := testReq(t, "GET", "/v1/ignored/noregex", nil)
-	req.Header.Set("version", "v1")
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	spec := createDefinitionFromString(nonExpiringDef)
+	t.Run("Extended Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+					{
+						"path": "/ignored/literal",
+						"method_actions": {"GET": {"action": "no_action"}}
+					},
+					{
+						"path": "/ignored/{id}/test",
+						"method_actions": {"GET": {"action": "no_action"}}
+					}
+				]`), &v.ExtendedPaths.Ignored)
+			})
 
-	ok, status, _ := spec.RequestValid(req)
-	if !ok {
-		t.Error("Request should pass, URL is ignored")
-	}
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})
 
-	if status != StatusOkAndIgnore {
-		t.Error("Request should return StatusOkAndIgnore!")
-		t.Error(status)
-	}
-}
+		ts.Run(t, []test.TestCase{
+			// Should ignore auth check
+			{Path: "/ignored/literal", Code: 200},
+			{Path: "/ignored/123/test", Code: 200},
+			// Only GET is ignored
+			{Method: "POST", Path: "/ext/ignored/literal", Code: 401},
 
-func TestBlacklistLinksMulti(t *testing.T) {
-	req := testReq(t, "GET", "/v1/disallowed/blacklist/literal", nil)
-	req.Header.Set("version", "v2")
+			{Path: "/", Code: 401},
+		}...)
+	})
 
-	spec := createDefinitionFromString(nonExpiringMultiDef)
+	t.Run("Simple Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.Ignored = []string{"/ignored/literal", "/ignored/{id}/test"}
+				v.UseExtendedPaths = false
+			})
 
-	ok, status, _ := spec.RequestValid(req)
-	if ok {
-		t.Error("Request should fail as URL is blacklisted!")
-	}
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})
 
-	if status != EndPointNotAllowed {
-		t.Error("Request should return endpoint disallowed status!")
-		t.Error(status)
-	}
+		ts.Run(t, []test.TestCase{
+			// Should ignore auth check
+			{Path: "/ignored/literal", Code: 200},
+			{Path: "/ignored/123/test", Code: 200},
+			// All methods ignored
+			{Method: "POST", Path: "/ext/ignored/literal", Code: 200},
 
-	req = testReq(t, "GET", "/v1/disallowed/blacklist/abacab12345", nil)
-	req.Header.Set("version", "v2")
-
-	ok, status, _ = spec.RequestValid(req)
-	if !ok {
-		t.Error("Request should be OK as in v2 this URL is not blacklisted")
-		t.Error(spec.RxPaths["v2"])
-	}
-
-	if status != StatusOk {
-		t.Error("Request should return StatusOK as URL not blacklisted!")
-		t.Error(status)
-	}
+			{Path: "/", Code: 401},
+		}...)
+	})
 }
 
 func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
+	configMu.Lock()
+	defer configMu.Unlock()
+
 	config.Global.SlaveOptions.UseRPC = true
 	config.Global.SlaveOptions.RPCKey = "test_org"
 	config.Global.SlaveOptions.APIKey = "test"

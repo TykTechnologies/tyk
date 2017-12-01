@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -49,496 +49,182 @@ type testAPIDefinition struct {
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
-	uri := "/tyk/health/?api_id=1"
-	old := config.Global.HealthCheck.EnableHealthChecks
 	config.Global.HealthCheck.EnableHealthChecks = true
-	defer func() { config.Global.HealthCheck.EnableHealthChecks = old }()
+	defer resetTestConfig()
 
-	recorder := httptest.NewRecorder()
-	loadSampleAPI(t, apiTestDef)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	req := testReq(t, "GET", uri, nil)
+	buildAndLoadAPI()
 
-	healthCheckhandler(recorder, req)
-	if recorder.Code != 200 {
-		t.Error("Recorder should return 200 for health check")
-	}
-}
-
-func createSampleSession() *user.SessionState {
-	return &user.SessionState{
-		Rate:             5.0,
-		Allowance:        5.0,
-		LastCheck:        time.Now().Unix(),
-		Per:              8.0,
-		QuotaRenewalRate: 300, // 5 minutes
-		QuotaRenews:      time.Now().Unix(),
-		QuotaRemaining:   10,
-		QuotaMax:         10,
-		AccessRights: map[string]user.AccessDefinition{
-			"1": {
-				APIName:  "Test",
-				APIID:    "1",
-				Versions: []string{"v1"},
-			},
-		},
-	}
-}
-
-func TestApiHandler(t *testing.T) {
-	uris := []string{"/tyk/apis/", "/tyk/apis"}
-
-	for _, uri := range uris {
-		sampleKey := createSampleSession()
-		recorder := httptest.NewRecorder()
-
-		loadSampleAPI(t, apiTestDef)
-
-		req := withAuth(testReq(t, "GET", uri, sampleKey))
-
-		mainRouter.ServeHTTP(recorder, req)
-
-		// We can't deserialize BSON ObjectID's if they are not in th test base!
-		var apiList []testAPIDefinition
-		json.NewDecoder(recorder.Body).Decode(&apiList)
-
-		if len(apiList) != 1 {
-			t.Error("API's not returned, len was: \n", len(apiList), recorder.Body.String(), uri)
-		} else if apiList[0].APIID != "1" {
-			t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String(), uri)
-		}
-	}
-}
-
-func TestApiHandlerGetSingle(t *testing.T) {
-	uri := "/tyk/apis/1"
-	sampleKey := createSampleSession()
-
-	recorder := httptest.NewRecorder()
-
-	loadSampleAPI(t, apiTestDef)
-
-	req := withAuth(testReq(t, "GET", uri, sampleKey))
-
-	mainRouter.ServeHTTP(recorder, req)
-
-	// We can't deserialize BSON ObjectID's if they are not in th test base!
-	var apiDef testAPIDefinition
-	json.NewDecoder(recorder.Body).Decode(&apiDef)
-
-	if apiDef.APIID != "1" {
-		t.Error("Response is incorrect - no API ID value in struct :\n", recorder.Body.String())
-	}
-}
-
-func TestApiHandlerPost(t *testing.T) {
-	uri := "/tyk/apis/1"
-	recorder := httptest.NewRecorder()
-
-	req := withAuth(testReq(t, "POST", uri, apiTestDef))
-
-	mainRouter.ServeHTTP(recorder, req)
-
-	var success apiModifyKeySuccess
-	json.NewDecoder(recorder.Body).Decode(&success)
-
-	if success.Status != "ok" {
-		t.Error("Response is incorrect - not success :\n", recorder.Body.String())
-	}
+	ts.Run(t, []test.TestCase{
+		{Path: "/tyk/health/?api_id=test", AdminAuth: true, Code: 200},
+		{Path: "/tyk/health/?api_id=unknown", AdminAuth: true, Code: 404, BodyMatch: `"message":"API ID not found"`},
+	}...)
 }
 
 func TestApiHandlerPostDupPath(t *testing.T) {
-	specs := func() (res []*APISpec) {
-		for _, id := range []string{"2", "3"} {
-			def := strings.Replace(apiTestDef, `"1"`, `"`+id+`"`, 1)
-			res = append(res, createSpecTest(t, def))
-		}
-		return res
-	}
-	var s2, s3 *APISpec
-
-	// both dups added at the same time
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-	loadApps(specs(), discardMuxer)
-
-	s2 = getApiSpec("2")
-	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
-		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
-	}
-	s3 = getApiSpec("3")
-	if want, got := "/v1-3", s3.Proxy.ListenPath; want != got {
-		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
+	type testCase struct {
+		APIID, ListenPath string
 	}
 
-	// one dup was there first, gets to keep its path. apiids are
-	// not used to mandate priority. survives multiple reloads too.
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-	loadApps(specs()[1:], discardMuxer)
-	loadApps(specs(), discardMuxer)
-	loadApps(specs(), discardMuxer)
-
-	s2 = getApiSpec("2")
-	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
-		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
-	}
-	s3 = getApiSpec("3")
-	if want, got := "/v1", s3.Proxy.ListenPath; want != got {
-		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
-	}
-
-	// both dups were there first, neither gets to keep its original
-	// path.
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-	loadApps(specs(), discardMuxer)
-	loadApps(specs(), discardMuxer)
-
-	s2 = getApiSpec("2")
-	if want, got := "/v1-2", s2.Proxy.ListenPath; want != got {
-		t.Errorf("API spec %s want path %s, got %s", "2", want, got)
-	}
-	s3 = getApiSpec("3")
-	if want, got := "/v1-3", s3.Proxy.ListenPath; want != got {
-		t.Errorf("API spec %s want path %s, got %s", "3", want, got)
-	}
-}
-
-func TestApiHandlerPostDbConfig(t *testing.T) {
-	uri := "/tyk/apis/1"
-
-	config.Global.UseDBAppConfigs = true
-	defer func() { config.Global.UseDBAppConfigs = false }()
-
-	recorder := httptest.NewRecorder()
-
-	req := withAuth(testReq(t, "POST", uri, apiTestDef))
-
-	mainRouter.ServeHTTP(recorder, req)
-
-	var success apiModifyKeySuccess
-	json.NewDecoder(recorder.Body).Decode(&success)
-	if success.Status == "ok" {
-		t.Error("Response is incorrect - expected error due to use_db_app_config :\n", recorder.Body.String())
-	}
-}
-
-func TestApiHandlerMethodAPIID(t *testing.T) {
-	base := "/tyk/apis"
-	tests := [...]struct {
-		method, path string
-		code         int
-	}{
-		// GET and POST can do either
-		{"GET", "/", 200},
-		{"GET", "/missing", 404},
-		{"POST", "/", 200},
-		{"POST", "/1", 200},
-		// DELETE and PUT must use one
-		{"DELETE", "/1", 200},
-		{"DELETE", "/", 400},
-		{"PUT", "/1", 200},
-		{"PUT", "/", 400},
-
-		// apiid mismatch
-		{"POST", "/mismatch", 400},
-		{"PUT", "/mismatch", 400},
-	}
-	for _, tc := range tests {
-		recorder := httptest.NewRecorder()
-		url := base + tc.path
-		req := withAuth(testReq(t, tc.method, url, apiTestDef))
-
-		mainRouter.ServeHTTP(recorder, req)
-		if tc.code != recorder.Code {
-			t.Errorf("%s %s got %d, want %d", tc.method, url,
-				recorder.Code, tc.code)
-		}
-	}
-}
-
-func TestKeyHandlerNewKey(t *testing.T) {
-	for _, api_id := range []string{"1", "none", ""} {
-		uri := "/tyk/keys/1234"
-		sampleKey := createSampleSession()
-
-		recorder := httptest.NewRecorder()
-		param := make(url.Values)
-
-		loadSampleAPI(t, apiTestDef)
-		if api_id != "" {
-			param.Set("api_id", api_id)
-		}
-		req := withAuth(testReq(t, "POST", uri+param.Encode(), sampleKey))
-
-		mainRouter.ServeHTTP(recorder, req)
-
-		newSuccess := apiModifyKeySuccess{}
-		json.NewDecoder(recorder.Body).Decode(&newSuccess)
-		if newSuccess.Status != "ok" {
-			t.Error("key not created, status error:\n", recorder.Body.String())
-		}
-		if newSuccess.Action != "added" {
-			t.Error("Response is incorrect - action is not 'added' :\n", recorder.Body.String())
-		}
-	}
-}
-
-func TestKeyHandlerUpdateKey(t *testing.T) {
-	for _, api_id := range []string{"1", "none", ""} {
-		uri := "/tyk/keys/1234"
-		sampleKey := createSampleSession()
-
-		recorder := httptest.NewRecorder()
-		param := make(url.Values)
-		loadSampleAPI(t, apiTestDef)
-		if api_id != "" {
-			param.Set("api_id", api_id)
-		}
-		req := withAuth(testReq(t, "PUT", uri+param.Encode(), sampleKey))
-
-		mainRouter.ServeHTTP(recorder, req)
-
-		newSuccess := apiModifyKeySuccess{}
-		json.NewDecoder(recorder.Body).Decode(&newSuccess)
-		if newSuccess.Status != "ok" {
-			t.Error("key not created, status error:\n", recorder.Body.String())
-		}
-		if newSuccess.Action != "modified" {
-			t.Error("Response is incorrect - action is not 'modified' :\n", recorder.Body.String())
-		}
-	}
-}
-
-func TestKeyHandlerGetKey(t *testing.T) {
-	for _, pathSuffix := range []string{"/", "/1234"} {
-		for _, api_id := range []string{"1", "none", ""} {
-			loadSampleAPI(t, apiTestDef)
-			createKey(t)
-
-			uri := "/tyk/keys" + pathSuffix
-
-			recorder := httptest.NewRecorder()
-			param := make(url.Values)
-
-			if api_id != "" {
-				param.Set("api_id", api_id)
-			}
-			req := withAuth(testReq(t, "GET", uri+"?"+param.Encode(), nil))
-
-			mainRouter.ServeHTTP(recorder, req)
-
-			if recorder.Code != 200 {
-				t.Errorf("key not requested, path %s status error %s",
-					req.URL.Path, recorder.Body.String())
+	assertListenPaths := func(tests []testCase) {
+		for _, tc := range tests {
+			s := getApiSpec(tc.APIID)
+			if want, got := tc.ListenPath, s.Proxy.ListenPath; want != got {
+				t.Errorf("API spec %s want path %s, got %s", "2", want, got)
 			}
 		}
 	}
+
+	t.Run("Sequentieal order", func(t *testing.T) {
+		// Load initial API
+		buildAndLoadAPI(
+			func(spec *APISpec) { spec.APIID = "1" },
+		)
+
+		buildAndLoadAPI(
+			func(spec *APISpec) { spec.APIID = "1" },
+			func(spec *APISpec) { spec.APIID = "2" },
+			func(spec *APISpec) { spec.APIID = "3" },
+		)
+
+		assertListenPaths([]testCase{
+			// Should retain original API
+			{"1", "/sample"},
+			{"2", "/sample-2"},
+			{"3", "/sample-3"},
+		})
+	})
+
+	t.Run("Should re-order", func(t *testing.T) {
+		buildAndLoadAPI(
+			func(spec *APISpec) { spec.APIID = "2" },
+			func(spec *APISpec) { spec.APIID = "3" },
+		)
+
+		assertListenPaths([]testCase{
+			{"2", "/sample-2"},
+			{"3", "/sample-3"},
+		})
+	})
+
+	t.Run("Restore original order", func(t *testing.T) {
+		buildAndLoadAPI(
+			func(spec *APISpec) { spec.APIID = "1" },
+			func(spec *APISpec) { spec.APIID = "2" },
+			func(spec *APISpec) { spec.APIID = "3" },
+		)
+
+		assertListenPaths([]testCase{
+			// Since API was not loaded previously first it has prefixed id
+			{"1", "/sample-1"},
+			{"2", "/sample-2"},
+			{"3", "/sample-3"},
+		})
+	})
 }
 
-func createKey(t *testing.T) {
-	uri := "/tyk/keys/1234"
-	sampleKey := createSampleSession()
+func TestKeyHandler(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	recorder := httptest.NewRecorder()
-	req := withAuth(testReq(t, "POST", uri, sampleKey))
+	buildAndLoadAPI()
 
-	mainRouter.ServeHTTP(recorder, req)
-}
+	// Access right not specified
+	masterKey := createStandardSession()
+	masterKeyJSON, _ := json.Marshal(masterKey)
 
-func TestKeyHandlerDeleteKey(t *testing.T) {
-	for _, api_id := range []string{"1", "none", ""} {
-		createKey(t)
+	withAccess := createStandardSession()
+	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+	withAccessJSON, _ := json.Marshal(withAccess)
 
-		uri := "/tyk/keys/1234?"
+	knownKey := createSession()
 
-		recorder := httptest.NewRecorder()
-		param := make(url.Values)
-		loadSampleAPI(t, apiTestDef)
-		if api_id != "" {
-			param.Set("api_id", api_id)
-		}
-		req := withAuth(testReq(t, "DELETE", uri+param.Encode(), nil))
+	t.Run("Create key", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// Master keys should be disabled by default
+			{Method: "POST", Path: "/tyk/keys/create", Data: string(masterKeyJSON), AdminAuth: true, Code: 400, BodyMatch: "Failed to create key, keys must have at least one Access Rights record set."},
+			{Method: "POST", Path: "/tyk/keys/create", Data: string(withAccessJSON), AdminAuth: true, Code: 200},
+		}...)
+	})
 
-		mainRouter.ServeHTTP(recorder, req)
+	t.Run("Get key", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/tyk/keys/unknown", AdminAuth: true, Code: 404},
+			{Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200},
+			{Method: "GET", Path: "/tyk/keys/" + knownKey + "?api_id=test", AdminAuth: true, Code: 200},
+			{Method: "GET", Path: "/tyk/keys/" + knownKey + "?api_id=unknown", AdminAuth: true, Code: 200},
+		}...)
+	})
 
-		newSuccess := apiModifyKeySuccess{}
-		json.NewDecoder(recorder.Body).Decode(&newSuccess)
+	t.Run("List keys", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/tyk/keys/", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=test", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+			{Method: "GET", Path: "/tyk/keys/?api_id=unknown", AdminAuth: true, Code: 200, BodyMatch: knownKey},
+		}...)
+	})
 
-		if newSuccess.Status != "ok" {
-			t.Error("key not deleted, status error:\n", recorder.Body.String())
-		}
-		if newSuccess.Action != "deleted" {
-			t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
-		}
-	}
-}
+	t.Run("Update key", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// Without data
+			{Method: "PUT", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 400},
+			{Method: "PUT", Path: "/tyk/keys/" + knownKey, Data: string(withAccessJSON), AdminAuth: true, Code: 200},
+			{Method: "PUT", Path: "/tyk/keys/" + knownKey + "?api_id=test", Data: string(withAccessJSON), AdminAuth: true, Code: 200},
+			{Method: "PUT", Path: "/tyk/keys/" + knownKey + "?api_id=none", Data: string(withAccessJSON), AdminAuth: true, Code: 200},
+		}...)
+	})
 
-func TestMethodNotSupported(t *testing.T) {
-	recorder := httptest.NewRecorder()
-	req := withAuth(testReq(t, "POST", "/tyk/reload/", nil))
-
-	mainRouter.ServeHTTP(recorder, req)
-	if recorder.Code != 405 {
-		t.Fatal(`Wanted response to be 405 since the wrong method was used`)
-	}
-}
-
-func TestCreateKeyHandlerCreateNewKey(t *testing.T) {
-	for _, api_id := range []string{"1", "none", ""} {
-		createKey(t)
-
-		uri := "/tyk/keys/create"
-
-		sampleKey := createSampleSession()
-
-		recorder := httptest.NewRecorder()
-		param := make(url.Values)
-		loadSampleAPI(t, apiTestDef)
-		if api_id != "" {
-			param.Set("api_id", api_id)
-		}
-		req := withAuth(testReq(t, "POST", uri+param.Encode(), sampleKey))
-
-		mainRouter.ServeHTTP(recorder, req)
-
-		newSuccess := apiModifyKeySuccess{}
-		json.NewDecoder(recorder.Body).Decode(&newSuccess)
-
-		if newSuccess.Status != "ok" {
-			t.Error("key not created, status error:\n", recorder.Body.String())
-		}
-		if newSuccess.Action != "added" {
-			t.Error("Response is incorrect - action is not 'create' :\n", recorder.Body.String())
-		}
-	}
-}
-
-func TestAPIAuthFail(t *testing.T) {
-	uri := "/tyk/apis/"
-	loadSampleAPI(t, apiTestDef)
-
-	recorder := httptest.NewRecorder()
-	req := testReq(t, "GET", uri, nil)
-	req.Header.Set("x-tyk-authorization", "12345")
-
-	mainRouter.ServeHTTP(recorder, req)
-
-	if recorder.Code == 200 {
-		t.Error("Access to API should have been blocked, but response code was: ", recorder.Code)
-	}
-}
-
-func TestAPIAuthOk(t *testing.T) {
-	uri := "/tyk/apis/"
-
-	recorder := httptest.NewRecorder()
-	req := withAuth(testReq(t, "GET", uri, nil))
-
-	loadSampleAPI(t, apiTestDef)
-	mainRouter.ServeHTTP(recorder, req)
-
-	if recorder.Code != 200 {
-		t.Error("Access to API should have gone through, but response code was: ", recorder.Code)
-	}
+	t.Run("Delete key", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Method: "DELETE", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200, BodyMatch: `"action":"deleted"`},
+			{Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 404},
+		}...)
+	})
 }
 
 func TestInvalidateCache(t *testing.T) {
-	for _, suffix := range []string{"", "/"} {
-		loadSampleAPI(t, apiTestDef)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-		// TODO: Note that this test is fairly dumb, as it doesn't check
-		// that the cache is empty and will pass even if the apiID does
-		// not exist. This test should be improved to check that the
-		// endpoint actually did what it's supposed to.
-		rec := httptest.NewRecorder()
-		req := withAuth(testReq(t, "DELETE", "/tyk/cache/1"+suffix, nil))
+	buildAndLoadAPI()
 
-		mainRouter.ServeHTTP(rec, req)
-
-		if rec.Code != 200 {
-			t.Errorf("Could not invalidate cache: %v\n%v", rec.Code, rec.Body)
-		}
-	}
+	ts.Run(t, []test.TestCase{
+		{Method: "DELETE", Path: "/tyk/cache/test", AdminAuth: true, Code: 200},
+		{Method: "DELETE", Path: "/tyk/cache/test/", AdminAuth: true, Code: 200},
+	}...)
 }
 
 func TestGetOAuthClients(t *testing.T) {
-	testAPIID := "1"
-	var responseCode int
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	_, responseCode = getOauthClients(testAPIID)
-	if responseCode != 400 {
-		t.Fatal("Retrieving OAuth clients from nonexistent APIs must return error.")
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseOauth2 = true
+	})
+
+	oauthRequest := NewClientRequest{
+		ClientID:          "test",
+		ClientRedirectURI: "http://localhost",
+		APIID:             "test",
+		PolicyID:          "test",
+		ClientSecret:      "secret",
 	}
+	validOauthRequest, _ := json.Marshal(oauthRequest)
 
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisByID[testAPIID] = &APISpec{}
-	apisMu.Unlock()
+	oauthRequest.APIID = "unknown"
+	wrongAPIOauthRequest, _ := json.Marshal(oauthRequest)
 
-	_, responseCode = getOauthClients(testAPIID)
-	if responseCode != 400 {
-		t.Fatal("Retrieving OAuth clients from APIs with no OAuthManager must return an error.")
-	}
-
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-}
-
-func TestResetHandler(t *testing.T) {
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-
-	loadSampleAPI(t, apiTestDef)
-	recorder := httptest.NewRecorder()
-
-	req := testReq(t, "GET", "/tyk/reload", nil)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	resetHandler(wg.Done)(recorder, req)
-
-	if recorder.Code != 200 {
-		t.Fatal("Hot reload failed, response code was: ", recorder.Code)
-	}
-	reloadTick <- time.Time{}
-	wg.Wait()
-
-	apisMu.RLock()
-	if len(apisByID) == 0 {
-		t.Fatal("Hot reload was triggered but no APIs were found.")
-	}
-	apisMu.RUnlock()
-}
-
-func TestResetHandlerBlock(t *testing.T) {
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-	loadSampleAPI(t, apiTestDef)
-
-	recorder := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/tyk/reload?block=true", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// have a tick ready for grabs
-	go func() { reloadTick <- time.Time{} }()
-	resetHandler(nil)(recorder, req)
-
-	if recorder.Code != 200 {
-		t.Fatal("Hot reload failed, response code was: ", recorder.Code)
-	}
-	apisMu.RLock()
-	if len(apisByID) == 0 {
-		t.Fatal("Hot reload was triggered but no APIs were found.")
-	}
-	apisMu.RUnlock()
+	ts.Run(t, []test.TestCase{
+		{Path: "/tyk/oauth/clients/unknown", AdminAuth: true, Code: 404},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[]`},
+		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(wrongAPIOauthRequest), Code: 500, BodyMatch: `API doesn't exist`},
+		{Method: "POST", Path: "/tyk/oauth/clients/create", AdminAuth: true, Data: string(validOauthRequest), Code: 200},
+		{Path: "/tyk/oauth/clients/test", AdminAuth: true, Code: 200, BodyMatch: `[{"client_id":"test"`},
+	}...)
 }
 
 func TestGroupResetHandler(t *testing.T) {
@@ -639,32 +325,14 @@ func TestHotReloadMany(t *testing.T) {
 	}
 }
 
-const apiBenchDef = `{
-	"api_id": "REPLACE",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"v1": {"name": "v1"}
-		}
-	},
-	"proxy": {
-		"listen_path": "/listen-REPLACE",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
 func BenchmarkApiReload(b *testing.B) {
 	specs := make([]*APISpec, 1000)
-	for i := range specs {
-		id := strconv.Itoa(i + 1)
-		def := strings.Replace(apiBenchDef, "REPLACE", id, -1)
-		spec := createDefinitionFromString(def)
-		specs[i] = spec
+
+	for i := 0; i < 1000; i++ {
+		s := buildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = strconv.Itoa(i + 1)
+		})
+		specs = append(specs, s[0])
 	}
 
 	b.ResetTimer()
@@ -711,12 +379,13 @@ func TestContextSession(t *testing.T) {
 
 func TestApiLoaderLongestPathFirst(t *testing.T) {
 	config.Global.EnableCustomDomains = true
-	defer func() { config.Global.EnableCustomDomains = false }()
+	defer resetTestConfig()
+
 	type hostAndPath struct {
 		host, path string
 	}
 	inputs := map[hostAndPath]bool{}
-	hosts := []string{"host1", "host22", "host3"}
+	hosts := []string{"host1.local", "host2.local", "host3.local"}
 	paths := []string{"a", "ab", "a/b/c", "ab/c", "abc", "a/b/c"}
 	// Use a map so that we get a somewhat random order when
 	// iterating. Would be better to use math/rand.Shuffle once we
@@ -726,46 +395,31 @@ func TestApiLoaderLongestPathFirst(t *testing.T) {
 			inputs[hostAndPath{host, path}] = true
 		}
 	}
-	var specs []*APISpec
-	for hp := range inputs {
-		loader := APIDefinitionLoader{}
-		def := loader.ParseDefinition(strings.NewReader(sampleAPI))
-		def.APIID = hp.path
-		def.Domain = hp.host
-		def.Proxy.ListenPath = "/" + hp.path
-		// put the path in the target URL too, to make
-		// sure that we're using the right API spec
-		def.Proxy.TargetURL = testHttpAny + "/" + hp.path
 
-		spec := loader.MakeSpec(def)
-		specs = append(specs, spec)
-	}
-
-	apisMu.Lock()
-	apisByID = make(map[string]*APISpec)
-	apisMu.Unlock()
-
-	mu := mux.NewRouter()
-	loadApps(specs, mu)
+	var apis []*APISpec
 
 	for hp := range inputs {
-		rec := httptest.NewRecorder()
-		path := "/" + hp.path
-		r := testReq(t, "GET", path, nil)
-		r.Host = hp.host
-		mu.ServeHTTP(rec, r)
-		if rec.Code >= 400 {
-			t.Errorf("%v: code %d", hp, rec.Code)
-			continue
-		}
-		var resp testHttpResponse
-		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-			t.Errorf("%v: JSON decoding failed: %v", hp, err)
-			continue
-		}
-		if want, got := path+path, resp.Url; want != got {
-			t.Errorf("%v: wanted %s, got %s", hp, want, got)
-			continue
-		}
+		apis = append(apis, buildAPI(func(spec *APISpec) {
+			spec.APIID = uuid.NewV4().String()
+			spec.Domain = hp.host
+			spec.Proxy.ListenPath = "/" + hp.path
+		})[0])
 	}
+
+	ts := newTykTestServer()
+	defer ts.Close()
+	loadAPI(apis...)
+
+	var testCases []test.TestCase
+
+	for hp := range inputs {
+		testCases = append(testCases, test.TestCase{
+			Path:      "/" + hp.path,
+			Domain:    hp.host,
+			Code:      200,
+			BodyMatch: `"Url":"/` + hp.path + `"`,
+		})
+	}
+
+	ts.Run(t, testCases...)
 }

@@ -37,6 +37,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
 
@@ -99,6 +100,8 @@ func (d *TestDispatcher) TestMessageLength(messagePtr unsafe.Pointer) int {
 	message := (*C.struct_CoProcessMessage)(messagePtr)
 	return int(C.TestMessageLength(message))
 }
+
+func (d *TestDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {}
 
 func TestTykStoreData(key, value string, ttl int) {
 	Ckey := C.CString(key)

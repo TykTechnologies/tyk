@@ -1,26 +1,12 @@
 package main
 
 import (
-	"net/http"
+	"encoding/json"
+	"io/ioutil"
 	"testing"
-)
 
-const batchTestDef = `{
-	"api_id": "987999",
-	"org_id": "default",
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"v1": {"name": "v1"}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1/",
-		"target_url": "` + testHttpAny + `"
-	},
-	"enable_batch_request_support": true
-}`
+	"github.com/TykTechnologies/tyk/test"
+)
 
 const testBatchRequest = `{
 	"requests": [
@@ -45,67 +31,37 @@ const testBatchRequest = `{
 	"suppress_parallel_execution": true
 }`
 
-func TestBatchSuccess(t *testing.T) {
-	spec := createSpecTest(t, batchTestDef)
+func TestBatch(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	batchHandler := BatchRequestHandler{API: spec}
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/v1/"
+		spec.EnableBatchRequestSupport = true
+	})
 
-	req := testReq(t, "POST", "/vi/tyk/batch/", testBatchRequest)
+	ts.Run(t, []test.TestCase{
+		{Method: "POST", Path: "/v1/tyk/batch/", Data: `{"requests":[]}`, Code: 200, BodyMatch: "[]"},
+		{Method: "POST", Path: "/v1/tyk/batch/", Data: "malformed", Code: 400},
+		{Method: "POST", Path: "/v1/tyk/batch/", Data: testBatchRequest, Code: 200},
+	}...)
 
-	// Test decode
-	batchRequest, err := batchHandler.DecodeBatchRequest(req)
-	if err != nil {
-		t.Error("Decode batch request body failed: ", err)
-	}
+	resp, _ := ts.Do(test.TestCase{Method: "POST", Path: "/v1/tyk/batch/", Data: testBatchRequest})
+	if resp != nil {
+		body, _ := ioutil.ReadAll(resp.Body)
+		defer resp.Body.Close()
 
-	if len(batchRequest.Requests) != 3 {
-		t.Error("Decoded batchRequest object doesn;t have the right number of requests, should be 3, is: ", len(batchRequest.Requests))
-	}
+		var batchResponse []map[string]json.RawMessage
+		if err := json.Unmarshal(body, &batchResponse); err != nil {
+			t.Fatal(err)
+		}
 
-	if !batchRequest.SuppressParallelExecution {
-		t.Error("Parallel execution flag should be True, is: ", batchRequest.SuppressParallelExecution)
-	}
+		if len(batchResponse) != 3 {
+			t.Errorf("Length not match: %d", len(batchResponse))
+		}
 
-	// Test request constructions:
-
-	requestSet, err := batchHandler.ConstructRequests(batchRequest, false)
-	if err != nil {
-		t.Error("Batch request creation failed , request structure malformed")
-	}
-
-	if len(requestSet) != 3 {
-		t.Error("Request set length should be 3, is: ", len(requestSet))
-	}
-
-	if requestSet[0].URL.Host != "localhost:8080" {
-		t.Error("Request Host is wrong, is: ", requestSet[0].URL.Host)
-	}
-
-	if requestSet[0].URL.Path != "/v1/get/" {
-		t.Error("Request Path is wrong, is: ", requestSet[0].URL.Path)
-	}
-
-}
-
-func TestMakeRequest(t *testing.T) {
-	spec := createSpecTest(t, batchTestDef)
-	batchHandler := BatchRequestHandler{API: spec}
-
-	relURL := "/"
-	req, err := http.NewRequest("GET", testHttpGet, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	replyUnit := batchHandler.doRequest(req, relURL)
-
-	if replyUnit.RelativeURL != relURL {
-		t.Error("Relativce URL in reply is wrong")
-	}
-	if replyUnit.Code != 200 {
-		t.Error("Response reported a non-200 response")
-	}
-	if len(replyUnit.Body) < 1 {
-		t.Error("Reply body is too short, should be larger than 1!")
+		if string(batchResponse[0]["relative_url"]) != `"get/?param1=this"` {
+			t.Error("Url order not match:", string(batchResponse[0]["relative_url"]))
+		}
 	}
 }

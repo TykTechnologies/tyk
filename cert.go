@@ -91,6 +91,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	}
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+		configMu.Lock()
+		defer configMu.Unlock()
+
 		newConfig := baseConfig.Clone()
 
 		isControlAPI := (listenPort != 0 && config.Global.ControlAPIPort == listenPort) || (config.Global.ControlAPIHostname == hello.ServerName)
@@ -104,7 +107,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		apisMu.RLock()
 		for _, spec := range apiSpecs {
-			if spec.UseMutualTLSAuth && spec.Domain == hello.ServerName {
+			if spec.UseMutualTLSAuth && spec.Domain != "" && spec.Domain == hello.ServerName {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 				certIDs := append(spec.ClientCertificates, config.Global.Security.Certificates.API...)
 				newConfig.ClientCAs = CertificateManager.CertPool(certIDs)

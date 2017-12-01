@@ -164,6 +164,9 @@ func (r *RPCStorageHandler) Connect() bool {
 	}
 
 	RPCCLientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
+		configMu.Lock()
+		defer configMu.Unlock()
+
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,

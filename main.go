@@ -816,6 +816,8 @@ func setupLogger() {
 
 }
 
+var configMu sync.Mutex
+
 func initialiseSystem() error {
 
 	// Enable command mode
