@@ -850,11 +850,13 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 func resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
+
 		if fn == nil && r.URL.Query().Get("block") == "true" {
 			wg.Add(1)
-			fn = wg.Done
+			reloadURLStructure(wg.Done)
+		} else {
+			reloadURLStructure(fn)
 		}
-		reloadURLStructure(fn)
 
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -1051,6 +1053,8 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 			"status": "fail",
 			"err":    "API doesn't exist",
 		}).Error("Failed to create OAuth client")
+		doJSONWrite(w, 500, apiError("API doesn't exist"))
+		return
 	}
 
 	err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
@@ -1243,6 +1247,8 @@ func handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
 	return statusObj, 200
 }
 
+const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
+
 // List Clients
 func getOauthClients(apiID string) (interface{}, int) {
 	filterID := prefixClient
@@ -1267,7 +1273,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
 
-		return apiError("OAuth client list isn't available or hasn't been propagated yet."), 400
+		return apiError(oAuthNotPropagatedErr), 400
 	}
 
 	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, true)

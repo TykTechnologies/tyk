@@ -4,7 +4,8 @@ set -e
 
 MATRIX=(
 	""
-	"-tags 'coprocess'"
+	"-tags 'coprocess python'"
+	"-tags 'coprocess grpc'"
 )
 
 # print a command and execute it
@@ -21,6 +22,9 @@ fatal() {
 PKGS="$(go list ./... | grep -v /vendor/)"
 
 i=0
+
+go get -t
+
 # need to do per-pkg because go test doesn't support a single coverage
 # profile for multiple pkgs
 for pkg in $PKGS; do

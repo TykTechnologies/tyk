@@ -178,6 +178,8 @@ func (r *RedisAnalyticsHandler) Init() {
 
 // RecordHit will store an AnalyticsRecord in Redis
 func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
+	configMu.Lock()
+	defer configMu.Unlock()
 
 	r.AnalyticsPool.SendWork(func() {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)

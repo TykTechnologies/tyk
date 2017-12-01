@@ -77,15 +77,17 @@ type EndPointMeta struct {
 
 type RequestInputType string
 
+type TemplateData struct {
+	Input          RequestInputType `bson:"input_type" json:"input_type"`
+	Mode           TemplateMode     `bson:"template_mode" json:"template_mode"`
+	EnableSession  bool             `bson:"enable_session" json:"enable_session"`
+	TemplateSource string           `bson:"template_source" json:"template_source"`
+}
+
 type TemplateMeta struct {
-	TemplateData struct {
-		Input          RequestInputType `bson:"input_type" json:"input_type"`
-		Mode           TemplateMode     `bson:"template_mode" json:"template_mode"`
-		EnableSession  bool             `bson:"enable_session" json:"enable_session"`
-		TemplateSource string           `bson:"template_source" json:"template_source"`
-	} `bson:"template_data" json:"template_data"`
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	TemplateData TemplateData `bson:"template_data" json:"template_data"`
+	Path         string       `bson:"path" json:"path"`
+	Method       string       `bson:"method" json:"method"`
 }
 
 type HeaderInjectionMeta struct {

@@ -1,78 +1,36 @@
 package main
 
 import (
-	"net/http/httptest"
-	"net/url"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 )
 
-const contextVarsMiddlewareDefinition = `{
-	"api_id": "1",
-	"org_id": "default",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"global_headers":{
-					"X-Static": "foo",
-					"X-Request-ID":"$tyk_context.request_id",
-					"X-Path": "$tyk_context.path",
-					"X-Remote-Addr": "$tyk_context.remote_addr"
-				}
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	},
-	"enable_context_vars": true
-}`
-
 func TestContextVarsMiddleware(t *testing.T) {
-	spec := createSpecTest(t, contextVarsMiddlewareDefinition)
-	session := createNonThrottledSession()
-	spec.SessionManager.UpdateSession("1234wer", session, 60)
-	uri := "/test/this/path"
-	method := "GET"
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	recorder := httptest.NewRecorder()
-	param := make(url.Values)
-	req := testReq(t, method, uri+param.Encode(), nil)
-	req.RemoteAddr = "127.0.0.1:80"
-	req.Header.Set("authorization", "1234wer")
-	req.Header.Set("x-forwarded-for", "1.2.3.4, 5.6.7.8")
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
+		spec.VersionData.Versions = map[string]apidef.VersionInfo{
+			"v1": {
+				UseExtendedPaths: true,
+				GlobalHeaders: map[string]string{
+					"X-Static":      "foo",
+					"X-Request-ID":  "$tyk_context.request_id",
+					"X-Path":        "$tyk_context.path",
+					"X-Remote-Addr": "$tyk_context.remote_addr",
+				},
+			},
+		}
+	})
 
-	chain := getChain(spec)
-	chain.ServeHTTP(recorder, req)
-
-	if recorder.Code != 200 {
-		t.Fatal("Invalid response code, should be 200:  \n", recorder.Code, recorder.Body)
-	}
-
-	if req.Header.Get("X-Static") == "" {
-		t.Fatal("Sanity check failed: could not find static const in header")
-	}
-
-	if req.Header.Get("X-Path") == "" {
-		t.Fatal("Could not find Path in header")
-	}
-
-	addr := req.Header.Get("X-Remote-Addr")
-	if addr == "" {
-		t.Fatal("Could not find Remote-Addr in header")
-	} else if addr != "1.2.3.4" {
-		t.Fatal("Remote-Addr is not the expected value")
-	}
-
-	if req.Header.Get("X-Request-ID") == "" {
-		t.Fatal("Could not find Correlation ID in header")
-	}
-
+	ts.Run(t, []test.TestCase{
+		{Path: "/test/path", Code: 200, BodyMatch: `"X-Remote-Addr":"127.0.0.1"`},
+		{Path: "/test/path", Code: 200, BodyMatch: `"X-Path":"/test/path"`},
+		{Path: "/test/path", Code: 200, BodyMatch: `"X-Static":"foo"`},
+		{Path: "/test/path", Code: 200, BodyMatch: `"X-Request-Id":"`},
+	}...)
 }

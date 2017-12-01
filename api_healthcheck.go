@@ -60,6 +60,9 @@ func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
 
 // reportHealthValue is a shortcut we can use throughout the app to push a health check value
 func reportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
+	configMu.Lock()
+	defer configMu.Unlock()
+
 	if !config.Global.HealthCheck.EnableHealthChecks {
 		return
 	}
