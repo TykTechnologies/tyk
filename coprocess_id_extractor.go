@@ -63,12 +63,14 @@ func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err 
 
 // ExtractForm is used when a FormSource is specified.
 func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValue string, err error) {
-	r.ParseForm()
+	copiedRequest := copyRequest(r)
+	copiedRequest.ParseForm()
+
 	if paramName == "" {
 		return "", errors.New("no form param name set")
 	}
 
-	values := r.Form[paramName]
+	values := copiedRequest.Form[paramName]
 	if len(values) == 0 {
 		return "", errors.New("no form value")
 	}
@@ -202,6 +204,11 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	regexOutput := expression.FindAllString(extractorOutput, -1)
+
+	if config.RegexMatchIndex > len(regexOutput)-1 {
+		returnOverrides = e.Error(r, fmt.Errorf("Can't find regexp match group"), "RegexExtractor error")
+		return SessionID, returnOverrides
+	}
 
 	SessionID = e.GenerateSessionID(regexOutput[config.RegexMatchIndex], e.BaseMid)
 

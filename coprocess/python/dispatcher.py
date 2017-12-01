@@ -1,6 +1,6 @@
 from glob import glob
 from os import getcwd, chdir, path
-import sys
+import sys, traceback
 
 import tyk
 from tyk.middleware import TykMiddleware
@@ -42,7 +42,7 @@ class TykDispatcher:
         return found_middleware
 
     def load_bundle(self, base_bundle_path):
-        bundle_path = path.join(base_bundle_path, '*.py')
+        bundle_path = path.join(str(base_bundle_path), '*.py')
         bundle_modules = self.get_modules(bundle_path)
         sys.path.append(base_bundle_path)
         for module_name in bundle_modules:
@@ -113,12 +113,15 @@ class TykDispatcher:
                 tyk.log( "Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
             return object.dump()
         except:
+            exc_trace = traceback.format_exc()
+            print(exc_trace)
             tyk.log_error( "Can't dispatch, error:" )
+
             return object_msg
 
     def purge_event_handlers(self):
         tyk.log( "Purging event handlers.", "debug" )
-        self.event_handlers = []
+        self.event_handlers = {}
 
     def load_event_handlers(self):
         tyk.log( "Loading event handlers.", "debug" )
