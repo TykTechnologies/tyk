@@ -5,7 +5,7 @@ package main
 
 /*
 #cgo pkg-config: python3
-#cgo python CFLAGS: -DENABLE_PYTHON
+#cgo python CFLAGS: -DENABLE_PYTHON -DPy_LIMITED_API
 
 
 #include <Python.h>
@@ -20,17 +20,17 @@ package main
 #include "coprocess/python/binding.h"
 #include "coprocess/python/dispatcher.h"
 
-#include "coprocess/python/tyk/gateway.h"
+#include "coprocess/python/tyk/gateway_wrapper.h"
 
 PyGILState_STATE gilState;
 
 static int Python_Init() {
 	CoProcessLog( sdsnew("Initializing interpreter, Py_Initialize()"), "info");
+	// This exposes the glue module as "gateway_wrapper"
+	PyImport_AppendInittab("gateway_wrapper", &PyInit_gateway_wrapper);
 	Py_Initialize();
 	gilState = PyGILState_Ensure();
 	PyEval_InitThreads();
-	// This exposes the Cython interface as "gateway"
-	PyInit_gateway();
 	return Py_IsInitialized();
 }
 

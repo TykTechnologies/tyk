@@ -1,5 +1,3 @@
-import sys
-
 from tyk.session import TykSession
 from tyk.request import TykCoProcessRequest
 
@@ -9,6 +7,7 @@ from coprocess_object_pb2 import Object
 from coprocess_mini_request_object_pb2 import MiniRequestObject
 from coprocess_return_overrides_pb2 import ReturnOverrides
 from coprocess_session_state_pb2 import SessionState
+
 
 class TykCoProcessObject:
     def __init__(self, object_msg):
