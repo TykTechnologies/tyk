@@ -485,21 +485,21 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.Director(outreq)
 	outreq.Close = false
 
-	// Remove hop-by-hop headers listed in the "Connection" header.
-	// See RFC 2616, section 14.10.
-	if c := outreq.Header.Get("Connection"); c != "" {
-		for _, f := range strings.Split(c, ",") {
-			if f = strings.TrimSpace(f); f != "" {
-				outreq.Header.Del(f)
-			}
-		}
-	}
-
 	log.Debug("Outbound Request: ", outreq.URL.String())
+	outReqIsWebsocket := IsWebsocket(outreq)
 
 	// Do not modify outbound request headers if they are WS
-	if !IsWebsocket(outreq) {
-		// Remove hop-by-hop headers to the backend. Especially
+	if !outReqIsWebsocket {
+		// Remove hop-by-hop headers listed in the "Connection" header.
+		// See RFC 2616, section 14.10.
+		if c := outreq.Header.Get("Connection"); c != "" {
+			for _, f := range strings.Split(c, ",") {
+				if f = strings.TrimSpace(f); f != "" {
+					outreq.Header.Del(f)
+				}
+			}
+		}
+		// Remove other hop-by-hop headers to the backend. Especially
 		// important is "Connection" because we want a persistent
 		// connection, regardless of what the client sent to us.
 		for _, h := range hopHeaders {
@@ -518,12 +518,18 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	// Circuit breaker
 	breakerEnforced, breakerConf := p.CheckCircuitBreakerEnforced(p.TykAPISpec, req)
 
+	// set up TLS certificates for upstream if needed
+	var tlsCertificates []tls.Certificate = nil
 	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
-		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{*cert}
+		tlsCertificates = []tls.Certificate{*cert}
+	}
+	if outReqIsWebsocket {
+		p.TykAPISpec.HTTPTransport.(*WSDialer).TLSClientConfig.Certificates = tlsCertificates
 	} else {
-		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = nil
+		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
 	}
 
+	// do request round trip
 	var res *http.Response
 	var err error
 	if breakerEnforced {
