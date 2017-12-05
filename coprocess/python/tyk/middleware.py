@@ -1,5 +1,6 @@
 from importlib import reload as reload_module
 from importlib import invalidate_caches as invalidate_caches
+
 from importlib.machinery import SourceFileLoader
 
 import inspect, sys
@@ -10,13 +11,12 @@ from gateway import TykGateway as tyk
 HandlerDecorators = list( map( lambda m: m[1], inspect.getmembers(decorators, inspect.isclass) ) )
 
 class TykMiddleware:
-    def __init__(self, filepath):
-        tyk.log( "Loading module: '{0}'".format(filepath), "info")
-        self.filepath = filepath
+    def __init__(self, module_path, module_name):
+        tyk.log( "Loading module: '{0}'".format(module_name), "info")
+        self.module_path = module_path
         self.handlers = {}
-
         try:
-            source = SourceFileLoader('middleware', self.filepath)
+            source = SourceFileLoader(module_name, self.module_path)
             self.module = source.load_module()
             self.register_handlers()
         except:
