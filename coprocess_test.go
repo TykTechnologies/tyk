@@ -288,6 +288,12 @@ const basicCoProcessDef = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpGet + `"
+	},
+	"config_data": {
+		"key": "value",
+		"nest_key": {
+			"k": "v"
+		}
 	}
 }`
 
@@ -318,5 +324,11 @@ const protectedCoProcessDef = `{
 	"proxy": {
 		"listen_path": "/v1",
 		"target_url": "` + testHttpGet + `"
+	},
+	"config_data": {
+		"key": "value",
+		"nest_key": {
+			"k": "v"
+		}
 	}
 }`

@@ -111,6 +111,15 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 			"OrgID": c.Middleware.Spec.OrgID,
 			"APIID": c.Middleware.Spec.APIID,
 		}
+
+		//Append ConfigData First Layer to Spec
+		for k, v := range c.Middleware.Spec.ConfigData {
+			switch v.(type) {
+			case string:
+				object.Spec[k] = v.(string)
+			}
+		}
+
 	}
 
 	// Encode the session object (if not a pre-process & not a custom key check):
