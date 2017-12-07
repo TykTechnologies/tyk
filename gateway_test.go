@@ -749,10 +749,13 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 		t.Error("Unexpected reply:", string(p))
 	}
 
-	// check that we still can interact via 2nd connection we did before
-	err = conn2.WriteMessage(websocket.BinaryMessage, []byte("new test message 2"))
-	if err != nil {
-		t.Fatalf("cannot write message: %v", err)
+		if cached && !tc.wantCached {
+			t.Fatalf("wanted %s %s to not cache, but it did", tc.method, tc.path)
+		} else if !cached && tc.wantCached {
+			t.Fatalf("wanted %s %s to cache, but it didn't", tc.method, tc.path)
+		}
+
+		time.Sleep(10 * time.Millisecond)
 	}
 	_, p, err = conn2.ReadMessage()
 	if err != nil {
