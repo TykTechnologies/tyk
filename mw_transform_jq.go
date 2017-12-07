@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Sirupsen/logrus"
+	"io"
 	"io/ioutil"
 	"net/http"
 )
@@ -58,7 +59,10 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 
 	var bodyObj interface{}
 	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(&bodyObj); err != nil {
+	err := dec.Decode(&bodyObj)
+
+	// Do not fail if the body is empty
+	if err != nil && err != io.EOF {
 		return err
 	}
 
