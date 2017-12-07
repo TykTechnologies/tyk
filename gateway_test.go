@@ -132,6 +132,26 @@ func firstVals(vals map[string][]string) map[string]string {
 
 const defaultListenPort = 8080
 
+// simulate reloads in the background, i.e. writes to
+// global variables that should not be accessed in a
+// racy way like the policies and api specs maps.
+func reloadSimulation(){
+	for {
+		policiesMu.Lock()
+		policiesByID["_"] = user.Policy{}
+		delete(policiesByID, "_")
+		policiesMu.Unlock()
+		apisMu.Lock()
+		old := apiSpecs
+		apiSpecs = append(apiSpecs, nil)
+		apiSpecs = old
+		apisByID["_"] = nil
+		delete(apisByID, "_")
+		apisMu.Unlock()
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestMain(m *testing.M) {
 	testServer := &http.Server{
 		Addr:           testHttpListen,
@@ -171,26 +191,7 @@ func TestMain(m *testing.M) {
 
 	go reloadLoop(reloadTick)
 	go reloadQueueLoop()
-
-	go func() {
-		// simulate reloads in the background, i.e. writes to
-		// global variables that should not be accessed in a
-		// racy way like the policies and api specs maps.
-		for {
-			policiesMu.Lock()
-			policiesByID["_"] = user.Policy{}
-			delete(policiesByID, "_")
-			policiesMu.Unlock()
-			apisMu.Lock()
-			old := apiSpecs
-			apiSpecs = append(apiSpecs, nil)
-			apiSpecs = old
-			apisByID["_"] = nil
-			delete(apisByID, "_")
-			apisMu.Unlock()
-			time.Sleep(10 * time.Millisecond)
-		}
-	}()
+	go reloadSimulation()
 
 	exitCode := m.Run()
 
