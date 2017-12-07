@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
@@ -107,9 +108,15 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	// Append spec data:
 	if c.Middleware != nil {
+		configDataAsJson := []byte("{}")
+		if len(c.Middleware.Spec.ConfigData) > 0 {
+			configDataAsJson, _ = json.Marshal(c.Middleware.Spec.ConfigData)
+		}
+
 		object.Spec = map[string]string{
-			"OrgID": c.Middleware.Spec.OrgID,
-			"APIID": c.Middleware.Spec.APIID,
+			"OrgID":       c.Middleware.Spec.OrgID,
+			"APIID":       c.Middleware.Spec.APIID,
+			"config_data": string(configDataAsJson),
 		}
 	}
 
