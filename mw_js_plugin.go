@@ -65,8 +65,10 @@ func (d *DynamicMiddleware) Name() string {
 	return "DynamicMiddleware"
 }
 
-func jsonConfigData(spec *APISpec) string {
+func specToJson(spec *APISpec) string {
 	m := map[string]interface{}{
+		"OrgID": spec.OrgID,
+		"APIID": spec.APIID,
 		// For backwards compatibility within 2.x.
 		// TODO: simplify or refactor in 3.x or later.
 		"config_data": spec.ConfigData,
@@ -106,7 +108,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteParams:   []string{},
 	}
 
-	asJsonRequestObj, err := json.Marshal(requestData)
+	requestAsJson, err := json.Marshal(requestData)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -114,7 +116,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
-	confData := jsonConfigData(d.Spec)
+	specAsJson := specToJson(d.Spec)
 
 	session := new(user.SessionState)
 	token := ctxGetAuthToken(r)
@@ -124,7 +126,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		session = ctxGetSession(r)
 	}
 
-	sessionAsJsonObj, err := json.Marshal(session)
+	sessionAsJson, err := json.Marshal(session)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -150,7 +152,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// the whole Go program.
 			recover()
 		}()
-		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
 		ret <- returnRaw
 		errRet <- err
 	}()

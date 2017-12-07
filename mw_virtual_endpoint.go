@@ -130,14 +130,14 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	r.ParseForm()
 	requestData.Params = r.Form
 
-	asJsonRequestObj, err := json.Marshal(requestData)
+	requestAsJson, err := json.Marshal(requestData)
 	if err != nil {
 		log.Error("Failed to encode request object for virtual endpoint: ", err)
 		return nil
 	}
 
 	// Encode the configuration data too
-	confData := jsonConfigData(d.Spec)
+	specAsJson := specToJson(d.Spec)
 
 	session := new(user.SessionState)
 	token := ctxGetAuthToken(r)
@@ -147,7 +147,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		session = ctxGetSession(r)
 	}
 
-	sessionAsJsonObj, err := json.Marshal(session)
+	sessionAsJson, err := json.Marshal(session)
 	if err != nil {
 		log.Error("Failed to encode session for VM: ", err)
 		return nil
@@ -155,7 +155,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Run the middleware
 	vm := d.Spec.JSVM.VM.Copy()
-	returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+	returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
 	if err != nil {
 		log.Error("Failed to run virtual endpoint JS code:", err)
 		return nil
