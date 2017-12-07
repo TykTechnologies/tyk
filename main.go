@@ -619,7 +619,12 @@ func rpcReloadLoop(rpcKey string) {
 	}
 }
 
+var reloadMu sync.Mutex
+
 func doReload() {
+	reloadMu.Lock()
+	defer reloadMu.Unlock()
+
 	// Load the API Policies
 	syncPolicies()
 	// load the specs

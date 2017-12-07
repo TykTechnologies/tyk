@@ -1269,5 +1269,7 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 		} else if !cached && tc.wantCached {
 			t.Fatalf("wanted %s %s to cache, but it didn't", tc.method, tc.path)
 		}
+
+		time.Sleep(10 * time.Millisecond)
 	}
 }
