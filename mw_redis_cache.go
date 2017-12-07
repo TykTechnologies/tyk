@@ -249,7 +249,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(session.QuotaRemaining)))
 		w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(session.QuotaRenews)))
 	}
-	w.Header().Add("x-tyk-cached-response", "1")
+	w.Header().Set("x-tyk-cached-response", "1")
 	w.WriteHeader(newRes.StatusCode)
 	m.Proxy.CopyResponse(w, newRes.Body)
 

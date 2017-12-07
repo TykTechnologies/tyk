@@ -135,7 +135,7 @@ const defaultListenPort = 8080
 // simulate reloads in the background, i.e. writes to
 // global variables that should not be accessed in a
 // racy way like the policies and api specs maps.
-func reloadSimulation(){
+func reloadSimulation() {
 	for {
 		policiesMu.Lock()
 		policiesByID["_"] = user.Policy{}
@@ -1254,29 +1254,20 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 		{"POST", "/", false}, // never cached
 		{"GET", "/", true},   // still cached after the POST
 	}
-	highestID := -1
+
 	for _, tc := range tests {
-		req, err := http.NewRequest(tc.method, baseURL+tc.path, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		req, _ := http.NewRequest(tc.method, baseURL+tc.path, nil)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
-		var testResp testHttpResponse
-		if err := json.NewDecoder(resp.Body).Decode(&testResp); err != nil {
-			t.Fatal(err)
-		}
-		cached := testResp.ID <= highestID
+
+		cached := resp.Header.Get("x-tyk-cached-response") == "1"
+
 		if cached && !tc.wantCached {
 			t.Fatalf("wanted %s %s to not cache, but it did", tc.method, tc.path)
 		} else if !cached && tc.wantCached {
 			t.Fatalf("wanted %s %s to cache, but it didn't", tc.method, tc.path)
-		}
-		if testResp.ID > highestID {
-			highestID = testResp.ID
 		}
 	}
 }
