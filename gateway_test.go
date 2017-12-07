@@ -1255,6 +1255,8 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 		{"GET", "/", true},   // still cached after the POST
 	}
 	highestID := -1
+	cachedRequest = make(chan bool)
+	defer func() { cachedRequest = nil }()
 	for _, tc := range tests {
 		req, err := http.NewRequest(tc.method, baseURL+tc.path, nil)
 		if err != nil {
@@ -1278,5 +1280,6 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 		if testResp.ID > highestID {
 			highestID = testResp.ID
 		}
+		<-cachedRequest
 	}
 }

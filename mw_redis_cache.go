@@ -96,11 +96,23 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 	return "", "", errors.New("Decoding failed, array length wrong")
 }
 
+// cachedRequest is for the tests to know if a request was cached,
+// as otherwise it's hard to tell given that the redis write is async.
+var cachedRequest chan bool
+
+func didCache(cached bool) {
+	if cachedRequest != nil {
+		// in a goroutine, to let the response be sent
+		go func() { cachedRequest <- cached }()
+	}
+}
+
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	// Only allow idempotent (safe) methods
 	if r.Method != "GET" && r.Method != "HEAD" {
+		didCache(false)
 		return nil, 200
 	}
 
@@ -121,6 +133,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Cached route matched, let go
 	if stat != StatusCached {
+		didCache(false)
 		return nil, 200
 	}
 	token := ctxGetAuthToken(r)
@@ -158,6 +171,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 		if reqVal == nil {
 			log.Warning("Upstream request must have failed, response is empty")
+			didCache(false)
 			return nil, 200
 		}
 
@@ -209,12 +223,19 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("Cache TTL is:", cacheTTL)
 			ts := m.getTimeTTL(cacheTTL)
 			toStore := m.encodePayload(wireFormatReq.String(), ts)
-			go m.CacheStore.SetKey(key, toStore, cacheTTL)
-
+			go func() {
+				m.CacheStore.SetKey(key, toStore, cacheTTL)
+				didCache(true)
+			}()
+		} else {
+			didCache(false)
 		}
 
 		return nil, mwStatusRespond
 	}
+
+	// the rest are retrieving, not setting the cache
+	defer didCache(false)
 
 	cachedData, timestamp, err := m.decodePayload(retBlob)
 	if err != nil {
