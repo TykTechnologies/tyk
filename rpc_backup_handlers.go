@@ -6,15 +6,13 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"io"
-	"net/http"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/Sirupsen/logrus"
 )
 
 const RPCKeyPrefix = "rpc:"
@@ -96,6 +94,9 @@ func doLoadWithBackup(specs []*APISpec) {
 	log.Warning("[RPC Backup] --> Initialised JSVM")
 
 	newRouter := mux.NewRouter()
+	if config.Global.HttpServerOptions.OverrideDefaults {
+		newRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
+	}
 	mainRouter = newRouter
 
 	log.Warning("[RPC Backup] --> Set up routers")
@@ -107,10 +108,7 @@ func doLoadWithBackup(specs []*APISpec) {
 	loadApps(specs, newRouter)
 	log.Warning("[RPC Backup] --> API Load Done")
 
-	newServeMux := http.NewServeMux()
-	newServeMux.Handle("/", mainRouter)
-
-	http.DefaultServeMux = newServeMux
+	router.Swap(newRouter)
 	log.Warning("[RPC Backup] --> Replaced muxer")
 
 	log.WithFields(logrus.Fields{
