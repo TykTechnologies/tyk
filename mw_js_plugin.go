@@ -463,6 +463,10 @@ func (j *JSVM) LoadTykJSApi() {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
 
+		if config.Global.ProxySSLInsecureSkipVerify {
+			tr.TLSClientConfig.InsecureSkipVerify = true
+		}
+
 		// using new Client each time should be ok, since we closing connection every time
 		client := &http.Client{Transport: tr}
 		resp, err := client.Do(r)
