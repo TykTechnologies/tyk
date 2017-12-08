@@ -196,6 +196,242 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	})
 }
 
+func getChain(spec *APISpec) http.Handler {
+	remote, err := url.Parse(spec.Proxy.TargetURL)
+	if err != nil {
+		panic(err)
+	}
+	proxy := TykNewSingleHostReverseProxy(remote, spec)
+	proxyHandler := ProxyHandler(proxy, spec)
+	creeateResponseMiddlewareChain(spec)
+	baseMid := BaseMiddleware{spec, proxy}
+	chain := alice.New(mwList(
+		&IPWhiteListMiddleware{baseMid},
+		&MiddlewareContextVars{BaseMiddleware: baseMid},
+		&AuthKey{baseMid},
+		&VersionCheck{BaseMiddleware: baseMid},
+		&KeyExpired{baseMid},
+		&AccessRightsCheck{baseMid},
+		&RateLimitAndQuotaCheck{baseMid},
+		&TransformHeaders{baseMid},
+		&URLRewriteMiddleware{baseMid},
+	)...).Then(proxyHandler)
+	return chain
+}
+
+const nonExpiringDefNoWhiteList = `{
+	"api_id": "1",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04"
+			}
+		}
+	},
+	"event_handlers": {
+		"events": {
+			"QuotaExceeded": [
+				{
+					"handler_name":"eh_log_handler",
+					"handler_meta": {
+						"prefix": "LOG-HANDLER-PREFIX"
+					}
+				},
+				{
+					"handler_name":"eh_web_hook_handler",
+					"handler_meta": {
+						"method": "POST",
+						"target_path": "` + testHttpPost + `",
+						"template_path": "templates/default_webhook.json",
+						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+						"event_timeout": 10
+					}
+				}
+			]
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+}`
+
+const versionedDefinition = `{
+	"api_id": "9991",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"versions": {
+			"v1": {"name": "v1"}
+		}
+	},
+	"event_handlers": {
+		"events": {
+			"QuotaExceeded": [
+				{
+					"handler_name":"eh_log_handler",
+					"handler_meta": {
+						"prefix": "LOG-HANDLER-PREFIX"
+					}
+				},
+				{
+					"handler_name":"eh_web_hook_handler",
+					"handler_meta": {
+						"method": "POST",
+						"target_path": "` + testHttpPost + `",
+						"template_path": "templates/default_webhook.json",
+						"header_map": {"X-Tyk-Test-Header": "Tyk v1.BANANA"},
+						"event_timeout": 10
+					}
+				}
+			]
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+}`
+
+const pathBasedDefinition = `{
+	"api_id": "9992",
+	"auth": {
+		"use_param": true,
+		"auth_header_name": "authorization"
+	},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"default": {
+				"name": "default"
+			}
+		}
+	},
+	"proxy": {
+		"listen_path": "/pathBased/",
+		"target_url": "` + testHttpGet + `"
+	}
+}`
+
+const extendedPathGatewaySetup = `{
+	"api_id": "1",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"use_extended_paths": true,
+				"extended_paths": {
+					"ignored": [
+						{
+							"path": "/v1/ignored/noregex",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "/v1/ignored/with_id/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					],
+					"white_list": [
+						{
+							"path": "/v1/allowed/whitelist/literal",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "/v1/allowed/whitelist/reply/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "reply",
+									"code": 200,
+									"data": "flump",
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						},
+						{
+							"path": "/v1/allowed/whitelist/{id}",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					],
+					"black_list": [
+						{
+							"path": "/v1/disallowed/blacklist/literal",
+							"method_actions": {
+								"GET": {
+									"action": "no_action",
+									"code": 200,
+									"headers": {
+										"x-tyk-override-test": "tyk-override",
+										"x-tyk-override-test-2": "tyk-override-2"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+}`
+
 func createSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	tname := t.Name()
