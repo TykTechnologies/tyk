@@ -37,6 +37,7 @@ type MiniRequestObject struct {
 	DeleteHeaders   []string
 	Body            []byte
 	URL             string
+	RequestURI      string
 	Params          map[string][]string
 	AddParams       map[string]string
 	ExtendedParams  map[string][]string
@@ -83,10 +84,9 @@ func specToJson(spec *APISpec) string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
 	t1 := time.Now().UnixNano()
 
-	// Createthe proxy object
+	// Create the proxy object
 	defer r.Body.Close()
 	originalBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -102,6 +102,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteHeaders:  []string{},
 		Body:           originalBody,
 		URL:            r.URL.Path,
+		RequestURI:     r.RequestURI,
 		Params:         r.URL.Query(),
 		AddParams:      map[string]string{},
 		ExtendedParams: map[string][]string{},
