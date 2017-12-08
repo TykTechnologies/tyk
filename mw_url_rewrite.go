@@ -48,6 +48,9 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 		log.Debug("URL Re-written from: ", path)
 		log.Debug("URL Re-written to: ", newpath)
 
+		// put url_rewrite path to context to be used in ResponseTransformMiddleware
+		ctxSetUrlRewritePath(r, meta.Path)
+
 		// matched?? Set the modified path
 		// return newpath, nil
 	}
