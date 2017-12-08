@@ -61,6 +61,18 @@
 			"revisionTime": "2016-08-29T16:00:34Z"
 		},
 		{
+			"checksumSHA1": "C7gtyz3E3AqJVC3vGJP7v2Q33Hg=",
+			"path": "github.com/TykTechnologies/logrus",
+			"revision": "55ff0f4b9b3de929d99bad783723811ff7add9b6",
+			"revisionTime": "2016-12-01T17:12:39Z"
+		},
+		{
+			"checksumSHA1": "3Mr3339eVXk4tpit/L43/Zb2dhQ=",
+			"path": "github.com/TykTechnologies/logrus/hooks/syslog",
+			"revision": "55ff0f4b9b3de929d99bad783723811ff7add9b6",
+			"revisionTime": "2016-12-01T17:12:39Z"
+		},
+		{
 			"checksumSHA1": "v64AG0uGiKryWV/kqq5360zw1ts=",
 			"path": "github.com/TykTechnologies/openid2go/openid",
 			"revision": "aab5ce1231ab090ca20af7b7b45a86ae34235eef",
@@ -197,12 +209,12 @@
 			"revisionTime": "2016-08-17T18:46:32Z"
 		},
 		{
-			"checksumSHA1": "Ow/mLkfVIZgMOXE6aPSdPiDLJ6c=",
+			"checksumSHA1": "hUTpkQKTPpTUll9JmFj9NyQ+wjs=",
 			"path": "github.com/gorilla/mux",
-			"revision": "bcd8bc72b08df0f70df986b97f95590779502d31",
-			"revisionTime": "2017-05-21T04:50:13Z",
-			"version": "v1.4.0",
-			"versionExact": "v1.4.0"
+			"revision": "7f08801859139f86dfafd1c296e2cba9a80d292e",
+			"revisionTime": "2017-11-05T17:23:20Z",
+			"version": "v1.6.0",
+			"versionExact": "v1.6.0"
 		},
 		{
 			"checksumSHA1": "oozAtDM7zyQcNmoi1MF0HNECXBk=",
@@ -295,6 +307,62 @@
 			"path": "github.com/mitchellh/mapstructure",
 			"revision": "f3009df150dadf309fdee4a54ed65c124afad715",
 			"revisionTime": "2016-10-20T16:18:36Z"
+		},
+		{
+			"checksumSHA1": "fG/hdI57tzm9CfcELMa7QVXESR8=",
+			"path": "github.com/newrelic/go-agent",
+			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
+			"revisionTime": "2017-04-18T16:35:58Z",
+			"version": "v1.9.0",
+			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "RLcqh1sr2fix+w5CLGqpgdXOSh4=",
+			"path": "github.com/newrelic/go-agent/_integrations/nrgorilla/v1",
+			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
+			"revisionTime": "2017-04-18T16:35:58Z",
+			"version": "v1.9.0",
+			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "xOBMYhyCFUIXslS7AWykIUY6dUk=",
+			"path": "github.com/newrelic/go-agent/internal",
+			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
+			"revisionTime": "2017-04-18T16:35:58Z",
+			"version": "v1.9.0",
+			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "mkbupMdy+cF7xyo8xW0A6Bq15k4=",
+			"path": "github.com/newrelic/go-agent/internal/jsonx",
+			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
+			"revisionTime": "2017-04-18T16:35:58Z",
+			"version": "v1.9.0",
+			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "ywxlVKtGArJ2vDfH1rAqEFwSGds=",
+			"path": "github.com/newrelic/go-agent/internal/logger",
+			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
+			"revisionTime": "2017-04-18T16:35:58Z",
+			"version": "v1.9.0",
+			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "S7CiHO7EblgZt9q7wgiXMv/j/ao=",
+			"path": "github.com/newrelic/go-agent/internal/sysinfo",
+			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
+			"revisionTime": "2017-04-18T16:35:58Z",
+			"version": "v1.9.0",
+			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "c2JSKesj3tHYgzIF3QL37WfHWG8=",
+			"path": "github.com/newrelic/go-agent/internal/utilization",
+			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
+			"revisionTime": "2017-04-18T16:35:58Z",
+			"version": "v1.9.0",
+			"versionExact": "v1.9.0"
 		},
 		{
 			"checksumSHA1": "xmWd9nj+yZQ5TiHznuoyj4fkknk=",
@@ -521,7 +589,7 @@
 			"revisionTime": "2017-02-06T03:21:01Z"
 		},
 		{
-			"checksumSHA1": "uTQtOqR0ePMMcvuvAIksiIZxhqU=",
+			"checksumSHA1": "Xhsm+TevJogC8U4sG6FO+czBMps=",
 			"path": "golang.org/x/sys/unix",
 			"revision": "7a6e5648d140666db5d920909e082ca00a87ba2c",
 			"revisionTime": "2017-02-01T04:15:14Z"

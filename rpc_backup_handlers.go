@@ -9,12 +9,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/Sirupsen/logrus"
 )
 
 const RPCKeyPrefix = "rpc:"
@@ -106,6 +105,12 @@ func doLoadWithBackup(specs []*APISpec) {
 	log.Warning("[RPC Backup] --> Loading APIs")
 	loadApps(specs, newRouter)
 	log.Warning("[RPC Backup] --> API Load Done")
+
+	if config.Global.NewRelic.AppName != "" {
+		log.Warning("[RPC Backup] --> Adding NewRelic instrumentation")
+		AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+		log.Warning("[RPC Backup] --> NewRelic instrumentation added")
+	}
 
 	newServeMux := http.NewServeMux()
 	newServeMux.Handle("/", mainRouter)

@@ -52,12 +52,31 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 	if r.buildOnly || r.err != nil {
 		return false
 	}
+
+	var matchErr error
+
 	// Match everything.
 	for _, m := range r.matchers {
 		if matched := m.Match(req, match); !matched {
+			if _, ok := m.(methodMatcher); ok {
+				matchErr = ErrMethodMismatch
+				continue
+			}
+			matchErr = nil
 			return false
 		}
 	}
+
+	if matchErr != nil {
+		match.MatchErr = matchErr
+		return false
+	}
+
+	if match.MatchErr == ErrMethodMismatch {
+		// We found a route which matches request method, clear MatchErr
+		match.MatchErr = nil
+	}
+
 	// Yay, we have a match. Let's collect some info about it.
 	if match.Route == nil {
 		match.Route = r
@@ -68,6 +87,7 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 	if match.Vars == nil {
 		match.Vars = make(map[string]string)
 	}
+
 	// Set variables.
 	if r.regexp != nil {
 		r.regexp.setMatch(req, match, r)
@@ -482,13 +502,14 @@ func (r *Route) URL(pairs ...string) (*url.URL, error) {
 		return nil, err
 	}
 	var scheme, host, path string
+	queries := make([]string, 0, len(r.regexp.queries))
 	if r.regexp.host != nil {
 		if host, err = r.regexp.host.url(values); err != nil {
 			return nil, err
 		}
 		scheme = "http"
-		if r.buildScheme != "" {
-			scheme = r.buildScheme
+		if s := r.getBuildScheme(); s != "" {
+			scheme = s
 		}
 	}
 	if r.regexp.path != nil {
@@ -496,10 +517,18 @@ func (r *Route) URL(pairs ...string) (*url.URL, error) {
 			return nil, err
 		}
 	}
+	for _, q := range r.regexp.queries {
+		var query string
+		if query, err = q.url(values); err != nil {
+			return nil, err
+		}
+		queries = append(queries, query)
+	}
 	return &url.URL{
-		Scheme: scheme,
-		Host:   host,
-		Path:   path,
+		Scheme:   scheme,
+		Host:     host,
+		Path:     path,
+		RawQuery: strings.Join(queries, "&"),
 	}, nil
 }
 
@@ -525,8 +554,8 @@ func (r *Route) URLHost(pairs ...string) (*url.URL, error) {
 		Scheme: "http",
 		Host:   host,
 	}
-	if r.buildScheme != "" {
-		u.Scheme = r.buildScheme
+	if s := r.getBuildScheme(); s != "" {
+		u.Scheme = s
 	}
 	return u, nil
 }
@@ -581,6 +610,44 @@ func (r *Route) GetPathRegexp() (string, error) {
 		return "", errors.New("mux: route does not have a path")
 	}
 	return r.regexp.path.regexp.String(), nil
+}
+
+// GetQueriesRegexp returns the expanded regular expressions used to match the
+// route queries.
+// This is useful for building simple REST API documentation and for instrumentation
+// against third-party services.
+// An empty list will be returned if the route does not have queries.
+func (r *Route) GetQueriesRegexp() ([]string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.regexp == nil || r.regexp.queries == nil {
+		return nil, errors.New("mux: route doesn't have queries")
+	}
+	var queries []string
+	for _, query := range r.regexp.queries {
+		queries = append(queries, query.regexp.String())
+	}
+	return queries, nil
+}
+
+// GetQueriesTemplates returns the templates used to build the
+// query matching.
+// This is useful for building simple REST API documentation and for instrumentation
+// against third-party services.
+// An empty list will be returned if the route does not define queries.
+func (r *Route) GetQueriesTemplates() ([]string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.regexp == nil || r.regexp.queries == nil {
+		return nil, errors.New("mux: route doesn't have queries")
+	}
+	var queries []string
+	for _, query := range r.regexp.queries {
+		queries = append(queries, query.template)
+	}
+	return queries, nil
 }
 
 // GetMethods returns the methods the route matches against
@@ -640,9 +707,20 @@ func (r *Route) buildVars(m map[string]string) map[string]string {
 
 // parentRoute allows routes to know about parent host and path definitions.
 type parentRoute interface {
+	getBuildScheme() string
 	getNamedRoutes() map[string]*Route
 	getRegexpGroup() *routeRegexpGroup
 	buildVars(map[string]string) map[string]string
+}
+
+func (r *Route) getBuildScheme() string {
+	if r.buildScheme != "" {
+		return r.buildScheme
+	}
+	if r.parent != nil {
+		return r.parent.getBuildScheme()
+	}
+	return ""
 }
 
 // getNamedRoutes returns the map where named routes are registered.

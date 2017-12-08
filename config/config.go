@@ -172,6 +172,11 @@ type SecurityConfig struct {
 	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
+type NewRelicConfig struct {
+	AppName    string `json:"app_name"`
+	LicenseKey string `json:"license_key"`
+}
+
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
 	// OriginalPath is the path to the config file that was read. If
@@ -263,6 +268,7 @@ type Config struct {
 	LogLevel                          string                                `json:"log_level"`
 	Security                          SecurityConfig                        `json:"security"`
 	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
+	NewRelic                          NewRelicConfig                        `json:"newrelic"`
 }
 
 type CertData struct {
