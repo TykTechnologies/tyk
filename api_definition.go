@@ -863,10 +863,19 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
 	// Check if ignored
 	for _, v := range rxPaths {
+		if mode != v.Status {
+			continue
+		}
 		match := v.Spec.MatchString(r.URL.Path)
 		// only return it it's what we are looking for
-		if !match || mode != v.Status {
-			continue
+		if !match {
+			// check for special case when using url_rewrites with transform_response
+			// and specifying the same "path" expression
+			if mode != TransformedResponse {
+				continue
+			} else if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
+				continue
+			}
 		}
 		switch v.Status {
 		case Ignored, BlackList, WhiteList, Cached:

@@ -1460,3 +1460,16 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	}
 	setCtxValue(r, VersionData, v)
 }
+
+func ctxSetUrlRewritePath(r *http.Request, path string) {
+	setCtxValue(r, UrlRewritePath, path)
+}
+
+func ctxGetUrlRewritePath(r *http.Request) string {
+	if v := r.Context().Value(UrlRewritePath); v != nil {
+		if strVal, ok := v.(string); ok {
+			return strVal
+		}
+	}
+	return ""
+}
