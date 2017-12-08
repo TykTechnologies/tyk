@@ -5,7 +5,8 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
-	"github.com/gtforge/tyk/config"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 type RouteProcessor func(*mux.Router)

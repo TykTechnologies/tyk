@@ -7,7 +7,7 @@ import (
 	"github.com/newrelic/go-agent"
 	"github.com/newrelic/go-agent/_integrations/nrgorilla/v1"
 
-	"github.com/gtforge/tyk/config"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func setupNewRelic() {
