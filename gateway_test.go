@@ -843,8 +843,10 @@ func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
 		setupGlobals()
 		// This is emulate calling start()
 		// But this lines is the only thing needed for this tests
-		if config.Global.ControlAPIPort == 0 {
-			loadAPIEndpoints(mainRouter)
+		if config.Global.ControlAPIPort > 0 {
+			loadAPIEndpoints(controlRouter)
+		} else {
+			router.PreProcess(loadAPIEndpoints)
 		}
 
 		if m.goagain {

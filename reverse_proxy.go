@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	newrelic "github.com/newrelic/go-agent"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -428,6 +429,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
 		return wsTransport
+	}
+
+	if txn, ok := rw.(newrelic.Transaction); ok {
+		return newrelic.NewRoundTripper(txn, transport)
 	}
 
 	return transport

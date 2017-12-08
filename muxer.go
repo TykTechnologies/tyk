@@ -5,17 +5,39 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/gtforge/tyk/config"
 )
 
+type RouteProcessor func(*mux.Router)
+
 type routerSwapper struct {
+	pre  []RouteProcessor
+	post []RouteProcessor
 	mu   sync.Mutex
 	root *mux.Router
 }
 
-func (rs *routerSwapper) Swap(newRouter *mux.Router) {
+func (rs *routerSwapper) Build() (muxer *mux.Router) {
+	muxer = mux.NewRouter()
+	if config.Global.HttpServerOptions.OverrideDefaults {
+		muxer.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
+	}
+
+	for _, f := range rs.pre {
+		f(muxer)
+	}
+
+	return
+}
+
+func (rs *routerSwapper) Swap(muxer *mux.Router) {
+	for _, f := range rs.post {
+		f(muxer)
+	}
+
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	rs.root = newRouter
+	rs.root = muxer
 }
 
 func (rs *routerSwapper) Current() *mux.Router {
@@ -26,4 +48,12 @@ func (rs *routerSwapper) Current() *mux.Router {
 
 func (rs *routerSwapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rs.Current().ServeHTTP(w, r)
+}
+
+func (rs *routerSwapper) PreProcess(rif RouteProcessor) {
+	rs.pre = append(rs.pre, rif)
+}
+
+func (rs *routerSwapper) PostProcess(rif RouteProcessor) {
+	rs.post = append(rs.post, rif)
 }

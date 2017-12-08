@@ -525,14 +525,18 @@ func loadGlobalApps() {
 	specs := make([]*APISpec, len(apiSpecs))
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
-	loadApps(specs, mainRouter)
+
+	newRouter := router.Build()
+	loadApps(specs, newRouter)
+	router.Swap(newRouter)
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec, muxer *mux.Router) {
 	hostname := config.Global.HostName
+	defaultMuxer := muxer
 	if hostname != "" {
-		muxer = muxer.Host(hostname).Subrouter()
+		defaultMuxer = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("API hostname set: ", hostname)
@@ -602,7 +606,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 					"domain": spec.Domain,
 					"api_id": spec.APIID,
 				}).Warning("Trying to load API with Domain when custom domains are disabled.")
-				subrouter = muxer
+				subrouter = defaultMuxer
 			}
 
 			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)

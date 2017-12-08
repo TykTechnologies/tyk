@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -93,16 +92,9 @@ func doLoadWithBackup(specs []*APISpec) {
 	GlobalEventsJSVM.Init(nil)
 	log.Warning("[RPC Backup] --> Initialised JSVM")
 
-	newRouter := mux.NewRouter()
-	if config.Global.HttpServerOptions.OverrideDefaults {
-		newRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
-	}
-	mainRouter = newRouter
-
-	log.Warning("[RPC Backup] --> Set up routers")
-	log.Warning("[RPC Backup] --> Loading endpoints")
-
-	loadAPIEndpoints(newRouter)
+	log.Warning("[RPC Backup] --> Creating main router")
+	newRouter := router.Build()
+	log.Warning("[RPC Backup] --> Main router created")
 
 	log.Warning("[RPC Backup] --> Loading APIs")
 	loadApps(specs, newRouter)

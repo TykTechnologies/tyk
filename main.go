@@ -68,7 +68,7 @@ var (
 	policiesMu   sync.RWMutex
 	policiesByID = map[string]user.Policy{}
 
-	router        = &routerSwapper{}
+	router        *routerSwapper
 	mainRouter    *mux.Router
 	controlRouter *mux.Router
 	LE_MANAGER    letsencrypt.Manager
@@ -124,12 +124,7 @@ func apisByIDLen() int {
 
 // Create all globals and init connection handlers
 func setupGlobals() {
-	mainRouter = mux.NewRouter()
-	if config.Global.HttpServerOptions.OverrideDefaults {
-		mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
-	}
-	router.Swap(mainRouter)
-
+	router = &routerSwapper{}
 	controlRouter = mux.NewRouter()
 
 	if config.Global.EnableAnalytics && config.Global.Storage.Type != "redis" {
@@ -207,6 +202,10 @@ func setupGlobals() {
 	}
 
 	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
+
+	if config.Global.NewRelic.Enabled {
+		setupNewRelic()
+	}
 }
 
 func buildConnStr(resource string) string {
@@ -352,6 +351,19 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 	})
 }
 
+func loadProfilingEndpoints(muxer *mux.Router) {
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Debug("Adding pprof endpoints")
+
+	r := muxer.PathPrefix("/debug/pprof").Subrouter()
+	r.HandleFunc("/{rest:.*}", pprof_http.Index)
+	r.HandleFunc("/cmdline", pprof_http.Cmdline)
+	r.HandleFunc("/profile", pprof_http.Profile)
+	r.HandleFunc("/symbol", pprof_http.Symbol)
+	r.HandleFunc("/trace", pprof_http.Trace)
+}
+
 // Set up default Tyk control API endpoints - these are global, so need to be added first
 func loadAPIEndpoints(muxer *mux.Router) {
 	hostname := config.Global.HostName
@@ -370,8 +382,9 @@ func loadAPIEndpoints(muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
 	}
+
 	if *httpProfile {
-		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
+		router.PreProcess(loadProfilingEndpoints)
 	}
 
 	log.WithFields(logrus.Fields{
@@ -646,17 +659,13 @@ func doReload() {
 		GlobalEventsJSVM.Init(nil)
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Preparing new router")
-	mainRouter = mux.NewRouter()
-	if config.Global.HttpServerOptions.OverrideDefaults {
-		mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
-	}
-
 	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Preparing new router")
 
 	loadGlobalApps()
 
@@ -1154,6 +1163,12 @@ func start() {
 		defer pprof.StopCPUProfile()
 	}
 
+	if config.Global.ControlAPIPort > 0 {
+		loadAPIEndpoints(controlRouter)
+	} else {
+		router.PreProcess(loadAPIEndpoints)
+	}
+
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global.SupressDefaultOrgStore {
 		log.WithFields(logrus.Fields{
@@ -1162,9 +1177,6 @@ func start() {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
-	}
-	if config.Global.ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
 	}
 
 	// Start listening for reload messages
@@ -1312,10 +1324,6 @@ func listen(l, controlListener net.Listener, err error) {
 				loadGlobalApps()
 				syncPolicies()
 			}
-
-			if config.Global.ControlAPIPort > 0 {
-				loadAPIEndpoints(controlRouter)
-			}
 		}
 
 		// Use a custom server so we can control keepalives
@@ -1385,10 +1393,6 @@ func listen(l, controlListener net.Listener, err error) {
 			if count > 0 {
 				loadGlobalApps()
 				syncPolicies()
-			}
-
-			if config.Global.ControlAPIPort > 0 {
-				loadAPIEndpoints(controlRouter)
 			}
 
 			if config.Global.UseDBAppConfigs {
