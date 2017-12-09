@@ -205,6 +205,12 @@
 			"versionExact": "v1.4.0"
 		},
 		{
+			"checksumSHA1": "oozAtDM7zyQcNmoi1MF0HNECXBk=",
+			"path": "github.com/gorilla/websocket",
+			"revision": "b89020ee79b89a7f932c5617d218fc06db382f53",
+			"revisionTime": "2017-12-01T01:43:01Z"
+		},
+		{
 			"checksumSHA1": "tP/Ohi+jei+mhMoXH5iEGav3ZTE=",
 			"path": "github.com/jeffail/tunny",
 			"revision": "c757dde1c2969a4756e8a99622e2f2ddbab35b10",
