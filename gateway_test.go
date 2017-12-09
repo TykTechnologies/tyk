@@ -20,7 +20,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -585,11 +585,26 @@ func TestQuota(t *testing.T) {
 	webhookWG.Wait()
 }
 
-func TestAnalytics(t *testing.T) {
-	ts := newTykTestServer(tykTestServerConfig{
-		delay: 20 * time.Millisecond,
-	})
-	defer ts.Close()
+type tykHttpTest struct {
+	method, path string
+	code         int
+	body         interface{}
+	headers      map[string]string
+
+	adminAuth      bool
+	controlRequest bool
+}
+
+func testHttp(t *testing.T, tests []tykHttpTest, separateControlPort bool) {
+	var testMatrix = []struct {
+		goagain          bool
+		overrideDefaults bool
+	}{
+		{false, false},
+		{false, true},
+		{true, true},
+		{true, false},
+	}
 
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -624,9 +639,48 @@ func TestAnalytics(t *testing.T) {
 			"authorization": key,
 		}
 
-		ts.Run(t, test.TestCase{
-			Path: "/", Headers: authHeaders, Code: 200,
-		})
+		for ti, tc := range tests {
+			tPrefix := ""
+			if m.goagain {
+				tPrefix += "[Goagain]"
+			}
+			if m.overrideDefaults {
+				tPrefix += "[OverrideDefaults]"
+			}
+			if tc.adminAuth {
+				tPrefix += "[Auth]"
+			}
+			if tc.controlRequest {
+				tPrefix += "[Control]"
+			}
+
+			baseUrl := "http://" + ln.Addr().String()
+
+			if tc.controlRequest {
+				baseUrl = "http://" + cln.Addr().String()
+			}
+
+			bodyReader := testReqBody(t, tc.body)
+			req, err := http.NewRequest(tc.method, baseUrl+tc.path, bodyReader)
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+
+			for key, val := range tc.headers {
+				req.Header.Add(key, val)
+			}
+
+			if tc.adminAuth {
+				req = withAuth(req)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+			resp.Body.Close()
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
@@ -1017,4 +1071,94 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	// clean up connections
 	conn2.Close()
 	conn3.Close()
+}
+
+func TestWebsocketsUpstream(t *testing.T) {
+	// setup and run web socket upstream
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	wsHandler := func(w http.ResponseWriter, req *http.Request) {
+		conn, err := upgrader.Upgrade(w, req, nil)
+		if err != nil {
+			t.Error("cannot upgrade:", err)
+			http.Error(w, fmt.Sprintf("cannot upgrade: %v", err), http.StatusInternalServerError)
+		}
+		mt, p, err := conn.ReadMessage()
+		if err != nil {
+			t.Error("cannot read message:", err)
+			return
+		}
+		conn.WriteMessage(mt, []byte("reply to message:"+string(p)))
+	}
+	wsServer := httptest.NewServer(http.HandlerFunc(wsHandler))
+	defer wsServer.Close()
+	u, _ := url.Parse(wsServer.URL)
+	u.Scheme = "ws"
+	targetUrl := u.String()
+	t.Log("upstream target URL:", targetUrl)
+
+	// setup spec and do test HTTP upgrade-request
+	config.Global.HttpServerOptions.EnableWebSockets = true
+
+	apiSpec := `{
+		"api_id": "1",
+		"use_keyless": true,
+		"definition": {
+			"location": "header",
+			"key": "version"
+		},
+		"auth": {"auth_header_name": "authorization"},
+		"version_data": {
+			"not_versioned": true,
+			"versions": {
+				"v1": {
+					"name": "v1",
+					"expires": "3000-01-02 15:04"
+				}
+			}
+		},
+		"proxy": {
+			"listen_path": "/v1",
+			"strip_listen_path": true,
+			"target_url": "` + targetUrl + `"
+		}
+	}`
+
+	tests := []tykHttpTest{
+		{
+			method:    http.MethodPost,
+			path:      "/tyk/apis",
+			body:      apiSpec,
+			adminAuth: true,
+			code:      http.StatusOK,
+		},
+		{
+			method:    http.MethodGet,
+			path:      "/tyk/reload/?block=true",
+			adminAuth: true,
+			code:      http.StatusOK,
+		},
+		{
+			method: http.MethodGet,
+			path:   "/v1",
+			code:   http.StatusSwitchingProtocols,
+			headers: map[string]string{
+				"Connection":            "Upgrade",
+				"Upgrade":               "websocket",
+				"Sec-Websocket-Version": "13",
+				"Sec-Websocket-Key":     "abc",
+			},
+		},
+	}
+	// have all needed reload ticks ready
+	go func() {
+		// two calls to testHttp, each loops over tests 4 times
+		for i := 0; i < 2*4; i++ {
+			reloadTick <- time.Time{}
+		}
+	}()
+	testHttp(t, tests, false)
 }
