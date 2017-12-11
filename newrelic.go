@@ -28,7 +28,7 @@ func setupNewRelic() {
 	instrument.AddSink(&newRelicSink{relic: app})
 }
 
-func NewrelicRouterInstrumentation(app newrelic.Application) RouteProcessor {
+func NewrelicRouterInstrumentation(app newrelic.Application) func(*mux.Router) {
 	return func(r *mux.Router) { nrgorilla.InstrumentRoutes(r, app) }
 }
 

@@ -603,13 +603,13 @@ func TestGroupResetHandler(t *testing.T) {
 }
 
 func TestHotReloadSingle(t *testing.T) {
-	oldRouter := router.Current()
+	oldRouter := mainRouter
 	var wg sync.WaitGroup
 	wg.Add(1)
 	reloadURLStructure(wg.Done)
 	reloadTick <- time.Time{}
 	wg.Wait()
-	if router.Current() == oldRouter {
+	if mainRouter == oldRouter {
 		t.Fatal("router wasn't swapped")
 	}
 }
