@@ -106,7 +106,7 @@ func doLoadWithBackup(specs []*APISpec) {
 	loadApps(specs, newRouter)
 	log.Warning("[RPC Backup] --> API Load Done")
 
-	if config.Global.NewRelic.Enabled {
+	if config.Global.NewRelic.AppName != "" {
 		log.Warning("[RPC Backup] --> Adding NewRelic instrumentation")
 		AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
 		log.Warning("[RPC Backup] --> NewRelic instrumentation added")

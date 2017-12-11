@@ -527,7 +527,7 @@ func loadGlobalApps() {
 	apisMu.RUnlock()
 	loadApps(specs, mainRouter)
 
-	if config.Global.NewRelic.Enabled {
+	if config.Global.NewRelic.AppName != "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Adding NewRelic instrumentation")

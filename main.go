@@ -205,7 +205,7 @@ func setupGlobals() {
 
 	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
 
-	if config.Global.NewRelic.Enabled {
+	if config.Global.NewRelic.AppName != "" {
 		NewRelicApplication = SetupNewRelic()
 	}
 }

@@ -171,7 +171,6 @@ type SecurityConfig struct {
 }
 
 type NewRelicConfig struct {
-	Enabled    bool   `json:"enabled"`
 	AppName    string `json:"app_name"`
 	LicenseKey string `json:"license_key"`
 }

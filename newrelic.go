@@ -18,7 +18,9 @@ func SetupNewRelic() (app newrelic.Application) {
 	logger.Info("Initializing NewRelic...")
 
 	cfg := newrelic.NewConfig(config.Global.NewRelic.AppName, config.Global.NewRelic.LicenseKey)
-	cfg.Enabled = config.Global.NewRelic.Enabled
+	if config.Global.NewRelic.AppName != "" {
+		cfg.Enabled = true
+	}
 	cfg.Logger = &newRelicLogger{logger}
 
 	if app, err = newrelic.NewApplication(cfg); err != nil {
