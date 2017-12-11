@@ -10,7 +10,9 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-func setupNewRelic() {
+// SetupNewRelic creates new newrelic.Application instance
+func SetupNewRelic() (app newrelic.Application) {
+	var err error
 	logger := log.WithFields(logrus.Fields{"prefix": "newrelic"})
 
 	logger.Info("Initializing NewRelic...")
@@ -19,17 +21,22 @@ func setupNewRelic() {
 	cfg.Enabled = config.Global.NewRelic.Enabled
 	cfg.Logger = &newRelicLogger{logger}
 
-	app, err := newrelic.NewApplication(cfg)
-	if err != nil {
+	if app, err = newrelic.NewApplication(cfg); err != nil {
 		logger.Warn("Error initializing NewRelic, skipping... ", err)
 		return
 	}
-	router.PostProcess(NewrelicRouterInstrumentation(app))
+
 	instrument.AddSink(&newRelicSink{relic: app})
+	logger.Info("NewRelic initialized")
+
+	return
 }
 
-func NewrelicRouterInstrumentation(app newrelic.Application) func(*mux.Router) {
-	return func(r *mux.Router) { nrgorilla.InstrumentRoutes(r, app) }
+// AddNewRelicInstrumentation adds NewRelic instrumentation to the router
+func AddNewRelicInstrumentation(app newrelic.Application, r *mux.Router) {
+	if app != nil {
+		nrgorilla.InstrumentRoutes(mainRouter, app)
+	}
 }
 
 type newRelicLogger struct{ *logrus.Entry }
@@ -44,7 +51,7 @@ func (l *newRelicLogger) Info(msg string, c map[string]interface{}) {
 	l.WithFields(c).Info(msg)
 }
 func (l *newRelicLogger) Debug(msg string, c map[string]interface{}) {
-	l.WithFields(c).Info(msg)
+	l.WithFields(c).Debug(msg)
 }
 func (l *newRelicLogger) DebugEnabled() bool {
 	return l.Level >= logrus.DebugLevel

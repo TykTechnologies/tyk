@@ -106,6 +106,12 @@ func doLoadWithBackup(specs []*APISpec) {
 	loadApps(specs, newRouter)
 	log.Warning("[RPC Backup] --> API Load Done")
 
+	if config.Global.NewRelic.Enabled {
+		log.Warning("[RPC Backup] --> Adding NewRelic instrumentation")
+		AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+		log.Warning("[RPC Backup] --> NewRelic instrumentation added")
+	}
+
 	newServeMux := http.NewServeMux()
 	newServeMux.Handle("/", mainRouter)
 
