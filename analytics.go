@@ -17,8 +17,8 @@ import (
 // AnalyticsRecord encodes the details of a request
 type AnalyticsRecord struct {
 	Method        string
-	Path          string
-	RawPath       string
+	Path          string // HTTP path, can be overriden by "track path" plugin
+	RawPath       string // Original HTTP path
 	ContentLength int64
 	UserAgent     string
 	Day           int
@@ -34,8 +34,8 @@ type AnalyticsRecord struct {
 	OrgID         string
 	OauthID       string
 	RequestTime   int64
-	RawRequest    string
-	RawResponse   string
+	RawRequest    string // Base64 encoded request data (if detailed recording turned on)
+	RawResponse   string // ^ same but for response
 	IPAddress     string
 	Geo           GeoData
 	Tags          []string
