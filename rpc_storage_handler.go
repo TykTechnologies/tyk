@@ -157,7 +157,12 @@ func (r *RPCStorageHandler) Connect() bool {
 	}
 
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
-	RPCCLientSingleton.Conns = 50
+
+	RPCCLientSingleton.Conns = config.Global.SlaveOptions.RPCPoolSize
+	if config.Global.SlaveOptions.RPCPoolSize == 0 {
+		RPCCLientSingleton.Conns = 50
+	}
+
 	RPCCLientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
