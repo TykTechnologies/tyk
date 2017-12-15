@@ -16,30 +16,9 @@ testapps/
 build_tools/
 build/
 
-tyk.conf
-tyk.zeroconf.cluster.conf
-tyk_elasticache.conf
-tyk.compose.rpc.conf
-tyk.compose.local_rpc.conf
-tyk.compose.cluster.conf
-tyk.zeroconf*.conf
-tyk.rpc.conf
-tyk.zerobench.conf
-tyk.rpc.local*.conf
-live_hybrid.conf
-tyk.conf.bak
-tyk.folder.conf
-tyk.db.conf
-tyk.compose.conf
-tyk.live.conf
-tyk.compose.rpc2.conf
-test.*.conf
-live_hybrid.conf
-ty.clonedash.conf
-tyk.dashboard.conf
-tyk.dashcluster.conf
-tyk.benchmark.conf
-tyk_elasticache.conf
+/*.conf
+/*.json
+/*.bak
 
 /tyk
 logs/
