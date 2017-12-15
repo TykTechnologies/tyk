@@ -103,6 +103,7 @@ type SlaveOptionsConfig struct {
 	GroupID                         string `json:"group_id"`
 	CallTimeout                     int    `json:"call_timeout"`
 	PingTimeout                     int    `json:"ping_timeout"`
+	RPCPoolSize                     int    `json:"rpc_pool_size"`
 }
 
 type LocalSessionCacheConf struct {
