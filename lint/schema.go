@@ -537,6 +537,9 @@ const confSchema = `{
 			},
 			"use_ssl": {
 				"type": "boolean"
+			},
+			"rpc_pool_size": {
+				"type": "integer"
 			}
 		}
 	},
