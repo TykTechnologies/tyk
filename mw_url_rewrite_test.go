@@ -494,7 +494,7 @@ func TestRewriterTriggers(t *testing.T) {
 				Triggers:     tc.triggerConf,
 			}
 
-			ctxSetSession(tc.req, &user.SessionState{
+			ctxSetSession(tc.req, &SessionState{
 				MetaData: map[string]interface{}{
 					"rewrite": "bar",
 				},
