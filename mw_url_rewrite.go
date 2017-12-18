@@ -8,6 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"fmt"
+	"io/ioutil"
+	"net/textproto"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -23,13 +27,112 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	newpath := path
 
 	result_slice := mp.FindAllStringSubmatch(path, -1)
+
+	// Check triggers
+	rewriteToPath := meta.RewriteTo
+	if len(meta.Triggers) > 0 {
+
+		// This feature uses context, we must force it if it doesn't exist
+		contextData := ctxGetData(r)
+		if contextData == nil {
+			contextDataObject := make(map[string]interface{})
+			ctxSetData(r, contextDataObject)
+		}
+
+		for tn, triggerOpts := range meta.Triggers {
+			checkAny := false
+			setCount := 0
+			if triggerOpts.On == apidef.Any {
+				checkAny = true
+			}
+
+			// Check headers
+			if len(triggerOpts.Options.HeaderMatches) > 0 {
+				if checkHeaderTrigger(r, triggerOpts.Options.HeaderMatches, checkAny, tn) {
+					setCount += 1
+					if checkAny {
+						rewriteToPath = triggerOpts.RewriteTo
+						break
+					}
+				}
+			}
+
+			// Check query string
+			if len(triggerOpts.Options.QueryValMatches) > 0 {
+				if checkQueryString(r, triggerOpts.Options.QueryValMatches, checkAny, tn) {
+					setCount += 1
+					if checkAny {
+						rewriteToPath = triggerOpts.RewriteTo
+						break
+					}
+				}
+			}
+
+			// Check path parts
+			if len(triggerOpts.Options.PathPartMatches) > 0 {
+				if checkPathParts(r, triggerOpts.Options.PathPartMatches, checkAny, tn) {
+					setCount += 1
+					if checkAny {
+						rewriteToPath = triggerOpts.RewriteTo
+						break
+					}
+				}
+			}
+
+			// Check session meta
+
+			if session := ctxGetSession(r); session != nil {
+				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
+					if checkSessionTrigger(r, session, triggerOpts.Options.SessionMetaMatches, checkAny, tn) {
+						setCount += 1
+						if checkAny {
+							rewriteToPath = triggerOpts.RewriteTo
+							break
+						}
+					}
+				}
+			}
+
+			// Check payload
+			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
+				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
+					setCount += 1
+					if checkAny {
+						rewriteToPath = triggerOpts.RewriteTo
+						break
+					}
+				}
+			}
+
+			if !checkAny {
+				// Set total count:
+				total := 0
+				if len(triggerOpts.Options.HeaderMatches) > 0 {
+					total += 1
+				}
+				if len(triggerOpts.Options.QueryValMatches) > 0 {
+					total += 1
+				}
+				if len(triggerOpts.Options.PathPartMatches) > 0 {
+					total += 1
+				}
+				if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
+					total += 1
+				}
+				if total == setCount {
+					rewriteToPath = triggerOpts.RewriteTo
+				}
+			}
+		}
+	}
+
 	// Make sure it matches the string
 	log.Debug("Rewriter checking matches, len is: ", len(result_slice))
 	if len(result_slice) > 0 {
-		newpath = meta.RewriteTo
+		newpath = rewriteToPath
 		// get the indices for the replacements:
 		dollarMatch := regexp.MustCompile(`\$\d+`) // Prepare our regex
-		replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
+		replace_slice := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 
 		log.Debug(result_slice)
 		log.Debug(replace_slice)
@@ -57,11 +160,10 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 
 	contextData := ctxGetData(r)
 
-	dollarMatch := regexp.MustCompile(`\$tyk_context.(\w+)`)
-	replace_slice := dollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
+	dollarMatch := regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
+	replace_slice := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 	for _, v := range replace_slice {
 		contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
-		log.Debug("Replacing: ", v[0])
 
 		if val, ok := contextData[contextKey]; ok {
 			newpath = strings.Replace(newpath, v[0],
@@ -73,7 +175,7 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	if session := ctxGetSession(r); session != nil {
 
 		metaDollarMatch := regexp.MustCompile(`\$tyk_meta.(\w+)`)
-		metaReplace_slice := metaDollarMatch.FindAllStringSubmatch(meta.RewriteTo, -1)
+		metaReplace_slice := metaDollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 		for _, v := range metaReplace_slice {
 			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
 			log.Debug("Replacing: ", v[0])
@@ -123,10 +225,30 @@ func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
+func (m *URLRewriteMiddleware) InitTriggerRx() {
+	// Generate regexp for each special match parameter
+	for _, ver := range m.Spec.VersionData.Versions {
+		for _, path := range ver.ExtendedPaths.URLRewrite {
+			for _, tr := range path.Triggers {
+				for _, h := range tr.Options.HeaderMatches {
+					h.Init()
+				}
+				for _, q := range tr.Options.QueryValMatches {
+					q.Init()
+				}
+				if tr.Options.PayloadMatches.MatchPattern != "" {
+					tr.Options.PayloadMatches.Init()
+				}
+			}
+		}
+	}
+}
+
 func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 	for _, version := range m.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.URLRewrite) > 0 {
 			m.Spec.URLRewriteEnabled = true
+			m.InitTriggerRx()
 			return true
 		}
 	}
@@ -168,4 +290,137 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		r.URL = newURL
 	}
 	return nil, 200
+}
+
+func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
+	contextData := ctxGetData(r)
+	fCount := 0
+	for mh, mr := range options {
+		mhCN := textproto.CanonicalMIMEHeaderKey(mh)
+		vals, ok := r.Header[mhCN]
+		if ok {
+			for i, v := range vals {
+				b := mr.Check(v)
+				if len(b) > 0 {
+					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mhCN, i)
+					contextData[kn] = b
+					fCount++
+				}
+			}
+		}
+	}
+
+	if fCount > 0 {
+		ctxSetData(r, contextData)
+		if any {
+			return true
+		}
+
+		return len(options) <= fCount
+	}
+
+	return false
+}
+
+func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
+	contextData := ctxGetData(r)
+	fCount := 0
+	for mv, mr := range options {
+		qvals := r.URL.Query()
+		vals, ok := qvals[mv]
+		if ok {
+			for i, v := range vals {
+				b := mr.Check(v)
+				if len(b) > 0 {
+					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, i)
+					contextData[kn] = b
+					fCount++
+				}
+			}
+		}
+	}
+
+	if fCount > 0 {
+		ctxSetData(r, contextData)
+		if any {
+			return true
+		}
+
+		return len(options) <= fCount
+	}
+
+	return false
+}
+
+func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
+	contextData := ctxGetData(r)
+	fCount := 0
+	for mv, mr := range options {
+		pathParts := strings.Split(r.URL.Path, "/")
+
+		for _, part := range pathParts {
+			b := mr.Check(part)
+			if len(b) > 0 {
+				kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, fCount)
+				contextData[kn] = b
+				fCount++
+			}
+		}
+	}
+
+	if fCount > 0 {
+		ctxSetData(r, contextData)
+		if any {
+			return true
+		}
+
+		return len(options) <= fCount
+	}
+
+	return false
+}
+
+func checkSessionTrigger(r *http.Request, sess *SessionState, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
+	contextData := ctxGetData(r)
+	fCount := 0
+	for mh, mr := range options {
+		rawVal, ok := sess.MetaData[mh]
+		if ok {
+			val, valOk := rawVal.(string)
+			if valOk {
+				b := mr.Check(val)
+				if len(b) > 0 {
+					kn := fmt.Sprintf("trigger-%d-%s", triggernum, mh)
+					contextData[kn] = b
+					fCount++
+				}
+			}
+		}
+	}
+
+	if fCount > 0 {
+		ctxSetData(r, contextData)
+		if any {
+			return true
+		}
+
+		return len(options) <= fCount
+	}
+
+	return false
+}
+
+func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
+	contextData := ctxGetData(r)
+	cp := copyRequest(r)
+	bodyBytes, _ := ioutil.ReadAll(cp.Body)
+
+	b := options.Check(string(bodyBytes))
+	if len(b) > 0 {
+		kn := fmt.Sprintf("trigger-%d-payload", triggernum)
+		contextData[kn] = string(b)
+		return true
+	}
+
+	return false
 }

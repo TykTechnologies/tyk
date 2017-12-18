@@ -3,6 +3,8 @@ package apidef
 import (
 	"encoding/base64"
 
+	"regexp"
+
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -20,6 +22,7 @@ type MiddlewareDriver string
 type IdExtractorSource string
 type IdExtractorType string
 type AuthTypeEnum string
+type RoutingTriggerOnType string
 
 const (
 	NoAction EndpointMethodAction = "no_action"
@@ -53,6 +56,11 @@ const (
 	OIDCUser      AuthTypeEnum = "oidc_user"
 	OAuthKey      AuthTypeEnum = "oauth_key"
 	UnsetAuth     AuthTypeEnum = ""
+
+	// For routing triggers
+	All    RoutingTriggerOnType = "all"
+	Any    RoutingTriggerOnType = "any"
+	Ignore RoutingTriggerOnType = ""
 )
 
 type EndpointMethodMeta struct {
@@ -113,11 +121,31 @@ type CircuitBreakerMeta struct {
 	ReturnToServiceAfter int     `bson:"return_to_service_after" json:"return_to_service_after"`
 }
 
+type StringRegexMap struct {
+	MatchPattern string `bson:"match_rx" json:"match_rx"`
+	matchRegex   *regexp.Regexp
+}
+
+type RoutingTriggerOptions struct {
+	HeaderMatches      map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
+	QueryValMatches    map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
+	PathPartMatches    map[string]StringRegexMap `bson:"path_part_matches" json:"path_part_matches"`
+	SessionMetaMatches map[string]StringRegexMap `bson:"session_meta_matches" json:"session_meta_matches"`
+	PayloadMatches     StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
+}
+
+type RoutingTrigger struct {
+	On        RoutingTriggerOnType  `bson:"on" json:"on"`
+	Options   RoutingTriggerOptions `bson:"options" json:"options"`
+	RewriteTo string                `bson:"rewrite_to" json:"rewrite_to"`
+}
+
 type URLRewriteMeta struct {
-	Path         string `bson:"path" json:"path"`
-	Method       string `bson:"method" json:"method"`
-	MatchPattern string `bson:"match_pattern" json:"match_pattern"`
-	RewriteTo    string `bson:"rewrite_to" json:"rewrite_to"`
+	Path         string           `bson:"path" json:"path"`
+	Method       string           `bson:"method" json:"method"`
+	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
+	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
+	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
 }
 
 type VirtualMeta struct {
@@ -421,4 +449,14 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 
 	a.UpstreamCertificates = new_upstream_certificates
+}
+
+func (s *StringRegexMap) Check(value string) string {
+	return s.matchRegex.FindString(value)
+}
+
+func (s *StringRegexMap) Init() error {
+	var err error
+	s.matchRegex, err = regexp.Compile(s.MatchPattern)
+	return err
 }
