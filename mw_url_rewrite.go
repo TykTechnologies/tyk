@@ -381,7 +381,7 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 	return false
 }
 
-func checkSessionTrigger(r *http.Request, sess *SessionState, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
+func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
 	contextData := ctxGetData(r)
 	fCount := 0
 	for mh, mr := range options {
