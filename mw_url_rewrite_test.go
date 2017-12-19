@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestRewriter(t *testing.T) {
@@ -493,7 +494,7 @@ func TestRewriterTriggers(t *testing.T) {
 				Triggers:     tc.triggerConf,
 			}
 
-			ctxSetSession(tc.req, &SessionState{
+			ctxSetSession(tc.req, &user.SessionState{
 				MetaData: map[string]interface{}{
 					"rewrite": "bar",
 				},
