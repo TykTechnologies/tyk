@@ -438,6 +438,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if p.TykAPISpec.HTTPTransport == nil {
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+	} else if IsWebsocket(req) { // check if it is an upgrade request to NEW WS-connection
+		// overwrite transport's ResponseWriter from previous upgrade request
+		// as it was already hijacked and now is being used for other connection
+		p.TykAPISpec.HTTPTransport.(*WSDialer).RW = rw
 	}
 
 	ctx := req.Context()

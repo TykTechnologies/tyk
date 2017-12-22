@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/miekg/dns"
 	"github.com/satori/go.uuid"
 
@@ -90,6 +91,29 @@ const (
 )
 
 func testHttpHandler() http.Handler {
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	wsHandler := func(w http.ResponseWriter, req *http.Request) {
+		conn, err := upgrader.Upgrade(w, req, nil)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("cannot upgrade: %v", err), http.StatusInternalServerError)
+		}
+
+		// start simple reader/writer per connection
+		go func() {
+			for {
+				mt, p, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				conn.WriteMessage(mt, []byte("reply to message: "+string(p)))
+			}
+		}()
+	}
+
 	httpError := func(w http.ResponseWriter, status int) {
 		http.Error(w, http.StatusText(status), status)
 	}
@@ -121,6 +145,7 @@ func testHttpHandler() http.Handler {
 	mux.HandleFunc("/", handleMethod(""))
 	mux.HandleFunc("/get", handleMethod("GET"))
 	mux.HandleFunc("/post", handleMethod("POST"))
+	mux.HandleFunc("/ws", wsHandler)
 	mux.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
@@ -182,6 +207,7 @@ type tykTestServerConfig struct {
 type tykTestServer struct {
 	ln  net.Listener
 	cln net.Listener
+	URL string
 
 	globalConfig config.Config
 	config       tykTestServerConfig
@@ -211,6 +237,8 @@ func (s *tykTestServer) Start() {
 	} else {
 		listen(s.ln, s.cln, fmt.Errorf("Without goagain"))
 	}
+
+	s.URL = "http://" + s.ln.Addr().String()
 }
 
 func (s *tykTestServer) Close() {
