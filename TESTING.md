@@ -260,6 +260,7 @@ There is also few special URLs with specific behavior:
 - `/get` accepts only `GET` requests
 - `/post` accepts only `POST` requests
 - `/jwk.json` used for cases when JWK token downloaded from upsteram
+- `/ws` used for testing WebSockets
 - `/bundles` built in plugin bundle web server, more details below
 
 ### Coprocess plugin testing
