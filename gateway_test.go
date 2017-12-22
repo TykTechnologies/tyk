@@ -660,32 +660,7 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
-func TestWebsocketsUpstream(t *testing.T) {
-	// setup and run web socket upstream
-	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-
-	wsHandler := func(w http.ResponseWriter, req *http.Request) {
-		conn, err := upgrader.Upgrade(w, req, nil)
-		if err != nil {
-			t.Error("cannot upgrade:", err)
-			http.Error(w, fmt.Sprintf("cannot upgrade: %v", err), http.StatusInternalServerError)
-		}
-		mt, p, err := conn.ReadMessage()
-		if err != nil {
-			t.Error("cannot read message:", err)
-			return
-		}
-		conn.WriteMessage(mt, []byte("reply to message:"+string(p)))
-	}
-	wsServer := httptest.NewServer(http.HandlerFunc(wsHandler))
-	defer wsServer.Close()
-	u, _ := url.Parse(wsServer.URL)
-	u.Scheme = "ws"
-	targetUrl := u.String()
-
+func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
 	// setup spec and do test HTTP upgrade-request
 	config.Global.HttpServerOptions.EnableWebSockets = true
 	defer resetTestConfig()
@@ -695,16 +670,112 @@ func TestWebsocketsUpstream(t *testing.T) {
 
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
-		spec.Proxy.TargetURL = targetUrl
 	})
 
 	ts.Run(t, test.TestCase{
-		Code: http.StatusSwitchingProtocols,
+		Path: "/ws",
 		Headers: map[string]string{
 			"Connection":            "Upgrade",
 			"Upgrade":               "websocket",
 			"Sec-Websocket-Version": "13",
 			"Sec-Websocket-Key":     "abc",
 		},
+		Code: http.StatusSwitchingProtocols,
 	})
+}
+
+func TestWebsocketsSeveralOpenClose(t *testing.T) {
+	config.Global.HttpServerOptions.EnableWebSockets = true
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
+
+	// connect 1st time, send and read message, close connection
+	conn1, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
+	if err != nil {
+		t.Fatalf("cannot make websocket connection: %v", err)
+	}
+	err = conn1.WriteMessage(websocket.BinaryMessage, []byte("test message 1"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err := conn1.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: test message 1" {
+		t.Error("Unexpected reply:", string(p))
+	}
+	conn1.Close()
+
+	// connect 2nd time, send and read message, but don't close yet
+	conn2, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
+	if err != nil {
+		t.Fatalf("cannot make websocket connection: %v", err)
+	}
+	err = conn2.WriteMessage(websocket.BinaryMessage, []byte("test message 2"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err = conn2.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: test message 2" {
+		t.Error("Unexpected reply:", string(p))
+	}
+
+	// connect 3d time having one connection already open before, send and read message
+	conn3, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
+	if err != nil {
+		t.Fatalf("cannot make websocket connection: %v", err)
+	}
+	err = conn3.WriteMessage(websocket.BinaryMessage, []byte("test message 3"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err = conn3.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: test message 3" {
+		t.Error("Unexpected reply:", string(p))
+	}
+
+	// check that we still can interact via 2nd connection we did before
+	err = conn2.WriteMessage(websocket.BinaryMessage, []byte("new test message 2"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err = conn2.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: new test message 2" {
+		t.Error("Unexpected reply:", string(p))
+	}
+
+	// check that we still can interact via 3d connection we did before
+	err = conn3.WriteMessage(websocket.BinaryMessage, []byte("new test message 3"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err = conn3.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: new test message 3" {
+		t.Error("Unexpected reply:", string(p))
+	}
+
+	// clean up connections
+	conn2.Close()
+	conn3.Close()
 }
