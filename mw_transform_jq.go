@@ -119,7 +119,22 @@ func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResu
 	}
 
 	jq_result.Body = values["body"]
-	jq_result.RewriteHeaders, _ = values["rewrite_headers"].(map[string]string)
+
+	headers, converted := values["rewrite_headers"].(map[string]interface{})
+	if !converted {
+		log.Error("rewrite_headers field must be a JSON object of string/string pairs")
+	} else {
+		jq_result.RewriteHeaders = make(map[string]string)
+		for k, v := range headers {
+			switch x := v.(type) {
+			case string:
+				jq_result.RewriteHeaders[k] = x
+			default:
+				log.Errorf("rewrite_header field must be a JSON object of string/string pairs (%s isn't)", k)
+			}
+		}
+	}
+
 	jq_result.TykContext, _ = values["tyk_context"].(map[string]interface{})
 
 	return jq_result, nil
