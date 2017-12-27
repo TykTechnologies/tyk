@@ -10,10 +10,13 @@ import (
 	"reflect"
 )
 
+// JQ type stores a JQ vm
+// Must be protected with mutex in threaded environment
 type JQ struct {
 	state *C.jq_state
 }
 
+// NewJQ creates a bew JQ vm. program is the actual JQ filter to compile
 func NewJQ(program string) (*JQ, error) {
 	state := C.jq_init()
 
@@ -25,6 +28,7 @@ func NewJQ(program string) (*JQ, error) {
 	return &JQ{state}, nil
 }
 
+// Handle applies the compiled filter ton the value
 func (jq *JQ) Handle(value interface{}) (interface{}, error) {
 	jv := goToJv(value)
 	if !isValid(jv) {
@@ -33,16 +37,16 @@ func (jq *JQ) Handle(value interface{}) (interface{}, error) {
 	}
 
 	C.jq_start(jq.state, jv, 0)
-	jv_result := C.jq_next(jq.state)
+	jvResult := C.jq_next(jq.state)
 
-	if isValid(jv_result) {
-		result := jvToGo(jv_result)
-		C.jv_free(jv_result)
-		return result, nil
-	} else {
-		C.jv_free(jv_result)
+	if !isValid(jvResult) {
+		C.jv_free(jvResult)
 		return nil, errors.New("Error while applying JQ transformation XXX: Get the error message from jv_result")
 	}
+
+	result := jvToGo(jvResult)
+	C.jv_free(jvResult)
+	return result, nil
 }
 
 func isValid(jv C.jv) bool {

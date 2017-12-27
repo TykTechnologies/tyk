@@ -41,12 +41,12 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		"response_headers": res.Header,
 	}
 
-	jq_result, err := lockedJQTransform(t, jqObj)
+	jqResult, err := lockedJQTransform(t, jqObj)
 	if err != nil {
 		return err
 	}
 
-	transformed, _ := json.Marshal(jq_result.Body)
+	transformed, _ := json.Marshal(jqResult.Body)
 
 	bodyBuffer := bytes.NewBuffer(transformed)
 	res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
@@ -54,7 +54,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 	res.Body = ioutil.NopCloser(bodyBuffer)
 
 	// Replace header in the response
-	for hName, hValue := range jq_result.RewriteHeaders {
+	for hName, hValue := range jqResult.RewriteHeaders {
 		res.Header.Set(hName, hValue)
 	}
 

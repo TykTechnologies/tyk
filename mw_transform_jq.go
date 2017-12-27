@@ -14,6 +14,8 @@ type TransformJQMiddleware struct {
 	BaseMiddleware
 }
 
+// JQResult structure stores the result of Tyk-JQ filter.
+// It means that the result of the filter must contains the following fields
 type JQResult struct {
 	Body           interface{}            `mapstructure:"body"`
 	RewriteHeaders map[string]string      `mapstructure:"rewrite_headers"`
@@ -71,25 +73,25 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		"_tyk_context": ctxGetData(r),
 	}
 
-	jq_result, err := lockedJQTransform(t, jqObj)
+	jqResult, err := lockedJQTransform(t, jqObj)
 	if err != nil {
 		return err
 	}
 
-	transformed, _ := json.Marshal(jq_result.Body)
+	transformed, _ := json.Marshal(jqResult.Body)
 	bodyBuffer := bytes.NewBuffer(transformed)
 	r.Body = ioutil.NopCloser(bodyBuffer)
 	r.ContentLength = int64(bodyBuffer.Len())
 
 	// Replace header in the request
-	for hName, hValue := range jq_result.RewriteHeaders {
+	for hName, hValue := range jqResult.RewriteHeaders {
 		r.Header.Set(hName, hValue)
 	}
 
 	if contextVars {
 		// Set variables in context vars
 		contextDataObject := ctxGetData(r)
-		for k, v := range jq_result.TykContext {
+		for k, v := range jqResult.TykContext {
 			contextDataObject[k] = v
 		}
 		ctxSetData(r, contextDataObject)
@@ -112,30 +114,30 @@ func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResu
 	//    "tyk_context": {"var1_name": "var1_value", ...}
 	//  }
 
-	var jq_result JQResult
+	var jqResult JQResult
 	values, ok := value.(map[string]interface{})
 	if !ok {
 		return JQResult{}, errors.New("Invalid JSON object returned by JQ filter. Allowed field are 'body', 'rewrite_headers' and 'tyk_context'")
 	}
 
-	jq_result.Body = values["body"]
+	jqResult.Body = values["body"]
 
 	headers, converted := values["rewrite_headers"].(map[string]interface{})
 	if !converted {
 		log.Error("rewrite_headers field must be a JSON object of string/string pairs")
 	} else {
-		jq_result.RewriteHeaders = make(map[string]string)
+		jqResult.RewriteHeaders = make(map[string]string)
 		for k, v := range headers {
 			switch x := v.(type) {
 			case string:
-				jq_result.RewriteHeaders[k] = x
+				jqResult.RewriteHeaders[k] = x
 			default:
 				log.Errorf("rewrite_header field must be a JSON object of string/string pairs (%s isn't)", k)
 			}
 		}
 	}
 
-	jq_result.TykContext, _ = values["tyk_context"].(map[string]interface{})
+	jqResult.TykContext, _ = values["tyk_context"].(map[string]interface{})
 
-	return jq_result, nil
+	return jqResult, nil
 }
