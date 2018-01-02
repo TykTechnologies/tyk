@@ -1,6 +1,6 @@
 package main
 
-// #cgo LDFLAGS: -ljq
+// #cgo LDFLAGS: -l:libjq.a -l:libonig.a -lm
 // #include <jq.h>
 // #include <jv.h>
 import "C"
