@@ -235,6 +235,10 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
 			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
+			// force RequestURI to skip escaping if API's proxy is set for this
+			if spec.Proxy.SkipTargetPathEscaping {
+				req.URL.Opaque = req.URL.Path // if we set opaque here it will force URL.RequestURI to skip escaping
+			}
 		}
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host

@@ -266,6 +266,53 @@ func TestParambasedAuth(t *testing.T) {
 	})
 }
 
+func TestSkipTargetPassEscapingOff(t *testing.T) {
+	tests := map[string]struct {
+		SkipTargetPathEscaping bool
+		URI                    string
+		ExpectedUpstreamURI    string
+	}{
+		"skip_target_path_escaping=false": {
+			SkipTargetPathEscaping: false,
+			URI:                 "/v1/promotions/(abc,xyz)",
+			ExpectedUpstreamURI: "/get/promotions/%28abc,xyz%29",
+		},
+		"skip_target_path_escaping=true": {
+			SkipTargetPathEscaping: true,
+			URI:                 "/v1/promotions/(abc,xyz)",
+			ExpectedUpstreamURI: "/get/promotions/(abc,xyz)",
+		},
+	}
+
+	for testName, test := range tests {
+		t.Run(testName, func(t *testing.T) {
+			spec := createSpecTest(t, fmt.Sprintf(skipPathEscapingDefinition, test.SkipTargetPathEscaping))
+			session := createStandardSession()
+			spec.SessionManager.UpdateSession("tyutyu345345dgh", session, 60)
+
+			recorder := httptest.NewRecorder()
+			req := testReq(t, http.MethodGet, test.URI, nil)
+			req.Header.Set("authorization", "tyutyu345345dgh")
+
+			chain := getChain(spec)
+			chain.ServeHTTP(recorder, req)
+
+			if recorder.Code != 200 {
+				t.Fatal("Initial request failed with non-200 code: ", recorder.Code)
+			}
+
+			var resp testHttpResponse
+			if err := json.NewDecoder(recorder.Body).Decode(&resp); err != nil {
+				t.Fatal("JSON decoding failed:", err)
+			}
+
+			if resp.Url != test.ExpectedUpstreamURI {
+				t.Errorf("Expected upstream path: '%s' Got: '%s'", test.ExpectedUpstreamURI, resp.Url)
+			}
+		})
+	}
+}
+
 func TestQuota(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
