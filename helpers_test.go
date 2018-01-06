@@ -124,6 +124,7 @@ func testHttpHandler() http.Handler {
 			httpError(w, http.StatusInternalServerError)
 			return
 		}
+		r.URL.Opaque = r.URL.RawPath
 		err := json.NewEncoder(w).Encode(testHttpResponse{
 			Method:  r.Method,
 			Url:     r.URL.String(),
