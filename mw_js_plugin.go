@@ -43,6 +43,7 @@ type MiniRequestObject struct {
 	DeleteParams    []string
 	ReturnOverrides ReturnOverrides
 	IgnoreBody      bool
+	Method          string
 }
 
 type VMReturnObject struct {
@@ -106,6 +107,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		AddParams:      map[string]string{},
 		ExtendedParams: map[string][]string{},
 		DeleteParams:   []string{},
+		Method:         r.Method,
 	}
 
 	requestAsJson, err := json.Marshal(requestData)
