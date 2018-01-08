@@ -16,6 +16,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     map :extended_params, :string, :string, 8
     repeated :delete_params, :string, 9
     optional :return_overrides, :message, 10, "coprocess.ReturnOverrides"
+    optional :method, :string, 11
   end
 end
 
