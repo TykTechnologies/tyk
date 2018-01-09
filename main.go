@@ -1282,6 +1282,7 @@ func startDRL() {
 type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
 	mainRouter.ServeHTTP(w, r)
 }
 
