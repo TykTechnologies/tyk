@@ -11,7 +11,7 @@ protoc -I. --go_out=plugins=grpc:../ *.proto
 echo "Generating bindings for Python."
 mkdir -p ../bindings/python
 protoc -I. --python_out=../bindings/python *.proto
-python codegen.py
+python3 codegen.py
 
 echo "Generating bindings for Ruby."
 mkdir -p ../bindings/ruby
