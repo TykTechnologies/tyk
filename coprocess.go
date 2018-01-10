@@ -89,8 +89,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		ReturnOverrides: &coprocess.ReturnOverrides{
 			ResponseCode: -1,
 		},
-		Method:     r.Method,
-		RequestUri: r.RequestURI,
+		Method: r.Method,
 	}
 
 	object := &coprocess.Object{
