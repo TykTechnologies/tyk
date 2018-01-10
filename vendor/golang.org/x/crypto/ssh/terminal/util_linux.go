@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build dragonfly freebsd netbsd openbsd
+package terminal
 
-package unix
+import "golang.org/x/sys/unix"
 
-const ImplementsGetwd = false
-
-func Getwd() (string, error) { return "", ENOTSUP }
+const ioctlReadTermios = unix.TCGETS
+const ioctlWriteTermios = unix.TCSETS

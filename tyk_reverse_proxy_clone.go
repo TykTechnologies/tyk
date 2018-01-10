@@ -9,11 +9,6 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
-	"github.com/gorilla/context"
-	"github.com/newrelic/go-agent"
-	"github.com/pmylund/go-cache"
 	"io"
 	"io/ioutil"
 	"net"
@@ -23,6 +18,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
+	"github.com/gorilla/context"
+	"github.com/newrelic/go-agent"
+	"github.com/pmylund/go-cache"
 )
 
 var ServiceCache *cache.Cache
@@ -199,7 +200,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// no override, better check if LB is enabled
 			if spec.Proxy.EnableLoadBalancing {
 				// it is, lets get that target data
-				lbRemote, lbErr := url.Parse(GetNextTarget(spec.Proxy.StructuredTargetList, spec))
+				lbRemote, lbErr := url.Parse(GetNextTarget(&spec.Proxy.StructuredTargetList, spec))
 				if lbErr != nil {
 					log.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", lbErr)
 				} else {
