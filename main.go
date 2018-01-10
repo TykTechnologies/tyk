@@ -19,13 +19,14 @@ import (
 
 	pprof_http "net/http/pprof"
 
+	logger "github.com/gtforge/tyk/log"
+
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/logrus"
 	"github.com/TykTechnologies/logrus-logstash-hook"
 	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
 	"github.com/TykTechnologies/logrus_sentry"
 	"github.com/TykTechnologies/tykcommon"
-	logger "github.com/TykTechnologies/tykcommon-logger"
 	"github.com/docopt/docopt.go"
 	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
@@ -36,7 +37,7 @@ import (
 	"rsc.io/letsencrypt"
 )
 
-var log = logger.GetLogger()
+var log = logger.Get()
 var rawLog = logger.GetRaw()
 var config = Config{}
 var templates = &template.Template{}
