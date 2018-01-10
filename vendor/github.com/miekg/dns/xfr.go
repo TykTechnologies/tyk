@@ -17,7 +17,7 @@ type Transfer struct {
 	DialTimeout    time.Duration     // net.DialTimeout, defaults to 2 seconds
 	ReadTimeout    time.Duration     // net.Conn.SetReadTimeout value for connections, defaults to 2 seconds
 	WriteTimeout   time.Duration     // net.Conn.SetWriteTimeout value for connections, defaults to 2 seconds
-	TsigSecret     map[string]string // Secret(s) for Tsig map[<zonename>]<base64 secret>, zonename must be in canonical form (lowercase, fqdn, see RFC 4034 Section 6.2)
+	TsigSecret     map[string]string // Secret(s) for Tsig map[<zonename>]<base64 secret>, zonename must be fully qualified
 	tsigTimersOnly bool
 }
 
@@ -51,18 +51,18 @@ func (t *Transfer) In(q *Msg, a string) (env chan *Envelope, err error) {
 	env = make(chan *Envelope)
 	go func() {
 		if q.Question[0].Qtype == TypeAXFR {
-			go t.inAxfr(q, env)
+			go t.inAxfr(q.Id, env)
 			return
 		}
 		if q.Question[0].Qtype == TypeIXFR {
-			go t.inIxfr(q, env)
+			go t.inIxfr(q.Id, env)
 			return
 		}
 	}()
 	return env, nil
 }
 
-func (t *Transfer) inAxfr(q *Msg, c chan *Envelope) {
+func (t *Transfer) inAxfr(id uint16, c chan *Envelope) {
 	first := true
 	defer t.Close()
 	defer close(c)
@@ -77,7 +77,7 @@ func (t *Transfer) inAxfr(q *Msg, c chan *Envelope) {
 			c <- &Envelope{nil, err}
 			return
 		}
-		if q.Id != in.Id {
+		if id != in.Id {
 			c <- &Envelope{in.Answer, ErrId}
 			return
 		}
@@ -110,11 +110,9 @@ func (t *Transfer) inAxfr(q *Msg, c chan *Envelope) {
 	}
 }
 
-func (t *Transfer) inIxfr(q *Msg, c chan *Envelope) {
+func (t *Transfer) inIxfr(id uint16, c chan *Envelope) {
 	serial := uint32(0) // The first serial seen is the current server serial
-	axfr := true
-	n := 0
-	qser := q.Ns[0].(*SOA).Serial
+	first := true
 	defer t.Close()
 	defer close(c)
 	timeout := dnsTimeout
@@ -128,15 +126,21 @@ func (t *Transfer) inIxfr(q *Msg, c chan *Envelope) {
 			c <- &Envelope{nil, err}
 			return
 		}
-		if q.Id != in.Id {
+		if id != in.Id {
 			c <- &Envelope{in.Answer, ErrId}
 			return
 		}
-		if in.Rcode != RcodeSuccess {
-			c <- &Envelope{in.Answer, &Error{err: fmt.Sprintf(errXFR, in.Rcode)}}
-			return
-		}
-		if n == 0 {
+		if first {
+			if in.Rcode != RcodeSuccess {
+				c <- &Envelope{in.Answer, &Error{err: fmt.Sprintf(errXFR, in.Rcode)}}
+				return
+			}
+			// A single SOA RR signals "no changes"
+			if len(in.Answer) == 1 && isSOAFirst(in) {
+				c <- &Envelope{in.Answer, nil}
+				return
+			}
+
 			// Check if the returned answer is ok
 			if !isSOAFirst(in) {
 				c <- &Envelope{in.Answer, ErrSoa}
@@ -144,30 +148,21 @@ func (t *Transfer) inIxfr(q *Msg, c chan *Envelope) {
 			}
 			// This serial is important
 			serial = in.Answer[0].(*SOA).Serial
-			// Check if there are no changes in zone
-			if qser >= serial {
-				c <- &Envelope{in.Answer, nil}
-				return
-			}
+			first = !first
 		}
+
 		// Now we need to check each message for SOA records, to see what we need to do
-		t.tsigTimersOnly = true
-		for _, rr := range in.Answer {
-			if v, ok := rr.(*SOA); ok {
+		if !first {
+			t.tsigTimersOnly = true
+			// If the last record in the IXFR contains the servers' SOA,  we should quit
+			if v, ok := in.Answer[len(in.Answer)-1].(*SOA); ok {
 				if v.Serial == serial {
-					n++
-					// quit if it's a full axfr or the the servers' SOA is repeated the third time
-					if axfr && n == 2 || n == 3 {
-						c <- &Envelope{in.Answer, nil}
-						return
-					}
-				} else if axfr {
-					// it's an ixfr
-					axfr = false
+					c <- &Envelope{in.Answer, nil}
+					return
 				}
 			}
+			c <- &Envelope{in.Answer, nil}
 		}
-		c <- &Envelope{in.Answer, nil}
 	}
 }
 
