@@ -54,6 +54,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :id_extractor_deadline, :int64, 27
     optional :session_lifetime, :int64, 28
     repeated :apply_policies, :string, 29
+    optional :certificate, :string, 30
   end
 end
 
