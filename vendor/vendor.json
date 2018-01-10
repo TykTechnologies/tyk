@@ -267,10 +267,10 @@
 			"revisionTime": "2015-09-14T16:22:38Z"
 		},
 		{
-			"checksumSHA1": "akCm4KM54M7Y+ZGpGuGVLAKuymw=",
+			"checksumSHA1": "LYb1KNw16kU6m+XOO0o4o58YPnE=",
 			"path": "github.com/miekg/dns",
-			"revision": "f5ac34d755eb6975958108413c7802a782ca16c8",
-			"revisionTime": "2018-01-10T13:37:59Z"
+			"revision": "e78414ef75607394ad7d917824f07f381df2eafa",
+			"revisionTime": "2017-06-04T12:30:08Z"
 		},
 		{
 			"checksumSHA1": "UuXgD2dDojfS8AViUEe15gLIWZE=",
@@ -463,10 +463,8 @@
 		{
 			"checksumSHA1": "C0rdOPxkLdobk6yQFN1CvsFRH1w=",
 			"path": "github.com/xenolf/lego/acme",
-			"revision": "192334c448f7e1e271bca93062f2f295cb3f35c8",
-			"revisionTime": "2017-07-13T01:17:00Z",
-			"version": "v0.4.0",
-			"versionExact": "v0.4.0"
+			"revision": "28ead50ff1ca93acdb62734d3ed8da0206d036ff",
+			"revisionTime": "2017-06-18T17:58:28Z"
 		},
 		{
 			"checksumSHA1": "vE43s37+4CJ2CDU6TlOUOYE0K9c=",
@@ -493,10 +491,10 @@
 			"revisionTime": "2018-01-09T18:05:24Z"
 		},
 		{
-			"checksumSHA1": "TJmmMKEHkGrmn+/39c9HiPpSQ3Q=",
+			"checksumSHA1": "8ilf6IafY1VH+th++Pp+2IHcrq8=",
 			"path": "golang.org/x/crypto/ocsp",
-			"revision": "9477e0b78b9ac3d0b03822fd95422e2fe07627cd",
-			"revisionTime": "2016-10-31T15:37:30Z"
+			"revision": "84f24dfdf3c414ed893ca1b318d0045ef5a1f607",
+			"revisionTime": "2017-06-23T10:03:27Z"
 		},
 		{
 			"checksumSHA1": "X1NTlfcau2XcV6WtAHF6b/DECOA=",
@@ -511,10 +509,10 @@
 			"revisionTime": "2017-09-25T09:26:47Z"
 		},
 		{
-			"checksumSHA1": "9jjO5GjLa0XF/nfWihF02RoH4qc=",
+			"checksumSHA1": "Y+HGqEkYM15ir+J93MEaHdyFy0c=",
 			"path": "golang.org/x/net/context",
-			"revision": "4971afdc2f162e82d185353533d3cf16188a9f4e",
-			"revisionTime": "2016-11-15T21:05:04Z"
+			"revision": "8663ed5da4fd087c3cfb99a996e628b72e2f0948",
+			"revisionTime": "2017-06-28T03:07:11Z"
 		},
 		{
 			"checksumSHA1": "vqc3a+oTUGX8PmD0TS+qQ7gmN8I=",
@@ -589,10 +587,10 @@
 			"revisionTime": "2016-11-15T21:05:04Z"
 		},
 		{
-			"checksumSHA1": "iN//qSunKGImecnRCcQrGTFgJMk=",
+			"checksumSHA1": "+7gSOeJWKSUhXho9cQPtyzJL+ok=",
 			"path": "golang.org/x/net/publicsuffix",
-			"revision": "434ec0c7fe3742c984919a691b2018a6e9694425",
-			"revisionTime": "2017-09-25T09:26:47Z"
+			"revision": "8663ed5da4fd087c3cfb99a996e628b72e2f0948",
+			"revisionTime": "2017-06-28T03:07:11Z"
 		},
 		{
 			"checksumSHA1": "P9qTIn8a6L6Q9wd1IJBCuhno1Q8=",
@@ -703,10 +701,10 @@
 			"revisionTime": "2016-10-26T11:09:11Z"
 		},
 		{
-			"checksumSHA1": "eFQDEix/mGnhwnFu/Hq63zMfrX8=",
+			"checksumSHA1": "vGfePfr0+weQUeTM/71mu+LCFuE=",
 			"path": "golang.org/x/time/rate",
-			"revision": "f51c12702a4d776e4c1fa9b0fabab841babae631",
-			"revisionTime": "2016-10-28T04:02:39Z"
+			"revision": "8be79e1e0910c292df4e79c241bb7e8f7e725959",
+			"revisionTime": "2017-04-24T23:28:54Z"
 		},
 		{
 			"checksumSHA1": "xyB2Py2ViSKX8Td+oe2hxG6f0Ak=",
@@ -820,19 +818,25 @@
 			"checksumSHA1": "4FonadPMjBW33hDoyy+ZtBmU/bc=",
 			"path": "gopkg.in/square/go-jose.v1",
 			"revision": "aa2e30fdd1fe9dd3394119af66451ae790d50e0d",
-			"revisionTime": "2016-09-23T00:08:11Z"
+			"revisionTime": "2016-09-23T00:08:11Z",
+			"version": "v1.1.0",
+			"versionExact": "v1.1.0"
 		},
 		{
 			"checksumSHA1": "vSlztt3rfYwwDDKEiqUDWXl2LGw=",
 			"path": "gopkg.in/square/go-jose.v1/cipher",
 			"revision": "aa2e30fdd1fe9dd3394119af66451ae790d50e0d",
-			"revisionTime": "2016-09-23T00:08:11Z"
+			"revisionTime": "2016-09-23T00:08:11Z",
+			"version": "v1.1.0",
+			"versionExact": "v1.1.0"
 		},
 		{
 			"checksumSHA1": "UYvcpB3og7YJHbRu4feZFxXAU/A=",
 			"path": "gopkg.in/square/go-jose.v1/json",
 			"revision": "aa2e30fdd1fe9dd3394119af66451ae790d50e0d",
-			"revisionTime": "2016-09-23T00:08:11Z"
+			"revisionTime": "2016-09-23T00:08:11Z",
+			"version": "v1.1.0",
+			"versionExact": "v1.1.0"
 		},
 		{
 			"checksumSHA1": "auzS48O3vpr/7Yr2GEZZPQKjfhU=",
@@ -851,6 +855,14 @@
 			"path": "gopkg.in/xmlpath.v2",
 			"revision": "860cbeca3ebcc600db0b213c0e83ad6ce91f5739",
 			"revisionTime": "2015-08-20T20:48:37Z"
+		},
+		{
+			"checksumSHA1": "3TIOXWQI7brGqVtlc6wpm7OEXPU=",
+			"path": "rsc.io/letsencrypt",
+			"revision": "33926faef6d434b854ea994228f11d0185faa0c1",
+			"revisionTime": "2017-06-28T17:37:31Z",
+			"version": "v0.0.1",
+			"versionExact": "v0.0.1"
 		}
 	],
 	"rootPath": "github.com/gtforge/tyk"
