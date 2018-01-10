@@ -42,7 +42,7 @@ func (l *newRelicLogger) Info(msg string, c map[string]interface{}) {
 	l.WithFields(c).Info(msg)
 }
 func (l *newRelicLogger) Debug(msg string, c map[string]interface{}) {
-	l.WithFields(c).Info(msg)
+	l.WithFields(c).Debug(msg)
 }
 func (l *newRelicLogger) DebugEnabled() bool {
 	return l.Level >= logrus.DebugLevel
