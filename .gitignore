@@ -1,5 +1,6 @@
 .idea/
 .vagrant/
+.vscode/
 temp/
 /middleware/bundles
 /middleware/e1d21f942ec746ed416ab97fe1bf07e8/
@@ -23,6 +24,7 @@ build/
 /tyk
 logs/
 *.mprof
+*.cov
 /apps/test.json
 logs
 lint_results.txt

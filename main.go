@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/newrelic/go-agent"
+
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -58,6 +60,7 @@ var (
 	RPCListener              RPCStorageHandler
 	DashService              DashboardServiceSender
 	CertificateManager       *certs.CertificateManager
+	NewRelicApplication      newrelic.Application
 
 	apisMu   sync.RWMutex
 	apiSpecs []*APISpec
@@ -201,6 +204,10 @@ func setupGlobals() {
 	}
 
 	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
+
+	if config.Global.NewRelic.AppName != "" {
+		NewRelicApplication = SetupNewRelic()
+	}
 }
 
 func buildConnStr(resource string) string {
@@ -364,6 +371,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
 	}
+
 	if *httpProfile {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
@@ -1164,6 +1172,7 @@ func start() {
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
+
 	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
@@ -1281,6 +1290,7 @@ func startDRL() {
 type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
 	mainRouter.ServeHTTP(w, r)
 }
 

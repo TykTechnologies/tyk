@@ -8,6 +8,7 @@ import (
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
+	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 
@@ -53,6 +54,12 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if config.Global.NewRelic.AppName != "" {
+				if txn, ok := w.(newrelic.Transaction); ok {
+					defer newrelic.StartSegment(txn, mw.Name()).End()
+				}
+			}
+
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
 				"from_ip":  requestIP(r),

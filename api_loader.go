@@ -526,6 +526,13 @@ func loadGlobalApps() {
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
 	loadApps(specs, mainRouter)
+
+	if config.Global.NewRelic.AppName != "" {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Adding NewRelic instrumentation")
+		AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+	}
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware

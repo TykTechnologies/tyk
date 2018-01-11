@@ -5,7 +5,7 @@ import "strconv"
 import "errors"
 import "math/rand"
 import "os"
-import "github.com/Sirupsen/logrus"
+import "github.com/TykTechnologies/logrus"
 import iMap "github.com/TykTechnologies/concurrent-map"
 
 const RedisClusterHashSlots = 16384
