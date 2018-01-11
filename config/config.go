@@ -126,6 +126,7 @@ type HttpServerOptionsConfig struct {
 	MinVersion            uint16     `json:"min_version"`
 	FlushInterval         int        `json:"flush_interval"`
 	SkipURLCleaning       bool       `json:"skip_url_cleaning"`
+	Ciphers               []string   `json:"ssl_ciphers"`
 }
 
 type AuthOverrideConf struct {

@@ -599,3 +599,44 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		}...)
 	})
 }
+
+func TestCipherSuites(t *testing.T) {
+	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID)
+
+	config.Global.HttpServerOptions.UseSSL = true
+	config.Global.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
+	config.Global.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	//matching ciphers
+	t.Run("Cipher match", func(t *testing.T) {
+
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}),
+			InsecureSkipVerify: true,
+		}}}
+
+		// If there is an internal TLS error it will fail test
+		ts.Run(t, test.TestCase{Client: client, Path: "/"})
+	})
+
+	t.Run("Cipher non-match", func(t *testing.T) {
+
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			CipherSuites:       getCipherAliases([]string{"TLS_RSA_WITH_AES_256_CBC_SHA"}), // not matching ciphers
+			InsecureSkipVerify: true,
+		}}}
+
+		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
+	})
+}
