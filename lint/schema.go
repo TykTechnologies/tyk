@@ -345,6 +345,12 @@ const confSchema = `{
 				"items": {
 					"type": "string"
 				}
+			},
+			"ssl_ciphers":{
+				"type": ["array", "null"],
+				"items": {
+					"type": "string"
+				}
 			}
 		}
 	},
