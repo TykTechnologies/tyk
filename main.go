@@ -72,7 +72,6 @@ var (
 	controlRouter *mux.Router
 	LE_MANAGER    letsencrypt.Manager
 	LE_FIRSTRUN   bool
-	tlsCiphers    []uint16
 
 	NodeID string
 
@@ -1205,17 +1204,13 @@ func generateListener(listenPort int) (net.Listener, error) {
 			"prefix": "main",
 		}).Info("--> Using SSL (https)")
 
-		if config.Global.HttpServerOptions.Ciphers != nil {
-			tlsCiphers = getCipherAliases(config.Global.HttpServerOptions.Ciphers)
-		}
-
 		tlsConfig := tls.Config{
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         config.Global.HttpServerOptions.ServerName,
 			MinVersion:         config.Global.HttpServerOptions.MinVersion,
 			ClientAuth:         tls.RequestClientCert,
 			InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
-			CipherSuites:       tlsCiphers,
+			CipherSuites:       getCipherAliases(config.Global.HttpServerOptions.Ciphers),
 		}
 
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
