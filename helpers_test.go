@@ -78,11 +78,12 @@ const (
 	testHttpListen = "127.0.0.1:16500"
 	// Accepts any http requests on /, only allows GET on /get, etc.
 	// All return a JSON with request info.
-	testHttpAny     = "http://" + testHttpListen
-	testHttpGet     = testHttpAny + "/get"
-	testHttpPost    = testHttpAny + "/post"
-	testHttpJWK     = testHttpAny + "/jwk.json"
-	testHttpBundles = testHttpAny + "/bundles/"
+	testHttpAny        = "http://" + testHttpListen
+	testHttpGet        = testHttpAny + "/get"
+	testHttpPost       = testHttpAny + "/post"
+	testHttpJWK        = testHttpAny + "/jwk.json"
+	testHttpEncodedJWK = "aHR0cDovLzEyNy4wLjAuMToxNjUwMC9qd2suanNvbg==" // Base64 encoded http://127.0.0.1:16500/jwk.json
+	testHttpBundles    = testHttpAny + "/bundles/"
 
 	// Nothing should be listening on port 16501 - useful for
 	// testing TCP and HTTP failures.
