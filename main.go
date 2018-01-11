@@ -20,10 +20,10 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	"github.com/bshuster-repo/logrus-logstash-hook"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
-	"github.com/gemnasium/logrus-graylog-hook"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/gorpc"
@@ -72,6 +72,7 @@ var (
 	controlRouter *mux.Router
 	LE_MANAGER    letsencrypt.Manager
 	LE_FIRSTRUN   bool
+	tlsCiphers    []uint16
 
 	NodeID string
 
@@ -776,7 +777,7 @@ func setupLogger() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Graylog support")
-		hook := graylog.NewGraylogHook(config.Global.GraylogNetworkAddr,
+		hook := graylogHook.NewGraylogHook(config.Global.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
@@ -791,7 +792,7 @@ func setupLogger() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Logstash support")
-		hook, err := logrus_logstash.NewHook(config.Global.LogstashTransport,
+		hook, err := logstashHook.NewHook(config.Global.LogstashTransport,
 			config.Global.LogstashNetworkAddr,
 			"tyk-gateway")
 
@@ -1204,12 +1205,17 @@ func generateListener(listenPort int) (net.Listener, error) {
 			"prefix": "main",
 		}).Info("--> Using SSL (https)")
 
+		if config.Global.HttpServerOptions.Ciphers != nil {
+			tlsCiphers = getCipherAliases(config.Global.HttpServerOptions.Ciphers)
+		}
+
 		tlsConfig := tls.Config{
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         config.Global.HttpServerOptions.ServerName,
 			MinVersion:         config.Global.HttpServerOptions.MinVersion,
 			ClientAuth:         tls.RequestClientCert,
 			InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
+			CipherSuites:       tlsCiphers,
 		}
 
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
