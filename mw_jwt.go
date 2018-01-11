@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	cache "github.com/pmylund/go-cache"
 
@@ -170,19 +171,16 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	return []byte(session.JWTData.Secret), nil
 }
 
-func (k *JWTMiddleware) getPolicyIDFromToken(token *jwt.Token) (string, bool) {
-	policyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.Spec.JWTPolicyFieldName].(string)
-	if !foundPolicy {
-		log.Error("Could not identify a policy to apply to this token from field!")
-		return "", false
-	}
-
-	return policyID, true
-}
-
 func (k *JWTMiddleware) getBasePolicyID(token *jwt.Token) (string, bool) {
 	if k.Spec.JWTPolicyFieldName != "" {
-		return k.getPolicyIDFromToken(token)
+		basePolicyID, foundPolicy := token.Claims.(jwt.MapClaims)[k.Spec.JWTPolicyFieldName].(string)
+		if !foundPolicy {
+			log.Error("Could not identify a policy to apply to this token from field!")
+			return "", false
+		}
+
+		return basePolicyID, true
+
 	} else if k.Spec.JWTClientIDBaseField != "" {
 		clientID, clientIDFound := token.Claims.(jwt.MapClaims)[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
@@ -240,7 +238,6 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy := k.getBasePolicyID(token)
 		if !foundPolicy {
-			k.reportLoginFailure(baseFieldData, r)
 			return errors.New("Key not authorized: no matching policy found"), 403
 		}
 
@@ -269,25 +266,6 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		k.reportLoginFailure(baseFieldData, r)
 		log.Error("Could not find a valid policy to apply to this token!")
 		return errors.New("Key not authorized: no matching policy"), 403
-	} else if k.Spec.JWTPolicyFieldName != "" {
-		// extract policy ID from JWT token
-		policyID, foundPolicy := k.getPolicyIDFromToken(token)
-		if !foundPolicy {
-			k.reportLoginFailure(baseFieldData, r)
-			return errors.New("Key not authorized: no matching policy found"), 403
-		}
-		// check if policy in session is the same as policy set in the given token
-		pols := session.PolicyIDs()
-		if len(pols) < 1 {
-			k.reportLoginFailure(baseFieldData, r)
-			log.Error("No policies for the found session. Failing Request.")
-			return errors.New("Key not authorized: no matching policy found"), 403
-		}
-		if pols[0] != policyID {
-			k.reportLoginFailure(baseFieldData, r)
-			log.Error("Policy ID found in active session is not the same as policy in token!")
-			return errors.New("Key not authorized: no matching policy"), 403
-		}
 	}
 
 	log.Debug("Key found")
@@ -352,8 +330,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if rawJWT == "" {
 		// No header value, fail
-		logEntry := getLogEntryForRequest(r, "", nil)
-		logEntry.Info("Attempted access with malformed header, no JWT auth header found.")
+		log.WithFields(logrus.Fields{
+			"path":   r.URL.Path,
+			"origin": requestIP(r),
+		}).Info("Attempted access with malformed header, no JWT auth header found.")
 
 		log.Debug("Looked in: ", config.AuthHeaderName)
 		log.Debug("Raw data was: ", rawJWT)
@@ -418,11 +398,16 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// No, let's try one-to-one mapping
 		return k.processOneToOneTokenMap(r, token)
 	}
-	logEntry := getLogEntryForRequest(r, "", nil)
-	logEntry.Info("Attempted JWT access with non-existent key.")
+	log.WithFields(logrus.Fields{
+		"path":   r.URL.Path,
+		"origin": requestIP(r),
+	}).Info("Attempted JWT access with non-existent key.")
 
 	if err != nil {
-		logEntry.Error("JWT validation error: ", err)
+		log.WithFields(logrus.Fields{
+			"path":   r.URL.Path,
+			"origin": requestIP(r),
+		}).Error("JWT validation error: ", err)
 	}
 
 	k.reportLoginFailure(tykId, r)
