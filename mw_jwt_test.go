@@ -51,6 +51,27 @@ const jwtWithJWKDef = `{
 	}
 }`
 
+const jwtWithEncodedJWKDef = `{
+	"api_id": "76",
+	"org_id": "default",
+	"enable_jwt": true,
+	"jwt_source": "` + testHttpEncodedJWK + `",
+	"jwt_signing_method": "RSA",
+	"jwt_identity_base_field": "user_id",
+	"jwt_policy_field_name": "policy_id",
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {"name": "v1"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/jwt_test",
+		"target_url": "` + testHttpAny + `"
+	}
+}`
+
 const jwtWithCentralDef = `{
 	"api_id": "76",
 	"org_id": "default",
@@ -698,11 +719,11 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	}
 
 	recorder = httptest.NewRecorder()
-	req = testReq(t, "GET", "/jwt_test/", nil)
+	req2 := testReq(t, "GET", "/jwt_test/", nil)
 	// add a colon here
-	req.Header.Set("authorization", "Bearer "+tokenString)
+	req2.Header.Set("authorization", "Bearer "+tokenString)
 
-	chain.ServeHTTP(recorder, req)
+	chain.ServeHTTP(recorder, req2)
 
 	if recorder.Code != 403 {
 		t.Error("Initial request failed with non-403 code, should have failed!: ", recorder.Code)
@@ -712,6 +733,56 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 
 func TestJWTSessionRSAWithJWK(t *testing.T) {
 	spec := createSpecTest(t, jwtWithJWKDef)
+	spec.JWTSigningMethod = "rsa"
+
+	policiesMu.Lock()
+	policiesByID["987654321"] = user.Policy{
+		ID:               "987654321",
+		OrgID:            "default",
+		Rate:             1000.0,
+		Per:              1.0,
+		QuotaMax:         -1,
+		QuotaRenewalRate: -1,
+		AccessRights:     map[string]user.AccessDefinition{},
+		Active:           true,
+		KeyExpiresIn:     60,
+	}
+	policiesMu.Unlock()
+
+	// Create the token
+	token := jwt.New(jwt.GetSigningMethod("RS512"))
+	// Set the token ID
+	token.Header["kid"] = "12345"
+	// Set some claims
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["user_id"] = testKey(t, "token")
+	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	// Sign and get the complete encoded token as a string
+	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
+	if err != nil {
+		t.Fatal("Couldn't extract private key: ", err)
+	}
+	tokenString, err := token.SignedString(signKey)
+	if err != nil {
+		t.Fatal("Couldn't create JWT token: ", err)
+	}
+
+	recorder := httptest.NewRecorder()
+	req := testReq(t, "GET", "/jwt_test/", nil)
+	// add a colon here
+	req.Header.Set("authorization", "Bearer "+tokenString)
+
+	chain := getJWTChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have passed!: ", recorder.Code)
+	}
+}
+
+func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
+	spec := createSpecTest(t, jwtWithEncodedJWKDef)
 	spec.JWTSigningMethod = "rsa"
 
 	policiesMu.Lock()
