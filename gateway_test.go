@@ -634,6 +634,28 @@ func TestCustomDomain(t *testing.T) {
 	})
 }
 
+func TestHelloHealthcheck(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	t.Run("Without APIs", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/hello", Code: 200},
+		}...)
+	})
+
+	t.Run("With APIs", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/sample"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Method: "GET", Path: "/hello", Code: 200},
+			{Method: "GET", Path: "/sample/hello", Code: 200},
+		}...)
+	})
+}
+
 func TestWithCacheAllSafeRequests(t *testing.T) {
 	ts := newTykTestServer(tykTestServerConfig{
 		delay: 10 * time.Millisecond,
