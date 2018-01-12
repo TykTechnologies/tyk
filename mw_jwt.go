@@ -119,25 +119,38 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 
 func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	config := k.Spec.APIDefinition
+
 	// Check for central JWT source
 	if config.JWTSource != "" {
 
-		// Is it a URL?
-		if httpScheme.MatchString(config.JWTSource) {
-			secret, err := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.Spec.JWTSigningMethod)
+		jwtSource := config.JWTSource
+		var decodedSource []byte
+
+		// Only if it's not a URL - Base64 decode it
+		if false == httpScheme.MatchString(jwtSource) {
+			var err error
+			// Get the actual decoded value
+			decodedSource, err = base64.StdEncoding.DecodeString(config.JWTSource)
+			if err != nil {
+				return nil, err
+			}
+
+			jwtSource = string(decodedSource[:])
+		}
+
+		// Check if it's url (for encoded case we have decoded the string first)
+		if httpScheme.MatchString(jwtSource) {
+
+			// Gets a secret from URL of JWKS
+			// URL used to redirect to a JWKS file instead of saving the actual secret locally
+			secret, err := k.getSecretFromURL(jwtSource, token.Header["kid"].(string), k.Spec.JWTSigningMethod)
 			if err != nil {
 				return nil, err
 			}
 
 			return secret, nil
 		}
-
-		// If not, return the actual value
-		decodedCert, err := base64.StdEncoding.DecodeString(config.JWTSource)
-		if err != nil {
-			return nil, err
-		}
-		return decodedCert, nil
+		return decodedSource, nil //It's the actual public key
 	}
 
 	// Try using a kid or sub header
