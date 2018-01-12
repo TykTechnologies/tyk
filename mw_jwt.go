@@ -121,7 +121,6 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 	config := k.Spec.APIDefinition
 	// Check for central JWT source
 	if config.JWTSource != "" {
-
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
 			secret, err := k.getSecretFromURL(config.JWTSource, token.Header["kid"].(string), k.Spec.JWTSigningMethod)
@@ -137,6 +136,17 @@ func (k *JWTMiddleware) getSecret(token *jwt.Token) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Is decoded url too?
+		if httpScheme.MatchString(string(decodedCert)) {
+			secret, err := k.getSecretFromURL(string(decodedCert), token.Header["kid"].(string), k.Spec.JWTSigningMethod)
+			if err != nil {
+				return nil, err
+			}
+
+			return secret, nil
+		}
+
 		return decodedCert, nil
 	}
 

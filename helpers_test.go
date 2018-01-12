@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
 	"github.com/miekg/dns"
 	"github.com/satori/go.uuid"
@@ -186,6 +187,56 @@ func createSession(sGen ...func(s *user.SessionState)) string {
 
 	FallbackKeySesionManager.UpdateSession(key, session, 60)
 	return key
+}
+
+func createStandardPolicy() *user.Policy {
+	return &user.Policy{
+		Rate:             1000.0,
+		Per:              1.0,
+		QuotaMax:         -1,
+		QuotaRenewalRate: -1,
+		AccessRights:     map[string]user.AccessDefinition{},
+		Active:           true,
+		KeyExpiresIn:     60,
+	}
+}
+
+func createPolicy(pGen ...func(p *user.Policy)) string {
+	pID := keyGen.GenerateAuthKey("")
+	pol := createStandardPolicy()
+	pol.ID = pID
+
+	if len(pGen) > 0 {
+		pGen[0](pol)
+	}
+
+	policiesMu.Lock()
+	policiesByID[pID] = *pol
+	policiesMu.Unlock()
+
+	return pID
+}
+
+func createJWKToken(jGen ...func(*jwt.Token)) string {
+	// Create the token
+	token := jwt.New(jwt.GetSigningMethod("RS512"))
+	// Set the token ID
+
+	if len(jGen) > 0 {
+		jGen[0](token)
+	}
+
+	// Sign and get the complete encoded token as a string
+	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
+	if err != nil {
+		panic("Couldn't extract private key: " + err.Error())
+	}
+	tokenString, err := token.SignedString(signKey)
+	if err != nil {
+		panic("Couldn't create JWT token: " + err.Error())
+	}
+
+	return tokenString
 }
 
 func firstVals(vals map[string][]string) map[string]string {
