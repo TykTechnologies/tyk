@@ -1471,4 +1471,8 @@ func listen(l, controlListener net.Listener, err error) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("--> PID: ", hostDetails.PID)
+
+	mainRouter.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello Tiki")
+	})
 }
