@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/justinas/alice"
 
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -758,4 +760,48 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have passed!: ", recorder.Code)
 	}
+}
+
+func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	spec := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	pID := createPolicy()
+	jwtToken := createJWKToken(func(t *jwt.Token) {
+		t.Header["kid"] = "12345"
+		// Set some claims
+		t.Claims.(jwt.MapClaims)["foo"] = "bar"
+		t.Claims.(jwt.MapClaims)["user_id"] = "user"
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	})
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	t.Run("Direct JWK URL", func(t *testing.T) {
+		spec.JWTSource = testHttpJWK
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: 200,
+		})
+	})
+
+	t.Run("Base64 JWK URL", func(t *testing.T) {
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(testHttpJWK))
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: 200,
+		})
+	})
 }
