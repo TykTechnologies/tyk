@@ -303,6 +303,12 @@
 			"revisionTime": "2017-02-06T15:57:36Z"
 		},
 		{
+			"checksumSHA1": "QJ6vGHN1wS7lhWHv6/vF/EtcU3A=",
+			"path": "github.com/miekg/dns",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
+		},
+		{
 			"checksumSHA1": "UuXgD2dDojfS8AViUEe15gLIWZE=",
 			"path": "github.com/mitchellh/mapstructure",
 			"revision": "f3009df150dadf309fdee4a54ed65c124afad715",
@@ -523,10 +529,31 @@
 			"revisionTime": "2017-02-07T22:51:51Z"
 		},
 		{
+			"checksumSHA1": "1hwn8cgg4EVXhCpJIqmMbzqnUo0=",
+			"origin": "github.com/miekg/dns/vendor/golang.org/x/crypto/ed25519",
+			"path": "golang.org/x/crypto/ed25519",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
+		},
+		{
+			"checksumSHA1": "LXFcVx8I587SnWmKycSDEq9yvK8=",
+			"origin": "github.com/miekg/dns/vendor/golang.org/x/crypto/ed25519/internal/edwards25519",
+			"path": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
+		},
+		{
 			"checksumSHA1": "UlBPMaKC4dO/9ge7wJfDtptVoVo=",
 			"path": "golang.org/x/crypto/ocsp",
 			"revision": "22ddb68eccda408bbf17759ac18d3120ce0d4f3f",
 			"revisionTime": "2017-02-07T22:51:51Z"
+		},
+		{
+			"checksumSHA1": "uX2McdP4VcQ6zkAF0Q4oyd0rFtU=",
+			"origin": "github.com/miekg/dns/vendor/golang.org/x/net/bpf",
+			"path": "golang.org/x/net/bpf",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
 		},
 		{
 			"checksumSHA1": "Y+HGqEkYM15ir+J93MEaHdyFy0c=",
@@ -571,10 +598,38 @@
 			"revisionTime": "2017-02-06T03:21:01Z"
 		},
 		{
+			"checksumSHA1": "YoSf+PgTWvHmFVaF3MrtZz3kX38=",
+			"origin": "github.com/miekg/dns/vendor/golang.org/x/net/internal/iana",
+			"path": "golang.org/x/net/internal/iana",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
+		},
+		{
+			"checksumSHA1": "yBGrvq2Acd3ufxsCVtp8zgV7wF0=",
+			"origin": "github.com/miekg/dns/vendor/golang.org/x/net/internal/socket",
+			"path": "golang.org/x/net/internal/socket",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
+		},
+		{
 			"checksumSHA1": "UxahDzW2v4mf/+aFxruuupaoIwo=",
 			"path": "golang.org/x/net/internal/timeseries",
 			"revision": "236b8f043b920452504e263bc21d354427127473",
 			"revisionTime": "2017-02-06T03:21:01Z"
+		},
+		{
+			"checksumSHA1": "ZGMENpNTj2hojdJMcrUO+UPKVgE=",
+			"origin": "github.com/miekg/dns/vendor/golang.org/x/net/ipv4",
+			"path": "golang.org/x/net/ipv4",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
+		},
+		{
+			"checksumSHA1": "QUvByKIVmIy9c+8+O1XGyh9ynoY=",
+			"origin": "github.com/miekg/dns/vendor/golang.org/x/net/ipv6",
+			"path": "golang.org/x/net/ipv6",
+			"revision": "90888765254c1fa54fa39e2eb383aa3436a2e8f8",
+			"revisionTime": "2017-12-21T10:24:07Z"
 		},
 		{
 			"checksumSHA1": "3xyuaSNmClqG4YWC7g0isQIbUTc=",
