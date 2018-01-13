@@ -277,8 +277,8 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29"?arg=val`},
-			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29"?arg=val`},
+			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
+			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
 		}...)
 	})
 
@@ -291,6 +291,62 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/(abc,xyz)?arg=val"`},
 			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = false
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = false
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/(abc,xyz)?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = true
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = true
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/(abc,xyz)?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
 		}...)
 	})
 }
