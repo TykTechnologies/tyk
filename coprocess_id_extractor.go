@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -142,10 +141,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID)
 
 	if keyExists {
-		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
-
-		deadlineTs := int64(lastUpdated) + previousSession.IdExtractorDeadline
-		if deadlineTs > time.Now().Unix() {
+		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			e.PostProcess(r, &previousSession, sessionID)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
@@ -216,11 +212,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	if keyExists {
 
-		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
-
-		deadlineTs := int64(lastUpdated) + previousSession.IdExtractorDeadline
-
-		if deadlineTs > time.Now().Unix() {
+		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			e.PostProcess(r, &previousSession, SessionID)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
@@ -290,12 +282,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
 	if keyExists {
-
-		lastUpdated, _ := strconv.Atoi(previousSession.LastUpdated)
-
-		deadlineTs := int64(lastUpdated) + previousSession.IdExtractorDeadline
-
-		if deadlineTs > time.Now().Unix() {
+		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			e.PostProcess(r, &previousSession, SessionID)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
