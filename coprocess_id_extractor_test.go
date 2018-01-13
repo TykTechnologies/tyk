@@ -49,8 +49,7 @@ def MyAuthHook(request, session, metadata, spec):
     if auth_header == 'valid_token' and counter < 2:
         session.rate = 1000.0
         session.per = 1.0
-        session.last_updated = str(int(time.time()))
-        session.id_extractor_deadline = 60
+        session.id_extractor_deadline = int(time.time()) + 60
         metadata["token"] = "valid_token"
     return request, session, metadata
 	`,
@@ -96,8 +95,7 @@ def MyAuthHook(request, session, metadata, spec):
     if auth_param and auth_param[0] == 'valid_token' and counter < 2:
         session.rate = 1000.0
         session.per = 1.0
-        session.last_updated = str(int(time.time()))
-        session.id_extractor_deadline = 60
+        session.id_extractor_deadline = int(time.time()) + 60
         metadata["token"] = "valid_token"
     return request, session, metadata
 	`,
@@ -142,8 +140,7 @@ def MyAuthHook(request, session, metadata, spec):
     if auth_header and auth_header == '12345' and counter < 2:
         session.rate = 1000.0
         session.per = 1.0
-        session.last_updated = str(int(time.time()))
-        session.id_extractor_deadline = 60
+        session.id_extractor_deadline = int(time.time()) + 60
         metadata["token"] = "valid_token"
     return request, session, metadata
 	`,
