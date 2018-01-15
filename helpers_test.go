@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -513,31 +514,40 @@ func buildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return loadAPI(buildAPI(apiGens...)...)
 }
 
-var domainsToAddresses map[string]string = map[string]string{
-	"host1.local.":     "127.0.0.1",
-	"host2.local.":     "127.0.0.1",
-	"host3.local.":     "127.0.0.1",
-	"localhost.local.": "127.0.0.1",
+var domainsToAddresses = map[string]string{
+	"host1.local.": "127.0.0.1",
+	"host2.local.": "127.0.0.1",
+	"host3.local.": "127.0.0.1",
 }
 
 type dnsMockHandler struct{}
 
-func (this *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	msg := dns.Msg{}
 	msg.SetReply(r)
 	switch r.Question[0].Qtype {
 	case dns.TypeA:
 		msg.Authoritative = true
 		domain := msg.Question[0].Name
+
 		address, ok := domainsToAddresses[domain]
-		if ok {
-			msg.Answer = append(msg.Answer, &dns.A{
-				Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-				A:   net.ParseIP(address),
-			})
-		} else {
-			panic("Following domain not mocked:" + domain)
+		if !ok {
+			// ^ 				start of line
+			// localhost\.		match literally
+			// ()* 				match between 0 and unlimited times
+			// [[:alnum:]]+\.	match single character in [a-zA-Z0-9] minimum one time and ending in . literally
+			reg := regexp.MustCompile(`^localhost\.([[:alnum:]]+\.)*`)
+			if matched := reg.MatchString(domain); !matched {
+				panic("domain not mocked: " + domain)
+			}
+
+			address = "127.0.0.1"
 		}
+
+		msg.Answer = append(msg.Answer, &dns.A{
+			Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+			A:   net.ParseIP(address),
+		})
 	}
 	w.WriteMsg(&msg)
 }
