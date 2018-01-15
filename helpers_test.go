@@ -253,7 +253,6 @@ type tykTestServerConfig struct {
 	delay              time.Duration
 	hotReload          bool
 	overrideDefaults   bool
-	lastResponse       *http.Response
 }
 
 type tykTestServer struct {
@@ -488,10 +487,11 @@ func buildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 func loadAPI(specs ...*APISpec) (out []*APISpec) {
 	oldPath := config.Global.AppPath
 	config.Global.AppPath, _ = ioutil.TempDir("", "apps")
+
 	defer func() {
+		os.RemoveAll(config.Global.AppPath)
 		config.Global.AppPath = oldPath
 	}()
-	defer os.RemoveAll(config.Global.AppPath)
 
 	for i, spec := range specs {
 		specBytes, _ := json.Marshal(spec)

@@ -518,20 +518,20 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.SH.ServeHTTP(w, r)
 }
 
-func loadGlobalApps() {
+func loadGlobalApps(router *mux.Router) {
 	// we need to make a full copy of the slice, as loadApps will
 	// use in-place to sort the apis.
 	apisMu.RLock()
 	specs := make([]*APISpec, len(apiSpecs))
 	copy(specs, apiSpecs)
 	apisMu.RUnlock()
-	loadApps(specs, mainRouter)
+	loadApps(specs, router)
 
 	if config.Global.NewRelic.AppName != "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Adding NewRelic instrumentation")
-		AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+		AddNewRelicInstrumentation(NewRelicApplication, router)
 	}
 }
 

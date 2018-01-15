@@ -95,7 +95,6 @@ func doLoadWithBackup(specs []*APISpec) {
 	log.Warning("[RPC Backup] --> Initialised JSVM")
 
 	newRouter := mux.NewRouter()
-	mainRouter = newRouter
 
 	log.Warning("[RPC Backup] --> Set up routers")
 	log.Warning("[RPC Backup] --> Loading endpoints")
@@ -108,12 +107,14 @@ func doLoadWithBackup(specs []*APISpec) {
 
 	if config.Global.NewRelic.AppName != "" {
 		log.Warning("[RPC Backup] --> Adding NewRelic instrumentation")
-		AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+		AddNewRelicInstrumentation(NewRelicApplication, newRouter)
 		log.Warning("[RPC Backup] --> NewRelic instrumentation added")
 	}
 
 	newServeMux := http.NewServeMux()
-	newServeMux.Handle("/", mainRouter)
+	newServeMux.Handle("/", newRouter)
+
+	mainRouter = newRouter
 
 	http.DefaultServeMux = newServeMux
 	log.Warning("[RPC Backup] --> Replaced muxer")
