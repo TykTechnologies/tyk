@@ -126,6 +126,9 @@ func apisByIDLen() int {
 
 // Create all globals and init connection handlers
 func setupGlobals() {
+	reloadMu.Lock()
+	defer reloadMu.Unlock()
+
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
 
@@ -656,20 +659,22 @@ func doReload() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Preparing new router")
-	mainRouter = mux.NewRouter()
+	newRouter := mux.NewRouter()
 	if config.Global.HttpServerOptions.OverrideDefaults {
-		mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
+		newRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 	}
 
 	if config.Global.ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
+		loadAPIEndpoints(newRouter)
 	}
 
-	loadGlobalApps()
+	loadGlobalApps(newRouter)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("API reload complete")
+
+	mainRouter = newRouter
 
 	// Unset these
 	rpcEmergencyModeLoaded = false
@@ -1321,7 +1326,7 @@ func listen(l, controlListener net.Listener, err error) {
 		if !rpcEmergencyMode {
 			count := syncAPISpecs()
 			if count > 0 {
-				loadGlobalApps()
+				loadGlobalApps(mainRouter)
 				syncPolicies()
 			}
 
@@ -1397,7 +1402,7 @@ func listen(l, controlListener net.Listener, err error) {
 		if !rpcEmergencyMode {
 			count := syncAPISpecs()
 			if count > 0 {
-				loadGlobalApps()
+				loadGlobalApps(mainRouter)
 				syncPolicies()
 			}
 

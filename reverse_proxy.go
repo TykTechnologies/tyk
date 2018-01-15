@@ -435,6 +435,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	// 1. Check if timeouts are set for this endpoint
+	p.TykAPISpec.Lock()
 	if p.TykAPISpec.HTTPTransport == nil {
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
@@ -443,6 +444,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		// as it was already hijacked and now is being used for other connection
 		p.TykAPISpec.HTTPTransport.(*WSDialer).RW = rw
 	}
+	p.TykAPISpec.Unlock()
 
 	ctx := req.Context()
 	if cn, ok := rw.(http.CloseNotifier); ok {
@@ -527,11 +529,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if cert := getUpstreamCertificate(outreq.Host, p.TykAPISpec); cert != nil {
 		tlsCertificates = []tls.Certificate{*cert}
 	}
+
+	p.TykAPISpec.Lock()
 	if outReqIsWebsocket {
 		p.TykAPISpec.HTTPTransport.(*WSDialer).TLSClientConfig.Certificates = tlsCertificates
 	} else {
 		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
 	}
+	p.TykAPISpec.Unlock()
 
 	// do request round trip
 	var res *http.Response
