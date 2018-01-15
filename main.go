@@ -19,8 +19,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	"github.com/docopt/docopt.go"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/docopt/docopt.go"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -95,8 +95,13 @@ func getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
+var reloadMu sync.Mutex
+
 // Create all globals and init connection handlers
 func setupGlobals() {
+	reloadMu.Lock()
+	defer reloadMu.Unlock()
+
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
 
@@ -195,7 +200,7 @@ func buildConnStr(resource string) string {
 	return config.Global.DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() {
+func syncAPISpecs() int {
 	loader := APIDefinitionLoader{}
 
 	apisMu.Lock()
@@ -234,6 +239,8 @@ func syncAPISpecs() {
 			apiSpecs[i].SessionProvider = config.Global.AuthOverride.SessionProvider
 		}
 	}
+
+	return len(apiSpecs)
 }
 
 func syncPolicies() {
@@ -592,6 +599,9 @@ func rpcReloadLoop(rpcKey string) {
 }
 
 func doReload() {
+	reloadMu.Lock()
+	defer reloadMu.Unlock()
+
 	// Load the API Policies
 	syncPolicies()
 	// load the specs
@@ -614,20 +624,22 @@ func doReload() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Preparing new router")
-	mainRouter = mux.NewRouter()
+	newRouter := mux.NewRouter()
 	if config.Global.HttpServerOptions.OverrideDefaults {
-		mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
+		newRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 	}
 
 	if config.Global.ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
+		loadAPIEndpoints(newRouter)
 	}
 
-	loadApps(apiSpecs, mainRouter)
+	loadGlobalApps(newRouter)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("API reload complete")
+
+	mainRouter = newRouter
 
 	// Unset these
 	rpcEmergencyModeLoaded = false
@@ -1298,9 +1310,9 @@ func listen(l, controlListener net.Listener, err error) {
 		startDRL()
 
 		if !rpcEmergencyMode {
-			syncAPISpecs()
-			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter)
+			count := syncAPISpecs()
+			if count > 0 {
+				loadGlobalApps(mainRouter)
 				syncPolicies()
 			}
 
@@ -1374,9 +1386,9 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// Resume accepting connections in a new goroutine.
 		if !rpcEmergencyMode {
-			syncAPISpecs()
-			if apiSpecs != nil {
-				loadApps(apiSpecs, mainRouter)
+			count := syncAPISpecs()
+			if count > 0 {
+				loadGlobalApps(mainRouter)
 				syncPolicies()
 			}
 
