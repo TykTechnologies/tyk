@@ -640,3 +640,29 @@ func TestCipherSuites(t *testing.T) {
 		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
 	})
 }
+
+func TestHttp2(t *testing.T) {
+	//configure server so we can useSSL and utilize the logic, but skip verification in the clients
+	_, _, combinedPEM, _ := genServerCertificate()
+	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(serverCertID)
+
+	config.Global.HttpServerOptions.UseSSL = true
+	config.Global.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	config.Global.HttpServerOptions.UseHttp2 = true
+
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	t.Run("http2client", func(t *testing.T) {
+		client := getTLSClient(nil, nil)
+
+		ts.Run(t, test.TestCase{Client: client, Path: "/"})
+	})
+}

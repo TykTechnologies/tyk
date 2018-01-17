@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/newrelic/go-agent"
 
 	"github.com/Sirupsen/logrus"
@@ -1217,7 +1219,22 @@ func generateListener(listenPort int) (net.Listener, error) {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("--> Using SSL (https)")
+		if config.Global.HttpServerOptions.UseHttp2 {
 
+			tlsConfig := tls.Config{
+				GetCertificate:     dummyGetCertificate,
+				ServerName:         config.Global.HttpServerOptions.ServerName,
+				MinVersion:         config.Global.HttpServerOptions.MinVersion,
+				ClientAuth:         tls.RequestClientCert,
+				InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
+				CipherSuites:       getCipherAliases([]string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"}),
+				NextProtos:         []string{http2.NextProtoTLS},
+			}
+
+			tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
+
+			return tls.Listen("tcp", targetPort, &tlsConfig)
+		}
 		tlsConfig := tls.Config{
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         config.Global.HttpServerOptions.ServerName,
