@@ -253,7 +253,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			req.Header.Set("User-Agent", defaultUserAgent)
 		}
 
-		if spec.Proxy.SkipTargetPathEscaping {
+		if config.Global.HttpServerOptions.SkipTargetPathEscaping {
 			// force RequestURI to skip escaping if API's proxy is set for this
 			// if we set opaque here it will force URL.RequestURI to skip escaping
 			if req.URL.RawPath != "" {
