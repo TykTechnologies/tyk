@@ -235,6 +235,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
 			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
+			if req.URL.RawPath != "" {
+				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath)
+			}
 		}
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
@@ -248,6 +251,17 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			// Set Tyk's own default user agent. Without
 			// this line, we would get the net/http default.
 			req.Header.Set("User-Agent", defaultUserAgent)
+		}
+
+		if spec.Proxy.SkipTargetPathEscaping {
+			// force RequestURI to skip escaping if API's proxy is set for this
+			// if we set opaque here it will force URL.RequestURI to skip escaping
+			if req.URL.RawPath != "" {
+				req.URL.Opaque = req.URL.RawPath
+			}
+		} else if req.URL.RawPath == req.URL.Path {
+			// this should force URL to do escaping
+			req.URL.RawPath = ""
 		}
 	}
 
