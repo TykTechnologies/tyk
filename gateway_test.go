@@ -271,10 +271,12 @@ func TestParambasedAuth(t *testing.T) {
 func TestSkipTargetPassEscapingOff(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
+	defer resetTestConfig()
 
 	t.Run("With escaping, default", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = false
+
 		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.SkipTargetPathEscaping = false
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -285,8 +287,9 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = true
+
 		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.SkipTargetPathEscaping = true
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -297,9 +300,10 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = false
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
-			spec.Proxy.SkipTargetPathEscaping = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})
@@ -311,9 +315,10 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = true
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
-			spec.Proxy.SkipTargetPathEscaping = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})
@@ -325,9 +330,10 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = false
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
-			spec.Proxy.SkipTargetPathEscaping = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})
@@ -339,9 +345,10 @@ func TestSkipTargetPassEscapingOff(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = true
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
-			spec.Proxy.SkipTargetPathEscaping = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})
@@ -369,8 +376,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("With escaping, default", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = false
+
 		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.SkipTargetPathEscaping = false
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -380,8 +388,9 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, default", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = true
+
 		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.SkipTargetPathEscaping = true
 			spec.Proxy.ListenPath = "/"
 		})
 
@@ -391,9 +400,10 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = false
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
-			spec.Proxy.SkipTargetPathEscaping = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})
@@ -406,9 +416,10 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = true
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = false
-			spec.Proxy.SkipTargetPathEscaping = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})
@@ -421,9 +432,10 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = false
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
-			spec.Proxy.SkipTargetPathEscaping = false
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})
@@ -436,9 +448,10 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 	})
 
 	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		config.Global.HttpServerOptions.SkipTargetPathEscaping = true
+
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.StripListenPath = true
-			spec.Proxy.SkipTargetPathEscaping = true
 			spec.Proxy.ListenPath = "/listen_me"
 			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
 		})

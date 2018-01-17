@@ -113,20 +113,21 @@ type LocalSessionCacheConf struct {
 }
 
 type HttpServerOptionsConfig struct {
-	OverrideDefaults      bool       `json:"override_defaults"`
-	ReadTimeout           int        `json:"read_timeout"`
-	WriteTimeout          int        `json:"write_timeout"`
-	UseSSL                bool       `json:"use_ssl"`
-	UseLE_SSL             bool       `json:"use_ssl_le"`
-	SSLInsecureSkipVerify bool       `json:"ssl_insecure_skip_verify"`
-	EnableWebSockets      bool       `json:"enable_websockets"`
-	Certificates          []CertData `json:"certificates"`
-	SSLCertificates       []string   `json:"ssl_certificates"`
-	ServerName            string     `json:"server_name"`
-	MinVersion            uint16     `json:"min_version"`
-	FlushInterval         int        `json:"flush_interval"`
-	SkipURLCleaning       bool       `json:"skip_url_cleaning"`
-	Ciphers               []string   `json:"ssl_ciphers"`
+	OverrideDefaults       bool       `json:"override_defaults"`
+	ReadTimeout            int        `json:"read_timeout"`
+	WriteTimeout           int        `json:"write_timeout"`
+	UseSSL                 bool       `json:"use_ssl"`
+	UseLE_SSL              bool       `json:"use_ssl_le"`
+	SSLInsecureSkipVerify  bool       `json:"ssl_insecure_skip_verify"`
+	EnableWebSockets       bool       `json:"enable_websockets"`
+	Certificates           []CertData `json:"certificates"`
+	SSLCertificates        []string   `json:"ssl_certificates"`
+	ServerName             string     `json:"server_name"`
+	MinVersion             uint16     `json:"min_version"`
+	FlushInterval          int        `json:"flush_interval"`
+	SkipURLCleaning        bool       `json:"skip_url_cleaning"`
+	SkipTargetPathEscaping bool       `json:"skip_target_path_escaping"`
+	Ciphers                []string   `json:"ssl_ciphers"`
 }
 
 type AuthOverrideConf struct {

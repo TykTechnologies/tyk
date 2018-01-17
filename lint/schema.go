@@ -331,6 +331,9 @@ const confSchema = `{
 			"skip_url_cleaning": {
 				"type": "boolean"
 			},
+			"skip_target_path_escaping": {
+				"type": "boolean"
+			},
 			"ssl_insecure_skip_verify": {
 				"type": "boolean"
 			},
