@@ -156,9 +156,9 @@ func testHttpHandler() *mux.Router {
 	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
+	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
 	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
-	r.HandleFunc("/bundles/", bundleHandleFunc)
 	return r
 }
 
