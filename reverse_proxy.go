@@ -407,6 +407,8 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	return false, nil
 }
 
+var defaultResolver *net.Resolver
+
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport() // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
@@ -421,6 +423,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.DialContext = (&net.Dialer{
 			Timeout:   time.Duration(timeOut) * time.Second,
 			KeepAlive: 30 * time.Second,
+			Resolver:  defaultResolver,
 		}).DialContext
 		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}

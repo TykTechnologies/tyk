@@ -682,28 +682,30 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 	}...)
 }
 
-func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
-	// setup spec and do test HTTP upgrade-request
-	config.Global.HttpServerOptions.EnableWebSockets = true
+func TestDNSChange(t *testing.T) {
+	config.Global.ProxyDefaultTimeout = 1
 	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()
 
+	domainsToAddresses.Store("dynamic.local.", "127.0.0.1")
+
 	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.TargetURL = strings.Replace(testHttpAny, "127.0.0.1", "dynamic.local", -1)
 		spec.Proxy.ListenPath = "/"
 	})
 
-	ts.Run(t, test.TestCase{
-		Path: "/ws",
-		Headers: map[string]string{
-			"Connection":            "Upgrade",
-			"Upgrade":               "websocket",
-			"Sec-Websocket-Version": "13",
-			"Sec-Websocket-Key":     "abc",
-		},
-		Code: http.StatusSwitchingProtocols,
-	})
+	ts.Run(t, test.TestCase{Path: "/", Code: 200})
+
+	domainsToAddresses.Store("dynamic.local.", "128.0.0.1")
+
+	ts.Run(t, test.TestCase{Path: "/", Code: 200})
+
+	// DNS ttl is 1 second
+	time.Sleep(time.Second)
+
+	ts.Run(t, test.TestCase{Path: "/", Code: 500})
 }
 
 func TestConcurrencyReloads(t *testing.T) {
