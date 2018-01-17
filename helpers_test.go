@@ -24,6 +24,8 @@ import (
 	"github.com/miekg/dns"
 	"github.com/satori/go.uuid"
 
+	"github.com/gorilla/mux"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
@@ -92,7 +94,7 @@ const (
 	testHttpFailureAny = "http://" + testHttpFailure
 )
 
-func testHttpHandler() http.Handler {
+func testHttpHandler() *mux.Router {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -124,6 +126,7 @@ func testHttpHandler() http.Handler {
 			httpError(w, http.StatusInternalServerError)
 			return
 		}
+		r.URL.Opaque = r.URL.RawPath
 		err := json.NewEncoder(w).Encode(testHttpResponse{
 			Method:  r.Method,
 			Url:     r.URL.String(),
@@ -143,17 +146,20 @@ func testHttpHandler() http.Handler {
 			}
 		}
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleMethod(""))
-	mux.HandleFunc("/get", handleMethod("GET"))
-	mux.HandleFunc("/post", handleMethod("POST"))
-	mux.HandleFunc("/ws", wsHandler)
-	mux.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
+
+	// use gorilla's mux as it allows to cancel URI cleaning
+	// (it is not configurable in standard http mux)
+	r := mux.NewRouter()
+	r.HandleFunc("/get", handleMethod("GET"))
+	r.HandleFunc("/post", handleMethod("POST"))
+	r.HandleFunc("/ws", wsHandler)
+	r.HandleFunc("/jwk.json", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, jwkTestJson)
 	})
+	r.HandleFunc("/bundles/{rest:.*}", bundleHandleFunc)
+	r.HandleFunc("/{rest:.*}", handleMethod(""))
 
-	mux.HandleFunc("/bundles/", bundleHandleFunc)
-	return mux
+	return r
 }
 
 const jwkTestJson = `{

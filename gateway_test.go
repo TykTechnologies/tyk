@@ -47,6 +47,7 @@ var (
 const defaultListenPort = 8080
 
 var defaultTestConfig config.Config
+var testServerRouter *mux.Router
 
 func resetTestConfig() {
 	configMu.Lock()
@@ -75,9 +76,10 @@ func reloadSimulation() {
 }
 
 func TestMain(m *testing.M) {
+	testServerRouter = testHttpHandler()
 	testServer := &http.Server{
 		Addr:           testHttpListen,
-		Handler:        testHttpHandler(),
+		Handler:        testServerRouter,
 		ReadTimeout:    1 * time.Second,
 		WriteTimeout:   1 * time.Second,
 		MaxHeaderBytes: 1 << 20,
@@ -266,6 +268,190 @@ func TestParambasedAuth(t *testing.T) {
 	})
 }
 
+func TestSkipTargetPassEscapingOff(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	t.Run("With escaping, default", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
+			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val`},
+		}...)
+	})
+
+	t.Run("Without escaping", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/(abc,xyz)?arg=val", BodyMatch: `"Url":"/(abc,xyz)?arg=val"`},
+			{Path: "/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = false
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = false
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/(abc,xyz)?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = true
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+
+	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = true
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/(abc,xyz)?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+		}...)
+	})
+}
+
+func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
+	config.Global.HttpServerOptions.OverrideDefaults = true
+	config.Global.HttpServerOptions.SkipURLCleaning = true
+	defer resetTestConfig()
+
+	// here we expect that test gateway will be sending to test upstream requests with not cleaned URI
+	// so test upstream shouldn't reply with 301 and process them as well
+	prevSkipClean := defaultTestConfig.HttpServerOptions.OverrideDefaults &&
+		defaultTestConfig.HttpServerOptions.SkipURLCleaning
+	testServerRouter.SkipClean(true)
+	defer testServerRouter.SkipClean(prevSkipClean)
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	t.Run("With escaping, default", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com?arg=val`},
+		}...)
+	})
+
+	t.Run("Without escaping, default", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/abc/xyz/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/abc/xyz/http%3A%2F%2Ftest.com?arg=val`},
+		}...)
+	})
+
+	t.Run("With escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = false
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com?arg=val`},
+		}...)
+	})
+
+	t.Run("Without escaping, listen path and target URL are set, StripListenPath is OFF", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = false
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/(abc,xyz)?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/listen_me/http%3A%2F%2Ftest.com?arg=val`},
+		}...)
+	})
+
+	t.Run("With escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = true
+			spec.Proxy.SkipTargetPathEscaping = false
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com?arg=val`},
+		}...)
+	})
+
+	t.Run("Without escaping, listen path and target URL are set, StripListenPath is ON", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.StripListenPath = true
+			spec.Proxy.SkipTargetPathEscaping = true
+			spec.Proxy.ListenPath = "/listen_me"
+			spec.Proxy.TargetURL = testHttpAny + "/sent_to_me"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/listen_me/(abc,xyz)?arg=val", BodyMatch: `"Url":"/sent_to_me/(abc,xyz)?arg=val"`},
+			{Path: "/listen_me/%28abc,xyz%29?arg=val", BodyMatch: `"Url":"/sent_to_me/%28abc,xyz%29?arg=val"`},
+			{Path: "/listen_me/http%3A%2F%2Ftest.com?arg=val", BodyMatch: `"Url":"/sent_to_me/http%3A%2F%2Ftest.com?arg=val`},
+		}...)
+	})
+
+}
+
 func TestQuota(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -406,7 +592,7 @@ func TestAnalytics(t *testing.T) {
 }
 
 func TestListener(t *testing.T) {
-	// Trcik to get spec JSON, without loading API
+	// Trick to get spec JSON, without loading API
 	// Specs will be reseted when we do `newTykTestServer`
 	specs := buildAndLoadAPI()
 	specJSON, _ := json.Marshal(specs[0].APIDefinition)
