@@ -80,9 +80,12 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			}
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
+
 				handler := ErrorHandler{mw.Base()}
 				handler.HandleError(w, r, err.Error(), errCode)
+
 				meta["error"] = err.Error()
+
 				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
 				return

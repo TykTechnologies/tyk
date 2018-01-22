@@ -40,35 +40,43 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	vPathMeta := meta.(*apidef.ValidatePathMeta)
-	if vPathMeta.ValidateWith == nil {
+	if vPathMeta.Schema == nil {
 		return errors.New("no schemas to validate against"), http.StatusInternalServerError
+	}
+
+	if vPathMeta.SchemaVersion != "" && vPathMeta.SchemaVersion != "draft-v4" {
+		return errors.New("unsupported schema version"), http.StatusInternalServerError
 	}
 
 	rCopy := copyRequest(r)
 	bodyBytes, err := ioutil.ReadAll(rCopy.Body)
 	if err != nil {
-		return err, http.StatusInternalServerError
+		return err, http.StatusBadRequest
 	}
 	defer rCopy.Body.Close()
 
-	schema := vPathMeta.ValidateWith
+	schema := vPathMeta.Schema
 
 	result, err := k.validate(bodyBytes, schema)
 	if err != nil {
-		return err, http.StatusInternalServerError
+		return fmt.Errorf("JSON parsing error: %v", err), http.StatusBadRequest
 	}
 
 	if !result.Valid() {
-		errStr := "payload validation failed"
-		for _, desc := range result.Errors() {
-			errStr = fmt.Sprintf("%s, %s", errStr, desc)
+		errStr := ""
+		for i, desc := range result.Errors() {
+			if i == 0 {
+				errStr = desc.String()
+			} else {
+				errStr = fmt.Sprintf("%s; %s", errStr, desc)
+			}
 		}
 
-		if vPathMeta.ValidationErrorResponseCode == 0 {
-			vPathMeta.ValidationErrorResponseCode = http.StatusUnprocessableEntity
+		if vPathMeta.ErrorResponseCode == 0 {
+			vPathMeta.ErrorResponseCode = http.StatusUnprocessableEntity
 		}
 
-		return errors.New(errStr), vPathMeta.ValidationErrorResponseCode
+		return errors.New(errStr), vPathMeta.ErrorResponseCode
 	}
 
 	return nil, http.StatusOK
