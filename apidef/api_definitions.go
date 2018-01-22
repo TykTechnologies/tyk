@@ -166,11 +166,13 @@ type MethodTransformMeta struct {
 }
 
 type ValidatePathMeta struct {
-	Path         string                 `bson:"path" json:"path"`
-	Method       string                 `bson:"method" json:"method"`
-	ValidateWith map[string]interface{} `json:"validate_with"`
+	Path   string                 `bson:"path" json:"path"`
+	Method string                 `bson:"method" json:"method"`
+	Schema map[string]interface{} `bson:"schema" json:"schema"`
+	// TODO: Implement multi schema support
+	SchemaVersion string `bson:"schema_version" json:"schema_version"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
-	ValidationErrorResponseCode int `bson:"validation_error_response_code" json:"validation_error_response_code"`
+	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
 type ExtendedPathsSet struct {
