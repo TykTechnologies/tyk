@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1022,4 +1023,109 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	// clean up connections
 	conn2.Close()
 	conn3.Close()
+}
+
+func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Listener {
+	l, err := net.Listen("tcp", "127.0.0.1:6666")
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		conns := 0
+
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				fmt.Println(err)
+				log.Fatal(err)
+			}
+
+			conns++
+			fmt.Println("conns " + strconv.Itoa(conns))
+
+			if conns > allowedConns {
+				t.Error("Too many connections")
+				break
+			}
+			defer conn.Close()
+
+			reads := 0
+			//Hold the connection
+			go func() {
+
+				_, err := ioutil.ReadAll(conn)
+				if err != nil {
+					t.Error(err)
+				}
+				reads++
+
+				fmt.Println("reads " + strconv.Itoa(reads))
+				if reads > readsPerConn {
+					t.Error("Too many reads per conn")
+					// break
+				}
+				conn.Write([]byte("HTTP/1.1 200 OK"))
+			}()
+		}
+	}()
+
+	return l
+}
+
+func TestKeepAliveConns(t *testing.T) {
+
+	t.Run("Should use same connection", func(t *testing.T) {
+		// set keep alive option
+		config.Global.DisableKeepAlives = true
+		defer resetTestConfig()
+
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = "http://127.0.0.1:6666"
+		})
+
+		upstream := createTestUptream(t, 1, 2)
+		if upstream != nil {
+			defer upstream.Close()
+		}
+
+		//do 2 requests
+		_, err := ts.Run(t, test.TestCase{Path: "/"})
+		if err != nil {
+			t.Error(err)
+		}
+		_, err1 := ts.Run(t, test.TestCase{Path: "/"})
+		if err1 != nil {
+			t.Error(err)
+		}
+	})
+
+	// t.Run("Should use separate connection", func(t *testing.T) {
+	// 	ts := newTykTestServer()
+	// 	defer ts.Close()
+	// 	// set keep alive option
+	// 	config.Global.DisableKeepAlives = true
+	// 	defer resetTestConfig()
+
+	// 	buildAndLoadAPI(func(spec *APISpec) {
+	// 		spec.Proxy.ListenPath = "/"
+	// 		spec.Proxy.TargetURL = "http://127.0.0.1:0"
+	// 	})
+	// 	upstream := createTestUptream(t, 2, 1)
+	// 	if upstream != nil {
+	// 		defer upstream.Close()
+	// 	}
+	// 	//do 2 requests
+	// 	_, err := ts.Do(test.TestCase{Path: "/"})
+	// 	if err != nil {
+	// 		t.Error(err)
+	// 	}
+	// 	//_, err1 := ts.Do(test.TestCase{Path: "/"})
+	// 	//if err1 != nil {
+	// 	//	t.Error(err)
+	// 	//}
+	// })
 }
