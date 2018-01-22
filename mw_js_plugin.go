@@ -309,12 +309,12 @@ func (j *JSVM) Init(spec *APISpec) {
 		if err == nil {
 			_, err = vm.Run(f)
 			f.Close()
-		}
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "jsvm",
-			}).Error("Could not load user's TykJS: ", err)
-			return
+
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("Could not load user's TykJS: ", err)
+			}
 		}
 	}
 
