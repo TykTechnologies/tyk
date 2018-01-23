@@ -97,8 +97,21 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
+	headers := r.Header
+	host := r.Host
+	if host == "" && r.URL != nil {
+		host = r.URL.Host
+	}
+	if host != "" {
+		headers = make(http.Header)
+		for k, v := range r.Header {
+			headers[k] = v
+		}
+		headers.Set("Host", host)
+	}
+
 	requestData := MiniRequestObject{
-		Headers:        r.Header,
+		Headers:        headers,
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
 		Body:           originalBody,
