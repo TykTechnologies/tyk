@@ -76,8 +76,18 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		body = string(originalBody)
 	}
 
+	headers := ProtoMap(r.Header)
+
+	host := r.Host
+	if host == "" && r.URL != nil {
+		host = r.URL.Host
+	}
+	if host != "" {
+		headers["Host"] = host
+	}
+
 	miniRequestObject := &coprocess.MiniRequestObject{
-		Headers:        ProtoMap(r.Header),
+		Headers:        headers,
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
 		Body:           body,
