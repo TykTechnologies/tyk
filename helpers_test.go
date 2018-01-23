@@ -520,11 +520,7 @@ func buildAndLoadAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	return loadAPI(buildAPI(apiGens...)...)
 }
 
-var domainsToAddresses = map[string]string{
-	"host1.local.": "127.0.0.1",
-	"host2.local.": "127.0.0.1",
-	"host3.local.": "127.0.0.1",
-}
+var domainsToAddresses sync.Map
 
 type dnsMockHandler struct{}
 
@@ -536,7 +532,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		msg.Authoritative = true
 		domain := msg.Question[0].Name
 
-		address, ok := domainsToAddresses[domain]
+		address, ok := domainsToAddresses.Load(domain)
 		if !ok {
 			// ^ 				start of line
 			// localhost\.		match literally
@@ -551,8 +547,8 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		}
 
 		msg.Answer = append(msg.Answer, &dns.A{
-			Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-			A:   net.ParseIP(address),
+			Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 1},
+			A:   net.ParseIP(address.(string)),
 		})
 	}
 	w.WriteMsg(&msg)
@@ -566,15 +562,21 @@ func initDNSMock() {
 	dnsMock.Handler = &dnsMockHandler{}
 	go dnsMock.ActivateAndServe()
 
+	domainsToAddresses.Store("host1.local.", "127.0.0.1")
+	domainsToAddresses.Store("host2.local.", "127.0.0.1")
+	domainsToAddresses.Store("host3.local.", "127.0.0.1")
+
+	defaultResolver = &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{}
+			return d.DialContext(ctx, network, dnsMock.PacketConn.LocalAddr().String())
+		},
+	}
+
 	http.DefaultTransport = &http.Transport{
 		DialContext: (&net.Dialer{
-			Resolver: &net.Resolver{
-				PreferGo: true,
-				Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-					d := net.Dialer{}
-					return d.DialContext(ctx, network, dnsMock.PacketConn.LocalAddr().String())
-				},
-			},
+			Resolver: defaultResolver,
 		}).DialContext,
 	}
 }
