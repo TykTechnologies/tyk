@@ -1026,45 +1026,44 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 }
 
 func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Listener {
-	l, err := net.Listen("tcp", "127.0.0.1:6666")
-	if err != nil {
-		log.Fatal(err)
-	}
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	go func() {
 		conns := 0
 
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				fmt.Println(err)
-				log.Fatal(err)
+				return
 			}
-
 			conns++
-			fmt.Println("conns " + strconv.Itoa(conns))
 
 			if conns > allowedConns {
-				t.Error("Too many connections")
-				break
+				t.Fatal("Too many connections")
+				conn.Close()
+				return
 			}
-			defer conn.Close()
 
 			reads := 0
-			//Hold the connection
 			go func() {
+				for {
+					buf := make([]byte, 1024)
+					conn.SetDeadline(time.Now().Add(50 * time.Millisecond))
+					_, err := conn.Read(buf)
+					if err != nil {
+						conn.Close()
+						return
+					}
+					reads++
 
-				_, err := ioutil.ReadAll(conn)
-				if err != nil {
-					t.Error(err)
-				}
-				reads++
+					if reads > readsPerConn {
+						t.Error("Too many reads per conn")
+						conn.Close()
+						return
+					}
 
-				fmt.Println("reads " + strconv.Itoa(reads))
-				if reads > readsPerConn {
-					t.Error("Too many reads per conn")
-					// break
+					conn.SetDeadline(time.Now().Add(50 * time.Millisecond))
+					conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"))
 				}
-				conn.Write([]byte("HTTP/1.1 200 OK"))
 			}()
 		}
 	}()
@@ -1073,59 +1072,46 @@ func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Lis
 }
 
 func TestKeepAliveConns(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	defer resetTestConfig()
 
 	t.Run("Should use same connection", func(t *testing.T) {
 		// set keep alive option
-		config.Global.DisableKeepAlives = true
-		defer resetTestConfig()
+		config.Global.CloseConnections = false
 
-		ts := newTykTestServer()
-		defer ts.Close()
+		// Allow 1 connection with 3 reads
+		upstream := createTestUptream(t, 1, 3)
+		defer upstream.Close()
 
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = "http://127.0.0.1:6666"
+			spec.Proxy.TargetURL = "http://" + upstream.Addr().String()
 		})
 
-		upstream := createTestUptream(t, 1, 2)
-		if upstream != nil {
-			defer upstream.Close()
-		}
-
-		//do 2 requests
-		_, err := ts.Run(t, test.TestCase{Path: "/"})
-		if err != nil {
-			t.Error(err)
-		}
-		_, err1 := ts.Run(t, test.TestCase{Path: "/"})
-		if err1 != nil {
-			t.Error(err)
-		}
+		ts.Run(t, []test.TestCase{
+			{Code: 200},
+			{Code: 200},
+			{Code: 200},
+		}...)
 	})
 
-	// t.Run("Should use separate connection", func(t *testing.T) {
-	// 	ts := newTykTestServer()
-	// 	defer ts.Close()
-	// 	// set keep alive option
-	// 	config.Global.DisableKeepAlives = true
-	// 	defer resetTestConfig()
+	t.Run("Should use separate connection", func(t *testing.T) {
+		config.Global.CloseConnections = true
 
-	// 	buildAndLoadAPI(func(spec *APISpec) {
-	// 		spec.Proxy.ListenPath = "/"
-	// 		spec.Proxy.TargetURL = "http://127.0.0.1:0"
-	// 	})
-	// 	upstream := createTestUptream(t, 2, 1)
-	// 	if upstream != nil {
-	// 		defer upstream.Close()
-	// 	}
-	// 	//do 2 requests
-	// 	_, err := ts.Do(test.TestCase{Path: "/"})
-	// 	if err != nil {
-	// 		t.Error(err)
-	// 	}
-	// 	//_, err1 := ts.Do(test.TestCase{Path: "/"})
-	// 	//if err1 != nil {
-	// 	//	t.Error(err)
-	// 	//}
-	// })
+		// Allow 3 connections with 1 read
+		upstream := createTestUptream(t, 3, 1)
+		defer upstream.Close()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = "http://" + upstream.Addr().String()
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Code: 200},
+			{Code: 200},
+			{Code: 200},
+		}...)
+	})
 }
