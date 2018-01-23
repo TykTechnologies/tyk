@@ -439,6 +439,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}
 
+	if config.Global.CloseConnections {
+		transport.DisableKeepAlives = true
+	}
+
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
 		return wsTransport

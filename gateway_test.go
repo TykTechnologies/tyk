@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1022,4 +1023,95 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	// clean up connections
 	conn2.Close()
 	conn3.Close()
+}
+
+func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Listener {
+	l, _ := net.Listen("tcp", "127.0.0.1:0")
+	go func() {
+		conns := 0
+
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+			conns++
+
+			if conns > allowedConns {
+				t.Fatal("Too many connections")
+				conn.Close()
+				return
+			}
+
+			reads := 0
+			go func() {
+				for {
+					buf := make([]byte, 1024)
+					conn.SetDeadline(time.Now().Add(50 * time.Millisecond))
+					_, err := conn.Read(buf)
+					if err != nil {
+						conn.Close()
+						return
+					}
+					reads++
+
+					if reads > readsPerConn {
+						t.Error("Too many reads per conn")
+						conn.Close()
+						return
+					}
+
+					conn.SetDeadline(time.Now().Add(50 * time.Millisecond))
+					conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"))
+				}
+			}()
+		}
+	}()
+
+	return l
+}
+
+func TestKeepAliveConns(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	defer resetTestConfig()
+
+	t.Run("Should use same connection", func(t *testing.T) {
+		// set keep alive option
+		config.Global.CloseConnections = false
+
+		// Allow 1 connection with 3 reads
+		upstream := createTestUptream(t, 1, 3)
+		defer upstream.Close()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = "http://" + upstream.Addr().String()
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Code: 200},
+			{Code: 200},
+			{Code: 200},
+		}...)
+	})
+
+	t.Run("Should use separate connection", func(t *testing.T) {
+		config.Global.CloseConnections = true
+
+		// Allow 3 connections with 1 read
+		upstream := createTestUptream(t, 3, 1)
+		defer upstream.Close()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = "http://" + upstream.Addr().String()
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Code: 200},
+			{Code: 200},
+			{Code: 200},
+		}...)
+	})
 }
