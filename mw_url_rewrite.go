@@ -231,11 +231,13 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 	for _, ver := range m.Spec.VersionData.Versions {
 		for _, path := range ver.ExtendedPaths.URLRewrite {
 			for _, tr := range path.Triggers {
-				for _, h := range tr.Options.HeaderMatches {
+				for key, h := range tr.Options.HeaderMatches {
 					h.Init()
+					tr.Options.HeaderMatches[key] = h
 				}
-				for _, q := range tr.Options.QueryValMatches {
+				for key, q := range tr.Options.QueryValMatches {
 					q.Init()
+					tr.Options.QueryValMatches[key] = q
 				}
 				if tr.Options.PayloadMatches.MatchPattern != "" {
 					tr.Options.PayloadMatches.Init()
