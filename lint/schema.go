@@ -352,6 +352,9 @@ const confSchema = `{
 					"type": "string"
 				}
 			},
+			"use_http2":{
+				"type": "boolean"
+			},
 			"ssl_ciphers":{
 				"type": ["array", "null"],
 				"items": {
