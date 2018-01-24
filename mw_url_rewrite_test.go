@@ -512,66 +512,98 @@ func TestRewriterTriggers(t *testing.T) {
 }
 
 func TestInitTriggerRx(t *testing.T) {
+	// prepare test data
 	testRewriteMW := &URLRewriteMiddleware{
 		BaseMiddleware: BaseMiddleware{
 			Spec: &APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					VersionData: struct {
-						NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
-						DefaultVersion string                        `bson:"default_version" json:"default_version"`
-						Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
-					}{
-						NotVersioned:   true,
-						DefaultVersion: "Default",
-						Versions: map[string]apidef.VersionInfo{
-							"Default": {
-								ExtendedPaths: apidef.ExtendedPathsSet{
-									URLRewrite: []apidef.URLRewriteMeta{
-										{
-											Triggers: []apidef.RoutingTrigger{
-												{
-													Options: apidef.RoutingTriggerOptions{
-														HeaderMatches: map[string]apidef.StringRegexMap{
-															"abc": {
-																MatchPattern: "^abc.*",
-															},
-														},
-														QueryValMatches: map[string]apidef.StringRegexMap{
-															"def": {
-																MatchPattern: "^def.*",
-															},
-														},
-														PayloadMatches: apidef.StringRegexMap{
-															MatchPattern: "^ghi.*",
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
+				APIDefinition: &apidef.APIDefinition{},
+			},
+		},
+	}
+	testRewriteMW.Spec.APIDefinition.VersionData = struct {
+		NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
+		DefaultVersion string                        `bson:"default_version" json:"default_version"`
+		Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
+	}{}
+
+	routingTriggerOptions := apidef.RoutingTriggerOptions{
+		HeaderMatches: map[string]apidef.StringRegexMap{
+			"abc": {
+				MatchPattern: "^abc.*",
+			},
+		},
+		QueryValMatches: map[string]apidef.StringRegexMap{
+			"def": {
+				MatchPattern: "^def.*",
+			},
+		},
+		PayloadMatches: apidef.StringRegexMap{
+			MatchPattern: "^ghi.*",
+		},
+	}
+
+	extendedPathsSet := apidef.ExtendedPathsSet{
+		URLRewrite: []apidef.URLRewriteMeta{
+			{
+				Triggers: []apidef.RoutingTrigger{
+					{
+						Options: routingTriggerOptions,
 					},
 				},
 			},
 		},
 	}
+	testRewriteMW.Spec.APIDefinition.VersionData.Versions = map[string]apidef.VersionInfo{
+		"Default": {
+			ExtendedPaths: extendedPathsSet,
+		},
+	}
 
+	// run method under test
 	testRewriteMW.InitTriggerRx()
 
-	if headerMatch := testRewriteMW.Spec.APIDefinition.VersionData.Versions["Default"].ExtendedPaths.URLRewrite[0].
-		Triggers[0].Options.HeaderMatches["abc"]; headerMatch.Check("abc") == "" {
+	// assert HeaderMatches
+	headerMatch := testRewriteMW.
+		Spec.
+		APIDefinition.
+		VersionData.
+		Versions["Default"].
+		ExtendedPaths.
+		URLRewrite[0].
+		Triggers[0].
+		Options.
+		HeaderMatches["abc"]
+	if headerMatch.Check("abc") == "" {
 		t.Errorf("Expected HeaderMatches initalized and matched, received no match")
 	}
 
-	if queryValMatch := testRewriteMW.Spec.APIDefinition.VersionData.Versions["Default"].ExtendedPaths.URLRewrite[0].
-		Triggers[0].Options.QueryValMatches["def"]; queryValMatch.Check("def") == "" {
+	// assert QueryValMatches
+	queryValMatch := testRewriteMW.
+		Spec.
+		APIDefinition.
+		VersionData.
+		Versions["Default"].
+		ExtendedPaths.
+		URLRewrite[0].
+		Triggers[0].
+		Options.
+		QueryValMatches["def"]
+	if queryValMatch.Check("def") == "" {
 		t.Errorf("Expected QueryValMatches initalized and matched, received no match")
 	}
 
-	if payloadMatch := testRewriteMW.Spec.APIDefinition.VersionData.Versions["Default"].ExtendedPaths.URLRewrite[0].
-		Triggers[0].Options.PayloadMatches; payloadMatch.Check("ghi") == "" {
+	// assert PayloadMatches
+	payloadMatch := testRewriteMW.
+		Spec.
+		APIDefinition.
+		VersionData.
+		Versions["Default"].
+		ExtendedPaths.
+		URLRewrite[0].
+		Triggers[0].
+		Options.
+		PayloadMatches
+	if payloadMatch.Check("ghi") == "" {
 		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
 	}
 }
