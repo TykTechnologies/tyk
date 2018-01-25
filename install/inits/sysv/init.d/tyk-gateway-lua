@@ -21,7 +21,7 @@ export PATH
 name=tyk-gateway-lua
 program=/opt/tyk-gateway/tyk-lua
 args='--conf=/opt/tyk-gateway/tyk.conf'
-pidfile="/var/run/tyk/tyk-gateway.pid"
+pidfile="/var/run/tyk-gateway.pid"
 
 [ -r /etc/default/$name ] && . /etc/default/$name
 [ -r /etc/sysconfig/$name ] && . /etc/sysconfig/$name
