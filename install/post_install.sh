@@ -1,16 +1,4 @@
 #!/bin/bash
-echo "Setting permissions"
-# Config file must not be world-readable due to sensitive data
-chown tyk:tyk /opt/tyk-gateway/tyk.conf
-chmod 660 /opt/tyk-gateway/tyk.conf
-
-echo "Creating a PID directory"
-if [ ! -d /var/run/tyk ]; then
-	mkdir -p /var/run/tyk
-	chown tyk:tyk /var/run/tyk
-	chmod 770 /var/run/tyk
-fi
-
 echo "Installing init scripts..."
 
 SYSTEMD="/lib/systemd/system"
@@ -19,7 +7,7 @@ SYSV1="/etc/init.d"
 SYSV2="/etc/rc.d/init.d/"
 DIR="/opt/tyk-gateway/install"
 
-if [ -d "$SYSTEMD" -a -x "$(command -v systemctl)" ]; then
+if [ -d "$SYSTEMD" ] && systemctl status > /dev/null 2> /dev/null; then
 	echo "Found Systemd"
 	[ -f /etc/default/tyk-gateway ] || cp $DIR/inits/systemd/default/tyk-gateway /etc/default/
 	cp $DIR/inits/systemd/system/tyk-gateway.service /lib/systemd/system/
