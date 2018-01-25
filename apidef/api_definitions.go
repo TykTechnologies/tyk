@@ -460,6 +460,10 @@ func (s *StringRegexMap) Check(value string) string {
 
 func (s *StringRegexMap) Init() error {
 	var err error
-	s.matchRegex, err = regexp.Compile(s.MatchPattern)
-	return err
+	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {
+		log.WithError(err).WithField("MatchPattern", s.MatchPattern).
+			Error("Could not compile regexp for StringRegexMap")
+		return err
+	}
+	return nil
 }
