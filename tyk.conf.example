@@ -1,7 +1,6 @@
 {
   "listen_address": "",
   "listen_port": 8080,
-  "pid_file_location": "/var/run/tyk/tyk-gateway.pid",
   "secret": "352d20ee67be67f6340b4c0605b044b7",
   "template_path": "/opt/tyk-gateway/templates",
   "use_db_app_configs": false,
