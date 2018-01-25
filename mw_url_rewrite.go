@@ -117,6 +117,9 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 				if len(triggerOpts.Options.PathPartMatches) > 0 {
 					total += 1
 				}
+				if len(triggerOpts.Options.SessionMetaMatches) > 0 {
+					total += 1
+				}
 				if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
 					total += 1
 				}
@@ -242,6 +245,18 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 					q.Init()
 					m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
 						Triggers[trKey].Options.QueryValMatches[key] = q
+				}
+				for key, h := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+					Triggers[trKey].Options.SessionMetaMatches {
+					h.Init()
+					m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+						Triggers[trKey].Options.SessionMetaMatches[key] = h
+				}
+				for key, h := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+					Triggers[trKey].Options.PathPartMatches {
+					h.Init()
+					m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+						Triggers[trKey].Options.PathPartMatches[key] = h
 				}
 				if m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
 					Triggers[trKey].Options.PayloadMatches.MatchPattern != "" {
