@@ -228,19 +228,25 @@ func (m *URLRewriteMiddleware) Name() string {
 
 func (m *URLRewriteMiddleware) InitTriggerRx() {
 	// Generate regexp for each special match parameter
-	for _, ver := range m.Spec.VersionData.Versions {
-		for _, path := range ver.ExtendedPaths.URLRewrite {
-			for _, tr := range path.Triggers {
-				for key, h := range tr.Options.HeaderMatches {
+	for verKey := range m.Spec.VersionData.Versions {
+		for pathKey := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite {
+			for trKey := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].Triggers {
+				for key, h := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+					Triggers[trKey].Options.HeaderMatches {
 					h.Init()
-					tr.Options.HeaderMatches[key] = h
+					m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+						Triggers[trKey].Options.HeaderMatches[key] = h
 				}
-				for key, q := range tr.Options.QueryValMatches {
+				for key, q := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+					Triggers[trKey].Options.QueryValMatches {
 					q.Init()
-					tr.Options.QueryValMatches[key] = q
+					m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+						Triggers[trKey].Options.QueryValMatches[key] = q
 				}
-				if tr.Options.PayloadMatches.MatchPattern != "" {
-					tr.Options.PayloadMatches.Init()
+				if m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+					Triggers[trKey].Options.PayloadMatches.MatchPattern != "" {
+					m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey].
+						Triggers[trKey].Options.PayloadMatches.Init()
 				}
 			}
 		}
