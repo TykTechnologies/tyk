@@ -849,7 +849,7 @@ func initialiseSystem() error {
 	setupLogger()
 
 	if config.Global.PIDFileLocation == "" {
-		config.Global.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+		config.Global.PIDFileLocation = "/var/run/tyk-gateway.pid"
 	}
 
 	mainLog.Info("PIDFile location set to: ", config.Global.PIDFileLocation)

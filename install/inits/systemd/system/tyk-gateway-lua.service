@@ -3,8 +3,8 @@ Description=Tyk API Gateway (LUA Support)
  
 [Service]
 Type=simple
-User=tyk
-Group=tyk
+User=root
+Group=root
 # Load env vars from /etc/default/ and /etc/sysconfig/ if they exist.
 # Prefixing the path with '-' makes it try to load, but if the file doesn't
 # exist, it continues onward.
@@ -15,7 +15,6 @@ Restart=always
 WorkingDirectory=/opt/tyk-gateway
 RuntimeDirectory=tyk
 RuntimeDirectoryMode=0770
-PIDFile=/var/run/tyk/tyk-gateway.pid
 
 [Install]
 WantedBy=multi-user.target
