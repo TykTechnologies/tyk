@@ -18,11 +18,18 @@ if [ -d "$SYSTEMD" ] && systemctl status > /dev/null 2> /dev/null; then
 fi
 
 if [ -d "$UPSTART" ]; then
-	echo "Found upstart"
 	[ -f /etc/default/tyk-gateway ] || cp $DIR/inits/upstart/default/tyk-gateway /etc/default/
-	cp $DIR/inits/upstart/init/tyk-gateway.conf /etc/init/
-	cp $DIR/inits/upstart/init/tyk-gateway-lua.conf /etc/init/
-	cp $DIR/inits/upstart/init/tyk-gateway-python.conf /etc/init/
+	if [[ "$(initctl version)" =~ .*upstart[[:space:]]1\..* ]]; then
+		echo "Found upstart 1.x+"
+		cp $DIR/inits/upstart/init/1.x/tyk-gateway.conf /etc/init/
+		cp $DIR/inits/upstart/init/1.x/tyk-gateway-lua.conf /etc/init/
+		cp $DIR/inits/upstart/init/1.x/tyk-gateway-python.conf /etc/init/
+	else
+		echo "Found upstart 0.x"
+		cp $DIR/inits/upstart/init/0.x/tyk-gateway.conf /etc/init/
+		cp $DIR/inits/upstart/init/0.x/tyk-gateway-lua.conf /etc/init/
+		cp $DIR/inits/upstart/init/0.x/tyk-gateway-python.conf /etc/init/
+	fi
 	exit
 fi
 
