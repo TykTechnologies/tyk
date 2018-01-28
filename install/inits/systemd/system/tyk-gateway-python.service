@@ -10,7 +10,7 @@ Group=root
 # exist, it continues onward.
 EnvironmentFile=-/etc/default/tyk-gateway
 EnvironmentFile=-/etc/sysconfig/tyk-gateway
-ExecStart=/opt/tyk-gateway/tyk-python --conf=/opt/tyk-gateway/tyk.conf
+ExecStart=/opt/tyk-gateway/tyk-python --conf /opt/tyk-gateway/tyk.conf
 Restart=always
 WorkingDirectory=/opt/tyk-gateway
 RuntimeDirectory=tyk

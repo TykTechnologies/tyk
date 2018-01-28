@@ -23,9 +23,9 @@ fi
 if [ -f "/etc/init/tyk-gateway.conf" ]; then
 	echo "Found upstart"
 	echo "Stopping the service"
-	service tyk-gateway stop
-	service tyk-gateway-python stop
-	service tyk-gateway-lua stop
+	stop tyk-gateway
+	stop tyk-gateway-python
+	stop tyk-gateway-lua
 	echo "Removing the service"
 	rm /etc/init/tyk-gateway.conf
 	rm /etc/init/tyk-gateway-python.conf
