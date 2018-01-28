@@ -712,6 +712,86 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 
 }
 
+func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
+	spec := createSpecTest(t, jwtWithCentralDef)
+	spec.JWTSigningMethod = "rsa"
+
+	policiesMu.Lock()
+	policiesByID["987654321"] = user.Policy{
+		ID:               "987654321",
+		OrgID:            "default",
+		Rate:             1000.0,
+		Per:              1.0,
+		QuotaMax:         -1,
+		QuotaRenewalRate: -1,
+		AccessRights:     map[string]user.AccessDefinition{},
+		Active:           true,
+		KeyExpiresIn:     60,
+	}
+	policiesByID["1234567890"] = user.Policy{
+		ID:               "1234567890",
+		OrgID:            "default",
+		Rate:             2000.0,
+		Per:              1.0,
+		QuotaMax:         -1,
+		QuotaRenewalRate: -1,
+		AccessRights:     map[string]user.AccessDefinition{},
+		Active:           true,
+		KeyExpiresIn:     60,
+	}
+	policiesMu.Unlock()
+
+	// Create the token
+	token := jwt.New(jwt.GetSigningMethod("RS512"))
+	// Set the token ID
+	token.Header["kid"] = "12345"
+	// Set some claims
+	token.Claims.(jwt.MapClaims)["foo"] = "bar"
+	token.Claims.(jwt.MapClaims)["user_id"] = testKey(t, "token")
+	token.Claims.(jwt.MapClaims)["policy_id"] = "987654321"
+	token.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	// Sign and get the complete encoded token as a string
+	signKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(jwtRSAPrivKey))
+	if err != nil {
+		t.Fatal("Couldn't extract private key: ", err)
+	}
+	tokenString, err := token.SignedString(signKey)
+	if err != nil {
+		t.Fatal("Couldn't create JWT token: ", err)
+	}
+
+	recorder := httptest.NewRecorder()
+	req := testReq(t, "GET", "/jwt_test/", nil)
+	// add a colon here
+	req.Header.Set("authorization", "Bearer "+tokenString)
+
+	chain := getJWTChain(spec)
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have passed!: ", recorder.Code)
+	}
+
+	// put JWT invalid policy ID and do request again
+	token.Claims.(jwt.MapClaims)["policy_id"] = "1234567890"
+	tokenString, err = token.SignedString(signKey)
+	if err != nil {
+		t.Fatal("Couldn't create JWT token: ", err)
+	}
+
+	recorder = httptest.NewRecorder()
+	req = testReq(t, "GET", "/jwt_test/", nil)
+	// add a colon here
+	req.Header.Set("authorization", "Bearer "+tokenString)
+
+	chain.ServeHTTP(recorder, req)
+
+	if recorder.Code != 200 {
+		t.Error("Initial request failed with non-200 code, should have passed!: ", recorder.Code)
+	}
+
+}
+
 func TestJWTSessionRSAWithJWK(t *testing.T) {
 	spec := createSpecTest(t, jwtWithJWKDef)
 	spec.JWTSigningMethod = "rsa"
