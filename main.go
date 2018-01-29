@@ -1341,7 +1341,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Info("Custom gateway started")
+			}).Infof("Custom gateway started (%s)", VERSION)
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
