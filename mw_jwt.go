@@ -273,7 +273,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			return errors.New("Key not authorized: no matching policy found"), 403
 		}
 		// check if we received a valid policy ID in claim
+		policiesMu.RLock()
 		policy, ok := policiesByID[policyID]
+		policiesMu.RUnlock()
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
 			log.Error("Policy ID found in token is invalid!")
