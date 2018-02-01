@@ -348,8 +348,9 @@ type APIDefinition struct {
 	HmacAllowedClockSkew          float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
 	BaseIdentityProvidedBy        AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition             struct {
-		Location string `bson:"location" json:"location"`
-		Key      string `bson:"key" json:"key"`
+		Location  string `bson:"location" json:"location"`
+		Key       string `bson:"key" json:"key"`
+		StripPath bool   `bson:"strip_path" json:"strip_path"`
 	} `bson:"definition" json:"definition"`
 	VersionData struct {
 		NotVersioned   bool                   `bson:"not_versioned" json:"not_versioned"`
