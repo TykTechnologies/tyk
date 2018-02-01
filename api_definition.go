@@ -944,10 +944,15 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case "url":
-		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
+		uPath := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
 		// First non-empty part of the path is the version ID
-		for _, part := range strings.Split(url, "/") {
+		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
+
+				u := r.URL.String()
+				newU, _ := url.Parse(strings.Replace(u, part+"/", "", 1))
+				r.URL = newU
+
 				return part
 			}
 		}
@@ -1052,7 +1057,6 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 
 		// cache for the future
 		ctxSetVersionInfo(r, &version)
-
 	}
 
 	// Load path data and whitelist data for version
@@ -1070,7 +1074,6 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 	}
 
 	return &version, rxPaths, whiteListStatus, StatusOk
-
 }
 
 type RoundRobin struct {
