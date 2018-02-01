@@ -1033,9 +1033,9 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case "url":
-		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
+		uPath := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
 		// First non-empty part of the path is the version ID
-		for _, part := range strings.Split(url, "/") {
+		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
 				return part
 			}
@@ -1158,7 +1158,6 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 	}
 
 	return &version, rxPaths, whiteListStatus, StatusOk
-
 }
 
 type RoundRobin struct {
