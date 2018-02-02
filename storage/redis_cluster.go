@@ -15,6 +15,11 @@ import (
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
 
+const (
+	waitStorageRetriesNum      = 10
+	waitStorageRetriesInterval = 5 * time.Second
+)
+
 var (
 	redisSingletonMu           sync.RWMutex
 	redisClusterSingleton      *rediscluster.RedisCluster
@@ -26,6 +31,55 @@ type RedisCluster struct {
 	KeyPrefix string
 	HashKeys  bool
 	IsCache   bool
+}
+
+func clusterConnectionIsOpen(cluster *rediscluster.RedisCluster) bool {
+	// check if at least one of cluster handles has an alive connection
+	for item := range cluster.Handles.Iter() {
+		conn := item.Val.(*rediscluster.RedisHandle).GetRedisConn()
+		isOpen := conn.Err() == nil
+		conn.Close()
+		if isOpen {
+			return true
+		}
+	}
+	return false
+}
+
+// IsConnected waits with retries until Redis connection pools are connected
+func IsConnected() bool {
+	// create temporary ones to access singletons
+	cluster := RedisCluster{}
+	cacheCluster := RedisCluster{IsCache: true}
+	cluster.Connect()
+	cacheCluster.Connect()
+
+	// wait for connection pools with retries
+	retryNum := 0
+	for {
+		if retryNum == waitStorageRetriesNum {
+			log.Error("Waiting for Redis connection pools failed")
+			return false
+		}
+
+		// check that both have active Redis connections
+		clusterSingle := cluster.singleton()
+		cacheClusterSingle := cacheCluster.singleton()
+		if clusterSingle != nil &&
+			cacheClusterSingle != nil &&
+			clusterConnectionIsOpen(clusterSingle) &&
+			clusterConnectionIsOpen(cacheClusterSingle) {
+			break
+		}
+
+		// sleep before next check
+		log.WithField("currRetry", retryNum).Info("Waiting for Redis connection pools to be ready")
+		time.Sleep(waitStorageRetriesInterval)
+		retryNum++
+	}
+	log.WithField("currRetry", retryNum).Info("Redis connection pools are ready after number of retires")
+
+	return true
 }
 
 func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
