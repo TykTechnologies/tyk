@@ -120,7 +120,8 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, errors.New("HTTP Error")
+		httpError := fmt.Sprintf("HTTP Error, got status code %d", resp.StatusCode)
+		return nil, errors.New(httpError)
 	}
 
 	defer resp.Body.Close()
@@ -138,7 +139,10 @@ type ZipBundleSaver struct{}
 // Save implements the main method of the BundleSaver interface. It makes use of archive/zip.
 func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) error {
 	buf := bytes.NewReader(bundle.Data)
-	reader, _ := zip.NewReader(buf, int64(len(bundle.Data)))
+	reader, err := zip.NewReader(buf, int64(len(bundle.Data)))
+	if err != nil {
+		return err
+	}
 
 	for _, f := range reader.File {
 		destPath := filepath.Join(bundlePath, f.Name)
@@ -184,6 +188,9 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 	var getter BundleGetter
 
 	u, err := url.Parse(bundleURL)
+	if err != nil {
+		return bundle, err
+	}
 	switch u.Scheme {
 	case "http":
 		getter = &HTTPBundleGetter{
@@ -219,7 +226,6 @@ func saveBundle(bundle *Bundle, destPath string, spec *APISpec) error {
 	case "zip":
 		bundleSaver = ZipBundleSaver{}
 	}
-
 	bundleSaver.Save(bundle, destPath, spec)
 
 	return nil
@@ -258,16 +264,15 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 }
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
-func loadBundle(spec *APISpec) {
+func loadBundle(spec *APISpec) error {
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundle == "" {
-		return
+		return nil
 	}
 
 	// Skip if no bundle base URL is set.
 	if config.Global.BundleBaseURL == "" {
-		bundleError(spec, nil, "No bundle base URL set, skipping bundle")
-		return
+		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 	}
 
 	tykBundlePath := filepath.Join(config.Global.MiddlewarePath, "bundles")
@@ -300,7 +305,7 @@ func loadBundle(spec *APISpec) {
 
 		bundle.AddToSpec()
 
-		return
+		return nil
 	}
 
 	log.WithFields(logrus.Fields{
@@ -309,18 +314,15 @@ func loadBundle(spec *APISpec) {
 
 	bundle, err := fetchBundle(spec)
 	if err != nil {
-		bundleError(spec, err, "Couldn't fetch bundle")
-		return
+		return bundleError(spec, err, "Couldn't fetch bundle")
 	}
 
 	if err := os.MkdirAll(destPath, 0700); err != nil {
-		bundleError(spec, err, "Couldn't create bundle directory")
-		return
+		return bundleError(spec, err, "Couldn't create bundle directory")
 	}
 
 	if err := saveBundle(&bundle, destPath, spec); err != nil {
-		bundleError(spec, err, "Couldn't save bundle")
-		return
+		return bundleError(spec, err, "Couldn't save bundle")
 	}
 
 	log.WithFields(logrus.Fields{
@@ -336,7 +338,7 @@ func loadBundle(spec *APISpec) {
 		if err := os.RemoveAll(bundle.Path); err != nil {
 			bundleError(spec, err, "Couldn't remove bundle")
 		}
-		return
+		return nil
 	}
 
 	log.WithFields(logrus.Fields{
@@ -345,10 +347,14 @@ func loadBundle(spec *APISpec) {
 
 	bundle.AddToSpec()
 
+	return nil
 }
 
 // bundleError is a log helper.
-func bundleError(spec *APISpec, err error, message string) {
+func bundleError(spec *APISpec, err error, message string) error {
+	if err != nil {
+		message = fmt.Sprintf("%s: %s", message, err.Error())
+	}
 	log.WithFields(logrus.Fields{
 		"prefix":      "main",
 		"user_ip":     "-",
@@ -357,5 +363,6 @@ func bundleError(spec *APISpec, err error, message string) {
 		"org_id":      spec.OrgID,
 		"api_id":      spec.APIID,
 		"path":        "-",
-	}).Error(message, ": ", err)
+	}).Error(message)
+	return errors.New(message)
 }

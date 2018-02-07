@@ -1,11 +1,12 @@
 {
   "listen_address": "",
   "listen_port": 8080,
+  "pid_file_location": "/var/run/tyk/tyk-gateway.pid",
   "secret": "352d20ee67be67f6340b4c0605b044b7",
-  "template_path": "/etc/tyk/templates",
+  "template_path": "/opt/tyk-gateway/templates",
   "use_db_app_configs": false,
-  "app_path": "/etc/tyk/apps",
-  "middleware_path": "/etc/tyk/middleware",
+  "app_path": "/opt/tyk-gateway/apps",
+  "middleware_path": "/opt/tyk-gateway/middleware",
   "storage": {
     "type": "redis",
     "host": "localhost",

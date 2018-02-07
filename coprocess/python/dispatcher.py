@@ -1,6 +1,6 @@
 from glob import glob
 from os import path
-import sys
+import sys, traceback
 
 from tyk.middleware import TykMiddleware
 from tyk.object import TykCoProcessObject
@@ -14,7 +14,6 @@ class TykDispatcher:
 
     def __init__(self, middleware_path, event_handler_path, bundle_paths):
         tyk.log("Initializing dispatcher", "info")
-
         self.event_handler_path = path.join(event_handler_path, '*.py')
         self.event_handlers = {}
         self.load_event_handlers()
@@ -25,7 +24,6 @@ class TykDispatcher:
 
         self.middlewares = []
         self.hook_table = {}
-        self.load_middlewares()
 
     def get_modules(self, the_path):
         files = glob(the_path)
@@ -36,24 +34,26 @@ class TykDispatcher:
         found_middleware = None
         if len(self.middlewares) > 0:
             for middleware in self.middlewares:
-                if middleware.filepath == path and not found_middleware:
+                if middleware.module_path == path and not found_middleware:
                     found_middleware = middleware
                     break
         return found_middleware
 
     def load_bundle(self, base_bundle_path):
-        bundle_path = path.join(base_bundle_path, '*.py')
+        bundle_path = path.join(str(base_bundle_path), '*.py')
         bundle_modules = self.get_modules(bundle_path)
         sys.path.append(base_bundle_path)
         for module_name in bundle_modules:
+            module_filename = "{0}.py".format(module_name)
+            module_path = path.join(base_bundle_path, module_filename)
             middleware = self.find_middleware(module_name)
             if middleware:
                 middleware.reload()
             else:
-                middleware = TykMiddleware(module_name)
+                middleware = TykMiddleware(module_path, module_name)
                 self.middlewares.append(middleware)
-        self.update_hook_table()
 
+        self.update_hook_table()
     def load_middlewares(self):
         tyk.log("Loading middlewares.", "debug")
         available_modules = self.get_modules(self.middleware_path)
@@ -110,12 +110,15 @@ class TykDispatcher:
                 tyk.log("Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
             return object.dump()
         except:
+            exc_trace = traceback.format_exc()
+            print(exc_trace)
             tyk.log_error("Can't dispatch, error:")
+
             return object_msg
 
     def purge_event_handlers(self):
         tyk.log("Purging event handlers.", "debug")
-        self.event_handlers = []
+        self.event_handlers = {}
 
     def load_event_handlers(self):
         tyk.log("Loading event handlers.", "debug")
@@ -141,8 +144,6 @@ class TykDispatcher:
 
     def reload(self):
         tyk.log("Reloading event handlers and middlewares.", "info")
-
         self.purge_event_handlers()
         self.load_event_handlers()
-
         self.load_middlewares()

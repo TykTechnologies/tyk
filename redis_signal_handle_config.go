@@ -63,7 +63,7 @@ func handleNewConfiguration(payload string) {
 		return
 	}
 
-	if config.Global.AllowRemoteConfig {
+	if !config.Global.AllowRemoteConfig {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Warning("Ignoring new config: Remote configuration is not allowed for this node.")

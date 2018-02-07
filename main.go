@@ -18,12 +18,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/newrelic/go-agent"
+
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	"github.com/bshuster-repo/logrus-logstash-hook"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/facebookgo/pidfile"
-	"github.com/gemnasium/logrus-graylog-hook"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/gorpc"
@@ -58,6 +60,7 @@ var (
 	RPCListener              RPCStorageHandler
 	DashService              DashboardServiceSender
 	CertificateManager       *certs.CertificateManager
+	NewRelicApplication      newrelic.Application
 
 	apisMu   sync.RWMutex
 	apiSpecs []*APISpec
@@ -123,6 +126,9 @@ func apisByIDLen() int {
 
 // Create all globals and init connection handlers
 func setupGlobals() {
+	reloadMu.Lock()
+	defer reloadMu.Unlock()
+
 	mainRouter = mux.NewRouter()
 	controlRouter = mux.NewRouter()
 
@@ -201,6 +207,10 @@ func setupGlobals() {
 	}
 
 	CertificateManager = certs.NewCertificateManager(getGlobalStorageHandler("cert-", false), certificateSecret, log)
+
+	if config.Global.NewRelic.AppName != "" {
+		NewRelicApplication = SetupNewRelic()
+	}
 }
 
 func buildConnStr(resource string) string {
@@ -364,6 +374,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 			"prefix": "main",
 		}).Info("Control API hostname set: ", hostname)
 	}
+
 	if *httpProfile {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
@@ -619,7 +630,12 @@ func rpcReloadLoop(rpcKey string) {
 	}
 }
 
+var reloadMu sync.Mutex
+
 func doReload() {
+	reloadMu.Lock()
+	defer reloadMu.Unlock()
+
 	// Load the API Policies
 	syncPolicies()
 	// load the specs
@@ -643,20 +659,22 @@ func doReload() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Preparing new router")
-	mainRouter = mux.NewRouter()
+	newRouter := mux.NewRouter()
 	if config.Global.HttpServerOptions.OverrideDefaults {
-		mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
+		newRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 	}
 
 	if config.Global.ControlAPIPort == 0 {
-		loadAPIEndpoints(mainRouter)
+		loadAPIEndpoints(newRouter)
 	}
 
-	loadGlobalApps()
+	loadGlobalApps(newRouter)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("API reload complete")
+
+	mainRouter = newRouter
 
 	// Unset these
 	rpcEmergencyModeLoaded = false
@@ -771,7 +789,7 @@ func setupLogger() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Graylog support")
-		hook := graylog.NewGraylogHook(config.Global.GraylogNetworkAddr,
+		hook := graylogHook.NewGraylogHook(config.Global.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
@@ -786,7 +804,7 @@ func setupLogger() {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Enabling Logstash support")
-		hook, err := logrus_logstash.NewHook(config.Global.LogstashTransport,
+		hook, err := logstashHook.NewHook(config.Global.LogstashTransport,
 			config.Global.LogstashNetworkAddr,
 			"tyk-gateway")
 
@@ -810,6 +828,8 @@ func setupLogger() {
 	}
 
 }
+
+var configMu sync.Mutex
 
 func initialiseSystem() error {
 
@@ -905,7 +925,7 @@ func initialiseSystem() error {
 	setupLogger()
 
 	if config.Global.PIDFileLocation == "" {
-		config.Global.PIDFileLocation = "/var/run/tyk-gateway.pid"
+		config.Global.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1157,6 +1177,7 @@ func start() {
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
+
 	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
@@ -1203,6 +1224,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 			MinVersion:         config.Global.HttpServerOptions.MinVersion,
 			ClientAuth:         tls.RequestClientCert,
 			InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
+			CipherSuites:       getCipherAliases(config.Global.HttpServerOptions.Ciphers),
 		}
 
 		tlsConfig.GetConfigForClient = getTLSConfigForClient(&tlsConfig, listenPort)
@@ -1273,6 +1295,7 @@ func startDRL() {
 type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
 	mainRouter.ServeHTTP(w, r)
 }
 
@@ -1303,7 +1326,7 @@ func listen(l, controlListener net.Listener, err error) {
 		if !rpcEmergencyMode {
 			count := syncAPISpecs()
 			if count > 0 {
-				loadGlobalApps()
+				loadGlobalApps(mainRouter)
 				syncPolicies()
 			}
 
@@ -1318,7 +1341,7 @@ func listen(l, controlListener net.Listener, err error) {
 
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
-			}).Info("Custom gateway started")
+			}).Infof("Custom gateway started (%s)", VERSION)
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
@@ -1379,7 +1402,7 @@ func listen(l, controlListener net.Listener, err error) {
 		if !rpcEmergencyMode {
 			count := syncAPISpecs()
 			if count > 0 {
-				loadGlobalApps()
+				loadGlobalApps(mainRouter)
 				syncPolicies()
 			}
 
@@ -1453,4 +1476,8 @@ func listen(l, controlListener net.Listener, err error) {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("--> PID: ", hostDetails.PID)
+
+	mainRouter.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello Tiki")
+	})
 }

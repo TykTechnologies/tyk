@@ -211,12 +211,15 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
+	done := make(chan bool)
 	go func() {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		CBundlePath := C.CString(basePath)
 		C.Python_HandleMiddlewareCache(CBundlePath)
+		done <- true
 	}()
+	<-done
 }
 
 // PythonInit initializes the Python interpreter.

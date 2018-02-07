@@ -13,11 +13,11 @@ addons:
   apt:
     packages:
     - python3-dev
+    - python3-pip
     - libluajit-5.1-dev
 
 matrix:
   include:
-    - go: 1.8.x
     - go: 1.9.x
       env: LATEST_GO=true # run linters and report coverage
 
@@ -25,11 +25,14 @@ services:
   - redis-server
 
 install:
+  - go get
   - go install ./...
     # As of 1.9, ./... no longer includes ./vendor/...
   - go install ./vendor/{golang.org/x/tools/cmd/goimports,github.com/wadey/gocovmerge,github.com/mattn/goveralls}
 
 script:
+  - sudo pip3 install google
+  - sudo pip3 install protobuf
   - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
   - go build -tags 'coprocess grpc'

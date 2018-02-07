@@ -16,4 +16,6 @@ message MiniRequestObject {
   map<string, string> extended_params = 8;
   repeated string delete_params = 9;
   ReturnOverrides return_overrides = 10;
+  string method = 11;
+  string request_uri = 12;
 }

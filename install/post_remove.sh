@@ -7,50 +7,49 @@ SYSV1="/etc/init.d"
 SYSV2="/etc/rc.d/init.d/"
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-if [ -d "$SYSTEMD" ]; then
-	if [ -f "/lib/systemd/system/tyk-gateway.service" ]
-	then
-		echo "Found Systemd"
-		rm /lib/systemd/system/tyk-gateway.service
-		rm /lib/systemd/system/tyk-gateway-lua.service
-		rm /lib/systemd/system/tyk-gateway-python.service
-	fi
+if [ -f "/lib/systemd/system/tyk-gateway.service" ]; then
+	echo "Found Systemd"
+	echo "Stopping the service"
+	systemctl stop tyk-gateway.service
+	systemctl stop tyk-gateway-python.service
+	systemctl stop tyk-gateway-lua.service
+	echo "Removing the service"
+	rm /lib/systemd/system/tyk-gateway.service
+	rm /lib/systemd/system/tyk-gateway-python.service
+	rm /lib/systemd/system/tyk-gateway-lua.service
+	systemctl --system daemon-reload
 fi
 
-if [ -d "$UPSTART" ]; then
-	if [ -f "/etc/init/tyk-gateway.conf" ]
-	then
-		echo "Found upstart"
-		rm /etc/init/tyk-gateway.conf 
-		rm /etc/init/tyk-gateway-lua.conf 
-		rm /etc/init/tyk-gateway-python.conf 
-	fi
+if [ -f "/etc/init/tyk-gateway.conf" ]; then
+	echo "Found upstart"
+	echo "Stopping the service"
+	service tyk-gateway stop
+	service tyk-gateway-python stop
+	service tyk-gateway-lua stop
+	echo "Removing the service"
+	rm /etc/init/tyk-gateway.conf
+	rm /etc/init/tyk-gateway-python.conf
+	rm /etc/init/tyk-gateway-lua.conf
 fi
 
-if [ -d "$SYSV1" ]; then
-	if [ -f "/etc/default/tyk-gateway" ]
-	then
-		echo "Found SysV1"
-		rm /etc/default/tyk-gateway
-		rm /etc/default/tyk-gateway-lua
-		rm /etc/default/tyk-gateway-python
-	fi
-
-	if [ -f "/etc/init.d/tyk-gateway" ]
-	then
-		rm /etc/init.d/tyk-gateway
-		rm /etc/init.d/tyk-gateway-lua
-		rm /etc/init.d/tyk-gateway-python
-	fi  	
+if [ -f "/etc/init.d/tyk-gateway" ]; then
+	echo "Found Sysv1"
+	/etc/init.d/tyk-gateway stop
+	/etc/init.d/tyk-gateway-python stop
+	/etc/init.d/tyk-gateway-lua stop
+	rm /etc/init.d/tyk-gateway
+	rm /etc/init.d/tyk-gateway-python
+	rm /etc/init.d/tyk-gateway-lua
 fi
 
-if [ -d "$SYSV2" ]; then
-	if [ -f "/etc/rc.d/init.d/tyk-gateway" ]
-	then
-		echo "Found Sysv2"
-		rm /etc/rc.d/init.d/tyk-gateway
-		rm /etc/rc.d/init.d/tyk-gateway-lua
-		rm /etc/rc.d/init.d/tyk-gateway-python
-	fi  
-	
+if [ -f "/etc/rc.d/init.d/tyk-gateway" ]; then
+	echo "Found Sysv2"
+	echo "Stopping the service"
+	/etc/rc.d/init.d/tyk-gateway stop
+	/etc/rc.d/init.d/tyk-gateway-python stop
+	/etc/rc.d/init.d/tyk-gateway-lua stop
+	echo "Removing the service"
+	rm /etc/rc.d/init.d/tyk-gateway
+	rm /etc/rc.d/init.d/tyk-gateway-python
+	rm /etc/rc.d/init.d/tyk-gateway-lua
 fi

@@ -194,6 +194,9 @@ const confSchema = `{
 			}
 		}
 	},
+	"version_header":{
+		"type": "string"
+	},
 	"disable_dashboard_zeroconf": {
 		"type": "boolean"
 	},
@@ -328,6 +331,9 @@ const confSchema = `{
 			"skip_url_cleaning": {
 				"type": "boolean"
 			},
+			"skip_target_path_escaping": {
+				"type": "boolean"
+			},
 			"ssl_insecure_skip_verify": {
 				"type": "boolean"
 			},
@@ -341,6 +347,12 @@ const confSchema = `{
 				"type": "integer"
 			},
 			"ssl_certificates": {
+				"type": ["array", "null"],
+				"items": {
+					"type": "string"
+				}
+			},
+			"ssl_ciphers":{
 				"type": ["array", "null"],
 				"items": {
 					"type": "string"
@@ -537,6 +549,9 @@ const confSchema = `{
 			},
 			"use_ssl": {
 				"type": "boolean"
+			},
+			"rpc_pool_size": {
+				"type": "integer"
 			}
 		}
 	},
@@ -661,6 +676,18 @@ const confSchema = `{
 	},
 	"enable_key_logging": {
 		"type": "boolean"
+	},
+	"newrelic": {
+		"type": ["object", "null"],
+		"additionalProperties": false,
+		"properties": {
+			"app_name": {
+				"type": "string"
+			},
+			"license_key": {
+				"type": "string"
+			}
+		}
 	}
 }
 }`

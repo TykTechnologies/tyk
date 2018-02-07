@@ -22,6 +22,31 @@ type APIAllCertificates struct {
 	CertIDs []string `json:"certs"`
 }
 
+var cipherSuites = map[string]uint16{
+	"TLS_RSA_WITH_RC4_128_SHA":                0x0005,
+	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":           0x000a,
+	"TLS_RSA_WITH_AES_128_CBC_SHA":            0x002f,
+	"TLS_RSA_WITH_AES_256_CBC_SHA":            0x0035,
+	"TLS_RSA_WITH_AES_128_CBC_SHA256":         0x003c,
+	"TLS_RSA_WITH_AES_128_GCM_SHA256":         0x009c,
+	"TLS_RSA_WITH_AES_256_GCM_SHA384":         0x009d,
+	"TLS_ECDHE_ECDSA_WITH_RC4_128_SHA":        0xc007,
+	"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    0xc009,
+	"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    0xc00a,
+	"TLS_ECDHE_RSA_WITH_RC4_128_SHA":          0xc011,
+	"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA":     0xc012,
+	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      0xc013,
+	"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      0xc014,
+	"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256": 0xc023,
+	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":   0xc027,
+	"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   0xc02f,
+	"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": 0xc02b,
+	"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":   0xc030,
+	"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": 0xc02c,
+	"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":    0xcca8,
+	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  0xcca9,
+}
+
 func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
 
@@ -91,6 +116,9 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	}
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+		configMu.Lock()
+		defer configMu.Unlock()
+
 		newConfig := baseConfig.Clone()
 
 		isControlAPI := (listenPort != 0 && config.Global.ControlAPIPort == listenPort) || (config.Global.ControlAPIHostname == hello.ServerName)
@@ -104,7 +132,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 
 		apisMu.RLock()
 		for _, spec := range apiSpecs {
-			if spec.UseMutualTLSAuth && spec.Domain == hello.ServerName {
+			if spec.UseMutualTLSAuth && spec.Domain != "" && spec.Domain == hello.ServerName {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
 				certIDs := append(spec.ClientCertificates, config.Global.Security.Certificates.API...)
 				newConfig.ClientCAs = CertificateManager.CertPool(certIDs)
@@ -173,4 +201,15 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 		CertificateManager.Delete(certID)
 		doJSONWrite(w, 200, &apiStatusMessage{"ok", "removed"})
 	}
+}
+
+func getCipherAliases(ciphers []string) (cipherCodes []uint16) {
+	for k, v := range cipherSuites {
+		for _, str := range ciphers {
+			if str == k {
+				cipherCodes = append(cipherCodes, v)
+			}
+		}
+	}
+	return cipherCodes
 }

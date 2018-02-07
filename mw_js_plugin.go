@@ -43,6 +43,8 @@ type MiniRequestObject struct {
 	DeleteParams    []string
 	ReturnOverrides ReturnOverrides
 	IgnoreBody      bool
+	Method          string
+	RequestURI      string
 }
 
 type VMReturnObject struct {
@@ -65,8 +67,10 @@ func (d *DynamicMiddleware) Name() string {
 	return "DynamicMiddleware"
 }
 
-func jsonConfigData(spec *APISpec) string {
+func specToJson(spec *APISpec) string {
 	m := map[string]interface{}{
+		"OrgID": spec.OrgID,
+		"APIID": spec.APIID,
 		// For backwards compatibility within 2.x.
 		// TODO: simplify or refactor in 3.x or later.
 		"config_data": spec.ConfigData,
@@ -81,10 +85,9 @@ func jsonConfigData(spec *APISpec) string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
 	t1 := time.Now().UnixNano()
 
-	// Createthe proxy object
+	// Create the proxy object
 	defer r.Body.Close()
 	originalBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -94,8 +97,21 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
+	headers := r.Header
+	host := r.Host
+	if host == "" && r.URL != nil {
+		host = r.URL.Host
+	}
+	if host != "" {
+		headers = make(http.Header)
+		for k, v := range r.Header {
+			headers[k] = v
+		}
+		headers.Set("Host", host)
+	}
+
 	requestData := MiniRequestObject{
-		Headers:        r.Header,
+		Headers:        headers,
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
 		Body:           originalBody,
@@ -104,9 +120,11 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		AddParams:      map[string]string{},
 		ExtendedParams: map[string][]string{},
 		DeleteParams:   []string{},
+		Method:         r.Method,
+		RequestURI:     r.RequestURI,
 	}
 
-	asJsonRequestObj, err := json.Marshal(requestData)
+	requestAsJson, err := json.Marshal(requestData)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -114,7 +132,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		return nil, 200
 	}
 
-	confData := jsonConfigData(d.Spec)
+	specAsJson := specToJson(d.Spec)
 
 	session := new(user.SessionState)
 	token := ctxGetAuthToken(r)
@@ -124,7 +142,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		session = ctxGetSession(r)
 	}
 
-	sessionAsJsonObj, err := json.Marshal(session)
+	sessionAsJson, err := json.Marshal(session)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
@@ -150,7 +168,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// the whole Go program.
 			recover()
 		}()
-		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(asJsonRequestObj) + `, ` + string(sessionAsJsonObj) + `, ` + confData + `);`)
+		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
 		ret <- returnRaw
 		errRet <- err
 	}()
@@ -304,12 +322,12 @@ func (j *JSVM) Init(spec *APISpec) {
 		if err == nil {
 			_, err = vm.Run(f)
 			f.Close()
-		}
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "jsvm",
-			}).Error("Could not load user's TykJS: ", err)
-			return
+
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("Could not load user's TykJS: ", err)
+			}
 		}
 	}
 
@@ -459,6 +477,10 @@ func (j *JSVM) LoadTykJSApi() {
 		tr := &http.Transport{TLSClientConfig: &tls.Config{}}
 		if cert := getUpstreamCertificate(r.Host, j.Spec); cert != nil {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
+		}
+
+		if config.Global.ProxySSLInsecureSkipVerify {
+			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
 
 		// using new Client each time should be ok, since we closing connection every time

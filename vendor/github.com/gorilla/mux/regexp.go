@@ -35,7 +35,7 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash,
 	// Now let's parse it.
 	defaultPattern := "[^/]+"
 	if matchQuery {
-		defaultPattern = "[^?&]*"
+		defaultPattern = ".*"
 	} else if matchHost {
 		defaultPattern = "[^.]+"
 		matchPrefix = false
@@ -141,7 +141,7 @@ type routeRegexp struct {
 	matchQuery bool
 	// The strictSlash value defined on the route, but disabled if PathPrefix was used.
 	strictSlash bool
-	// Determines whether to use encoded path from getPath function or unencoded
+	// Determines whether to use encoded req.URL.EnscapedPath() or unencoded
 	// req.URL.Path for path matching
 	useEncodedPath bool
 	// Expanded regexp.
@@ -162,7 +162,7 @@ func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
 		}
 		path := req.URL.Path
 		if r.useEncodedPath {
-			path = getPath(req)
+			path = req.URL.EscapedPath()
 		}
 		return r.regexp.MatchString(path)
 	}
@@ -177,6 +177,9 @@ func (r *routeRegexp) url(values map[string]string) (string, error) {
 		value, ok := values[v]
 		if !ok {
 			return "", fmt.Errorf("mux: missing route variable %q", v)
+		}
+		if r.matchQuery {
+			value = url.QueryEscape(value)
 		}
 		urlValues[k] = value
 	}
@@ -269,7 +272,7 @@ func (v *routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) 
 	}
 	path := req.URL.Path
 	if r.useEncodedPath {
-		path = getPath(req)
+		path = req.URL.EscapedPath()
 	}
 	// Store path variables.
 	if v.path != nil {

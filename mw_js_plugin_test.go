@@ -152,8 +152,8 @@ func TestJSVMConfigData(t *testing.T) {
 	const js = `
 var testJSVMData = new TykJS.TykMiddleware.NewMiddleware({})
 
-testJSVMData.NewProcessRequest(function(request, session, config) {
-	request.SetHeaders["data-foo"] = config.config_data.foo
+testJSVMData.NewProcessRequest(function(request, session, spec) {
+	request.SetHeaders["data-foo"] = spec.config_data.foo
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
