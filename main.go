@@ -693,8 +693,10 @@ var reloadDoneChan = make(chan struct{}, 1)
 func reloadLoop(tick <-chan time.Time) {
 	<-tick
 	for range startReloadChan {
-		log.Info("Initiating reload")
+		log.Info("reload: initiating")
 		doReload()
+		log.Info("reload: complete")
+
 		log.Info("Initiating coprocess reload")
 		doCoprocessReload()
 
@@ -1086,8 +1088,6 @@ func main() {
 			log.Info("Starting control API listener: ", controlListener, err, config.Global.ControlAPIPort)
 		}
 	}
-
-	initialiseSystem()
 
 	start()
 
