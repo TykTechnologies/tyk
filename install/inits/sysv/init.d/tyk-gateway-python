@@ -20,8 +20,8 @@ export PATH
 
 name=tyk-gateway-python
 program=/opt/tyk-gateway/tyk-python
-args='--conf=/opt/tyk-gateway/tyk.conf'
-pidfile="/var/run/tyk/tyk-gateway.pid"
+args='--conf /opt/tyk-gateway/tyk.conf'
+pidfile="/var/run/tyk-gateway.pid"
 
 [ -r /etc/default/$name ] && . /etc/default/$name
 [ -r /etc/sysconfig/$name ] && . /etc/sysconfig/$name
@@ -36,13 +36,6 @@ emit() {
 }
 
 start() {
-
-  # Ensure the log directory is setup correctly.
-  [ ! -d "/var/log/" ] && mkdir "/var/log/"
-  chown "$user":"$group" "/var/log/"
-  chmod 755 "/var/log/"
-
-
   # Setup any environmental stuff beforehand
   
 

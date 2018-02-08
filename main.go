@@ -693,8 +693,11 @@ var reloadDoneChan = make(chan struct{}, 1)
 func reloadLoop(tick <-chan time.Time) {
 	<-tick
 	for range startReloadChan {
-		log.Info("Initiating reload")
+		log.Info("reload: initiating")
 		doReload()
+		log.Info("reload: complete")
+
+		// TODO can we delete below log & doCoprocessReload?
 		log.Info("Initiating coprocess reload")
 		doCoprocessReload()
 
@@ -925,7 +928,7 @@ func initialiseSystem() error {
 	setupLogger()
 
 	if config.Global.PIDFileLocation == "" {
-		config.Global.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+		config.Global.PIDFileLocation = "/var/run/tyk-gateway.pid"
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1086,8 +1089,6 @@ func main() {
 			log.Info("Starting control API listener: ", controlListener, err, config.Global.ControlAPIPort)
 		}
 	}
-
-	initialiseSystem()
 
 	start()
 
