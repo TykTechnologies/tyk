@@ -37,7 +37,7 @@ static PyObject *get_data(PyObject *self, PyObject *args) {
 	return ret;
 }
 
-static PyObject* trigger_event(PyObject* self, PyObject* args) {
+static PyObject *trigger_event(PyObject *self, PyObject *args) {
 	char *name, *payload;
 
 	if (!PyArg_ParseTuple(args, "ss", &name, &payload))
@@ -48,7 +48,7 @@ static PyObject* trigger_event(PyObject* self, PyObject* args) {
 	Py_RETURN_NONE;
 }
 
-static PyObject* coprocess_log(PyObject* self, PyObject* args) {
+static PyObject *coprocess_log(PyObject *self, PyObject *args) {
 	char *message, *level;
 
 	if (!PyArg_ParseTuple(args, "ss", &message, &level))
