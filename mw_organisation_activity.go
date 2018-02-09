@@ -117,7 +117,8 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 		go k.SetOrgSentinel(orgChan, k.Spec.OrgID)
 	}
 
-	go k.AllowAccessNext(orgChan, r)
+	requestCopy := copyRequest(r)
+	go k.AllowAccessNext(orgChan, requestCopy)
 
 	orgActiveMap.RLock()
 	active, found := orgActiveMap.OrgMap[k.Spec.OrgID]
