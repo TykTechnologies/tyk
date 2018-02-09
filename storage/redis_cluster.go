@@ -684,3 +684,58 @@ func (r RedisCluster) SetRollingWindow(keyName string, per int64, value_override
 func (r RedisCluster) GetKeyPrefix() string {
 	return r.KeyPrefix
 }
+
+// AddToSortedSet adds value with given score to sorted set identified by keyName
+func (r RedisCluster) AddToSortedSet(keyName, value string, score float64) {
+	fixedKey := r.fixKey(keyName)
+	log.Debug("Pushing raw key to sorted set: ", keyName)
+	log.Debug("Pushing fixed key to sorted set: ", fixedKey)
+	r.ensureConnection()
+	_, err := r.singleton().Do("ZADD", fixedKey, score, value)
+
+	if err != nil {
+		log.Error("Error trying to append keys: ", err)
+	}
+}
+
+// GetSortedSetRange gets range of elements of sorted set identified by keyName
+func (r RedisCluster) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	fixedKey := r.fixKey(keyName)
+	log.Debug("Getting sorted set range: ", keyName, scoreFrom, scoreTo)
+	log.Debug("Getting sorted set range (fixed key): ", fixedKey, scoreFrom, scoreTo)
+
+	values, err := redis.Strings(r.singleton().Do("ZRANGEBYSCORE", fixedKey, scoreFrom, scoreTo, "WITHSCORES"))
+	if err != nil {
+		log.Error("ZRANGEBYSCORE command failed: ", err)
+		return nil, nil, err
+	}
+
+	if len(values) == 0 {
+		return nil, nil, nil
+	}
+
+	elements := make([]string, len(values)/2)
+	scores := make([]float64, len(values)/2)
+
+	for i := 0; i < len(elements); i++ {
+		elements[i] = values[i*2]
+		scores[i], _ = strconv.ParseFloat(values[i*2+1], 64)
+	}
+
+	return elements, scores, nil
+}
+
+// RemoveSortedSetRange removes range of elements from sorted set identified by keyName
+func (r RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+	fixedKey := r.fixKey(keyName)
+	log.Debug("Removing sorted set range: ", keyName, scoreFrom, scoreTo)
+	log.Debug("Removing sorted set range (fixed key): ", fixedKey, scoreFrom, scoreTo)
+
+	_, err := r.singleton().Do("ZREMRANGEBYSCORE", fixedKey, scoreFrom, scoreTo)
+	if err != nil {
+		log.Error("ZREMRANGEBYSCORE command failed: ", err)
+		return err
+	}
+
+	return nil
+}

@@ -1197,6 +1197,34 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+	keyName := mux.Vars(r)["keyName"]
+
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"client": keyName,
+			"err":    "not found",
+		}).Error("Failed to retrieve OAuth tokens")
+		doJSONWrite(w, http.StatusNotFound, apiError("OAuth Client ID not found"))
+		return
+	}
+
+	// get tokens from redis
+	// TODO: add pagination
+	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, tokens)
+}
+
 // Get client details
 func getOauthClientDetails(keyName, apiID string) (interface{}, int) {
 	storageID := oauthClientStorageID(keyName)
