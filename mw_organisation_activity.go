@@ -110,19 +110,19 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 
 func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, int) {
 
+	orgActiveMap.Lock()
 	orgChan, ok := orgChanMap[k.Spec.OrgID]
 	if !ok {
 		orgChanMap[k.Spec.OrgID] = make(chan bool)
 		orgChan = orgChanMap[k.Spec.OrgID]
 		go k.SetOrgSentinel(orgChan, k.Spec.OrgID)
 	}
+	active, found := orgActiveMap.OrgMap[k.Spec.OrgID]
+	orgActiveMap.Unlock()
 
 	requestCopy := copyRequest(r)
 	go k.AllowAccessNext(orgChan, requestCopy)
 
-	orgActiveMap.RLock()
-	active, found := orgActiveMap.OrgMap[k.Spec.OrgID]
-	orgActiveMap.RUnlock()
 	if found && !active {
 		log.Debug("Is not active")
 		return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
