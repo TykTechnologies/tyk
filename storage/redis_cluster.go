@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/google/uuid"
 	"github.com/lonelycode/redigocluster/rediscluster"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -16,8 +17,8 @@ import (
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
 
 const (
-	waitStorageRetriesNum      = 10
-	waitStorageRetriesInterval = 5 * time.Second
+	waitStorageRetriesNum      = 5
+	waitStorageRetriesInterval = 1 * time.Second
 )
 
 var (
@@ -33,26 +34,31 @@ type RedisCluster struct {
 	IsCache   bool
 }
 
-func clusterConnectionIsOpen(cluster *rediscluster.RedisCluster) bool {
-	// check if at least one of cluster handles has an alive connection
-	for item := range cluster.Handles.Iter() {
-		conn := item.Val.(*rediscluster.RedisHandle).GetRedisConn()
-		isOpen := conn.Err() == nil
-		conn.Close()
-		if isOpen {
-			return true
-		}
+func clusterConnectionIsOpen(cluster *RedisCluster) bool {
+	testKey := "redis-test-" + uuid.New().String()
+	// set test key
+	if err := cluster.SetKey(testKey, "test", 1); err != nil {
+		return false
 	}
-	return false
+	// get test key
+	if _, err := cluster.GetKey(testKey); err != nil {
+		return false
+	}
+	return true
 }
 
 // IsConnected waits with retries until Redis connection pools are connected
 func IsConnected() bool {
 	// create temporary ones to access singletons
-	cluster := RedisCluster{}
-	cacheCluster := RedisCluster{IsCache: true}
-	cluster.Connect()
-	cacheCluster.Connect()
+	testClusters := []*RedisCluster{
+		&RedisCluster{},
+	}
+	if config.Global.EnableSeperateCacheStore {
+		testClusters = append(testClusters, &RedisCluster{IsCache: true})
+	}
+	for _, cluster := range testClusters {
+		cluster.Connect()
+	}
 
 	// wait for connection pools with retries
 	retryNum := 0
@@ -62,13 +68,15 @@ func IsConnected() bool {
 			return false
 		}
 
-		// check that both have active Redis connections
-		clusterSingle := cluster.singleton()
-		cacheClusterSingle := cacheCluster.singleton()
-		if clusterSingle != nil &&
-			cacheClusterSingle != nil &&
-			clusterConnectionIsOpen(clusterSingle) &&
-			clusterConnectionIsOpen(cacheClusterSingle) {
+		// check that redis is available
+		var redisIsReady bool
+		for _, cluster := range testClusters {
+			redisIsReady = cluster.singleton() != nil && clusterConnectionIsOpen(cluster)
+			if !redisIsReady {
+				break
+			}
+		}
+		if redisIsReady {
 			break
 		}
 
