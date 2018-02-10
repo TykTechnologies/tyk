@@ -11,14 +11,7 @@ import (
 
 var orgChanMap = make(map[string]chan bool)
 
-type orgActiveMapMu struct {
-	sync.RWMutex
-	OrgMap map[string]bool
-}
-
-var orgActiveMap = orgActiveMapMu{
-	OrgMap: map[string]bool{},
-}
+var orgActiveMap sync.Map
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
@@ -102,28 +95,28 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	for isActive := range orgChan {
 		log.Debug("Chan got:", isActive)
-		orgActiveMap.Lock()
-		orgActiveMap.OrgMap[orgId] = isActive
-		orgActiveMap.Unlock()
+		o, ok := orgActiveMap.Load(orgId)
+		if ok {
+			o = isActive
+			orgActiveMap.Store(orgId, o)
+		}
 	}
 }
 
 func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, int) {
 
-	orgActiveMap.Lock()
 	orgChan, ok := orgChanMap[k.Spec.OrgID]
 	if !ok {
 		orgChanMap[k.Spec.OrgID] = make(chan bool)
 		orgChan = orgChanMap[k.Spec.OrgID]
 		go k.SetOrgSentinel(orgChan, k.Spec.OrgID)
 	}
-	active, found := orgActiveMap.OrgMap[k.Spec.OrgID]
-	orgActiveMap.Unlock()
+	active, found := orgActiveMap.Load(k.Spec.OrgID)
 
 	requestCopy := copyRequest(r)
 	go k.AllowAccessNext(orgChan, requestCopy)
 
-	if found && !active {
+	if found && !active.(bool) {
 		log.Debug("Is not active")
 		return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
 	}
