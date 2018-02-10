@@ -113,8 +113,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 	}
 	active, found := orgActiveMap.Load(k.Spec.OrgID)
 
-	requestCopy := copyRequest(r)
-	go k.AllowAccessNext(orgChan, requestCopy)
+	go k.AllowAccessNext(orgChan, r.URL.Path, requestIP(r), r)
 
 	if found && !active.(bool) {
 		log.Debug("Is not active")
@@ -127,7 +126,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 	return nil, 200
 }
 
-func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request) {
+func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, path string, IP string, r *http.Request) {
 
 	session, found := k.OrgSession(k.Spec.OrgID)
 
@@ -138,7 +137,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 	}
 
 	// Is it active?
-	logEntry := getLogEntryForRequest(r, k.Spec.OrgID, nil)
+	logEntry := getExplicitLogEntryForRequest(path, IP, k.Spec.OrgID, nil)
 	if session.IsInactive {
 		logEntry.Warning("Organisation access is disabled.")
 
@@ -157,10 +156,11 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, r *http.Request
 
 		// Fire a quota exceeded event
 		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
-			Path:             r.URL.Path,
-			Origin:           requestIP(r),
-			Key:              k.Spec.OrgID,
+			EventMetaDefault: EventMetaDefault{
+				Message: "Organisation quota has been exceeded"},
+			Path:   path,
+			Origin: IP,
+			Key:    k.Spec.OrgID,
 		})
 
 		//return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
