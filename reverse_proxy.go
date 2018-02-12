@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -783,8 +783,8 @@ func (m *maxLatencyWriter) flushLoop() {
 func (m *maxLatencyWriter) stop() { m.done <- true }
 
 func requestIP(r *http.Request) string {
-	if real := r.Header.Get("X-Real-IP"); real != "" {
-		return real
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		return realIP
 	}
 	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
 		// X-Forwarded-For has no port
