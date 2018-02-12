@@ -337,7 +337,7 @@ func (j *JSVM) Init(spec *APISpec) {
 	// Add environment API
 	j.LoadTykJSApi()
 
-	if (config.Global.JSVMTimeout == 0) {
+	if (config.Global.JSVMTimeout <= 0) {
 		j.Timeout = 5 * time.Second
 	} else {
 		j.Timeout = time.Duration(config.Global.JSVMTimeout) * time.Second
