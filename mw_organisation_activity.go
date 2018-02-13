@@ -9,8 +9,12 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-var orgChanMap = make(map[string]chan bool)
+type orgChanMapMu struct {
+	sync.Mutex
+	channels map[string](chan bool)
+}
 
+var orgChanMap = orgChanMapMu{channels: map[string](chan bool){}}
 var orgActiveMap sync.Map
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
@@ -104,13 +108,14 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 }
 
 func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, int) {
-
-	orgChan, ok := orgChanMap[k.Spec.OrgID]
+	orgChanMap.Lock()
+	orgChan, ok := orgChanMap.channels[k.Spec.OrgID]
 	if !ok {
-		orgChanMap[k.Spec.OrgID] = make(chan bool)
-		orgChan = orgChanMap[k.Spec.OrgID]
+		orgChan = make(chan bool)
+		orgChanMap.channels[k.Spec.OrgID] = orgChan
 		go k.SetOrgSentinel(orgChan, k.Spec.OrgID)
 	}
+	orgChanMap.Unlock()
 	active, found := orgActiveMap.Load(k.Spec.OrgID)
 
 	go k.AllowAccessNext(orgChan, r.URL.Path, requestIP(r), r)
