@@ -107,6 +107,14 @@ func checkAndApplyTrialPeriod(keyName, apiId string, newSession *user.SessionSta
 	}
 }
 
+func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec) error {
+	// use basic middleware to apply policies to key/session (it also saves it)
+	mw := BaseMiddleware{
+		Spec: spec,
+	}
+	return mw.ApplyPolicies(keyName, session)
+}
+
 func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool) error {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
@@ -137,8 +145,8 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
 
-				err := apiSpec.SessionManager.UpdateSession(keyName, newSession, newSession.Lifetime(apiSpec.SessionLifetime))
-				if err != nil {
+				// apply polices (if any) and save key
+				if err := applyPoliciesAndSave(keyName, newSession, apiSpec); err != nil {
 					return err
 				}
 			}
@@ -158,8 +166,9 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 			}
 			checkAndApplyTrialPeriod(keyName, spec.APIID, newSession)
-			err := spec.SessionManager.UpdateSession(keyName, newSession, newSession.Lifetime(spec.SessionLifetime))
-			if err != nil {
+
+			// apply polices (if any) and save key
+			if err := applyPoliciesAndSave(keyName, newSession, spec); err != nil {
 				return err
 			}
 		}
@@ -901,8 +910,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					apiSpec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := apiSpec.SessionManager.UpdateSession(newKey, newSession, newSession.Lifetime(apiSpec.SessionLifetime))
-				if err != nil {
+				// apply polices (if any) and save key
+				if err := applyPoliciesAndSave(newKey, newSession, apiSpec); err != nil {
 					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
 				}
@@ -941,8 +950,8 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 					spec.SessionManager.ResetQuota(newKey, newSession)
 					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				}
-				err := spec.SessionManager.UpdateSession(newKey, newSession, newSession.Lifetime(spec.SessionLifetime))
-				if err != nil {
+				// apply polices (if any) and save key
+				if err := applyPoliciesAndSave(newKey, newSession, spec); err != nil {
 					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return
 				}
