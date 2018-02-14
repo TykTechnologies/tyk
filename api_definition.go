@@ -696,6 +696,13 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
+
+		// set Path if it wasn't set
+		if stringSpec.Path == "" {
+			// even if it is empty (and regex matches everything) some middlewares expect to be value here
+			stringSpec.Path = "/"
+		}
+
 		// Extend with method actions
 		newSpec.TrackEndpoint = stringSpec
 		urlSpec = append(urlSpec, newSpec)
