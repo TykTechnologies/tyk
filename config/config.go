@@ -247,6 +247,7 @@ type Config struct {
 	ControlAPIPort                    int                                   `json:"control_api_port"`
 	EnableCustomDomains               bool                                  `json:"enable_custom_domains"`
 	EnableJSVM                        bool                                  `json:"enable_jsvm"`
+	JSVMTimeout                       int                                   `json:"jsvm_timeout"`
 	CoProcessOptions                  CoProcessConfig                       `json:"coprocess_options"`
 	HideGeneratorHeader               bool                                  `json:"hide_generator_header"`
 	EventHandlers                     apidef.EventHandlerMetaConfig         `json:"event_handlers"`

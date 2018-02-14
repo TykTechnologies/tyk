@@ -221,6 +221,9 @@ const confSchema = `{
 	"enable_jsvm": {
 		"type": "boolean"
 	},
+	"jsvm_timeout": {
+		"type": "integer"
+	},
 	"enable_non_transactional_rate_limiter": {
 		"type": "boolean"
 	},

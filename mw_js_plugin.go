@@ -303,6 +303,8 @@ type JSVM struct {
 	RawLog  *logrus.Logger // logger used by `rawlog` func to avoid formatting
 }
 
+const defaultJSVMTimeout = 5
+
 // Init creates the JSVM with the core library and sets up a default
 // timeout.
 func (j *JSVM) Init(spec *APISpec) {
@@ -337,7 +339,12 @@ func (j *JSVM) Init(spec *APISpec) {
 	// Add environment API
 	j.LoadTykJSApi()
 
-	j.Timeout = 5 * time.Second
+	if config.Global.JSVMTimeout <= 0 {
+		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
+	} else {
+		j.Timeout = time.Duration(config.Global.JSVMTimeout) * time.Second
+	}
+
 	j.Log = log // use the global logger by default
 	j.RawLog = rawLog
 }
