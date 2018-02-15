@@ -176,7 +176,14 @@ func (r RedisCluster) GetExp(keyName string) (int64, error) {
 		return 0, ErrKeyNotFound
 	}
 	return value, nil
+}
 
+func (r RedisCluster) SetExp(keyName string, timeout int64) error {
+	_, err := r.singleton().Do("EXPIRE", r.fixKey(keyName), timeout)
+	if err != nil {
+		log.Error("Could not EXPIRE key: ", err)
+	}
+	return err
 }
 
 // SetKey will create (or update) a key value in the store
@@ -187,9 +194,7 @@ func (r RedisCluster) SetKey(keyName, session string, timeout int64) error {
 	r.ensureConnection()
 	_, err := r.singleton().Do("SET", r.fixKey(keyName), session)
 	if timeout > 0 {
-		_, err := r.singleton().Do("EXPIRE", r.fixKey(keyName), timeout)
-		if err != nil {
-			log.Error("Could not EXPIRE key: ", err)
+		if err := r.SetExp(keyName, timeout); err != nil {
 			return err
 		}
 	}

@@ -22,6 +22,7 @@ type Handler interface {
 	GetRawKey(string) (string, error)
 	SetKey(string, string, int64) error // Second input string is expected to be a JSON object (user.SessionState)
 	SetRawKey(string, string, int64) error
+	SetExp(string, int64) error   // Set key expiration
 	GetExp(string) (int64, error) // Returns expiry of a key
 	GetKeys(string) []string
 	DeleteKey(string) bool

@@ -6,18 +6,18 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const RPCKeyPrefix = "rpc:"
-const BackupKeyBase = "node-definition-backup:"
+const BackupApiKeyBase = "node-definition-backup:"
+const BackupPolicyKeyBase = "node-policy-backup:"
 
 func getTagListAsString() string {
 	tagList := ""
@@ -28,38 +28,13 @@ func getTagListAsString() string {
 	return tagList
 }
 
-func saveRPCDefinitionsBackup(list string) {
-	log.Info("Storing RPC backup")
-	tagList := getTagListAsString()
-
-	log.Info("--> Connecting to DB")
-
-	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
-	connected := store.Connect()
-
-	log.Info("--> Connected to DB")
-
-	if !connected {
-		log.Error("--> RPC Backup save failed: redis connection failed")
-		return
-	}
-
-	secret := rightPad2Len(config.Global.Secret, "=", 32)
-	cryptoText := encrypt([]byte(secret), list)
-	err := store.SetKey(BackupKeyBase+tagList, cryptoText, -1)
-	if err != nil {
-		log.Error("Failed to store node backup: ", err)
-	}
-}
-
 func LoadDefinitionsFromRPCBackup() []*APISpec {
 	tagList := getTagListAsString()
-	checkKey := BackupKeyBase + tagList
+	checkKey := BackupApiKeyBase + tagList
 
 	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
-
 	connected := store.Connect()
-	log.Info("[RPC] --> Connected to DB")
+	log.Info("[RPC] --> Loading API definitions from backup")
 
 	if !connected {
 		log.Error("[RPC] --> RPC Backup recovery failed: redis connection failed")
@@ -79,58 +54,85 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 	return a.processRPCDefinitions(apiListAsString)
 }
 
-func doLoadWithBackup(specs []*APISpec) {
+func saveRPCDefinitionsBackup(list string) {
+	log.Info("Storing RPC Definitions backup")
+	tagList := getTagListAsString()
 
-	log.Warning("[RPC Backup] --> Load Policies too!")
+	log.Info("--> Connecting to DB")
 
-	if len(specs) == 0 {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("No API Definitions found, not loading backup")
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	connected := store.Connect()
+
+	log.Info("--> Connected to DB")
+
+	if !connected {
+		log.Error("--> RPC Backup save failed: redis connection failed")
 		return
 	}
 
-	// Reset the JSVM
-	GlobalEventsJSVM.Init(nil)
-	log.Warning("[RPC Backup] --> Initialised JSVM")
-
-	newRouter := mux.NewRouter()
-
-	log.Warning("[RPC Backup] --> Set up routers")
-	log.Warning("[RPC Backup] --> Loading endpoints")
-
-	loadAPIEndpoints(newRouter)
-
-	log.Warning("[RPC Backup] --> Loading APIs")
-	loadApps(specs, newRouter)
-	log.Warning("[RPC Backup] --> API Load Done")
-
-	if config.Global.NewRelic.AppName != "" {
-		log.Warning("[RPC Backup] --> Adding NewRelic instrumentation")
-		AddNewRelicInstrumentation(NewRelicApplication, newRouter)
-		log.Warning("[RPC Backup] --> NewRelic instrumentation added")
-	}
-
-	newServeMux := http.NewServeMux()
-	newServeMux.Handle("/", newRouter)
-
-	mainRouter = newRouter
-
-	http.DefaultServeMux = newServeMux
-	log.Warning("[RPC Backup] --> Replaced muxer")
-
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("API backup load complete")
-
-	log.Warning("[RPC Backup] --> Ready to listen")
-	rpcEmergencyModeLoaded = true
-
-	l, err := generateListener(0)
+	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	cryptoText := encrypt([]byte(secret), list)
+	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
-		log.Error("Failed to generate listener:", err)
+		log.Error("Failed to store node backup: ", err)
 	}
-	listen(l, nil, nil)
+}
+
+func LoadPoliciesFromRPCBackup() map[string]user.Policy {
+	tagList := getTagListAsString()
+	checkKey := BackupPolicyKeyBase + tagList
+
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+
+	connected := store.Connect()
+	log.Info("[RPC] Loading Policies from backup")
+
+	if !connected {
+		log.Error("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
+		return nil
+	}
+
+	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	cryptoText, err := store.GetKey(checkKey)
+	listAsString := decrypt([]byte(secret), cryptoText)
+
+	if err != nil {
+		log.Error("[RPC] --> Failed to get node policy backup (", checkKey, "): ", err)
+		return nil
+	}
+
+	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Error("Failed decode: ", err)
+		return nil
+	} else {
+		return policies
+	}
+}
+
+func saveRPCPoliciesBackup(list string) {
+	log.Info("Storing RPC policies backup")
+	tagList := getTagListAsString()
+
+	log.Info("--> Connecting to DB")
+
+	store := storage.RedisCluster{KeyPrefix: RPCKeyPrefix}
+	connected := store.Connect()
+
+	log.Info("--> Connected to DB")
+
+	if !connected {
+		log.Error("--> RPC Backup save failed: redis connection failed")
+		return
+	}
+
+	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	cryptoText := encrypt([]byte(secret), list)
+	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
+	if err != nil {
+		log.Error("Failed to store node backup: ", err)
+	}
 }
 
 // encrypt string to base64 crypto using AES

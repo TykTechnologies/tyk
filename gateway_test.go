@@ -113,6 +113,9 @@ func TestMain(m *testing.M) {
 	config.Global.BundleBaseURL = testHttpBundles
 	config.Global.MiddlewarePath = testMiddlewarePath
 
+	purgeTicker = make(chan time.Time)
+	rpcPurgeTicker = make(chan time.Time)
+
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and ealier
 	config.Global.ListenAddress = "127.0.0.1"
