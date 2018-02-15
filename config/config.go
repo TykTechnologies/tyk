@@ -66,6 +66,7 @@ type AnalyticsConfigConfig struct {
 	GeoIPDBLocation         string              `json:"geo_ip_db_path"`
 	NormaliseUrls           NormalisedURLConfig `json:"normalise_urls"`
 	PoolSize                int                 `json:"pool_size"`
+	StorageExpirationTime   int                 `json:"storage_expiration_time"`
 	ignoredIPsCompiled      map[string]bool
 }
 

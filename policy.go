@@ -139,21 +139,11 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	return policies
 }
 
-func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
+func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	var dbPolicyList []user.Policy
 
-	store := &RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
-	store.Connect()
-
-	rpcPolicies := store.GetPolicies(orgId)
-
-	//store.Disconnect()
-
-	if err := json.Unmarshal([]byte(rpcPolicies), &dbPolicyList); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "policy",
-		}).Error("Failed decode: ", err)
-		return nil
+	if err := json.Unmarshal([]byte(list), &dbPolicyList); err != nil {
+		return nil, err
 	}
 
 	policies := make(map[string]user.Policy, len(dbPolicyList))
@@ -162,6 +152,32 @@ func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
 		p.ID = p.MID.Hex()
 		policies[p.MID.Hex()] = p
 	}
+
+	return policies, nil
+}
+
+func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
+	if rpcEmergencyMode {
+		return LoadPoliciesFromRPCBackup()
+	}
+
+	store := &RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
+	if !store.Connect() {
+		return nil
+	}
+
+	rpcPolicies := store.GetPolicies(orgId)
+
+	policies, err := parsePoliciesFromRPC(rpcPolicies)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "policy",
+		}).Error("Failed decode: ", err, rpcPolicies)
+		return nil
+	}
+
+	saveRPCPoliciesBackup(rpcPolicies)
 
 	return policies
 }
