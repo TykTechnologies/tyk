@@ -491,7 +491,8 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 	key := prefixClientTokens + id
 
 	// use current timestamp as a start score so all expired tokens won't be picked
-	startScore := strconv.FormatInt(time.Now().Unix(), 10)
+	nowTs := time.Now().Unix()
+	startScore := strconv.FormatInt(nowTs, 10)
 
 	log.Info("Getting client tokens sorted list:", key)
 
@@ -500,8 +501,11 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 		return nil, err
 	}
 
-	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp exclusive)
-	go r.store.RemoveSortedSetRange(key, "-inf", "("+startScore)
+	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
+	if config.Global.OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global.OauthTokenExpiredRetainPeriod), 10)
+		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
+	}
 
 	// convert sorted set data and scores into reply struct
 	tokensData := make([]OAuthClientToken, len(tokens))

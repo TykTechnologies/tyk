@@ -233,6 +233,7 @@ type Config struct {
 	Monitor                           MonitorConfig                         `json:"monitor"`
 	OauthRefreshExpire                int64                                 `json:"oauth_refresh_token_expire"`
 	OauthTokenExpire                  int32                                 `json:"oauth_token_expire"`
+	OauthTokenExpiredRetainPeriod     int32                                 `json:"oauth_token_expired_retain_period"`
 	OauthRedirectUriSeparator         string                                `json:"oauth_redirect_uri_separator"`
 	SlaveOptions                      SlaveOptionsConfig                    `json:"slave_options"`
 	DisableVirtualPathBlobs           bool                                  `json:"disable_virtual_path_blobs"`

@@ -466,6 +466,9 @@ const confSchema = `{
 	"oauth_token_expire": {
 		"type": "integer"
 	},
+	"oauth_token_expired_retain_period": {
+		"type": "integer"
+	},
 	"optimisations_use_async_session_write": {
 		"type": "boolean"
 	},

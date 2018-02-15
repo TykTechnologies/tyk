@@ -15,6 +15,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 
+	"fmt"
+
+	"net/http"
+
+	"time"
+
+	"github.com/google/uuid"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -70,10 +78,10 @@ const oauthDefinition = `{
 	}
 }`
 
-func getOAuthChain(spec *APISpec, muxer *mux.Router) {
+func getOAuthChain(spec *APISpec, muxer *mux.Router, clientID string) {
 	// Ensure all the correct ahndlers are in place
 	loadAPIEndpoints(muxer)
-	manager := addOAuthHandlers(spec, muxer)
+	spec.OAuthManager = addOAuthHandlers(spec, muxer)
 
 	// add a test client
 	testPolicy := user.Policy{}
@@ -96,12 +104,12 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.Global.OauthRedirectUriSeparator)
 	}
 	testClient := OAuthClient{
-		ClientID:          "1234",
-		ClientSecret:      "aabbccdd",
+		ClientID:          clientID,
+		ClientSecret:      authClientSecret,
 		ClientRedirectURI: redirectURI,
 		PolicyID:          "TEST-4321",
 	}
-	manager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
 
 	remote, _ := url.Parse(testHttpAny)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
@@ -120,7 +128,7 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 func TestAuthCodeRedirect(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/authorize/"
 
@@ -147,7 +155,7 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/authorize/"
 
@@ -174,7 +182,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/authorize/"
 
@@ -198,7 +206,7 @@ func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
 func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -223,7 +231,7 @@ func TestAPIClientAuthorizeAuthCode(t *testing.T) {
 func TestAPIClientAuthorizeToken(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -248,7 +256,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -292,7 +300,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 func getAuthCode(t *testing.T) map[string]string {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/tyk/oauth/authorize-client/"
 
@@ -312,6 +320,94 @@ func getAuthCode(t *testing.T) map[string]string {
 	return response
 }
 
+func TestGetClientTokens(t *testing.T) {
+	clientID := uuid.New().String()
+
+	spec := createSpecTest(t, oauthDefinition)
+	testMuxer := mux.NewRouter()
+	getOAuthChain(spec, testMuxer, clientID)
+
+	apisMu.Lock()
+	apisByID["999999"] = spec
+	apisMu.Unlock()
+
+	// set tokens to be expired after 1 second
+	config.Global.OauthTokenExpire = 1
+	// cleanup tokens older than 3 seconds
+	config.Global.OauthTokenExpiredRetainPeriod = 3
+
+	uri := "/APIID/tyk/oauth/authorize-client/"
+
+	// make three tokens
+	param := make(url.Values)
+	param.Set("response_type", "token")
+	param.Set("redirect_uri", authRedirectUri)
+	param.Set("client_id", clientID)
+	param.Set("client_secret", authClientSecret)
+	param.Set("key_rules", keyRules)
+	tokensID := map[string]bool{}
+	for i := 0; i < 3; i++ {
+		req := withAuth(testReq(t, "POST", uri, param.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		recorder := httptest.NewRecorder()
+		testMuxer.ServeHTTP(recorder, req)
+
+		if recorder.Code != http.StatusOK {
+			t.Error("Token wasn't created. Response code:", recorder.Code)
+		}
+
+		response := map[string]interface{}{}
+		if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+			t.Fatal(err)
+		}
+		tokensID[response["access_token"].(string)] = true
+	}
+
+	// get list of tokens
+	listURI := fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID)
+	req := withAuth(testReq(t, "GET", listURI, nil))
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Error("Token list wasn't received. Response code:", recorder.Code)
+	}
+
+	tokensResp := []OAuthClientToken{}
+	if err := json.NewDecoder(recorder.Body).Decode(&tokensResp); err != nil {
+		t.Fatal(err)
+	}
+
+	// check response
+	if len(tokensResp) != len(tokensID) {
+		t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", len(tokensID), len(tokensResp))
+	}
+	for _, token := range tokensResp {
+		if !tokensID[token.Token] {
+			t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
+		}
+	}
+
+	// sleep to wait until tokens expire
+	time.Sleep(2 * time.Second)
+
+	// get tokens again
+	recorder = httptest.NewRecorder()
+	testMuxer.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Error("Token list wasn't received. Response code:", recorder.Code)
+	}
+	tokensResp = []OAuthClientToken{}
+	if err := json.NewDecoder(recorder.Body).Decode(&tokensResp); err != nil {
+		t.Fatal(err)
+	}
+	if len(tokensResp) > 0 {
+		t.Errorf("Wrong number of tokens received. Expected 0 - all tokens expired. Got: %d", len(tokensResp))
+	}
+}
+
 type tokenData struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -322,7 +418,7 @@ func getToken(t *testing.T) tokenData {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/token/"
 
@@ -346,7 +442,7 @@ func getToken(t *testing.T) tokenData {
 func TestOAuthClientCredsGrant(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/token/"
 
@@ -385,7 +481,7 @@ func TestClientAccessRequest(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/token/"
 
@@ -417,7 +513,7 @@ func TestOAuthAPIRefreshInvalidate(t *testing.T) {
 	spec := createSpecTest(t, oauthDefinition)
 	loadApps([]*APISpec{spec}, discardMuxer)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	// Step 2 - invalidate the refresh token
 
@@ -472,7 +568,7 @@ func TestClientRefreshRequest(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/token/"
 
@@ -502,7 +598,7 @@ func TestClientRefreshRequestDouble(t *testing.T) {
 
 	spec := createSpecTest(t, oauthDefinition)
 	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	getOAuthChain(spec, testMuxer, authClientID)
 
 	uri := "/APIID/oauth/token/"
 
