@@ -124,6 +124,11 @@ func apisByIDLen() int {
 	return len(apisByID)
 }
 
+var redisPurgeOnce sync.Once
+var rpcPurgeOnce sync.Once
+var purgeTicker <-chan time.Time = time.Tick(time.Second)
+var rpcPurgeTicker <-chan time.Time = time.Tick(10 * time.Second)
+
 // Create all globals and init connection handlers
 func setupGlobals() {
 	reloadMu.Lock()
@@ -144,21 +149,29 @@ func setupGlobals() {
 
 	if config.Global.EnableAnalytics && analytics.Store == nil {
 		config.Global.LoadIgnoredIPs()
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Setting up analytics DB connection")
 
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		analytics.Store = &analyticsStore
 		analytics.Init()
+
+		redisPurgeOnce.Do(func() {
+			store := storage.RedisCluster{KeyPrefix: "analytics-"}
+			redisPurger := RedisPurger{Store: &store}
+			go redisPurger.PurgeLoop(purgeTicker)
+		})
 
 		if config.Global.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
 
-			purger := RPCPurger{Store: &analyticsStore}
-			purger.Connect()
-			analytics.Clean = &purger
-			go analytics.Clean.PurgeLoop(10 * time.Second)
+			rpcPurgeOnce.Do(func() {
+				store := storage.RedisCluster{KeyPrefix: "analytics-"}
+				purger := RPCPurger{Store: &store}
+				purger.Connect()
+				go purger.PurgeLoop(rpcPurgeTicker)
+			})
 		}
 	}
 
@@ -274,7 +287,7 @@ func syncAPISpecs() int {
 	return len(apiSpecs)
 }
 
-func syncPolicies() {
+func syncPolicies() int {
 	var pols map[string]user.Policy
 
 	log.WithFields(logrus.Fields{
@@ -308,7 +321,7 @@ func syncPolicies() {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("No policy record name defined, skipping...")
-			return
+			return 0
 		}
 		pols = LoadPoliciesFromFile(config.Global.Policies.PolicyRecordName)
 	}
@@ -321,11 +334,13 @@ func syncPolicies() {
 		}).Infof(" - %s", id)
 	}
 
+	policiesMu.Lock()
+	defer policiesMu.Unlock()
 	if len(pols) > 0 {
-		policiesMu.Lock()
 		policiesByID = pols
-		policiesMu.Unlock()
 	}
+
+	return len(pols)
 }
 
 // stripSlashes removes any trailing slashes from the request's URL
@@ -676,9 +691,9 @@ func doReload() {
 
 	mainRouter = newRouter
 
-	// Unset these
-	rpcEmergencyModeLoaded = false
-	rpcEmergencyMode = false
+	// // Unset these
+	// rpcEmergencyModeLoaded = false
+	// rpcEmergencyMode = false
 }
 
 // startReloadChan and reloadDoneChan are used by the two reload loops
@@ -1275,6 +1290,8 @@ func handleDashboardRegistration() {
 	go DashService.StartBeating()
 }
 
+var drlOnce sync.Once
+
 func startDRL() {
 	switch {
 	case config.Global.ManagementNode:
@@ -1311,6 +1328,8 @@ func listen(l, controlListener net.Listener, err error) {
 		writeTimeout = config.Global.HttpServerOptions.WriteTimeout
 	}
 
+	drlOnce.Do(startDRL)
+
 	// Handle reload when SIGUSR2 is received
 	if err != nil {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
@@ -1320,8 +1339,6 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
-
-		startDRL()
 
 		if !rpcEmergencyMode {
 			count := syncAPISpecs()
@@ -1396,7 +1413,6 @@ func listen(l, controlListener net.Listener, err error) {
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")
 		}
-		startDRL()
 
 		// Resume accepting connections in a new goroutine.
 		if !rpcEmergencyMode {
