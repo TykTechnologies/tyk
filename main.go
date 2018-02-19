@@ -1091,6 +1091,28 @@ func main() {
 
 	start()
 
+	if *memProfile {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Memory profiling active")
+		var err error
+		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
+			panic(err)
+		}
+		defer memProfFile.Close()
+	}
+	if *cpuProfile {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Cpu profiling active")
+		cpuProfFile, err := os.Create("tyk.prof")
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(cpuProfFile)
+		defer pprof.StopCPUProfile()
+	}
+
 	if goAgainErr != nil {
 		var err error
 		if l, err = generateListener(config.Global.ListenPort); err != nil {
@@ -1146,28 +1168,6 @@ func main() {
 }
 
 func start() {
-	if *memProfile {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Memory profiling active")
-		var err error
-		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
-			panic(err)
-		}
-		defer memProfFile.Close()
-	}
-	if *cpuProfile {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Cpu profiling active")
-		cpuProfFile, err := os.Create("tyk.prof")
-		if err != nil {
-			panic(err)
-		}
-		pprof.StartCPUProfile(cpuProfFile)
-		defer pprof.StopCPUProfile()
-	}
-
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global.SupressDefaultOrgStore {
 		log.WithFields(logrus.Fields{
