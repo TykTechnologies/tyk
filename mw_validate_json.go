@@ -6,14 +6,12 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/xeipuuv/gojsonschema"
-
+	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type ValidateJSON struct {
 	BaseMiddleware
-	schemaLoader gojsonschema.JSONLoader
 }
 
 func (k *ValidateJSON) Name() string {
@@ -44,50 +42,49 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		return errors.New("no schemas to validate against"), http.StatusInternalServerError
 	}
 
-	if vPathMeta.SchemaVersion != "" && vPathMeta.SchemaVersion != "draft-v4" {
-		return errors.New("unsupported schema version"), http.StatusInternalServerError
+	if val, exists := vPathMeta.Schema["$schema"]; exists {
+		if val != "http://json-schema.org/draft-04/schema#" {
+			return errors.New("unsupported schema, unable to validate"), http.StatusInternalServerError
+		}
 	}
 
+	// Load input body into gojsonschema
 	rCopy := copyRequest(r)
 	bodyBytes, err := ioutil.ReadAll(rCopy.Body)
 	if err != nil {
 		return err, http.StatusBadRequest
 	}
 	defer rCopy.Body.Close()
+	inputLoader := gojsonschema.NewBytesLoader(bodyBytes)
 
-	schema := vPathMeta.Schema
-
-	result, err := k.validate(bodyBytes, schema)
+	// Perform validation
+	result, err := gojsonschema.Validate(vPathMeta.SchemaCache, inputLoader)
 	if err != nil {
 		return fmt.Errorf("JSON parsing error: %v", err), http.StatusBadRequest
 	}
 
+	// Handle Failure
 	if !result.Valid() {
-		errStr := ""
-		for i, desc := range result.Errors() {
-			if i == 0 {
-				errStr = desc.String()
-			} else {
-				errStr = fmt.Sprintf("%s; %s", errStr, desc)
-			}
-		}
-
 		if vPathMeta.ErrorResponseCode == 0 {
 			vPathMeta.ErrorResponseCode = http.StatusUnprocessableEntity
 		}
 
-		return errors.New(errStr), vPathMeta.ErrorResponseCode
+		return k.formatError(result.Errors()), vPathMeta.ErrorResponseCode
 	}
 
+	// Handle Success
 	return nil, http.StatusOK
 }
 
-func (k *ValidateJSON) validate(input []byte, schema map[string]interface{}) (*gojsonschema.Result, error) {
-	inputLoader := gojsonschema.NewBytesLoader(input)
-
-	if k.schemaLoader == nil {
-		k.schemaLoader = gojsonschema.NewGoLoader(schema)
+func (k *ValidateJSON) formatError(schemaErrors []gojsonschema.ResultError) error {
+	errStr := ""
+	for i, desc := range schemaErrors {
+		if i == 0 {
+			errStr = desc.String()
+		} else {
+			errStr = fmt.Sprintf("%s; %s", errStr, desc)
+		}
 	}
 
-	return gojsonschema.Validate(k.schemaLoader, inputLoader)
+	return errors.New(errStr)
 }

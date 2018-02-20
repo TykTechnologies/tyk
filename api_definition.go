@@ -19,6 +19,7 @@ import (
 
 	"github.com/rubyist/circuitbreaker"
 
+	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -724,6 +725,8 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
+
+		stringSpec.SchemaCache = gojsonschema.NewGoLoader(stringSpec.Schema)
 		newSpec.ValidatePathMeta = stringSpec
 		urlSpec[i] = newSpec
 	}
@@ -1091,7 +1094,6 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 
 		// cache for the future
 		ctxSetVersionInfo(r, &version)
-
 	}
 
 	// Load path data and whitelist data for version
