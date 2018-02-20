@@ -51,7 +51,7 @@ func clusterConnectionIsOpen(cluster *RedisCluster) bool {
 func IsConnected() bool {
 	// create temporary ones to access singletons
 	testClusters := []*RedisCluster{
-		&RedisCluster{},
+		{},
 	}
 	if config.Global.EnableSeperateCacheStore {
 		testClusters = append(testClusters, &RedisCluster{IsCache: true})
