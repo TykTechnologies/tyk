@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/google/uuid"
 	"github.com/lonelycode/redigocluster/rediscluster"
+	"github.com/satori/go.uuid"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -35,7 +35,7 @@ type RedisCluster struct {
 }
 
 func clusterConnectionIsOpen(cluster *RedisCluster) bool {
-	testKey := "redis-test-" + uuid.New().String()
+	testKey := "redis-test-" + uuid.NewV4().String()
 	// set test key
 	if err := cluster.SetKey(testKey, "test", 1); err != nil {
 		return false
