@@ -251,8 +251,19 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(session.QuotaRenews)))
 	}
 	w.Header().Set("x-tyk-cached-response", "1")
+
+	if reqEtag := r.Header.Get("If-None-Match"); reqEtag != "" {
+		if respEtag := newRes.Header.Get("Etag"); respEtag != "" {
+			if strings.Contains(reqEtag, respEtag) {
+				newRes.StatusCode = http.StatusNotModified
+			}
+		}
+	}
+
 	w.WriteHeader(newRes.StatusCode)
-	m.Proxy.CopyResponse(w, newRes.Body)
+	if newRes.StatusCode != http.StatusNotModified {
+		m.Proxy.CopyResponse(w, newRes.Body)
+	}
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {

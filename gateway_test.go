@@ -859,11 +859,11 @@ func TestHelloHealthcheck(t *testing.T) {
 	})
 }
 
-func TestWithCacheAllSafeRequests(t *testing.T) {
-	ts := newTykTestServer(tykTestServerConfig{
-		delay: 10 * time.Millisecond,
-	})
+func TestCacheAllSafeRequests(t *testing.T) {
+	ts := newTykTestServer()
 	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
 
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
@@ -877,11 +877,44 @@ func TestWithCacheAllSafeRequests(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "GET", Path: "/", HeadersNotMatch: headerCache},
+		{Method: "GET", Path: "/", HeadersNotMatch: headerCache, Delay: 10 * time.Millisecond},
 		{Method: "GET", Path: "/", HeadersMatch: headerCache},
 		{Method: "POST", Path: "/", HeadersNotMatch: headerCache},
 		{Method: "POST", Path: "/", HeadersNotMatch: headerCache},
 		{Method: "GET", Path: "/", HeadersMatch: headerCache},
+	}...)
+}
+
+func TestCacheEtag(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	cache := storage.RedisCluster{KeyPrefix: "cache-"}
+	defer cache.DeleteScanMatch("*")
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Etag", "12345")
+		w.Write([]byte("body"))
+	}))
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.CacheOptions = apidef.CacheOptions{
+			CacheTimeout:         120,
+			EnableCache:          true,
+			CacheAllSafeRequests: true,
+		}
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+	})
+
+	headerCache := map[string]string{"x-tyk-cached-response": "1"}
+	invalidEtag := map[string]string{"If-None-Match": "invalid"}
+	validEtag := map[string]string{"If-None-Match": "12345"}
+
+	ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/", HeadersNotMatch: headerCache, Delay: 100 * time.Millisecond},
+		{Method: "GET", Path: "/", HeadersMatch: headerCache, BodyMatch: "body"},
+		{Method: "GET", Path: "/", Headers: invalidEtag, HeadersMatch: headerCache, BodyMatch: "body"},
+		{Method: "GET", Path: "/", Headers: validEtag, HeadersMatch: headerCache, BodyNotMatch: "body"},
 	}...)
 }
 
