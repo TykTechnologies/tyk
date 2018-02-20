@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func createDefinitionFromString(defStr string) *APISpec {
@@ -323,13 +324,22 @@ func TestDefaultVersion(t *testing.T) {
 		spec.VersionData.Versions["v2"] = v2
 		spec.VersionData.DefaultVersion = "v2"
 		spec.Proxy.ListenPath = "/"
+
+		spec.UseKeylessAccess = false
 	})
 
-	ts.Run(t, []test.TestCase{
-		{Path: "/foo", Code: 403},      // Not whitelisted for default v2
-		{Path: "/bar", Code: 200},      // Whitelisted for default v2
-		{Path: "/foo?v=v1", Code: 200}, // Allowed for v1
-		{Path: "/bar?v=v1", Code: 403}, // Not allowed for v1
-	}...)
+	key := createSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1", "v2"},
+		}}
+	})
 
+	authHeaders := map[string]string{"authorization": key}
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
+		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
+		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
+		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+	}...)
 }
