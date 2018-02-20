@@ -368,8 +368,13 @@ func (s *tykTestServer) Run(t *testing.T, testCases ...test.TestCase) (*http.Res
 			t.Errorf("[%d] %s. %s", ti, lastError.Error(), string(tcJSON))
 		}
 
-		if s.config.delay > 0 {
-			time.Sleep(s.config.delay)
+		delay := tc.Delay
+		if delay == 0 {
+			delay = s.config.delay
+		}
+
+		if delay > 0 {
+			time.Sleep(delay)
 		}
 	}
 
