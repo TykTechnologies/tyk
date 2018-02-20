@@ -7,7 +7,6 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -342,7 +341,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	spec := buildAPI(func(spec *APISpec) {
+	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "777888"
 		spec.OrgID = "default"
 		spec.UseKeylessAccess = false
@@ -352,11 +351,6 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTClientIDBaseField = "azp"
 		spec.Proxy.ListenPath = "/"
-		tName := t.Name()
-		redisStore := storage.RedisCluster{KeyPrefix: tName + "-apikey."}
-		healthStore := storage.RedisCluster{KeyPrefix: tName + "-apihealth."}
-		orgStore := storage.RedisCluster{KeyPrefix: tName + "-orgKey."}
-		spec.Init(redisStore, redisStore, healthStore, orgStore)
 	})[0]
 
 	policyID := createPolicy(func(p *user.Policy) {
@@ -373,7 +367,6 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	tokenID := "1234567891010101"
 	session := createJWTSessionWithRSAWithPolicy(policyID)
 
-	spec = loadAPI(spec)[0]
 	spec.SessionManager.ResetQuota(tokenID, session)
 	spec.SessionManager.UpdateSession(tokenID, session, 60)
 

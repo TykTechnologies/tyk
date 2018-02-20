@@ -500,13 +500,6 @@ func buildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 			panic(err)
 		}
 
-		spec.Health = &DefaultHealthChecker{
-			APIID: spec.APIID,
-		}
-		spec.AuthManager = &DefaultAuthorisationManager{}
-		spec.SessionManager = &DefaultSessionManager{}
-		spec.OrgSessionManager = &DefaultSessionManager{}
-
 		specs = append(specs, spec)
 		gen(spec)
 	}
