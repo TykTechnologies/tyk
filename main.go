@@ -1106,7 +1106,13 @@ func main() {
 
 	start()
 
-	if goAgainErr != nil {
+	// Wait while Redis connection pools are ready before start serving traffic
+	if !storage.IsConnected() {
+		log.Fatal("Redis connection pools are not ready. Exiting...")
+	}
+	log.Info("Redis connection pools are ready")
+
+    if goAgainErr != nil {
 		var err error
 		if l, err = generateListener(config.Global.ListenPort); err != nil {
 			log.WithFields(logrus.Fields{
