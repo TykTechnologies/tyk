@@ -141,6 +141,7 @@ type APISpec struct {
 	HasRun                   bool
 	ServiceRefreshInProgress bool
 	HTTPTransport            http.RoundTripper
+	HTTPTransportCreated     time.Time
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
