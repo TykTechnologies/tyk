@@ -246,6 +246,23 @@ func createJWKToken(jGen ...func(*jwt.Token)) string {
 	return tokenString
 }
 
+func createJWKTokenHMAC(jGen ...func(*jwt.Token)) string {
+	// Create the token
+	token := jwt.New(jwt.SigningMethodHS256)
+	// Set the token ID
+
+	if len(jGen) > 0 {
+		jGen[0](token)
+	}
+
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		panic("Couldn't create JWT token: " + err.Error())
+	}
+
+	return tokenString
+}
+
 func firstVals(vals map[string][]string) map[string]string {
 	m := make(map[string]string, len(vals))
 	for k, vs := range vals {
