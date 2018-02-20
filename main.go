@@ -124,6 +124,11 @@ func apisByIDLen() int {
 	return len(apisByID)
 }
 
+var redisPurgeOnce sync.Once
+var rpcPurgeOnce sync.Once
+var purgeTicker <-chan time.Time = time.Tick(time.Second)
+var rpcPurgeTicker <-chan time.Time = time.Tick(10 * time.Second)
+
 // Create all globals and init connection handlers
 func setupGlobals() {
 	reloadMu.Lock()
@@ -144,21 +149,29 @@ func setupGlobals() {
 
 	if config.Global.EnableAnalytics && analytics.Store == nil {
 		config.Global.LoadIgnoredIPs()
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Debug("Setting up analytics DB connection")
 
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		analytics.Store = &analyticsStore
 		analytics.Init()
+
+		redisPurgeOnce.Do(func() {
+			store := storage.RedisCluster{KeyPrefix: "analytics-"}
+			redisPurger := RedisPurger{Store: &store}
+			go redisPurger.PurgeLoop(purgeTicker)
+		})
 
 		if config.Global.AnalyticsConfig.Type == "rpc" {
 			log.Debug("Using RPC cache purge")
 
-			purger := RPCPurger{Store: &analyticsStore}
-			purger.Connect()
-			analytics.Clean = &purger
-			go analytics.Clean.PurgeLoop(10 * time.Second)
+			rpcPurgeOnce.Do(func() {
+				store := storage.RedisCluster{KeyPrefix: "analytics-"}
+				purger := RPCPurger{Store: &store}
+				purger.Connect()
+				go purger.PurgeLoop(rpcPurgeTicker)
+			})
 		}
 	}
 
@@ -274,7 +287,7 @@ func syncAPISpecs() int {
 	return len(apiSpecs)
 }
 
-func syncPolicies() {
+func syncPolicies() int {
 	var pols map[string]user.Policy
 
 	log.WithFields(logrus.Fields{
@@ -308,7 +321,7 @@ func syncPolicies() {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Debug("No policy record name defined, skipping...")
-			return
+			return 0
 		}
 		pols = LoadPoliciesFromFile(config.Global.Policies.PolicyRecordName)
 	}
@@ -321,11 +334,13 @@ func syncPolicies() {
 		}).Infof(" - %s", id)
 	}
 
+	policiesMu.Lock()
+	defer policiesMu.Unlock()
 	if len(pols) > 0 {
-		policiesMu.Lock()
 		policiesByID = pols
-		policiesMu.Unlock()
 	}
+
+	return len(pols)
 }
 
 // stripSlashes removes any trailing slashes from the request's URL
@@ -676,9 +691,9 @@ func doReload() {
 
 	mainRouter = newRouter
 
-	// Unset these
-	rpcEmergencyModeLoaded = false
-	rpcEmergencyMode = false
+	// // Unset these
+	// rpcEmergencyModeLoaded = false
+	// rpcEmergencyMode = false
 }
 
 // startReloadChan and reloadDoneChan are used by the two reload loops
@@ -693,8 +708,10 @@ var reloadDoneChan = make(chan struct{}, 1)
 func reloadLoop(tick <-chan time.Time) {
 	<-tick
 	for range startReloadChan {
-		log.Info("Initiating reload")
+		log.Info("reload: initiating")
 		doReload()
+		log.Info("reload: complete")
+
 		log.Info("Initiating coprocess reload")
 		doCoprocessReload()
 
@@ -1087,8 +1104,6 @@ func main() {
 		}
 	}
 
-	initialiseSystem()
-
 	start()
 
 	// Wait while Redis connection pools are ready before start serving traffic
@@ -1096,6 +1111,28 @@ func main() {
 		log.Fatal("Redis connection pools are not ready. Exiting...")
 	}
 	log.Info("Redis connection pools are ready")
+
+	if *memProfile {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Memory profiling active")
+		var err error
+		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
+			panic(err)
+		}
+		defer memProfFile.Close()
+	}
+	if *cpuProfile {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Cpu profiling active")
+		cpuProfFile, err := os.Create("tyk.prof")
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(cpuProfFile)
+		defer pprof.StopCPUProfile()
+	}
 
 	if goAgainErr != nil {
 		var err error
@@ -1152,28 +1189,6 @@ func main() {
 }
 
 func start() {
-	if *memProfile {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Memory profiling active")
-		var err error
-		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
-			panic(err)
-		}
-		defer memProfFile.Close()
-	}
-	if *cpuProfile {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Cpu profiling active")
-		cpuProfFile, err := os.Create("tyk.prof")
-		if err != nil {
-			panic(err)
-		}
-		pprof.StartCPUProfile(cpuProfFile)
-		defer pprof.StopCPUProfile()
-	}
-
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global.SupressDefaultOrgStore {
 		log.WithFields(logrus.Fields{
@@ -1281,6 +1296,8 @@ func handleDashboardRegistration() {
 	go DashService.StartBeating()
 }
 
+var drlOnce sync.Once
+
 func startDRL() {
 	switch {
 	case config.Global.ManagementNode:
@@ -1317,6 +1334,8 @@ func listen(l, controlListener net.Listener, err error) {
 		writeTimeout = config.Global.HttpServerOptions.WriteTimeout
 	}
 
+	drlOnce.Do(startDRL)
+
 	// Handle reload when SIGUSR2 is received
 	if err != nil {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
@@ -1326,8 +1345,6 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
-
-		startDRL()
 
 		if !rpcEmergencyMode {
 			count := syncAPISpecs()
@@ -1402,7 +1419,6 @@ func listen(l, controlListener net.Listener, err error) {
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")
 		}
-		startDRL()
 
 		// Resume accepting connections in a new goroutine.
 		if !rpcEmergencyMode {

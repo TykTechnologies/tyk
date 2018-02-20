@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -40,7 +41,16 @@ type BatchRequestHandler struct {
 
 // doRequest will make the same request but return a BatchReplyUnit
 func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchReplyUnit {
-	resp, err := http.DefaultClient.Do(req)
+	tr := &http.Transport{TLSClientConfig: &tls.Config{}}
+
+	if cert := getUpstreamCertificate(req.Host, b.API); cert != nil {
+		tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
+	}
+
+	tr.TLSClientConfig.InsecureSkipVerify = config.Global.ProxySSLInsecureSkipVerify
+	client := &http.Client{Transport: tr}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Error("Webhook request failed: ", err)
 		return BatchReplyUnit{}

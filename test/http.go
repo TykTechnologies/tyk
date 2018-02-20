@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type TestCase struct {
@@ -18,6 +19,7 @@ type TestCase struct {
 	Headers         map[string]string `json:",omitempty"`
 	PathParams      map[string]string `json:",omitempty"`
 	Cookies         []*http.Cookie    `json:",omitempty"`
+	Delay           time.Duration     `json:",omitempty"`
 	BodyMatch       string            `json:",omitempty"`
 	BodyNotMatch    string            `json:",omitempty"`
 	HeadersMatch    map[string]string `json:",omitempty"`

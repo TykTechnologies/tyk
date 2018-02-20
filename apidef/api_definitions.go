@@ -165,6 +165,16 @@ type MethodTransformMeta struct {
 	ToMethod string `bson:"to_method" json:"to_method"`
 }
 
+type ValidatePathMeta struct {
+	Path   string                 `bson:"path" json:"path"`
+	Method string                 `bson:"method" json:"method"`
+	Schema map[string]interface{} `bson:"schema" json:"schema"`
+	// TODO: Implement multi schema support
+	SchemaVersion string `bson:"schema_version" json:"schema_version"`
+	// Allows override of default 422 Unprocessible Entity response code for validation errors.
+	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
+}
+
 type ExtendedPathsSet struct {
 	Ignored                 []EndPointMeta        `bson:"ignored" json:"ignored,omitempty"`
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
@@ -182,6 +192,7 @@ type ExtendedPathsSet struct {
 	MethodTransforms        []MethodTransformMeta `bson:"method_transforms" json:"method_transforms,omitempty"`
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
+	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
 }
 
 type VersionInfo struct {

@@ -3,11 +3,11 @@ import json
 
 import tyk.decorators as decorators
 
+
 class TykEventHandler:
     def __init__(self, name, callback):
         self.name = name
         self.callback = callback
-
 
     def process(self, event):
         print("process", event)
@@ -24,6 +24,7 @@ class TykEventHandler:
                     event_handler = TykEventHandler(attr, attr_value)
                     event_handlers.append(event_handler)
         return event_handlers
+
 
 class TykEvent:
     def __init__(self, event_json):

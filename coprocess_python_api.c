@@ -1,1 +1,1 @@
-coprocess/python/tyk/gateway.c
+coprocess/python/tyk/gateway_wrapper.c

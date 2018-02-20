@@ -52,6 +52,7 @@ const (
 	MethodTransformed
 	RequestTracked
 	RequestNotTracked
+	ValidateJSONRequest
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -80,6 +81,7 @@ const (
 	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
 	StatusRequesTracked            RequestStatus = "Request Tracked"
 	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
+	StatusValidateJSON             RequestStatus = "Validate JSON"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -101,6 +103,7 @@ type URLSpec struct {
 	MethodTransform         apidef.MethodTransformMeta
 	TrackEndpoint           apidef.TrackEndpointMeta
 	DoNotTrackEndpoint      apidef.TrackEndpointMeta
+	ValidatePathMeta        apidef.ValidatePathMeta
 }
 
 type TransformSpec struct {
@@ -138,6 +141,7 @@ type APISpec struct {
 	HasRun                   bool
 	ServiceRefreshInProgress bool
 	HTTPTransport            http.RoundTripper
+	HTTPTransportCreated     time.Time
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
@@ -298,8 +302,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
 func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
+	if rpcEmergencyMode {
+		return LoadDefinitionsFromRPCBackup()
+	}
+
 	store := RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
-	store.Connect()
+	if !store.Connect() {
+		return nil
+	}
 
 	// enable segments
 	var tags []string
@@ -693,9 +703,30 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 	for _, stringSpec := range paths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
+
+		// set Path if it wasn't set
+		if stringSpec.Path == "" {
+			// even if it is empty (and regex matches everything) some middlewares expect to be value here
+			stringSpec.Path = "/"
+		}
+
 		// Extend with method actions
 		newSpec.TrackEndpoint = stringSpec
 		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus) []URLSpec {
+	urlSpec := make([]URLSpec, len(paths))
+
+	for i, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		// Extend with method actions
+		newSpec.ValidatePathMeta = stringSpec
+		urlSpec[i] = newSpec
 	}
 
 	return urlSpec
@@ -734,6 +765,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed)
 	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked)
 	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked)
+	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -752,6 +784,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, methodTransforms...)
 	combinedPath = append(combinedPath, trackedPaths...)
 	combinedPath = append(combinedPath, unTrackedPaths...)
+	combinedPath = append(combinedPath, validateJSON...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -797,6 +830,9 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequesTracked
 	case RequestNotTracked:
 		return StatusRequestNotTracked
+	case ValidateJSONRequest:
+		return StatusValidateJSON
+
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -929,6 +965,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case RequestNotTracked:
 			if r.Method == v.DoNotTrackEndpoint.Method {
 				return true, &v.DoNotTrackEndpoint
+			}
+		case ValidateJSONRequest:
+			if r.Method == v.ValidatePathMeta.Method {
+				return true, &v.ValidatePathMeta
 			}
 		}
 	}

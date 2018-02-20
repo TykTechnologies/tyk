@@ -6,6 +6,7 @@ import (
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -13,7 +14,7 @@ import (
 // of analytics data to prevent it growing too large
 type Purger interface {
 	PurgeCache()
-	PurgeLoop(time.Duration)
+	PurgeLoop(<-chan time.Time)
 }
 
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
@@ -32,15 +33,20 @@ func (r *RPCPurger) Connect() {
 
 // PurgeLoop starts the loop that will pull data out of the in-memory
 // store and into RPC.
-func (r RPCPurger) PurgeLoop(sleep time.Duration) {
+func (r RPCPurger) PurgeLoop(ticker <-chan time.Time) {
 	for {
-		time.Sleep(sleep)
+		<-ticker
 		r.PurgeCache()
 	}
 }
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *RPCPurger) PurgeCache() {
+	if _, err := RPCFuncClientSingleton.Call("Ping", nil); err != nil {
+		log.Error("Failed to ping RPC: ", err)
+		return
+	}
+
 	analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
 	if len(analyticsValues) == 0 {
 		return
@@ -69,4 +75,29 @@ func (r *RPCPurger) PurgeCache() {
 		log.Error("Failed to call purge: ", err)
 	}
 
+}
+
+type RedisPurger struct {
+	Store storage.Handler
+}
+
+func (r RedisPurger) PurgeLoop(ticker <-chan time.Time) {
+	for {
+		<-ticker
+		r.PurgeCache()
+	}
+}
+
+func (r *RedisPurger) PurgeCache() {
+	configMu.Lock()
+	expireAfter := config.Global.AnalyticsConfig.StorageExpirationTime
+	configMu.Unlock()
+	if expireAfter == 0 {
+		expireAfter = 60 // 1 minute
+	}
+
+	exp, _ := r.Store.GetExp(analyticsKeyName)
+	if exp <= 0 {
+		r.Store.SetExp(analyticsKeyName, int64(expireAfter))
+	}
 }

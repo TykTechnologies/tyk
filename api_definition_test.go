@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/lonelycode/gorpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -189,80 +188,6 @@ func TestIgnored(t *testing.T) {
 			{Path: "/", Code: 401},
 		}...)
 	})
-}
-
-func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
-	configMu.Lock()
-	defer configMu.Unlock()
-
-	config.Global.SlaveOptions.UseRPC = true
-	config.Global.SlaveOptions.RPCKey = "test_org"
-	config.Global.SlaveOptions.APIKey = "test"
-
-	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
-	list := &customListener{}
-	server.Listener = list
-	server.LogError = gorpc.NilErrorLogger
-
-	if err := server.Start(); err != nil {
-		panic(err)
-	}
-	config.Global.SlaveOptions.ConnectionString = list.L.Addr().String()
-
-	return server
-}
-
-func stopRPCMock(server *gorpc.Server) {
-	config.Global.SlaveOptions.ConnectionString = ""
-	config.Global.SlaveOptions.RPCKey = ""
-	config.Global.SlaveOptions.APIKey = ""
-	config.Global.SlaveOptions.UseRPC = false
-
-	server.Listener.Close()
-	server.Stop()
-
-	RPCCLientSingleton.Stop()
-	RPCClientIsConnected = false
-	RPCCLientSingleton = nil
-	RPCFuncClientSingleton = nil
-}
-
-func TestSyncAPISpecsRPCFailure(t *testing.T) {
-	// Mock RPC
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
-		return "malformed json", nil
-	})
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return true
-	})
-
-	rpc := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
-
-	count := syncAPISpecs()
-	if count != 0 {
-		t.Error("Should return empty value for malformed rpc response", apiSpecs)
-	}
-}
-
-func TestSyncAPISpecsRPCSuccess(t *testing.T) {
-	// Mock RPC
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
-		return "[{}]", nil
-	})
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return true
-	})
-
-	rpc := startRPCMock(dispatcher)
-	defer stopRPCMock(rpc)
-
-	count := syncAPISpecs()
-	if count != 1 {
-		t.Error("Should return array with one spec", apiSpecs)
-	}
 }
 
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {

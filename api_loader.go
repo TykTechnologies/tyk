@@ -304,6 +304,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
@@ -441,6 +442,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
 		mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
@@ -665,8 +667,6 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	}).Info("Initialised API Definitions")
 
 	if config.Global.SlaveOptions.UseRPC {
-		//log.Warning("TODO: PUT THE KEEPALIVE WATCHER BACK")
-		startRPCKeepaliveWatcher(rpcAuthStore)
 		startRPCKeepaliveWatcher(rpcOrgStore)
 	}
 }

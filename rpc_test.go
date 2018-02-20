@@ -1,0 +1,184 @@
+// +build !race
+
+package main
+
+import (
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/lonelycode/gorpc"
+
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
+)
+
+func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
+	configMu.Lock()
+	defer configMu.Unlock()
+
+	GlobalRPCCallTimeout = 100 * time.Millisecond
+	config.Global.SlaveOptions.UseRPC = true
+	config.Global.SlaveOptions.RPCKey = "test_org"
+	config.Global.SlaveOptions.APIKey = "test"
+	config.Global.Policies.PolicySource = "rpc"
+	config.Global.SlaveOptions.CallTimeout = 1
+	config.Global.SlaveOptions.RPCPoolSize = 2
+
+	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
+	list := &customListener{}
+	server.Listener = list
+	server.LogError = gorpc.NilErrorLogger
+
+	if err := server.Start(); err != nil {
+		panic(err)
+	}
+	config.Global.SlaveOptions.ConnectionString = list.L.Addr().String()
+
+	return server
+}
+
+func stopRPCMock(server *gorpc.Server) {
+	config.Global.SlaveOptions.ConnectionString = ""
+	config.Global.SlaveOptions.RPCKey = ""
+	config.Global.SlaveOptions.APIKey = ""
+	config.Global.SlaveOptions.UseRPC = false
+	config.Global.Policies.PolicySource = ""
+
+	if server != nil {
+		server.Listener.Close()
+		server.Stop()
+	}
+
+	RPCCLientSingleton.Stop()
+	RPCClientIsConnected = false
+	RPCCLientSingleton = nil
+	RPCFuncClientSingleton = nil
+	rpcLoadCount = 0
+	rpcEmergencyMode = false
+	rpcEmergencyModeLoaded = false
+}
+
+// Our RPC layer too racy, but not harmul, mostly global variables like RPCIsClientConnected
+func TestSyncAPISpecsRPCFailure(t *testing.T) {
+	// Mock RPC
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+		return "malformed json", nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+
+	rpc := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc)
+
+	count := syncAPISpecs()
+	if count != 0 {
+		t.Error("Should return empty value for malformed rpc response", apiSpecs)
+	}
+}
+
+func TestSyncAPISpecsRPCSuccess(t *testing.T) {
+	// Mock RPC
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+		return "[" + sampleAPI + "]", nil
+	})
+	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+		return `[{"_id":"507f191e810c19729de860ea", "rate":1, "per":1}]`, nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
+		return "", fmt.Errorf("Not found")
+	})
+
+	t.Run("RPC is live", func(t *testing.T) {
+		rpc := startRPCMock(dispatcher)
+		defer stopRPCMock(rpc)
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		apiBackup := LoadDefinitionsFromRPCBackup()
+		if len(apiBackup) != 1 {
+			t.Fatal("Should have APIs in backup")
+		}
+
+		policyBackup := LoadPoliciesFromRPCBackup()
+		if len(policyBackup) != 1 {
+			t.Fatal("Should have Policies in backup")
+		}
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Code: 200},
+		}...)
+
+		count := syncAPISpecs()
+		if count != 1 {
+			t.Error("Should return array with one spec", apiSpecs)
+		}
+	})
+
+	t.Run("RPC down, load backup", func(t *testing.T) {
+		// Point rpc to non existent address
+		config.Global.SlaveOptions.ConnectionString = testHttpFailure
+		config.Global.SlaveOptions.UseRPC = true
+		config.Global.SlaveOptions.RPCKey = "test_org"
+		config.Global.SlaveOptions.APIKey = "test"
+		config.Global.Policies.PolicySource = "rpc"
+
+		// RPC layer is down
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		// Wait for backup to load
+		time.Sleep(200 * time.Millisecond)
+
+		// Still should work!
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Code: 200},
+		}...)
+
+		stopRPCMock(nil)
+	})
+
+	t.Run("RPC is back", func(t *testing.T) {
+		rpcEmergencyModeLoaded = false
+		rpcEmergencyMode = false
+
+		dispatcher := gorpc.NewDispatcher()
+		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+			return "[" + sampleAPI + "," + sampleAPI + "]", nil
+		})
+		dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+			return `[{"_id":"507f191e810c19729de860ea", "rate":1, "per":1}, {"_id":"507f191e810c19729de860eb", "rate":1, "per":1}]`, nil
+		})
+		dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+			return true
+		})
+		dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
+			return "", fmt.Errorf("Not found")
+		})
+		// Back to live
+		rpc := startRPCMock(dispatcher)
+		defer stopRPCMock(rpc)
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		time.Sleep(100 * time.Millisecond)
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Code: 200},
+		}...)
+
+		if count := syncAPISpecs(); count != 2 {
+			t.Error("Should fetch latest specs", count)
+		}
+
+		if count := syncPolicies(); count != 2 {
+			t.Error("Should fetch latest policies", count)
+		}
+	})
+}

@@ -135,11 +135,38 @@ func TestKeyHandler(t *testing.T) {
 	masterKey := createStandardSession()
 	masterKeyJSON, _ := json.Marshal(masterKey)
 
+	// with access
 	withAccess := createStandardSession()
 	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
 		APIID: "test", Versions: []string{"v1"},
 	}}
 	withAccessJSON, _ := json.Marshal(withAccess)
+
+	// with policy
+	policiesMu.Lock()
+	policiesByID["abc_policy"] = user.Policy{
+		Active:   true,
+		QuotaMax: 1234567890,
+	}
+	policiesMu.Unlock()
+	withPolicy := createStandardSession()
+	withPolicy.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+	withPolicy.ApplyPolicies = []string{
+		"abc_policy",
+	}
+	withPolicyJSON, _ := json.Marshal(withPolicy)
+
+	// with invalid policy
+	withBadPolicy := createStandardSession()
+	withBadPolicy.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+	withBadPolicy.ApplyPolicies = []string{
+		"xyz_policy",
+	}
+	withBadPolicyJSON, _ := json.Marshal(withBadPolicy)
 
 	knownKey := createSession()
 
@@ -148,6 +175,39 @@ func TestKeyHandler(t *testing.T) {
 			// Master keys should be disabled by default
 			{Method: "POST", Path: "/tyk/keys/create", Data: string(masterKeyJSON), AdminAuth: true, Code: 400, BodyMatch: "Failed to create key, keys must have at least one Access Rights record set."},
 			{Method: "POST", Path: "/tyk/keys/create", Data: string(withAccessJSON), AdminAuth: true, Code: 200},
+		}...)
+	})
+
+	t.Run("Create key with policy", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/create",
+				Data:      string(withPolicyJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/create",
+				Data:      string(withBadPolicyJSON),
+				AdminAuth: true,
+				Code:      500,
+			},
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/my_key_id",
+				Data:      string(withPolicyJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/my_key_id" + "?api_id=test",
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"quota_max":1234567890`,
+			},
 		}...)
 	})
 

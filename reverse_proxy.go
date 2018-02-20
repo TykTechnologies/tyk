@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -454,12 +454,19 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	// 1. Check if timeouts are set for this endpoint
 	p.TykAPISpec.Lock()
-	if p.TykAPISpec.HTTPTransport == nil {
+
+	createTransport := p.TykAPISpec.HTTPTransport == nil
+	if !createTransport && config.Global.MaxConnTime != 0 {
+		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global.MaxConnTime)*time.Second
+	}
+
+	if createTransport {
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
 	} else if IsWebsocket(req) { // check if it is an upgrade request to NEW WS-connection
 		// overwrite transport's ResponseWriter from previous upgrade request
 		// as it was already hijacked and now is being used for other connection
+		p.TykAPISpec.HTTPTransportCreated = time.Now()
 		p.TykAPISpec.HTTPTransport.(*WSDialer).RW = rw
 	}
 	p.TykAPISpec.Unlock()
@@ -783,8 +790,8 @@ func (m *maxLatencyWriter) flushLoop() {
 func (m *maxLatencyWriter) stop() { m.done <- true }
 
 func requestIP(r *http.Request) string {
-	if real := r.Header.Get("X-Real-IP"); real != "" {
-		return real
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		return realIP
 	}
 	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
 		// X-Forwarded-For has no port
