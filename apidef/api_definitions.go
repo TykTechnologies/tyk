@@ -2,11 +2,13 @@ package apidef
 
 import (
 	"encoding/base64"
-
+	"encoding/json"
 	"regexp"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/TykTechnologies/gojsonschema"
 )
 
 type AuthProviderCode string
@@ -166,11 +168,11 @@ type MethodTransformMeta struct {
 }
 
 type ValidatePathMeta struct {
-	Path   string                 `bson:"path" json:"path"`
-	Method string                 `bson:"method" json:"method"`
-	Schema map[string]interface{} `bson:"schema" json:"schema"`
-	// TODO: Implement multi schema support
-	SchemaVersion string `bson:"schema_version" json:"schema_version"`
+	Path        string                  `bson:"path" json:"path"`
+	Method      string                  `bson:"method" json:"method"`
+	Schema      map[string]interface{}  `bson:"schema" json:"schema"`
+	SchemaB64   string                  `bson:"schema_b64" json:"schema_b64,omitempty"`
+	SchemaCache gojsonschema.JSONLoader `bson:"-" json:"-"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
@@ -420,49 +422,69 @@ type BundleManifest struct {
 
 // Clean will URL encode map[string]struct variables for saving
 func (a *APIDefinition) EncodeForDB() {
-	new_version := make(map[string]VersionInfo)
+	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
 		newK := base64.StdEncoding.EncodeToString([]byte(k))
 		v.Name = newK
-		new_version[newK] = v
+		newVersion[newK] = v
 	}
-	a.VersionData.Versions = new_version
+	a.VersionData.Versions = newVersion
 
-	new_upstream_certificates := make(map[string]string)
+	newUpstreamCerts := make(map[string]string)
 	for domain, cert := range a.UpstreamCertificates {
 		newD := base64.StdEncoding.EncodeToString([]byte(domain))
-		new_upstream_certificates[newD] = cert
+		newUpstreamCerts[newD] = cert
 	}
-	a.UpstreamCertificates = new_upstream_certificates
+	a.UpstreamCertificates = newUpstreamCerts
+
+	for i, version := range a.VersionData.Versions {
+		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
+
+			jsBytes, _ := json.Marshal(oldSchema.Schema)
+			oldSchema.SchemaB64 = base64.StdEncoding.EncodeToString(jsBytes)
+			oldSchema.Schema = nil
+
+			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
+		}
+	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
-	new_version := make(map[string]VersionInfo)
+	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
 		newK, err := base64.StdEncoding.DecodeString(k)
 		if err != nil {
 			log.Error("Couldn't Decode, leaving as it may be legacy...")
-			new_version[k] = v
+			newVersion[k] = v
 		} else {
 			v.Name = string(newK)
-			new_version[string(newK)] = v
+			newVersion[string(newK)] = v
 		}
 	}
+	a.VersionData.Versions = newVersion
 
-	a.VersionData.Versions = new_version
-
-	new_upstream_certificates := make(map[string]string)
+	newUpstreamCerts := make(map[string]string)
 	for domain, cert := range a.UpstreamCertificates {
 		newD, err := base64.StdEncoding.DecodeString(domain)
 		if err != nil {
 			log.Error("Couldn't Decode, leaving as it may be legacy...")
-			new_upstream_certificates[domain] = cert
+			newUpstreamCerts[domain] = cert
 		} else {
-			new_upstream_certificates[string(newD)] = cert
+			newUpstreamCerts[string(newD)] = cert
 		}
 	}
+	a.UpstreamCertificates = newUpstreamCerts
 
-	a.UpstreamCertificates = new_upstream_certificates
+	for i, version := range a.VersionData.Versions {
+		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
+			jsBytes, _ := base64.StdEncoding.DecodeString(oldSchema.SchemaB64)
+
+			json.Unmarshal(jsBytes, &oldSchema.Schema)
+			oldSchema.SchemaB64 = ""
+
+			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
+		}
+	}
 }
 
 func (s *StringRegexMap) Check(value string) string {
