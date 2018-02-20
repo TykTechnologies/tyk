@@ -8,12 +8,18 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/google/uuid"
 	"github.com/lonelycode/redigocluster/rediscluster"
 
 	"github.com/TykTechnologies/tyk/config"
 )
 
 // ------------------- REDIS CLUSTER STORAGE MANAGER -------------------------------
+
+const (
+	waitStorageRetriesNum      = 5
+	waitStorageRetriesInterval = 1 * time.Second
+)
 
 var (
 	redisSingletonMu           sync.RWMutex
@@ -26,6 +32,62 @@ type RedisCluster struct {
 	KeyPrefix string
 	HashKeys  bool
 	IsCache   bool
+}
+
+func clusterConnectionIsOpen(cluster *RedisCluster) bool {
+	testKey := "redis-test-" + uuid.New().String()
+	// set test key
+	if err := cluster.SetKey(testKey, "test", 1); err != nil {
+		return false
+	}
+	// get test key
+	if _, err := cluster.GetKey(testKey); err != nil {
+		return false
+	}
+	return true
+}
+
+// IsConnected waits with retries until Redis connection pools are connected
+func IsConnected() bool {
+	// create temporary ones to access singletons
+	testClusters := []*RedisCluster{
+		{},
+	}
+	if config.Global.EnableSeperateCacheStore {
+		testClusters = append(testClusters, &RedisCluster{IsCache: true})
+	}
+	for _, cluster := range testClusters {
+		cluster.Connect()
+	}
+
+	// wait for connection pools with retries
+	retryNum := 0
+	for {
+		if retryNum == waitStorageRetriesNum {
+			log.Error("Waiting for Redis connection pools failed")
+			return false
+		}
+
+		// check that redis is available
+		var redisIsReady bool
+		for _, cluster := range testClusters {
+			redisIsReady = cluster.singleton() != nil && clusterConnectionIsOpen(cluster)
+			if !redisIsReady {
+				break
+			}
+		}
+		if redisIsReady {
+			break
+		}
+
+		// sleep before next check
+		log.WithField("currRetry", retryNum).Info("Waiting for Redis connection pools to be ready")
+		time.Sleep(waitStorageRetriesInterval)
+		retryNum++
+	}
+	log.WithField("currRetry", retryNum).Info("Redis connection pools are ready after number of retires")
+
+	return true
 }
 
 func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {

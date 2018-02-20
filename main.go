@@ -1106,6 +1106,12 @@ func main() {
 
 	start()
 
+	// Wait while Redis connection pools are ready before start serving traffic
+	if !storage.IsConnected() {
+		log.Fatal("Redis connection pools are not ready. Exiting...")
+	}
+	log.Info("Redis connection pools are ready")
+
 	if *memProfile {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
