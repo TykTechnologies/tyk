@@ -66,6 +66,7 @@ type AnalyticsConfigConfig struct {
 	GeoIPDBLocation         string              `json:"geo_ip_db_path"`
 	NormaliseUrls           NormalisedURLConfig `json:"normalise_urls"`
 	PoolSize                int                 `json:"pool_size"`
+	StorageExpirationTime   int                 `json:"storage_expiration_time"`
 	ignoredIPsCompiled      map[string]bool
 }
 
@@ -264,6 +265,7 @@ type Config struct {
 	AllowRemoteConfig                 bool                                  `bson:"allow_remote_config" json:"allow_remote_config"`
 	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
+	MaxConnTime                       int64                                 `json:"max_conn_time"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`

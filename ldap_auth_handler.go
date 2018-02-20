@@ -95,10 +95,16 @@ func (l *LDAPStorageHandler) GetRawKey(filter string) (string, error) {
 	return "", nil
 }
 
+func (l *LDAPStorageHandler) SetExp(cn string, exp int64) error {
+	log.Warning("Not implementated")
+	return nil
+}
+
 func (l *LDAPStorageHandler) GetExp(cn string) (int64, error) {
 	log.Warning("Not implementated")
 	return 0, nil
 }
+
 func (l *LDAPStorageHandler) GetKeys(filter string) []string {
 	log.Warning("Not implementated")
 	s := []string{}

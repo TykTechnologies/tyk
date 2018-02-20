@@ -92,6 +92,9 @@ const confSchema = `{
 			"pool_size": {
 				"type": "integer"
 			},
+			"storage_expiration_time": {
+				"type": "integer"
+			},
 			"type": {
 				"type": "string"
 			}
@@ -402,6 +405,9 @@ const confSchema = `{
 		"type": "boolean"
 	},
 	"max_idle_connections_per_host": {
+		"type": "integer"
+	},
+	"max_conn_time": {
 		"type": "integer"
 	},
 	"middleware_path": {

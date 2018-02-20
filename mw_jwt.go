@@ -244,28 +244,27 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		newSession, err := generateSessionFromPolicy(basePolicyID,
 			k.Spec.OrgID,
 			true)
-
-		if err == nil {
-			session = newSession
-			session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
-			session.Alias = baseFieldData
-
-			// Update the session in the session manager in case it gets called again
-			k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime))
-			log.Debug("Policy applied to key")
-
-			switch k.Spec.BaseIdentityProvidedBy {
-			case apidef.JWTClaim, apidef.UnsetAuth:
-				ctxSetSession(r, &session)
-				ctxSetAuthToken(r, sessionID)
-			}
-			k.setContextVars(r, token)
-			return nil, 200
+		if err != nil {
+			k.reportLoginFailure(baseFieldData, r)
+			log.Error("Could not find a valid policy to apply to this token!")
+			return errors.New("Key not authorized: no matching policy"), 403
 		}
 
-		k.reportLoginFailure(baseFieldData, r)
-		log.Error("Could not find a valid policy to apply to this token!")
-		return errors.New("Key not authorized: no matching policy"), 403
+		session = newSession
+		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+		session.Alias = baseFieldData
+
+		// Update the session in the session manager in case it gets called again
+		k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime))
+		log.Debug("Policy applied to key")
+
+		switch k.Spec.BaseIdentityProvidedBy {
+		case apidef.JWTClaim, apidef.UnsetAuth:
+			ctxSetSession(r, &session)
+			ctxSetAuthToken(r, sessionID)
+		}
+		k.setContextVars(r, token)
+		return nil, 200
 	} else if k.Spec.JWTPolicyFieldName != "" {
 		// extract policy ID from JWT token
 		policyID, foundPolicy := k.getPolicyIDFromToken(token)
@@ -273,17 +272,35 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			k.reportLoginFailure(baseFieldData, r)
 			return errors.New("Key not authorized: no matching policy found"), 403
 		}
-		// check if policy in session is the same as policy set in the given token
+		// check if we received a valid policy ID in claim
+		policiesMu.RLock()
+		policy, ok := policiesByID[policyID]
+		policiesMu.RUnlock()
+		if !ok {
+			k.reportLoginFailure(baseFieldData, r)
+			log.Error("Policy ID found in token is invalid!")
+			return errors.New("Key not authorized: no matching policy"), 403
+		}
+		// check if token for this session was switched to another valid policy
 		pols := session.PolicyIDs()
-		if len(pols) < 1 {
+		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			log.Error("No policies for the found session. Failing Request.")
 			return errors.New("Key not authorized: no matching policy found"), 403
 		}
-		if pols[0] != policyID {
-			k.reportLoginFailure(baseFieldData, r)
-			log.Error("Policy ID found in active session is not the same as policy in token!")
-			return errors.New("Key not authorized: no matching policy"), 403
+		if pols[0] != policyID { // switch session to new policy and update session storage and cache
+			// check ownership before updating session
+			if policy.OrgID != k.Spec.OrgID {
+				k.reportLoginFailure(baseFieldData, r)
+				log.Error("Policy ID found in token is invalid (wrong ownership)!")
+				return errors.New("Key not authorized: no matching policy"), 403
+			}
+			// update session storage
+			session.SetPolicies(policyID)
+			session.LastUpdated = time.Now().String()
+			k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime))
+			// update session in cache
+			go SessionCache.Set(sessionID, session, cache.DefaultExpiration)
 		}
 	}
 

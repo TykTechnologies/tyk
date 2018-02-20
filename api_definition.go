@@ -141,6 +141,7 @@ type APISpec struct {
 	HasRun                   bool
 	ServiceRefreshInProgress bool
 	HTTPTransport            http.RoundTripper
+	HTTPTransportCreated     time.Time
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
@@ -301,8 +302,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
 func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
+	if rpcEmergencyMode {
+		return LoadDefinitionsFromRPCBackup()
+	}
+
 	store := RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
-	store.Connect()
+	if !store.Connect() {
+		return nil
+	}
 
 	// enable segments
 	var tags []string

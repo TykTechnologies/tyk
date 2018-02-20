@@ -61,10 +61,10 @@ var (
 )
 
 func rpcKeepAliveCheck(r *RPCStorageHandler) {
-	// Only run when connected
 	if !RPCClientIsConnected {
 		return
 	}
+
 	// Make sure the auth back end is still alive
 	c1 := make(chan string, 1)
 
@@ -236,7 +236,9 @@ func (r *RPCStorageHandler) Connect() bool {
 		RPCFuncClientSingleton = d.NewFuncClient(RPCCLientSingleton)
 	}
 
-	r.Login()
+	if !r.Login() {
+		return false
+	}
 
 	if !r.SuppressRegister {
 		r.Register()
@@ -280,31 +282,25 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 	return setKeyName
 }
 
-func (r *RPCStorageHandler) ReAttemptLogin(err error) {
+func (r *RPCStorageHandler) ReAttemptLogin(err error) bool {
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
 
 	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
 		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
-		apiList := LoadDefinitionsFromRPCBackup()
-		log.Warning("[RPC Store] --> Done")
-		if apiList != nil {
-			rpcEmergencyMode = true
-			log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-			doLoadWithBackup(apiList)
-		}
-
-		//LoadPoliciesFromRPCBackup()
+		log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
+		doReload()
+		rpcEmergencyModeLoaded = true
 	}
 
 	time.Sleep(time.Second * 3)
 	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
 		r.ReConnect()
-		return
+		return false
 	}
-	r.Login()
+	return r.Login()
 }
 
-func (r *RPCStorageHandler) GroupLogin() {
+func (r *RPCStorageHandler) GroupLogin() bool {
 	groupLoginData := GroupLoginRequest{
 		UserKey: r.UserKey,
 		GroupID: config.Global.SlaveOptions.GroupID,
@@ -320,20 +316,31 @@ func (r *RPCStorageHandler) GroupLogin() {
 				"GroupID": groupLoginData.GroupID,
 			},
 		)
-		r.ReAttemptLogin(err)
-		return
+		rpcEmergencyMode = true
+		go r.ReAttemptLogin(err)
+		return false
 	}
 
 	if ok == false {
 		log.Error("RPC Login incorrect")
-		r.ReAttemptLogin(errors.New("Login incorrect"))
-		return
+		rpcEmergencyMode = true
+		go r.ReAttemptLogin(errors.New("Login incorrect"))
+		return false
 	}
 	log.Debug("[RPC Store] Group Login complete")
 	rpcLoadCount++
+
+	// Recovery
+	if rpcEmergencyMode {
+		doReload()
+	}
+
+	rpcEmergencyMode = false
+	rpcEmergencyModeLoaded = false
+	return true
 }
 
-func (r *RPCStorageHandler) Login() {
+func (r *RPCStorageHandler) Login() bool {
 	log.Debug("[RPC Store] Login initiated")
 
 	if len(r.UserKey) == 0 {
@@ -342,25 +349,34 @@ func (r *RPCStorageHandler) Login() {
 
 	// If we have a group ID, lets login as a group
 	if config.Global.SlaveOptions.GroupID != "" {
-		r.GroupLogin()
-		return
+		return r.GroupLogin()
 	}
 
 	ok, err := RPCFuncClientSingleton.CallTimeout("Login", r.UserKey, GlobalRPCCallTimeout)
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
 		emitRPCErrorEvent(rpcFuncClientSingletonCall, "Login", err)
-		r.ReAttemptLogin(err)
-		return
+		rpcEmergencyMode = true
+		go r.ReAttemptLogin(err)
+		return false
 	}
 
 	if ok == false {
 		log.Error("RPC Login incorrect")
-		r.ReAttemptLogin(errors.New("Login incorrect"))
-		return
+		rpcEmergencyMode = true
+		go r.ReAttemptLogin(errors.New("Login incorrect"))
+		return false
 	}
 	log.Debug("[RPC Store] Login complete")
 	rpcLoadCount++
+
+	if rpcEmergencyMode {
+		doReload()
+	}
+
+	rpcEmergencyMode = false
+	rpcEmergencyModeLoaded = false
+	return true
 }
 
 // GetKey will retrieve a key from the database
@@ -439,6 +455,11 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 		return 0, storage.ErrKeyNotFound
 	}
 	return value.(int64), nil
+}
+
+func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
+	log.Error("SetExp Not Implemented")
+	return nil
 }
 
 // SetKey will create (or update) a key value in the store
