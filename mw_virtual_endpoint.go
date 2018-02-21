@@ -11,9 +11,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/robertkrimen/otto"
+	_ "github.com/robertkrimen/otto/underscore"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // RequestObject is marshalled to JSON string and passed into JSON middleware
@@ -155,9 +160,46 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Run the middleware
 	vm := d.Spec.JSVM.VM.Copy()
-	returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
-	if err != nil {
-		log.Error("Failed to run virtual endpoint JS code:", err)
+	vm.Interrupt = make(chan func(), 1)
+	log.WithFields(logrus.Fields{
+		"prefix": "jsvm",
+	}).Debug("Running: ", vmeta.ResponseFunctionName)
+	// buffered, leaving no chance of a goroutine leak since the
+	// spawned goroutine will send 0 or 1 values.
+	ret := make(chan otto.Value, 1)
+	errRet := make(chan error, 1)
+	go func() {
+		defer func() {
+			// the VM executes the panic func that gets it
+			// to stop, so we must recover here to not crash
+			// the whole Go program.
+			recover()
+		}()
+		returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
+		ret <- returnRaw
+		errRet <- err
+	}()
+	var returnRaw otto.Value
+	t := time.NewTimer(d.Spec.JSVM.Timeout)
+	select {
+	case returnRaw = <-ret:
+		if err := <-errRet; err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("Failed to run JS middleware: ", err)
+			return nil
+		}
+		t.Stop()
+	case <-t.C:
+		t.Stop()
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
+		vm.Interrupt <- func() {
+			// only way to stop the VM is to send it a func
+			// that panics.
+			panic("stop")
+		}
 		return nil
 	}
 	returnDataStr, _ := returnRaw.ToString()
