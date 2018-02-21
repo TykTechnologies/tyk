@@ -341,8 +341,14 @@ func (j *JSVM) Init(spec *APISpec) {
 
 	if config.Global.JSVMTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Debugf("Default JSVM timeout used: %v", j.Timeout)
 	} else {
 		j.Timeout = time.Duration(config.Global.JSVMTimeout) * time.Second
+		log.WithFields(logrus.Fields{
+			"prefix": "jsvm",
+		}).Debugf("Custom JSVM timeout: %v", j.Timeout)
 	}
 
 	j.Log = log // use the global logger by default
