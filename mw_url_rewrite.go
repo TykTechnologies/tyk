@@ -170,8 +170,12 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 		contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
 
 		if val, ok := contextData[contextKey]; ok {
-			newpath = strings.Replace(newpath, v[0],
-				url.QueryEscape(valToStr(val)), -1)
+			valStr := valToStr(val)
+			// If contains url with domain
+			if !strings.HasPrefix(valStr, "http") {
+				valStr = url.QueryEscape(valStr)
+			}
+			newpath = strings.Replace(newpath, v[0], valStr, -1)
 		}
 	}
 
@@ -186,8 +190,12 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 
 			val, ok := session.MetaData[contextKey]
 			if ok {
-				newpath = strings.Replace(newpath, v[0],
-					url.QueryEscape(valToStr(val)), -1)
+				valStr := valToStr(val)
+				// If contains url with domain
+				if !strings.HasPrefix(valStr, "http") {
+					valStr = url.QueryEscape(valStr)
+				}
+				newpath = strings.Replace(newpath, v[0], valStr, -1)
 			}
 
 		}
