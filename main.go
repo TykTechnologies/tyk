@@ -1112,7 +1112,7 @@ func main() {
 	}
 	log.Info("Redis connection pools are ready")
 
-    if goAgainErr != nil {
+	if goAgainErr != nil {
 		var err error
 		if l, err = generateListener(config.Global.ListenPort); err != nil {
 			log.WithFields(logrus.Fields{
