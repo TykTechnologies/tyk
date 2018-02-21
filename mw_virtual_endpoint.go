@@ -157,7 +157,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		log.Error("Failed to encode session for VM: ", err)
 		return nil
 	}
-	
+
 	// Run the middleware
 	// vm := d.Spec.JSVM.VM.Copy()
 	// returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
@@ -212,7 +212,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 	returnDataStr, _ := returnRaw.ToString()
-	
+
 	// Decode the return object
 	newResponseData := VMResponseObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
