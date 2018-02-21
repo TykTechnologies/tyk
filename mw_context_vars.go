@@ -36,6 +36,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		n := "headers_" + strings.Replace(hname, "-", "_", -1)
 		contextDataObject[n] = vals[0]
 	}
+	contextDataObject["headers_Host"] = copiedRequest.Host
 
 	// Path parts
 	segmentedPathArray := strings.Split(copiedRequest.URL.Path, "/")
