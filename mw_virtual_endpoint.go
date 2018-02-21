@@ -159,15 +159,6 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Run the middleware
-	// vm := d.Spec.JSVM.VM.Copy()
-	// returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
-	// if err != nil {
-	// 	log.Error("Failed to run virtual endpoint JS code:", err)
-	// 	return nil
-	// }
-	// returnDataStr, _ := returnRaw.ToString()
-
-	// Run the middleware
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
 	log.WithFields(logrus.Fields{
