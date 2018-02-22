@@ -74,8 +74,11 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.RegistrationEndpoint = buildConnStr("/register/node")
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
-
-	h.Secret = config.Global.NodeSecret
+	if h.Secret = config.Global.NodeSecret; h.Secret == "" {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Fatal("Node secret is not set, required for dashboard connection")
+	}
 	return nil
 }
 
