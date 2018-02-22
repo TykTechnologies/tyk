@@ -134,7 +134,9 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		defer ts.Close()
 
 		// Wait for backup to load
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
+		reloadTick <- time.Time{}
+		time.Sleep(100 * time.Millisecond)
 
 		// Still should work!
 		ts.Run(t, []test.TestCase{
