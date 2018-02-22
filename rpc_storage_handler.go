@@ -288,9 +288,8 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) bool {
 	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
 		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
 		log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-		reloadURLStructure(func(){
-			rpcEmergencyModeLoaded = true
-		})
+		doReload()
+		rpcEmergencyModeLoaded = true
 	}
 
 	time.Sleep(time.Second * 3)
@@ -333,10 +332,9 @@ func (r *RPCStorageHandler) GroupLogin() bool {
 
 	// Recovery
 	if rpcEmergencyMode {
-		reloadURLStructure(func(){
-			rpcEmergencyMode = false
-			rpcEmergencyModeLoaded = false
-		})
+		rpcEmergencyMode = false
+		rpcEmergencyModeLoaded = false
+		reloadURLStructure(nil)
 	}
 
 	return true
@@ -373,10 +371,9 @@ func (r *RPCStorageHandler) Login() bool {
 	rpcLoadCount++
 
 	if rpcEmergencyMode {
-		reloadURLStructure(func(){
-			rpcEmergencyMode = false
-			rpcEmergencyModeLoaded = false
-		})
+		rpcEmergencyMode = false
+		rpcEmergencyModeLoaded = false
+		reloadURLStructure(nil)
 	}
 
 	return true
