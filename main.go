@@ -690,10 +690,6 @@ func doReload() {
 	}).Info("API reload complete")
 
 	mainRouter = newRouter
-
-	// // Unset these
-	// rpcEmergencyModeLoaded = false
-	// rpcEmergencyMode = false
 }
 
 // startReloadChan and reloadDoneChan are used by the two reload loops
