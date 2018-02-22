@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/jeffail/tunny"
 	cache "github.com/pmylund/go-cache"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const (
@@ -18,7 +21,9 @@ const (
 )
 
 var (
-	HostCheckerClient = &http.Client{Timeout: 500 * time.Millisecond}
+	HostCheckerClient = &http.Client{
+		Timeout: 500 * time.Millisecond,
+	}
 
 	hostCheckTicker = make(chan struct{})
 )
@@ -145,7 +150,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 
 	useMethod := toCheck.Method
 	if toCheck.Method == "" {
-		useMethod = "GET"
+		useMethod = http.MethodGet
 	}
 
 	req, err := http.NewRequest(useMethod, toCheck.CheckURL, strings.NewReader(toCheck.Body))
@@ -153,10 +158,16 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 		log.Error("Could not create request: ", err)
 		return
 	}
-	for header_name, header_value := range toCheck.Headers {
-		req.Header.Set(header_name, header_value)
+	for headerName, headerValue := range toCheck.Headers {
+		req.Header.Set(headerName, headerValue)
 	}
 	req.Header.Set("Connection", "close")
+
+	HostCheckerClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: config.Global.ProxySSLInsecureSkipVerify,
+		},
+	}
 
 	response, err := HostCheckerClient.Do(req)
 
@@ -177,7 +188,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 
 	report.ResponseCode = response.StatusCode
 
-	if response.StatusCode != 200 {
+	if response.StatusCode != http.StatusOK {
 		h.errorChan <- report
 		return
 	}
