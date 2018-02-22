@@ -667,6 +667,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	}).Info("Initialised API Definitions")
 
 	if config.Global.SlaveOptions.UseRPC {
+		startRPCKeepaliveWatcher(rpcAuthStore)
 		startRPCKeepaliveWatcher(rpcOrgStore)
 	}
 }
