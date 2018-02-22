@@ -65,28 +65,17 @@ func rpcKeepAliveCheck(r *RPCStorageHandler) {
 		return
 	}
 
-	// Make sure the auth back end is still alive
-	c1 := make(chan string, 1)
-
-	go func() {
-		log.Debug("Getting keyspace check test key")
-		r.GetKey("0000")
-		log.Debug("--> done")
-		c1 <- "1"
-		close(c1)
-	}()
-
-	select {
-	case res := <-c1:
-		log.Debug("RPC Still alive: ", res)
-		// Don't run too quickly, pulse every 10 secs
-		time.Sleep(time.Second * 10)
-	case <-time.After(time.Second * 10):
+	log.Debug("Getting keyspace check test key")
+	r.SetKey("0000", "0000", 10)
+	if _, err := r.GetKey("0000"); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "RPC Conn Mgr",
 		}).Warning("Handler seems to have disconnected, attempting reconnect")
-		r.ReConnect()
+	} else {
+		log.Debug("RPC Still alive")
 	}
+
+	time.Sleep(time.Second * 10)
 }
 
 // RPCStorageHandler is a storage manager that uses the redis database.
