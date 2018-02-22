@@ -288,6 +288,7 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) bool {
 	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
 		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
 		log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
+		rpcEmergencyMode = true
 		rpcEmergencyModeLoaded = true
 		reloadURLStructure(nil)
 	}
@@ -316,14 +317,12 @@ func (r *RPCStorageHandler) GroupLogin() bool {
 				"GroupID": groupLoginData.GroupID,
 			},
 		)
-		rpcEmergencyMode = true
 		go r.ReAttemptLogin(err)
 		return false
 	}
 
 	if ok == false {
 		log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
 		go r.ReAttemptLogin(errors.New("Login incorrect"))
 		return false
 	}
@@ -356,14 +355,12 @@ func (r *RPCStorageHandler) Login() bool {
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
 		emitRPCErrorEvent(rpcFuncClientSingletonCall, "Login", err)
-		rpcEmergencyMode = true
 		go r.ReAttemptLogin(err)
 		return false
 	}
 
 	if ok == false {
 		log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
 		go r.ReAttemptLogin(errors.New("Login incorrect"))
 		return false
 	}
@@ -411,8 +408,9 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 			},
 		)
 		if r.IsAccessError(err) {
-			r.Login()
-			return r.GetKey(keyName)
+			if r.Login() {
+				return r.GetKey(keyName)
+			}
 		}
 
 		log.Debug("Error trying to get value:", err)
@@ -448,8 +446,9 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 			},
 		)
 		if r.IsAccessError(err) {
-			r.Login()
-			return r.GetExp(keyName)
+			if r.Login() {
+				return r.GetExp(keyName)
+			}
 		}
 		log.Error("Error trying to get TTL: ", err)
 		return 0, storage.ErrKeyNotFound
@@ -482,10 +481,15 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 				"fixedKeyName": ibd.KeyName,
 			},
 		)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.SetKey(keyName, session, timeout)
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.SetKey(keyName, session, timeout)
+			}
+		}
+
+		log.Debug("Error trying to set value:", err)
+		return err
 	}
 
 	elapsed := time.Since(start)
@@ -513,8 +517,10 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 		)
 	}
 	if r.IsAccessError(err) {
-		r.Login()
-		r.Decrement(keyName)
+		if r.Login() {
+			r.Decrement(keyName)
+			return
+		}
 	}
 }
 
@@ -538,8 +544,9 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		)
 	}
 	if r.IsAccessError(err) {
-		r.Login()
-		return r.IncrememntWithExpire(keyName, expire)
+		if r.Login() {
+			return r.IncrememntWithExpire(keyName, expire)
+		}
 	}
 
 	if val == nil {
@@ -573,10 +580,14 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 				"searchStr": searchStr,
 			},
 		)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.GetKeysAndValuesWithFilter(filter)
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.GetKeysAndValuesWithFilter(filter)
+			}
+		}
+
+		return nil
 	}
 
 	returnValues := make(map[string]string)
@@ -596,10 +607,14 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 	kvPair, err := RPCFuncClientSingleton.CallTimeout("GetKeysAndValues", searchStr, GlobalRPCCallTimeout)
 	if err != nil {
 		emitRPCErrorEvent(rpcFuncClientSingletonCall, "GetKeysAndValues", err)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.GetKeysAndValues()
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.GetKeysAndValues()
+			}
+		}
+
+		return nil
 	}
 
 	returnValues := make(map[string]string)
@@ -627,10 +642,12 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 				"fixedKeyName": r.fixKey(keyName),
 			},
 		)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.DeleteKey(keyName)
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.DeleteKey(keyName)
+			}
+		}
 	}
 
 	return ok == true
@@ -648,10 +665,12 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 				"keyName": keyName,
 			},
 		)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.DeleteRawKey(keyName)
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.DeleteRawKey(keyName)
+			}
+		}
 	}
 
 	return ok == true
@@ -677,10 +696,12 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 					"asInterface": strings.Join(asInterface, ","),
 				},
 			)
-		}
-		if r.IsAccessError(err) {
-			r.Login()
-			return r.DeleteKeys(keys)
+
+			if r.IsAccessError(err) {
+				if r.Login() {
+					return r.DeleteKeys(keys)
+				}
+			}
 		}
 
 		return ok == true
@@ -723,8 +744,9 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 		)
 	}
 	if r.IsAccessError(err) {
-		r.Login()
-		r.AppendToSet(keyName, value)
+		if r.Login() {
+			r.AppendToSet(keyName, value)
+		}
 	}
 }
 
@@ -748,10 +770,12 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 				"per":     strconv.Itoa(int(per)),
 			},
 		)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.SetRollingWindow(keyName, per, val, false)
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.SetRollingWindow(keyName, per, val, false)
+			}
+		}
 	}
 
 	elapsed := time.Since(start)
@@ -804,10 +828,14 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 				"tags":  strings.Join(tags, ","),
 			},
 		)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.GetApiDefinitions(orgId, tags)
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.GetApiDefinitions(orgId, tags)
+			}
+		}
+
+		return ""
 	}
 	log.Debug("API Definitions retrieved")
 
@@ -830,10 +858,14 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 				"orgId": orgId,
 			},
 		)
-	}
-	if r.IsAccessError(err) {
-		r.Login()
-		return r.GetPolicies(orgId)
+
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.GetPolicies(orgId)
+			}
+		}
+
+		return ""
 	}
 
 	if defString != nil {
@@ -917,10 +949,12 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 			reqData,
 		)
 		if r.IsAccessError(err) {
-			r.Login()
-			r.CheckForKeyspaceChanges(orgId)
+			if r.Login() {
+				r.CheckForKeyspaceChanges(orgId)
+			}
 		}
 		log.Warning("Keysapce warning: ", err)
+		return
 	}
 
 	if keys == nil {
