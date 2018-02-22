@@ -494,6 +494,11 @@ func updateAPIVersion(spec *APISpec, name string, verGen func(version *apidef.Ve
 	spec.VersionData.Versions[name] = version
 }
 
+func jsonMarshalString(i interface{}) (out string) {
+	b, _ := json.Marshal(i)
+	return string(b)
+}
+
 func buildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 	if len(apiGens) == 0 {
 		apiGens = append(apiGens, func(spec *APISpec) {})
