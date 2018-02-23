@@ -1214,6 +1214,7 @@ func start() {
 			Address:          config.Global.SlaveOptions.ConnectionString,
 			SuppressRegister: true,
 		}
+
 		RPCListener.Connect()
 		go rpcReloadLoop(config.Global.SlaveOptions.RPCKey)
 		go RPCListener.StartRPCLoopCheck(config.Global.SlaveOptions.RPCKey)
@@ -1314,6 +1315,7 @@ func startDRL() {
 type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Fatal(r)
 	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
 	mainRouter.ServeHTTP(w, r)
 }
@@ -1332,7 +1334,15 @@ func listen(l, controlListener net.Listener, err error) {
 
 	drlOnce.Do(startDRL)
 
-	// Handle reload when SIGUSR2 is received
+	if config.Global.ControlAPIPort > 0 {
+		loadAPIEndpoints(controlRouter)
+	}
+
+	if !rpcEmergencyMode {
+		doReload()
+	}
+
+	// Error not empty if handle reload when SIGUSR2 is received
 	if err != nil {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
 		log.WithFields(logrus.Fields{
@@ -1341,18 +1351,6 @@ func listen(l, controlListener net.Listener, err error) {
 
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
-
-		if !rpcEmergencyMode {
-			count := syncAPISpecs()
-			if count > 0 {
-				loadGlobalApps(mainRouter)
-				syncPolicies()
-			}
-
-			if config.Global.ControlAPIPort > 0 {
-				loadAPIEndpoints(controlRouter)
-			}
-		}
 
 		// Use a custom server so we can control keepalives
 		if config.Global.HttpServerOptions.OverrideDefaults {
@@ -1389,10 +1387,8 @@ func listen(l, controlListener net.Listener, err error) {
 
 			go http.Serve(l, mainHandler{})
 
-			if !rpcEmergencyMode {
-				if controlListener != nil {
-					go http.Serve(controlListener, controlRouter)
-				}
+			if controlListener != nil {
+				go http.Serve(controlListener, controlRouter)
 			}
 		}
 	} else {
@@ -1416,21 +1412,8 @@ func listen(l, controlListener net.Listener, err error) {
 			os.Setenv("TYK_SERVICE_NODEID", "")
 		}
 
-		// Resume accepting connections in a new goroutine.
-		if !rpcEmergencyMode {
-			count := syncAPISpecs()
-			if count > 0 {
-				loadGlobalApps(mainRouter)
-				syncPolicies()
-			}
-
-			if config.Global.ControlAPIPort > 0 {
-				loadAPIEndpoints(controlRouter)
-			}
-
-			if config.Global.UseDBAppConfigs {
-				go DashService.StartBeating()
-			}
+		if config.Global.UseDBAppConfigs {
+			go DashService.StartBeating()
 		}
 
 		if config.Global.HttpServerOptions.OverrideDefaults {
@@ -1466,14 +1449,12 @@ func listen(l, controlListener net.Listener, err error) {
 
 			go http.Serve(l, mainHandler{})
 
-			if !rpcEmergencyMode {
-				if controlListener != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Info("Control API listener started: ", controlListener, controlRouter)
+			if controlListener != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "main",
+				}).Info("Control API listener started: ", controlListener, controlRouter)
 
-					go http.Serve(controlListener, controlRouter)
-				}
+				go http.Serve(controlListener, controlRouter)
 			}
 		}
 

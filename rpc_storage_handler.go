@@ -66,8 +66,9 @@ func rpcKeepAliveCheck(r *RPCStorageHandler) {
 	}
 
 	log.Debug("Getting keyspace check test key")
-	r.SetKey("0000", "0000", 10)
-	if _, err := r.GetKey("0000"); err != nil {
+	err := r.SetKey("0000", "0000", 10)
+	// This error message comes from RPC layer
+	if err.Error() != "Write dissallowed for API Tokens" {
 		log.WithFields(logrus.Fields{
 			"prefix": "RPC Conn Mgr",
 		}).Warning("Handler seems to have disconnected, attempting reconnect")
@@ -140,11 +141,19 @@ func emitRPCErrorEventKv(jobName string, funcName string, err error, kv map[stri
 	}
 }
 
+var rpcConnectMu sync.Mutex
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
+	rpcConnectMu.Lock()
+	defer rpcConnectMu.Unlock()
+
 	if RPCClientIsConnected {
 		log.Debug("Using RPC singleton for connection")
 		return true
+	}
+
+	if RPCCLientSingleton != nil {
+		return rpcEmergencyMode != true
 	}
 
 	// RPC Client is unset
@@ -168,15 +177,15 @@ func (r *RPCStorageHandler) Connect() bool {
 		RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
 	}
 
-	if log.Level != logrus.DebugLevel {
+	// if log.Level != logrus.DebugLevel {
 		RPCCLientSingleton.LogError = gorpc.NilErrorLogger
-	}
+	// }
 
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
 
 	RPCCLientSingleton.Conns = config.Global.SlaveOptions.RPCPoolSize
 	if config.Global.SlaveOptions.RPCPoolSize == 0 {
-		RPCCLientSingleton.Conns = 50
+		RPCCLientSingleton.Conns = 20
 	}
 
 	RPCCLientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
@@ -271,16 +280,19 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 	return setKeyName
 }
 
+var rpcLoginMu sync.Mutex
+
 func (r *RPCStorageHandler) ReAttemptLogin(err error) bool {
+	rpcLoginMu.Lock()
 	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
 
 	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
 		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
 		log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-		rpcEmergencyMode = true
 		rpcEmergencyModeLoaded = true
-		reloadURLStructure(nil)
+		go doReload()
 	}
+	rpcLoginMu.Unlock()
 
 	time.Sleep(time.Second * 3)
 	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
@@ -306,12 +318,14 @@ func (r *RPCStorageHandler) GroupLogin() bool {
 				"GroupID": groupLoginData.GroupID,
 			},
 		)
+		rpcEmergencyMode = true
 		go r.ReAttemptLogin(err)
 		return false
 	}
 
 	if ok == false {
 		log.Error("RPC Login incorrect")
+		rpcEmergencyMode = true
 		go r.ReAttemptLogin(errors.New("Login incorrect"))
 		return false
 	}
@@ -344,12 +358,14 @@ func (r *RPCStorageHandler) Login() bool {
 	if err != nil {
 		log.Error("RPC Login failed: ", err)
 		emitRPCErrorEvent(rpcFuncClientSingletonCall, "Login", err)
+		rpcEmergencyMode = true
 		go r.ReAttemptLogin(err)
 		return false
 	}
 
 	if ok == false {
 		log.Error("RPC Login incorrect")
+		rpcEmergencyMode = true
 		go r.ReAttemptLogin(errors.New("Login incorrect"))
 		return false
 	}
