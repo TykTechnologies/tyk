@@ -180,9 +180,9 @@ func (r *RPCStorageHandler) Connect() bool {
 		RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
 	}
 
-	// if log.Level != logrus.DebugLevel {
-	RPCCLientSingleton.LogError = gorpc.NilErrorLogger
-	// }
+	if log.Level != logrus.DebugLevel {
+		RPCCLientSingleton.LogError = gorpc.NilErrorLogger
+	}
 
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
 
