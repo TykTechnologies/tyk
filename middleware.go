@@ -139,7 +139,7 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 
 func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(key)
+	session, found := t.Spec.OrgSessionManager.SessionDetail(key, false)
 	if found && config.Global.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -283,7 +283,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 
 	// Check session store
 	log.Debug("Querying keystore")
-	session, found := t.Spec.SessionManager.SessionDetail(key)
+	session, found := t.Spec.SessionManager.SessionDetail(key, false)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it

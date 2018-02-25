@@ -300,7 +300,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			if foundKey {
 				log.Info("Found old token, revoking: ", oldToken)
 
-				o.API.SessionManager.RemoveSession(oldToken)
+				o.API.SessionManager.RemoveSession(oldToken, false)
 			}
 		}
 
@@ -660,7 +660,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 	r.store.DeleteKey(key)
 
 	// remove the access token from central storage too
-	r.sessionManager.RemoveSession(token)
+	r.sessionManager.RemoveSession(token, false)
 
 	return nil
 }

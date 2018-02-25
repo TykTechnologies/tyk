@@ -40,6 +40,7 @@ type Handler interface {
 	GetAndDeleteSet(string) []interface{}
 	RemoveFromSet(string, string)
 	DeleteScanMatch(string) bool
+	GetKeyPrefix() string
 }
 
 func HashStr(in string) string {
