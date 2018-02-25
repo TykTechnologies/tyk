@@ -68,12 +68,14 @@ func rpcKeepAliveCheck(r *RPCStorageHandler) {
 	log.Debug("Getting keyspace check test key")
 	err := r.SetKey("0000", "0000", 10)
 	// This error message comes from RPC layer
-	if err.Error() != "Write dissallowed for API Tokens" {
+	if err != nil && err.Error() != "Write dissallowed for API Tokens" {
 		log.WithFields(logrus.Fields{
 			"prefix": "RPC Conn Mgr",
 		}).Warning("Handler seems to have disconnected, attempting reconnect")
 	} else {
-		log.Debug("RPC Still alive")
+		if err != nil {
+			log.Debug("RPC Still alive")
+		}
 	}
 
 	time.Sleep(time.Second * 10)
@@ -142,6 +144,7 @@ func emitRPCErrorEventKv(jobName string, funcName string, err error, kv map[stri
 }
 
 var rpcConnectMu sync.Mutex
+
 // Connect will establish a connection to the DB
 func (r *RPCStorageHandler) Connect() bool {
 	rpcConnectMu.Lock()
@@ -178,7 +181,7 @@ func (r *RPCStorageHandler) Connect() bool {
 	}
 
 	// if log.Level != logrus.DebugLevel {
-		RPCCLientSingleton.LogError = gorpc.NilErrorLogger
+	RPCCLientSingleton.LogError = gorpc.NilErrorLogger
 	// }
 
 	RPCCLientSingleton.OnConnect = r.OnConnectFunc
@@ -189,17 +192,16 @@ func (r *RPCStorageHandler) Connect() bool {
 	}
 
 	RPCCLientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
-		configMu.Lock()
-		defer configMu.Unlock()
-
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}
 
-		useSSL := false
-		if config.Global.SlaveOptions.UseSSL {
-			useSSL = true
+		configMu.Lock()
+		useSSL := config.Global.SlaveOptions.UseSSL
+		configMu.Unlock()
+
+		if useSSL {
 			cfg := &tls.Config{
 				InsecureSkipVerify: config.Global.SlaveOptions.SSLInsecureSkipVerify,
 			}
