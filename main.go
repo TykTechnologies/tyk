@@ -1306,10 +1306,6 @@ func listen(l, controlListener net.Listener, err error) {
 		loadAPIEndpoints(controlRouter)
 	}
 
-	if !rpcEmergencyMode {
-		doReload()
-	}
-
 	// Error not empty if handle reload when SIGUSR2 is received
 	if err != nil {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
@@ -1447,4 +1443,8 @@ func listen(l, controlListener net.Listener, err error) {
 	mainRouter.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello Tiki")
 	})
+
+	if !rpcEmergencyMode {
+		doReload()
+	}
 }
