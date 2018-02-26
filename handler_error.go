@@ -84,7 +84,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	ip := requestIP(r)
 	if config.Global.StoreAnalytics(ip) {
-
 		t := time.Now()
 
 		addVersionHeader(w, r)

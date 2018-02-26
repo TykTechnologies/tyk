@@ -3,7 +3,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -24,6 +23,8 @@ func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 	config.Global.Policies.PolicySource = "rpc"
 	config.Global.SlaveOptions.CallTimeout = 1
 	config.Global.SlaveOptions.RPCPoolSize = 2
+	config.Global.AuthOverride.ForceAuthProvider = true
+	config.Global.AuthOverride.AuthProvider.StorageEngine = "rpc"
 
 	server := gorpc.NewTCPServer("127.0.0.1:0", dispatcher.NewHandlerFunc())
 	list := &customListener{}
@@ -44,6 +45,7 @@ func stopRPCMock(server *gorpc.Server) {
 	config.Global.SlaveOptions.APIKey = ""
 	config.Global.SlaveOptions.UseRPC = false
 	config.Global.Policies.PolicySource = ""
+	config.Global.AuthOverride.ForceAuthProvider = false
 
 	if server != nil {
 		server.Listener.Close()
@@ -83,7 +85,9 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	// Mock RPC
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
-		return "[" + sampleAPI + "]", nil
+		return jsonMarshalString(buildAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+		})), nil
 	})
 	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
 		return `[{"_id":"507f191e810c19729de860ea", "rate":1, "per":1}]`, nil
@@ -92,7 +96,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		return true
 	})
 	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
-		return "", fmt.Errorf("Not found")
+		return jsonMarshalString(createStandardSession()), nil
 	})
 
 	t.Run("RPC is live", func(t *testing.T) {
@@ -111,8 +115,9 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			t.Fatal("Should have Policies in backup")
 		}
 
+		authHeaders := map[string]string{"Authorization": "test"}
 		ts.Run(t, []test.TestCase{
-			{Path: "/sample", Code: 200},
+			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 
 		count := syncAPISpecs()
@@ -121,7 +126,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		}
 	})
 
-	t.Run("RPC down, load backup", func(t *testing.T) {
+	t.Run("RPC down, cold start, load backup", func(t *testing.T) {
 		// Point rpc to non existent address
 		config.Global.SlaveOptions.ConnectionString = testHttpFailure
 		config.Global.SlaveOptions.UseRPC = true
@@ -134,23 +139,34 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		defer ts.Close()
 
 		// Wait for backup to load
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
+		select {
+		case reloadTick <- time.Time{}:
+		case <-time.After(100 * time.Millisecond):
+		}
+		time.Sleep(100 * time.Millisecond)
 
-		// Still should work!
+		cachedAuth := map[string]string{"Authorization": "test"}
+		notCachedAuth := map[string]string{"Authorization": "nope1"}
+		// Stil works, since it knows about cached key
 		ts.Run(t, []test.TestCase{
-			{Path: "/sample", Code: 200},
+			{Path: "/sample", Headers: cachedAuth, Code: 200},
+			{Path: "/sample", Headers: notCachedAuth, Code: 403},
 		}...)
 
 		stopRPCMock(nil)
 	})
 
-	t.Run("RPC is back", func(t *testing.T) {
+	t.Run("RPC is back, hard reload", func(t *testing.T) {
 		rpcEmergencyModeLoaded = false
 		rpcEmergencyMode = false
 
 		dispatcher := gorpc.NewDispatcher()
 		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
-			return "[" + sampleAPI + "," + sampleAPI + "]", nil
+			return jsonMarshalString(buildAPI(
+				func(spec *APISpec) { spec.UseKeylessAccess = false },
+				func(spec *APISpec) { spec.UseKeylessAccess = false },
+			)), nil
 		})
 		dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
 			return `[{"_id":"507f191e810c19729de860ea", "rate":1, "per":1}, {"_id":"507f191e810c19729de860eb", "rate":1, "per":1}]`, nil
@@ -159,7 +175,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			return true
 		})
 		dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
-			return "", fmt.Errorf("Not found")
+			return jsonMarshalString(createStandardSession()), nil
 		})
 		// Back to live
 		rpc := startRPCMock(dispatcher)
@@ -169,8 +185,11 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 		time.Sleep(100 * time.Millisecond)
 
+		cachedAuth := map[string]string{"Authorization": "test"}
+		notCachedAuth := map[string]string{"Authorization": "nope2"}
 		ts.Run(t, []test.TestCase{
-			{Path: "/sample", Code: 200},
+			{Path: "/sample", Headers: cachedAuth, Code: 200},
+			{Path: "/sample", Headers: notCachedAuth, Code: 200},
 		}...)
 
 		if count := syncAPISpecs(); count != 2 {
@@ -180,5 +199,46 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		if count := syncPolicies(); count != 2 {
 			t.Error("Should fetch latest policies", count)
 		}
+	})
+
+	t.Run("RPC is back, live reload", func(t *testing.T) {
+		rpc := startRPCMock(dispatcher)
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		time.Sleep(100 * time.Millisecond)
+
+		authHeaders := map[string]string{"Authorization": "test"}
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: authHeaders, Code: 200},
+		}...)
+
+		rpc.Listener.Close()
+		rpc.Stop()
+
+		cached := map[string]string{"Authorization": "test"}
+		notCached := map[string]string{"Authorization": "nope3"}
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: cached, Code: 200},
+			{Path: "/sample", Headers: notCached, Code: 403},
+		}...)
+
+		// Dynamically restart RPC layer
+		rpc = gorpc.NewTCPServer(rpc.Listener.(*customListener).L.Addr().String(), dispatcher.NewHandlerFunc())
+		list := &customListener{}
+		rpc.Listener = list
+		rpc.LogError = gorpc.NilErrorLogger
+		if err := rpc.Start(); err != nil {
+			panic(err)
+		}
+		defer stopRPCMock(rpc)
+
+		// Internal gorpc reconnect timeout is 1 second
+		time.Sleep(1000 * time.Millisecond)
+
+		notCached = map[string]string{"Authorization": "nope4"}
+		ts.Run(t, []test.TestCase{
+			{Path: "/sample", Headers: notCached, Code: 200},
+		}...)
 	})
 }
