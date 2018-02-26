@@ -896,10 +896,11 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		)
 		if r.IsAccessError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
-			r.ReConnect()
+			if r.Login() {
+				r.CheckForReload(orgId)
+			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
-			r.ReConnect()
 		}
 	} else if reload == true {
 		// Do the reload!
