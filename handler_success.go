@@ -117,6 +117,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		rawRequest := ""
 		rawResponse := ""
+
 		if recordDetail(r) {
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
@@ -250,6 +251,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		if recordDetail(r) {
 			copiedResponse = copyResponse(resp)
 		}
+
 		s.RecordHit(r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
 	log.Debug("Done proxy")

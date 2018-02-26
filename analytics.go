@@ -178,13 +178,11 @@ func (r *RedisAnalyticsHandler) Init() {
 
 // RecordHit will store an AnalyticsRecord in Redis
 func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
-	configMu.Lock()
-	defer configMu.Unlock()
-
 	r.AnalyticsPool.SendWork(func() {
 		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
 		record.APIKey = storage.HashKey(record.APIKey)
 
+		configMu.Lock()
 		if config.Global.SlaveOptions.UseRPC {
 			// Extend tag list to include this data so wecan segment by node if necessary
 			record.Tags = append(record.Tags, "tyk-hybrid-rpc")
@@ -194,6 +192,7 @@ func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
 			// Extend tag list to include this data so wecan segment by node if necessary
 			record.Tags = append(record.Tags, config.Global.DBAppConfOptions.Tags...)
 		}
+		configMu.Unlock()
 
 		// Lets add some metadata
 		if record.APIKey != "" {

@@ -224,15 +224,11 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if spec.UseOauth2 {
 		log.Debug("Loading OAuth Manager")
-		if !rpcEmergencyMode {
-			oauthManager := addOAuthHandlers(spec, subrouter)
-			log.Debug("-- Added OAuth Handlers")
+		oauthManager := addOAuthHandlers(spec, subrouter)
+		log.Debug("-- Added OAuth Handlers")
 
-			spec.OAuthManager = oauthManager
-			log.Debug("Done loading OAuth Manager")
-		} else {
-			log.Warning("RPC Emergency mode detected! OAuth APIs will not function!")
-		}
+		spec.OAuthManager = oauthManager
+		log.Debug("Done loading OAuth Manager")
 	}
 
 	enableVersionOverrides := false
@@ -667,6 +663,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	}).Info("Initialised API Definitions")
 
 	if config.Global.SlaveOptions.UseRPC {
+		startRPCKeepaliveWatcher(rpcAuthStore)
 		startRPCKeepaliveWatcher(rpcOrgStore)
 	}
 }
