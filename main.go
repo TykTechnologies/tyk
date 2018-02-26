@@ -991,38 +991,6 @@ func getHostDetails() {
 	}
 }
 
-var KeepaliveRunning bool
-
-func startRPCKeepaliveWatcher(engine *RPCStorageHandler) {
-	if KeepaliveRunning {
-		return
-	}
-
-	go func() {
-		log.WithFields(logrus.Fields{
-			"prefix": "RPC Conn Mgr",
-		}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
-		for {
-			KeepaliveRunning = true
-			rpcKeepAliveCheck(engine)
-			if engine == nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "RPC Conn Mgr",
-				}).Info("No engine, break")
-				KeepaliveRunning = false
-				break
-			}
-			if engine.Killed {
-				log.WithFields(logrus.Fields{
-					"prefix": "RPC Conn Mgr",
-				}).Debug("[RPC Conn Mgr] this connection killed")
-				KeepaliveRunning = false
-				break
-			}
-		}
-	}()
-}
-
 func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	if config.Global.SlaveOptions.UseRPC {
 		return &RPCStorageHandler{KeyPrefix: keyPrefix, HashKeys: hashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
@@ -1217,6 +1185,7 @@ func start() {
 
 		RPCListener.Connect()
 		go rpcReloadLoop(config.Global.SlaveOptions.RPCKey)
+		go RPCListener.StartRPCKeepaliveWatcher()
 		go RPCListener.StartRPCLoopCheck(config.Global.SlaveOptions.RPCKey)
 	}
 

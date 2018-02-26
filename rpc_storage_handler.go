@@ -60,27 +60,6 @@ var (
 	GlobalRPCPingTimeout time.Duration
 )
 
-func rpcKeepAliveCheck(r *RPCStorageHandler) {
-	if !RPCClientIsConnected {
-		return
-	}
-
-	log.Debug("Getting keyspace check test key")
-	err := r.SetKey("0000", "0000", 10)
-	// This error message comes from RPC layer
-	if err != nil && err.Error() != "Write dissallowed for API Tokens" {
-		log.WithFields(logrus.Fields{
-			"prefix": "RPC Conn Mgr",
-		}).Warning("Handler seems to have disconnected, attempting reconnect")
-	} else {
-		if err != nil {
-			log.Debug("RPC Still alive")
-		}
-	}
-
-	time.Sleep(time.Second * 10)
-}
-
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
 	KeyPrefix        string
@@ -920,6 +899,35 @@ func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
 
 	for {
 		r.CheckForKeyspaceChanges(orgId)
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
+	log.WithFields(logrus.Fields{
+		"prefix": "RPC Conn Mgr",
+	}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
+	for {
+
+		if err := r.SetKey("0000", "0000", 10); err != nil {
+			if r.IsAccessError(err) {
+				if r.Login() {
+					continue
+				}
+			}
+
+			if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
+				log.WithFields(logrus.Fields{
+					"prefix": "RPC Conn Mgr",
+				}).Info("Can't connect to RPC layer")
+				continue
+			}
+		}
+
+		log.WithFields(logrus.Fields{
+			"prefix": "RPC Conn Mgr",
+		}).Info("RPC is alive")
+
 		time.Sleep(10 * time.Second)
 	}
 }
