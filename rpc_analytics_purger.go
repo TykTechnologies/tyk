@@ -43,7 +43,7 @@ func (r RPCPurger) PurgeLoop(ticker <-chan time.Time) {
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *RPCPurger) PurgeCache() {
 	if _, err := RPCFuncClientSingleton.Call("Ping", nil); err != nil {
-		log.Error("Failed to ping RPC: ", err)
+		log.Error("Can't purge cache, failed to ping RPC: ", err)
 		return
 	}
 
