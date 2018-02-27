@@ -176,19 +176,25 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 		policy, ok := policiesByID[polID]
 		policiesMu.RUnlock()
 		if !ok {
-			return fmt.Errorf("policy not found: %q", polID)
+			err := fmt.Errorf("policy not found: %q", polID)
+			log.Error(err)
+			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise youcould overwrite a session key with a policy from a different org!
 		if policy.OrgID != t.Spec.OrgID {
-			return fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
+			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
+			log.Error(err)
+			return err
 		}
 
 		if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
 			// This is a partitioned policy, only apply what is active
 			if policy.Partitions.Quota {
 				if didQuota {
-					return fmt.Errorf("cannot apply multiple quota policies")
+					err := fmt.Errorf("cannot apply multiple quota policies")
+					log.Error(err)
+					return err
 				}
 				didQuota = true
 				// Quotas
@@ -198,7 +204,9 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 
 			if policy.Partitions.RateLimit {
 				if didRateLimit {
-					return fmt.Errorf("cannot apply multiple rate limit policies")
+					err := fmt.Errorf("cannot apply multiple rate limit policies")
+					log.Error(err)
+					return err
 				}
 				didRateLimit = true
 				// Rate limting
@@ -225,7 +233,9 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 
 		} else {
 			if len(policies) > 1 {
-				return fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
+				err := fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
+				log.Error(err)
+				return err
 			}
 			// This is not a partitioned policy, apply everything
 			// Quotas
