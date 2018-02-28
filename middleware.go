@@ -168,6 +168,7 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) error {
+	rights := session.AccessRights
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
 	policies := session.PolicyIDs()
@@ -221,12 +222,12 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			if policy.Partitions.Acl {
 				// ACL
 				if !didACL { // first, overwrite rights
-					session.AccessRights = policy.AccessRights
+					rights = make(map[string]user.AccessDefinition)
 					didACL = true
-				} else { // second or later, merge
-					for k, v := range policy.AccessRights {
-						session.AccessRights[k] = v
-					}
+				}
+				// Second or later, merge
+				for k, v := range policy.AccessRights {
+					rights[k] = v
 				}
 				session.HMACEnabled = policy.HMACEnabled
 			}
@@ -269,6 +270,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 	for tag := range tags {
 		session.Tags = append(session.Tags, tag)
 	}
+	session.AccessRights = rights
 	// Update the session in the session manager in case it gets called again
 	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime))
 }
