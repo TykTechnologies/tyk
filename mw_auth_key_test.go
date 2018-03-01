@@ -49,7 +49,7 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/auth_key_test/", nil)
@@ -86,7 +86,7 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
@@ -124,7 +124,7 @@ func TestMultiAuthSession(t *testing.T) {
 	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
 	// Set the url param
 	recorder := httptest.NewRecorder()

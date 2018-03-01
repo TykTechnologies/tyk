@@ -97,7 +97,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSession()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKTokenHMAC(func(t *jwt.Token) {
 		t.Header["kid"] = tokenKID
@@ -127,7 +127,7 @@ func TestJWTSessionRSA(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = tokenKID
@@ -157,7 +157,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	authHeaders := map[string]string{"authorization": ""}
 	t.Run("Request with empty authorization header", func(t *testing.T) {
@@ -181,7 +181,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	authHeaders := map[string]string{}
 	t.Run("Request without authorization header", func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = tokenKID
@@ -236,7 +236,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = tokenKID
@@ -266,7 +266,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	authHeaders := map[string]string{"authorization": "123"}
 	t.Run("Request with invalid JWT", func(t *testing.T) {
@@ -290,7 +290,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	spec = loadAPI(spec)[0]
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = tokenKID
@@ -321,7 +321,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(t, "token")
 	spec.SessionManager.ResetQuota(tokenKID, session)
-	spec.SessionManager.UpdateSession(tokenKID, session, 60)
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = tokenKID
@@ -368,7 +368,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	session := createJWTSessionWithRSAWithPolicy(policyID)
 
 	spec.SessionManager.ResetQuota(tokenID, session)
-	spec.SessionManager.UpdateSession(tokenID, session, 60)
+	spec.SessionManager.UpdateSession(tokenID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"

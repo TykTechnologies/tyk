@@ -320,7 +320,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			keyName := o.API.OrgID + username
 
 			log.Debug("Updating user:", keyName)
-			err := o.API.SessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime))
+			err := o.API.SessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)
 			if err != nil {
 				log.Error(err)
 			}
@@ -612,7 +612,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
 
 	// Use the default session expiry here as this is OAuth
-	r.sessionManager.UpdateSession(accessData.AccessToken, &newSession, int64(accessData.ExpiresIn))
+	r.sessionManager.UpdateSession(accessData.AccessToken, &newSession, int64(accessData.ExpiresIn), false)
 
 	// Store the refresh token too
 	if accessData.RefreshToken != "" {

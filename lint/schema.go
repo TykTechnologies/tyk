@@ -697,6 +697,9 @@ const confSchema = `{
 				"type": "string"
 			}
 		}
+	},
+	"enable_hashed_keys_listing": {
+		"type": "boolean"
 	}
 }
 }`

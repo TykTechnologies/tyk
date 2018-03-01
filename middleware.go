@@ -260,7 +260,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 		session.Tags = append(session.Tags, tag)
 	}
 	// Update the session in the session manager in case it gets called again
-	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime))
+	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime), false)
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
@@ -315,7 +315,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		log.Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		// Need to set this in order for the write to work!
 		session.LastUpdated = time.Now().String()
-		t.Spec.SessionManager.UpdateSession(key, &session, session.Lifetime(t.Spec.SessionLifetime))
+		t.Spec.SessionManager.UpdateSession(key, &session, session.Lifetime(t.Spec.SessionLifetime), false)
 	}
 
 	return session, found

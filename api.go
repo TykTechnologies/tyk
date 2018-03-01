@@ -591,7 +591,17 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = handleGetDetail(keyName, apiID, isHashed)
 		} else {
 			// Return list of keys
-			if isHashed {
+			if config.Global.HashKeys {
+				// get all keys is disabled by default
+				if !config.Global.EnableHashedKeysListing {
+					doJSONWrite(
+						w,
+						http.StatusNotFound,
+						apiError("Hashed key listing is disabled in config (enable_hashed_keys_listing)"),
+					)
+					return
+				}
+
 				// we don't use filter for hashed keys
 				obj, code = handleGetAllKeys("", apiID)
 			} else {
@@ -653,7 +663,7 @@ func handleUpdateHashedKey(keyName, apiID, policyId string) (interface{}, int) {
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	sess.SetPolicies(policyId)
 
-	err := sessionManager.UpdateSession(keyName, &sess, 0)
+	err := sessionManager.UpdateSession(keyName, &sess, 0, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -735,10 +745,10 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
 
 		// manage quotas separately
-		DefaultQuotaStore.Store().DeleteRawKey(rawKey)
+		DefaultQuotaStore.RemoveSession(rawKey, false)
 	}
 
-	err := sessionManager.UpdateSession(keyName, newSession, 0)
+	err := sessionManager.UpdateSession(keyName, newSession, 0, false)
 	if err != nil {
 		return apiError("Error writing to key store " + err.Error()), 500
 	}
@@ -916,7 +926,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 				sessionManager := FallbackKeySesionManager
 				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 				sessionManager.ResetQuota(newKey, newSession)
-				err := sessionManager.UpdateSession(newKey, newSession, -1)
+				err := sessionManager.UpdateSession(newKey, newSession, -1, false)
 				if err != nil {
 					doJSONWrite(w, 500, apiError("Failed to create key - "+err.Error()))
 					return

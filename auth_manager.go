@@ -29,7 +29,7 @@ type AuthorisationHandler interface {
 // user.SessionState objects, not identity
 type SessionHandler interface {
 	Init(store storage.Handler)
-	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64) error
+	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(keyName string, hashed bool)
 	SessionDetail(keyName string, hashed bool) (user.SessionState, bool)
 	Sessions(filter string) []string
@@ -109,7 +109,8 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64) error {
+func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
+	resetTTLTo int64, hashed bool) error {
 	if !session.HasChanged() {
 		log.Debug("Session has not changed, not updating")
 		return nil
@@ -119,8 +120,17 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 
 	// Keep the TTL
 	if config.Global.UseAsyncSessionWrite {
+		if hashed {
+			go b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
+			return nil
+		}
+
 		go b.store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
+	}
+
+	if hashed {
+		return b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
 	}
 
 	return b.store.SetKey(keyName, string(v), resetTTLTo)
