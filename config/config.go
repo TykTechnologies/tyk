@@ -274,6 +274,7 @@ type Config struct {
 	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
 	NewRelic                          NewRelicConfig                        `json:"newrelic"`
 	VersionHeader                     string                                `json:"version_header"`
+	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
 }
 
 type CertData struct {

@@ -60,7 +60,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(), false, false)
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime))
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
 
 	// org limits apply only to quotas, so we don't care about
 	// sessionFailRateLimit.
@@ -149,7 +149,7 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, path string, IP
 	// We found a session, apply the quota limiter
 	isQuotaExceeded := k.sessionlimiter.RedisQuotaExceeded(&session, k.Spec.OrgID, k.Spec.OrgSessionManager.Store())
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime))
+	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
 
 	if isQuotaExceeded {
 		logEntry.Warning("Organisation quota has been exceeded.")

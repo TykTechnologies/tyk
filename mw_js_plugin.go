@@ -250,7 +250,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the sesison data (if modified)
 	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
 		session.MetaData = mapStrsToIfaces(newRequestData.SessionMeta)
-		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime))
+		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime), false)
 	}
 
 	log.WithFields(logrus.Fields{
@@ -530,7 +530,7 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		obj, _ := handleGetDetail(apiKey, apiId)
+		obj, _ := handleGetDetail(apiKey, apiId, false)
 		bs, _ := json.Marshal(obj)
 
 		returnVal, err := j.VM.ToValue(string(bs))

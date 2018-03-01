@@ -192,7 +192,7 @@ func createSession(sGen ...func(s *user.SessionState)) string {
 		key = session.Certificate
 	}
 
-	FallbackKeySesionManager.UpdateSession(key, session, 60)
+	FallbackKeySesionManager.UpdateSession(key, session, 60, false)
 	return key
 }
 

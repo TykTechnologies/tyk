@@ -190,3 +190,8 @@ func (l LDAPStorageHandler) DeleteScanMatch(pattern string) bool {
 	log.Error("Not implemented")
 	return false
 }
+
+func (l LDAPStorageHandler) GetKeyPrefix() string {
+	log.Error("Not implemented")
+	return ""
+}

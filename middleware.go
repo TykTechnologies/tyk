@@ -139,7 +139,7 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 
 func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(key)
+	session, found := t.Spec.OrgSessionManager.SessionDetail(key, false)
 	if found && config.Global.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
@@ -272,7 +272,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 	}
 	session.AccessRights = rights
 	// Update the session in the session manager in case it gets called again
-	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime))
+	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime), false)
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
@@ -295,7 +295,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 
 	// Check session store
 	log.Debug("Querying keystore")
-	session, found := t.Spec.SessionManager.SessionDetail(key)
+	session, found := t.Spec.SessionManager.SessionDetail(key, false)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it
@@ -327,7 +327,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		log.Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		// Need to set this in order for the write to work!
 		session.LastUpdated = time.Now().String()
-		t.Spec.SessionManager.UpdateSession(key, &session, session.Lifetime(t.Spec.SessionLifetime))
+		t.Spec.SessionManager.UpdateSession(key, &session, session.Lifetime(t.Spec.SessionLifetime), false)
 	}
 
 	return session, found

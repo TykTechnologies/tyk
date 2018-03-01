@@ -1005,6 +1005,11 @@ func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
 	return false
 }
 
+func (r *RPCStorageHandler) GetKeyPrefix() string {
+	log.Error("Not implemented")
+	return ""
+}
+
 func getDispatcher() *gorpc.Dispatcher {
 	dispatch := gorpc.NewDispatcher()
 

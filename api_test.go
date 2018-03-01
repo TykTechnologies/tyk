@@ -13,6 +13,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
 
+	"fmt"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -242,6 +244,342 @@ func TestKeyHandler(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{Method: "DELETE", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200, BodyMatch: `"action":"deleted"`},
 			{Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 404},
+		}...)
+	})
+}
+
+func TestHashKeyHandler(t *testing.T) {
+	// make it to use hashes for Redis keys
+	hashKeys := config.Global.HashKeys
+	config.Global.HashKeys = true
+	// enable hashed keys listing
+	enableListing := config.Global.EnableHashedKeysListing
+	config.Global.EnableHashedKeysListing = true
+
+	defer func() {
+		config.Global.HashKeys = hashKeys
+		config.Global.EnableHashedKeysListing = enableListing
+	}()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI()
+
+	withAccess := createStandardSession()
+	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+	withAccessJSON, _ := json.Marshal(withAccess)
+
+	myKey := "my_key_id"
+	myKeyHash := storage.HashKey(myKey)
+
+	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// create key
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/create",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"key_hash"`,
+			},
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"key_hash"`,
+			},
+			// create key with custom value
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/" + myKey,
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
+			},
+			// get one key by key name
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKey,
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// get one key by hash value with specifying hashed=true (no API specified)
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// get one key by hash value with specifying hashed=true (API specified)
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// get one key by hash value without specifying hashed=true
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash,
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      404,
+			},
+			// get list of keys' hashes, no API specified
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: myKeyHash,
+			},
+			// get list of keys' hashes, API specified
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys?api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: myKeyHash,
+			},
+			// delete one key by hash value with specifying hashed=true
+			{
+				Method:    "DELETE",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// check that key is not present any more
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      404,
+			},
+		}...)
+	})
+}
+
+func TestHashKeyListingDisabled(t *testing.T) {
+	// make it to use hashes for Redis keys
+	hashKeys := config.Global.HashKeys
+	config.Global.HashKeys = true
+	// disable hashed keys listing
+	enableListing := config.Global.EnableHashedKeysListing
+	config.Global.EnableHashedKeysListing = false
+
+	defer func() {
+		config.Global.HashKeys = hashKeys
+		config.Global.EnableHashedKeysListing = enableListing
+	}()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI()
+
+	withAccess := createStandardSession()
+	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+	withAccessJSON, _ := json.Marshal(withAccess)
+
+	myKey := "my_key_id"
+	myKeyHash := storage.HashKey(myKey)
+
+	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// create key
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/create",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"key_hash"`,
+			},
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"key_hash"`,
+			},
+			// create key with custom value
+			{
+				Method:    "POST",
+				Path:      "/tyk/keys/" + myKey,
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
+			},
+			// get one key by key name
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKey,
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// get one key by hash value with specifying hashed=true (no API specified)
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// get one key by hash value with specifying hashed=true (API specified)
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// get one key by hash value without specifying hashed=true
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash,
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      404,
+			},
+			// get list of keys' hashes, no API specified
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      404,
+			},
+			// get list of keys' hashes, API specified
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys?api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      404,
+			},
+			// delete one key by hash value with specifying hashed=true
+			{
+				Method:    "DELETE",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// check that key is not present any more
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      404,
+			},
+		}...)
+	})
+}
+
+func TestHashKeyHandlerHashingDisabled(t *testing.T) {
+	// make it to NOT use hashes for Redis keys
+	hashKeys := config.Global.HashKeys
+	config.Global.HashKeys = false
+
+	defer func() {
+		config.Global.HashKeys = hashKeys
+	}()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI()
+
+	withAccess := createStandardSession()
+	withAccess.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+	withAccessJSON, _ := json.Marshal(withAccess)
+
+	myKey := "my_key_id"
+	myKeyHash := storage.HashKey(myKey)
+
+	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			// create key
+			{
+				Method:       "POST",
+				Path:         "/tyk/keys/create",
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyNotMatch: `"key_hash"`,
+			},
+			{
+				Method:       "POST",
+				Path:         "/tyk/keys",
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyNotMatch: `"key_hash"`,
+			},
+			// create key with custom value
+			{
+				Method:       "POST",
+				Path:         "/tyk/keys/" + myKey,
+				Data:         string(withAccessJSON),
+				AdminAuth:    true,
+				Code:         200,
+				BodyMatch:    fmt.Sprintf(`"key":"%s"`, myKey),
+				BodyNotMatch: fmt.Sprintf(`"key_hash":"%s"`, myKeyHash),
+			},
+			// get one key by key name
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKey,
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
+			// get one key by hash value with specifying hashed=true (no API specified)
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      400,
+			},
+			// get one key by hash value with specifying hashed=true (API specified)
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      400,
+			},
+			// delete one key by hash value with specifying hashed=true
+			{
+				Method:    "DELETE",
+				Path:      "/tyk/keys/" + myKeyHash + "?hashed=true&api_id=test",
+				Data:      string(withAccessJSON),
+				AdminAuth: true,
+				Code:      200,
+			},
 		}...)
 	})
 }

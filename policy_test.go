@@ -38,7 +38,7 @@ type dummySessionManager struct {
 	DefaultSessionManager
 }
 
-func (dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64) error {
+func (dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64, hashed bool) error {
 	return nil
 }
 

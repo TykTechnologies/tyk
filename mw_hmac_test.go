@@ -111,7 +111,7 @@ func TestHMACAuthSessionPass(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", session, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
@@ -163,7 +163,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", session, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
@@ -215,7 +215,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", session, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
@@ -267,7 +267,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", session, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
@@ -319,7 +319,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", session, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
@@ -371,7 +371,7 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", session, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
@@ -444,7 +444,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	}
 
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("9876", session, 60)
+	spec.SessionManager.UpdateSession("9876", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)

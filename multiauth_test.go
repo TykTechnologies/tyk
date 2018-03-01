@@ -88,13 +88,13 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
+	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -120,13 +120,13 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
+	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -157,13 +157,13 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	username := "0987876"
 	password := "WRONG"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
+	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
@@ -189,13 +189,13 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default0987876", baSession, 60)
+	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession()
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))

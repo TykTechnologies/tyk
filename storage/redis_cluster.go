@@ -316,7 +316,11 @@ func (r RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r RedisCluster) GetKeys(filter string) []string {
 	r.ensureConnection()
-	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
+	filterHash := ""
+	if filter != "" {
+		filterHash = r.hashKey(filter)
+	}
+	searchStr := r.KeyPrefix + filterHash + "*"
 	sessionsInterface, err := r.singleton().Do("KEYS", searchStr)
 	if err != nil {
 		log.Error("Error trying to get all keys: ", err)
@@ -333,7 +337,11 @@ func (r RedisCluster) GetKeys(filter string) []string {
 // GetKeysAndValuesWithFilter will return all keys and their values with a filter
 func (r RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]string {
 	r.ensureConnection()
-	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
+	filterHash := ""
+	if filter != "" {
+		filterHash = r.hashKey(filter)
+	}
+	searchStr := r.KeyPrefix + filterHash + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 	sessionsInterface, err := r.singleton().Do("KEYS", searchStr)
 	if err != nil {
@@ -670,4 +678,9 @@ func (r RedisCluster) SetRollingWindow(keyName string, per int64, value_override
 	log.Debug("Returned: ", intVal)
 
 	return intVal, redVal[1].([]interface{})
+}
+
+// GetPrefix returns storage key prefix
+func (r RedisCluster) GetKeyPrefix() string {
+	return r.KeyPrefix
 }
