@@ -20,6 +20,8 @@ import (
 
 	"github.com/newrelic/go-agent"
 
+	"github.com/TykTechnologies/tyk/checkup"
+
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -1069,6 +1071,9 @@ func main() {
 	}
 
 	start()
+
+	checkup.CheckFileDescriptors()
+	checkup.CheckCpus()
 
 	// Wait while Redis connection pools are ready before start serving traffic
 	if !storage.IsConnected() {
