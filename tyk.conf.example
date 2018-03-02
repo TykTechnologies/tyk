@@ -24,8 +24,7 @@
   "optimisations_use_async_session_write": true,
   "allow_master_keys": false,
   "policies": {
-    	"policy_source": "mongo",
-    	"policy_record_name": "tyk_policies"
+    	"policy_source": "file",
     },
   "hash_keys": true,
   "suppress_redis_signal_reload": false
