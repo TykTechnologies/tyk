@@ -38,3 +38,4 @@ script:
   - go build -tags 'coprocess grpc'
   - ./utils/ci-test.sh
   - if [[ $LATEST_GO ]]; then goveralls -coverprofile=<(gocovmerge *.cov); fi
+  - ./utils/ci-benchmark.sh

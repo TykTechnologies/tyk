@@ -234,6 +234,8 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 }
 
 func BenchmarkCopyRequestResponse(b *testing.B) {
+	b.ReportAllocs()
+
 	str := strings.Repeat("very long body line that is repeated", 128)
 	req := &http.Request{}
 	res := &http.Response{}
