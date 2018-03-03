@@ -726,9 +726,9 @@ func TestHotReloadMany(t *testing.T) {
 func BenchmarkApiReload(b *testing.B) {
 	b.ReportAllocs()
 
-	specs := make([]*APISpec, 1000)
+	specs := make([]*APISpec, 100)
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		specs[i] = buildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = strconv.Itoa(i + 1)
 		})[0]
