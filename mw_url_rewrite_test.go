@@ -6,6 +6,7 @@ import (
 
 	"bytes"
 	"net/http"
+	"regexp"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -62,6 +63,7 @@ func TestRewriter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			testConf := apidef.URLRewriteMeta{
 				MatchPattern: tc.pattern,
+				MatchRegexp:  regexp.MustCompile(tc.pattern),
 				RewriteTo:    tc.to,
 			}
 			r := httptest.NewRequest("GET", tc.in, nil)
@@ -490,6 +492,7 @@ func TestRewriterTriggers(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			testConf := apidef.URLRewriteMeta{
 				MatchPattern: tc.pattern,
+				MatchRegexp:  regexp.MustCompile(tc.pattern),
 				RewriteTo:    tc.to,
 				Triggers:     tc.triggerConf,
 			}
