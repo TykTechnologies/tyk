@@ -205,7 +205,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 func recordDetail(r *http.Request) bool {
 	// Are we even checking?
 	if !config.Global.EnforceOrgDataDetailLogging {
-		return false
+		return config.Global.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// We are, so get session data
