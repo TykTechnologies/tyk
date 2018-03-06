@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"regexp"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -22,6 +23,7 @@ func TestTransformResponseWithURLRewrite(t *testing.T) {
 		Path:         "abc",
 		Method:       "GET",
 		MatchPattern: "abc",
+		MatchRegexp:  regexp.MustCompile("abc"),
 		RewriteTo:    "get",
 	}
 
