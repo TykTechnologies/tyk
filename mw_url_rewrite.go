@@ -16,15 +16,27 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const (
+	metaLabel    = "$tyk_meta."
+	contextLabel = "$tyk_context."
+)
+
+var dollarMatch = regexp.MustCompile(`\$\d+`)
+var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
+var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
+
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
-	if meta.MatchRegexp == nil {
-		return "", fmt.Errorf("URLRewrite regexp error", meta.MatchPattern)
-	}
 	path := r.URL.String()
 	log.Debug("Inbound path: ", path)
 	newpath := path
 
-	result_slice := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
+	if meta.MatchRegexp == nil {
+		var err error
+		meta.MatchRegexp, err = regexp.Compile(meta.MatchPattern)
+		if err != nil {
+			return path, fmt.Errorf("URLRewrite regexp error %s", meta.MatchPattern)
+		}
+	}
 
 	// Check triggers
 	rewriteToPath := meta.RewriteTo
@@ -127,25 +139,27 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 		}
 	}
 
+	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
+
 	// Make sure it matches the string
-	log.Debug("Rewriter checking matches, len is: ", len(result_slice))
-	if len(result_slice) > 0 {
+	log.Debug("Rewriter checking matches, len is: ", len(matchGroups))
+	if len(matchGroups) > 0 {
 		newpath = rewriteToPath
 		// get the indices for the replacements:
 		dollarMatch := regexp.MustCompile(`\$\d+`) // Prepare our regex
-		replace_slice := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
+		replaceGroups := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 
-		log.Debug(result_slice)
-		log.Debug(replace_slice)
+		log.Debug(matchGroups)
+		log.Debug(replaceGroups)
 
-		mapped_replace := make(map[string]string)
-		for mI, replacementVal := range result_slice[0] {
+		groupReplace := make(map[string]string)
+		for mI, replacementVal := range matchGroups[0] {
 			indexVal := "$" + strconv.Itoa(mI)
-			mapped_replace[indexVal] = replacementVal
+			groupReplace[indexVal] = replacementVal
 		}
 
-		for _, v := range replace_slice {
-			newpath = strings.Replace(newpath, v[0], mapped_replace[v[0]], -1)
+		for _, v := range replaceGroups {
+			newpath = strings.Replace(newpath, v[0], groupReplace[v[0]], -1)
 		}
 
 		log.Debug("URL Re-written from: ", path)
@@ -160,20 +174,12 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	return newpath, nil
 }
 
-const (
-	metaLabel    = "$tyk_meta."
-	contextLabel = "$tyk_context."
-)
-
-var dollarMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
-var metaDollarMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
-
 func replaceTykVariables(r *http.Request, in string, escape bool) string {
-	contextData := ctxGetData(r)
-
 	if strings.Contains(in, contextLabel) {
-		replace_slice := dollarMatch.FindAllStringSubmatch(in, -1)
-		for _, v := range replace_slice {
+		contextData := ctxGetData(r)
+
+		replaceGroups := contextMatch.FindAllStringSubmatch(in, -1)
+		for _, v := range replaceGroups {
 			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
 
 			if val, ok := contextData[contextKey]; ok {
@@ -187,15 +193,15 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 		}
 	}
 
-	// Meta data from the token
-	session := ctxGetSession(r)
-	if session == nil {
-		return in
-	}
-
 	if strings.Contains(in, metaLabel) {
-		metaReplace_slice := metaDollarMatch.FindAllStringSubmatch(in, -1)
-		for _, v := range metaReplace_slice {
+		// Meta data from the token
+		session := ctxGetSession(r)
+		if session == nil {
+			return in
+		}
+
+		replaceGroups := metaMatch.FindAllStringSubmatch(in, -1)
+		for _, v := range replaceGroups {
 			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
 
 			val, ok := session.MetaData[contextKey]
@@ -251,14 +257,6 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 	for verKey := range m.Spec.VersionData.Versions {
 		for pathKey := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite {
 			rewrite := m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey]
-
-			var err error
-			rewrite.MatchRegexp, err = regexp.Compile(rewrite.MatchPattern)
-			if err != nil {
-				log.WithError(err).WithField("MatchPattern", rewrite.MatchPattern).
-					Error("Could not compile regexp for URLRewrite")
-				continue
-			}
 
 			for trKey := range rewrite.Triggers {
 				tr := rewrite.Triggers[trKey]
@@ -325,6 +323,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	oldPath := r.URL.String()
 	p, err := urlRewrite(umeta, r)
 	if err != nil {
+		log.Error(err)
 		return err, 500
 	}
 
