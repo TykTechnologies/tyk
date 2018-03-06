@@ -32,16 +32,18 @@ type DBAppConfOptionsConfig struct {
 }
 
 type StorageOptionsConf struct {
-	Type          string            `json:"type"`
-	Host          string            `json:"host"`
-	Port          int               `json:"port"`
-	Hosts         map[string]string `json:"hosts"`
-	Username      string            `json:"username"`
-	Password      string            `json:"password"`
-	Database      int               `json:"database"`
-	MaxIdle       int               `json:"optimisation_max_idle"`
-	MaxActive     int               `json:"optimisation_max_active"`
-	EnableCluster bool              `json:"enable_cluster"`
+	Type                  string            `json:"type"`
+	Host                  string            `json:"host"`
+	Port                  int               `json:"port"`
+	Hosts                 map[string]string `json:"hosts"`
+	Username              string            `json:"username"`
+	Password              string            `json:"password"`
+	Database              int               `json:"database"`
+	MaxIdle               int               `json:"optimisation_max_idle"`
+	MaxActive             int               `json:"optimisation_max_active"`
+	EnableCluster         bool              `json:"enable_cluster"`
+	UseSSL                bool              `json:"use_ssl"`
+	SSLInsecureSkipVerify bool              `json:"ssl_insecure_skip_verify"`
 }
 
 type NormalisedURLConfig struct {

@@ -9,9 +9,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"github.com/lonelycode/redigocluster/rediscluster"
 	"github.com/satori/go.uuid"
 
+	"github.com/TykTechnologies/redigocluster/rediscluster"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -115,12 +115,14 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 	}
 
 	poolConf := rediscluster.PoolConfig{
-		MaxIdle:     maxIdle,
-		MaxActive:   maxActive,
-		IdleTimeout: 240 * time.Second,
-		Database:    cfg.Database,
-		Password:    cfg.Password,
-		IsCluster:   cfg.EnableCluster,
+		MaxIdle:       maxIdle,
+		MaxActive:     maxActive,
+		IdleTimeout:   240 * time.Second,
+		Database:      cfg.Database,
+		Password:      cfg.Password,
+		IsCluster:     cfg.EnableCluster,
+		UseTLS:        cfg.UseSSL,
+		TLSSkipVerify: cfg.SSLInsecureSkipVerify,
 	}
 
 	seed_redii := []map[string]string{}
