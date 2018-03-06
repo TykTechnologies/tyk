@@ -14,11 +14,13 @@
 
 package redis
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // Subscription represents a subscribe or unsubscribe notification.
 type Subscription struct {
-
 	// Kind is "subscribe", "unsubscribe", "psubscribe" or "punsubscribe"
 	Kind string
 
@@ -31,7 +33,6 @@ type Subscription struct {
 
 // Message represents a message notification.
 type Message struct {
-
 	// The originating channel.
 	Channel string
 
@@ -41,7 +42,6 @@ type Message struct {
 
 // PMessage represents a pmessage notification.
 type PMessage struct {
-
 	// The matched pattern.
 	Pattern string
 
@@ -94,6 +94,9 @@ func (c PubSubConn) PUnsubscribe(channel ...interface{}) error {
 }
 
 // Ping sends a PING to the server with the specified data.
+//
+// The connection must be subscribed to at least one channel or pattern when
+// calling this method.
 func (c PubSubConn) Ping(data string) error {
 	c.Conn.Send("PING", data)
 	return c.Conn.Flush()
@@ -103,7 +106,17 @@ func (c PubSubConn) Ping(data string) error {
 // or error. The return value is intended to be used directly in a type switch
 // as illustrated in the PubSubConn example.
 func (c PubSubConn) Receive() interface{} {
-	reply, err := Values(c.Conn.Receive())
+	return c.receiveInternal(c.Conn.Receive())
+}
+
+// ReceiveWithTimeout is like Receive, but it allows the application to
+// override the connection's default timeout.
+func (c PubSubConn) ReceiveWithTimeout(timeout time.Duration) interface{} {
+	return c.receiveInternal(ReceiveWithTimeout(c.Conn, timeout))
+}
+
+func (c PubSubConn) receiveInternal(replyArg interface{}, errArg error) interface{} {
+	reply, err := Values(replyArg, errArg)
 	if err != nil {
 		return err
 	}

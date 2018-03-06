@@ -15,6 +15,12 @@ const confSchema = `{
 			"enable_cluster": {
 				"type": "boolean"
 			},
+			"use_ssl":{
+				"type": "boolean"
+			},
+			"ssl_insecure_skip_verify":{
+				"type": "boolean"
+			},
 			"host": {
 				"type": "string",
 				"format": "host-no-port"
