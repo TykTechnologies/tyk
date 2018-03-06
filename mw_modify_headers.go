@@ -37,10 +37,8 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Add
-	if len(vInfo.GlobalHeaders) > 0 {
-		for nKey, nVal := range vInfo.GlobalHeaders {
-			r.Header.Set(nKey, replaceTykVariables(r, nVal, false))
-		}
+	for nKey, nVal := range vInfo.GlobalHeaders {
+		r.Header.Set(nKey, replaceTykVariables(r, nVal, false))
 	}
 
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, HeaderInjected)
