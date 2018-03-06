@@ -150,6 +150,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
+	MatchRegexp  *regexp.Regexp
 }
 
 type VirtualMeta struct {
