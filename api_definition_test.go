@@ -134,6 +134,34 @@ func TestBlacklist(t *testing.T) {
 	})
 }
 
+func TestConflictingPaths(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			json.Unmarshal([]byte(`[
+				{
+					"path": "/metadata/{id}",
+					"method_actions": {"GET": {"action": "no_action"}}
+				},
+				{
+					"path": "/metadata/purge",
+					"method_actions": {"POST": {"action": "no_action"}}
+				}
+			]`), &v.ExtendedPaths.WhiteList)
+		})
+
+		spec.Proxy.ListenPath = "/"
+	})
+
+	ts.Run(t, []test.TestCase{
+		// Should ignore auth check
+		{Method: "POST", Path: "/customer-servicing/documents/metadata/purge", Code: 200},
+		{Method: "GET", Path: "/customer-servicing/documents/metadata/{id}", Code: 200},
+	}...)
+}
+
 func TestIgnored(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()

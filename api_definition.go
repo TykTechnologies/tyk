@@ -852,29 +852,24 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := v.MethodActions[r.Method]
-			if matchMethodOk {
-				// Matched the method, check what status it is:
-				if methodMeta.Action == apidef.NoAction {
-					// NoAction status means we're not treating this request in any special or exceptional way
-					return a.getURLStatus(v.Status), nil
-				}
-				// TODO: Extend here for additional reply options
-				switch methodMeta.Action {
-				case apidef.Reply:
-					return StatusRedirectFlowByReply, &methodMeta
-				default:
-					log.Error("URL Method Action was not set to NoAction, blocking.")
-					return EndPointNotAllowed, nil
-				}
+
+			if !matchMethodOk {
+				continue
 			}
 
-			if whiteListStatus {
-				// We have a whitelist, nothing gets through unless specifically defined
+			// Matched the method, check what status it is:
+			if methodMeta.Action == apidef.NoAction {
+				// NoAction status means we're not treating this request in any special or exceptional way
+				return a.getURLStatus(v.Status), nil
+			}
+			// TODO: Extend here for additional reply options
+			switch methodMeta.Action {
+			case apidef.Reply:
+				return StatusRedirectFlowByReply, &methodMeta
+			default:
+				log.Error("URL Method Action was not set to NoAction, blocking.")
 				return EndPointNotAllowed, nil
 			}
-
-			// Method not matched in an extended set, means it can be passed through
-			return StatusOk, nil
 		}
 
 		if v.TransformAction.Template != nil {

@@ -17,7 +17,7 @@ import (
 
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/satori/go.uuid"
 
 	"github.com/lonelycode/osin"
 
@@ -380,7 +380,7 @@ func TestGetClientTokens(t *testing.T) {
 
 	spec := loadTestOAuthSpec()
 
-	clientID := uuid.New().String()
+	clientID := uuid.NewV4().String()
 	createTestOAuthClient(spec, clientID)
 
 	// make three tokens
