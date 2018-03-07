@@ -353,7 +353,11 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	}
 
 	if tc.Client == nil {
-		tc.Client = http.DefaultClient
+		tc.Client = &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
 	}
 
 	return tc.Client.Do(req)
@@ -381,7 +385,8 @@ func (s *tykTestServer) Run(t *testing.T, testCases ...test.TestCase) (*http.Res
 			continue
 		}
 
-		if lastError = test.AssertResponse(lastResponse, tc); lastError != nil {
+		respCopy := copyResponse(lastResponse)
+		if lastError = test.AssertResponse(respCopy, tc); lastError != nil {
 			t.Errorf("[%d] %s. %s", ti, lastError.Error(), string(tcJSON))
 		}
 

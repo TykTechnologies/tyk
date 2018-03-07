@@ -12,6 +12,8 @@ import (
 	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"strconv"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -342,7 +344,14 @@ const (
 	prefixAccess    = "oauth-access."
 	prefixRefresh   = "oauth-refresh."
 	prefixClientset = "oauth-clientset."
+
+	prefixClientTokens = "oauth-client-tokens."
 )
+
+type OAuthClientToken struct {
+	Token   string `json:"code"`
+	Expires int64  `json:"expires"`
+}
 
 type ExtendedOsinStorageInterface interface {
 	osin.Storage
@@ -352,6 +361,8 @@ type ExtendedOsinStorageInterface interface {
 
 	// Custom getter to handle prefixing issues in Redis
 	GetClientNoPrefix(id string) (osin.Client, error)
+
+	GetClientTokens(id string) ([]OAuthClientToken, error)
 
 	GetClients(filter string, ignorePrefix bool) ([]osin.Client, error)
 
@@ -476,6 +487,38 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	return theseClients, nil
 }
 
+func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientToken, error) {
+	key := prefixClientTokens + id
+
+	// use current timestamp as a start score so all expired tokens won't be picked
+	nowTs := time.Now().Unix()
+	startScore := strconv.FormatInt(nowTs, 10)
+
+	log.Info("Getting client tokens sorted list:", key)
+
+	tokens, scores, err := r.store.GetSortedSetRange(key, startScore, "+inf")
+	if err != nil {
+		return nil, err
+	}
+
+	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
+	if config.Global.OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global.OauthTokenExpiredRetainPeriod), 10)
+		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
+	}
+
+	// convert sorted set data and scores into reply struct
+	tokensData := make([]OAuthClientToken, len(tokens))
+	for i := 0; i < len(tokensData); i++ {
+		tokensData[i] = OAuthClientToken{
+			Token:   tokens[i],
+			Expires: int64(scores[i]), // we store expire timestamp as a score
+		}
+	}
+
+	return tokensData, nil
+}
+
 // SetClient creates client data
 func (r *RedisOsinStorageInterface) SetClient(id string, client osin.Client, ignorePrefix bool) error {
 	clientDataJSON, err := json.Marshal(client)
@@ -519,10 +562,13 @@ func (r *RedisOsinStorageInterface) DeleteClient(id string, ignorePrefix bool) e
 
 	r.store.DeleteKey(key)
 
+	// delete list of tokens for this client
+	r.store.DeleteKey(prefixClientTokens + id)
+
 	return nil
 }
 
-// SaveAuthorize saves authorisation data to REdis
+// SaveAuthorize saves authorisation data to Redis
 func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) error {
 	authDataJSON, err := json.Marshal(&authData)
 	if err != nil {
@@ -531,8 +577,8 @@ func (r *RedisOsinStorageInterface) SaveAuthorize(authData *osin.AuthorizeData) 
 	key := prefixAuth + authData.Code
 	log.Debug("Saving auth code: ", key)
 	r.store.SetKey(key, string(authDataJSON), int64(authData.ExpiresIn))
-	return nil
 
+	return nil
 }
 
 // LoadAuthorize loads auth data from redis
@@ -578,6 +624,15 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	}
 
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
+
+	// add code to list of tokens for this client
+	sortedListKey := prefixClientTokens + accessData.Client.GetId()
+	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
+	r.store.AddToSortedSet(
+		sortedListKey,
+		accessData.AccessToken,
+		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
+	)
 
 	// Create a user.SessionState object and register it with the authmanager
 	var newSession user.SessionState

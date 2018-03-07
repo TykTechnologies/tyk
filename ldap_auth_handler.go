@@ -195,3 +195,17 @@ func (l LDAPStorageHandler) GetKeyPrefix() string {
 	log.Error("Not implemented")
 	return ""
 }
+
+func (l LDAPStorageHandler) AddToSortedSet(keyName, value string, score float64) {
+	log.Error("Not implemented")
+}
+
+func (l LDAPStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
+	log.Error("Not implemented")
+	return nil, nil, nil
+}
+
+func (l LDAPStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
+	log.Error("Not implemented")
+	return nil
+}

@@ -1065,28 +1065,74 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		"prefix": "api",
 	}).Debug("Created storage ID: ", storageID)
 
-	apiSpec := getApiSpec(newOauthClient.APIID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  newOauthClient.APIID,
-			"status": "fail",
-			"err":    "API doesn't exist",
-		}).Error("Failed to create OAuth client")
-		doJSONWrite(w, 500, apiError("API doesn't exist"))
-		return
-	}
+	if newOauthClient.APIID != "" {
+		// set client only for passed API ID
+		apiSpec := getApiSpec(newOauthClient.APIID)
+		if apiSpec == nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  newOauthClient.APIID,
+				"status": "fail",
+				"err":    "API doesn't exist",
+			}).Error("Failed to create OAuth client")
+			doJSONWrite(w, 500, apiError("API doesn't exist"))
+			return
+		}
 
-	err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  newOauthClient.APIID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to create OAuth client")
-		doJSONWrite(w, 500, apiError("Failure in storing client data."))
-		return
+		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  newOauthClient.APIID,
+				"status": "fail",
+				"err":    err,
+			}).Error("Failed to create OAuth client")
+			doJSONWrite(w, 500, apiError("Failure in storing client data."))
+			return
+		}
+	} else {
+		// set client for all APIs from the given policy
+		policiesMu.RLock()
+		policy, ok := policiesByID[newClient.PolicyID]
+		policiesMu.RUnlock()
+		if !ok {
+			log.WithFields(logrus.Fields{
+				"prefix":   "api",
+				"policyID": newClient.PolicyID,
+				"status":   "fail",
+				"err":      "Policy doesn't exist",
+			}).Error("Failed to create OAuth client")
+			doJSONWrite(w, 500, apiError("Policy doesn't exist"))
+			return
+		}
+		// iterate over APIs and set client for each of them
+		for apiID := range policy.AccessRights {
+			apiSpec := getApiSpec(apiID)
+			if apiSpec == nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "api",
+					"apiID":  apiID,
+					"status": "fail",
+					"err":    "API doesn't exist",
+				}).Error("Failed to create OAuth client")
+				doJSONWrite(w, 500, apiError("API doesn't exist"))
+				return
+			}
+			// set oauth client if it is oauth API
+			if apiSpec.UseOauth2 {
+				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, &newClient, true)
+				if err != nil {
+					log.WithFields(logrus.Fields{
+						"prefix": "api",
+						"apiID":  apiID,
+						"status": "fail",
+						"err":    err,
+					}).Error("Failed to create OAuth client")
+					doJSONWrite(w, 500, apiError("Failure in storing client data."))
+					return
+				}
+			}
+		}
 	}
 
 	clientData := NewClientRequest{
@@ -1101,6 +1147,7 @@ func createOauthClient(w http.ResponseWriter, r *http.Request) {
 		"apiID":             newOauthClient.APIID,
 		"clientID":          clientData.ClientID,
 		"clientRedirectURI": clientData.ClientRedirectURI,
+		"policyID":          clientData.PolicyID,
 		"status":            "ok",
 	}).Info("Created OAuth client")
 
@@ -1195,6 +1242,34 @@ func oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doJSONWrite(w, code, obj)
+}
+
+func oAuthClientTokensHandler(w http.ResponseWriter, r *http.Request) {
+	apiID := mux.Vars(r)["apiID"]
+	keyName := mux.Vars(r)["keyName"]
+
+	apiSpec := getApiSpec(apiID)
+	if apiSpec == nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"apiID":  apiID,
+			"status": "fail",
+			"client": keyName,
+			"err":    "not found",
+		}).Error("Failed to retrieve OAuth tokens")
+		doJSONWrite(w, http.StatusNotFound, apiError("OAuth Client ID not found"))
+		return
+	}
+
+	// get tokens from redis
+	// TODO: add pagination
+	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, tokens)
 }
 
 // Get client details

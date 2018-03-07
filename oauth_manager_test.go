@@ -6,16 +6,24 @@ package main
 
 import (
 	"encoding/json"
-	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
+	"fmt"
 
+	"net/http"
+
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/lonelycode/osin"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -37,44 +45,54 @@ const keyRules = `{
 	"quota_renewal_rate": 300
 }`
 
-const oauthDefinition = `{
-	"api_id": "999999",
-	"org_id": "default",
-	"auth": {"auth_header_name": "authorization"},
-	"use_oauth2": true,
-	"oauth_meta": {
-		"allowed_access_types": [
-			"authorization_code",
-			"refresh_token",
-			"client_credentials"
-		],
-		"allowed_authorize_types": [
-			"code",
-			"token"
-		],
-		"auth_login_redirect": "` + testHttpPost + `"
-	},
-	"notifications": {
-		"shared_secret": "9878767657654343123434556564444",
-		"oauth_on_keychange_url": "` + testHttpPost + `"
-	},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"v1": {"name": "v1"}
+func loadTestOAuthSpec() *APISpec {
+	spec := buildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "999999"
+		spec.OrgID = "default"
+		spec.Auth = apidef.Auth{
+			AuthHeaderName: "authorization",
 		}
-	},
-	"proxy": {
-		"listen_path": "/APIID/",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
+		spec.UseOauth2 = true
+		spec.Oauth2Meta = struct {
+			AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
+			AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
+			AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
+		}{
+			AllowedAccessTypes: []osin.AccessRequestType{
+				"authorization_code",
+				"refresh_token",
+				"client_credentials",
+			},
+			AllowedAuthorizeTypes: []osin.AuthorizeRequestType{
+				"code",
+				"token",
+			},
+			AuthorizeLoginRedirect: testHttpPost,
+		}
+		spec.NotificationsDetails = apidef.NotificationsManager{
+			SharedSecret:      "9878767657654343123434556564444",
+			OAuthKeyChangeURL: testHttpPost,
+		}
+		spec.VersionData = struct {
+			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
+			DefaultVersion string                        `bson:"default_version" json:"default_version"`
+			Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
+		}{
+			NotVersioned: true,
+			Versions: map[string]apidef.VersionInfo{
+				"v1": {
+					Name: "v1",
+				},
+			},
+		}
+		spec.Proxy.ListenPath = "/APIID/"
+		spec.Proxy.StripListenPath = true
+	})[0]
 
-func getOAuthChain(spec *APISpec, muxer *mux.Router) {
-	// Ensure all the correct ahndlers are in place
-	loadAPIEndpoints(muxer)
-	manager := addOAuthHandlers(spec, muxer)
+	return spec
+}
 
+func createTestOAuthClient(spec *APISpec, clientID string) {
 	// add a test client
 	testPolicy := user.Policy{}
 	testPolicy.Rate = 100
@@ -96,220 +114,363 @@ func getOAuthChain(spec *APISpec, muxer *mux.Router) {
 		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.Global.OauthRedirectUriSeparator)
 	}
 	testClient := OAuthClient{
-		ClientID:          "1234",
-		ClientSecret:      "aabbccdd",
+		ClientID:          clientID,
+		ClientSecret:      authClientSecret,
 		ClientRedirectURI: redirectURI,
 		PolicyID:          "TEST-4321",
 	}
-	manager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
-
-	remote, _ := url.Parse(testHttpAny)
-	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{spec, proxy}
-	chain := alice.New(mwList(
-		&VersionCheck{BaseMiddleware: baseMid},
-		&Oauth2KeyExists{baseMid},
-		&KeyExpired{baseMid},
-		&AccessRightsCheck{baseMid},
-		&RateLimitAndQuotaCheck{baseMid},
-	)...).Then(proxyHandler)
-	muxer.Handle(spec.Proxy.ListenPath, chain)
+	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, &testClient, false)
 }
 
 func TestAuthCodeRedirect(t *testing.T) {
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	uri := "/APIID/oauth/authorize/"
+	spec := loadTestOAuthSpec()
 
-	param := make(url.Values)
-	param.Set("response_type", "code")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	createTestOAuthClient(spec, authClientID)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+	t.Run("Authorize request with redirect", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "code")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
 
-	if recorder.Code != 307 {
-		t.Error("Request should have redirected, code should have been 307 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/authorize/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusTemporaryRedirect,
+		})
+	})
 }
 
 func TestAuthCodeRedirectMultipleURL(t *testing.T) {
+	oauthRedirectUriSeparator := config.Global.OauthRedirectUriSeparator
+	defer func() {
+		config.Global.OauthRedirectUriSeparator = oauthRedirectUriSeparator
+	}()
 	// Enable multiple Redirect URIs
 	config.Global.OauthRedirectUriSeparator = ","
 
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	uri := "/APIID/oauth/authorize/"
+	spec := loadTestOAuthSpec()
 
-	param := make(url.Values)
-	param.Set("response_type", "code")
-	param.Set("redirect_uri", authRedirectUri2)
-	param.Set("client_id", authClientID)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	createTestOAuthClient(spec, authClientID)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+	t.Run("Client authorize request with multiple redirect URI", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "code")
+		param.Set("redirect_uri", authRedirectUri2)
+		param.Set("client_id", authClientID)
 
-	if recorder.Code != 307 {
-		t.Error("Request should have redirected, code should have been 307 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/authorize/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusTemporaryRedirect,
+		})
+	})
 }
 
 func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
+	oauthRedirectUriSeparator := config.Global.OauthRedirectUriSeparator
+	defer func() {
+		config.Global.OauthRedirectUriSeparator = oauthRedirectUriSeparator
+	}()
 	// Disable multiple Redirect URIs
 	config.Global.OauthRedirectUriSeparator = ""
 
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	uri := "/APIID/oauth/authorize/"
+	spec := loadTestOAuthSpec()
 
-	param := make(url.Values)
-	param.Set("response_type", "code")
-	param.Set("redirect_uri", authRedirectUri2)
-	param.Set("client_id", authClientID)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	createTestOAuthClient(spec, authClientID)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+	t.Run("Client authorize request with invalid redirect URI", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "code")
+		param.Set("redirect_uri", authRedirectUri2)
+		param.Set("client_id", authClientID)
 
-	if recorder.Code == 307 {
-		t.Error("Request should have not been redirected, code should have been 403 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/authorize/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusForbidden,
+		})
+	})
 }
 
 func TestAPIClientAuthorizeAuthCode(t *testing.T) {
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	uri := "/APIID/tyk/oauth/authorize-client/"
+	spec := loadTestOAuthSpec()
 
-	param := make(url.Values)
-	param.Set("response_type", "code")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
-	param.Set("key_rules", keyRules)
-	req := withAuth(testReq(t, "POST", uri, param.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	createTestOAuthClient(spec, authClientID)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+	t.Run("Client authorize code request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "code")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("key_rules", keyRules)
 
-	if recorder.Code != 200 {
-		t.Error("Response code should have been 200 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+			BodyMatch: `"code"`,
+		})
+	})
 }
 
 func TestAPIClientAuthorizeToken(t *testing.T) {
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	uri := "/APIID/tyk/oauth/authorize-client/"
+	spec := loadTestOAuthSpec()
 
-	param := make(url.Values)
-	param.Set("response_type", "token")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
-	param.Set("key_rules", keyRules)
-	req := withAuth(testReq(t, "POST", uri, param.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	createTestOAuthClient(spec, authClientID)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+	t.Run("Client authorize token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("key_rules", keyRules)
 
-	if recorder.Code != 200 {
-		t.Error("Response code should have been 200 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+			BodyMatch: `"access_token"`,
+		})
+	})
 }
 
 func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	uri := "/APIID/tyk/oauth/authorize-client/"
+	spec := loadTestOAuthSpec()
 
-	param := make(url.Values)
-	param.Set("response_type", "token")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
+	createTestOAuthClient(spec, authClientID)
 
-	req := withAuth(testReq(t, "POST", uri, param.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	t.Run("Client authorize token with policy request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
 
-	if recorder.Code != 200 {
-		t.Error("Response code should have been 200 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      "/APIID/tyk/oauth/authorize-client/",
+			AdminAuth: true,
+			Data:      param.Encode(),
+			Headers:   headers,
+			Method:    http.MethodPost,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
 
-	asData := make(map[string]interface{})
-	if err := json.NewDecoder(recorder.Body).Decode(&asData); err != nil {
-		t.Fatal("Decode failed:", err)
-	}
-	token, ok := asData["access_token"].(string)
-	if !ok {
-		t.Fatal("No access token found")
-	}
+		// check response
+		asData := make(map[string]interface{})
+		if err := json.NewDecoder(resp.Body).Decode(&asData); err != nil {
+			t.Fatal("Decode failed:", err)
+		}
+		token, ok := asData["access_token"].(string)
+		if !ok {
+			t.Fatal("No access token found")
+		}
 
-	// Verify the token is correct
-	session, ok := spec.AuthManager.KeyAuthorised(token)
-	if !ok {
-		t.Error("Key was not created (Can't find it)!")
-	}
+		// Verify the token is correct
+		session, ok := spec.AuthManager.KeyAuthorised(token)
+		if !ok {
+			t.Error("Key was not created (Can't find it)!")
+		}
 
-	if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
-		t.Error("Policy not added to token!")
-	}
+		if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {
+			t.Error("Policy not added to token!")
+		}
+	})
 }
 
-func getAuthCode(t *testing.T) map[string]string {
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
-
-	uri := "/APIID/tyk/oauth/authorize-client/"
-
+func getAuthCode(t *testing.T, ts *tykTestServer) map[string]string {
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("key_rules", keyRules)
-	req := withAuth(testReq(t, "POST", uri, param.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+	headers := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
+
+	resp, err := ts.Run(t, test.TestCase{
+		Path:      "/APIID/tyk/oauth/authorize-client/",
+		AdminAuth: true,
+		Data:      param.Encode(),
+		Headers:   headers,
+		Method:    http.MethodPost,
+		Code:      http.StatusOK,
+	})
+
+	if err != nil {
+		t.Error(err)
+	}
 
 	response := map[string]string{}
-	json.NewDecoder(recorder.Body).Decode(&response)
+	json.NewDecoder(resp.Body).Decode(&response)
 	return response
+}
+
+func TestGetClientTokens(t *testing.T) {
+	// restore global config after test is done
+	oauthTokenExpire := config.Global.OauthTokenExpire
+	oauthTokenExpiredRetainPeriod := config.Global.OauthTokenExpiredRetainPeriod
+	defer func() {
+		config.Global.OauthTokenExpire = oauthTokenExpire
+		config.Global.OauthTokenExpiredRetainPeriod = oauthTokenExpiredRetainPeriod
+	}()
+
+	// set tokens to be expired after 1 second
+	config.Global.OauthTokenExpire = 1
+	// cleanup tokens older than 3 seconds
+	config.Global.OauthTokenExpiredRetainPeriod = 3
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	spec := loadTestOAuthSpec()
+
+	clientID := uuid.New().String()
+	createTestOAuthClient(spec, clientID)
+
+	// make three tokens
+	tokensID := map[string]bool{}
+	t.Run("Send three token requests", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("response_type", "token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", clientID)
+		param.Set("client_secret", authClientSecret)
+		param.Set("key_rules", keyRules)
+
+		headers := map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		}
+
+		for i := 0; i < 3; i++ {
+			resp, err := ts.Run(t, test.TestCase{
+				Path:      "/APIID/tyk/oauth/authorize-client/",
+				Data:      param.Encode(),
+				AdminAuth: true,
+				Headers:   headers,
+				Method:    http.MethodPost,
+				Code:      http.StatusOK,
+			})
+			if err != nil {
+				t.Error(err)
+			}
+
+			response := map[string]interface{}{}
+			if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+				t.Fatal(err)
+			}
+
+			// save tokens for future check
+			tokensID[response["access_token"].(string)] = true
+		}
+	})
+
+	// get list of tokens
+	t.Run("Get list of tokens", func(t *testing.T) {
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		tokensResp := []OAuthClientToken{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+
+		// check response
+		if len(tokensResp) != len(tokensID) {
+			t.Errorf("Wrong number of tokens received. Expected: %d. Got: %d", len(tokensID), len(tokensResp))
+		}
+		for _, token := range tokensResp {
+			if !tokensID[token.Token] {
+				t.Errorf("Token %s is not found in expected result. Expecting: %v", token.Token, tokensID)
+			}
+		}
+	})
+
+	t.Run("Get list of tokens after they expire", func(t *testing.T) {
+		// sleep to wait until tokens expire
+		time.Sleep(2 * time.Second)
+
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      fmt.Sprintf("/tyk/oauth/clients/999999/%s/tokens", clientID),
+			AdminAuth: true,
+			Method:    http.MethodGet,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		// check response
+		tokensResp := []OAuthClientToken{}
+		if err := json.NewDecoder(resp.Body).Decode(&tokensResp); err != nil {
+			t.Fatal(err)
+		}
+		if len(tokensResp) > 0 {
+			t.Errorf("Wrong number of tokens received. Expected 0 - all tokens expired. Got: %d", len(tokensResp))
+		}
+	})
 }
 
 type tokenData struct {
@@ -317,232 +478,254 @@ type tokenData struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func getToken(t *testing.T) tokenData {
-	authData := getAuthCode(t)
-
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
-
-	uri := "/APIID/oauth/token/"
+func getToken(t *testing.T, ts *tykTestServer) tokenData {
+	authData := getAuthCode(t, ts)
 
 	param := make(url.Values)
 	param.Set("grant_type", "authorization_code")
 	param.Set("redirect_uri", authRedirectUri)
 	param.Set("client_id", authClientID)
 	param.Set("code", authData["code"])
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+	headers := map[string]string{
+		"Content-Type":  "application/x-www-form-urlencoded",
+		"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+	}
+
+	resp, err := ts.Run(t, test.TestCase{
+		Path:    "/APIID/oauth/token/",
+		Data:    param.Encode(),
+		Headers: headers,
+		Method:  http.MethodPost,
+		Code:    http.StatusOK,
+	})
+
+	if err != nil {
+		t.Error(err)
+	}
 
 	response := tokenData{}
-	json.NewDecoder(recorder.Body).Decode(&response)
+	json.NewDecoder(resp.Body).Decode(&response)
 	return response
 }
 
 func TestOAuthClientCredsGrant(t *testing.T) {
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	uri := "/APIID/oauth/token/"
+	spec := loadTestOAuthSpec()
 
-	param := make(url.Values)
-	param.Set("grant_type", "client_credentials")
-	param.Set("client_id", authClientID)
-	param.Set("client_secret", authClientSecret)
+	createTestOAuthClient(spec, authClientID)
 
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	t.Run("Client credentials grant token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("grant_type", "client_credentials")
+		param.Set("client_id", authClientID)
+		param.Set("client_secret", authClientSecret)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+		headers := map[string]string{
+			"Content-Type":  "application/x-www-form-urlencoded",
+			"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+		}
 
-	response := tokenData{}
-	json.NewDecoder(recorder.Body).Decode(&response)
+		resp, err := ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/token/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
 
-	if recorder.Code != 200 {
-		t.Error("Response code should have 200 error but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
-
-	if response.AccessToken == "" {
-		t.Error("Access token is empty!")
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-	}
-
+		// check response content
+		response := tokenData{}
+		json.NewDecoder(resp.Body).Decode(&response)
+		if response.AccessToken == "" {
+			t.Error("Access token is empty!")
+		}
+	})
 }
 
 func TestClientAccessRequest(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	authData := getAuthCode(t)
+	spec := loadTestOAuthSpec()
 
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	createTestOAuthClient(spec, authClientID)
 
-	uri := "/APIID/oauth/token/"
+	authData := getAuthCode(t, &ts)
 
-	param := make(url.Values)
-	param.Set("grant_type", "authorization_code")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
-	param.Set("code", authData["code"])
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	t.Run("Exchane access code for token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("grant_type", "authorization_code")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("code", authData["code"])
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+		headers := map[string]string{
+			"Content-Type":  "application/x-www-form-urlencoded",
+			"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+		}
 
-	if recorder.Code != 200 {
-		t.Error("Response code should have been 200 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-		t.Error("CODE: ", authData)
-	}
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/token/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusOK,
+		})
+	})
 }
 
 func TestOAuthAPIRefreshInvalidate(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	spec := loadTestOAuthSpec()
+
+	createTestOAuthClient(spec, authClientID)
 
 	// Step 1 create token
-	tokenData := getToken(t)
-
-	spec := createSpecTest(t, oauthDefinition)
-	loadApps([]*APISpec{spec}, discardMuxer)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	tokenData := getToken(t, &ts)
 
 	// Step 2 - invalidate the refresh token
+	t.Run("Invalidate token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("api_id", "999999")
+		resp, err := ts.Run(t, test.TestCase{
+			Path:      "/tyk/oauth/refresh/" + tokenData.RefreshToken + "?" + param.Encode(),
+			AdminAuth: true,
+			Method:    http.MethodDelete,
+			Code:      http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
 
-	uri1 := "/tyk/oauth/refresh/" + tokenData.RefreshToken + "?"
-
-	recorder := httptest.NewRecorder()
-	param1 := make(url.Values)
-	//MakeSampleAPI()
-	param1.Set("api_id", "999999")
-	req := withAuth(testReq(t, "DELETE", uri1+param1.Encode(), nil))
-
-	testMuxer.ServeHTTP(recorder, req)
-
-	newSuccess := apiModifyKeySuccess{}
-	json.NewDecoder(recorder.Body).Decode(&newSuccess)
-
-	if newSuccess.Status != "ok" {
-		t.Error("key not deleted, status error:\n", recorder.Body.String())
-		t.Error(apisByID)
-	}
-	if newSuccess.Action != "deleted" {
-		t.Error("Response is incorrect - action is not 'deleted' :\n", recorder.Body.String())
-	}
+		newSuccess := apiModifyKeySuccess{}
+		json.NewDecoder(resp.Body).Decode(&newSuccess)
+		if newSuccess.Status != "ok" {
+			t.Errorf("key not deleted, status error: %s\n", newSuccess.Status)
+			t.Error(apisByID)
+		}
+		if newSuccess.Action != "deleted" {
+			t.Errorf("Response is incorrect - action is not 'deleted': %s\n", newSuccess.Action)
+		}
+	})
 
 	// Step 3 - try to refresh
-
-	uri := "/APIID/oauth/token/"
-
-	param := make(url.Values)
-	param.Set("grant_type", "refresh_token")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
-	param.Set("refresh_token", tokenData.RefreshToken)
-	req = testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	recorder = httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
-
-	if recorder.Code == 200 {
-		t.Error("Response code should have been error but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-		t.Error("CODE: ", tokenData.RefreshToken)
-	}
+	t.Run("Refresh token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("grant_type", "refresh_token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("refresh_token", tokenData.RefreshToken)
+		headers := map[string]string{
+			"Content-Type":  "application/x-www-form-urlencoded",
+			"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+		}
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/token/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusForbidden,
+		})
+	})
 }
 
 func TestClientRefreshRequest(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	tokenData := getToken(t)
+	spec := loadTestOAuthSpec()
 
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	createTestOAuthClient(spec, authClientID)
 
-	uri := "/APIID/oauth/token/"
+	tokenData := getToken(t, &ts)
 
-	param := make(url.Values)
-	param.Set("grant_type", "refresh_token")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
-	param.Set("refresh_token", tokenData.RefreshToken)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	t.Run("Refresh token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("grant_type", "refresh_token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("refresh_token", tokenData.RefreshToken)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+		headers := map[string]string{
+			"Content-Type":  "application/x-www-form-urlencoded",
+			"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+		}
 
-	if recorder.Code != 200 {
-		t.Error("Response code should have been 200 but is: ", recorder.Code)
-		t.Error(recorder.Body)
-		t.Error(req.Body)
-		t.Error("CODE: ", tokenData.RefreshToken)
-	}
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/token/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusOK,
+		})
+	})
 }
 
 func TestClientRefreshRequestDouble(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	tokenData := getToken(t)
+	spec := loadTestOAuthSpec()
 
-	spec := createSpecTest(t, oauthDefinition)
-	testMuxer := mux.NewRouter()
-	getOAuthChain(spec, testMuxer)
+	createTestOAuthClient(spec, authClientID)
 
-	uri := "/APIID/oauth/token/"
+	tokenData := getToken(t, &ts)
+
+	headers := map[string]string{
+		"Content-Type":  "application/x-www-form-urlencoded",
+		"Authorization": "Basic MTIzNDphYWJiY2NkZA==",
+	}
 
 	// req 1
-	param := make(url.Values)
-	param.Set("grant_type", "refresh_token")
-	param.Set("redirect_uri", authRedirectUri)
-	param.Set("client_id", authClientID)
-	param.Set("refresh_token", tokenData.RefreshToken)
-	req := testReq(t, "POST", uri, param.Encode())
-	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	token := ""
+	t.Run("1st refresh token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("grant_type", "refresh_token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("refresh_token", tokenData.RefreshToken)
 
-	recorder := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder, req)
+		resp, err := ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/token/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusOK,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+		responseData := make(map[string]interface{})
+		json.NewDecoder(resp.Body).Decode(&responseData)
+		var ok bool
+		token, ok = responseData["refresh_token"].(string)
+		if !ok {
+			t.Fatal("No refresh token found")
+		}
+	})
 
-	responseData := make(map[string]interface{})
+	// req 2
+	t.Run("2nd refresh token request", func(t *testing.T) {
+		param := make(url.Values)
+		param.Set("grant_type", "refresh_token")
+		param.Set("redirect_uri", authRedirectUri)
+		param.Set("client_id", authClientID)
+		param.Set("refresh_token", token)
 
-	json.NewDecoder(recorder.Body).Decode(&responseData)
-	token, ok := responseData["refresh_token"].(string)
-	if !ok {
-		t.Fatal("No refresh token found")
-	}
-
-	param2 := make(url.Values)
-	param2.Set("grant_type", "refresh_token")
-	param2.Set("redirect_uri", authRedirectUri)
-	param2.Set("client_id", authClientID)
-	param2.Set("refresh_token", token)
-	req = testReq(t, "POST", uri, param2.Encode())
-	req.Header.Set("Authorization", "Basic MTIzNDphYWJiY2NkZA==")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	recorder2 := httptest.NewRecorder()
-	testMuxer.ServeHTTP(recorder2, req)
-
-	if recorder2.Code != 200 {
-		t.Error("Response code should have been 200 but is: ", recorder2.Code)
-		t.Error(recorder2.Body)
-		t.Error(req.Body)
-	}
-
+		ts.Run(t, test.TestCase{
+			Path:    "/APIID/oauth/token/",
+			Data:    param.Encode(),
+			Headers: headers,
+			Method:  http.MethodPost,
+			Code:    http.StatusOK,
+		})
+	})
 }
