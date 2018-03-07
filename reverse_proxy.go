@@ -456,6 +456,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.TykAPISpec.Lock()
 
 	createTransport := p.TykAPISpec.HTTPTransport == nil
+
 	if !createTransport && config.Global.MaxConnTime != 0 {
 		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global.MaxConnTime)*time.Second
 	}
@@ -463,6 +464,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if createTransport {
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+		p.TykAPISpec.HTTPTransportCreated = time.Now()
 	} else if IsWebsocket(req) { // check if it is an upgrade request to NEW WS-connection
 		// overwrite transport's ResponseWriter from previous upgrade request
 		// as it was already hijacked and now is being used for other connection
