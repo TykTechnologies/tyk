@@ -223,7 +223,7 @@ type Config struct {
 	StatsdConnectionString            string                                `json:"statsd_connection_string"`
 	StatsdPrefix                      string                                `json:"statsd_prefix"`
 	EnforceOrgDataAge                 bool                                  `json:"enforce_org_data_age"`
-	EnforceOrgDataDeailLogging        bool                                  `json:"enforce_org_data_detail_logging"`
+	EnforceOrgDataDetailLogging       bool                                  `json:"enforce_org_data_detail_logging"`
 	EnforceOrgQuotas                  bool                                  `json:"enforce_org_quotas"`
 	ExperimentalProcessOrgOffThread   bool                                  `json:"experimental_process_org_off_thread"`
 	EnableNonTransactionalRateLimiter bool                                  `json:"enable_non_transactional_rate_limiter"`

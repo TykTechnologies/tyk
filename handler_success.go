@@ -204,7 +204,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 func recordDetail(r *http.Request) bool {
 	// Are we even checking?
-	if !config.Global.EnforceOrgDataDeailLogging {
+	if !config.Global.EnforceOrgDataDetailLogging {
 		return config.Global.AnalyticsConfig.EnableDetailedRecording
 	}
 
