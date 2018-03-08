@@ -4,4 +4,4 @@ set -e
 
 benchRegex=${1:-.}
 
-go test -run=NONE -bench=$benchRegex || fatal "go test -run=NONE -bench=$benchRegex"
+TYK_LOGLEVEL= go test -run=NONE -bench=$benchRegex || fatal "go test -run=NONE -bench=$benchRegex"
