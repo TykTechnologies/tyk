@@ -127,6 +127,7 @@ func testHttpHandler() *mux.Router {
 			return
 		}
 		r.URL.Opaque = r.URL.RawPath
+		w.Header().Set("X-Tyk-Mock", "1")
 		err := json.NewEncoder(w).Encode(testHttpResponse{
 			Method:  r.Method,
 			Url:     r.URL.String(),
