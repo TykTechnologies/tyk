@@ -212,7 +212,7 @@ func createSpecTest(t *testing.T, def string) *APISpec {
 	return spec
 }
 
-func testKey(t *testing.T, name string) string {
+func testKey(t testing.TB, name string) string {
 	return fmt.Sprintf("%s-%s", t.Name(), name)
 }
 

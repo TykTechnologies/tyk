@@ -363,7 +363,7 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	return tc.Client.Do(req)
 }
 
-func (s *tykTestServer) Run(t *testing.T, testCases ...test.TestCase) (*http.Response, error) {
+func (s *tykTestServer) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
 	var lastResponse *http.Response
 	var lastError error
 
