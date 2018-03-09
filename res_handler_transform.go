@@ -82,10 +82,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		mxj.XmlCharsetReader = WrappedCharsetReader
 		var err error
 
-		bodyBuf, _ := ioutil.ReadAll(respBody)
-		log.Warning("BODY:", string(bodyBuf))
-
-		bodyData, err = mxj.NewMapXml(bodyBuf) // unmarshal
+		bodyData, err = mxj.NewMapXmlReader(respBody) // unmarshal
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix":      "outbound-transform",
