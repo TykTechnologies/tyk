@@ -33,7 +33,7 @@ import (
 	"github.com/lonelycode/gorpc"
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"rsc.io/letsencrypt"
 
