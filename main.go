@@ -1034,8 +1034,6 @@ func main() {
 		}).Fatalf("Error initialising system: %v", err)
 	}
 
-	amForked := false
-
 	var controlListener net.Listener
 
 	onFork := func() {
@@ -1145,20 +1143,20 @@ func main() {
 		}).Error("Listen handler exit: ", err)
 	}
 
-	if !amForked {
-		log.Info("Stop signal received.")
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Stop signal received.")
 
-		if config.Global.UseDBAppConfigs {
-			log.Info("Stopping heartbeat...")
-			DashService.StopBeating()
-			time.Sleep(2 * time.Second)
-			DashService.DeRegister()
-		}
-
-		log.Info("Terminating.")
-	} else {
-		log.Info("Terminated from fork.")
+	if config.Global.UseDBAppConfigs {
+		log.Info("Stopping heartbeat...")
+		DashService.StopBeating()
+		time.Sleep(2 * time.Second)
+		DashService.DeRegister()
 	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "main",
+	}).Info("Terminating.")
 
 	time.Sleep(time.Second)
 }
