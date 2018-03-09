@@ -113,6 +113,11 @@ var (
 	}
 )
 
+const (
+	defReadTimeout  = 120 * time.Second
+	defWriteTimeout = 120 * time.Second
+)
+
 func getApiSpec(apiID string) *APISpec {
 	apisMu.RLock()
 	spec := apisByID[apiID]
@@ -1295,15 +1300,17 @@ func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func listen(l, controlListener net.Listener, err error) {
-	readTimeout := 120
-	writeTimeout := 120
+
+	readTimeout := defReadTimeout
+	writeTimeout := defWriteTimeout
+
 	targetPort := fmt.Sprintf("%s:%d", config.Global.ListenAddress, config.Global.ListenPort)
 	if config.Global.HttpServerOptions.ReadTimeout > 0 {
-		readTimeout = config.Global.HttpServerOptions.ReadTimeout
+		readTimeout = time.Duration(config.Global.HttpServerOptions.ReadTimeout) * time.Second
 	}
 
 	if config.Global.HttpServerOptions.WriteTimeout > 0 {
-		writeTimeout = config.Global.HttpServerOptions.WriteTimeout
+		writeTimeout = time.Duration(config.Global.HttpServerOptions.WriteTimeout) * time.Second
 	}
 
 	drlOnce.Do(startDRL)
@@ -1329,13 +1336,15 @@ func listen(l, controlListener net.Listener, err error) {
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Infof("Custom gateway started (%s)", VERSION)
+
 			log.WithFields(logrus.Fields{
 				"prefix": "main",
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
+
 			s := &http.Server{
 				Addr:         targetPort,
-				ReadTimeout:  time.Duration(readTimeout) * time.Second,
-				WriteTimeout: time.Duration(writeTimeout) * time.Second,
+				ReadTimeout:  readTimeout,
+				WriteTimeout: writeTimeout,
 				Handler:      mainHandler{},
 			}
 
@@ -1344,8 +1353,8 @@ func listen(l, controlListener net.Listener, err error) {
 
 			if controlListener != nil {
 				cs := &http.Server{
-					ReadTimeout:  time.Duration(readTimeout) * time.Second,
-					WriteTimeout: time.Duration(writeTimeout) * time.Second,
+					ReadTimeout:  readTimeout,
+					WriteTimeout: writeTimeout,
 					Handler:      controlRouter,
 				}
 				go cs.Serve(controlListener)
@@ -1394,8 +1403,8 @@ func listen(l, controlListener net.Listener, err error) {
 			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
-				ReadTimeout:  time.Duration(readTimeout) * time.Second,
-				WriteTimeout: time.Duration(writeTimeout) * time.Second,
+				ReadTimeout:  readTimeout,
+				WriteTimeout: writeTimeout,
 				Handler:      mainHandler{},
 			}
 
@@ -1406,8 +1415,8 @@ func listen(l, controlListener net.Listener, err error) {
 
 			if controlListener != nil {
 				cs := &http.Server{
-					ReadTimeout:  time.Duration(readTimeout) * time.Second,
-					WriteTimeout: time.Duration(writeTimeout) * time.Second,
+					ReadTimeout:  readTimeout,
+					WriteTimeout: writeTimeout,
 					Handler:      controlRouter,
 				}
 				go cs.Serve(controlListener)
