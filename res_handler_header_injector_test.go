@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/apidef"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestResponseHeaderInjection(t *testing.T) {
@@ -33,23 +32,44 @@ func TestResponseHeaderInjection(t *testing.T) {
 					"path": "test-no-slash",
 					"method": "GET",
 					"act_on": false
+				},
+				{
+					"delete_headers": ["X-Tyk-Mock"],
+					"add_headers": {"X-Test": "test"},
+					"path": "/rewrite-test",
+					"method": "GET",
+					"act_on": false
 				}
 			]`), &v.ExtendedPaths.TransformResponseHeader)
+			json.Unmarshal([]byte(`[
+				{
+					"delete_headers": ["User-Agent"],
+					"add_headers": {"X-I-Am": "Request"},
+					"path": "/rewrite-test",
+					"method": "GET",
+					"act_on": false
+				}
+			]`), &v.ExtendedPaths.TransformHeader)
+
+			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+				Path:         "/rewrite-test",
+				Method:       "GET",
+				MatchPattern: "rewrite-test",
+				RewriteTo:    "newpath",
+			}}
 		})
 		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 	})
 
-	session := createStandardSession()
-	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
-
-	addHeaders := make(map[string]string)
-	deleteHeaders := make(map[string]string)
-	addHeaders["X-Test"] = "test"
-	deleteHeaders["X-Tyk-Mock"] = "1"
+	addHeaders := map[string]string{"X-Test": "test"}
+	deleteHeaders := map[string]string{"X-Tyk-Mock": "1"}
 
 	ts.Run(t, []test.TestCase{
 		// Create base auth based key
 		{Method: "GET", Path: "/test-with-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 		{Method: "GET", Path: "/test-no-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
+		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
+		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
+		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"User-Agent":"Tyk/v2.3.99"`},
 	}...)
 }
