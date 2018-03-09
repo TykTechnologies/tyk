@@ -254,7 +254,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Create the response processors
-	creeateResponseMiddlewareChain(spec)
+	createResponseMiddlewareChain(spec)
 
 	baseMid := BaseMiddleware{spec, proxy}
 	for _, v := range baseMid.Spec.VersionData.Versions {
