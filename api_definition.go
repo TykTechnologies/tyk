@@ -907,9 +907,9 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if !match {
 			// check for special case when using url_rewrites with transform_response
 			// and specifying the same "path" expression
-			if mode != TransformedResponse {
+			if mode == TransformedResponse && v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
 				continue
-			} else if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
+			} else if mode == HeaderInjectedResponse && v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
 				continue
 			}
 		}
