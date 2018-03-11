@@ -18,7 +18,7 @@ type orgChanMapMu struct {
 var orgChanMap = orgChanMapMu{channels: map[string](chan bool){}}
 var orgActiveMap sync.Map
 
-// RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
+// RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type OrganizationMonitor struct {
 	BaseMiddleware
@@ -60,29 +60,54 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		return errors.New("this organisation access has been disabled, please contact your API administrator"), 403
 	}
 
-	// We found a session, apply the quota limiter
-	reason := k.sessionlimiter.ForwardMessage(&session,
+	// We found a session, apply the quota and rate limiter
+	reason := k.sessionlimiter.ForwardMessage(
+		&session,
 		k.Spec.OrgID,
-		k.Spec.OrgSessionManager.Store(), false, false)
+		k.Spec.OrgSessionManager.Store(),
+		true,
+		true,
+	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
 
-	// org limits apply only to quotas, so we don't care about
-	// sessionFailRateLimit.
 	switch reason {
 	case sessionFailNone:
+		// all good, keep org active
 	case sessionFailQuota:
 		logEntry.Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
-		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
-			Path:             r.URL.Path,
-			Origin:           request.RealIP(r),
-			Key:              k.Spec.OrgID,
-		})
+		k.FireEvent(
+			EventOrgQuotaExceeded,
+			EventKeyFailureMeta{
+				EventMetaDefault: EventMetaDefault{
+					Message:            "Organisation quota has been exceeded",
+					OriginatingRequest: EncodeRequestToEvent(r),
+				},
+				Path:   r.URL.Path,
+				Origin: request.RealIP(r),
+				Key:    k.Spec.OrgID,
+			})
 
 		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
+	case sessionFailRateLimit:
+		logEntry.Warning("Organisation rate limit has been exceeded.")
+
+		// Fire a rate limit exceeded event
+		k.FireEvent(
+			EventOrgRateLimitExceeded,
+			EventKeyFailureMeta{
+				EventMetaDefault: EventMetaDefault{
+					Message:            "Organisation rate limit has been exceeded",
+					OriginatingRequest: EncodeRequestToEvent(r),
+				},
+				Path:   r.URL.Path,
+				Origin: request.RealIP(r),
+				Key:    k.Spec.OrgID,
+			},
+		)
+		return errors.New("This organisation rate limit has been exceeded, please contact your API administrator"), 403
 	}
 
 	if config.Global.Monitor.MonitorOrgKeys {
@@ -123,7 +148,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 
 	if found && !active.(bool) {
 		log.Debug("Is not active")
-		return errors.New("This organisation access has been disabled or quota is exceeded, please contact your API administrator"), 403
+		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), 403
 	}
 
 	log.Debug("Key not found")
@@ -146,43 +171,69 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, path string, IP
 	logEntry := getExplicitLogEntryForRequest(path, IP, k.Spec.OrgID, nil)
 	if session.IsInactive {
 		logEntry.Warning("Organisation access is disabled.")
-
-		//return errors.New("This organisation access has been disabled, please contact your API administrator."), 403
 		orgChan <- false
 		return
 	}
 
-	// We found a session, apply the quota limiter
-	isQuotaExceeded := k.sessionlimiter.RedisQuotaExceeded(&session, k.Spec.OrgID, k.Spec.OrgSessionManager.Store())
+	// We found a session, apply the quota and rate limiter
+	reason := k.sessionlimiter.ForwardMessage(
+		&session,
+		k.Spec.OrgID,
+		k.Spec.OrgSessionManager.Store(),
+		true,
+		true,
+	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
 
-	if isQuotaExceeded {
+	isExceeded := false
+	switch reason {
+	case sessionFailNone:
+		// all good, keep org active
+	case sessionFailQuota:
+		isExceeded = true
+
 		logEntry.Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
-		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{
-			EventMetaDefault: EventMetaDefault{
-				Message: "Organisation quota has been exceeded"},
-			Path:   path,
-			Origin: IP,
-			Key:    k.Spec.OrgID,
-		})
+		k.FireEvent(
+			EventOrgQuotaExceeded,
+			EventKeyFailureMeta{
+				EventMetaDefault: EventMetaDefault{
+					Message: "Organisation quota has been exceeded",
+				},
+				Path:   path,
+				Origin: IP,
+				Key:    k.Spec.OrgID,
+			},
+		)
+	case sessionFailRateLimit:
+		isExceeded = true
 
-		//return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
-		orgChan <- false
+		logEntry.Warning("Organisation rate limit has been exceeded.")
 
-		if config.Global.Monitor.MonitorOrgKeys {
-			// Run the trigger monitor
-			k.mon.Check(&session, "")
-		}
-
-		return
+		// Fire a rate limit exceeded event
+		k.FireEvent(
+			EventOrgRateLimitExceeded,
+			EventKeyFailureMeta{
+				EventMetaDefault: EventMetaDefault{
+					Message: "Organisation rate limit has been exceeded",
+				},
+				Path:   path,
+				Origin: IP,
+				Key:    k.Spec.OrgID,
+			},
+		)
 	}
 
 	if config.Global.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
+	}
+
+	if isExceeded {
+		orgChan <- false
+		return
 	}
 
 	// Lets keep a reference of the org
