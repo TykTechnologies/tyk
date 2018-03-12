@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
@@ -82,7 +83,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	token := ctxGetAuthToken(r)
 	var alias string
 
-	ip := requestIP(r)
+	ip := request.RealIP(r)
 	if config.Global.StoreAnalytics(ip) {
 		t := time.Now()
 

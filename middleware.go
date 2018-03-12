@@ -12,6 +12,8 @@ import (
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -62,7 +64,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
-				"from_ip":  requestIP(r),
+				"from_ip":  request.RealIP(r),
 				"method":   r.Method,
 				"endpoint": r.URL.Path,
 				"raw_url":  r.URL.String(),

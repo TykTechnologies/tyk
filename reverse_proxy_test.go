@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 func TestReverseProxyRetainHost(t *testing.T) {
@@ -129,7 +130,7 @@ func TestRequestIP(t *testing.T) {
 		r := &http.Request{RemoteAddr: tc.remote, Header: http.Header{}}
 		r.Header.Set("x-real-ip", tc.real)
 		r.Header.Set("x-forwarded-for", tc.forwarded)
-		got := requestIP(r)
+		got := request.RealIP(r)
 		if got != tc.want {
 			t.Errorf("requestIP({%q, %q, %q}) got %q, want %q",
 				tc.remote, tc.real, tc.forwarded, got, tc.want)

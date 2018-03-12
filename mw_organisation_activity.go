@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 type orgChanMapMu struct {
@@ -77,7 +78,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		k.FireEvent(EventOrgQuotaExceeded, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Organisation quota has been exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           requestIP(r),
+			Origin:           request.RealIP(r),
 			Key:              k.Spec.OrgID,
 		})
 
@@ -118,7 +119,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 	orgChanMap.Unlock()
 	active, found := orgActiveMap.Load(k.Spec.OrgID)
 
-	go k.AllowAccessNext(orgChan, r.URL.Path, requestIP(r), r)
+	go k.AllowAccessNext(orgChan, r.URL.Path, request.RealIP(r), r)
 
 	if found && !active.(bool) {
 		log.Debug("Is not active")

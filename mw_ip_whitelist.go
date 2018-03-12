@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/request"
 )
 
 // IPWhiteListMiddleware lets you define a list of IPs to allow upstream
@@ -21,7 +23,7 @@ func (i *IPWhiteListMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	remoteIP := net.ParseIP(requestIP(r))
+	remoteIP := net.ParseIP(request.RealIP(r))
 
 	// Enabled, check incoming IP address
 	for _, ip := range i.Spec.AllowedIPs {

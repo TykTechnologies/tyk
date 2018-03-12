@@ -9,6 +9,8 @@ import (
 
 	"github.com/gocraft/health"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -50,7 +52,7 @@ func InstrumentationMW(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 		job.EventKv("called", health.Kvs{
-			"from_ip":  requestIP(r),
+			"from_ip":  request.RealIP(r),
 			"method":   r.Method,
 			"endpoint": r.URL.Path,
 			"raw_url":  r.URL.String(),

@@ -7,6 +7,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 // KeyExists will check if the key being used to access the API is in the request data,
@@ -119,7 +120,7 @@ func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           requestIP(r),
+		Origin:           request.RealIP(r),
 		Key:              token,
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -49,7 +50,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "API Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           requestIP(r),
+		Origin:           request.RealIP(r),
 		Key:              token,
 	})
 
