@@ -12,6 +12,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -37,6 +39,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	target := canonicalAddr(req.URL)
+	ip := request.RealIP(req)
 
 	// TLS
 	dial := ws.DialContext
@@ -64,7 +67,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		http.Error(ws.RW, "Error contacting backend server.", 500)
 		log.WithFields(logrus.Fields{
 			"path":   target,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Error("Error dialing websocket backend", target, ": ", err)
 		return nil, err
 	}
@@ -80,7 +83,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Errorf("Hijack error: %v", err)
 		return nil, err
 	}
@@ -89,7 +92,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := req.Write(d); err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Errorf("Error copying request to target: %v", err)
 		return nil, err
 	}
@@ -110,7 +113,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		err = cerr
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Errorf("Error transmitting request: %v", err)
 	}
 

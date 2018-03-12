@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 var sessionLimiter = SessionLimiter{}
@@ -32,7 +33,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           requestIP(r),
+		Origin:           request.RealIP(r),
 		Key:              token,
 	})
 
@@ -50,7 +51,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           requestIP(r),
+		Origin:           request.RealIP(r),
 		Key:              token,
 	})
 

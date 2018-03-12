@@ -12,6 +12,8 @@ import (
 
 	cache "github.com/pmylund/go-cache"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"fmt"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -85,7 +87,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		return
 	}
 
-	ip := requestIP(r)
+	ip := request.RealIP(r)
 	if config.Global.StoreAnalytics(ip) {
 
 		t := time.Now()

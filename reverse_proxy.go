@@ -791,26 +791,6 @@ func (m *maxLatencyWriter) flushLoop() {
 
 func (m *maxLatencyWriter) stop() { m.done <- true }
 
-func requestIP(r *http.Request) string {
-	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-		return realIP
-	}
-	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
-		// X-Forwarded-For has no port
-		if i := strings.IndexByte(fw, ','); i >= 0 {
-			return fw[:i]
-		}
-		return fw
-	}
-
-	// From net/http.Request.RemoteAddr:
-	//   The HTTP server in this package sets RemoteAddr to an
-	//   "IP:port" address before invoking a handler.
-	// So we can ignore the case of the port missing.
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host
-}
-
 func requestIPHops(r *http.Request) string {
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
@@ -43,7 +44,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           requestIP(r),
+			Origin:           request.RealIP(r),
 			Reason:           string(stat),
 		})
 		return errors.New(string(stat)), 403

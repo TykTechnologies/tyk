@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -128,7 +129,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// No authentication data? use the IP.
 	if token == "" {
-		token = requestIP(r)
+		token = request.RealIP(r)
 	}
 
 	var copiedRequest *http.Request
