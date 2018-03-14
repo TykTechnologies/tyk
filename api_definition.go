@@ -870,17 +870,31 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if mode != v.Status {
 			continue
 		}
-		match := v.Spec.MatchString(r.URL.Path)
+
+		matchPath := r.URL.Path
+		if !strings.HasPrefix(matchPath, "/") {
+			matchPath = "/" + matchPath
+		}
+		match := v.Spec.MatchString(matchPath)
+
 		// only return it it's what we are looking for
 		if !match {
 			// check for special case when using url_rewrites with transform_response
 			// and specifying the same "path" expression
-			if mode != TransformedResponse {
-				continue
-			} else if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
+
+			if mode == TransformedResponse {
+				if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
+					continue
+				}
+			} else if mode == HeaderInjectedResponse {
+				if v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
+					continue
+				}
+			} else {
 				continue
 			}
 		}
+
 		switch v.Status {
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
