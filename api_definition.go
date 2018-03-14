@@ -911,6 +911,8 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 				continue
 			} else if mode == HeaderInjectedResponse && v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
 				continue
+			} else {
+				continue
 			}
 		}
 		switch v.Status {
