@@ -91,7 +91,7 @@ const (
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
-// path is on any of the white, plack or ignored lists. This is generated as part of the
+// path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
 	Spec                      *regexp.Regexp
