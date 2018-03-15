@@ -402,9 +402,16 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 }
 
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
+	// if strings.HasPrefix(stringSpec, "/") {
+	// 	stringSpec = stringSpec[1:]
+	// }
+	println("TEST")
 	apiLangIDsRegex := regexp.MustCompile(`{(.*?)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `(.*?)`)
 	asRegex, _ := regexp.Compile(asRegexStr)
+	println("asRegexStr")
+	println(asRegexStr)
+	println()
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
 }
@@ -897,24 +904,54 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+	println("CheckSpecMatchesStatus")
 	// Check if ignored
 	for _, v := range rxPaths {
 		if mode != v.Status {
 			continue
 		}
-		match := v.Spec.MatchString(r.URL.Path)
+		println("----------------------")
+		println()
+		println("r.URL.Path")
+		println(r.URL.Path)
+		println("r.Method")
+		println(r.Method)
+		println("v.InjectHeadersResponse.Method")
+		println(v.InjectHeadersResponse.Method)
+		println("v.Status")
+		println(v.Status)
+		println("HeaderInjectedResponse")
+		println(HeaderInjectedResponse)
+		println("v.Spec.String()")
+		println(v.Spec.String())
+		println()
+
+		matchPath := r.URL.Path
+		if !strings.HasPrefix(matchPath, "/") {
+			matchPath = "/" + matchPath
+		}
+		match := v.Spec.MatchString(matchPath)
+		println("match")
+		println(match)
+
 		// only return it it's what we are looking for
 		if !match {
 			// check for special case when using url_rewrites with transform_response
 			// and specifying the same "path" expression
+			println("ctxGetUrlRewritePath(r)")
+			println(ctxGetUrlRewritePath(r))
+			println("v.InjectHeadersResponse.Path")
+			println(v.InjectHeadersResponse.Path)
+			println("mode")
+			println(mode)
+
 			if mode == TransformedResponse && v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
 				continue
 			} else if mode == HeaderInjectedResponse && v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
 				continue
-			} else {
-				continue
-			}
+			} 
 		}
+	
 		switch v.Status {
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
@@ -927,6 +964,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 				return true, &v.InjectHeaders
 			}
 		case HeaderInjectedResponse:
+			println(" case header injected response")
 			if r.Method == v.InjectHeadersResponse.Method {
 				return true, &v.InjectHeadersResponse
 			}

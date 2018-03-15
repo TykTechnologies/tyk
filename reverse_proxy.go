@@ -231,6 +231,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		// if this is false, there was an url rewrite, thus we
 		// don't want to do anything to the path - req.URL is
 		// already final.
+		println("req.URL.Path before")
+		println(req.URL.Path)
 		if targetToUse == target {
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
@@ -239,6 +241,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath)
 			}
 		}
+		println("req.URL after")
+		println(req.URL.String())
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
 		}
