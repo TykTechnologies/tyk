@@ -36,13 +36,13 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		// Check CIDR if possible
 		if allowedNet != nil && allowedNet.Contains(remoteIP) {
 			// matched, pass through
-			return nil, 200
+			return nil, http.StatusOK
 		}
 
 		// We parse the IP to manage IPv4 and IPv6 easily
 		if allowedIP.Equal(remoteIP) {
 			// matched, pass through
-			return nil, 200
+			return nil, http.StatusOK
 		}
 	}
 
@@ -52,5 +52,5 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	reportHealthValue(i.Spec, KeyFailure, "-1")
 
 	// Not matched, fail
-	return errors.New("Access from this IP has been disallowed"), 403
+	return errors.New("access from this IP has been disallowed"), http.StatusForbidden
 }
