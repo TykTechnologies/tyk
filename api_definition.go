@@ -913,16 +913,16 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if !match {
 			// check for special case when using url_rewrites with transform_response
 			// and specifying the same "path" expression
-
-			if mode == TransformedResponse {
+			switch mode{
+			case TransformedResponse:
 				if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
 					continue
 				}
-			} else if mode == HeaderInjectedResponse {
+			case HeaderInjectedResponse:
 				if v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
 					continue
 				}
-			} else {
+			default:
 				continue
 			}
 		}
