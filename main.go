@@ -147,7 +147,7 @@ func setupGlobals() {
 	controlRouter = mux.NewRouter()
 
 	if config.Global.EnableAnalytics && config.Global.Storage.Type != "redis" {
-		mainLog.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
+		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
 	// Initialise our Host Checker
