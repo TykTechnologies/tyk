@@ -35,6 +35,7 @@ func getRLOpenChain(spec *APISpec) http.Handler {
 	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
+		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&RateLimitForAPI{BaseMiddleware: baseMid},
 	)...).Then(proxyHandler)
@@ -48,6 +49,7 @@ func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
+		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&AuthKey{baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&KeyExpired{baseMid},

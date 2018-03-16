@@ -70,6 +70,7 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
+		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&BasicAuthKeyIsValid{baseMid},
 		&AuthKey{baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
