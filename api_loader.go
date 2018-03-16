@@ -297,6 +297,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
@@ -349,6 +350,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
@@ -470,6 +472,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		var simpleArray []alice.Constructor
 		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
