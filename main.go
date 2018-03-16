@@ -134,8 +134,8 @@ func apisByIDLen() int {
 
 var redisPurgeOnce sync.Once
 var rpcPurgeOnce sync.Once
-var purgeTicker <-chan time.Time = time.Tick(time.Second)
-var rpcPurgeTicker <-chan time.Time = time.Tick(10 * time.Second)
+var purgeTicker = time.Tick(time.Second)
+var rpcPurgeTicker = time.Tick(10 * time.Second)
 
 // Create all globals and init connection handlers
 func setupGlobals() {
@@ -1101,12 +1101,12 @@ func generateListener(listenPort int) (net.Listener, error) {
 
 		GetLEState(&LE_MANAGER)
 
-		config := tls.Config{
+		conf := tls.Config{
 			GetCertificate: LE_MANAGER.GetCertificate,
 		}
-		config.GetConfigForClient = getTLSConfigForClient(&config, listenPort)
+		conf.GetConfigForClient = getTLSConfigForClient(&conf, listenPort)
 
-		return tls.Listen("tcp", targetPort, &config)
+		return tls.Listen("tcp", targetPort, &conf)
 	} else {
 		mainLog.WithField("port", targetPort).Info("--> Standard listener (http)")
 		return net.Listen("tcp", targetPort)
