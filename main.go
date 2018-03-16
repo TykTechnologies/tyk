@@ -49,6 +49,7 @@ import (
 
 var (
 	log                      = logger.Get()
+	mainLog                  = log.WithField("prefix", "main")
 	rawLog                   = logger.GetRaw()
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
@@ -138,6 +139,7 @@ var rpcPurgeTicker <-chan time.Time = time.Tick(10 * time.Second)
 
 // Create all globals and init connection handlers
 func setupGlobals() {
+
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
@@ -145,9 +147,7 @@ func setupGlobals() {
 	controlRouter = mux.NewRouter()
 
 	if config.Global.EnableAnalytics && config.Global.Storage.Type != "redis" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
+		mainLog.Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
 	// Initialise our Host Checker
@@ -156,9 +156,7 @@ func setupGlobals() {
 
 	if config.Global.EnableAnalytics && analytics.Store == nil {
 		config.Global.LoadIgnoredIPs()
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Setting up analytics DB connection")
+		mainLog.Debug("Setting up analytics DB connection")
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		analytics.Store = &analyticsStore
@@ -171,7 +169,7 @@ func setupGlobals() {
 		})
 
 		if config.Global.AnalyticsConfig.Type == "rpc" {
-			log.Debug("Using RPC cache purge")
+			mainLog.Debug("Using RPC cache purge")
 
 			rpcPurgeOnce.Do(func() {
 				store := storage.RedisCluster{KeyPrefix: "analytics-"}
@@ -196,9 +194,7 @@ func setupGlobals() {
 	}
 
 	// Get the notifier ready
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Debug("Notifier will not work in hybrid mode")
+	mainLog.Debug("Notifier will not work in hybrid mode")
 	mainNotifierStore := storage.RedisCluster{}
 	mainNotifierStore.Connect()
 	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
@@ -206,18 +202,14 @@ func setupGlobals() {
 	if config.Global.Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{}
 		if err := h.Init(config.Global.Monitor.Config); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("Failed to initialise monitor! ", err)
+			mainLog.Error("Failed to initialise monitor! ", err)
 		} else {
 			MonitoringHandler = h
 		}
 	}
 
 	if config.Global.AnalyticsConfig.NormaliseUrls.Enabled {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Setting up analytics normaliser")
+		mainLog.Info("Setting up analytics normaliser")
 		config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
 	}
 
@@ -236,13 +228,11 @@ func setupGlobals() {
 func buildConnStr(resource string) string {
 
 	if config.Global.DBAppConfOptions.ConnectionString == "" && config.Global.DisableDashboardZeroConf {
-		log.Fatal("Connection string is empty, failing.")
+		mainLog.Fatal("Connection string is empty, failing.")
 	}
 
 	if !config.Global.DisableDashboardZeroConf && config.Global.DBAppConfOptions.ConnectionString == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Waiting for zeroconf signal...")
+		mainLog.Info("Waiting for zeroconf signal...")
 		for config.Global.DBAppConfOptions.ConnectionString == "" {
 			time.Sleep(1 * time.Second)
 		}
@@ -262,22 +252,16 @@ func syncAPISpecs() int {
 		connStr := buildConnStr("/system/apis")
 		apiSpecs = loader.FromDashboardService(connStr, config.Global.NodeSecret)
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Downloading API Configurations from Dashboard Service")
+		mainLog.Debug("Downloading API Configurations from Dashboard Service")
 	} else if config.Global.SlaveOptions.UseRPC {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Using RPC Configuration")
+		mainLog.Debug("Using RPC Configuration")
 
 		apiSpecs = loader.FromRPC(config.Global.SlaveOptions.RPCKey)
 	} else {
 		apiSpecs = loader.FromDir(config.Global.AppPath)
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Printf("Detected %v APIs", len(apiSpecs))
+	mainLog.Printf("Detected %v APIs", len(apiSpecs))
 
 	if config.Global.AuthOverride.ForceAuthProvider {
 		for i := range apiSpecs {
@@ -297,48 +281,34 @@ func syncAPISpecs() int {
 func syncPolicies() int {
 	var pols map[string]user.Policy
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Loading policies")
+	mainLog.Info("Loading policies")
 
 	switch config.Global.Policies.PolicySource {
 	case "service":
 		if config.Global.Policies.PolicyConnectionString == "" {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatal("No connection string or node ID present. Failing.")
+			mainLog.Fatal("No connection string or node ID present. Failing.")
 		}
 		connStr := config.Global.Policies.PolicyConnectionString
 		connStr = connStr + "/system/policies"
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Using Policies from Dashboard Service")
+		mainLog.Info("Using Policies from Dashboard Service")
 
 		pols = LoadPoliciesFromDashboard(connStr, config.Global.NodeSecret, config.Global.Policies.AllowExplicitPolicyID)
 
 	case "rpc":
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Using Policies from RPC")
+		mainLog.Debug("Using Policies from RPC")
 		pols = LoadPoliciesFromRPC(config.Global.SlaveOptions.RPCKey)
 	default:
 		// this is the only case now where we need a policy record name
 		if config.Global.Policies.PolicyRecordName == "" {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("No policy record name defined, skipping...")
+			mainLog.Debug("No policy record name defined, skipping...")
 			return 0
 		}
 		pols = LoadPoliciesFromFile(config.Global.Policies.PolicyRecordName)
 	}
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Infof("Policies found (%d total):", len(pols))
+	mainLog.Infof("Policies found (%d total):", len(pols))
 	for id := range pols {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Infof(" - %s", id)
+		mainLog.Infof(" - %s", id)
 	}
 
 	policiesMu.Lock()
@@ -392,18 +362,14 @@ func loadAPIEndpoints(muxer *mux.Router) {
 
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Control API hostname set: ", hostname)
+		mainLog.Info("Control API hostname set: ", hostname)
 	}
 
 	if *httpProfile {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Initialising Tyk REST API Endpoints")
+	mainLog.Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
 	r.HandleFunc("/reload/group", allowMethods(groupResetHandler, "GET"))
@@ -421,9 +387,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/refresh/{keyName}", allowMethods(invalidateOauthRefresh, "DELETE"))
 		r.HandleFunc("/cache/{apiID}", allowMethods(invalidateCacheHandler, "DELETE"))
 	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Node is slaved, REST API minimised")
+		mainLog.Info("Node is slaved, REST API minimised")
 	}
 
 	r.HandleFunc("/keys", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
@@ -434,9 +398,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", allowMethods(oAuthClientTokensHandler, "GET"))
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Debug("Loaded API Endpoints")
+	mainLog.Debug("Loaded API Endpoints")
 }
 
 // checkIsAPIOwner will ensure that the accessor of the tyk API has the
@@ -448,7 +410,7 @@ func checkIsAPIOwner(next http.Handler) http.Handler {
 		tykAuthKey := r.Header.Get("X-Tyk-Authorization")
 		if tykAuthKey != config.Global.Secret {
 			// Error
-			log.Warning("Attempted administrative access with invalid or missing key!")
+			mainLog.Warning("Attempted administrative access with invalid or missing key!")
 
 			doJSONWrite(w, 403, apiError("Forbidden"))
 			return
@@ -491,9 +453,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 }
 
 func addBatchEndpoint(spec *APISpec, muxer *mux.Router) {
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Debug("Batch requests enabled for API")
+	mainLog.Debug("Batch requests enabled for API")
 	apiBatchPath := spec.Proxy.ListenPath + "tyk/batch/"
 	batchHandler := BatchRequestHandler{API: spec}
 	muxer.HandleFunc(apiBatchPath, batchHandler.HandleBatchRequest)
@@ -520,16 +480,12 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 	for _, mwObj := range spec.CustomMiddleware.Pre {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPreFuncs = append(mwPreFuncs, mwObj)
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
+		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
 	for _, mwObj := range spec.CustomMiddleware.Post {
 		mwPaths = append(mwPaths, mwObj.Path)
 		mwPostFuncs = append(mwPostFuncs, mwObj)
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
+		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
 
 	// Load from folders
@@ -546,28 +502,20 @@ func loadCustomMiddleware(spec *APISpec) ([]string, apidef.MiddlewareDefinition,
 		globPath := filepath.Join(config.Global.MiddlewarePath, spec.APIID, folder.name, "*.js")
 		paths, _ := filepath.Glob(globPath)
 		for _, path := range paths {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Loading file middleware from ", path)
+			mainLog.Debug("Loading file middleware from ", path)
 
 			mwDef := apidef.MiddlewareDefinition{
 				Name: strings.Split(filepath.Base(path), ".")[0],
 				Path: path,
 			}
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("-- Middleware name ", mwDef.Name)
+			mainLog.Debug("-- Middleware name ", mwDef.Name)
 			mwDef.RequireSession = strings.HasSuffix(mwDef.Name, "_with_session")
 			if mwDef.RequireSession {
 				switch folder.name {
 				case "post_auth", "post":
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Debug("-- Middleware requires session")
+					mainLog.Debug("-- Middleware requires session")
 				default:
-					log.WithFields(logrus.Fields{
-						"prefix": "main",
-					}).Warning("Middleware requires session, but isn't post-auth: ", mwDef.Name)
+					mainLog.Warning("Middleware requires session, but isn't post-auth: ", mwDef.Name)
 				}
 			}
 			mwPaths = append(mwPaths, path)
@@ -603,19 +551,13 @@ func createResponseMiddlewareChain(spec *APISpec) {
 	for i, processorDetail := range spec.ResponseProcessors {
 		processor := responseProcessorByName(processorDetail.Name)
 		if processor == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("No such processor: ", processorDetail.Name)
+			mainLog.Error("No such processor: ", processorDetail.Name)
 			return
 		}
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Debug("Failed to init processor: ", err)
+			mainLog.Debug("Failed to init processor: ", err)
 		}
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Loading Response processor: ", processorDetail.Name)
+		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
 		responseChain[i] = processor
 	}
 	spec.ResponseChain = responseChain
@@ -624,9 +566,7 @@ func createResponseMiddlewareChain(spec *APISpec) {
 func handleCORS(chain *[]alice.Constructor, spec *APISpec) {
 
 	if spec.CORS.Enable {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("CORS ENABLED")
+		mainLog.Debug("CORS ENABLED")
 		c := cors.New(cors.Options{
 			AllowedOrigins:     spec.CORS.AllowedOrigins,
 			AllowedMethods:     spec.CORS.AllowedMethods,
@@ -666,9 +606,7 @@ func doReload() {
 	// skip re-loading only if dashboard service reported 0 APIs
 	// and current registry had 0 APIs
 	if count == 0 && apisByIDLen() == 0 {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Warning("No API Definitions found, not reloading")
+		mainLog.Warning("No API Definitions found, not reloading")
 		return
 	}
 
@@ -679,9 +617,7 @@ func doReload() {
 		GlobalEventsJSVM.Init(nil)
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Preparing new router")
+	mainLog.Info("Preparing new router")
 	newRouter := mux.NewRouter()
 	if config.Global.HttpServerOptions.OverrideDefaults {
 		newRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
@@ -693,9 +629,7 @@ func doReload() {
 
 	loadGlobalApps(newRouter)
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("API reload complete")
+	mainLog.Info("API reload complete")
 
 	mainRouter = newRouter
 }
@@ -712,11 +646,11 @@ var reloadDoneChan = make(chan struct{}, 1)
 func reloadLoop(tick <-chan time.Time) {
 	<-tick
 	for range startReloadChan {
-		log.Info("reload: initiating")
+		mainLog.Info("reload: initiating")
 		doReload()
-		log.Info("reload: complete")
+		mainLog.Info("reload: complete")
 
-		log.Info("Initiating coprocess reload")
+		mainLog.Info("Initiating coprocess reload")
 		doCoprocessReload()
 
 		reloadDoneChan <- struct{}{}
@@ -744,11 +678,11 @@ func reloadQueueLoop() {
 				fns = append(fns, fn)
 			}
 			if !reloading {
-				log.Info("Reload queued")
+				mainLog.Info("Reload queued")
 				startReloadChan <- struct{}{}
 				reloading = true
 			} else {
-				log.Info("Reload already queued")
+				mainLog.Info("Reload already queued")
 			}
 		}
 	}
@@ -769,9 +703,7 @@ func reloadURLStructure(done func()) {
 
 func setupLogger() {
 	if config.Global.UseSentry {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Enabling Sentry support")
+		mainLog.Debug("Enabling Sentry support")
 		hook, err := logrus_sentry.NewSentryHook(config.Global.SentryCode, []logrus.Level{
 			logrus.PanicLevel,
 			logrus.FatalLevel,
@@ -784,15 +716,11 @@ func setupLogger() {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 		}
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Sentry hook active")
+		mainLog.Debug("Sentry hook active")
 	}
 
 	if config.Global.UseSyslog {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Enabling Syslog support")
+		mainLog.Debug("Enabling Syslog support")
 		hook, err := logrus_syslog.NewSyslogHook(config.Global.SyslogTransport,
 			config.Global.SyslogNetworkAddr,
 			syslog.LOG_INFO, "")
@@ -801,30 +729,22 @@ func setupLogger() {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 		}
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Syslog hook active")
+		mainLog.Debug("Syslog hook active")
 	}
 
 	if config.Global.UseGraylog {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Enabling Graylog support")
+		mainLog.Debug("Enabling Graylog support")
 		hook := graylogHook.NewGraylogHook(config.Global.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Graylog hook active")
+		mainLog.Debug("Graylog hook active")
 	}
 
 	if config.Global.UseLogstash {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Enabling Logstash support")
+		mainLog.Debug("Enabling Logstash support")
 		hook, err := logstashHook.NewHook(config.Global.LogstashTransport,
 			config.Global.LogstashNetworkAddr,
 			"tyk-gateway")
@@ -833,9 +753,7 @@ func setupLogger() {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 		}
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Logstash hook active")
+		mainLog.Debug("Logstash hook active")
 	}
 
 	if config.Global.UseRedisLog {
@@ -843,11 +761,8 @@ func setupLogger() {
 		log.Hooks.Add(hook)
 		rawLog.Hooks.Add(hook)
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Redis log hook active")
+		mainLog.Debug("Redis log hook active")
 	}
-
 }
 
 var configMu sync.Mutex
@@ -882,20 +797,14 @@ func initialiseSystem() error {
 		stdlog.SetOutput(ioutil.Discard)
 	} else if *debugMode {
 		log.Level = logrus.DebugLevel
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Enabling debug-level output")
+		mainLog.Debug("Enabling debug-level output")
 	}
 
 	if *conf != "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debugf("Using %s for configuration", *conf)
+		mainLog.Debugf("Using %s for configuration", *conf)
 		confPaths = []string{*conf}
 	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("No configuration file defined, will try to use default (tyk.conf)")
+		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
 	if !runningTests {
@@ -911,22 +820,18 @@ func initialiseSystem() error {
 		case "", "info":
 			// default, do nothing
 		case "error":
-			log.Level = logrus.ErrorLevel
+			mainLog.Level = logrus.ErrorLevel
 		case "warn":
-			log.Level = logrus.WarnLevel
+			mainLog.Level = logrus.WarnLevel
 		case "debug":
-			log.Level = logrus.DebugLevel
+			mainLog.Level = logrus.DebugLevel
 		default:
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
+			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
 		}
 	}
 
 	if config.Global.Storage.Type != "redis" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
+		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
 	setupGlobals()
@@ -934,9 +839,7 @@ func initialiseSystem() error {
 	if *port != "" {
 		portNum, err := strconv.Atoi(*port)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Error("Port specified in flags must be a number: ", err)
+			mainLog.Error("Port specified in flags must be a number: ", err)
 		} else {
 			config.Global.ListenPort = portNum
 		}
@@ -949,15 +852,11 @@ func initialiseSystem() error {
 		config.Global.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("PIDFile location set to: ", config.Global.PIDFileLocation)
+	mainLog.Info("PIDFile location set to: ", config.Global.PIDFileLocation)
 
 	pidfile.SetPidfilePath(config.Global.PIDFileLocation)
 	if err := pidfile.Write(); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("Failed to write PIDFile: ", err)
+		mainLog.Error("Failed to write PIDFile: ", err)
 	}
 
 	getHostDetails()
@@ -992,10 +891,10 @@ var hostDetails struct {
 func getHostDetails() {
 	var err error
 	if hostDetails.PID, err = pidfile.Read(); err != nil {
-		log.Error("Failed ot get host pid: ", err)
+		mainLog.Error("Failed ot get host pid: ", err)
 	}
 	if hostDetails.Hostname, err = os.Hostname(); err != nil {
-		log.Error("Failed ot get hostname: ", err)
+		mainLog.Error("Failed ot get hostname: ", err)
 	}
 }
 
@@ -1029,31 +928,25 @@ func main() {
 	NodeID = "solo-" + uuid.NewV4().String()
 
 	if err := initialiseSystem(); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatalf("Error initialising system: %v", err)
+		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
 	var controlListener net.Listener
 
 	onFork := func() {
-		log.Warning("PREPARING TO FORK")
+		mainLog.Warning("PREPARING TO FORK")
 
 		if controlListener != nil {
 			if err := controlListener.Close(); err != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Error("Control listen handler exit: ", err)
+				mainLog.Error("Control listen handler exit: ", err)
 			}
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Control listen closed")
+			mainLog.Info("Control listen closed")
 		}
 
 		if config.Global.UseDBAppConfigs {
-			log.Info("Stopping heartbeat")
+			mainLog.Info("Stopping heartbeat")
 			DashService.StopBeating()
-			log.Info("Waiting to de-register")
+			mainLog.Info("Waiting to de-register")
 			time.Sleep(10 * time.Second)
 
 			os.Setenv("TYK_SERVICE_NONCE", ServiceNonce)
@@ -1061,16 +954,14 @@ func main() {
 		}
 	}
 
-	l, goAgainErr := goagain.Listener(onFork)
+	listener, goAgainErr := goagain.Listener(onFork)
 
 	if config.Global.ControlAPIPort > 0 {
 		var err error
 		if controlListener, err = generateListener(config.Global.ControlAPIPort); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalf("Error starting control API listener: %s", err)
+			mainLog.Fatalf("Error starting control API listener: %s", err)
 		} else {
-			log.Info("Starting control API listener: ", controlListener, err, config.Global.ControlAPIPort)
+			mainLog.Info("Starting control API listener: ", controlListener, err, config.Global.ControlAPIPort)
 		}
 	}
 
@@ -1081,14 +972,12 @@ func main() {
 
 	// Wait while Redis connection pools are ready before start serving traffic
 	if !storage.IsConnected() {
-		log.Fatal("Redis connection pools are not ready. Exiting...")
+		mainLog.Fatal("Redis connection pools are not ready. Exiting...")
 	}
-	log.Info("Redis connection pools are ready")
+	mainLog.Info("Redis connection pools are ready")
 
 	if *memProfile {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Memory profiling active")
+		mainLog.Debug("Memory profiling active")
 		var err error
 		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
 			panic(err)
@@ -1096,9 +985,7 @@ func main() {
 		defer memProfFile.Close()
 	}
 	if *cpuProfile {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Cpu profiling active")
+		mainLog.Info("Cpu profiling active")
 		cpuProfFile, err := os.Create("tyk.prof")
 		if err != nil {
 			panic(err)
@@ -1109,54 +996,42 @@ func main() {
 
 	if goAgainErr != nil {
 		var err error
-		if l, err = generateListener(config.Global.ListenPort); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalf("Error starting listener: %s", err)
+		if listener, err = generateListener(config.Global.ListenPort); err != nil {
+			mainLog.Fatalf("Error starting listener: %s", err)
 		}
 
-		listen(l, controlListener, goAgainErr)
+		listen(listener, controlListener, goAgainErr)
 	} else {
-		listen(l, controlListener, nil)
+		listen(listener, controlListener, nil)
 
 		// Kill the parent, now that the child has started successfully.
-		log.Debug("KILLING PARENT PROCESS")
+		mainLog.Debug("KILLING PARENT PROCESS")
 		if err := goagain.Kill(); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Fatalln(err)
+			mainLog.Fatalln(err)
 		}
 	}
 
 	// Block the main goroutine awaiting signals.
-	if _, err := goagain.Wait(l); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Fatalln(err)
+	if _, err := goagain.Wait(listener); err != nil {
+		mainLog.Fatalln(err)
 	}
 
 	// Do whatever's necessary to ensure a graceful exit
 	// In this case, we'll simply stop listening and wait one second.
-	if err := l.Close(); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Error("Listen handler exit: ", err)
+	if err := listener.Close(); err != nil {
+		mainLog.Error("Listen handler exit: ", err)
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Stop signal received.")
+	mainLog.Info("Stop signal received.")
 
 	if config.Global.UseDBAppConfigs {
-		log.Info("Stopping heartbeat...")
+		mainLog.Info("Stopping heartbeat...")
 		DashService.StopBeating()
 		time.Sleep(2 * time.Second)
 		DashService.DeRegister()
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Terminating.")
+	mainLog.Info("Terminating.")
 
 	time.Sleep(time.Second)
 }
@@ -1164,9 +1039,7 @@ func main() {
 func start() {
 	// Set up a default org manager so we can traverse non-live paths
 	if !config.Global.SupressDefaultOrgStore {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Initialising default org store")
+		mainLog.Debug("Initialising default org store")
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
@@ -1182,9 +1055,7 @@ func start() {
 	}
 
 	if config.Global.SlaveOptions.UseRPC {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Debug("Starting RPC reload listener")
+		mainLog.Debug("Starting RPC reload listener")
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			UserKey:          config.Global.SlaveOptions.APIKey,
@@ -1210,9 +1081,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 	targetPort := fmt.Sprintf("%s:%d", listenAddress, listenPort)
 
 	if config.Global.HttpServerOptions.UseSSL {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("--> Using SSL (https)")
+		mainLog.Info("--> Using SSL (https)")
 
 		tlsConfig := tls.Config{
 			GetCertificate:     dummyGetCertificate,
@@ -1228,9 +1097,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 		return tls.Listen("tcp", targetPort, &tlsConfig)
 	} else if config.Global.HttpServerOptions.UseLE_SSL {
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("--> Using SSL LE (https)")
+		mainLog.Info("--> Using SSL LE (https)")
 
 		GetLEState(&LE_MANAGER)
 
@@ -1241,10 +1108,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 
 		return tls.Listen("tcp", targetPort, &config)
 	} else {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-			"port":   targetPort,
-		}).Info("--> Standard listener (http)")
+		mainLog.WithField("port", targetPort).Info("--> Standard listener (http)")
 		return net.Listen("tcp", targetPort)
 	}
 }
@@ -1261,11 +1125,9 @@ func handleDashboardRegistration() {
 
 	// connStr := buildConnStr("/register/node")
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Registering node.")
+	mainLog.Info("Registering node.")
 	if err := DashService.Register(); err != nil {
-		log.Fatal("Registration failed: ", err)
+		mainLog.Fatal("Registration failed: ", err)
 	}
 
 	go DashService.StartBeating()
@@ -1279,12 +1141,10 @@ func startDRL() {
 		return
 	case config.Global.EnableSentinelRateLImiter,
 		config.Global.EnableRedisRollingLimiter:
-		log.Warning("The old, non-distributed rate limiter is deprecated and we no longer recommend its use.")
+		mainLog.Warning("The old, non-distributed rate limiter is deprecated and we no longer recommend its use.")
 		return
 	}
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Initialising distributed rate limiter")
+	mainLog.Info("Initialising distributed rate limiter")
 	setupDRL()
 	startRateLimitNotifications()
 }
@@ -1297,7 +1157,7 @@ func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mainRouter.ServeHTTP(w, r)
 }
 
-func listen(l, controlListener net.Listener, err error) {
+func listen(listener, controlListener net.Listener, err error) {
 
 	readTimeout := defReadTimeout
 	writeTimeout := defWriteTimeout
@@ -1320,9 +1180,7 @@ func listen(l, controlListener net.Listener, err error) {
 	// Error not empty if handle reload when SIGUSR2 is received
 	if err != nil {
 		// Listen on a TCP or a UNIX domain socket (TCP here).
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Setting up Server")
+		mainLog.Info("Setting up Server")
 
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
@@ -1331,13 +1189,9 @@ func listen(l, controlListener net.Listener, err error) {
 		if config.Global.HttpServerOptions.OverrideDefaults {
 			mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Infof("Custom gateway started (%s)", VERSION)
+			mainLog.Infof("Custom gateway started (%s)", VERSION)
 
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
+			mainLog.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 
 			s := &http.Server{
 				Addr:         targetPort,
@@ -1347,7 +1201,7 @@ func listen(l, controlListener net.Listener, err error) {
 			}
 
 			// Accept connections in a new goroutine.
-			go s.Serve(l)
+			go s.Serve(listener)
 
 			if controlListener != nil {
 				cs := &http.Server{
@@ -1358,11 +1212,9 @@ func listen(l, controlListener net.Listener, err error) {
 				go cs.Serve(controlListener)
 			}
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Printf("Gateway started (%s)", VERSION)
+			mainLog.Printf("Gateway started (%s)", VERSION)
 
-			go http.Serve(l, mainHandler{})
+			go http.Serve(listener, mainHandler{})
 
 			if controlListener != nil {
 				go http.Serve(controlListener, controlRouter)
@@ -1373,17 +1225,13 @@ func listen(l, controlListener net.Listener, err error) {
 		nonce := os.Getenv("TYK_SERVICE_NONCE")
 		nodeID := os.Getenv("TYK_SERVICE_NODEID")
 		if nonce == "" || nodeID == "" {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Warning("No nonce found, re-registering")
+			mainLog.Warning("No nonce found, re-registering")
 			handleDashboardRegistration()
 
 		} else {
 			NodeID = nodeID
 			ServiceNonce = nonce
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("State recovered")
+			mainLog.Info("State recovered")
 
 			os.Setenv("TYK_SERVICE_NONCE", "")
 			os.Setenv("TYK_SERVICE_NODEID", "")
@@ -1396,9 +1244,7 @@ func listen(l, controlListener net.Listener, err error) {
 		if config.Global.HttpServerOptions.OverrideDefaults {
 			mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
+			mainLog.Warning("HTTP Server Overrides detected, this could destabilise long-running http-requests")
 			s := &http.Server{
 				Addr:         ":" + targetPort,
 				ReadTimeout:  readTimeout,
@@ -1406,10 +1252,8 @@ func listen(l, controlListener net.Listener, err error) {
 				Handler:      mainHandler{},
 			}
 
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Custom gateway started")
-			go s.Serve(l)
+			mainLog.Info("Custom gateway started")
+			go s.Serve(listener)
 
 			if controlListener != nil {
 				cs := &http.Server{
@@ -1420,38 +1264,26 @@ func listen(l, controlListener net.Listener, err error) {
 				go cs.Serve(controlListener)
 			}
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Printf("Gateway resumed (%s)", VERSION)
+			mainLog.Printf("Gateway resumed (%s)", VERSION)
 
-			go http.Serve(l, mainHandler{})
+			go http.Serve(listener, mainHandler{})
 
 			if controlListener != nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
-				}).Info("Control API listener started: ", controlListener, controlRouter)
+				mainLog.Info("Control API listener started: ", controlListener, controlRouter)
 
 				go http.Serve(controlListener, controlRouter)
 			}
 		}
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Resuming on", l.Addr())
+		mainLog.Info("Resuming on", listener.Addr())
 	}
 	address := config.Global.ListenAddress
 	if config.Global.ListenAddress == "" {
 		address = "(open interface)"
 	}
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("--> Listening on address: ", address)
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("--> Listening on port: ", config.Global.ListenPort)
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("--> PID: ", hostDetails.PID)
+	mainLog.Info("--> Listening on address: ", address)
+	mainLog.Info("--> Listening on port: ", config.Global.ListenPort)
+	mainLog.Info("--> PID: ", hostDetails.PID)
 
 	mainRouter.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello Tiki")
