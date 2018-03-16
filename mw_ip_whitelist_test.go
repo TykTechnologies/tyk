@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 )
@@ -15,11 +16,11 @@ func TestIPMiddlewarePass(t *testing.T) {
 		remote, forwarded string
 		wantCode          int
 	}{
-		{"127.0.0.1:80", "", 200},         // remote exact match
-		{"127.0.0.2:80", "", 200},         // remote CIDR match
-		{"10.0.0.1:80", "", 403},          // no match
-		{"10.0.0.1:80", "127.0.0.1", 200}, // forwarded exact match
-		{"10.0.0.1:80", "127.0.0.2", 200}, // forwarded CIDR match
+		{"127.0.0.1:80", "", http.StatusOK},         // remote exact match
+		{"127.0.0.2:80", "", http.StatusOK},         // remote CIDR match
+		{"10.0.0.1:80", "", http.StatusForbidden},   // no match
+		{"10.0.0.1:80", "127.0.0.1", http.StatusOK}, // forwarded exact match
+		{"10.0.0.1:80", "127.0.0.2", http.StatusOK}, // forwarded CIDR match
 	} {
 		rec := httptest.NewRecorder()
 		req := testReq(t, "GET", "/", nil)
