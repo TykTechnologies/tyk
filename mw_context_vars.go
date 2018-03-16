@@ -53,7 +53,12 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 	//Correlation ID
 	contextDataObject["request_id"] = uuid.NewV4().String()
 
+	for _, c := range copiedRequest.Cookies() {
+		name := "cookies_" + strings.Replace(c.Name, "-", "_", -1)
+		contextDataObject[name] = c.Value
+	}
+
 	ctxSetData(r, contextDataObject)
 
-	return nil, 200
+	return nil, http.StatusOK
 }
