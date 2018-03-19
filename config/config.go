@@ -129,6 +129,7 @@ type HttpServerOptionsConfig struct {
 	SkipURLCleaning        bool       `json:"skip_url_cleaning"`
 	SkipTargetPathEscaping bool       `json:"skip_target_path_escaping"`
 	Ciphers                []string   `json:"ssl_ciphers"`
+	UseHttp2               bool       `json:"use_http2"`
 }
 
 type AuthOverrideConf struct {
