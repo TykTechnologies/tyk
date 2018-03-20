@@ -189,7 +189,10 @@ func loopbackCORS(w http.ResponseWriter, r *http.Request, mw TykMiddleware) {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify},
 	}
 
-	corsClient := &http.Client{Transport: tr}
+	corsClient := &http.Client{
+		Transport: tr,
+		Timeout:   time.Second * 2,
+	}
 	corsRes, err := corsClient.Do(corsRequest)
 	if err != nil {
 		log.WithError(err).Error("Error from upstream OPTIONS request, ignoring and returning default response")
