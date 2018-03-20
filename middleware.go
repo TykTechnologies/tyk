@@ -193,7 +193,9 @@ func loopbackCORS(w http.ResponseWriter, r *http.Request, mw TykMiddleware) {
 	corsRes, err := corsClient.Do(corsRequest)
 	if err != nil {
 		log.WithError(err).Error("Error from upstream OPTIONS request, ignoring and returning default response")
+		return
 	}
+	defer corsRes.Body.Close()
 
 	corsHeaders := map[string]string{}
 	corsHeaders[response.AccessControlAllowOrigin] = corsRes.Header.Get(response.AccessControlAllowOrigin)
