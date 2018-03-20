@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gocraft/health"
@@ -13,6 +15,8 @@ import (
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
+
+	"github.com/TykTechnologies/tyk/response"
 
 	"github.com/TykTechnologies/tyk/request"
 
@@ -142,14 +146,38 @@ func loopbackCORS(w http.ResponseWriter, r *http.Request, mw TykMiddleware) {
 	if config.Global.HttpServerOptions.UseSSL {
 		scheme += "s"
 	}
+
 	u := fmt.Sprintf("%s://localhost:%d/%s", scheme, config.Global.ListenPort, r.URL.Path)
 	corsRequest, err := http.NewRequest(http.MethodOptions, u, nil)
+
+	// https://www.w3.org/TR/2014/REC-cors-20140116/#cross-origin-request-with-preflight-0
+
+	corsRequest.Header.Set("Content-Type", r.Header.Get("Content-Type"))
+	corsRequest.Header.Set(request.Origin, r.Header.Get("Origin"))
+	corsRequest.Header.Set(request.AccessControlRequestMethod, r.Method)
+
+	// If author request headers is not empty include an Access-Control-Request-Headers header with as header field
+	// value a comma-separated list of the header field names from author request headers in lexicographical order,
+	// each converted to ASCII lowercase (even when one or more are a simple header).
+	var requestHeaders []string
+	for key := range r.Header {
+		requestHeaders = append(requestHeaders, strings.ToLower(key))
+	}
+	sort.Strings(requestHeaders)
+
+	corsRequest.Header.Set(request.AccessControlRequestHeaders, strings.Join(requestHeaders, ", "))
+
+	// TODO: Exclude Credentials
+	// The term user credentials for the purposes of this specification means cookies, HTTP authentication, and
+	// client-side SSL certificates that would be sent based on the user agent's previous interactions with the
+	// origin. Specifically it does not refer to proxy authentication or the Origin header. [COOKIES]
+
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	dump, err := httputil.DumpRequest(r, true)
+	dump, err := httputil.DumpRequest(corsRequest, true)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
 		return
@@ -168,10 +196,10 @@ func loopbackCORS(w http.ResponseWriter, r *http.Request, mw TykMiddleware) {
 	}
 
 	corsHeaders := map[string]string{}
-	corsHeaders["Access-Control-Allow-Origin"] = corsRes.Header.Get("Access-Control-Allow-Origin")
-	corsHeaders["Access-Control-Allow-Methods"] = corsRes.Header.Get("Access-Control-Allow-Methods")
-	corsHeaders["Access-Control-Allow-Credentials"] = corsRes.Header.Get("Access-Control-Allow-Credentials")
-	corsHeaders["Access-Control-Max-Age"] = corsRes.Header.Get("Access-Control-Max-Age")
+	corsHeaders[response.AccessControlAllowOrigin] = corsRes.Header.Get(response.AccessControlAllowOrigin)
+	corsHeaders[response.AccessControlAllowMethods] = corsRes.Header.Get(response.AccessControlAllowMethods)
+	corsHeaders[response.AccessControlAllowCredentials] = corsRes.Header.Get(response.AccessControlAllowCredentials)
+	corsHeaders[response.AccessControlMaxAge] = corsRes.Header.Get(response.AccessControlMaxAge)
 
 	for k, v := range corsHeaders {
 		if v != "" {
