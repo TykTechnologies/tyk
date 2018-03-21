@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/ghodss/yaml"
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -369,9 +370,12 @@ func Load(paths []string, conf *Config) error {
 		log.Info("Loading default configuration...")
 		return Load([]string{path}, conf)
 	}
-	if err := json.NewDecoder(r).Decode(&conf); err != nil {
+
+	bytes, _ := ioutil.ReadAll(r)
+	if err := yaml.Unmarshal(bytes, &conf); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %v", err)
 	}
+
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return fmt.Errorf("failed to process config env vars: %v", err)
 	}

@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
-	"os"
 	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/ghodss/yaml"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -47,7 +47,7 @@ func handleNewConfiguration(payload string) {
 	// so as not to lose data through automatic defaults
 	config.Load(confPaths, &configPayload.Configuration)
 
-	err := json.Unmarshal([]byte(payload), &configPayload)
+	err := yaml.Unmarshal([]byte(payload), &configPayload)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -128,12 +128,14 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 }
 
 func getExistingConfig() (map[string]interface{}, error) {
-	f, err := os.Open(config.Global.OriginalPath)
+	bytesConf, err := ioutil.ReadFile(config.Global.OriginalPath)
 	if err != nil {
 		return nil, err
 	}
+
 	var microConfig map[string]interface{}
-	if err := json.NewDecoder(f).Decode(&microConfig); err != nil {
+
+	if err := yaml.Unmarshal(bytesConf, &microConfig); err != nil {
 		return nil, err
 	}
 	return sanitizeConfig(microConfig), nil
@@ -142,7 +144,7 @@ func getExistingConfig() (map[string]interface{}, error) {
 func handleSendMiniConfig(payload string) {
 	// Decode the configuration from the payload
 	configPayload := GetConfigPayload{}
-	err := json.Unmarshal([]byte(payload), &configPayload)
+	err := yaml.Unmarshal([]byte(payload), &configPayload)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -158,7 +160,7 @@ func handleSendMiniConfig(payload string) {
 		return
 	}
 
-	config, err := getExistingConfig()
+	conf, err := getExistingConfig()
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -169,7 +171,7 @@ func handleSendMiniConfig(payload string) {
 	returnPayload := ReturnConfigPayload{
 		FromHostname:  hostDetails.Hostname,
 		FromNodeID:    NodeID,
-		Configuration: config,
+		Configuration: conf,
 		TimeStamp:     time.Now().Unix(),
 	}
 
@@ -190,5 +192,4 @@ func handleSendMiniConfig(payload string) {
 	log.WithFields(logrus.Fields{
 		"prefix": "pub-sub",
 	}).Debug("Configuration request responded.")
-
 }
