@@ -193,16 +193,18 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		}...)
 	})
 
-	t.Run("Header regex", func(t *testing.T) {
-		bundleID := registerBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
-		spec.CustomMiddlewareBundle = bundleID
+	/*
+		t.Run("Header regex", func(t *testing.T) {
+			bundleID := registerBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
+			spec.CustomMiddlewareBundle = bundleID
 
-		loadAPI(spec)
+			loadAPI(spec)
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-123456"}, Code: 403},
-		}...)
-	})
+			ts.Run(t, []test.TestCase{
+				{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
+				{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
+				{Path: "/", Headers: map[string]string{"Authorization": "prefix-123456"}, Code: 403},
+			}...)
+		})
+	*/
 }

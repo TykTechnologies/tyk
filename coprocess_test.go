@@ -9,9 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
@@ -74,12 +72,9 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 }
 
 func TestCoProcessReload(t *testing.T) {
-	testDispatcher.reloaded = false
-	var wg sync.WaitGroup
-	wg.Add(1)
-	reloadURLStructure(wg.Done)
-	reloadTick <- time.Time{}
-	wg.Wait()
+	// Use this as the GlobalDispatcher:
+	GlobalDispatcher = testDispatcher
+	doCoprocessReload()
 	if !testDispatcher.reloaded {
 		t.Fatal("coprocess reload wasn't run")
 	}
