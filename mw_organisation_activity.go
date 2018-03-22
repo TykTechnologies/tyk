@@ -8,6 +8,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type orgChanMapMu struct {
@@ -130,6 +131,12 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 }
 
 func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, int) {
+	session, found := k.OrgSession(k.Spec.OrgID)
+	if !found {
+		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
+		return nil, 200
+	}
+
 	orgChanMap.Lock()
 	orgChan, ok := orgChanMap.channels[k.Spec.OrgID]
 	if !ok {
@@ -140,26 +147,34 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 	orgChanMap.Unlock()
 	active, found := orgActiveMap.Load(k.Spec.OrgID)
 
-	go k.AllowAccessNext(orgChan, r.URL.Path, request.RealIP(r), r)
+	go k.AllowAccessNext(
+		orgChan,
+		r.URL.Path,
+		request.RealIP(r),
+		r,
+		session,
+	)
 
 	if found && !active.(bool) {
 		log.Debug("Is not active")
 		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), 403
 	}
 
+	// Lets keep a reference of the org
+	// session might be updated by go-routine AllowAccessNext and we loose those changes here
+	// but it is OK as we need it in context for detailed org logging
+	setCtxValue(r, OrgSessionContext, session)
+
 	// Request is valid, carry on
 	return nil, 200
 }
 
-func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, path string, IP string, r *http.Request) {
-
-	session, found := k.OrgSession(k.Spec.OrgID)
-
-	if !found {
-		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
-		log.Debug("No session for org, skipping")
-		return
-	}
+func (k *OrganizationMonitor) AllowAccessNext(
+	orgChan chan bool,
+	path string,
+	IP string,
+	r *http.Request,
+	session user.SessionState) {
 
 	// Is it active?
 	logEntry := getExplicitLogEntryForRequest(path, IP, k.Spec.OrgID, nil)
@@ -229,9 +244,6 @@ func (k *OrganizationMonitor) AllowAccessNext(orgChan chan bool, path string, IP
 		orgChan <- false
 		return
 	}
-
-	// Lets keep a reference of the org
-	setCtxValue(r, OrgSessionContext, session)
 
 	orgChan <- true
 }

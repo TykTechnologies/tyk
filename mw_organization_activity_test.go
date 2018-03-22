@@ -13,11 +13,8 @@ import (
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	// setup global config
-	enforceOrgQuotas := config.Global.EnforceOrgQuotas
 	config.Global.EnforceOrgQuotas = true
-	defer func() {
-		config.Global.EnforceOrgQuotas = enforceOrgQuotas
-	}()
+	config.Global.ExperimentalProcessOrgOffThread = false
 
 	// run test server
 	ts := newTykTestServer()
@@ -70,14 +67,8 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	// setup global config
-	enforceOrgQuotas := config.Global.EnforceOrgQuotas
 	config.Global.EnforceOrgQuotas = true
-	experimentalProcessOrgOffThread := config.Global.ExperimentalProcessOrgOffThread
 	config.Global.ExperimentalProcessOrgOffThread = true
-	defer func() {
-		config.Global.EnforceOrgQuotas = enforceOrgQuotas
-		config.Global.ExperimentalProcessOrgOffThread = experimentalProcessOrgOffThread
-	}()
 
 	// run test server
 	ts := newTykTestServer()
@@ -153,14 +144,9 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	enforceOrgQuotas := config.Global.EnforceOrgQuotas
 	config.Global.EnforceOrgQuotas = true
-	enableRedisRollingLimiter := config.Global.EnableRedisRollingLimiter
 	config.Global.EnableRedisRollingLimiter = true
-	defer func() {
-		config.Global.EnforceOrgQuotas = enforceOrgQuotas
-		config.Global.EnableRedisRollingLimiter = enableRedisRollingLimiter
-	}()
+	config.Global.ExperimentalProcessOrgOffThread = false
 
 	// run test server
 	ts := newTykTestServer()
@@ -221,17 +207,9 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	enforceOrgQuotas := config.Global.EnforceOrgQuotas
 	config.Global.EnforceOrgQuotas = true
-	enableRedisRollingLimiter := config.Global.EnableRedisRollingLimiter
 	config.Global.EnableRedisRollingLimiter = true
-	experimentalProcessOrgOffThread := config.Global.ExperimentalProcessOrgOffThread
 	config.Global.ExperimentalProcessOrgOffThread = true
-	defer func() {
-		config.Global.EnforceOrgQuotas = enforceOrgQuotas
-		config.Global.EnableRedisRollingLimiter = enableRedisRollingLimiter
-		config.Global.ExperimentalProcessOrgOffThread = experimentalProcessOrgOffThread
-	}()
 
 	// run test server
 	ts := newTykTestServer()
