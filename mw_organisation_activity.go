@@ -125,11 +125,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	for isActive := range orgChan {
 		log.Debug("Chan got:", isActive)
-		o, ok := orgActiveMap.Load(orgId)
-		if ok {
-			o = isActive
-			orgActiveMap.Store(orgId, o)
-		}
+		orgActiveMap.Store(orgId, isActive)
 	}
 }
 
@@ -150,8 +146,6 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 		log.Debug("Is not active")
 		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), 403
 	}
-
-	log.Debug("Key not found")
 
 	// Request is valid, carry on
 	return nil, 200
