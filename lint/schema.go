@@ -161,6 +161,9 @@ const confSchema = `{
 	"close_connections": {
 		"type": "boolean"
 	},
+	"proxy_close_connections": {
+		"type": "boolean"
+	},
 	"close_idle_connections": {
 		"type": "boolean"
 	},
