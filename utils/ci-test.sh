@@ -29,7 +29,7 @@ go get -t
 # profile for multiple pkgs
 for pkg in $PKGS; do
 	for opts in "${MATRIX[@]}"; do
-		show go test -timeout 30s -v -coverprofile=test-$i.cov $opts $pkg \
+		show go test -timeout 40s -v -coverprofile=test-$i.cov $opts $pkg \
 			|| fatal "go test errored"
 		let i++ || true
 	done
