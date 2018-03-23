@@ -451,6 +451,11 @@ func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
 	if cnt := ctxGetData(r); cnt != nil {
 		claimPrefix := "jwt_claims_"
 
+		for claimName, claimValue := range token.Header {
+			claim := claimPrefix + claimName
+			cnt[claim] = claimValue
+		}
+
 		for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
 			claim := claimPrefix + claimName
 			cnt[claim] = claimValue

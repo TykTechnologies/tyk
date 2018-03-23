@@ -234,6 +234,11 @@ func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
 	}
 	claimPrefix := "jwt_claims_"
 
+	for claimName, claimValue := range token.Header {
+		claim := claimPrefix + claimName
+		cnt[claim] = claimValue
+	}
+
 	for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
 		claim := claimPrefix + claimName
 		cnt[claim] = claimValue
