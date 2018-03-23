@@ -249,7 +249,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			}
 
 			// ACL
-			session.AccessRights = policy.AccessRights
+			rights = policy.AccessRights
 			session.HMACEnabled = policy.HMACEnabled
 		}
 

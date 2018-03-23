@@ -82,6 +82,9 @@ func TestApplyPolicies(t *testing.T) {
 			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
+		"acl3": {
+			AccessRights: map[string]user.AccessDefinition{"c": {}},
+		},
 	}
 	policiesMu.RUnlock()
 	bmid := &BaseMiddleware{Spec: &APISpec{
@@ -181,6 +184,25 @@ func TestApplyPolicies(t *testing.T) {
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {}, "b": {}}
+				if !reflect.DeepEqual(want, s.AccessRights) {
+					t.Fatalf("want %v got %v", want, s.AccessRights)
+				}
+			},
+		},
+		{
+			"RightsUpdate", []string{"acl3"},
+			"", func(t *testing.T, s *user.SessionState) {
+				newPolicy := user.Policy{
+					AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}, "c": {}},
+				}
+				policiesMu.Lock()
+				policiesByID["acl3"] = newPolicy
+				policiesMu.Unlock()
+				err := bmid.ApplyPolicies("", s)
+				if err != nil {
+					t.Fatalf("couldn't apply policy: %s", err.Error())
+				}
+				want := newPolicy.AccessRights
 				if !reflect.DeepEqual(want, s.AccessRights) {
 					t.Fatalf("want %v got %v", want, s.AccessRights)
 				}
