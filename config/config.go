@@ -242,6 +242,7 @@ type Config struct {
 	LocalSessionCache                 LocalSessionCacheConf                 `json:"local_session_cache"`
 	HttpServerOptions                 HttpServerOptionsConfig               `json:"http_server_options"`
 	ServiceDiscovery                  ServiceDiscoveryConf                  `json:"service_discovery"`
+	ProxyCloseConnections             bool                                  `json:"proxy_close_connections"`
 	CloseConnections                  bool                                  `json:"close_connections"`
 	AuthOverride                      AuthOverrideConf                      `json:"auth_override"`
 	UptimeTests                       UptimeTestsConfig                     `json:"uptime_tests"`

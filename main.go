@@ -1185,7 +1185,7 @@ func listen(listener, controlListener net.Listener, err error) {
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
 
-		// Use a custom server so we can control keepalives
+		// Use a custom server so we can control tves
 		if config.Global.HttpServerOptions.OverrideDefaults {
 			mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 
@@ -1198,6 +1198,10 @@ func listen(listener, controlListener net.Listener, err error) {
 				ReadTimeout:  readTimeout,
 				WriteTimeout: writeTimeout,
 				Handler:      mainHandler{},
+			}
+
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
 			}
 
 			// Accept connections in a new goroutine.
@@ -1214,7 +1218,12 @@ func listen(listener, controlListener net.Listener, err error) {
 		} else {
 			mainLog.Printf("Gateway started (%s)", VERSION)
 
-			go http.Serve(listener, mainHandler{})
+			s := &http.Server{Handler: mainHandler{}}
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
+			}
+
+			go s.Serve(listener)
 
 			if controlListener != nil {
 				go http.Serve(controlListener, controlRouter)
@@ -1252,6 +1261,10 @@ func listen(listener, controlListener net.Listener, err error) {
 				Handler:      mainHandler{},
 			}
 
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
+			}
+
 			mainLog.Info("Custom gateway started")
 			go s.Serve(listener)
 
@@ -1266,7 +1279,12 @@ func listen(listener, controlListener net.Listener, err error) {
 		} else {
 			mainLog.Printf("Gateway resumed (%s)", VERSION)
 
-			go http.Serve(listener, mainHandler{})
+			s := &http.Server{Handler: mainHandler{}}
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
+			}
+
+			go s.Serve(listener)
 
 			if controlListener != nil {
 				mainLog.Info("Control API listener started: ", controlListener, controlRouter)
