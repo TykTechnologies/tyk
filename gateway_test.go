@@ -1114,7 +1114,7 @@ func TestKeepAliveConns(t *testing.T) {
 
 	t.Run("Should use same connection", func(t *testing.T) {
 		// set keep alive option
-		config.Global.CloseConnections = false
+		config.Global.ProxyCloseConnections = false
 
 		// Allow 1 connection with 3 reads
 		upstream := createTestUptream(t, 1, 3)
@@ -1133,7 +1133,7 @@ func TestKeepAliveConns(t *testing.T) {
 	})
 
 	t.Run("Should use separate connection", func(t *testing.T) {
-		config.Global.CloseConnections = true
+		config.Global.ProxyCloseConnections = true
 
 		// Allow 3 connections with 1 read
 		upstream := createTestUptream(t, 3, 1)
@@ -1152,7 +1152,7 @@ func TestKeepAliveConns(t *testing.T) {
 	})
 
 	t.Run("Should respect max_conn_time", func(t *testing.T) {
-		config.Global.CloseConnections = false
+		config.Global.ProxyCloseConnections = false
 		// Allow 2 connection with 2 reads
 		upstream := createTestUptream(t, 2, 2)
 		defer upstream.Close()

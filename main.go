@@ -1316,7 +1316,7 @@ func listen(l, controlListener net.Listener, err error) {
 		// handle dashboard registration and nonces if available
 		handleDashboardRegistration()
 
-		// Use a custom server so we can control keepalives
+		// Use a custom server so we can control tves
 		if config.Global.HttpServerOptions.OverrideDefaults {
 			mainRouter.SkipClean(config.Global.HttpServerOptions.SkipURLCleaning)
 
@@ -1331,6 +1331,10 @@ func listen(l, controlListener net.Listener, err error) {
 				ReadTimeout:  time.Duration(readTimeout) * time.Second,
 				WriteTimeout: time.Duration(writeTimeout) * time.Second,
 				Handler:      mainHandler{},
+			}
+
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
 			}
 
 			// Accept connections in a new goroutine.
@@ -1349,7 +1353,12 @@ func listen(l, controlListener net.Listener, err error) {
 				"prefix": "main",
 			}).Printf("Gateway started (%s)", VERSION)
 
-			go http.Serve(l, mainHandler{})
+			s := &http.Server{Handler: mainHandler{}}
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
+			}
+
+			go s.Serve(listener)
 
 			if controlListener != nil {
 				go http.Serve(controlListener, controlRouter)
@@ -1393,10 +1402,12 @@ func listen(l, controlListener net.Listener, err error) {
 				Handler:      mainHandler{},
 			}
 
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("Custom gateway started")
-			go s.Serve(l)
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
+			}
+
+			mainLog.Info("Custom gateway started")
+			go s.Serve(listener)
 
 			if controlListener != nil {
 				cs := &http.Server{
@@ -1411,7 +1422,12 @@ func listen(l, controlListener net.Listener, err error) {
 				"prefix": "main",
 			}).Printf("Gateway resumed (%s)", VERSION)
 
-			go http.Serve(l, mainHandler{})
+			s := &http.Server{Handler: mainHandler{}}
+			if config.Global.CloseConnections {
+				s.SetKeepAlivesEnabled(false)
+			}
+
+			go s.Serve(listener)
 
 			if controlListener != nil {
 				log.WithFields(logrus.Fields{

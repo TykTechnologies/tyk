@@ -439,7 +439,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}
 
-	if config.Global.CloseConnections {
+	if config.Global.ProxyCloseConnections {
 		transport.DisableKeepAlives = true
 	}
 
