@@ -224,6 +224,10 @@ func valToStr(v interface{}) string {
 	switch x := v.(type) {
 	case string:
 		s = x
+	case float64:
+		s = strconv.FormatFloat(x, 'f', -1, 32)
+	case int64:
+		s = strconv.FormatInt(x, 10)
 	case []string:
 		s = strings.Join(x, ",")
 		// Remove empty start
