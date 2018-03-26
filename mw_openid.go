@@ -205,7 +205,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, sessionID)
 	}
-	k.setContextVars(r, token)
+	ctxSetJWTContextVars(k.Spec, r, token)
 
 	return nil, 200
 }
@@ -221,31 +221,4 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 
 	// Report in health check
 	reportHealthValue(k.Spec, KeyFailure, "1")
-}
-
-func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
-	if !k.Spec.EnableContextVars {
-		return
-	}
-	// Flatten claims and add to context
-	cnt := ctxGetData(r)
-	if cnt == nil {
-		return
-	}
-	claimPrefix := "jwt_claims_"
-
-	for claimName, claimValue := range token.Header {
-		claim := claimPrefix + claimName
-		cnt[claim] = claimValue
-	}
-
-	for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
-		claim := claimPrefix + claimName
-		cnt[claim] = claimValue
-	}
-
-	// Key data
-	cnt["token"] = ctxGetAuthToken(r)
-
-	ctxSetData(r, cnt)
 }
