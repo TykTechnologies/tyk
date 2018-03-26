@@ -263,7 +263,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			ctxSetSession(r, &session)
 			ctxSetAuthToken(r, sessionID)
 		}
-		k.setContextVars(r, token)
+		ctxSetJWTContextVars(k.Spec, r, token)
 		return nil, 200
 	} else if k.Spec.JWTPolicyFieldName != "" {
 		// extract policy ID from JWT token
@@ -313,7 +313,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, sessionID)
 	}
-	k.setContextVars(r, token)
+	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, 200
 }
 
@@ -343,7 +343,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	log.Debug("Raw key ID found.")
 	ctxSetSession(r, &session)
 	ctxSetAuthToken(r, tykId)
-	k.setContextVars(r, token)
+	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, 200
 }
 
@@ -446,9 +446,9 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	return errors.New("Key not authorized"), 403
 }
 
-func (k *JWTMiddleware) setContextVars(r *http.Request, token *jwt.Token) {
+func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	// Flatten claims and add to context
-	if !k.Spec.EnableContextVars {
+	if !s.EnableContextVars {
 		return
 	}
 	if cnt := ctxGetData(r); cnt != nil {
