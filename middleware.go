@@ -351,6 +351,8 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &HeaderInjector{}
 	case "response_body_transform":
 		return &ResponseTransformMiddleware{}
+	case "response_body_transform_jq":
+		return &ResponseTransformJQMiddleware{}
 	case "header_transform":
 		return &HeaderTransform{}
 	}

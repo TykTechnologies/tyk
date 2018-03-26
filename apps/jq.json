@@ -1,0 +1,57 @@
+{
+    "name": "JQ Transform test API",
+    "api_id": "4",
+    "org_id": "default",
+    "definition": {
+        "location": "",
+        "key": ""
+    },
+    "use_keyless": true,
+    "auth": {
+        "auth_header_name": ""
+    },
+    "enable_context_vars": true,
+    "version_data": {
+        "not_versioned": true,
+        "versions": {
+            "Default": {
+                "name": "Default",
+                "expires": "3000-01-02 15:04",
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": [],
+                    "transform_jq": [{
+                        "path": "/post",
+                        "method": "POST",
+                        "filter": "{\"body\": (.body + {\"TRANSFORMED-REQUEST-BY-JQ\": true, path: ._tyk_context.path, user_agent: ._tyk_context.headers_User_Agent}), \"rewrite_headers\": {\"X-added-rewrite-headers\": \"test\"}, \"tyk_context\": {\"m2m_origin\": \"CSE3219/C9886\", \"deviceid\": .body.DEVICEID}}"
+                    }],
+		    "transform_headers": [
+			{
+			    "path": "/post",
+			    "method": "POST",
+			    "add_headers": {"X-added-by-transform_headers": "$tyk_context.deviceid",
+					    "X-M2M-Origin": "$tyk_context.m2m_origin"}
+			}
+		    ],
+		    "transform_jq_response": [{
+                        "path": "/post",
+                        "method": "POST",
+                        "filter": "{\"body\": (.body + {\"TRANSFORMED-RESPONSE-BY-JQ\": true, \"HEADERS-OF-RESPONSE\": .response_headers}), \"rewrite_headers\": {\"JQ-Response-header\": .body.origin}}"
+		    }]
+		}
+            }
+	}
+    },
+    "proxy": {
+        "listen_path": "/jq/",
+        "target_url": "http://httpbin.org/",
+        "strip_listen_path": true
+    },
+    "do_not_track": true,
+
+    "response_processors": [
+        { "name": "response_body_transform_jq", "options": {}}
+    ]
+}
