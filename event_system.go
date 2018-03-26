@@ -19,19 +19,20 @@ const EH_LogHandler apidef.TykEventHandlerName = "eh_log_handler"
 
 // Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
-	EventQuotaExceeded     apidef.TykEvent = "QuotaExceeded"
-	EventRateLimitExceeded apidef.TykEvent = "RatelimitExceeded"
-	EventAuthFailure       apidef.TykEvent = "AuthFailure"
-	EventKeyExpired        apidef.TykEvent = "KeyExpired"
-	EventVersionFailure    apidef.TykEvent = "VersionFailure"
-	EventOrgQuotaExceeded  apidef.TykEvent = "OrgQuotaExceeded"
-	EventTriggerExceeded   apidef.TykEvent = "TriggerExceeded"
-	EventBreakerTriggered  apidef.TykEvent = "BreakerTriggered"
-	EventHOSTDOWN          apidef.TykEvent = "HostDown"
-	EventHOSTUP            apidef.TykEvent = "HostUp"
-	EventTokenCreated      apidef.TykEvent = "TokenCreated"
-	EventTokenUpdated      apidef.TykEvent = "TokenUpdated"
-	EventTokenDeleted      apidef.TykEvent = "TokenDeleted"
+	EventQuotaExceeded        apidef.TykEvent = "QuotaExceeded"
+	EventRateLimitExceeded    apidef.TykEvent = "RatelimitExceeded"
+	EventAuthFailure          apidef.TykEvent = "AuthFailure"
+	EventKeyExpired           apidef.TykEvent = "KeyExpired"
+	EventVersionFailure       apidef.TykEvent = "VersionFailure"
+	EventOrgQuotaExceeded     apidef.TykEvent = "OrgQuotaExceeded"
+	EventOrgRateLimitExceeded apidef.TykEvent = "OrgRateLimitExceeded"
+	EventTriggerExceeded      apidef.TykEvent = "TriggerExceeded"
+	EventBreakerTriggered     apidef.TykEvent = "BreakerTriggered"
+	EventHOSTDOWN             apidef.TykEvent = "HostDown"
+	EventHOSTUP               apidef.TykEvent = "HostUp"
+	EventTokenCreated         apidef.TykEvent = "TokenCreated"
+	EventTokenUpdated         apidef.TykEvent = "TokenUpdated"
+	EventTokenDeleted         apidef.TykEvent = "TokenDeleted"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for

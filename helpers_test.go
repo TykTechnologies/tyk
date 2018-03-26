@@ -306,6 +306,11 @@ func (s *tykTestServer) Start() {
 	if config.Global.ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
+	// Set up a default org manager so we can traverse non-live paths
+	if !config.Global.SupressDefaultOrgStore {
+		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
+	}
 
 	if s.config.hotReload {
 		listen(s.ln, s.cln, nil)
