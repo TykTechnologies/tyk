@@ -1358,7 +1358,7 @@ func listen(l, controlListener net.Listener, err error) {
 				s.SetKeepAlivesEnabled(false)
 			}
 
-			go s.Serve(listener)
+			go s.Serve(l)
 
 			if controlListener != nil {
 				go http.Serve(controlListener, controlRouter)
@@ -1406,8 +1406,7 @@ func listen(l, controlListener net.Listener, err error) {
 				s.SetKeepAlivesEnabled(false)
 			}
 
-			mainLog.Info("Custom gateway started")
-			go s.Serve(listener)
+			go s.Serve(l)
 
 			if controlListener != nil {
 				cs := &http.Server{
@@ -1427,7 +1426,7 @@ func listen(l, controlListener net.Listener, err error) {
 				s.SetKeepAlivesEnabled(false)
 			}
 
-			go s.Serve(listener)
+			go s.Serve(l)
 
 			if controlListener != nil {
 				log.WithFields(logrus.Fields{

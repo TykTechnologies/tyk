@@ -47,7 +47,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key.", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           request.RealIP(r),
+		Origin:           requestIP(r),
 		Key:              token,
 	})
 	// Report in health check
