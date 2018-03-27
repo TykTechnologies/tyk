@@ -9,12 +9,10 @@ env:
   global:
     - TYK_LOGLEVEL=info
 
-before_install:
-    - sudo add-apt-repository -y ppa:opencpu/jq 
-    - sudo apt-get update -q
-
 addons:
   apt:
+    sources:
+    - sourceline: 'ppa:opencpu/jq'
     packages:
     - python3-dev
     - python3-pip
