@@ -9,6 +9,10 @@ env:
   global:
     - TYK_LOGLEVEL=info
 
+before_install:
+    - sudo add-apt-repository -y ppa:opencpu/jq 
+    - sudo apt-get update -q
+
 addons:
   apt:
     packages:
