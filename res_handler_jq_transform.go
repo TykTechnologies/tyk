@@ -31,7 +31,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 
 	defer res.Body.Close()
 
-	t := meta.(*TransformJQSpec)
+	ts := meta.(*TransformJQSpec)
 
 	var bodyObj interface{}
 	dec := json.NewDecoder(res.Body)
@@ -44,7 +44,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		"response_headers": res.Header,
 	}
 
-	jqResult, err := lockedJQTransform(t, jqObj)
+	jqResult, err := lockedJQTransform(h.Spec, ts, jqObj)
 	if err != nil {
 		return err
 	}

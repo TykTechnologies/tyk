@@ -49,7 +49,7 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		return nil, 200
 	}
 
-	err := transformJQBody(r, meta.(*TransformJQSpec), t.Spec.EnableContextVars)
+	err := t.transformJQBody(r, meta.(*TransformJQSpec))
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "inbound-transform-jq",
@@ -62,7 +62,7 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	return nil, 200
 }
 
-func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) error {
+func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQSpec) error {
 	defer r.Body.Close()
 
 	var bodyObj interface{}
@@ -79,7 +79,7 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		"_tyk_context": ctxGetData(r),
 	}
 
-	jqResult, err := lockedJQTransform(t, jqObj)
+	jqResult, err := lockedJQTransform(t.Spec, ts, jqObj)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 		r.Header.Set(hName, hValue)
 	}
 
-	if contextVars {
+	if t.Spec.EnableContextVars {
 		// Set variables in context vars
 		contextDataObject := ctxGetData(r)
 		for k, v := range jqResult.TykContext {
@@ -106,10 +106,10 @@ func transformJQBody(r *http.Request, t *TransformJQSpec, contextVars bool) erro
 	return nil
 }
 
-func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResult, error) {
-	t.Lock()
+func lockedJQTransform(s *APISpec, t *TransformJQSpec, jqObj map[string]interface{}) (JQResult, error) {
+	s.Lock()
 	value, err := t.JQFilter.Handle(jqObj)
-	t.Unlock()
+	s.Unlock()
 	if err != nil {
 		return JQResult{}, err
 	}
