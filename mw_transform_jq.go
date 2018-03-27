@@ -1,13 +1,19 @@
+// +build jq
+
 package main
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/Sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
+
+	"github.com/Sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type TransformJQMiddleware struct {
@@ -140,4 +146,38 @@ func lockedJQTransform(t *TransformJQSpec, jqObj map[string]interface{}) (JQResu
 	jqResult.TykContext, _ = values["tyk_context"].(map[string]interface{})
 
 	return jqResult, nil
+}
+
+type TransformJQSpec struct {
+	apidef.TransformJQMeta
+	sync.Mutex
+	JQFilter *JQ
+}
+
+func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus) []URLSpec {
+	urlSpec := []URLSpec{}
+
+	log.Debug("Checking for JQ tranform paths ...")
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		newTransformSpec := TransformJQSpec{TransformJQMeta: stringSpec}
+
+		var err error
+		newTransformSpec.JQFilter, err = NewJQ(stringSpec.Filter)
+
+		if stat == TransformedJQ {
+			newSpec.TransformJQAction = newTransformSpec
+		} else {
+			newSpec.TransformJQResponseAction = newTransformSpec
+		}
+
+		if err == nil {
+			urlSpec = append(urlSpec, newSpec)
+		} else {
+			log.Error("JQ Filter load failure! Skipping transformation: ", err)
+		}
+	}
+
+	return urlSpec
 }

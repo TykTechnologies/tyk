@@ -1,12 +1,15 @@
+//+build jq
+
 package main
 
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/user"
 	"io/ioutil"
 	"net/http"
 	"strconv"
+
+	"github.com/TykTechnologies/tyk/user"
 )
 
 type ResponseTransformJQMiddleware struct {

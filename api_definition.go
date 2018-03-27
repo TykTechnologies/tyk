@@ -12,18 +12,18 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"text/template"
 	"time"
 
 	"github.com/rubyist/circuitbreaker"
 
+	"sync"
+
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	"sync"
 )
 
 const (
@@ -117,12 +117,6 @@ type URLSpec struct {
 type TransformSpec struct {
 	apidef.TemplateMeta
 	Template *template.Template
-}
-
-type TransformJQSpec struct {
-	apidef.TransformJQMeta
-	sync.Mutex
-	JQFilter *JQ
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -531,34 +525,6 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 			log.Error("Template load failure! Skipping transformation: ", err)
 		}
 
-	}
-
-	return urlSpec
-}
-
-func (a *APIDefinitionLoader) compileTransformJQPathSpec(paths []apidef.TransformJQMeta, stat URLStatus) []URLSpec {
-	urlSpec := []URLSpec{}
-
-	log.Debug("Checking for JQ tranform paths ...")
-	for _, stringSpec := range paths {
-		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
-		newTransformSpec := TransformJQSpec{TransformJQMeta: stringSpec}
-
-		var err error
-		newTransformSpec.JQFilter, err = NewJQ(stringSpec.Filter)
-
-		if stat == TransformedJQ {
-			newSpec.TransformJQAction = newTransformSpec
-		} else {
-			newSpec.TransformJQResponseAction = newTransformSpec
-		}
-
-		if err == nil {
-			urlSpec = append(urlSpec, newSpec)
-		} else {
-			log.Error("JQ Filter load failure! Skipping transformation: ", err)
-		}
 	}
 
 	return urlSpec
@@ -973,6 +939,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 				}
 			} else if mode == HeaderInjectedResponse {
 				if v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
+					continue
+				}
+			} else if mode == TransformedJQResponse {
+				if v.TransformJQResponseAction.Path != ctxGetUrlRewritePath(r) {
 					continue
 				}
 			} else {
