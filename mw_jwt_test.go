@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/base64"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -561,8 +564,12 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 	loadAPI(spec)
 
-	p1ID := createPolicy()
-	p2ID := createPolicy()
+	p1ID := createPolicy(func(p *user.Policy) {
+		p.QuotaMax = 111
+	})
+	p2ID := createPolicy(func(p *user.Policy) {
+		p.QuotaMax = 999
+	})
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -572,12 +579,26 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
+	sessionID := fmt.Sprintf("%x", md5.Sum([]byte("user")))
+
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with 1st policy", func(t *testing.T) {
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
-		})
+		ts.Run(
+			t,
+			test.TestCase{
+				Headers: authHeaders, Code: 200,
+			},
+			test.TestCase{
+				Method:    http.MethodGet,
+				Path:      "/tyk/keys/" + sessionID,
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"quota_max":111`,
+			},
+		)
 	})
+
+	// check key/session quota
 
 	// put in JWT another valid policy ID and do request again
 	jwtTokenAnotherPolicy := createJWKToken(func(t *jwt.Token) {
@@ -590,9 +611,18 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 	authHeaders = map[string]string{"authorization": jwtTokenAnotherPolicy}
 	t.Run("Request with new valid policy in JWT", func(t *testing.T) {
-		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
-		})
+		ts.Run(t,
+			test.TestCase{
+				Headers: authHeaders, Code: 200,
+			},
+			test.TestCase{
+				Method:    http.MethodGet,
+				Path:      "/tyk/keys/" + sessionID,
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"quota_max":999`,
+			},
+		)
 	})
 }
 

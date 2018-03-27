@@ -295,10 +295,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				log.Error("Policy ID found in token is invalid (wrong ownership)!")
 				return errors.New("Key not authorized: no matching policy"), 403
 			}
-			// update session storage
+			// apply new policy to session and update session
 			session.SetPolicies(policyID)
-			session.LastUpdated = time.Now().String()
-			k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
+			if err := k.ApplyPolicies(sessionID, &session); err != nil {
+				k.reportLoginFailure(baseFieldData, r)
+				log.WithError(err).Error("Could not apply new policy from JWT to session")
+				return errors.New("Key not authorized: could not apply new policy"), 403
+			}
 			// update session in cache
 			go SessionCache.Set(sessionID, session, cache.DefaultExpiration)
 		}
