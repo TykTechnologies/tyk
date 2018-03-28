@@ -71,6 +71,7 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 type testHttpResponse struct {
 	Method  string
 	Url     string
+	Body    string
 	Headers map[string]string
 	Form    map[string]string
 }
@@ -128,11 +129,14 @@ func testHttpHandler() *mux.Router {
 		}
 		r.URL.Opaque = r.URL.RawPath
 		w.Header().Set("X-Tyk-Mock", "1")
+		body, _ := ioutil.ReadAll(r.Body)
+
 		err := json.NewEncoder(w).Encode(testHttpResponse{
 			Method:  r.Method,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
 			Form:    firstVals(r.Form),
+			Body:    string(body),
 		})
 		if err != nil {
 			httpError(w, http.StatusInternalServerError)

@@ -12,12 +12,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"text/template"
 	"time"
 
 	"github.com/rubyist/circuitbreaker"
+
+	"sync"
 
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -42,9 +43,11 @@ const (
 	BlackList
 	Cached
 	Transformed
+	TransformedJQ
 	HeaderInjected
 	HeaderInjectedResponse
 	TransformedResponse
+	TransformedJQResponse
 	HardTimeout
 	CircuitBreaker
 	URLRewrite
@@ -71,6 +74,8 @@ const (
 	StatusCached                   RequestStatus = "Cached path"
 	StatusTransform                RequestStatus = "Transformed path"
 	StatusTransformResponse        RequestStatus = "Transformed response"
+	StatusTransformJQ              RequestStatus = "Transformed path with JQ"
+	StatusTransformJQResponse      RequestStatus = "Transformed response with JQ"
 	StatusHeaderInjected           RequestStatus = "Header injected"
 	StatusMethodTransformed        RequestStatus = "Method Transformed"
 	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
@@ -89,22 +94,24 @@ const (
 // path is on any of the white, plack or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec                    *regexp.Regexp
-	Status                  URLStatus
-	MethodActions           map[string]apidef.EndpointMethodMeta
-	TransformAction         TransformSpec
-	TransformResponseAction TransformSpec
-	InjectHeaders           apidef.HeaderInjectionMeta
-	InjectHeadersResponse   apidef.HeaderInjectionMeta
-	HardTimeout             apidef.HardTimeoutMeta
-	CircuitBreaker          ExtendedCircuitBreakerMeta
-	URLRewrite              apidef.URLRewriteMeta
-	VirtualPathSpec         apidef.VirtualMeta
-	RequestSize             apidef.RequestSizeMeta
-	MethodTransform         apidef.MethodTransformMeta
-	TrackEndpoint           apidef.TrackEndpointMeta
-	DoNotTrackEndpoint      apidef.TrackEndpointMeta
-	ValidatePathMeta        apidef.ValidatePathMeta
+	Spec                      *regexp.Regexp
+	Status                    URLStatus
+	MethodActions             map[string]apidef.EndpointMethodMeta
+	TransformAction           TransformSpec
+	TransformResponseAction   TransformSpec
+	TransformJQAction         TransformJQSpec
+	TransformJQResponseAction TransformJQSpec
+	InjectHeaders             apidef.HeaderInjectionMeta
+	InjectHeadersResponse     apidef.HeaderInjectionMeta
+	HardTimeout               apidef.HardTimeoutMeta
+	CircuitBreaker            ExtendedCircuitBreakerMeta
+	URLRewrite                apidef.URLRewriteMeta
+	VirtualPathSpec           apidef.VirtualMeta
+	RequestSize               apidef.RequestSizeMeta
+	MethodTransform           apidef.MethodTransformMeta
+	TrackEndpoint             apidef.TrackEndpointMeta
+	DoNotTrackEndpoint        apidef.TrackEndpointMeta
+	ValidatePathMeta          apidef.ValidatePathMeta
 }
 
 type TransformSpec struct {
@@ -758,6 +765,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
 	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed)
 	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse)
+	transformJQPaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQ, TransformedJQ)
+	transformJQResponsePaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQResponse, TransformedJQResponse)
 	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
 	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
@@ -777,6 +786,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, cachedPaths...)
 	combinedPath = append(combinedPath, transformPaths...)
 	combinedPath = append(combinedPath, transformResponsePaths...)
+	combinedPath = append(combinedPath, transformJQPaths...)
+	combinedPath = append(combinedPath, transformJQResponsePaths...)
 	combinedPath = append(combinedPath, headerTransformPaths...)
 	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
 	combinedPath = append(combinedPath, hardTimeouts...)
@@ -811,12 +822,16 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusCached
 	case Transformed:
 		return StatusTransform
+	case TransformedJQ:
+		return StatusTransformJQ
 	case HeaderInjected:
 		return StatusHeaderInjected
 	case HeaderInjectedResponse:
 		return StatusHeaderInjectedResponse
 	case TransformedResponse:
 		return StatusTransformResponse
+	case TransformedJQResponse:
+		return StatusTransformJQResponse
 	case HardTimeout:
 		return StatusHardTimeout
 	case CircuitBreaker:
@@ -876,6 +891,10 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			return a.getURLStatus(v.Status), &v.TransformAction
 		}
 
+		if v.TransformJQAction.Filter != "" {
+			return a.getURLStatus(v.Status), &v.TransformJQAction
+		}
+
 		// TODO: Fix, Not a great detection method
 		if len(v.InjectHeaders.Path) > 0 {
 			return a.getURLStatus(v.Status), &v.InjectHeaders
@@ -922,6 +941,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 				if v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
 					continue
 				}
+			} else if mode == TransformedJQResponse {
+				if v.TransformJQResponseAction.Path != ctxGetUrlRewritePath(r) {
+					continue
+				}
 			} else {
 				continue
 			}
@@ -934,6 +957,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			if r.Method == v.TransformAction.Method {
 				return true, &v.TransformAction
 			}
+		case TransformedJQ:
+			if r.Method == v.TransformJQAction.Method {
+				return true, &v.TransformJQAction
+			}
 		case HeaderInjected:
 			if r.Method == v.InjectHeaders.Method {
 				return true, &v.InjectHeaders
@@ -945,6 +972,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case TransformedResponse:
 			if r.Method == v.TransformResponseAction.Method {
 				return true, &v.TransformResponseAction
+			}
+		case TransformedJQResponse:
+			if r.Method == v.TransformJQResponseAction.Method {
+				return true, &v.TransformJQResponseAction
 			}
 		case HardTimeout:
 			if r.Method == v.HardTimeout.Method {
