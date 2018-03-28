@@ -60,25 +60,28 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) error {
-	// Read the body:
+	body, _ := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
-	switch tmeta.TemplateData.Input {
-	case apidef.RequestXML:
-		mxj.XmlCharsetReader = WrappedCharsetReader
-		var err error
-		bodyData, err = mxj.NewMapXmlReader(r.Body) // unmarshal
-		if err != nil {
-			return fmt.Errorf("error unmarshalling XML: %v", err)
+
+	if len(body) > 0 {
+		switch tmeta.TemplateData.Input {
+		case apidef.RequestXML:
+			mxj.XmlCharsetReader = WrappedCharsetReader
+			var err error
+			bodyData, err = mxj.NewMapXml(body) // unmarshal
+			if err != nil {
+				return fmt.Errorf("error unmarshalling XML: %v", err)
+			}
+		case apidef.RequestJSON:
+			if err := json.Unmarshal(body, bodyData); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
 		}
-	case apidef.RequestJSON:
-		if err := json.NewDecoder(r.Body).Decode(&bodyData); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
 	}
 
 	if tmeta.TemplateData.EnableSession {

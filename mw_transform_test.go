@@ -36,7 +36,7 @@ func TestTransformNonAscii(t *testing.T) {
 func TestTransformXMLCrash(t *testing.T) {
 	// mxj.NewMapXmlReader used to take forever and crash the
 	// process by eating up all the memory.
-	in := strings.NewReader("")
+	in := strings.NewReader("not xml")
 	r := testReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
