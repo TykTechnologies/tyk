@@ -150,7 +150,6 @@ func lockedJQTransform(s *APISpec, t *TransformJQSpec, jqObj map[string]interfac
 
 type TransformJQSpec struct {
 	apidef.TransformJQMeta
-	sync.Mutex
 	JQFilter *JQ
 }
 
