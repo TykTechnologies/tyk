@@ -133,9 +133,15 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	// Encode the session object (if not a pre-process & not a custom key check):
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
-		session := ctxGetSession(r)
-		if session != nil {
+		if session := ctxGetSession(r); session != nil {
 			object.Session = ProtoSessionState(session)
+			// If the session contains metadata, add items to the object's metadata map:
+			if len(session.MetaData) > 0 {
+				object.Metadata = make(map[string]string)
+				for k, v := range session.MetaData {
+					object.Metadata[k] = v.(string)
+				}
+			}
 		}
 	}
 
@@ -307,6 +313,10 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		returnedSession := TykSessionState(returnObject.Session)
 
+		// If the returned object contains metadata, add them to the session:
+		for k, v := range returnObject.Metadata {
+			returnedSession.MetaData[k] = string(v)
+		}
 		if extractor == nil {
 			sessionLifetime := returnedSession.Lifetime(m.Spec.SessionLifetime)
 			// This API is not using the ID extractor, but we've got a session:
