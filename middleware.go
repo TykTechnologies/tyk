@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -282,9 +283,13 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.SessionState, bool) {
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
+	cacheKey := key
+	if config.Global.HashKeys {
+		cacheKey = storage.HashStr(key)
+	}
 	// Check in-memory cache
 	if !config.Global.LocalSessionCache.DisableCacheSessionState {
-		cachedVal, found := SessionCache.Get(key)
+		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
 			log.Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState)
@@ -301,7 +306,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it
-		go SessionCache.Set(key, session, cache.DefaultExpiration)
+		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
@@ -319,7 +324,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		log.Info("Recreating session for key: ", key)
 
 		// cache it
-		go SessionCache.Set(key, session, cache.DefaultExpiration)
+		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {

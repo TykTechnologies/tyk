@@ -32,6 +32,7 @@ const (
 	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
 	NoticeGatewayLENotification  NotificationCommand = "NoticeGatewayLENotification"
+	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -111,6 +112,8 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 			"prefix": "pub-sub",
 		}).Info("Reloading endpoints")
 		reloadURLStructure(reloaded)
+	case KeySpaceUpdateNotification:
+		handleKeySpaceEventCacheFlush(notif.Payload)
 	default:
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
@@ -120,6 +123,20 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	if handled != nil {
 		// went through. all others shoul have returned early.
 		handled(notif.Command)
+	}
+}
+
+func handleKeySpaceEventCacheFlush(payload string) {
+	keys := strings.Split(payload, ",")
+
+	for _, key := range keys {
+		splitKeys := strings.Split(key, ":")
+		if len(splitKeys) > 1 {
+			key = splitKeys[0]
+		}
+
+		RPCGlobalCache.Delete("apikey-" + key)
+		SessionCache.Delete(key)
 	}
 }
 
