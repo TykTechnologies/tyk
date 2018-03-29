@@ -988,6 +988,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 {
+			key = splitKeys[0]
 			if splitKeys[1] == "hashed" {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "")
@@ -997,7 +998,16 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			handleDeleteKey(key, "-1")
 		}
 
+		SessionCache.Delete(key)
+		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
+
+	// Notify rest of gateways in cluster to flush cache
+	n := Notification{
+		Command: KeySpaceUpdateNotification,
+		Payload: strings.Join(keys, ","),
+	}
+	MainNotifier.Notify(n)
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {

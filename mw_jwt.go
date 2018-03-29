@@ -14,6 +14,8 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -302,8 +304,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				log.WithError(err).Error("Could not apply new policy from JWT to session")
 				return errors.New("Key not authorized: could not apply new policy"), 403
 			}
+
+			cacheKey := sessionID
+			if config.Global.HashKeys {
+				cacheKey = storage.HashStr(sessionID)
+			}
 			// update session in cache
-			go SessionCache.Set(sessionID, session, cache.DefaultExpiration)
+			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 		}
 	}
 
