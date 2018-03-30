@@ -43,8 +43,7 @@ func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.Redis
 func skipSpecBecauseInvalid(spec *APISpec) bool {
 
 	if spec.Proxy.ListenPath == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
+		mainLog.WithFields(logrus.Fields{
 			"org_id": spec.OrgID,
 			"api_id": spec.APIID,
 		}).Error("Listen path is empty, skipping API ID: ", spec.APIID)
@@ -52,8 +51,7 @@ func skipSpecBecauseInvalid(spec *APISpec) bool {
 	}
 
 	if strings.Contains(spec.Proxy.ListenPath, " ") {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
+		mainLog.WithFields(logrus.Fields{
 			"org_id": spec.OrgID,
 			"api_id": spec.APIID,
 		}).Error("Listen path contains spaces, is invalid, skipping API ID: ", spec.APIID)
@@ -62,11 +60,10 @@ func skipSpecBecauseInvalid(spec *APISpec) bool {
 
 	_, err := url.Parse(spec.Proxy.TargetURL)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
+		mainLog.WithFields(logrus.Fields{
 			"org_id": spec.OrgID,
 			"api_id": spec.APIID,
-		}).Error("Couldn't parse target URL: ", err)
+		}).Error("couldn't parse target URL: ", err)
 		return true
 	}
 
@@ -87,8 +84,7 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 			if dN == "" {
 				dN = "(no host)"
 			}
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
+			mainLog.WithFields(logrus.Fields{
 				"api_name": spec.Name,
 				"domain":   dN,
 			}).Info("Tracking hostname")
@@ -105,8 +101,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var chainDef ChainObject
 	chainDef.Subrouter = subrouter
 
-	log.WithFields(logrus.Fields{
-		"prefix":   "main",
+	var coprocessLog = log.WithFields(logrus.Fields{
+		"prefix":   "coprocess",
+		"api_name": spec.Name,
+	})
+
+	mainLog.WithFields(logrus.Fields{
 		"api_name": spec.Name,
 	}).Info("Loading API")
 
@@ -121,8 +121,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	if skipSpecBecauseInvalid(spec) {
-		log.WithFields(logrus.Fields{
-			"prefix":   "main",
+		mainLog.WithFields(logrus.Fields{
 			"api_name": spec.Name,
 		}).Warning("Skipped!")
 		chainDef.Skip = true
@@ -151,8 +150,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 	if pathModified {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
+		mainLog.WithFields(logrus.Fields{
 			"org_id": spec.OrgID,
 			"api_id": spec.APIID,
 		}).Error("Listen path collision, changed to ", spec.Proxy.ListenPath)
@@ -202,10 +200,9 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		loadBundle(spec)
 	}
 
-	// TODO: use config.Global().EnableCoProcess
+	// TODO: use config.Global.EnableCoProcess
 	if config.Global().EnableJSVM || EnableCoProcess {
-		log.WithFields(logrus.Fields{
-			"prefix":   "main",
+		mainLog.WithFields(logrus.Fields{
 			"api_name": spec.Name,
 		}).Debug("Loading Middleware")
 
@@ -247,8 +244,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
-		log.WithFields(logrus.Fields{
-			"prefix":   "main",
+		mainLog.WithFields(logrus.Fields{
 			"api_name": spec.Name,
 		}).Info("Multi target enabled")
 		proxy = NewMultiTargetProxy(spec)
@@ -277,8 +273,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if spec.UseKeylessAccess {
 		chainDef.Open = true
-		log.WithFields(logrus.Fields{
-			"prefix":   "main",
+		mainLog.WithFields(logrus.Fields{
 			"api_name": spec.Name,
 		}).Info("Checking security policy: Open")
 
@@ -288,10 +283,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
-				log.WithFields(logrus.Fields{
-					"prefix":   "coprocess",
-					"api_name": spec.Name,
-				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
@@ -320,10 +313,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != apidef.OttoDriver {
-				log.WithFields(logrus.Fields{
-					"prefix":   "coprocess",
-					"api_name": spec.Name,
-				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
+
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
@@ -342,10 +333,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
 			if mwDriver != apidef.OttoDriver {
-				log.WithFields(logrus.Fields{
-					"prefix":   "coprocess",
-					"api_name": spec.Name,
-				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
@@ -364,38 +353,23 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		// Select the keying method to use for setting session states
 		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: OAuth")
+			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: OAuth")
 		}
 
 		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid}) {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: Basic")
+			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: Basic")
 		}
 
 		if mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid}) {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: HMAC")
+			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: HMAC")
 		}
 
 		if mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: JWT")
+			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: JWT")
 		}
 
 		if mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: OpenID")
+			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: OpenID")
 		}
 
 		coprocessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
@@ -403,38 +377,29 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		if coprocessAuth {
 			// TODO: check if mwAuthCheckFunc is available/valid
-			log.WithFields(logrus.Fields{
-				"prefix":   "coprocess",
-				"api_name": spec.Name,
-			}).Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
 			newExtractor(spec, baseMid)
 			mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver})
 		}
 
 		if ottoAuth {
-			log.WithFields(logrus.Fields{
-				"prefix": "main",
-			}).Info("----> Checking security policy: JS Plugin")
+
+			mainLog.Info("----> Checking security policy: JS Plugin")
 
 			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
-			log.WithFields(logrus.Fields{
-				"prefix":   "main",
-				"api_name": spec.Name,
-			}).Info("Checking security policy: Token")
+			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: Token")
 			authArray = append(authArray, createMiddleware(&AuthKey{baseMid}))
 		}
 
 		chainArray = append(chainArray, authArray...)
 
 		for _, obj := range mwPostAuthCheckFuncs {
-			log.WithFields(logrus.Fields{
-				"prefix":   "coprocess",
-				"api_name": spec.Name,
-			}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
+
+			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 			mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver})
 		}
 
@@ -455,20 +420,15 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		for _, obj := range mwPostFuncs {
 			if mwDriver != apidef.OttoDriver {
-				log.WithFields(logrus.Fields{
-					"prefix":   "coprocess",
-					"api_name": spec.Name,
-				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
+
+				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
 				mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver})
 			} else {
 				chainArray = append(chainArray, createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 			}
 		}
 
-		log.WithFields(logrus.Fields{
-			"prefix":   "main",
-			"api_name": spec.Name,
-		}).Debug("Custom middleware completed processing")
+		mainLog.WithField("api_name", spec.Name).Debug("Custom middleware completed processing")
 
 		// Use createMiddleware(&ModifiedMiddleware{baseMid})  to run custom middleware
 		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
@@ -485,19 +445,15 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
 
 		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
-		log.WithFields(logrus.Fields{
-			"prefix":   "main",
-			"api_name": spec.Name,
-		}).Debug("Rate limit endpoint is: ", rateLimitPath)
+
+		mainLog.WithField("api_name", spec.Name).Debug("Rate limit endpoint is: ", rateLimitPath)
+
 		chainDef.RateLimitPath = rateLimitPath
 		chainDef.RateLimitChain = alice.New(simpleArray...).
 			Then(http.HandlerFunc(userRatesCheck))
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix":   "main",
-		"api_name": spec.Name,
-	}).Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
+	mainLog.WithField("api_name", spec.Name).Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
 	chainDef.ThisHandler = chain
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
@@ -534,9 +490,7 @@ func loadGlobalApps(router *mux.Router) {
 	loadApps(specs, router)
 
 	if config.Global().NewRelic.AppName != "" {
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Adding NewRelic instrumentation")
+		mainLog.Info("Adding NewRelic instrumentation")
 		AddNewRelicInstrumentation(NewRelicApplication, router)
 	}
 }
@@ -546,14 +500,10 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	hostname := config.Global().HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("API hostname set: ", hostname)
+		mainLog.Info("API hostname set: ", hostname)
 	}
-	// load the APi defs
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Loading API configurations.")
+
+	mainLog.Info("Loading API configurations.")
 
 	tmpSpecRegister := make(map[string]*APISpec)
 
@@ -599,10 +549,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 		if hostRouters[host] != nil {
 			continue // already set up a subrouter
 		}
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-			"domain": host,
-		}).Info("Sub-router created for domain")
+		mainLog.WithField("domain", host).Info("Sub-router created for domain")
 		hostRouters[host] = muxer.Host(host).Subrouter()
 	}
 
@@ -610,8 +557,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 		go func(spec *APISpec, i int) {
 			subrouter := hostRouters[spec.Domain]
 			if subrouter == nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "main",
+				mainLog.WithFields(logrus.Fields{
 					"domain": spec.Domain,
 					"api_id": spec.APIID,
 				}).Warning("Trying to load API with Domain when custom domains are disabled.")
@@ -640,16 +586,14 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
 		}
 
-		log.WithFields(logrus.Fields{
-			"prefix": "main",
-		}).Info("Processed and listening on: ", chainObj.ListenOn)
+		mainLog.Info("Processed and listening on: ", chainObj.ListenOn)
 		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 	}
 
 	// All APIs processed, now we can healthcheck
 	// Add a root message to check all is OK
 	muxer.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello Tiki")
+		fmt.Fprint(w, "Hello Tiki")
 	})
 
 	// Swap in the new register
@@ -657,16 +601,14 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	apisByID = tmpSpecRegister
 	apisMu.Unlock()
 
-	log.Debug("Checker host list")
+	mainLog.Debug("Checker host list")
 
 	// Kick off our host checkers
 	if !config.Global().UptimeTests.Disable {
 		SetCheckerHostList()
 	}
 
-	log.Debug("Checker host Done")
+	mainLog.Debug("Checker host Done")
 
-	log.WithFields(logrus.Fields{
-		"prefix": "main",
-	}).Info("Initialised API Definitions")
+	mainLog.Info("Initialised API Definitions")
 }
