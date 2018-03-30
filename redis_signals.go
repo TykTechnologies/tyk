@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 
 	"github.com/TykTechnologies/goverify"
@@ -51,17 +50,11 @@ func startPubSubLoop() {
 			handleRedisEvent(v, nil, nil)
 		})
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-				"err":    err,
-			}).Error("Connection to Redis failed, reconnect in 10s")
+			pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
 
 			time.Sleep(10 * time.Second)
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-			}).Warning("Reconnecting")
+			pubSubLog.Warning("Reconnecting")
 		}
-
 	}
 }
 
@@ -72,7 +65,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	}
 	notif := Notification{}
 	if err := json.Unmarshal(message.Data, &notif); err != nil {
-		log.Error("Unmarshalling message body failed, malformed: ", err)
+		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
 
@@ -84,9 +77,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 
 	// Check for a signature, if not signature found, handle
 	if !isPayloadSignatureValid(notif) {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Payload signature is invalid!")
+		pubSubLog.Error("Payload signature is invalid!")
 		return
 	}
 
@@ -108,16 +99,12 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	case NoticeGatewayLENotification:
 		onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Info("Reloading endpoints")
+		pubSubLog.Info("Reloading endpoints")
 		reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
 		handleKeySpaceEventCacheFlush(notif.Payload)
 	default:
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Warnf("Unknown notification command: %q", notif.Command)
+		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return
 	}
 	if handled != nil {
@@ -127,6 +114,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 }
 
 func handleKeySpaceEventCacheFlush(payload string) {
+
 	keys := strings.Split(payload, ",")
 
 	for _, key := range keys {
@@ -144,6 +132,7 @@ var redisInsecureWarn sync.Once
 var notificationVerifier goverify.Verifier
 
 func isPayloadSignatureValid(notification Notification) bool {
+
 	switch notification.Command {
 	case NoticeGatewayDRLNotification, NoticeGatewayLENotification:
 		// Gateway to gateway
@@ -152,10 +141,9 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 	if notification.Signature == "" && config.Global().AllowInsecureConfigs {
 		redisInsecureWarn.Do(func() {
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-			}).Warning("Insecure configuration detected (allowing)!")
+			pubSubLog.Warning("Insecure configuration detected (allowing)!")
 		})
+
 		return true
 	}
 
@@ -163,25 +151,24 @@ func isPayloadSignatureValid(notification Notification) bool {
 		var err error
 		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-			}).Error("Notification signer: Failed loading private key from path: ", err)
+
+			pubSubLog.Error("Notification signer: Failed loading private key from path: ", err)
 			return false
 		}
 	}
 
 	if notificationVerifier != nil {
+
 		signed, err := base64.StdEncoding.DecodeString(notification.Signature)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-			}).Error("Failed to decode signature: ", err)
+
+			pubSubLog.Error("Failed to decode signature: ", err)
 			return false
 		}
+
 		if err := notificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "pub-sub",
-			}).Error("Could not verify notification: ", err, ": ", notification)
+
+			pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
 
 			return false
 		}
@@ -200,16 +187,23 @@ type RedisNotifier struct {
 
 // Notify will send a notification to a channel
 func (r *RedisNotifier) Notify(notif interface{}) bool {
+
 	toSend, err := json.Marshal(notif)
+
 	if err != nil {
-		log.Error("Problem marshalling notification: ", err)
+
+		pubSubLog.Error("Problem marshalling notification: ", err)
 		return false
 	}
-	log.Debug("Sending notification", notif)
+
+	pubSubLog.Debug("Sending notification", notif)
+
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
-		log.Error("Could not send notification: ", err)
+
+		pubSubLog.Error("Could not send notification: ", err)
 		return false
 	}
+
 	return true
 }
 
@@ -223,26 +217,31 @@ type dashboardConfigPayload struct {
 }
 
 func createConnectionStringFromDashboardObject(config dashboardConfigPayload) string {
+
 	hostname := "http://"
+
 	if config.DashboardConfig.UseTLS {
 		hostname = "https://"
 	}
+
 	hostname += config.DashboardConfig.Hostname
 
 	if config.DashboardConfig.Port != 0 {
+
 		hostname = strings.TrimRight(hostname, "/")
 		hostname += ":" + strconv.Itoa(config.DashboardConfig.Port)
 	}
+
 	return hostname
 }
 
 func handleDashboardZeroConfMessage(payload string) {
 	// Decode the configuration from the payload
 	dashPayload := dashboardConfigPayload{}
+
 	if err := json.Unmarshal([]byte(payload), &dashPayload); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Error("Failed to decode dashboard zeroconf payload")
+
+		pubSubLog.Error("Failed to decode dashboard zeroconf payload")
 		return
 	}
 
@@ -252,7 +251,8 @@ func handleDashboardZeroConfMessage(payload string) {
 
 	hostname := createConnectionStringFromDashboardObject(dashPayload)
 	setHostname := false
-	globalConf := config.Global()
+
+    globalConf := config.Global()
 	if globalConf.DBAppConfOptions.ConnectionString == "" {
 		globalConf.DBAppConfOptions.ConnectionString = hostname
 		setHostname = true
@@ -265,11 +265,6 @@ func handleDashboardZeroConfMessage(payload string) {
 
 	if setHostname {
 		config.SetGlobal(globalConf)
-	}
-
-	if setHostname {
-		log.WithFields(logrus.Fields{
-			"prefix": "pub-sub",
-		}).Info("Hostname set with dashboard zeroconf signal")
+        pubSubLog.Info("Hostname set with dashboard zeroconf signal")
 	}
 }
