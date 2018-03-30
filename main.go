@@ -376,7 +376,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/reload", allowMethods(resetHandler(nil), "GET"))
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
+		r.HandleFunc("/org/keys", allowMethods(orgHandler, "GET"))
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
 		r.HandleFunc("/keys/policy/{keyName}", allowMethods(policyUpdateHandler, "POST"))
 		r.HandleFunc("/keys/create", allowMethods(createKeyHandler, "POST"))
