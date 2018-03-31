@@ -358,6 +358,9 @@ const confSchema = `{
 			"use_ssl_le": {
 				"type": "boolean"
 			},
+			"accept_lets_encrypt_tos:": {
+				"type": "boolean"
+			},
 			"write_timeout": {
 				"type": "integer"
 			},
