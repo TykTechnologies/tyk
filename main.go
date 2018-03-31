@@ -17,11 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"github.com/newrelic/go-agent"
-
 	"github.com/TykTechnologies/tyk/checkup"
-
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -35,8 +32,6 @@ import (
 	"github.com/rs/cors"
 	"github.com/satori/go.uuid"
 	"gopkg.in/alecthomas/kingpin.v2"
-	"rsc.io/letsencrypt"
-
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
@@ -45,6 +40,7 @@ import (
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
@@ -76,7 +72,7 @@ var (
 
 	mainRouter    *mux.Router
 	controlRouter *mux.Router
-	LE_MANAGER    letsencrypt.Manager
+	LE_MANAGER    *autocert.Manager
 	LE_FIRSTRUN   bool
 
 	NodeID string
@@ -863,7 +859,10 @@ func initialiseSystem() error {
 	setupInstrumentation()
 
 	if config.Global.HttpServerOptions.UseLE_SSL {
-		go StartPeriodicStateBackup(&LE_MANAGER)
+		LE_MANAGER = &autocert.Manager{
+			Prompt: AcceptLetsEncryptTOS,
+			Cache: NewRedisCache(),
+		}
 	}
 
 	return nil
@@ -1099,11 +1098,20 @@ func generateListener(listenPort int) (net.Listener, error) {
 
 		mainLog.Info("--> Using SSL LE (https)")
 
-		GetLEState(&LE_MANAGER)
+		validationServer := MakeLEValidationHttpServer()
+		validationServer.Handler = LE_MANAGER.HTTPHandler(validationServer.Handler)
+
+		listener, err := CreateLEValidationServerListener(validationServer)
+		if err != nil {
+			mainLog.Fatal("--> Could not bind SSL LE Validation server to port 80")
+		}
+
+		go validationServer.Serve(listener)
 
 		conf := tls.Config{
 			GetCertificate: LE_MANAGER.GetCertificate,
 		}
+
 		conf.GetConfigForClient = getTLSConfigForClient(&conf, listenPort)
 
 		return tls.Listen("tcp", targetPort, &conf)

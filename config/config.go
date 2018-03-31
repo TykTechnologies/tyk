@@ -121,6 +121,7 @@ type HttpServerOptionsConfig struct {
 	WriteTimeout           int        `json:"write_timeout"`
 	UseSSL                 bool       `json:"use_ssl"`
 	UseLE_SSL              bool       `json:"use_ssl_le"`
+	AcceptLetsEncryptTOS   bool 	  `json:"accept_lets_encrypt_tos"`
 	SSLInsecureSkipVerify  bool       `json:"ssl_insecure_skip_verify"`
 	EnableWebSockets       bool       `json:"enable_websockets"`
 	Certificates           []CertData `json:"certificates"`
