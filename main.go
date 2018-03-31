@@ -3,6 +3,30 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/Sirupsen/logrus"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	"github.com/TykTechnologies/goagain"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/checkup"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/lint"
+	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
+	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/evalphobia/logrus_sentry"
+	"github.com/facebookgo/pidfile"
+	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
+	"github.com/lonelycode/gorpc"
+	"github.com/lonelycode/osin"
+	"github.com/newrelic/go-agent"
+	"github.com/rs/cors"
+	"github.com/satori/go.uuid"
+	"golang.org/x/crypto/acme/autocert"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -17,30 +41,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"github.com/newrelic/go-agent"
-	"github.com/TykTechnologies/tyk/checkup"
-	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	"github.com/facebookgo/pidfile"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
-	"github.com/gorilla/mux"
-	"github.com/justinas/alice"
-	"github.com/lonelycode/gorpc"
-	"github.com/lonelycode/osin"
-	"github.com/rs/cors"
-	"github.com/satori/go.uuid"
-	"gopkg.in/alecthomas/kingpin.v2"
-	"github.com/TykTechnologies/goagain"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/certs"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/lint"
-	logger "github.com/TykTechnologies/tyk/log"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
-	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
@@ -861,7 +861,7 @@ func initialiseSystem() error {
 	if config.Global.HttpServerOptions.UseLE_SSL {
 		LE_MANAGER = &autocert.Manager{
 			Prompt: AcceptLetsEncryptTOS,
-			Cache: NewRedisCache(),
+			Cache:  NewRedisCache(),
 		}
 	}
 

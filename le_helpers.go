@@ -3,15 +3,15 @@ package main
 import (
 	"encoding/json"
 
+	"context"
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"golang.org/x/crypto/acme/autocert"
-	"time"
-	"net/http"
 	"net"
-	"context"
-	"errors"
+	"net/http"
+	"time"
 )
 
 // Errors
@@ -31,7 +31,7 @@ func NewRedisCache() *RedisCache {
 	}
 }
 
-func ConnectToRedisStore() (*storage.RedisCluster, error){
+func ConnectToRedisStore() (*storage.RedisCluster, error) {
 	store := storage.RedisCluster{KeyPrefix: LEKeyPrefix}
 
 	connected := store.Connect()
@@ -84,7 +84,7 @@ func (m RedisCache) Put(ctx context.Context, name string, data []byte) error {
 	secret := rightPad2Len(config.Global.Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), string(data))
 
-	if err := store.SetKey("cache-" + name, cryptoText, -1); err != nil {
+	if err := store.SetKey("cache-"+name, cryptoText, -1); err != nil {
 		log.Error("[SSL] --> Failed to store SSL backup: ", err)
 		return ErrRedisConnection
 	}
@@ -148,7 +148,7 @@ func MakeLEValidationHttpServer() *http.Server {
 	mux.HandleFunc("/", handleRedirect)
 
 	validationServer := &http.Server{
-		Addr: ":80",
+		Addr:         ":80",
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  120 * time.Second,
