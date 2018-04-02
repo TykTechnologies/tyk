@@ -429,6 +429,8 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
+	transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
 		log.Debug("Setting timeout for outbound request to: ", timeOut)

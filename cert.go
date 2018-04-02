@@ -2,7 +2,10 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 
@@ -65,6 +68,15 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 			certID = id
 		}
 
+		hostParts := strings.SplitN(host, ".", 2)
+		if len(hostParts) > 1 {
+			hostPattern := "*." + hostParts[1]
+
+			if id, ok := m[hostPattern]; ok {
+				certID = id
+			}
+		}
+
 		if id, ok := m[host]; ok {
 			certID = id
 		}
@@ -81,6 +93,84 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 	}
 
 	return certs[0]
+}
+
+func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
+	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global.Security.PinnedPublicKeys) == 0 {
+		return nil
+	}
+
+	return func(network, addr string) (net.Conn, error) {
+		clone := tc.Clone()
+		clone.InsecureSkipVerify = true
+
+		c, err := tls.Dial(network, addr, clone)
+		if err != nil {
+			return c, err
+		}
+
+		host, _, _ := net.SplitHostPort(addr)
+		whitelist := getPinnedPublicKeys(host, spec)
+		if len(whitelist) == 0 {
+			return c, nil
+		}
+
+		state := c.ConnectionState()
+		for _, peercert := range state.PeerCertificates {
+			der, err := x509.MarshalPKIXPublicKey(peercert.PublicKey)
+			if err != nil {
+				continue
+			}
+			fingerprint := certs.HexSHA256(der)
+
+			for _, w := range whitelist {
+				if w == fingerprint {
+					return c, nil
+				}
+			}
+		}
+
+		return nil, errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
+	}
+}
+
+func getPinnedPublicKeys(host string, spec *APISpec) (fingerprint []string) {
+	var keyIDs string
+
+	pinMaps := []map[string]string{config.Global.Security.PinnedPublicKeys}
+
+	if spec != nil && spec.PinnedPublicKeys != nil {
+		pinMaps = append(pinMaps, spec.PinnedPublicKeys)
+	}
+
+	for _, m := range pinMaps {
+		if len(m) == 0 {
+			continue
+		}
+
+		if id, ok := m["*"]; ok {
+			keyIDs = id
+		}
+
+		hostParts := strings.SplitN(host, ".", 2)
+		if len(hostParts) > 1 {
+			hostPattern := "*." + hostParts[1]
+
+			if id, ok := m[hostPattern]; ok {
+				keyIDs = id
+			}
+		}
+
+		if id, ok := m[host]; ok {
+			keyIDs = id
+		}
+	}
+
+	if keyIDs == "" {
+		return nil
+	}
+
+	return CertificateManager.ListPublicKeys(strings.Split(keyIDs, ","))
 }
 
 // dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overriden by `getTLSConfigForClient`

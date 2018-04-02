@@ -660,6 +660,12 @@ const confSchema = `{
 			"control_api_use_mutual_tls": {
 				"type": "boolean"
 			},
+			"pinned_public_keys": {
+				"type": ["array", "null"],
+				"items": {
+					"type": "object"
+				}
+			},
 			"certificates": {
 				"type": ["object", "null"],
 				"additionalProperties": false,

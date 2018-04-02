@@ -49,7 +49,7 @@ func getTLSClient(cert *tls.Certificate, caCert []byte) *http.Client {
 }
 
 func genCertificate(template *x509.Certificate) ([]byte, []byte, []byte, tls.Certificate) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	priv, _ := rsa.GenerateKey(rand.Reader, 512)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
@@ -502,6 +502,74 @@ func TestUpstreamMutualTLS(t *testing.T) {
 
 		// Should pass with valid upstream certificate
 		ts.Run(t, test.TestCase{Code: 200})
+	})
+}
+
+func TestPublicKeyPinning(t *testing.T) {
+	_, _, _, serverCert := genServerCertificate()
+	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
+	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
+	pubID, _ := CertificateManager.Add(pubPem, "")
+	defer CertificateManager.Delete(pubID)
+
+	if pubID != certs.HexSHA256(pubDer) {
+		t.Error("Certmanager returned wrong pub key fingerprint:", certs.HexSHA256(pubDer), pubID)
+	}
+
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	}))
+	upstream.TLS = &tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{serverCert},
+	}
+
+	upstream.StartTLS()
+	defer upstream.Close()
+
+	t.Run("Pub key match", func(t *testing.T) {
+		// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
+		config.Global.ProxySSLInsecureSkipVerify = false
+		defer resetTestConfig()
+
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": pubID}
+			spec.Proxy.TargetURL = upstream.URL
+		})
+
+		ts.Run(t, test.TestCase{Code: 200})
+	})
+
+	t.Run("Pub key not match", func(t *testing.T) {
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
+			spec.Proxy.TargetURL = upstream.URL
+		})
+
+		ts.Run(t, test.TestCase{Code: 500})
+	})
+
+	t.Run("Global setting", func(t *testing.T) {
+		ts := newTykTestServer()
+		defer ts.Close()
+
+		config.Global.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
+		defer resetTestConfig()
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+		})
+
+		ts.Run(t, test.TestCase{Code: 500})
 	})
 }
 
