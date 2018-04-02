@@ -173,6 +173,7 @@ type CertificatesConfig struct {
 type SecurityConfig struct {
 	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
 	ControlAPIUseMutualTLS           bool               `json:"control_api_use_mutual_tls"`
+	PinnedPublicKeys                 map[string]string  `json:"pinned_public_keys"`
 	Certificates                     CertificatesConfig `json:"certificates"`
 }
 

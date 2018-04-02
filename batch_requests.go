@@ -48,6 +48,9 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 	}
 
 	tr.TLSClientConfig.InsecureSkipVerify = config.Global.ProxySSLInsecureSkipVerify
+
+	tr.DialTLS = dialTLSPinnedCheck(b.API, tr.TLSClientConfig)
+
 	client := &http.Client{Transport: tr}
 
 	resp, err := client.Do(req)

@@ -331,6 +331,7 @@ type APIDefinition struct {
 	UseMutualTLSAuth        bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
 	ClientCertificates      []string             `bson:"client_certificates" json:"client_certificates"`
 	UpstreamCertificates    map[string]string    `bson:"upstream_certificates" json:"upstream_certificates"`
+	PinnedPublicKeys        map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
 	EnableJWT               bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth         bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
 	EnableCoProcessAuth     bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`

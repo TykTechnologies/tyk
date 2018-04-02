@@ -496,6 +496,8 @@ func (j *JSVM) LoadTykJSApi() {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
 
+		tr.DialTLS = dialTLSPinnedCheck(j.Spec, tr.TLSClientConfig)
+
 		// using new Client each time should be ok, since we closing connection every time
 		client := &http.Client{Transport: tr}
 		resp, err := client.Do(r)
