@@ -41,7 +41,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 	jqObj := map[string]interface{}{
 		"body":             bodyObj,
 		"_tyk_context":     ctxGetData(req),
-		"response_headers": res.Header,
+		"_tyk_response_headers": res.Header,
 	}
 
 	jqResult, err := lockedJQTransform(h.Spec, ts, jqObj)
