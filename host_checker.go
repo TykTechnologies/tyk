@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Jeffail/tunny"
+	"github.com/jeffail/tunny"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"

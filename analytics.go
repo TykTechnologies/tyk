@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/Jeffail/tunny"
+	"github.com/jeffail/tunny"
 	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
