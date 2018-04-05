@@ -14,7 +14,6 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -306,7 +305,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			cacheKey := sessionID
-			if config.Global.HashKeys {
+			if k.Spec.GlobalConfig.HashKeys {
 				cacheKey = storage.HashStr(sessionID)
 			}
 			// update session in cache

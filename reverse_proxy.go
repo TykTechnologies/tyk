@@ -179,8 +179,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if ServiceCache == nil {
 			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
-			if config.Global.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = config.Global.ServiceDiscovery.DefaultCacheTimeout
+			if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
+				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
 			}
 			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
 		}
@@ -253,7 +253,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			req.Header.Set("User-Agent", defaultUserAgent)
 		}
 
-		if config.Global.HttpServerOptions.SkipTargetPathEscaping {
+		if spec.GlobalConfig.HttpServerOptions.SkipTargetPathEscaping {
 			// force RequestURI to skip escaping if API's proxy is set for this
 			// if we set opaque here it will force URL.RequestURI to skip escaping
 			if req.URL.RawPath != "" {
@@ -268,7 +268,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 	proxy := &ReverseProxy{
 		Director:      director,
 		TykAPISpec:    spec,
-		FlushInterval: time.Duration(config.Global.HttpServerOptions.FlushInterval) * time.Millisecond,
+		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{spec, proxy}
 	return proxy
@@ -312,7 +312,7 @@ func defaultTransport() *http.Transport {
 			DualStack: true,
 		}).DialContext,
 		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: config.Global.MaxIdleConnsPerHost, // default is 100
+		MaxIdleConnsPerHost: config.Global().MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
 }
@@ -359,7 +359,7 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, recordDetail(req))
+	return p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
 	// return nil
 }
 
@@ -369,7 +369,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
 	if !spec.EnforcedTimeoutEnabled {
-		return false, config.Global.ProxyDefaultTimeout
+		return false, spec.GlobalConfig.ProxyDefaultTimeout
 	}
 
 	_, versionPaths, _, _ := spec.Version(req)
@@ -380,7 +380,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 		return true, *intMeta
 	}
 
-	return false, config.Global.ProxyDefaultTimeout
+	return false, spec.GlobalConfig.ProxyDefaultTimeout
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
@@ -434,22 +434,22 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
-	if config.Global.ProxySSLInsecureSkipVerify {
+	if config.Global().ProxySSLInsecureSkipVerify {
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 
-	if config.Global.ProxySSLMinVersion > 0 {
-		transport.TLSClientConfig.MinVersion = config.Global.ProxySSLMinVersion
+	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
+		transport.TLSClientConfig.MinVersion = p.TykAPISpec.GlobalConfig.ProxySSLMinVersion
 	}
 
 	if p.TykAPISpec.Proxy.Transport.SSLMinVersion > 0 {
 		transport.TLSClientConfig.MinVersion = p.TykAPISpec.Proxy.Transport.SSLMinVersion
 	}
 
-	if len(config.Global.ProxySSLCipherSuites) > 0 {
-		transport.TLSClientConfig.CipherSuites = getCipherAliases(config.Global.ProxySSLCipherSuites)
+	if len(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites) > 0 {
+		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites)
 	}
 
 	if len(p.TykAPISpec.Proxy.Transport.SSLCipherSuites) > 0 {
@@ -466,9 +466,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}
 
-	if config.Global.ProxyCloseConnections {
-		transport.DisableKeepAlives = true
-	}
+	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
@@ -484,8 +482,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	createTransport := p.TykAPISpec.HTTPTransport == nil
 
-	if !createTransport && config.Global.MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global.MaxConnTime)*time.Second
+	if !createTransport && config.Global().MaxConnTime != 0 {
+		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
 	}
 
 	if createTransport {
@@ -714,7 +712,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	defer res.Body.Close()
 
 	// Close connections
-	if config.Global.CloseConnections {
+	if config.Global().CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 

@@ -67,7 +67,9 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		k.keyName,
 		storeRef,
 		true,
-		false)
+		false,
+		k.Spec.GlobalConfig,
+	)
 
 	if reason == sessionFailRateLimit {
 		return k.handleRateLimitFailure(r, k.keyName)

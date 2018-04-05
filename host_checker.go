@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jeffail/tunny"
+	"github.com/Jeffail/tunny"
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -165,7 +165,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 
 	HostCheckerClient.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.Global.ProxySSLInsecureSkipVerify,
+			InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
 		},
 	}
 

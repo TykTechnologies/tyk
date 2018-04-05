@@ -182,7 +182,7 @@ const jwkTestJson = `{
 
 func withAuth(r *http.Request) *http.Request {
 	// This is the default config secret
-	r.Header.Set("x-tyk-authorization", config.Global.Secret)
+	r.Header.Set("x-tyk-authorization", config.Global().Secret)
 	return r
 }
 
@@ -295,23 +295,26 @@ type tykTestServer struct {
 func (s *tykTestServer) Start() {
 	s.ln, _ = generateListener(0)
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
-	config.Global.ListenPort, _ = strconv.Atoi(port)
+	globalConf := config.Global()
+	globalConf.ListenPort, _ = strconv.Atoi(port)
 
 	if s.config.sepatateControlAPI {
 		s.cln, _ = net.Listen("tcp", "127.0.0.1:0")
 
 		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
-		config.Global.ControlAPIPort, _ = strconv.Atoi(port)
+		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
+
+	config.SetGlobal(globalConf)
 
 	setupGlobals()
 	// This is emulate calling start()
 	// But this lines is the only thing needed for this tests
-	if config.Global.ControlAPIPort == 0 {
+	if config.Global().ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
 	}
 	// Set up a default org manager so we can traverse non-live paths
-	if !config.Global.SupressDefaultOrgStore {
+	if !config.Global().SupressDefaultOrgStore {
 		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
 		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
@@ -330,13 +333,15 @@ func (s *tykTestServer) Close() {
 
 	if s.config.sepatateControlAPI {
 		s.cln.Close()
-		config.Global.ControlAPIPort = 0
+		globalConf := config.Global()
+		globalConf.ControlAPIPort = 0
+		config.SetGlobal(globalConf)
 	}
 }
 
 func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	scheme := "http://"
-	if config.Global.HttpServerOptions.UseSSL {
+	if config.Global().HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
 
@@ -350,8 +355,8 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	if tc.ControlRequest {
 		if s.config.sepatateControlAPI {
 			baseUrl = scheme + s.cln.Addr().String()
-		} else if config.Global.ControlAPIHostname != "" {
-			baseUrl = strings.Replace(baseUrl, "127.0.0.1", config.Global.ControlAPIHostname, 1)
+		} else if config.Global().ControlAPIHostname != "" {
+			baseUrl = strings.Replace(baseUrl, "127.0.0.1", config.Global().ControlAPIHostname, 1)
 		}
 	}
 
@@ -533,17 +538,21 @@ func buildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func loadAPI(specs ...*APISpec) (out []*APISpec) {
-	oldPath := config.Global.AppPath
-	config.Global.AppPath, _ = ioutil.TempDir("", "apps")
+	globalConf := config.Global()
+	oldPath := globalConf.AppPath
+	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
+	config.SetGlobal(globalConf)
 
 	defer func() {
-		os.RemoveAll(config.Global.AppPath)
-		config.Global.AppPath = oldPath
+		globalConf := config.Global()
+		os.RemoveAll(globalConf.AppPath)
+		globalConf.AppPath = oldPath
+		config.SetGlobal(globalConf)
 	}()
 
 	for i, spec := range specs {
 		specBytes, _ := json.Marshal(spec)
-		specFilePath := filepath.Join(config.Global.AppPath, spec.APIID+strconv.Itoa(i)+".json")
+		specFilePath := filepath.Join(config.Global().AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}

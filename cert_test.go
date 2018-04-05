@@ -95,7 +95,9 @@ func TestGatewayTLS(t *testing.T) {
 	client := getTLSClient(nil, nil)
 
 	t.Run("Without certificates", func(t *testing.T) {
-		config.Global.HttpServerOptions.UseSSL = true
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.UseSSL = true
+		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
 		ts := newTykTestServer()
@@ -115,12 +117,14 @@ func TestGatewayTLS(t *testing.T) {
 		certKeyPath := filepath.Join(dir, "server.key")
 		ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
 
-		config.Global.HttpServerOptions.Certificates = []config.CertData{{
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.Certificates = []config.CertData{{
 			Name:     "localhost",
 			CertFile: certFilePath,
 			KeyFile:  certKeyPath,
 		}}
-		config.Global.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.UseSSL = true
+		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
 		ts := newTykTestServer()
@@ -139,8 +143,10 @@ func TestGatewayTLS(t *testing.T) {
 		certPath := filepath.Join(dir, "server.pem")
 		ioutil.WriteFile(certPath, combinedPEM, 0666)
 
-		config.Global.HttpServerOptions.SSLCertificates = []string{certPath}
-		config.Global.HttpServerOptions.UseSSL = true
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.SSLCertificates = []string{certPath}
+		globalConf.HttpServerOptions.UseSSL = true
+		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
 		ts := newTykTestServer()
@@ -162,8 +168,10 @@ func TestGatewayTLS(t *testing.T) {
 		}
 		defer CertificateManager.Delete(certID)
 
-		config.Global.HttpServerOptions.SSLCertificates = []string{certID}
-		config.Global.HttpServerOptions.UseSSL = true
+		globalConf := config.Global()
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf.HttpServerOptions.UseSSL = true
+		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
 		ts := newTykTestServer()
@@ -183,8 +191,10 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	// Configure server
 	serverCertPem, _, combinedPEM, _ := genServerCertificate()
 
-	config.Global.HttpServerOptions.UseSSL = true
-	config.Global.Security.ControlAPIUseMutualTLS = true
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.Security.ControlAPIUseMutualTLS = true
+	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
 	dir, _ := ioutil.TempDir("", "certs")
@@ -203,16 +213,20 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		certID, _ := CertificateManager.Add(combinedPEM, "")
 		defer CertificateManager.Delete(certID)
 
-		config.Global.ControlAPIHostname = "localhost"
-		config.Global.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf := config.Global()
+		globalConf.ControlAPIHostname = "localhost"
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		config.SetGlobal(globalConf)
 
 		ts := newTykTestServer()
 		defer ts.Close()
 
 		defer func() {
 			CertificateManager.FlushCache()
-			config.Global.HttpServerOptions.SSLCertificates = nil
-			config.Global.Security.Certificates.ControlAPI = nil
+			globalConf := config.Global()
+			globalConf.HttpServerOptions.SSLCertificates = nil
+			globalConf.Security.Certificates.ControlAPI = nil
+			config.SetGlobal(globalConf)
 		}()
 
 		unknownErr := "x509: certificate signed by unknown authority"
@@ -230,7 +244,9 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 		defer CertificateManager.Delete(clientCertID)
 
-		config.Global.Security.Certificates.ControlAPI = []string{clientCertID}
+		globalConf = config.Global()
+		globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
+		config.SetGlobal(globalConf)
 
 		// Should pass request with valid client cert
 		ts.Run(t, test.TestCase{
@@ -242,13 +258,18 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		certID, _ := CertificateManager.Add(combinedPEM, "")
 		defer CertificateManager.Delete(certID)
 
-		config.Global.ControlAPIHostname = "localhost"
-		config.Global.HttpServerOptions.SSLCertificates = []string{certID}
+		globalConf = config.Global()
+		globalConf.ControlAPIHostname = "localhost"
+		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+		config.SetGlobal(globalConf)
 
 		defer func() {
-			config.Global.HttpServerOptions.SSLCertificates = nil
-			config.Global.Security.Certificates.ControlAPI = nil
+			globalConf = config.Global()
+			globalConf.HttpServerOptions.SSLCertificates = nil
+			globalConf.Security.Certificates.ControlAPI = nil
+			config.SetGlobal(globalConf)
 			CertificateManager.FlushCache()
+
 		}()
 
 		ts := newTykTestServer()
@@ -272,7 +293,9 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		t.Run("Redis certificate", func(t *testing.T) {
 			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
 			defer CertificateManager.Delete(clientCertID)
-			config.Global.Security.Certificates.ControlAPI = []string{clientCertID}
+			globalConf = config.Global()
+			globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
+			config.SetGlobal(globalConf)
 
 			ts.Run(t, []test.TestCase{
 				{Path: "/tyk/certs", AdminAuth: true, Code: 200, Client: clientWithCert},
@@ -283,7 +306,9 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			certPath := filepath.Join(dir, "client.pem")
 			ioutil.WriteFile(certPath, clientCertPem, 0666)
 
-			config.Global.Security.Certificates.ControlAPI = []string{certPath}
+			globalConf = config.Global()
+			globalConf.Security.Certificates.ControlAPI = []string{certPath}
+			config.SetGlobal(globalConf)
 
 			ts.Run(t, []test.TestCase{
 				{Path: "/tyk/certs", AdminAuth: true, Code: 200, Client: clientWithCert},
@@ -298,10 +323,12 @@ func TestAPIMutualTLS(t *testing.T) {
 	certID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(certID)
 
-	config.Global.EnableCustomDomains = true
-	config.Global.HttpServerOptions.UseSSL = true
-	config.Global.ListenPort = 0
-	config.Global.HttpServerOptions.SSLCertificates = []string{certID}
+	globalConf := config.Global()
+	globalConf.EnableCustomDomains = true
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.ListenPort = 0
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
 	ts := newTykTestServer()
@@ -481,6 +508,11 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 
 	t.Run("Upstream API", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.ProxySSLInsecureSkipVerify = true
+		config.SetGlobal(globalConf)
+		defer resetTestConfig()
+
 		ts := newTykTestServer()
 		defer ts.Close()
 
@@ -488,9 +520,6 @@ func TestUpstreamMutualTLS(t *testing.T) {
 		defer CertificateManager.Delete(clientCertID)
 
 		pool.AddCert(clientCert.Leaf)
-
-		config.Global.ProxySSLInsecureSkipVerify = true
-		defer resetTestConfig()
 
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -528,8 +557,10 @@ func TestPublicKeyPinning(t *testing.T) {
 	defer upstream.Close()
 
 	t.Run("Pub key match", func(t *testing.T) {
+		globalConf := config.Global()
 		// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
-		config.Global.ProxySSLInsecureSkipVerify = false
+		globalConf.ProxySSLInsecureSkipVerify = false
+		config.SetGlobal(globalConf)
 		defer resetTestConfig()
 
 		ts := newTykTestServer()
@@ -558,11 +589,13 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Global setting", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
+		config.SetGlobal(globalConf)
+		defer resetTestConfig()
+
 		ts := newTykTestServer()
 		defer ts.Close()
-
-		config.Global.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
-		defer resetTestConfig()
 
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -581,8 +614,10 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	_, _, _, clientCert := genCertificate(&x509.Certificate{})
 	clientCertID := certs.HexSHA256(clientCert.Certificate[0])
 
-	config.Global.HttpServerOptions.UseSSL = true
-	config.Global.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
 	ts := newTykTestServer()
@@ -674,9 +709,11 @@ func TestCipherSuites(t *testing.T) {
 	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
 	defer CertificateManager.Delete(serverCertID)
 
-	config.Global.HttpServerOptions.UseSSL = true
-	config.Global.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
-	config.Global.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.HttpServerOptions.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA"}
+	globalConf.HttpServerOptions.SSLCertificates = []string{serverCertID}
+	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
 	ts := newTykTestServer()

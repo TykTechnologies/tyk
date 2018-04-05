@@ -6,7 +6,6 @@ import (
 
 	"errors"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -34,11 +33,11 @@ func (k *OrganizationMonitor) Name() string {
 func (k *OrganizationMonitor) EnabledForSpec() bool {
 	// If false, we aren't enforcing quotas so skip this mw
 	// altogether
-	return config.Global.EnforceOrgQuotas
+	return k.Spec.GlobalConfig.EnforceOrgQuotas
 }
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
-	if config.Global.ExperimentalProcessOrgOffThread {
+	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
 		return k.ProcessRequestOffThread(r)
 	}
 	return k.ProcessRequestLive(r)
@@ -68,6 +67,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
+		k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
@@ -111,7 +111,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		return errors.New("This organisation rate limit has been exceeded, please contact your API administrator"), 403
 	}
 
-	if config.Global.Monitor.MonitorOrgKeys {
+	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}
@@ -191,6 +191,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
+		k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
@@ -235,7 +236,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		)
 	}
 
-	if config.Global.Monitor.MonitorOrgKeys {
+	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}

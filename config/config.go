@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"sync"
+	"sync/atomic"
 
 	"github.com/kelseyhightower/envconfig"
 
@@ -16,7 +18,8 @@ import (
 
 var log = logger.Get()
 
-var Global Config
+var global atomic.Value
+var globalMu sync.Mutex
 
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
@@ -321,6 +324,20 @@ var Default = Config{
 	AnalyticsConfig: AnalyticsConfigConfig{
 		IgnoredIPs: make([]string, 0),
 	},
+}
+
+func init() {
+	SetGlobal(Config{})
+}
+
+func Global() Config {
+	return global.Load().(Config)
+}
+
+func SetGlobal(conf Config) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+	global.Store(conf)
 }
 
 func WriteConf(path string, conf *Config) error {
