@@ -321,10 +321,8 @@ func TestJSVMRequestScheme(t *testing.T) {
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
-
 leakMid.NewProcessRequest(function(request, session) {
 	var test = request.Scheme += " appended"
-
 	var responseObject = {
         Body: test,
         Code: 200
@@ -346,4 +344,72 @@ leakMid.NewProcessRequest(function(request, session) {
 		t.Fatalf("JS plugin broke non-UTF8 body %q into %q",
 			want, got)
 	}
+}
+
+func TestTykMakeHTTPRequest(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.ConfigData = map[string]interface{}{
+		"base_url": ts.URL,
+	}
+
+	const js = `
+	var testTykMakeHTTPRequest = new TykJS.TykMiddleware.NewMiddleware({})
+	
+	testTykMakeHTTPRequest.NewProcessRequest(function(request, session, spec) {
+		var newRequest = {
+			"Method": "GET",
+			"Headers": {"Accept": "application/json"},
+			"Domain": spec.config_data.base_url,
+			"Resource": "/sample"
+		}
+	
+		var resp = TykMakeHttpRequest(JSON.stringify(newRequest));
+		var useableResponse = JSON.parse(resp);
+	
+		if(useableResponse.Code > 400) {
+			request.ReturnOverrides.ResponseCode = useableResponse.code
+			request.ReturnOverrides.ResponseError = "error"
+		}
+		
+		return testTykMakeHTTPRequest.ReturnData(request, {})
+	});`
+
+	dynMid := &DynamicMiddleware{
+		BaseMiddleware:      BaseMiddleware{spec, nil},
+		MiddlewareClassName: "testTykMakeHTTPRequest",
+		Pre:                 true,
+	}
+	jsvm := JSVM{}
+	jsvm.Init(nil)
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+
+	t.Run("Existing endpoint", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/sample"
+		})
+
+		r := testReq(t, "GET", "/v1/test-data", nil)
+		_, code := dynMid.ProcessRequest(nil, r, nil)
+		if want := 200; code != 200 {
+			t.Fatalf("wanted code to be %d, got %d", want, code)
+		}
+	})
+
+	t.Run("Nonexistent endpoint", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/abc"
+		})
+
+		r := testReq(t, "GET", "/v1/test-data", nil)
+		_, code := dynMid.ProcessRequest(nil, r, nil)
+		if want := 404; code != 404 {
+			t.Fatalf("wanted code to be %d, got %d", want, code)
+		}
+	})
 }
