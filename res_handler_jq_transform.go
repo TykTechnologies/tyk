@@ -39,8 +39,8 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 		return err
 	}
 	jqObj := map[string]interface{}{
-		"body":             bodyObj,
-		"_tyk_context":     ctxGetData(req),
+		"body":                  bodyObj,
+		"_tyk_context":          ctxGetData(req),
 		"_tyk_response_headers": res.Header,
 	}
 

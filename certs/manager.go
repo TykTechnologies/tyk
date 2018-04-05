@@ -290,7 +290,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var err error
 
 	for _, id := range keyIDs {
-		if fingerprint, found := c.cache.Get(id); found {
+		if fingerprint, found := c.cache.Get("pub-" + id); found {
 			out = append(out, fingerprint.(string))
 			continue
 		}
@@ -315,7 +315,7 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 
 		block, _ := pem.Decode(rawKey)
 		fingerprint := HexSHA256(block.Bytes)
-		c.cache.Set(id, fingerprint, cache.DefaultExpiration)
+		c.cache.Set("pub-"+id, fingerprint, cache.DefaultExpiration)
 		out = append(out, fingerprint)
 	}
 
