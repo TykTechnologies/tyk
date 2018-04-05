@@ -57,7 +57,7 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -osarch="linux/arm64 linux/amd64 linux/386" -tags 'coprocess grpc jq'
+gox -osarch="linux/arm64 linux/amd64 linux/386" -tags 'coprocess grpc'
 
 echo "Building Tyk CP binaries"
 export CPBINNAME_LUA=tyk_linux_amd64_lua
