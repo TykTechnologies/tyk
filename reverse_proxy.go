@@ -422,7 +422,7 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 
 func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 	return func(req *http.Request) (*url.URL, error) {
-		if api.Proxy.Transport.ProxyURL != "" {
+		if api != nil && api.Proxy.Transport.ProxyURL != "" {
 			return url.Parse(api.Proxy.Transport.ProxyURL)
 		}
 		return http.ProxyFromEnvironment(req)
