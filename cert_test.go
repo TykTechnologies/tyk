@@ -709,7 +709,7 @@ func TestCipherSuites(t *testing.T) {
 	})
 }
 
-func TestProxyCipherSuites(t *testing.T) {
+func TestProxyTransport(t *testing.T) {
 	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("test"))
 	}))
@@ -756,6 +756,19 @@ func TestProxyCipherSuites(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+		})
+
+		ts.Run(t, test.TestCase{Path: "/", Code: 500})
+	})
+
+	t.Run("API: Proxy", func(t *testing.T) {
+		config.Global.ProxySSLMinVersion = 771
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			// Invalid proxy
+			spec.Proxy.Transport.ProxyURL = upstream.URL
 		})
 
 		ts.Run(t, test.TestCase{Path: "/", Code: 500})
