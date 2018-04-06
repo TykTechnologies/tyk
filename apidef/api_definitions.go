@@ -374,7 +374,7 @@ type APIDefinition struct {
 		Transport                   struct {
 			SSLCipherSuites []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 			SSLMinVersion   uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
-			ProxyURL        string   `bson: "proxy_url" json: "proxy_url"`
+			ProxyURL        string   `bson:"proxy_url" json:"proxy_url"`
 		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
