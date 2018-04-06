@@ -431,6 +431,22 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 
 	transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 
+	if config.Global.ProxySSLMinVersion > 0 {
+		transport.TLSClientConfig.MinVersion = config.Global.ProxySSLMinVersion
+	}
+
+	if p.TykAPISpec.Proxy.Transport.SSLMinVersion > 0 {
+		transport.TLSClientConfig.MinVersion = p.TykAPISpec.Proxy.Transport.SSLMinVersion
+	}
+
+	if len(config.Global.ProxySSLCipherSuites) > 0 {
+		transport.TLSClientConfig.CipherSuites = getCipherAliases(config.Global.ProxySSLCipherSuites)
+	}
+
+	if len(p.TykAPISpec.Proxy.Transport.SSLCipherSuites) > 0 {
+		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
+	}
+
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
 		log.Debug("Setting timeout for outbound request to: ", timeOut)
