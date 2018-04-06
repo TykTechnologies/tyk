@@ -373,7 +373,7 @@ type APIDefinition struct {
 		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
 		Transport                   struct {
 			SSLCipherSuites []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
-			SSLMinVersion   uint16   `bson: "ssl_min_version" json: "ssl_min_version"`
+			SSLMinVersion   uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
 		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
