@@ -509,6 +509,15 @@ const confSchema = `{
 	"proxy_ssl_insecure_skip_verify": {
 		"type": "boolean"
 	},
+	"proxy_ssl_min_version": {
+		"type": "integer"
+	},
+	"proxy_ssl_ciphers": {
+		"type": ["array", "null"],
+		"items": {
+			"type": "string"
+		}
+	},
 	"public_key_path": {
 		"type": "string",
 		"format": "path"
