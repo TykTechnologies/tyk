@@ -91,7 +91,12 @@ func onServerStatusReceivedHandler(payload string) {
 	log.Debug("Received DRL data: ", serverData)
 
 	if DRLManager.Ready {
-		DRLManager.AddOrUpdateServer(serverData)
+		if err := DRLManager.AddOrUpdateServer(serverData); err != nil {
+			log.WithError(err).
+				WithField("serverData", serverData).
+				Error("AddOrUpdateServer error")
+			return
+		}
 		log.Debug(DRLManager.Report())
 	} else {
 		log.Warning("DRL not ready, skipping this notification")

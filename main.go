@@ -1171,8 +1171,6 @@ func listen(listener, controlListener net.Listener, err error) {
 		writeTimeout = time.Duration(config.Global.HttpServerOptions.WriteTimeout) * time.Second
 	}
 
-	drlOnce.Do(startDRL)
-
 	if config.Global.ControlAPIPort > 0 {
 		loadAPIEndpoints(controlRouter)
 	}
@@ -1295,6 +1293,10 @@ func listen(listener, controlListener net.Listener, err error) {
 
 		mainLog.Info("Resuming on", listener.Addr())
 	}
+
+	// at this point NodeID is ready to use by DRL
+	drlOnce.Do(startDRL)
+
 	address := config.Global.ListenAddress
 	if config.Global.ListenAddress == "" {
 		address = "(open interface)"
