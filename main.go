@@ -1113,15 +1113,19 @@ func generateListener(listenPort int) (net.Listener, error) {
 	}
 }
 
+func dashboardServiceInit() {
+	if DashService == nil {
+		DashService = &HTTPDashboardHandler{}
+		DashService.Init()
+	}
+}
+
 func handleDashboardRegistration() {
 	if !config.Global.UseDBAppConfigs {
 		return
 	}
 
-	if DashService == nil {
-		DashService = &HTTPDashboardHandler{}
-		DashService.Init()
-	}
+	dashboardServiceInit()
 
 	// connStr := buildConnStr("/register/node")
 
@@ -1245,6 +1249,7 @@ func listen(listener, controlListener net.Listener, err error) {
 		}
 
 		if config.Global.UseDBAppConfigs {
+			dashboardServiceInit()
 			go DashService.StartBeating()
 		}
 
