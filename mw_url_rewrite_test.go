@@ -91,7 +91,7 @@ func TestRewriterTriggers(t *testing.T) {
 			patt := "hello"
 			r.Header.Set("x-test", patt)
 
-			hOpt := apidef.StringRegexMap{MatchPattern: "hello"}
+			hOpt := apidef.StringRegexMap{MatchPattern: patt}
 			hOpt.Init()
 
 			return TestDef{
@@ -115,12 +115,38 @@ func TestRewriterTriggers(t *testing.T) {
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
 
+			r.Header.Set("x-test", "not-here")
+
+			hOpt := apidef.StringRegexMap{NotMatchPattern: "hello"}
+			hOpt.Init()
+
+			return TestDef{
+				"Header Single Negative",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				"/test/straight/rewrite", "/change/to/me/not-matched",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/not-matched",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
+
 			patt := "bar"
 			r.Header.Set("x-test-Two", patt)
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "hello"}
 			hOpt.Init()
-			hOpt2 := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt2 := apidef.StringRegexMap{MatchPattern: patt}
 			hOpt2.Init()
 
 			return TestDef{
@@ -150,7 +176,7 @@ func TestRewriterTriggers(t *testing.T) {
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "hello"}
 			hOpt.Init()
-			hOpt2 := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt2 := apidef.StringRegexMap{MatchPattern: patt}
 			hOpt2.Init()
 
 			return TestDef{
@@ -573,7 +599,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Triggers[0].
 		Options.
 		HeaderMatches["abc"]
-	if headerMatch.Check("abc") == "" {
+	if _, val := headerMatch.Check("abc"); val == "" {
 		t.Errorf("Expected HeaderMatches initalized and matched, received no match")
 	}
 
@@ -588,7 +614,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Triggers[0].
 		Options.
 		QueryValMatches["def"]
-	if queryValMatch.Check("def") == "" {
+	if _, val := queryValMatch.Check("def"); val == "" {
 		t.Errorf("Expected QueryValMatches initalized and matched, received no match")
 	}
 
@@ -603,7 +629,7 @@ func TestInitTriggerRx(t *testing.T) {
 		Triggers[0].
 		Options.
 		PayloadMatches
-	if payloadMatch.Check("ghi") == "" {
+	if _, val := payloadMatch.Check("ghi"); val == "" {
 		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
 	}
 }

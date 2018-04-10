@@ -350,7 +350,7 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 		vals, ok := r.Header[mhCN]
 		if ok {
 			for i, v := range vals {
-				b := mr.Check(v)
+				_, b := mr.Check(v)
 				if len(b) > 0 {
 					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mhCN, i)
 					contextData[kn] = b
@@ -380,7 +380,7 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 		vals, ok := qvals[mv]
 		if ok {
 			for i, v := range vals {
-				b := mr.Check(v)
+				_, b := mr.Check(v)
 				if len(b) > 0 {
 					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, i)
 					contextData[kn] = b
@@ -409,7 +409,7 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 		pathParts := strings.Split(r.URL.Path, "/")
 
 		for _, part := range pathParts {
-			b := mr.Check(part)
+			_, b := mr.Check(part)
 			if len(b) > 0 {
 				kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, fCount)
 				contextData[kn] = b
@@ -438,11 +438,13 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 		if ok {
 			val, valOk := rawVal.(string)
 			if valOk {
-				b := mr.Check(val)
-				if len(b) > 0 {
-					kn := fmt.Sprintf("trigger-%d-%s", triggernum, mh)
-					contextData[kn] = b
+				triggered, b := mr.Check(val)
+				if triggered {
 					fCount++
+					if len(b) > 0 {
+						kn := fmt.Sprintf("trigger-%d-%s", triggernum, mh)
+						contextData[kn] = b
+					}
 				}
 			}
 		}
@@ -465,7 +467,7 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 	cp := copyRequest(r)
 	bodyBytes, _ := ioutil.ReadAll(cp.Body)
 
-	b := options.Check(string(bodyBytes))
+	_, b := options.Check(string(bodyBytes))
 	if len(b) > 0 {
 		kn := fmt.Sprintf("trigger-%d-payload", triggernum)
 		contextData[kn] = string(b)

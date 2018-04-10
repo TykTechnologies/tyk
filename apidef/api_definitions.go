@@ -132,8 +132,10 @@ type CircuitBreakerMeta struct {
 }
 
 type StringRegexMap struct {
-	MatchPattern string `bson:"match_rx" json:"match_rx"`
-	matchRegex   *regexp.Regexp
+	MatchPattern    string `bson:"match_rx" json:"match_rx"`
+	matchRegex      *regexp.Regexp
+	NotMatchPattern string `bson:"not_match_rx" json:"not_match_rx"`
+	notMatchRegex   *regexp.Regexp
 }
 
 type RoutingTriggerOptions struct {
@@ -499,15 +501,26 @@ func (a *APIDefinition) DecodeFromDB() {
 	}
 }
 
-func (s *StringRegexMap) Check(value string) string {
-	return s.matchRegex.FindString(value)
+func (s *StringRegexMap) Check(value string) (bool, string) {
+	match := s.matchRegex.FindString(value)
+	if s.notMatchRegex.FindString(value) == "" {
+		if len(match) > 0 || s.MatchPattern == "" {
+			return true, match 
+		}
+	}
+	return false, ""
 }
 
 func (s *StringRegexMap) Init() error {
 	var err error
 	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {
 		log.WithError(err).WithField("MatchPattern", s.MatchPattern).
-			Error("Could not compile regexp for StringRegexMap")
+			Error("Could not compile matchRegex for StringRegexMap")
+		return err
+	}
+	if s.notMatchRegex, err = regexp.Compile(s.NotMatchPattern); err != nil {
+		log.WithError(err).WithField("NotMatchPattern", s.NotMatchPattern).
+			Error("Could not compile notMatchRegex for StringRegexMap")
 		return err
 	}
 	return nil
