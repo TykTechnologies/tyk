@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -63,6 +64,7 @@ func TestResponseHeaderInjection(t *testing.T) {
 
 	addHeaders := map[string]string{"X-Test": "test"}
 	deleteHeaders := map[string]string{"X-Tyk-Mock": "1"}
+	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
 
 	ts.Run(t, []test.TestCase{
 		// Create base auth based key
@@ -70,6 +72,6 @@ func TestResponseHeaderInjection(t *testing.T) {
 		{Method: "GET", Path: "/test-no-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
-		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"User-Agent":"Tyk/v2.3.99"`},
+		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
 	}...)
 }
