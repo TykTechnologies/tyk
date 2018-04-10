@@ -505,7 +505,7 @@ func (s *StringRegexMap) Check(value string) (bool, string) {
 	match := s.matchRegex.FindString(value)
 	if s.notMatchRegex.FindString(value) == "" {
 		if len(match) > 0 || s.MatchPattern == "" {
-			return true, match 
+			return true, match
 		}
 	}
 	return false, ""

@@ -350,11 +350,15 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 		vals, ok := r.Header[mhCN]
 		if ok {
 			for i, v := range vals {
-				_, b := mr.Check(v)
-				if len(b) > 0 {
-					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mhCN, i)
-					contextData[kn] = b
+				triggered, b := mr.Check(v)
+				println("HEY CAN YOU SEE ME?")
+				println(triggered)
+				if triggered {
 					fCount++
+					if len(b) > 0 {
+						kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mhCN, i)
+						contextData[kn] = b
+					}
 				}
 			}
 		}
