@@ -262,6 +262,36 @@ func TestRewriterTriggers(t *testing.T) {
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
 
+			r.Header.Set("x-test", "hello")
+			r.Header.Set("x-test-Two", "not matched")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "hello"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{NotMatchPattern: "bar"}
+			hOpt2.Init()
+
+			return TestDef{
+				"Header Multi Mixed All Pass",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				"/test/straight/rewrite", "/change/to/me/hello",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test":     hOpt,
+								"x-test-Two": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-X-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
+
 			r.Header.Set("y-test", "baz")
 			r.Header.Set("y-test-Two", "qux")
 
@@ -329,6 +359,30 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=not_matched", nil)
+
+			hOpt := apidef.StringRegexMap{NotMatchPattern: "foo"}
+			hOpt.Init()
+
+			return TestDef{
+				"Query Single Negative",
+				"/test/query/rewrite", "/change/to/me/ignore",
+				"/test/query/rewrite", "/change/to/me/rewritten",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							QueryValMatches: map[string]apidef.StringRegexMap{
+								"x_test": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/rewritten",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=foo&y_test=bar", nil)
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
@@ -365,7 +419,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt2.Init()
 
 			return TestDef{
-				"Multi Multi Type Any",
+				"Multi Multi-Type Any",
 				"/test/query/rewrite", "/change/to/me/ignore",
 				"/test/query/rewrite", "/change/to/me/foo",
 				[]apidef.RoutingTrigger{
@@ -395,7 +449,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt2.Init()
 
 			return TestDef{
-				"Multi Multi Type All",
+				"Multi Multi-Type All",
 				"/test/query/rewrite", "/change/to/me/ignore",
 				"/test/query/rewrite", "/change/to/me/bar",
 				[]apidef.RoutingTrigger{
@@ -428,7 +482,41 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt3.Init()
 
 			return TestDef{
-				"Multi Multi Type All Fail",
+				"Multi Multi-Type All Fail",
+				"/test/query/rewrite", "/change/to/me/ignore",
+				"/test/query/rewrite", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							QueryValMatches: map[string]apidef.StringRegexMap{
+								"x_test": hOpt,
+							},
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"y-test": hOpt2,
+								"z-test": hOpt3,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-Y-Test-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=foo", nil)
+			r.Header.Set("y-test", "bar")
+			r.Header.Set("z-test", "baz")
+
+			hOpt := apidef.StringRegexMap{NotMatchPattern: "foo"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt2.Init()
+			hOpt3 := apidef.StringRegexMap{MatchPattern: "baz"}
+			hOpt3.Init()
+
+			return TestDef{
+				"Multi Multi-Type Mixed-Logic All Fail",
 				"/test/query/rewrite", "/change/to/me/ignore",
 				"/test/query/rewrite", "/change/to/me/ignore",
 				[]apidef.RoutingTrigger{
