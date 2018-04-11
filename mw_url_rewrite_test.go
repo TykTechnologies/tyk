@@ -560,6 +560,52 @@ func TestRewriterTriggers(t *testing.T) {
 				r,
 			}
 		},
+		// func() TestDef {
+		// 	var jsonStr = []byte(`{"foo":"not-matched"}`)
+		// 	r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+
+		// 	hOpt := apidef.StringRegexMap{NotMatchPattern: "bar"}
+		// 	hOpt.Init()
+
+		// 	return TestDef{
+		// 		"Payload Single Negative",
+		// 		"/test/pl/rewrite", "/change/to/me/ignore",
+		// 		"/test/pl/rewrite", "/change/to/me/rewritten",
+		// 		[]apidef.RoutingTrigger{
+		// 			{
+		// 				On: apidef.Any,
+		// 				Options: apidef.RoutingTriggerOptions{
+		// 					PayloadMatches: hOpt,
+		// 				},
+		// 				RewriteTo: "/change/to/me/rewritten",
+		// 			},
+		// 		},
+		// 		r,
+		// 	}
+		// },
+		func() TestDef {
+			var jsonStr = []byte(`{"foo":"bar"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+
+			hOpt := apidef.StringRegexMap{NotMatchPattern: "bar"}
+			hOpt.Init()
+
+			return TestDef{
+				"Payload Single Negative Fail",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+						},
+						RewriteTo: "/change/to/me/rewritten",
+					},
+				},
+				r,
+			}
+		},
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}

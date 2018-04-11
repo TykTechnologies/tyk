@@ -106,9 +106,12 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 			// Check payload
 			if triggerOpts.Options.PayloadMatches.MatchPattern != "" {
 				if checkPayload(r, triggerOpts.Options.PayloadMatches, tn) {
+					println("HEY!!!")
 					setCount += 1
 					if checkAny {
+						println("CHECKANY!!!")
 						rewriteToPath = triggerOpts.RewriteTo
+						println(triggerOpts.RewriteTo)
 						break
 					}
 				}
@@ -471,12 +474,15 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 	cp := copyRequest(r)
 	bodyBytes, _ := ioutil.ReadAll(cp.Body)
 
-	_, b := options.Check(string(bodyBytes))
-	if len(b) > 0 {
-		kn := fmt.Sprintf("trigger-%d-payload", triggernum)
-		contextData[kn] = string(b)
-		return true
+	triggered, b := options.Check(string(bodyBytes))
+	if triggered {
+		if len(b) > 0 {
+			kn := fmt.Sprintf("trigger-%d-payload", triggernum)
+			contextData[kn] = string(b)
+			println("TRUE!!!")
+			return true
+		}
 	}
-
+	
 	return false
 }
