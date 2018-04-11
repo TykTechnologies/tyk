@@ -201,6 +201,37 @@ func TestRewriterTriggers(t *testing.T) {
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
 
+			patt := "bar"
+			r.Header.Set("x-test-Two", patt)
+			r.Header.Set("x-test", "negative")
+
+			hOpt := apidef.StringRegexMap{NotMatchPattern: "negative"}
+			hOpt.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: patt}
+			hOpt2.Init()
+
+			return TestDef{
+				"Header Multi Mixed All Fail",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test":     hOpt,
+								"x-test-Two": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-X-Test-Two-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
+
 			r.Header.Set("x-test-Two", "bar")
 			r.Header.Set("x-test", "hello")
 
