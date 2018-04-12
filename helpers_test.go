@@ -326,6 +326,7 @@ func (s *tykTestServer) Start() {
 	}
 
 	s.URL = "http://" + s.ln.Addr().String()
+	s.globalConfig = globalConf
 }
 
 func (s *tykTestServer) Close() {
@@ -341,7 +342,7 @@ func (s *tykTestServer) Close() {
 
 func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	scheme := "http://"
-	if config.Global().HttpServerOptions.UseSSL {
+	if s.globalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
 
@@ -355,8 +356,8 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	if tc.ControlRequest {
 		if s.config.sepatateControlAPI {
 			baseUrl = scheme + s.cln.Addr().String()
-		} else if config.Global().ControlAPIHostname != "" {
-			baseUrl = strings.Replace(baseUrl, "127.0.0.1", config.Global().ControlAPIHostname, 1)
+		} else if s.globalConfig.ControlAPIHostname != "" {
+			baseUrl = strings.Replace(baseUrl, "127.0.0.1", s.globalConfig.ControlAPIHostname, 1)
 		}
 	}
 
