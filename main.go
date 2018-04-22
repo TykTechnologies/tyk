@@ -195,7 +195,11 @@ func setupGlobals() {
 	}
 
 	if config.Global().CoProcessOptions.EnableCoProcess {
-		CoProcessInit()
+		if err := CoProcessInit(); err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "coprocess",
+			}).Error(err)
+		}
 	}
 
 	// Get the notifier ready
