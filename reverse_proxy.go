@@ -306,7 +306,6 @@ func defaultTransport() *http.Transport {
 	// allocate a new one every time for now, to avoid modifying a
 	// global variable for each request's needs (e.g. timeouts).
 	return &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -421,15 +420,41 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	return false, nil
 }
 
+func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
+	return func(req *http.Request) (*url.URL, error) {
+		if api != nil && api.Proxy.Transport.ProxyURL != "" {
+			return url.Parse(api.Proxy.Transport.ProxyURL)
+		}
+		return http.ProxyFromEnvironment(req)
+	}
+}
+
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport() // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
+	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
 	if config.Global.ProxySSLInsecureSkipVerify {
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+
+	if config.Global.ProxySSLMinVersion > 0 {
+		transport.TLSClientConfig.MinVersion = config.Global.ProxySSLMinVersion
+	}
+
+	if p.TykAPISpec.Proxy.Transport.SSLMinVersion > 0 {
+		transport.TLSClientConfig.MinVersion = p.TykAPISpec.Proxy.Transport.SSLMinVersion
+	}
+
+	if len(config.Global.ProxySSLCipherSuites) > 0 {
+		transport.TLSClientConfig.CipherSuites = getCipherAliases(config.Global.ProxySSLCipherSuites)
+	}
+
+	if len(p.TykAPISpec.Proxy.Transport.SSLCipherSuites) > 0 {
+		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
+	}
 
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {

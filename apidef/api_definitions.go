@@ -371,6 +371,11 @@ type APIDefinition struct {
 		StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+		Transport                   struct {
+			SSLCipherSuites []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+			SSLMinVersion   uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+			ProxyURL        string   `bson:"proxy_url" json:"proxy_url"`
+		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota              bool                   `bson:"disable_quota" json:"disable_quota"`
