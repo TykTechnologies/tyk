@@ -51,6 +51,8 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 
 	tr.DialTLS = dialTLSPinnedCheck(b.API, tr.TLSClientConfig)
 
+	tr.Proxy = proxyFromAPI(b.API)
+
 	client := &http.Client{Transport: tr}
 
 	resp, err := client.Do(req)

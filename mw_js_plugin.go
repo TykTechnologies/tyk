@@ -498,6 +498,8 @@ func (j *JSVM) LoadTykJSApi() {
 
 		tr.DialTLS = dialTLSPinnedCheck(j.Spec, tr.TLSClientConfig)
 
+		tr.Proxy = proxyFromAPI(j.Spec)
+
 		// using new Client each time should be ok, since we closing connection every time
 		client := &http.Client{Transport: tr}
 		resp, err := client.Do(r)
