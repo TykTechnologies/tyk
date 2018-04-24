@@ -366,6 +366,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 	}
 
 	if *httpProfile {
+		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
