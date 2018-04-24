@@ -311,7 +311,7 @@ func defaultTransport() *http.Transport {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		}).DialContext,
-		MaxIdleConns:        100,
+		MaxIdleConns:        config.Global().MaxIdleConns,
 		MaxIdleConnsPerHost: config.Global().MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
