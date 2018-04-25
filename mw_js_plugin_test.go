@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -304,5 +305,20 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 
 	if want, got := "globalValue", r.Header.Get("global"); want != got {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
+	}
+}
+func TestJSVMEnvVars(t *testing.T) {
+	testVal := "TEST_VALUE"
+	os.Setenv("TYK_CONTEXT_TEST", testVal)
+	jsvm := JSVM{}
+	jsvm.Init(nil)
+	const in = "TykJS.Environment[\"TYK_CONTEXT_TEST\"]"
+	v, _ := jsvm.VM.Run(in)
+	returnedVal, err := v.ToString()
+	if err != nil {
+		t.Fatal("Couldn't convert JSVM value")
+	}
+	if returnedVal != testVal {
+		t.Fatalf("wanted value to be %s, got %s", testVal, returnedVal)
 	}
 }
