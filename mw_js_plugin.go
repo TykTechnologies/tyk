@@ -310,6 +310,9 @@ const defaultJSVMTimeout = 5
 func (j *JSVM) Init(spec *APISpec) {
 	vm := otto.New()
 
+	// Inject environment variables, this is referenced by TykJS.Environment:
+	vm.Set("env", getCtxEnv())
+
 	// Init TykJS namespace, constructors etc.
 	if _, err := vm.Run(coreJS); err != nil {
 		log.WithFields(logrus.Fields{
@@ -379,6 +382,20 @@ func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
 		}
 		f.Close()
 	}
+}
+
+func getCtxEnv() map[string]string {
+	vars := make(map[string]string)
+	for _, v := range os.Environ() {
+		p := strings.Index(v, "=")
+		key := v[:p]
+		val := v[p+1:]
+		if strings.HasPrefix(key, "TYK_CONTEXT") {
+			// Should we strip the prefix?
+			vars[key] = val
+		}
+	}
+	return vars
 }
 
 type TykJSHttpRequest struct {
@@ -608,7 +625,8 @@ var TykJS = {
 	},
 	TykEventHandlers: {
 		EventHandlerComponentMeta: function() {}
-	}
+	},
+	Environment: env
 }
 
 TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessRequest = function(request, session, config) {
