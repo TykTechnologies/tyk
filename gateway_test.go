@@ -202,7 +202,7 @@ func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	})
 }
 
-func createSpecTest(t *testing.T, def string) *APISpec {
+func createSpecTest(t testing.TB, def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	tname := t.Name()
 	redisStore := storage.RedisCluster{KeyPrefix: tname + "-apikey."}
@@ -216,7 +216,7 @@ func testKey(t testing.TB, name string) string {
 	return fmt.Sprintf("%s-%s", t.Name(), name)
 }
 
-func testReqBody(t *testing.T, body interface{}) io.Reader {
+func testReqBody(t testing.TB, body interface{}) io.Reader {
 	switch x := body.(type) {
 	case []byte:
 		return bytes.NewReader(x)
@@ -235,7 +235,7 @@ func testReqBody(t *testing.T, body interface{}) io.Reader {
 	}
 }
 
-func testReq(t *testing.T, method, urlStr string, body interface{}) *http.Request {
+func testReq(t testing.TB, method, urlStr string, body interface{}) *http.Request {
 	return httptest.NewRequest(method, urlStr, testReqBody(t, body))
 }
 

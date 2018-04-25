@@ -8,10 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func TestVersioning(t *testing.T) {
-	ts := newTykTestServer()
-	defer ts.Close()
-
+func testPrepareVersioning() (string, string) {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.VersionData.NotVersioned = false
@@ -35,6 +32,15 @@ func TestVersioning(t *testing.T) {
 			APIID: "test", Versions: []string{"v1", "expired"},
 		}}
 	})
+
+	return keyWrongVersion, keyKnownVersion
+}
+
+func TestVersioning(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
 
 	wrongVersionHeaders := map[string]string{
 		"authorization": keyWrongVersion,
@@ -62,4 +68,42 @@ func TestVersioning(t *testing.T) {
 		{Path: "/", Code: 200, Headers: knownVersionHeaders},
 		{Path: "/", Code: 403, Headers: expiredVersionHeaders, BodyMatch: string(VersionExpired)},
 	}...)
+}
+
+func BenchmarkVersioning(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
+
+	wrongVersionHeaders := map[string]string{
+		"authorization": keyWrongVersion,
+		"version":       "v2",
+	}
+
+	disallowedAccessHeaders := map[string]string{
+		"authorization": keyWrongVersion,
+		"version":       "v1",
+	}
+
+	knownVersionHeaders := map[string]string{
+		"authorization": keyKnownVersion,
+		"version":       "v1",
+	}
+
+	expiredVersionHeaders := map[string]string{
+		"authorization": keyKnownVersion,
+		"version":       "expired",
+	}
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, []test.TestCase{
+			{Path: "/", Code: 403, Headers: wrongVersionHeaders, BodyMatch: "This API version does not seem to exist"},
+			{Path: "/", Code: 403, Headers: disallowedAccessHeaders, BodyMatch: "Access to this API has been disallowed"},
+			{Path: "/", Code: 200, Headers: knownVersionHeaders},
+			{Path: "/", Code: 403, Headers: expiredVersionHeaders, BodyMatch: string(VersionExpired)},
+		}...)
+	}
 }

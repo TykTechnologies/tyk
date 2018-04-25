@@ -9,10 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestResponseHeaderInjection(t *testing.T) {
-	ts := newTykTestServer()
-	defer ts.Close()
-
+func testPrepareResponseHeaderInjection() {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/"
@@ -61,6 +58,13 @@ func TestResponseHeaderInjection(t *testing.T) {
 		})
 		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 	})
+}
+
+func TestResponseHeaderInjection(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareResponseHeaderInjection()
 
 	addHeaders := map[string]string{"X-Test": "test"}
 	deleteHeaders := map[string]string{"X-Tyk-Mock": "1"}
@@ -74,4 +78,28 @@ func TestResponseHeaderInjection(t *testing.T) {
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
 		{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
 	}...)
+}
+
+func BenchmarkResponseHeaderInjection(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareResponseHeaderInjection()
+
+	addHeaders := map[string]string{"X-Test": "test"}
+	deleteHeaders := map[string]string{"X-Tyk-Mock": "1"}
+	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, []test.TestCase{
+			// Create base auth based key
+			{Method: "GET", Path: "/test-with-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
+			{Method: "GET", Path: "/test-no-slash", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders},
+			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"Url":"/newpath"`},
+			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: `"X-I-Am":"Request"`},
+			{Method: "GET", Path: "/rewrite-test", HeadersMatch: addHeaders, HeadersNotMatch: deleteHeaders, BodyMatch: userAgent},
+		}...)
+	}
 }

@@ -42,7 +42,14 @@ func (dummySessionManager) UpdateSession(key string, sess *user.SessionState, tt
 	return nil
 }
 
-func TestApplyPolicies(t *testing.T) {
+type testApplyPoliciesData struct {
+	name      string
+	policies  []string
+	errMatch  string                               // substring
+	sessMatch func(*testing.T, *user.SessionState) // ignored if nil
+}
+
+func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 	policiesMu.RLock()
 	policiesByID = map[string]user.Policy{
 		"nonpart1": {},
@@ -91,12 +98,7 @@ func TestApplyPolicies(t *testing.T) {
 		APIDefinition:  &apidef.APIDefinition{},
 		SessionManager: &dummySessionManager{},
 	}}
-	tests := []struct {
-		name      string
-		policies  []string
-		errMatch  string                               // substring
-		sessMatch func(*testing.T, *user.SessionState) // ignored if nil
-	}{
+	tests := []testApplyPoliciesData{
 		{
 			"Empty", nil,
 			"", nil,
@@ -209,6 +211,13 @@ func TestApplyPolicies(t *testing.T) {
 			},
 		},
 	}
+
+	return bmid, tests
+}
+
+func TestApplyPolicies(t *testing.T) {
+	bmid, tests := testPrepareApplyPolicies()
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			sess := &user.SessionState{}
@@ -227,5 +236,19 @@ func TestApplyPolicies(t *testing.T) {
 				tc.sessMatch(t, sess)
 			}
 		})
+	}
+}
+
+func BenchmarkApplyPolicies(b *testing.B) {
+	b.ReportAllocs()
+
+	bmid, tests := testPrepareApplyPolicies()
+
+	for i := 0; i < b.N; i++ {
+		for _, tc := range tests {
+			sess := &user.SessionState{}
+			sess.SetPolicies(tc.policies...)
+			bmid.ApplyPolicies("", sess)
+		}
 	}
 }
