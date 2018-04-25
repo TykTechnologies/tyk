@@ -397,6 +397,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
+	eventWG.Add(1)
 	encodedString, spec, req := testPrepareHMACAuthSessionPass(t, &eventWG, true)
 
 	recorder := httptest.NewRecorder()
