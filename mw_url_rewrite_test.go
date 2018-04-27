@@ -630,6 +630,52 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{NotMatchPattern: "not-matched"}
+			hOpt.Init()
+
+			return TestDef{
+				"PathPart Single Negative",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/rewritten",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/rewritten",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{NotMatchPattern: "foo"}
+			hOpt.Init()
+
+			return TestDef{
+				"PathPart Single Negative Fail",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/rewritten",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foo/rewrite/foo", nil)
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
 			hOpt.Init()
