@@ -77,11 +77,11 @@ func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValu
 }
 
 // ExtractBody is used when BodySource is specified.
-func (e *BaseExtractor) ExtractBody(r *http.Request) (bodyValue string, err error) {
+func (e *BaseExtractor) ExtractBody(r *http.Request) (string, error) {
 	copiedRequest := copyRequest(r)
 	body, err := ioutil.ReadAll(copiedRequest.Body)
 	if err != nil {
-		return bodyValue, err
+		return "", err
 	}
 	return string(body), err
 }
@@ -159,6 +159,8 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 type RegexExtractor struct {
 	BaseExtractor
+	compiledExpr *regexp.Regexp
+	cfg          *RegexExtractorConfig
 }
 
 type RegexExtractorConfig struct {
@@ -169,13 +171,14 @@ type RegexExtractorConfig struct {
 }
 
 func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
-	var extractorOutput string
-	var config RegexExtractorConfig
-
-	err := mapstructure.Decode(e.Config.ExtractorConfig, &config)
-	if err != nil {
-		returnOverrides = e.Error(r, err, "Can't decode RegexExtractor configuration")
-		return SessionID, returnOverrides
+	// Parse specific configuration settings:
+	if e.cfg == nil {
+		config := &RegexExtractorConfig{}
+		if err := mapstructure.Decode(e.Config.ExtractorConfig, config); err != nil {
+			returnOverrides = e.Error(r, err, "Can't decode RegexExtractor configuration")
+			return SessionID, returnOverrides
+		}
+		e.cfg = config
 	}
 
 	if e.Config.ExtractorConfig["regex_expression"] == nil {
@@ -183,39 +186,39 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	expression, err := regexp.Compile(config.RegexExpression)
-
-	if err != nil {
-		returnOverrides = e.Error(r, nil, "RegexExtractor found an invalid expression")
-		return SessionID, returnOverrides
+	var err error
+	if e.compiledExpr == nil {
+		e.compiledExpr, err = regexp.Compile(e.cfg.RegexExpression)
+		if err != nil {
+			returnOverrides = e.Error(r, nil, "RegexExtractor found an invalid expression")
+			return SessionID, returnOverrides
+		}
 	}
 
+	var extractorOutput string
 	switch e.Config.ExtractFrom {
 	case apidef.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
 	case apidef.BodySource:
 		extractorOutput, err = e.ExtractBody(r)
 	case apidef.FormSource:
-		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
+		extractorOutput, err = e.ExtractForm(r, e.cfg.FormParamName)
 	}
-
 	if err != nil {
 		returnOverrides = e.Error(r, err, "RegexExtractor error")
 		return SessionID, returnOverrides
 	}
 
-	regexOutput := expression.FindAllString(extractorOutput, -1)
-	if config.RegexMatchIndex > len(regexOutput)-1 {
+	regexOutput := e.compiledExpr.FindAllString(extractorOutput, -1)
+	if e.cfg.RegexMatchIndex > len(regexOutput)-1 {
 		returnOverrides = e.Error(r, fmt.Errorf("Can't find regexp match group"), "RegexExtractor error")
 		return SessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(regexOutput[config.RegexMatchIndex], e.BaseMid)
-
+	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMid)
 	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
 
 	if keyExists {
-
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			e.PostProcess(r, &previousSession, SessionID)
 			returnOverrides = ReturnOverrides{
@@ -223,7 +226,6 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 			}
 		}
 	}
-
 	return SessionID, returnOverrides
 }
 
@@ -232,8 +234,10 @@ type XPathExtractor struct {
 }
 
 type XPathExtractorConfig struct {
-	HeaderName    string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
-	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
+	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
+	FormParamName   string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 }
 
 func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
@@ -248,6 +252,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	expressionString := e.Config.ExtractorConfig["xpath_expression"].(string)
+
 	expression, err := xmlpath.Compile(expressionString)
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
@@ -305,7 +310,7 @@ func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {
 	case apidef.ValueExtractor:
 		extractor = &ValueExtractor{baseExtractor}
 	case apidef.RegexExtractor:
-		extractor = &RegexExtractor{baseExtractor}
+		extractor = &RegexExtractor{baseExtractor, nil, nil}
 	case apidef.XPathExtractor:
 		extractor = &XPathExtractor{baseExtractor}
 	}
