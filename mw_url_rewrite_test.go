@@ -727,7 +727,7 @@ func TestRewriterTriggers(t *testing.T) {
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foo/rewrite/foo", nil)
 			hOpt1 := apidef.StringRegexMap{MatchPattern: "foo",
-											NotMatchPattern: "not matched",}
+				NotMatchPattern: "not matched"}
 			hOpt1.Init()
 			hOpt2 := apidef.StringRegexMap{MatchPattern: "test"}
 			hOpt2.Init()
@@ -757,7 +757,7 @@ func TestRewriterTriggers(t *testing.T) {
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foo/rewrite/foo", nil)
 			hOpt1 := apidef.StringRegexMap{MatchPattern: "foo",
-											NotMatchPattern: "not matched",}
+				NotMatchPattern: "not matched"}
 			hOpt1.Init()
 			hOpt2 := apidef.StringRegexMap{MatchPattern: "test"}
 			hOpt2.Init()
