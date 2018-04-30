@@ -706,12 +706,12 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt2.Init()
 
 			return TestDef{
-				"PathPart MoreParts Multi Fail",
+				"PathPart MoreParts Multi All Fail",
 				"/test/foo/rewrite/foo", "/change/to/me/ignore",
 				"/test/foo/rewrite/foo", "/change/to/me/ignore",
 				[]apidef.RoutingTrigger{
 					{
-						On: apidef.Any,
+						On: apidef.All,
 						Options: apidef.RoutingTriggerOptions{
 							PathPartMatches: map[string]apidef.StringRegexMap{
 								"pathpart1": hOpt1,
@@ -719,6 +719,66 @@ func TestRewriterTriggers(t *testing.T) {
 							},
 						},
 						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart1-0/biz/$tyk_context.trigger-0-pathpart1-1",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite/foo", nil)
+			hOpt1 := apidef.StringRegexMap{MatchPattern: "foo",
+											NotMatchPattern: "not matched",}
+			hOpt1.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "test"}
+			hOpt2.Init()
+			hOpt3 := apidef.StringRegexMap{NotMatchPattern: "rewrite"}
+			hOpt3.Init()
+
+			return TestDef{
+				"PathPart MoreParts Multi Mixed Logic All Fail",
+				"/test/foo/rewrite/foo", "/change/to/me/ignore",
+				"/test/foo/rewrite/foo", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart1": hOpt1,
+								"pathpart2": hOpt2,
+								"pathpart3": hOpt3,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart1-0/biz/$tyk_context.trigger-0-pathpart1-1",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite/foo", nil)
+			hOpt1 := apidef.StringRegexMap{MatchPattern: "foo",
+											NotMatchPattern: "not matched",}
+			hOpt1.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "test"}
+			hOpt2.Init()
+			hOpt3 := apidef.StringRegexMap{NotMatchPattern: "baz"}
+			hOpt3.Init()
+
+			return TestDef{
+				"PathPart MoreParts Multi Mixed Logic All Pass",
+				"/test/foo/rewrite/foo", "/change/to/me/ignore",
+				"/test/foo/rewrite/foo", "/change/to/me/foo/biz/test",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.All,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart1": hOpt1,
+								"pathpart2": hOpt2,
+								"pathpart3": hOpt3,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart1-0/biz/$tyk_context.trigger-0-pathpart2-0",
 					},
 				},
 				r,
