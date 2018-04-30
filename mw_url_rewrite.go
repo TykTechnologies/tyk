@@ -413,27 +413,34 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 	contextData := ctxGetData(r)
 	fCount := 0
 	for mv, mr := range options {
-		pathParts := strings.Split(r.URL.Path, "/")
 
-		for _, part := range pathParts {
-			println("part")
-			println(part)
-			println("mr.NotMatchPattern")
-			println(mr.NotMatchPattern)
-			println("mr.MatchPattern")
-			println(mr.MatchPattern)
-			triggered, b := mr.Check(part)
-			println("triggered")
-			println(triggered)
+		// Check URL as a whole for NotMatchRegex
+		triggered, b := mr.Check(r.URL.Path)
+		if triggered {
+			pathParts := strings.Split(r.URL.Path, "/")
+			for _, part := range pathParts {
+				println("part")
+				println(part)
+				println("mr.NotMatchPattern")
+				println(mr.NotMatchPattern)
+				println("mr.MatchPattern")
+				println(mr.MatchPattern)
+				_, b = mr.Check(part)
+				println("triggered")
+				println(triggered)
 
-			if triggered {
+				
 				if len(b) > 0 {
 					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, fCount)
 					contextData[kn] = b
+					fCount++
 				}
-				fCount++
+				
+				
 			}
 		}
+
+		
 	}
 
 	if fCount > 0 {

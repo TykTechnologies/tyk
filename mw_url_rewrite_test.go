@@ -211,7 +211,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt2.Init()
 
 			return TestDef{
-				"Header Multi Mixed All Fail",
+				"Header Multi Mixed Logic All Fail",
 				"/test/straight/rewrite", "/change/to/me/ignore",
 				"/test/straight/rewrite", "/change/to/me/ignore",
 				[]apidef.RoutingTrigger{
@@ -271,7 +271,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt2.Init()
 
 			return TestDef{
-				"Header Multi Mixed All Pass",
+				"Header Multi Mixed Logic All Pass",
 				"/test/straight/rewrite", "/change/to/me/ignore",
 				"/test/straight/rewrite", "/change/to/me/hello",
 				[]apidef.RoutingTrigger{
@@ -693,6 +693,32 @@ func TestRewriterTriggers(t *testing.T) {
 							},
 						},
 						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0/biz/$tyk_context.trigger-0-pathpart-1",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite/foo", nil)
+			hOpt1 := apidef.StringRegexMap{MatchPattern: "foo"}
+			hOpt1.Init()
+			hOpt2 := apidef.StringRegexMap{MatchPattern: "baz"}
+			hOpt2.Init()
+
+			return TestDef{
+				"PathPart MoreParts Multi Fail",
+				"/test/foo/rewrite/foo", "/change/to/me/ignore",
+				"/test/foo/rewrite/foo", "/change/to/me/ignore",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart1": hOpt1,
+								"pathpart2": hOpt2,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart1-0/biz/$tyk_context.trigger-0-pathpart1-1",
 					},
 				},
 				r,
