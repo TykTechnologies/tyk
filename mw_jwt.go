@@ -102,17 +102,25 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 }
 
 func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
-	// Try using a kid or sub header
 	idFound := false
 	var tykId string
-	if token.Header["kid"] != nil {
-		tykId = token.Header["kid"].(string)
-		idFound = true
+
+	// Global config overrides and sets the api def
+	if config.Global.JWTUseIdFromKid {
+		k.Spec.APIDefinition.JWTUseIdFromKid = true
 	}
 
-	if !idFound && token.Claims.(jwt.MapClaims)["sub"] != nil {
-		tykId = token.Claims.(jwt.MapClaims)["sub"].(string)
-		idFound = true
+	// Check which claim is used for the id - kid or sub header
+	if k.Spec.APIDefinition.JWTUseIdFromKid {
+		if token.Header["kid"] != nil {
+			tykId = token.Header["kid"].(string)
+			idFound = true
+		}
+	} else {
+		if  token.Claims.(jwt.MapClaims)["sub"] != nil {
+			tykId = token.Claims.(jwt.MapClaims)["sub"].(string)
+			idFound = true
+		}
 	}
 
 	log.Debug("Found: ", tykId)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 const jwtSecret = "9879879878787878"
@@ -96,6 +97,8 @@ func prepareJWTSessionHMAC(tb testing.TB) string {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
+	config.Global.JWTUseIdFromKid = true
+
 	session := createJWTSession()
 	tokenKID := testKey(tb, "token")
 	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
@@ -147,6 +150,8 @@ func prepareJWTSessionRSA(tb testing.TB) (*APISpec, string) {
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
 	})[0]
+
+	config.Global.JWTUseIdFromKid = true
 
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(tb, "token")
@@ -322,10 +327,31 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 
 	jwtToken := prepareJWTSessionRSABearer(t)
 
-	authHeaders := map[string]string{"authorization": "Bearer: " + jwtToken} // extra ":"
+	authHeaders := map[string]string{"authorization": "Bearer: " + jwtToken} // extra ":" makes the value invalid
 	t.Run("Request with invalid Bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: 403,
+		})
+	})
+}
+
+func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	jwtToken := prepareJWTSessionRSABearer(t)
+
+	authHeaders1 := map[string]string{"authorization": "Bearer bearer" + jwtToken}
+	t.Run("Request with Bearer bearer", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders1, Code: 200, //fix code since it should be 403
+		})
+	})
+
+	authHeaders2 := map[string]string{"authorization": "bearer Bearer" + jwtToken}
+	t.Run("Request with bearer Bearer", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders2, Code: 200, //fix code since it should be 403
 		})
 	})
 }
