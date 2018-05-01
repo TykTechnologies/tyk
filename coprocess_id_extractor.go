@@ -107,6 +107,7 @@ func (e *BaseExtractor) GenerateSessionID(input string, mw BaseMiddleware) (sess
 
 type ValueExtractor struct {
 	BaseExtractor
+	cfg *ValueExtractorConfig
 }
 
 type ValueExtractorConfig struct {
@@ -120,20 +121,22 @@ func (e *ValueExtractor) Extract(input interface{}) string {
 }
 
 func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, returnOverrides ReturnOverrides) {
-	var extractorOutput string
-	var config ValueExtractorConfig
-
-	err := mapstructure.Decode(e.Config.ExtractorConfig, &config)
-	if err != nil {
-		returnOverrides = e.Error(r, err, "Couldn't decode ValueExtractor configuration")
-		return sessionID, returnOverrides
+	if e.cfg == nil {
+		config := &ValueExtractorConfig{}
+		if err := mapstructure.Decode(e.Config.ExtractorConfig, config); err != nil {
+			returnOverrides = e.Error(r, err, "Couldn't decode ValueExtractor configuration")
+			return sessionID, returnOverrides
+		}
+		e.cfg = config
 	}
 
+	var extractorOutput string
+	var err error
 	switch e.Config.ExtractFrom {
 	case apidef.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
 	case apidef.FormSource:
-		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
+		extractorOutput, err = e.ExtractForm(r, e.cfg.FormParamName)
 	}
 
 	if err != nil {
@@ -231,6 +234,8 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 type XPathExtractor struct {
 	BaseExtractor
+	cfg  *XPathExtractorConfig
+	path *xmlpath.Path
 }
 
 type XPathExtractorConfig struct {
@@ -241,31 +246,35 @@ type XPathExtractorConfig struct {
 }
 
 func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
-	var extractorOutput string
-
-	var config XPathExtractorConfig
-	err := mapstructure.Decode(e.Config.ExtractorConfig, &config)
-
+	var err error
+	config := &XPathExtractorConfig{}
+	if err = mapstructure.Decode(e.Config.ExtractorConfig, config); err != nil {
+		returnOverrides = e.Error(r, err, "Can't decode XPathExtractor configuration")
+		return SessionID, returnOverrides
+	}
+	e.cfg = config
 	if e.Config.ExtractorConfig["xpath_expression"] == nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: no expression set")
 		return SessionID, returnOverrides
 	}
 
-	expressionString := e.Config.ExtractorConfig["xpath_expression"].(string)
-
-	expression, err := xmlpath.Compile(expressionString)
-	if err != nil {
-		returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
-		return SessionID, returnOverrides
+	if e.path == nil {
+		expressionString := e.Config.ExtractorConfig["xpath_expression"].(string)
+		e.path, err = xmlpath.Compile(expressionString)
+		if err != nil {
+			returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
+			return SessionID, returnOverrides
+		}
 	}
 
+	var extractorOutput string
 	switch e.Config.ExtractFrom {
 	case apidef.HeaderSource:
 		extractorOutput, err = e.ExtractHeader(r)
 	case apidef.BodySource:
 		extractorOutput, err = e.ExtractBody(r)
 	case apidef.FormSource:
-		extractorOutput, err = e.ExtractForm(r, config.FormParamName)
+		extractorOutput, err = e.ExtractForm(r, e.cfg.FormParamName)
 	}
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor error")
@@ -278,7 +287,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	output, ok := expression.String(extractedXml)
+	output, ok := e.path.String(extractedXml)
 	if !ok {
 		returnOverrides = e.Error(r, err, "XPathExtractor: no input")
 		return SessionID, returnOverrides
@@ -308,11 +317,11 @@ func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {
 	// Initialize a extractor based on the API spec.
 	switch referenceSpec.CustomMiddleware.IdExtractor.ExtractWith {
 	case apidef.ValueExtractor:
-		extractor = &ValueExtractor{baseExtractor}
+		extractor = &ValueExtractor{baseExtractor, nil}
 	case apidef.RegexExtractor:
 		extractor = &RegexExtractor{baseExtractor, nil, nil}
 	case apidef.XPathExtractor:
-		extractor = &XPathExtractor{baseExtractor}
+		extractor = &XPathExtractor{baseExtractor, nil, nil}
 	}
 
 	referenceSpec.CustomMiddleware.IdExtractor.Extractor = extractor
