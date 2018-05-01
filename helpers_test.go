@@ -296,7 +296,6 @@ func (s *tykTestServer) Start() {
 	s.ln, _ = generateListener(0)
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
 	config.Global.ListenPort, _ = strconv.Atoi(port)
-	config.Global.UseAsyncSessionWrite = true
 
 	if s.config.sepatateControlAPI {
 		s.cln, _ = net.Listen("tcp", "127.0.0.1:0")
