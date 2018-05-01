@@ -36,6 +36,8 @@ petstore.json
 *.pem
 *.csr
 *.prof
+*.blockprof
+*.mutexprof
 *.pdf
 *.mmdb
 *.cov
