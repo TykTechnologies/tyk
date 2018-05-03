@@ -1,8 +1,6 @@
 package user
 
 import (
-	"fmt"
-
 	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
@@ -89,7 +87,7 @@ func (s *SessionState) Hash() string {
 		log.Error("Error encoding session data: ", err)
 		return ""
 	}
-	return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
+	return string(murmurHasher.Sum(encoded)[:])
 }
 
 func (s *SessionState) HasChanged() bool {
