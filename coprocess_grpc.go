@@ -13,6 +13,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -55,7 +57,10 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
 func (d *GRPCDispatcher) DispatchObject(object *coprocess.Object) (*coprocess.Object, error) {
-	newObject, err := grpcClient.Dispatch(context.Background(), object)
+	// Inject environment variables into the context:
+	md := metadata.New(getCtxEnv())
+	ctx := metadata.NewContext(context.Background(), md)
+	newObject, err := grpcClient.Dispatch(ctx, object)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
