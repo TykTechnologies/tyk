@@ -498,6 +498,55 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	})
 }
 
+func TestJWTSessionInvalidClaims(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	spec := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	pID := createPolicy()
+
+	t.Run("Fail if token expired", func(t *testing.T) {
+		spec.JWTDisableExpiresAtValidation = false
+		loadAPI(spec)
+
+		jwtToken := createJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["user_id"] = "user"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(-time.Hour * 72).Unix()
+		})
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: 401, BodyMatch: "Key not authorized: Token is expired",
+		})
+	})
+
+	t.Run("Pass if token expired and validation disabled", func(t *testing.T) {
+		spec.JWTDisableExpiresAtValidation = true
+		loadAPI(spec)
+
+		jwtToken := createJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["user_id"] = "user"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(-time.Hour * 72).Unix()
+		})
+		authHeaders := map[string]string{"authorization": jwtToken}
+
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: 200,
+		})
+	})
+}
+
 func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
