@@ -146,7 +146,6 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	if len(matchGroups) > 0 {
 		newpath = rewriteToPath
 		// get the indices for the replacements:
-		dollarMatch := regexp.MustCompile(`\$\d+`) // Prepare our regex
 		replaceGroups := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 
 		log.Debug(matchGroups)
