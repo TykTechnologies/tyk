@@ -752,32 +752,40 @@ func TestProxyTransport(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	config.Global.ProxySSLInsecureSkipVerify = true
+	globalConf := config.Global()
+	globalConf.ProxySSLInsecureSkipVerify = true
 	// force creating new transport on each reque
-	config.Global.MaxConnTime = -1
+	globalConf.MaxConnTime = -1
+	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.Proxy.TargetURL = upstream.URL
-	})
-
 	//matching ciphers
 	t.Run("Global: Cipher match", func(t *testing.T) {
-		config.Global.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+		config.SetGlobal(globalConf)
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+		})
 		ts.Run(t, test.TestCase{Path: "/", Code: 200})
 	})
 
 	t.Run("Global: Cipher not match", func(t *testing.T) {
-		config.Global.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		config.SetGlobal(globalConf)
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+		})
 		ts.Run(t, test.TestCase{Path: "/", Code: 500})
 	})
 
 	t.Run("API: Cipher override", func(t *testing.T) {
-		config.Global.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		config.SetGlobal(globalConf)
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -788,7 +796,8 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: MinTLS not match", func(t *testing.T) {
-		config.Global.ProxySSLMinVersion = 772
+		globalConf.ProxySSLMinVersion = 772
+		config.SetGlobal(globalConf)
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
@@ -799,7 +808,8 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Proxy", func(t *testing.T) {
-		config.Global.ProxySSLMinVersion = 771
+		globalConf.ProxySSLMinVersion = 771
+		config.SetGlobal(globalConf)
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
