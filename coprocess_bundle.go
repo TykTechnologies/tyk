@@ -41,14 +41,14 @@ func (b *Bundle) Verify() error {
 	var bundleVerifier goverify.Verifier
 
 	// Perform signature verification if a public key path is set:
-	if config.Global.PublicKeyPath != "" {
+	if config.Global().PublicKeyPath != "" {
 		if b.Manifest.Signature == "" {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
 		if notificationVerifier == nil {
 			var err error
-			bundleVerifier, err = goverify.LoadPublicKeyFromFile(config.Global.PublicKeyPath)
+			bundleVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 			if err != nil {
 				return err
 			}
@@ -175,7 +175,7 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 // fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
 func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 
-	if !config.Global.EnableBundleDownloader {
+	if !config.Global().EnableBundleDownloader {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Warning("Bundle downloader is disabled.")
@@ -183,7 +183,7 @@ func fetchBundle(spec *APISpec) (bundle Bundle, err error) {
 		return bundle, err
 	}
 
-	bundleURL := config.Global.BundleBaseURL + spec.CustomMiddlewareBundle
+	bundleURL := config.Global().BundleBaseURL + spec.CustomMiddlewareBundle
 
 	var getter BundleGetter
 
@@ -271,11 +271,11 @@ func loadBundle(spec *APISpec) error {
 	}
 
 	// Skip if no bundle base URL is set.
-	if config.Global.BundleBaseURL == "" {
+	if config.Global().BundleBaseURL == "" {
 		return bundleError(spec, nil, "No bundle base URL set, skipping bundle")
 	}
 
-	tykBundlePath := filepath.Join(config.Global.MiddlewarePath, "bundles")
+	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 	// Skip if the bundle destination path already exists.
 	bundlePath := spec.APIID + "-" + spec.CustomMiddlewareBundle
 	destPath := filepath.Join(tykBundlePath, bundlePath)

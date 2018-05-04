@@ -10,7 +10,7 @@ import (
 type Monitor struct{}
 
 func (Monitor) Enabled() bool {
-	return config.Global.Monitor.EnableTriggerMonitors
+	return config.Global().Monitor.EnableTriggerMonitors
 }
 
 func (Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit float64) {
@@ -48,13 +48,13 @@ func (m Monitor) Check(sessionData *user.SessionState, key string) {
 		return
 	}
 
-	if config.Global.Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global.Monitor.GlobalTriggerLimit {
+	if config.Global().Monitor.GlobalTriggerLimit > 0.0 && usagePerc >= config.Global().Monitor.GlobalTriggerLimit {
 		log.Info("Firing...")
-		m.Fire(sessionData, key, config.Global.Monitor.GlobalTriggerLimit)
+		m.Fire(sessionData, key, config.Global().Monitor.GlobalTriggerLimit)
 	}
 
 	for _, triggerLimit := range sessionData.Monitor.TriggerLimits {
-		if usagePerc >= triggerLimit && triggerLimit != config.Global.Monitor.GlobalTriggerLimit {
+		if usagePerc >= triggerLimit && triggerLimit != config.Global().Monitor.GlobalTriggerLimit {
 			log.Info("Firing...")
 			m.Fire(sessionData, key, triggerLimit)
 			break

@@ -234,15 +234,13 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	config.Global.UseDBAppConfigs = true
-	config.Global.AllowInsecureConfigs = true
-	config.Global.DBAppConfOptions.ConnectionString = ts.URL
+	globalConf := config.Global()
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	config.SetGlobal(globalConf)
 
-	defer func() {
-		config.Global.UseDBAppConfigs = false
-		config.Global.AllowInsecureConfigs = false
-		config.Global.DBAppConfOptions.ConnectionString = ""
-	}()
+	defer resetTestConfig()
 
 	var wg sync.WaitGroup
 	wg.Add(1)

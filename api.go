@@ -154,7 +154,7 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 		}
 	} else {
 		// nothing defined, add key to ALL
-		if !config.Global.AllowMasterKeys {
+		if !config.Global().AllowMasterKeys {
 			log.Error("Master keys disallowed in configuration, key not added.")
 			return errors.New("Master keys not allowed")
 		}
@@ -287,7 +287,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 	}
 
 	// add key hash for newly created key
-	if config.Global.HashKeys && r.Method == http.MethodPost {
+	if config.Global().HashKeys && r.Method == http.MethodPost {
 		response.KeyHash = storage.HashKey(keyName)
 	}
 
@@ -295,7 +295,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 }
 
 func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
-	if byHash && !config.Global.HashKeys {
+	if byHash && !config.Global().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), 400
 	}
 
@@ -464,7 +464,7 @@ func handleGetAPI(apiID string) (interface{}, int) {
 }
 
 func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
-	if config.Global.UseDBAppConfigs {
+	if config.Global().UseDBAppConfigs {
 		log.Error("Rejected new API Definition due to UseDBAppConfigs = true")
 		return apiError("Due to enabled use_db_app_configs, please use the Dashboard API"), 500
 	}
@@ -481,7 +481,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 	}
 
 	// Create a filename
-	defFilePath := filepath.Join(config.Global.AppPath, newDef.APIID+".json")
+	defFilePath := filepath.Join(config.Global().AppPath, newDef.APIID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err == nil {
@@ -517,7 +517,7 @@ func handleAddOrUpdateApi(apiID string, r *http.Request) (interface{}, int) {
 
 func handleDeleteAPI(apiID string) (interface{}, int) {
 	// Generate a filename
-	defFilePath := filepath.Join(config.Global.AppPath, apiID+".json")
+	defFilePath := filepath.Join(config.Global().AppPath, apiID+".json")
 
 	// If it exists, delete it
 	if _, err := os.Stat(defFilePath); err != nil {
@@ -591,9 +591,9 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 			obj, code = handleGetDetail(keyName, apiID, isHashed)
 		} else {
 			// Return list of keys
-			if config.Global.HashKeys {
+			if config.Global().HashKeys {
 				// get all keys is disabled by default
-				if !config.Global.EnableHashedKeysListing {
+				if !config.Global().EnableHashedKeysListing {
 					doJSONWrite(
 						w,
 						http.StatusNotFound,
@@ -731,7 +731,7 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 
 	if spec == nil {
 		log.Warning("Couldn't find org session store in active API list")
-		if config.Global.SupressDefaultOrgStore {
+		if config.Global().SupressDefaultOrgStore {
 			return apiError("No such organisation found in Active API list"), 404
 		}
 		sessionManager = &DefaultOrgStore
@@ -934,7 +934,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		if config.Global.AllowMasterKeys {
+		if config.Global().AllowMasterKeys {
 			// nothing defined, add key to ALL
 			log.WithFields(logrus.Fields{
 				"prefix":      "api",
@@ -988,7 +988,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// add key hash to reply
-	if config.Global.HashKeys {
+	if config.Global().HashKeys {
 		obj.KeyHash = storage.HashKey(newKey)
 	}
 
@@ -1407,7 +1407,7 @@ func getOauthClients(apiID string) (interface{}, int) {
 }
 
 func healthCheckhandler(w http.ResponseWriter, r *http.Request) {
-	if !config.Global.HealthCheck.EnableHealthChecks {
+	if !config.Global().HealthCheck.EnableHealthChecks {
 		doJSONWrite(w, 400, apiError("Health checks are not enabled for this node"))
 		return
 	}

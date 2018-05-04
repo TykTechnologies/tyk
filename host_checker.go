@@ -165,7 +165,7 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 
 	HostCheckerClient.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.Global.ProxySSLInsecureSkipVerify,
+			InsecureSkipVerify: config.Global().ProxySSLInsecureSkipVerify,
 		},
 	}
 

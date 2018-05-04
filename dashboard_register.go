@@ -37,7 +37,7 @@ type HTTPDashboardHandler struct {
 }
 
 func reLogin() {
-	if !config.Global.UseDBAppConfigs {
+	if !config.Global().UseDBAppConfigs {
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.RegistrationEndpoint = buildConnStr("/register/node")
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
-	if h.Secret = config.Global.NodeSecret; h.Secret == "" {
+	if h.Secret = config.Global().NodeSecret; h.Secret == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Fatal("Node secret is not set, required for dashboard connection")

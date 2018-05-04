@@ -268,7 +268,7 @@ func PythonSetEnv(pythonPaths ...string) {
 
 // getBundlePaths will return an array of the available bundle directories:
 func getBundlePaths() []string {
-	bundlePath := filepath.Join(config.Global.MiddlewarePath, "bundles")
+	bundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 	directories := make([]string, 0)
 	bundles, _ := ioutil.ReadDir(bundlePath)
 	for _, f := range bundles {
@@ -282,7 +282,7 @@ func getBundlePaths() []string {
 
 // NewCoProcessDispatcher wraps all the actions needed for this CP.
 func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
-	workDir := config.Global.CoProcessOptions.PythonPathPrefix
+	workDir := config.Global().CoProcessOptions.PythonPathPrefix
 
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	middlewarePath := filepath.Join(workDir, "middleware", "python")

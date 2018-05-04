@@ -47,7 +47,7 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 		tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 	}
 
-	tr.TLSClientConfig.InsecureSkipVerify = config.Global.ProxySSLInsecureSkipVerify
+	tr.TLSClientConfig.InsecureSkipVerify = config.Global().ProxySSLInsecureSkipVerify
 
 	tr.DialTLS = dialTLSPinnedCheck(b.API, tr.TLSClientConfig)
 
@@ -90,7 +90,7 @@ func (b *BatchRequestHandler) ConstructRequests(batchRequest BatchRequestStructu
 		// URLs need to be built absolute so they go through the rate limiting and request limiting machinery
 		var absURL string
 		if !unsafe {
-			absUrlHeader := "http://localhost:" + strconv.Itoa(config.Global.ListenPort)
+			absUrlHeader := "http://localhost:" + strconv.Itoa(config.Global().ListenPort)
 			absURL = strings.Join([]string{absUrlHeader, strings.Trim(b.API.Proxy.ListenPath, "/"), requestDef.RelativeURL}, "/")
 		} else {
 			absURL = requestDef.RelativeURL

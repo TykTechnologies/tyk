@@ -13,8 +13,11 @@ import (
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.ExperimentalProcessOrgOffThread = false
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	// run test server
 	ts := newTykTestServer()
@@ -67,8 +70,11 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.ExperimentalProcessOrgOffThread = true
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	// run test server
 	ts := newTykTestServer()
@@ -144,9 +150,12 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.EnableRedisRollingLimiter = true
-	config.Global.ExperimentalProcessOrgOffThread = false
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	// run test server
 	ts := newTykTestServer()
@@ -207,9 +216,12 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.EnableRedisRollingLimiter = true
-	config.Global.ExperimentalProcessOrgOffThread = true
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	// run test server
 	ts := newTykTestServer()
