@@ -105,7 +105,7 @@ type URLSpec struct {
 	InjectHeadersResponse     apidef.HeaderInjectionMeta
 	HardTimeout               apidef.HardTimeoutMeta
 	CircuitBreaker            ExtendedCircuitBreakerMeta
-	URLRewrite                apidef.URLRewriteMeta
+	URLRewrite                *apidef.URLRewriteMeta
 	VirtualPathSpec           apidef.VirtualMeta
 	RequestSize               apidef.RequestSizeMeta
 	MethodTransform           apidef.MethodTransformMeta
@@ -678,7 +678,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
-		newSpec.URLRewrite = stringSpec
+		newSpec.URLRewrite = &stringSpec
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -990,7 +990,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			}
 		case URLRewrite:
 			if r.Method == v.URLRewrite.Method {
-				return true, &v.URLRewrite
+				return true, v.URLRewrite
 			}
 		case VirtualPath:
 			if r.Method == v.VirtualPathSpec.Method {
