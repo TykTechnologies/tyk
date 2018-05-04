@@ -390,8 +390,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	// enable bearer token format
 	rawJWT = stripBearer(rawJWT)
 
+	// Use own validation logic, see below
+	parser := &jwt.Parser{SkipClaimsValidation: true}
+
 	// Verify the token
-	token, err := jwt.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
+	token, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		switch k.Spec.JWTSigningMethod {
 		case "hmac":
@@ -432,6 +435,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	})
 
 	if err == nil && token.Valid {
+		if jwtErr := k.validateJWTClaims(token.Claims.(jwt.MapClaims)); jwtErr != nil {
+			return errors.New("Key not authorized: " + jwtErr.Error()), 401
+		}
+
 		// Token is valid - let's move on
 
 		// Are we mapping to a central JWT Secret?
@@ -445,12 +452,42 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	logEntry := getLogEntryForRequest(r, "", nil)
 	logEntry.Info("Attempted JWT access with non-existent key.")
 
+	k.reportLoginFailure(tykId, r)
+
 	if err != nil {
 		logEntry.Error("JWT validation error: ", err)
+		return errors.New("Key not authorized:" + err.Error()), 403
+	} else {
+		return errors.New("Key not authorized"), 403
+	}
+}
+
+func (k *JWTMiddleware) validateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
+	vErr := new(jwt.ValidationError)
+	now := time.Now().Unix()
+
+	// The claims below are optional, by default, so if they are set to the
+	// default value in Go, let's not fail the verification for them.
+	if !k.Spec.JWTDisableExpiresAtValidation && c.VerifyExpiresAt(now, false) == false {
+		vErr.Inner = errors.New("Token is expired")
+		vErr.Errors |= jwt.ValidationErrorExpired
 	}
 
-	k.reportLoginFailure(tykId, r)
-	return errors.New("Key not authorized"), 403
+	if !k.Spec.JWTDisableIssuedAtValidation && c.VerifyIssuedAt(now, false) == false {
+		vErr.Inner = fmt.Errorf("Token used before issued")
+		vErr.Errors |= jwt.ValidationErrorIssuedAt
+	}
+
+	if !k.Spec.JWTDisableNotBeforeValidation && c.VerifyNotBefore(now, false) == false {
+		vErr.Inner = fmt.Errorf("token is not valid yet")
+		vErr.Errors |= jwt.ValidationErrorNotValidYet
+	}
+
+	if vErr.Errors == 0 {
+		return nil
+	}
+
+	return vErr
 }
 
 func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
