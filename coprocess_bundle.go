@@ -277,7 +277,9 @@ func loadBundle(spec *APISpec) error {
 
 	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 	// Skip if the bundle destination path already exists.
-	bundlePath := spec.APIID + "-" + spec.CustomMiddlewareBundle
+	bundleNameHash := md5.New()
+	io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
+	bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
 	destPath := filepath.Join(tykBundlePath, bundlePath)
 
 	// The bundle exists, load and return:
