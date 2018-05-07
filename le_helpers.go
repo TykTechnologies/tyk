@@ -29,7 +29,7 @@ func StoreLEState(m *letsencrypt.Manager) {
 	}
 
 	state := m.Marshal()
-	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), state)
 
 	if err := store.SetKey("cache", cryptoText, -1); err != nil {
@@ -57,7 +57,7 @@ func GetLEState(m *letsencrypt.Manager) {
 		return
 	}
 
-	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	sslState := decrypt([]byte(secret), cryptoText)
 
 	m.Unmarshal(sslState)

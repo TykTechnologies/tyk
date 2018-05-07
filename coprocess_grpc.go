@@ -33,7 +33,7 @@ type GRPCDispatcher struct {
 }
 
 func dialer(addr string, timeout time.Duration) (net.Conn, error) {
-	grpcUrl, err := url.Parse(config.Global.CoProcessOptions.CoProcessGRPCServer)
+	grpcUrl, err := url.Parse(config.Global().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
@@ -41,7 +41,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, err
 	}
 
-	if grpcUrl == nil || config.Global.CoProcessOptions.CoProcessGRPCServer == "" {
+	if grpcUrl == nil || config.Global().CoProcessOptions.CoProcessGRPCServer == "" {
 		errString := "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess-grpc",
@@ -49,7 +49,7 @@ func dialer(addr string, timeout time.Duration) (net.Conn, error) {
 		return nil, errors.New(errString)
 	}
 
-	grpcUrlString := config.Global.CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:]
+	grpcUrlString := config.Global().CoProcessOptions.CoProcessGRPCServer[len(grpcUrl.Scheme)+3:]
 	return net.DialTimeout(grpcUrl.Scheme, grpcUrlString, timeout)
 }
 

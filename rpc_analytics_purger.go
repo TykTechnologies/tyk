@@ -89,9 +89,7 @@ func (r RedisPurger) PurgeLoop(ticker <-chan time.Time) {
 }
 
 func (r *RedisPurger) PurgeCache() {
-	configMu.Lock()
-	expireAfter := config.Global.AnalyticsConfig.StorageExpirationTime
-	configMu.Unlock()
+	expireAfter := config.Global().AnalyticsConfig.StorageExpirationTime
 	if expireAfter == 0 {
 		expireAfter = 60 // 1 minute
 	}

@@ -97,8 +97,8 @@ func (s *SessionState) HasChanged() bool {
 }
 
 func (s *SessionState) Lifetime(fallback int64) int64 {
-	if config.Global.ForceGlobalSessionLifetime {
-		return config.Global.GlobalSessionLifetime
+	if config.Global().ForceGlobalSessionLifetime {
+		return config.Global().GlobalSessionLifetime
 	}
 	if s.SessionLifetime > 0 {
 		return s.SessionLifetime

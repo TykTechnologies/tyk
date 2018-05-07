@@ -20,12 +20,17 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	oldUseDBAppConfigs := config.Global.UseDBAppConfigs
-	config.Global.UseDBAppConfigs = false
+	globalConf := config.Global()
+	oldUseDBAppConfigs := globalConf.UseDBAppConfigs
+	globalConf.UseDBAppConfigs = false
+	config.SetGlobal(globalConf)
 
-	defer func() { config.Global.UseDBAppConfigs = oldUseDBAppConfigs }()
+	defer func() {
+		globalConf.UseDBAppConfigs = oldUseDBAppConfigs
+		config.SetGlobal(globalConf)
+	}()
 
-	allowExplicitPolicyID := config.Global.Policies.AllowExplicitPolicyID
+	allowExplicitPolicyID := config.Global().Policies.AllowExplicitPolicyID
 
 	policyMap := LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
 

@@ -22,7 +22,7 @@ func getLogEntryForRequest(r *http.Request, key string, data map[string]interfac
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !config.Global.EnableKeyLogging {
+		if !config.Global().EnableKeyLogging {
 			fields["key"] = logHiddenValue
 		}
 	}
@@ -42,7 +42,7 @@ func getExplicitLogEntryForRequest(path string, IP string, key string, data map[
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !config.Global.EnableKeyLogging {
+		if !config.Global().EnableKeyLogging {
 			fields["key"] = logHiddenValue
 		}
 	}

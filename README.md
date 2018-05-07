@@ -37,6 +37,9 @@ Tyk offers powerful, yet lightweight features that allow fine grained control ov
 Tyk is written in Go, which makes it fast and easy to set up. Its only dependencies are a Mongo database (for analytics) and Redis, 
 though it can be deployed without either (not recommended).
 
+## Tyk API Management Platform
+The Tyk Dashboard and Developer portal can be used with the Tyk API Gateway, to provide a full lifecycle API Management platform. You can find more details at https://tyk.io and for a full featureset, you can visit https://tyk.io/features.
+
 ## Why?
 
 Tyk was built because other open source API Gateways in the market come with dependencies and bloat, attempting to be too many things to too many people. Tyk is focused,

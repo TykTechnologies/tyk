@@ -34,8 +34,10 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts tykTestServer, data m
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.ExperimentalProcessOrgOffThread = false
+  globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+  config.SetGlobal(globalConf)
 
 	// run test server
 	ts := newTykTestServer()
@@ -77,10 +79,12 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 
 func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
-
-	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.ExperimentalProcessOrgOffThread = false
+  
+  // setup global config
+  globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+  config.SetGlobal(globalConf)
 
 	defer resetTestConfig()
 
@@ -108,8 +112,11 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.ExperimentalProcessOrgOffThread = true
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	// run test server
 	ts := newTykTestServer()
@@ -174,10 +181,12 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 
 func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
-
-	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.ExperimentalProcessOrgOffThread = true
+  
+  // setup global config
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+	config.SetGlobal(globalConf)
 
 	defer resetTestConfig()
 
@@ -205,9 +214,12 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.EnableRedisRollingLimiter = true
-	config.Global.ExperimentalProcessOrgOffThread = false
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	// run test server
 	ts := newTykTestServer()
@@ -256,11 +268,13 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 
 func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
-
+  
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.EnableRedisRollingLimiter = true
-	config.Global.ExperimentalProcessOrgOffThread = false
+  globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+	config.SetGlobal(globalConf)
 
 	defer resetTestConfig()
 
@@ -288,9 +302,12 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.EnableRedisRollingLimiter = true
-	config.Global.ExperimentalProcessOrgOffThread = true
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	// run test server
 	ts := newTykTestServer()
@@ -339,11 +356,13 @@ func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 
 func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
-
-	// setup global config
-	config.Global.EnforceOrgQuotas = true
-	config.Global.EnableRedisRollingLimiter = true
-	config.Global.ExperimentalProcessOrgOffThread = true
+  
+  // setup global config
+  globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+  config.SetGlobal(globalConf)
 
 	// run test server
 	ts := newTykTestServer()

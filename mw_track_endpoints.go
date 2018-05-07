@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 )
 
 // TrackEndpointMiddleware sets context variables to enable or disable whether Tyk should record analytitcs for a specific path.
@@ -17,7 +16,7 @@ func (t *TrackEndpointMiddleware) Name() string {
 }
 
 func (t *TrackEndpointMiddleware) EnabledForSpec() bool {
-	if !config.Global.EnableAnalytics || t.Spec.DoNotTrack {
+	if !t.Spec.GlobalConfig.EnableAnalytics || t.Spec.DoNotTrack {
 		return false
 	}
 

@@ -98,7 +98,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	case NoticeDashboardConfigRequest:
 		handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		if config.Global.ManagementNode {
+		if config.Global().ManagementNode {
 			// DRL is not initialized, going through would
 			// be mostly harmless but would flood the log
 			// with warnings since DRLManager.Ready == false
@@ -150,7 +150,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if notification.Signature == "" && config.Global.AllowInsecureConfigs {
+	if notification.Signature == "" && config.Global().AllowInsecureConfigs {
 		redisInsecureWarn.Do(func() {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
@@ -159,9 +159,9 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if config.Global.PublicKeyPath != "" && notificationVerifier == nil {
+	if config.Global().PublicKeyPath != "" && notificationVerifier == nil {
 		var err error
-		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global.PublicKeyPath)
+		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "pub-sub",
@@ -246,20 +246,25 @@ func handleDashboardZeroConfMessage(payload string) {
 		return
 	}
 
-	if !config.Global.UseDBAppConfigs || config.Global.DisableDashboardZeroConf {
+	if !config.Global().UseDBAppConfigs || config.Global().DisableDashboardZeroConf {
 		return
 	}
 
 	hostname := createConnectionStringFromDashboardObject(dashPayload)
 	setHostname := false
-	if config.Global.DBAppConfOptions.ConnectionString == "" {
-		config.Global.DBAppConfOptions.ConnectionString = hostname
+	globalConf := config.Global()
+	if globalConf.DBAppConfOptions.ConnectionString == "" {
+		globalConf.DBAppConfOptions.ConnectionString = hostname
 		setHostname = true
 	}
 
-	if config.Global.Policies.PolicyConnectionString == "" {
-		config.Global.Policies.PolicyConnectionString = hostname
+	if globalConf.Policies.PolicyConnectionString == "" {
+		globalConf.Policies.PolicyConnectionString = hostname
 		setHostname = true
+	}
+
+	if setHostname {
+		config.SetGlobal(globalConf)
 	}
 
 	if setHostname {
