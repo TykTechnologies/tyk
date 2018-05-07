@@ -55,7 +55,8 @@ class TykDispatcher:
         hooks = self.hook_table.get(api_id)
         # TODO: handle this situation and also nonexistent hooks
         if not hooks:
-            pass
+            raise Exception('No hooks defined for API: {0}'.format(api_id))
+
         hook = hooks.get(hook_name)
         if hook:
             return hook.middleware, hook
