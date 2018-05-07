@@ -286,7 +286,7 @@ func NewCoProcessDispatcher() (dispatcher coprocess.Dispatcher, err error) {
 
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	protoPath := filepath.Join(workDir, "coprocess", "python", "proto")
-	bundleRootPath := filepath.Join(config.Global.MiddlewarePath, "bundles")
+	bundleRootPath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 
 	paths := []string{dispatcherPath, protoPath, bundleRootPath}
 
