@@ -89,11 +89,13 @@ func BenchmarkURLReplacer(b *testing.B) {
 
 	defer resetTestConfig()
 
-	config.Global.AnalyticsConfig.NormaliseUrls.Enabled = true
-	config.Global.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-	config.Global.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
-	config.Global.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
-	config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+	globalConf := config.Global()
+	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+	config.SetGlobal(globalConf)
 
 	for i := 0; i < b.N; i++ {
 		recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}

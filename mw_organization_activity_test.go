@@ -34,10 +34,10 @@ func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts tykTestServer, data m
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	// setup global config
-  globalConf := config.Global()
+	globalConf := config.Global()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.ExperimentalProcessOrgOffThread = false
-  config.SetGlobal(globalConf)
+	config.SetGlobal(globalConf)
 
 	// run test server
 	ts := newTykTestServer()
@@ -79,12 +79,12 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 
 func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
-  
-  // setup global config
-  globalConf := config.Global()
+
+	// setup global config
+	globalConf := config.Global()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.ExperimentalProcessOrgOffThread = false
-  config.SetGlobal(globalConf)
+	config.SetGlobal(globalConf)
 
 	defer resetTestConfig()
 
@@ -181,8 +181,8 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 
 func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 	b.ReportAllocs()
-  
-  // setup global config
+
+	// setup global config
 	globalConf := config.Global()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.ExperimentalProcessOrgOffThread = true
@@ -268,9 +268,9 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 
 func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
-  
+
 	// setup global config
-  globalConf := config.Global()
+	globalConf := config.Global()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.EnableRedisRollingLimiter = true
 	globalConf.ExperimentalProcessOrgOffThread = false
@@ -356,13 +356,13 @@ func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 
 func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
 	b.ReportAllocs()
-  
-  // setup global config
-  globalConf := config.Global()
+
+	// setup global config
+	globalConf := config.Global()
 	globalConf.EnforceOrgQuotas = true
 	globalConf.EnableRedisRollingLimiter = true
 	globalConf.ExperimentalProcessOrgOffThread = true
-  config.SetGlobal(globalConf)
+	config.SetGlobal(globalConf)
 
 	// run test server
 	ts := newTykTestServer()
