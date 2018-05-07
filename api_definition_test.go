@@ -334,6 +334,42 @@ func TestDefaultVersion(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
+	key := testPrepareDefaultVersion()
+
+	authHeaders := map[string]string{"authorization": key}
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
+		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
+		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
+		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+	}...)
+}
+
+func BenchmarkDefaultVersion(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	key := testPrepareDefaultVersion()
+
+	authHeaders := map[string]string{"authorization": key}
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(
+			b,
+			[]test.TestCase{
+				{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
+				{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
+				{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
+				{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+			}...,
+		)
+	}
+}
+
+func testPrepareDefaultVersion() string {
 	buildAndLoadAPI(func(spec *APISpec) {
 		v1 := apidef.VersionInfo{Name: "v1"}
 		v1.Name = "v1"
@@ -354,18 +390,9 @@ func TestDefaultVersion(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})
 
-	key := createSession(func(s *user.SessionState) {
+	return createSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
 	})
-
-	authHeaders := map[string]string{"authorization": key}
-
-	ts.Run(t, []test.TestCase{
-		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
-		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
-		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
-		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
-	}...)
 }

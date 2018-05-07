@@ -11,18 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestProcessRequestLiveQuotaLimit(t *testing.T) {
-	// setup global config
-	globalConf := config.Global()
-	globalConf.EnforceOrgQuotas = true
-	globalConf.ExperimentalProcessOrgOffThread = false
-	config.SetGlobal(globalConf)
-	defer resetTestConfig()
-
-	// run test server
-	ts := newTykTestServer()
-	defer ts.Close()
-
+func testPrepareProcessRequestQuotaLimit(tb testing.TB, ts tykTestServer, data map[string]interface{}) {
 	// load API
 	orgID := "test-org-" + uuid.NewV4().String()
 	buildAndLoadAPI(func(spec *APISpec) {
@@ -31,19 +20,39 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
+	data["org_id"] = orgID
+
 	// create org key with quota
-	ts.Run(t, test.TestCase{
+	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
 		AdminAuth: true,
 		Method:    http.MethodPost,
 		Code:      http.StatusOK,
-		Data: map[string]interface{}{
+		Data:      data,
+	})
+}
+
+func TestProcessRequestLiveQuotaLimit(t *testing.T) {
+	// setup global config
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+	config.SetGlobal(globalConf)
+
+	// run test server
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// load API
+	testPrepareProcessRequestQuotaLimit(
+		t,
+		ts,
+		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
 			"quota_renewal_rate": 3,
-			"org_id":             orgID,
 		},
-	})
+	)
 
 	t.Run("Process request live with quota", func(t *testing.T) {
 		// 1st ten requests within quota
@@ -68,6 +77,39 @@ func TestProcessRequestLiveQuotaLimit(t *testing.T) {
 	})
 }
 
+func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
+	b.ReportAllocs()
+
+	// setup global config
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+	config.SetGlobal(globalConf)
+
+	defer resetTestConfig()
+
+	// run test server
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// load API
+	testPrepareProcessRequestQuotaLimit(
+		b,
+		ts,
+		map[string]interface{}{
+			"quota_max":          1000000,
+			"quota_remaining":    1000000,
+			"quota_renewal_rate": 3,
+		},
+	)
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Code: http.StatusOK,
+		})
+	}
+}
+
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	// setup global config
 	globalConf := config.Global()
@@ -81,26 +123,15 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	defer ts.Close()
 
 	// load API
-	orgID := "test-org-" + uuid.NewV4().String()
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = true
-		spec.OrgID = orgID
-		spec.Proxy.ListenPath = "/"
-	})
-
-	// create org key with quota
-	ts.Run(t, test.TestCase{
-		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
-		AdminAuth: true,
-		Method:    http.MethodPost,
-		Code:      http.StatusOK,
-		Data: map[string]interface{}{
+	testPrepareProcessRequestQuotaLimit(
+		t,
+		ts,
+		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
 			"quota_renewal_rate": 3,
-			"org_id":             orgID,
 		},
-	})
+	)
 
 	t.Run("Process request off thread with quota", func(t *testing.T) {
 		// at least first 10 requests within quota should be OK
@@ -148,6 +179,39 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 	})
 }
 
+func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
+	b.ReportAllocs()
+
+	// setup global config
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+	config.SetGlobal(globalConf)
+
+	defer resetTestConfig()
+
+	// run test server
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// load API
+	testPrepareProcessRequestQuotaLimit(
+		b,
+		ts,
+		map[string]interface{}{
+			"quota_max":          1000000,
+			"quota_remaining":    1000000,
+			"quota_renewal_rate": 3,
+		},
+	)
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Code: http.StatusOK,
+		})
+	}
+}
+
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	// setup global config
 	globalConf := config.Global()
@@ -162,27 +226,15 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	defer ts.Close()
 
 	// load API
-	orgID := "test-org-" + uuid.NewV4().String()
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = true
-		spec.OrgID = orgID
-		spec.Proxy.ListenPath = "/"
-	})
-
-	// create org key with quota
-	ts.Run(t, test.TestCase{
-		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
-		AdminAuth: true,
-		Method:    http.MethodPost,
-		Code:      http.StatusOK,
-		Data: map[string]interface{}{
+	testPrepareProcessRequestQuotaLimit(
+		t,
+		ts,
+		map[string]interface{}{
 			"quota_max": -1,
-			"allowance": 10,
 			"rate":      10,
 			"per":       1,
-			"org_id":    orgID,
 		},
-	})
+	)
 
 	t.Run("Process request live with rate limit", func(t *testing.T) {
 		// ten requests per sec should be OK
@@ -214,6 +266,40 @@ func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
 	})
 }
 
+func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
+	b.ReportAllocs()
+
+	// setup global config
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = false
+	config.SetGlobal(globalConf)
+
+	defer resetTestConfig()
+
+	// run test server
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// load API
+	testPrepareProcessRequestQuotaLimit(
+		b,
+		ts,
+		map[string]interface{}{
+			"quota_max": -1,
+			"rate":      10000,
+			"per":       1,
+		},
+	)
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Code: http.StatusOK,
+		})
+	}
+}
+
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	// setup global config
 	globalConf := config.Global()
@@ -228,27 +314,15 @@ func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 	defer ts.Close()
 
 	// load API
-	orgID := "test-org-" + uuid.NewV4().String()
-	buildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = true
-		spec.OrgID = orgID
-		spec.Proxy.ListenPath = "/"
-	})
-
-	// create org key with quota
-	ts.Run(t, test.TestCase{
-		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
-		AdminAuth: true,
-		Method:    http.MethodPost,
-		Code:      http.StatusOK,
-		Data: map[string]interface{}{
+	testPrepareProcessRequestQuotaLimit(
+		t,
+		ts,
+		map[string]interface{}{
 			"quota_max": -1,
-			"allowance": 10,
 			"rate":      10,
 			"per":       1,
-			"org_id":    orgID,
 		},
-	})
+	)
 
 	t.Run("Process request off thread with rate limit", func(t *testing.T) {
 		// ten requests per sec should be OK
@@ -278,4 +352,36 @@ func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
 			t.Logf("Started failing after %d requests over limit", reqNum-10)
 		}
 	})
+}
+
+func BenchmarkProcessRequestOffThreadRedisRollingLimiter(b *testing.B) {
+	b.ReportAllocs()
+
+	// setup global config
+	globalConf := config.Global()
+	globalConf.EnforceOrgQuotas = true
+	globalConf.EnableRedisRollingLimiter = true
+	globalConf.ExperimentalProcessOrgOffThread = true
+	config.SetGlobal(globalConf)
+
+	// run test server
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	// load API
+	testPrepareProcessRequestQuotaLimit(
+		b,
+		ts,
+		map[string]interface{}{
+			"quota_max": -1,
+			"rate":      10000,
+			"per":       1,
+		},
+	)
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Code: http.StatusOK,
+		})
+	}
 }

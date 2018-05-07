@@ -45,12 +45,17 @@ func getAuthKeyChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func TestBearerTokenAuthKeySession(t *testing.T) {
-	spec := createSpecTest(t, authKeyDef)
+func testPrepareAuthKeySession(tb testing.TB, apiDef string) (string, *APISpec) {
+	spec := createSpecTest(tb, apiDef)
 	session := createAuthKeyAuthSession()
 	customToken := "54321111"
 	// AuthKey sessions are stored by {token}
 	spec.SessionManager.UpdateSession(customToken, session, 60, false)
+	return customToken, spec
+}
+
+func TestBearerTokenAuthKeySession(t *testing.T) {
+	customToken, spec := testPrepareAuthKeySession(t, authKeyDef)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/auth_key_test/", nil)
@@ -63,6 +68,27 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
 		t.Error(recorder.Body.String())
+	}
+}
+
+func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
+	b.ReportAllocs()
+
+	customToken, spec := testPrepareAuthKeySession(b, authKeyDef)
+
+	recorder := httptest.NewRecorder()
+	req := testReq(b, "GET", "/auth_key_test/", nil)
+
+	req.Header.Set("authorization", "Bearer "+customToken)
+
+	chain := getAuthKeyChain(spec)
+
+	for i := 0; i < b.N; i++ {
+		chain.ServeHTTP(recorder, req)
+		if recorder.Code != 200 {
+			b.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+			b.Error(recorder.Body.String())
+		}
 	}
 }
 
@@ -83,11 +109,7 @@ const authKeyDef = `{
 }`
 
 func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
-	spec := createSpecTest(t, multiAuthBackwardsCompatible)
-	session := createAuthKeyAuthSession()
-	customToken := "54321111"
-	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60, false)
+	customToken, spec := testPrepareAuthKeySession(t, multiAuthBackwardsCompatible)
 
 	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
@@ -98,6 +120,25 @@ func TestMultiAuthBackwardsCompatibleSession(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
 		t.Error(recorder.Body.String())
+	}
+}
+
+func BenchmarkMultiAuthBackwardsCompatibleSession(b *testing.B) {
+	b.ReportAllocs()
+
+	customToken, spec := testPrepareAuthKeySession(b, multiAuthBackwardsCompatible)
+
+	recorder := httptest.NewRecorder()
+	req := testReq(b, "GET", fmt.Sprintf("/auth_key_test/?token=%s", customToken), nil)
+
+	chain := getAuthKeyChain(spec)
+
+	for i := 0; i < b.N; i++ {
+		chain.ServeHTTP(recorder, req)
+		if recorder.Code != 200 {
+			b.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+			b.Error(recorder.Body.String())
+		}
 	}
 }
 

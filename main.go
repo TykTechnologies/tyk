@@ -12,6 +12,7 @@ import (
 	pprof_http "net/http/pprof"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -89,6 +90,8 @@ var (
 	port               = kingpin.Flag("port", "listen on PORT (overrides config file)").String()
 	memProfile         = kingpin.Flag("memprofile", "generate a memory profile").Bool()
 	cpuProfile         = kingpin.Flag("cpuprofile", "generate a cpu profile").Bool()
+	blockProfile       = kingpin.Flag("blockprofile", "generate a block profile").Bool()
+	mutexProfile       = kingpin.Flag("mutexprofile", "generate a mutex profile").Bool()
 	httpProfile        = kingpin.Flag("httpprofile", "expose runtime profiling data via HTTP").Bool()
 	debugMode          = kingpin.Flag("debug", "enable debug mode").Bool()
 	importBlueprint    = kingpin.Flag("import-blueprint", "import an API Blueprint file").PlaceHolder("FILE").String()
@@ -1004,6 +1007,14 @@ func main() {
 		pprof.StartCPUProfile(cpuProfFile)
 		defer pprof.StopCPUProfile()
 	}
+	if *blockProfile {
+		mainLog.Info("Block profiling active")
+		runtime.SetBlockProfileRate(1)
+	}
+	if *mutexProfile {
+		mainLog.Info("Mutex profiling active")
+		runtime.SetMutexProfileFraction(1)
+	}
 
 	if goAgainErr != nil {
 		var err error
@@ -1035,6 +1046,8 @@ func main() {
 
 	mainLog.Info("Stop signal received.")
 
+	writeProfiles()
+
 	if config.Global().UseDBAppConfigs {
 		mainLog.Info("Stopping heartbeat...")
 		DashService.StopBeating()
@@ -1045,6 +1058,29 @@ func main() {
 	mainLog.Info("Terminating.")
 
 	time.Sleep(time.Second)
+}
+
+func writeProfiles() {
+	if *blockProfile {
+		f, err := os.Create("tyk.blockprof")
+		if err != nil {
+			panic(err)
+		}
+		if err = pprof.Lookup("block").WriteTo(f, 0); err != nil {
+			panic(err)
+		}
+		f.Close()
+	}
+	if *mutexProfile {
+		f, err := os.Create("tyk.mutexprof")
+		if err != nil {
+			panic(err)
+		}
+		if err = pprof.Lookup("mutex").WriteTo(f, 0); err != nil {
+			panic(err)
+		}
+		f.Close()
+	}
 }
 
 func start() {

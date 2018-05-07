@@ -81,7 +81,7 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func TestMultiSession_BA_Standard_OK(t *testing.T) {
+func testPrepareMultiSessionBA(t testing.TB) (*APISpec, *http.Request) {
 	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
@@ -100,16 +100,38 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 	to_encode := strings.Join([]string{username, password}, ":")
 	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
 
-	recorder := httptest.NewRecorder()
 	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
 	req.Header.Set("x-standard-auth", fmt.Sprintf("Bearer %s", customToken))
 
+	return spec, req
+}
+
+func TestMultiSession_BA_Standard_OK(t *testing.T) {
+	spec, req := testPrepareMultiSessionBA(t)
+
+	recorder := httptest.NewRecorder()
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
 	chain.ServeHTTP(recorder, req)
 
 	if recorder.Code != 200 {
 		t.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+	}
+}
+
+func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
+	b.ReportAllocs()
+
+	spec, req := testPrepareMultiSessionBA(b)
+
+	recorder := httptest.NewRecorder()
+	chain := getMultiAuthStandardAndBasicAuthChain(spec)
+
+	for i := 0; i < b.N; i++ {
+		chain.ServeHTTP(recorder, req)
+		if recorder.Code != 200 {
+			b.Error("Initial request failed with non-200 code, should have gone through!: \n", recorder.Code)
+		}
 	}
 }
 

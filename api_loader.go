@@ -202,7 +202,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		loadBundle(spec)
 	}
 
-	// TODO: use config.Global.EnableCoProcess
+	// TODO: use config.Global().EnableCoProcess
 	if config.Global().EnableJSVM || EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
