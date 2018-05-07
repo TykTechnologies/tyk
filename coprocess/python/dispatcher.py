@@ -52,7 +52,7 @@ class TykDispatcher:
             self.hook_table[with_bundle.api_id] = with_bundle.build_hooks_and_event_handlers()
 
     def find_hook(self, api_id, hook_name):
-        hooks = self.hook_table[api_id]
+        hooks = self.hook_table.get(api_id)
         # TODO: handle this situation and also nonexistent hooks
         if not hooks:
             pass
