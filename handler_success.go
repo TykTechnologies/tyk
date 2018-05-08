@@ -14,8 +14,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/request"
 
-	"fmt"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -62,7 +60,7 @@ func tagHeaders(r *http.Request, th []string, tags []string) []string {
 
 		if ok {
 			for _, val := range v {
-				tagName := fmt.Sprintf("%s-%s", cleanK, val)
+				tagName := cleanK + "-" + val
 				tags = append(tags, tagName)
 			}
 		}

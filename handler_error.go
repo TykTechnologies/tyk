@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
@@ -47,20 +46,20 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	w.Header().Set("Content-Type", contentType)
 
-	templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
+	templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 	// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
 	tmpl := templates.Lookup(templateName)
 
 	// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 	if tmpl == nil {
-		templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
+		templateName = defaultTemplateName + "." + templateExtension
 		tmpl = templates.Lookup(templateName)
 	}
 
 	// If no template is available for this content type, fallback to "error.json".
 	if tmpl == nil {
-		templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
+		templateName = defaultTemplateName + "." + defaultTemplateFormat
 		tmpl = templates.Lookup(templateName)
 		w.Header().Set("Content-Type", defaultContentType)
 	}

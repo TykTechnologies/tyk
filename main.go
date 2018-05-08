@@ -1125,7 +1125,7 @@ func start() {
 func generateListener(listenPort int) (net.Listener, error) {
 	listenAddress := config.Global().ListenAddress
 
-	targetPort := fmt.Sprintf("%s:%d", listenAddress, listenPort)
+	targetPort := listenAddress + ":" + strconv.Itoa(listenPort)
 
 	if httpServerOptions := config.Global().HttpServerOptions; httpServerOptions.UseSSL {
 		mainLog.Info("--> Using SSL (https)")
@@ -1213,7 +1213,7 @@ func listen(listener, controlListener net.Listener, err error) {
 	readTimeout := defReadTimeout
 	writeTimeout := defWriteTimeout
 
-	targetPort := fmt.Sprintf("%s:%d", config.Global().ListenAddress, config.Global().ListenPort)
+	targetPort := config.Global().ListenAddress + ":" + strconv.Itoa(config.Global().ListenPort)
 	if config.Global().HttpServerOptions.ReadTimeout > 0 {
 		readTimeout = time.Duration(config.Global().HttpServerOptions.ReadTimeout) * time.Second
 	}

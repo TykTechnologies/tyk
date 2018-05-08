@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -167,17 +166,17 @@ func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
-	logMsg := fmt.Sprintf("%s:%s", l.prefix, em.Type)
+	logMsg := l.prefix + ":" + string(em.Type)
 
 	// We can handle specific event types easily
 	if em.Type == EventQuotaExceeded {
 		msgConf := em.Meta.(EventKeyFailureMeta)
-		logMsg = fmt.Sprintf("%s:%s:%s:%s", logMsg, msgConf.Key, msgConf.Origin, msgConf.Path)
+		logMsg = logMsg + ":" + msgConf.Key + ":" + msgConf.Origin + ":" + msgConf.Path
 	}
 
 	if em.Type == EventBreakerTriggered {
 		msgConf := em.Meta.(EventCurcuitBreakerMeta)
-		logMsg = fmt.Sprintf("%s:%s:%s: [STATUS] %v", logMsg, msgConf.APIID, msgConf.Path, msgConf.CircuitEvent)
+		logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + string(msgConf.CircuitEvent)
 	}
 
 	log.Warning(logMsg)
