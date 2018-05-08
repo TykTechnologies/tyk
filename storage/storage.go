@@ -94,11 +94,8 @@ func ModifyFromHashRange(in string) string {
 
 func InRange(key string) bool {
 	kLen := len(key)
-	if kLen == 56 {
-		// old hashing method OrgID+Token
-		return false
-	} else if kLen < 56 {
-		// likely custom token
+	if kLen <= 56 {
+		// old hashing method OrgID+Token or a custom token
 		return false
 	}
 
