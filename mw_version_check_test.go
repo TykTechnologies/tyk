@@ -25,10 +25,10 @@ func testPrepareVersioning() (string, string) {
 			UseExtendedPaths: true,
 			ExtendedPaths: apidef.ExtendedPathsSet{
 				WhiteList: []apidef.EndPointMeta{
-					apidef.EndPointMeta{
+					{
 						Path: "/mock",
 						MethodActions: map[string]apidef.EndpointMethodMeta{
-							http.MethodGet: apidef.EndpointMethodMeta{
+							http.MethodGet: {
 								Action:  apidef.Reply,
 								Code:    http.StatusOK,
 								Data:    "testbody",
@@ -38,7 +38,7 @@ func testPrepareVersioning() (string, string) {
 					},
 				},
 				Ignored: []apidef.EndPointMeta{
-					apidef.EndPointMeta{
+					{
 						Path: "/ignore",
 					},
 				},

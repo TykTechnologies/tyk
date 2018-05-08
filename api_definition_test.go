@@ -396,3 +396,115 @@ func testPrepareDefaultVersion() string {
 		}}
 	})
 }
+
+func TestGetVersionFromRequest(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	versionInfo := apidef.VersionInfo{}
+	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar"}
+
+	t.Run("Header location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionData.Versions["v1"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
+			{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+		}...)
+	})
+
+	t.Run("URL param location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Key = "version"
+			spec.VersionData.Versions["v2"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo?version=v2", Code: 200},
+			{Path: "/bar?version=v2", Code: 403},
+		}...)
+	})
+
+	t.Run("URL location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url"
+			spec.VersionData.Versions["v3"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/v3/foo", Code: 200},
+			{Path: "/v3/bar", Code: 403},
+		}...)
+	})
+}
+
+func BenchmarkGetVersionFromRequest(b *testing.B) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	versionInfo := apidef.VersionInfo{}
+	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar"}
+
+	b.Run("Header location", func(b *testing.B) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionData.Versions["v1"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
+				{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+			}...)
+		}
+	})
+
+	b.Run("URL param location", func(b *testing.B) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Key = "version"
+			spec.VersionData.Versions["v2"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/foo?version=v2", Code: 200},
+				{Path: "/bar?version=v2", Code: 403},
+			}...)
+		}
+	})
+
+	b.Run("URL location", func(b *testing.B) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url"
+			spec.VersionData.Versions["v3"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/v3/foo", Code: 200},
+				{Path: "/v3/bar", Code: 403},
+			}...)
+		}
+	})
+}
