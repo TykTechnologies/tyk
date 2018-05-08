@@ -37,6 +37,11 @@ func testPrepareVersioning() (string, string) {
 						},
 					},
 				},
+				Ignored: []apidef.EndPointMeta{
+					apidef.EndPointMeta{
+						Path: "/ignore",
+					},
+				},
 			},
 		}
 	})
@@ -93,6 +98,7 @@ func TestVersioning(t *testing.T) {
 		{Path: "/", Code: 200, Headers: knownVersionHeaders},
 		{Path: "/", Code: 403, Headers: expiredVersionHeaders, BodyMatch: string(VersionExpired)},
 		{Path: "/mock", Code: 200, Headers: mockVersionHeaders, BodyMatch: "testbody", HeadersMatch: map[string]string{"testheader": "testvalue"}},
+		{Path: "/ignore", Code: 200, Headers: mockVersionHeaders},
 	}...)
 }
 
@@ -126,6 +132,7 @@ func BenchmarkVersioning(b *testing.B) {
 		"authorization": keyKnownVersion,
 		"version":       "v2",
 	}
+
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, []test.TestCase{
 			{Path: "/", Code: 403, Headers: wrongVersionHeaders, BodyMatch: "This API version does not seem to exist"},
@@ -133,6 +140,7 @@ func BenchmarkVersioning(b *testing.B) {
 			{Path: "/", Code: 200, Headers: knownVersionHeaders},
 			{Path: "/", Code: 403, Headers: expiredVersionHeaders, BodyMatch: string(VersionExpired)},
 			{Path: "/mock", Code: 200, Headers: mockVersionHeaders, BodyMatch: "testbody", HeadersMatch: map[string]string{"testheader": "testvalue"}},
+			{Path: "/ignore", Code: 200, Headers: mockVersionHeaders},
 		}...)
 	}
 }
