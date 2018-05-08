@@ -278,9 +278,23 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime), false)
 }
 
+func (t BaseMiddleware) keyValid(key string) bool {
+	if len(key) <= t.Spec.GlobalConfig.MinTokenLength || len(key) <= 3 {
+		return false
+	}
+
+	return true
+}
+
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.SessionState, bool) {
+	// Validate first
+	if !t.keyValid(key) {
+		log.Error("key does not pass validity checks")
+		return user.SessionState{IsInactive: true}, false
+	}
+
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
 	cacheKey := key

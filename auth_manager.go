@@ -190,7 +190,9 @@ type DefaultKeyGenerator struct{}
 func (DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
 	u5 := uuid.NewV4()
 	cleanSting := strings.Replace(u5.String(), "-", "", -1)
-	return orgID + cleanSting
+	withOrg := orgID + cleanSting
+
+	return storage.ModifyFromHashRange(withOrg)
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
