@@ -1,3 +1,5 @@
+// +build !python
+
 package main
 
 import (

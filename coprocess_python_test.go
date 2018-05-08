@@ -5,6 +5,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -54,6 +55,8 @@ func TestPythonBundles(t *testing.T) {
 			spec.CustomMiddlewareBundle = bundleID
 			spec.VersionData.NotVersioned = true
 		})
+
+		time.Sleep(1 * time.Second)
 
 		validAuth := map[string]string{"Authorization": "valid_token"}
 		invalidAuth := map[string]string{"Authorization": "invalid_token"}
