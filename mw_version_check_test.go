@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -19,17 +20,41 @@ func testPrepareVersioning() (string, string) {
 			Name:    "expired",
 			Expires: "2006-01-02 15:04",
 		}
+		spec.VersionData.Versions["v2"] = apidef.VersionInfo{
+			Name:             "v2",
+			UseExtendedPaths: true,
+			ExtendedPaths: apidef.ExtendedPathsSet{
+				WhiteList: []apidef.EndPointMeta{
+					{
+						Path: "/mock",
+						MethodActions: map[string]apidef.EndpointMethodMeta{
+							http.MethodGet: {
+								Action:  apidef.Reply,
+								Code:    http.StatusOK,
+								Data:    "testbody",
+								Headers: map[string]string{"testheader": "testvalue"},
+							},
+						},
+					},
+				},
+				Ignored: []apidef.EndPointMeta{
+					{
+						Path: "/ignore",
+					},
+				},
+			},
+		}
 	})
 
 	keyWrongVersion := createSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
-			APIID: "test", Versions: []string{"v2"},
+			APIID: "test", Versions: []string{"v3"},
 		}}
 	})
 
 	keyKnownVersion := createSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
-			APIID: "test", Versions: []string{"v1", "expired"},
+			APIID: "test", Versions: []string{"v1", "v2", "expired"},
 		}}
 	})
 
@@ -44,7 +69,7 @@ func TestVersioning(t *testing.T) {
 
 	wrongVersionHeaders := map[string]string{
 		"authorization": keyWrongVersion,
-		"version":       "v2",
+		"version":       "v3",
 	}
 
 	disallowedAccessHeaders := map[string]string{
@@ -62,11 +87,18 @@ func TestVersioning(t *testing.T) {
 		"version":       "expired",
 	}
 
+	mockVersionHeaders := map[string]string{
+		"authorization": keyKnownVersion,
+		"version":       "v2",
+	}
+
 	ts.Run(t, []test.TestCase{
 		{Path: "/", Code: 403, Headers: wrongVersionHeaders, BodyMatch: "This API version does not seem to exist"},
 		{Path: "/", Code: 403, Headers: disallowedAccessHeaders, BodyMatch: "Access to this API has been disallowed"},
 		{Path: "/", Code: 200, Headers: knownVersionHeaders},
 		{Path: "/", Code: 403, Headers: expiredVersionHeaders, BodyMatch: string(VersionExpired)},
+		{Path: "/mock", Code: 200, Headers: mockVersionHeaders, BodyMatch: "testbody", HeadersMatch: map[string]string{"testheader": "testvalue"}},
+		{Path: "/ignore", Code: 200, Headers: mockVersionHeaders},
 	}...)
 }
 
@@ -77,10 +109,9 @@ func BenchmarkVersioning(b *testing.B) {
 	defer ts.Close()
 
 	keyWrongVersion, keyKnownVersion := testPrepareVersioning()
-
 	wrongVersionHeaders := map[string]string{
 		"authorization": keyWrongVersion,
-		"version":       "v2",
+		"version":       "v3",
 	}
 
 	disallowedAccessHeaders := map[string]string{
@@ -97,6 +128,10 @@ func BenchmarkVersioning(b *testing.B) {
 		"authorization": keyKnownVersion,
 		"version":       "expired",
 	}
+	mockVersionHeaders := map[string]string{
+		"authorization": keyKnownVersion,
+		"version":       "v2",
+	}
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, []test.TestCase{
@@ -104,6 +139,8 @@ func BenchmarkVersioning(b *testing.B) {
 			{Path: "/", Code: 403, Headers: disallowedAccessHeaders, BodyMatch: "Access to this API has been disallowed"},
 			{Path: "/", Code: 200, Headers: knownVersionHeaders},
 			{Path: "/", Code: 403, Headers: expiredVersionHeaders, BodyMatch: string(VersionExpired)},
+			{Path: "/mock", Code: 200, Headers: mockVersionHeaders, BodyMatch: "testbody", HeadersMatch: map[string]string{"testheader": "testvalue"}},
+			{Path: "/ignore", Code: 200, Headers: mockVersionHeaders},
 		}...)
 	}
 }
