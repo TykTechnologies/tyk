@@ -901,6 +901,10 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if newSession.Certificate != "" {
 		newKey = newSession.OrgID + newSession.Certificate
+
+		if strings.HasPrefix(newSession.Certificate, newSession.OrgID) {
+			newKey = newSession.Certificate
+		}
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
