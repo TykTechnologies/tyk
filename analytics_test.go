@@ -45,12 +45,12 @@ func TestURLReplacer(t *testing.T) {
 	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
 	config.SetGlobal(globalConf)
 
-	recordUUID1.NormalisePath()
-	recordUUID2.NormalisePath()
-	recordUUID3.NormalisePath()
-	recordUUID4.NormalisePath()
-	recordID1.NormalisePath()
-	recordCust.NormalisePath()
+	recordUUID1.NormalisePath(&globalConf)
+	recordUUID2.NormalisePath(&globalConf)
+	recordUUID3.NormalisePath(&globalConf)
+	recordUUID4.NormalisePath(&globalConf)
+	recordID1.NormalisePath(&globalConf)
+	recordCust.NormalisePath(&globalConf)
 
 	if recordUUID1.Path != "/{uuid}/search" {
 		t.Error("Path not altered, is:")
@@ -105,12 +105,12 @@ func BenchmarkURLReplacer(b *testing.B) {
 		recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
 		recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
-		recordUUID1.NormalisePath()
-		recordUUID2.NormalisePath()
-		recordUUID3.NormalisePath()
-		recordUUID4.NormalisePath()
-		recordID1.NormalisePath()
-		recordCust.NormalisePath()
+		recordUUID1.NormalisePath(&globalConf)
+		recordUUID2.NormalisePath(&globalConf)
+		recordUUID3.NormalisePath(&globalConf)
+		recordUUID4.NormalisePath(&globalConf)
+		recordID1.NormalisePath(&globalConf)
+		recordCust.NormalisePath(&globalConf)
 	}
 }
 

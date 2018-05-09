@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"regexp"
 	"sync"
 	"sync/atomic"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
+	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
 
 var log = logger.Get()
@@ -58,9 +58,9 @@ type NormalisedURLConfig struct {
 }
 
 type NormaliseURLPatterns struct {
-	UUIDs  *regexp.Regexp
-	IDs    *regexp.Regexp
-	Custom []*regexp.Regexp
+	UUIDs  *tykregexp.Regexp
+	IDs    *tykregexp.Regexp
+	Custom []*tykregexp.Regexp
 }
 
 type AnalyticsConfigConfig struct {
