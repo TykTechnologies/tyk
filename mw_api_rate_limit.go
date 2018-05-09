@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"strconv"
@@ -30,7 +29,7 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 	}
 
 	// We'll init here
-	k.keyName = fmt.Sprintf("apilimiter-%s%s", k.Spec.OrgID, k.Spec.APIID)
+	k.keyName = "apilimiter-" + k.Spec.OrgID + k.Spec.APIID
 
 	// Set last updated on each load to ensure we always use a new rate limit bucket
 	k.apiSess = &user.SessionState{

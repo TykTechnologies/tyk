@@ -82,7 +82,7 @@ func (k *ValidateJSON) formatError(schemaErrors []gojsonschema.ResultError) erro
 		if i == 0 {
 			errStr = desc.String()
 		} else {
-			errStr = fmt.Sprintf("%s; %s", errStr, desc)
+			errStr = errStr + "; " + desc.String()
 		}
 	}
 
