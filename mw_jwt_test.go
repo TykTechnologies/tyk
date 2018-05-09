@@ -10,9 +10,9 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/TykTechnologies/tyk/config"
 )
 
 const jwtSecret = "9879879878787878"

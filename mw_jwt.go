@@ -117,7 +117,7 @@ func (k *JWTMiddleware) getIdentityFomToken(token *jwt.Token) (string, bool) {
 			idFound = true
 		}
 	} else {
-		if  token.Claims.(jwt.MapClaims)["sub"] != nil {
+		if token.Claims.(jwt.MapClaims)["sub"] != nil {
 			tykId = token.Claims.(jwt.MapClaims)["sub"].(string)
 			idFound = true
 		}
