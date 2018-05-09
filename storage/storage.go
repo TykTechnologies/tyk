@@ -6,8 +6,12 @@ import (
 
 	"github.com/spaolacci/murmur3"
 
+	"fmt"
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
+	murmur2 "github.com/aviddiviner/go-murmur"
+	"math/rand"
+	"time"
 )
 
 var log = logger.Get()
@@ -46,10 +50,80 @@ type Handler interface {
 	RemoveSortedSetRange(string, string, string) error
 }
 
-func HashStr(in string) string {
+func init() {
+	// Set of indicators that a token is from a new hash function
+	BuildRange(114, 414)
+}
+
+var HashRange []string
+
+func BuildRange(min, max int) {
+	top := max - min
+	HashRange = make([]string, top)
+
+	v := ""
+	ind := 0
+	for i := min; i < max; i++ {
+		v = fmt.Sprintf("%x", i)
+		if len(v) < 3 {
+			v = "x" + v
+		}
+
+		HashRange[ind] = v
+		ind++
+	}
+
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
+func ModifyFromHashRange(in string) string {
+	rand.Seed(time.Now().UnixNano())
+	n := rand.Int() % len(HashRange)
+
+	out := in + HashRange[n]
+	return out
+}
+
+func InRange(key string) bool {
+	kLen := len(key)
+	if kLen <= 56 {
+		// old hashing method OrgID+Token or a custom token
+		return false
+	}
+
+	// Check if tail in range
+	lastThree := key[len(key)-3:]
+	return stringInSlice(lastThree, HashRange)
+}
+
+// See https://softwareengineering.stackexchange.com/questions/49550/which-hashing-algorithm-is-best-for-uniqueness-and-speed
+func HashMM2(in string) string {
+	// Uses 64-bit hash that has good randomness
+	h := murmur2.MurmurHash64A([]byte(in), 42)
+	return fmt.Sprintf("%x", h)
+}
+
+func HashMM3(in string) string {
 	h := murmur3.New32()
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func HashStr(in string) string {
+	if InRange(in) {
+		// use murmur2-based hash
+		return HashMM2(in)
+	}
+
+	return HashMM3(in)
 }
 
 func HashKey(in string) string {
