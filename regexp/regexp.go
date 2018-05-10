@@ -112,10 +112,13 @@ func (re *Regexp) String() string {
 // When using a Regexp in multiple goroutines, giving each goroutine
 // its own copy helps to avoid lock contention.
 func (re *Regexp) Copy() *Regexp {
-	return &Regexp{
-		re.Regexp.Copy(),
-		re.FromCache,
+	reCopy := &Regexp{
+		FromCache: re.FromCache,
 	}
+	if re.Regexp != nil {
+		reCopy.Regexp = re.Regexp.Copy()
+	}
+	return reCopy
 }
 
 // Longest calls regexp.Regexp.Longest of wrapped regular expression
