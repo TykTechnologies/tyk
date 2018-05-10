@@ -10,13 +10,13 @@ import (
 )
 
 var (
-	compileRegexpCache                 compileCache
-	compileRegexpPOSIXCache            compilePOSIXCache
-	matchStringRegexpCache             matchStringCache
-	matchRegexpCache                   matchCache
-	replaceAllStringRegexpCache        replaceAllStringCache
-	replaceAllLiteralStringRegexpCache replaceAllLiteralStringCache
-	replaceAllStringFuncRegexpCache    replaceAllStringFuncCache
+	compileRegexpCache                 = compileCache{}
+	compileRegexpPOSIXCache            = compilePOSIXCache{}
+	matchStringRegexpCache             = matchStringCache{}
+	matchRegexpCache                   = matchCache{}
+	replaceAllStringRegexpCache        = replaceAllStringCache{}
+	replaceAllLiteralStringRegexpCache = replaceAllLiteralStringCache{}
+	replaceAllStringFuncRegexpCache    = replaceAllStringFuncCache{}
 )
 
 // Regexp is a wrapper around regexp.Regexp but with caching
@@ -31,27 +31,13 @@ func init() {
 
 // ResetCache resets cache to initial state
 func ResetCache() {
-	compileRegexpCache = compileCache{
-		cache: map[string]*regexp.Regexp{},
-	}
-	compileRegexpPOSIXCache = compilePOSIXCache{
-		cache: map[string]*regexp.Regexp{},
-	}
-	matchStringRegexpCache = matchStringCache{
-		cache: map[string]bool{},
-	}
-	matchRegexpCache = matchCache{
-		cache: map[string]bool{},
-	}
-	replaceAllStringRegexpCache = replaceAllStringCache{
-		cache: map[string]string{},
-	}
-	replaceAllLiteralStringRegexpCache = replaceAllLiteralStringCache{
-		cache: map[string]string{},
-	}
-	replaceAllStringFuncRegexpCache = replaceAllStringFuncCache{
-		cache: map[string]string{},
-	}
+	compileRegexpCache.reset()
+	compileRegexpPOSIXCache.reset()
+	matchStringRegexpCache.reset()
+	matchRegexpCache.reset()
+	replaceAllStringRegexpCache.reset()
+	replaceAllLiteralStringRegexpCache.reset()
+	replaceAllStringFuncRegexpCache.reset()
 }
 
 // Compile does the same as regexp.Compile but returns cached *Regexp instead.
@@ -203,7 +189,7 @@ func (re *Regexp) ReplaceAllLiteralString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllStringRegexpCache.replaceAllLiteralString(re.Regexp, src, repl)
+	return replaceAllLiteralStringRegexpCache.replaceAllLiteralString(re.Regexp, src, repl)
 }
 
 // ReplaceAllStringFunc is the same as regexp.Regexp.ReplaceAllStringFunc but returns cached result instead.

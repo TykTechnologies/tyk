@@ -27,3 +27,9 @@ func (c *matchCache) match(r *regexp.Regexp, b []byte) bool {
 
 	return realMatched
 }
+
+func (c *matchCache) reset() {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+	c.cache = map[string]bool{}
+}

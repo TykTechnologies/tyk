@@ -28,3 +28,9 @@ func (c *replaceAllStringFuncCache) replaceAllStringFunc(r *regexp.Regexp, src s
 
 	return res
 }
+
+func (c *replaceAllStringFuncCache) reset() {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+	c.cache = map[string]string{}
+}

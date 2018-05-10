@@ -39,3 +39,9 @@ func (c *compilePOSIXCache) compilePOSIX(expr string) (*Regexp, error) {
 		},
 		nil
 }
+
+func (c *compilePOSIXCache) reset() {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+	c.cache = map[string]*regexp.Regexp{}
+}

@@ -27,3 +27,9 @@ func (c *matchStringCache) matchString(r *regexp.Regexp, s string) bool {
 
 	return realMatched
 }
+
+func (c *matchStringCache) reset() {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+	c.cache = map[string]bool{}
+}

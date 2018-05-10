@@ -10,7 +10,7 @@ type replaceAllLiteralStringCache struct {
 	cacheMu sync.Mutex
 }
 
-func (c *replaceAllStringCache) replaceAllLiteralString(r *regexp.Regexp, src, repl string) string {
+func (c *replaceAllLiteralStringCache) replaceAllLiteralString(r *regexp.Regexp, src, repl string) string {
 	c.cacheMu.Lock()
 	defer c.cacheMu.Unlock()
 
@@ -26,4 +26,10 @@ func (c *replaceAllStringCache) replaceAllLiteralString(r *regexp.Regexp, src, r
 	c.cache[r.String()+src+repl] = res
 
 	return res
+}
+
+func (c *replaceAllLiteralStringCache) reset() {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+	c.cache = map[string]string{}
 }
