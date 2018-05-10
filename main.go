@@ -184,11 +184,6 @@ func setupGlobals() {
 	templatesDir := filepath.Join(config.Global.TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
 
-	// Set up global JSVM
-	if config.Global.EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
-	}
-
 	if config.Global.CoProcessOptions.EnableCoProcess {
 		CoProcessInit()
 	}
@@ -599,6 +594,11 @@ func doReload() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
+	// Initialize/reset the JSVM
+	if config.Global.EnableJSVM {
+		GlobalEventsJSVM.Init(nil)
+	}
+
 	// Load the API Policies
 	syncPolicies()
 	// load the specs
@@ -611,11 +611,6 @@ func doReload() {
 	}
 
 	// We have updated specs, lets load those...
-
-	// Reset the JSVM
-	if config.Global.EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
-	}
 
 	mainLog.Info("Preparing new router")
 	newRouter := mux.NewRouter()
