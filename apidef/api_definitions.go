@@ -335,7 +335,7 @@ type APIDefinition struct {
 	EnableJWT               bool                 `bson:"enable_jwt" json:"enable_jwt"`
 	UseStandardAuth         bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
 	EnableCoProcessAuth     bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
-	JWTUseIdFromKid        	bool                 `bson:"jwt_use_id_from_kid" json:"jwt_use_id_from_kid"`
+	JWTSkipCheckKidAsId     bool                 `bson:"jwt_skip_check_kid_as_id" json:"jwt_skip_check_kid_as_id"`
 	JWTSigningMethod        string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource               string               `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField    string               `bson:"jwt_identity_base_field" json:"jwt_identity_base_field"`
