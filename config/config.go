@@ -286,6 +286,7 @@ type Config struct {
 	NewRelic                          NewRelicConfig                        `json:"newrelic"`
 	VersionHeader                     string                                `json:"version_header"`
 	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
+	MinTokenLength                    int                                   `json:"min_token_length"`
 }
 
 type CertData struct {
