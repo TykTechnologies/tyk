@@ -727,6 +727,9 @@ const confSchema = `{
 	},
 	"enable_hashed_keys_listing": {
 		"type": "boolean"
-	}
+	},
+	"min_token_length": {
+		"type": "integer"
+ 	}
 }
 }`
