@@ -884,9 +884,11 @@ func afterConfSetup(conf *config.Config) {
 	if conf.SlaveOptions.CallTimeout == 0 {
 		conf.SlaveOptions.CallTimeout = 30
 	}
+
 	if conf.SlaveOptions.PingTimeout == 0 {
 		conf.SlaveOptions.PingTimeout = 60
 	}
+
 	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
