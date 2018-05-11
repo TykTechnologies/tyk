@@ -1,11 +1,10 @@
-// +build coprocess
-
 package main
 
 import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
@@ -77,8 +76,14 @@ func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValu
 	return strings.Join(values, ""), nil
 }
 
+// ExtractBody is used when BodySource is specified.
 func (e *BaseExtractor) ExtractBody(r *http.Request) (bodyValue string, err error) {
-	return bodyValue, err
+	copiedRequest := copyRequest(r)
+	body, err := ioutil.ReadAll(copiedRequest.Body)
+	if err != nil {
+		return bodyValue, err
+	}
+	return string(body), err
 }
 
 // Error is a helper for logging the extractor errors. It always returns HTTP 400 (so we don't expose any details).
@@ -200,7 +205,6 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	regexOutput := expression.FindAllString(extractorOutput, -1)
-
 	if config.RegexMatchIndex > len(regexOutput)-1 {
 		returnOverrides = e.Error(r, fmt.Errorf("Can't find regexp match group"), "RegexExtractor error")
 		return SessionID, returnOverrides
@@ -228,10 +232,8 @@ type XPathExtractor struct {
 }
 
 type XPathExtractorConfig struct {
-	HeaderName      string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
-	RegexExpression string `mapstructure:"regex_expression" bson:"regex_expression" json:"regex_expression"`
-	RegexMatchIndex int    `mapstructure:"regex_match_index" bson:"regex_match_index" json:"regex_match_index"`
-	FormParamName   string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
+	HeaderName    string `mapstructure:"header_name" bson:"header_name" json:"header_name"`
+	FormParamName string `mapstructure:"param_name" bson:"param_name" json:"param_name"`
 }
 
 func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, returnOverrides ReturnOverrides) {
@@ -246,7 +248,6 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	expressionString := e.Config.ExtractorConfig["xpath_expression"].(string)
-
 	expression, err := xmlpath.Compile(expressionString)
 	if err != nil {
 		returnOverrides = e.Error(r, err, "XPathExtractor: bad expression")
