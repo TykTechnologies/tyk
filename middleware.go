@@ -286,7 +286,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		// See https://github.com/TykTechnologies/tyk/issues/1681
 		minLength = 3
 	}
-	
+
 	if len(key) <= minLength {
 		return user.SessionState{IsInactive: true}, false
 	}
