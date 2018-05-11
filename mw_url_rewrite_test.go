@@ -76,16 +76,14 @@ func TestRewriter(t *testing.T) {
 		})
 	}
 }
-
 func BenchmarkRewriter(b *testing.B) {
 	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		for _, tc := range testRewriterData {
-			testConf := apidef.URLRewriteMeta{
-				MatchPattern: tc.pattern,
-				RewriteTo:    tc.to,
-			}
+	for _, tc := range testRewriterData {
+		testConf := apidef.URLRewriteMeta{
+			MatchPattern: tc.pattern,
+			RewriteTo:    tc.to,
+		}
+		for i := 0; i < b.N; i++ {
 			r := httptest.NewRequest("GET", tc.in, nil)
 			urlRewrite(&testConf, r)
 		}
