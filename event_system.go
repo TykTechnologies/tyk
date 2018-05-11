@@ -185,9 +185,9 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 	log.Warning(logMsg)
 }
 
-func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]config.TykEventHandler {
-	actualEventHandlers := make(map[apidef.TykEvent][]config.TykEventHandler)
-	for eventName, eventHandlerConfs := range theseEvents.Events {
+func initGenericEventHandlers(conf *config.Config) {
+	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
+	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
@@ -197,10 +197,10 @@ func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[api
 				log.Error("Failed to init event handler: ", err)
 			} else {
 				log.Debug("Init Event Handler: ", eventName)
-				actualEventHandlers[eventName] = append(actualEventHandlers[eventName], eventHandlerInstance)
+				handlers[eventName] = append(handlers[eventName], eventHandlerInstance)
 			}
 
 		}
 	}
-	return actualEventHandlers
+	conf.EventTriggers = handlers
 }
