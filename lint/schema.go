@@ -732,7 +732,7 @@ const confSchema = `{
 		"type": "boolean"
 	},
 	"min_token_length": {
-		"type": "string"
+		"type": "integer"
  	}
 }
 }`
