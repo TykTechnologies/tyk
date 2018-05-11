@@ -281,7 +281,13 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.SessionState, bool) {
-	if len(key) <= t.Spec.GlobalConfig.MinTokenLength || len(key) <= 3 {
+	minLength := t.Spec.GlobalConfig.MinTokenLength
+	if minLength == 0 {
+		// See https://github.com/TykTechnologies/tyk/issues/1681
+		minLength = 3
+	}
+	
+	if len(key) <= minLength {
 		return user.SessionState{IsInactive: true}, false
 	}
 
