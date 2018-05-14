@@ -5,22 +5,30 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/pmylund/go-cache"
+	"github.com/spaolacci/murmur3"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const defaultBasicAuthTTL = time.Duration(60) * time.Second
+
 // BasicAuthKeyIsValid uses a username instead of
 type BasicAuthKeyIsValid struct {
 	BaseMiddleware
+	cache *cache.Cache
 }
 
 func (k *BasicAuthKeyIsValid) Name() string {
 	return "BasicAuthKeyIsValid"
 }
 
+// EnabledForSpec checks if UseBasicAuth is set in the API definition.
 func (k *BasicAuthKeyIsValid) EnabledForSpec() bool {
 	return k.Spec.UseBasicAuth
 }
@@ -75,39 +83,22 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if !keyExists {
 		logEntry.Info("Attempted access with non-existent user.")
 
-		// Fire Authfailed Event
-		AuthFailed(k, r, token)
-
-		// Report in health check
-		reportHealthValue(k.Spec, KeyFailure, "-1")
-
-		return k.requestForBasicAuth(w, "User not authorised")
+		return k.handleAuthFail(w, r, token)
 	}
 
-	// Ensure that the username and password match up
-	var passMatch bool
 	switch session.BasicAuthData.Hash {
 	case user.HashBCrypt:
-		err := bcrypt.CompareHashAndPassword([]byte(session.BasicAuthData.Password), []byte(authValues[1]))
-		if err == nil {
-			passMatch = true
+
+		if err := k.compareHashAndPassword(session.BasicAuthData.Password, authValues[1], logEntry); err != nil {
+			logEntry.Warn("Attempted access with existing user, failed password check.")
+			return k.handleAuthFail(w, r, token)
 		}
 	case user.HashPlainText:
-		if session.BasicAuthData.Password == authValues[1] {
-			passMatch = true
+		if session.BasicAuthData.Password != authValues[1] {
+
+			logEntry.Warn("Attempted access with existing user, failed password check.")
+			return k.handleAuthFail(w, r, token)
 		}
-	}
-
-	if !passMatch {
-		logEntry.Info("Attempted access with existing user but failed password check.")
-
-		// Fire Authfailed Event
-		AuthFailed(k, r, token)
-
-		// Report in health check
-		reportHealthValue(k.Spec, KeyFailure, "-1")
-
-		return k.requestForBasicAuth(w, "User not authorised")
 	}
 
 	// Set session state on context, we will need it later
@@ -116,6 +107,65 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		ctxSetSession(r, &session, keyName, false)
 	}
 
-	// Request is valid, carry on
 	return nil, http.StatusOK
+}
+
+func (k *BasicAuthKeyIsValid) handleAuthFail(w http.ResponseWriter, r *http.Request, token string) (error, int) {
+
+	// Fire Authfailed Event
+	AuthFailed(k, r, token)
+
+	// Report in health check
+	reportHealthValue(k.Spec, KeyFailure, "-1")
+
+	return k.requestForBasicAuth(w, "User not authorised")
+}
+
+func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration time.Duration, hashedPassword []byte, password []byte) error {
+	if err := bcrypt.CompareHashAndPassword(hashedPassword, password); err != nil {
+
+		return err
+	}
+
+	hasher := murmur3.New32()
+	hasher.Write(password)
+	k.cache.Set(string(hashedPassword), string(hasher.Sum(nil)), cacheDuration)
+
+	return nil
+}
+
+func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password string, logEntry *logrus.Entry) error {
+
+	cacheEnabled := !k.Spec.BasicAuth.DisableCaching
+	passwordBytes := []byte(password)
+	hashBytes := []byte(hash)
+
+	if !cacheEnabled {
+
+		logEntry.Debug("cache disabled")
+		return bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
+	}
+
+	cacheTTL := defaultBasicAuthTTL // set a default TTL, then override based on BasicAuth.CacheTTL
+	if k.Spec.BasicAuth.CacheTTL > 0 {
+		cacheTTL = time.Duration(k.Spec.BasicAuth.CacheTTL) * time.Second
+	}
+
+	cachedPass, inCache := k.cache.Get(hash)
+	if !inCache {
+
+		logEntry.Debug("cache enabled: miss: bcrypt")
+		return k.doBcryptWithCache(cacheTTL, hashBytes, passwordBytes)
+	}
+
+	hasher := murmur3.New32()
+	hasher.Write(passwordBytes)
+	if cachedPass.(string) != string(hasher.Sum(nil)) {
+
+		logEntry.Warn("cache enabled: hit: failed auth: bcrypt")
+		return bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
+	}
+
+	logEntry.Debug("cache enabled: hit: success")
+	return nil
 }

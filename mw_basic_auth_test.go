@@ -16,7 +16,7 @@ func genAuthHeader(username, password string) string {
 	return fmt.Sprintf("Basic %s", encodedPass)
 }
 
-func testPrepareBasicAuth() *user.SessionState {
+func testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 	session := createStandardSession()
 	session.BasicAuthData.Password = "password"
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
@@ -24,6 +24,7 @@ func testPrepareBasicAuth() *user.SessionState {
 
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseBasicAuth = true
+		spec.BasicAuth.DisableCaching = cacheDisabled
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.OrgID = "default"
@@ -36,7 +37,7 @@ func TestBasicAuth(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	session := testPrepareBasicAuth()
+	session := testPrepareBasicAuth(false)
 
 	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
 	wrongPassword := map[string]string{"Authorization": genAuthHeader("user", "wrong")}
@@ -60,7 +61,7 @@ func BenchmarkBasicAuth(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	session := testPrepareBasicAuth()
+	session := testPrepareBasicAuth(false)
 
 	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
 	wrongPassword := map[string]string{"Authorization": genAuthHeader("user", "wrong")}
@@ -83,6 +84,58 @@ func BenchmarkBasicAuth(b *testing.B) {
 			{Method: "GET", Path: "/", Headers: wrongPassword, Code: 401},
 			{Method: "GET", Path: "/", Headers: wrongFormat, Code: 400, BodyMatch: `Attempted access with malformed header, values not in basic auth format`},
 			{Method: "GET", Path: "/", Headers: malformed, Code: 400, BodyMatch: `Attempted access with malformed header, auth data not encoded correctly`},
+		}...)
+	}
+}
+
+func BenchmarkBasicAuth_CacheEnabled(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	session := testPrepareBasicAuth(false)
+
+	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
+
+	// Create base auth based key
+	ts.Run(b, test.TestCase{
+		Method:    "POST",
+		Path:      "/tyk/keys/defaultuser",
+		Data:      session,
+		AdminAuth: true,
+		Code:      200,
+	})
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, []test.TestCase{
+			{Method: "GET", Path: "/", Headers: validPassword, Code: 200},
+		}...)
+	}
+}
+
+func BenchmarkBasicAuth_CacheDisabled(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	session := testPrepareBasicAuth(true)
+
+	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
+
+	// Create base auth based key
+	ts.Run(b, test.TestCase{
+		Method:    "POST",
+		Path:      "/tyk/keys/defaultuser",
+		Data:      session,
+		AdminAuth: true,
+		Code:      200,
+	})
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, []test.TestCase{
+			{Method: "GET", Path: "/", Headers: validPassword, Code: 200},
 		}...)
 	}
 }
