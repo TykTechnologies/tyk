@@ -22,12 +22,12 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
 	if !foundAPI {
 		log.Debug("Version not found")
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	if len(sessionVersionData.AllowedURLs) == 0 {
 		log.Debug("No allowed URLS")
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
@@ -36,7 +36,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		asRegex, err := regexp.Compile(accessSpec.URL)
 		if err != nil {
 			log.Error("Regex error: ", err)
-			return nil, 200
+			return nil, http.StatusOK
 		}
 
 		match := asRegex.MatchString(r.URL.Path)
@@ -44,7 +44,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			log.Debug("Match!")
 			for _, method := range accessSpec.Methods {
 				if method == r.Method {
-					return nil, 200
+					return nil, http.StatusOK
 				}
 			}
 		}
@@ -55,6 +55,6 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	logEntry := getLogEntryForRequest(r, token, map[string]interface{}{"api_found": false})
 	logEntry.Info("Attempted access to unauthorised endpoint (Granular).")
 
-	return errors.New("Access to this resource has been disallowed"), 403
+	return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
 
 }

@@ -129,7 +129,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Everything seems in order let the request through
-	return nil, 200
+	return nil, http.StatusOK
 
 }
 
@@ -172,7 +172,7 @@ func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
 
 	AuthFailed(hm, r, r.Header.Get("Authorization"))
 
-	return errors.New("Authorization field missing, malformed or invalid"), 400
+	return errors.New("Authorization field missing, malformed or invalid"), http.StatusBadRequest
 }
 
 func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {

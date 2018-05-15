@@ -218,7 +218,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if !found {
 			log.Error("ID Could not be generated. Failing Request.")
 			k.reportLoginFailure("[NOT FOUND]", r)
-			return errors.New("Key not authorized"), 403
+			return errors.New("Key not authorized"), http.StatusForbidden
 		}
 
 	}
@@ -239,7 +239,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		basePolicyID, foundPolicy := k.getBasePolicyID(token)
 		if !foundPolicy {
 			k.reportLoginFailure(baseFieldData, r)
-			return errors.New("Key not authorized: no matching policy found"), 403
+			return errors.New("Key not authorized: no matching policy found"), http.StatusForbidden
 		}
 
 		newSession, err := generateSessionFromPolicy(basePolicyID,
@@ -248,7 +248,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if err != nil {
 			k.reportLoginFailure(baseFieldData, r)
 			log.Error("Could not find a valid policy to apply to this token!")
-			return errors.New("Key not authorized: no matching policy"), 403
+			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
 
 		session = newSession
@@ -265,13 +265,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			ctxSetAuthToken(r, sessionID)
 		}
 		ctxSetJWTContextVars(k.Spec, r, token)
-		return nil, 200
+		return nil, http.StatusOK
 	} else if k.Spec.JWTPolicyFieldName != "" {
 		// extract policy ID from JWT token
 		policyID, foundPolicy := k.getPolicyIDFromToken(token)
 		if !foundPolicy {
 			k.reportLoginFailure(baseFieldData, r)
-			return errors.New("Key not authorized: no matching policy found"), 403
+			return errors.New("Key not authorized: no matching policy found"), http.StatusForbidden
 		}
 		// check if we received a valid policy ID in claim
 		policiesMu.RLock()
@@ -280,28 +280,28 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
 			log.Error("Policy ID found in token is invalid!")
-			return errors.New("Key not authorized: no matching policy"), 403
+			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
 		pols := session.PolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			log.Error("No policies for the found session. Failing Request.")
-			return errors.New("Key not authorized: no matching policy found"), 403
+			return errors.New("Key not authorized: no matching policy found"), http.StatusForbidden
 		}
 		if pols[0] != policyID { // switch session to new policy and update session storage and cache
 			// check ownership before updating session
 			if policy.OrgID != k.Spec.OrgID {
 				k.reportLoginFailure(baseFieldData, r)
 				log.Error("Policy ID found in token is invalid (wrong ownership)!")
-				return errors.New("Key not authorized: no matching policy"), 403
+				return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 			}
 			// apply new policy to session and update session
 			session.SetPolicies(policyID)
 			if err := k.ApplyPolicies(sessionID, &session); err != nil {
 				k.reportLoginFailure(baseFieldData, r)
 				log.WithError(err).Error("Could not apply new policy from JWT to session")
-				return errors.New("Key not authorized: could not apply new policy"), 403
+				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
 			}
 
 			cacheKey := sessionID
@@ -320,7 +320,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		ctxSetAuthToken(r, sessionID)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (k *JWTMiddleware) reportLoginFailure(tykId string, r *http.Request) {
@@ -336,21 +336,21 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 	if !found {
 		k.reportLoginFailure(tykId, r)
-		return errors.New("Key id not found"), 404
+		return errors.New("Key id not found"), http.StatusNotFound
 	}
 
 	log.Debug("Using raw key ID: ", tykId)
 	session, exists := k.CheckSessionAndIdentityForValidKey(tykId)
 	if !exists {
 		k.reportLoginFailure(tykId, r)
-		return errors.New("Key not authorized"), 403
+		return errors.New("Key not authorized"), http.StatusForbidden
 	}
 
 	log.Debug("Raw key ID found.")
 	ctxSetSession(r, &session)
 	ctxSetAuthToken(r, tykId)
 	ctxSetJWTContextVars(k.Spec, r, token)
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -383,7 +383,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		log.Debug("Headers are: ", r.Header)
 
 		k.reportLoginFailure(tykId, r)
-		return errors.New("Authorization field missing"), 400
+		return errors.New("Authorization field missing"), http.StatusBadRequest
 	}
 
 	// enable bearer token format
@@ -435,7 +435,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if err == nil && token.Valid {
 		if jwtErr := k.validateJWTClaims(token.Claims.(jwt.MapClaims)); jwtErr != nil {
-			return errors.New("Key not authorized: " + jwtErr.Error()), 401
+			return errors.New("Key not authorized: " + jwtErr.Error()), http.StatusUnauthorized
 		}
 
 		// Token is valid - let's move on
@@ -455,9 +455,9 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if err != nil {
 		logEntry.Error("JWT validation error: ", err)
-		return errors.New("Key not authorized:" + err.Error()), 403
+		return errors.New("Key not authorized:" + err.Error()), http.StatusForbidden
 	} else {
-		return errors.New("Key not authorized"), 403
+		return errors.New("Key not authorized"), http.StatusForbidden
 	}
 }
 

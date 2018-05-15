@@ -600,7 +600,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return nil
 		}
 		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
-		if err != nil || res.StatusCode == 500 {
+		if err != nil || res.StatusCode == http.StatusInternalServerError {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
@@ -645,11 +645,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return nil
 		}
 		if strings.Contains(err.Error(), "no such host") {
-			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", 500)
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError)
 			return nil
 		}
 
-		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", 500)
+		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError)
 		return nil
 
 	}

@@ -94,7 +94,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 403 {
+	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
 		reLogin()

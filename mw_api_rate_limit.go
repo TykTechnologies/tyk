@@ -56,7 +56,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 	// Report in health check
 	reportHealthValue(k.Spec, Throttle, "-1")
 
-	return errors.New("API Rate limit exceeded"), 429
+	return errors.New("API Rate limit exceeded"), http.StatusTooManyRequests
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -75,5 +75,5 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Request is valid, carry on
-	return nil, 200
+	return nil, http.StatusOK
 }

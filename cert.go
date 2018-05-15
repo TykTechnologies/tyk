@@ -246,17 +246,17 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 		orgID := r.URL.Query().Get("org_id")
 		var certID string
 		if certID, err = CertificateManager.Add(content, orgID); err != nil {
-			doJSONWrite(w, 403, apiError(err.Error()))
+			doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 			return
 		}
 
-		doJSONWrite(w, 200, &APICertificateStatusMessage{certID, "ok", "Certificate added"})
+		doJSONWrite(w, http.StatusOK, &APICertificateStatusMessage{certID, "ok", "Certificate added"})
 	case "GET":
 		if certID == "" {
 			orgID := r.URL.Query().Get("org_id")
 
 			certIds := CertificateManager.ListAllIds(orgID)
-			doJSONWrite(w, 200, &APIAllCertificates{certIds})
+			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIds})
 			return
 		}
 
@@ -265,11 +265,11 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 
 		if len(certIDs) == 1 {
 			if certificates[0] == nil {
-				doJSONWrite(w, 404, apiError("Certificate with given SHA256 fingerprint not found"))
+				doJSONWrite(w, http.StatusNotFound, apiError("Certificate with given SHA256 fingerprint not found"))
 				return
 			}
 
-			doJSONWrite(w, 200, certs.ExtractCertificateMeta(certificates[0], certIDs[0]))
+			doJSONWrite(w, http.StatusOK, certs.ExtractCertificateMeta(certificates[0], certIDs[0]))
 			return
 		} else {
 			var meta []*certs.CertificateMeta
@@ -281,12 +281,12 @@ func certHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			doJSONWrite(w, 200, meta)
+			doJSONWrite(w, http.StatusOK, meta)
 			return
 		}
 	case "DELETE":
 		CertificateManager.Delete(certID)
-		doJSONWrite(w, 200, &apiStatusMessage{"ok", "removed"})
+		doJSONWrite(w, http.StatusOK, &apiStatusMessage{"ok", "removed"})
 	}
 }
 

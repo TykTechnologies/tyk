@@ -104,7 +104,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if halt {
 		// Fire Authfailed Event
 		k.reportLoginFailure("[JWT]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusForbidden
 	}
 
 	// 3. Create or set the session to match
@@ -116,7 +116,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusForbidden
 	}
 
 	k.lock.RLock()
@@ -127,7 +127,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusForbidden
 	}
 
 	policyID := ""
@@ -156,7 +156,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No matching policy found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusForbidden
 	}
 
 	data := []byte(ouser.ID)
@@ -186,7 +186,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			log.WithFields(logrus.Fields{
 				"prefix": OIDPREFIX,
 			}).Error("Could not find a valid policy to apply to this token!")
-			return errors.New("Key not authorized: no matching policy"), 403
+			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
 
 		session = newSession
@@ -207,7 +207,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {

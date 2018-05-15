@@ -317,7 +317,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	_, versionPaths, _, _ := m.Spec.Version(r)
 	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, URLRewrite)
 	if !found {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	log.Debug("Rewriter active")
@@ -327,7 +327,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	p, err := urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
-		return err, 500
+		return err, http.StatusInternalServerError
 	}
 
 	m.CheckHostRewrite(oldPath, p, r)
@@ -338,7 +338,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	} else {
 		r.URL = newURL
 	}
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
