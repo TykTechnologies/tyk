@@ -64,7 +64,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	d, err := dial(context.TODO(), "tcp", target)
 	if err != nil {
-		http.Error(ws.RW, "Error contacting backend server.", 500)
+		http.Error(ws.RW, "Error contacting backend server.", http.StatusInternalServerError)
 		log.WithFields(logrus.Fields{
 			"path":   target,
 			"origin": ip,
@@ -75,7 +75,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	hj, ok := ws.RW.(http.Hijacker)
 	if !ok {
-		http.Error(ws.RW, "Not a hijacker?", 500)
+		http.Error(ws.RW, "Not a hijacker?", http.StatusInternalServerError)
 		return nil, errors.New("Not a hjijacker?")
 	}
 

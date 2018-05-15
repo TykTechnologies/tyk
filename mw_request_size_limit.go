@@ -35,7 +35,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 	size, err := strconv.ParseInt(statedCL, 0, 64)
 	if err != nil {
 		log.Error("String conversion for content length failed:", err)
-		return errors.New("content length is not a valid Integer"), 400
+		return errors.New("content length is not a valid Integer"), http.StatusBadRequest
 	}
 	if r.ContentLength > size {
 		size = r.ContentLength
@@ -53,10 +53,10 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 		)
 		logEntry.Info("Attempted access with large request size, blocked.")
 
-		return errors.New("Request is too large"), 400
+		return errors.New("Request is too large"), http.StatusBadRequest
 	}
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 // RequestSizeLimit will check a request for maximum request size, this can be a global limit or a matched limit.
@@ -71,14 +71,14 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 		log.Debug("Checking global limit")
 		err, code := t.checkRequestLimit(r, vInfo.GlobalSizeLimit)
 		// If not OK, block
-		if code != 200 {
+		if code != http.StatusOK {
 			return err, code
 		}
 	}
 
 	// if there's no paths at all path check
 	if len(vInfo.ExtendedPaths.SizeLimit) == 0 {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	// If there's a potential match, try to match
@@ -89,5 +89,5 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 		return t.checkRequestLimit(r, rmeta.SizeLimit)
 	}
 
-	return nil, 200
+	return nil, http.StatusOK
 }

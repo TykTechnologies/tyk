@@ -345,7 +345,7 @@ func controlAPICheckClientCertificate(certLevel string, next http.Handler) http.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if config.Global().Security.ControlAPIUseMutualTLS {
 			if err := CertificateManager.ValidateRequestCertificate(config.Global().Security.Certificates.ControlAPI, r); err != nil {
-				doJSONWrite(w, 403, apiError(err.Error()))
+				doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 				return
 			}
 		}
@@ -420,7 +420,7 @@ func checkIsAPIOwner(next http.Handler) http.Handler {
 			// Error
 			mainLog.Warning("Attempted administrative access with invalid or missing key!")
 
-			doJSONWrite(w, 403, apiError("Forbidden"))
+			doJSONWrite(w, http.StatusForbidden, apiError("Forbidden"))
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -438,7 +438,7 @@ func addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
 	clientAccessPath := spec.Proxy.ListenPath + "oauth/token{_:/?}"
 
 	serverConfig := osin.NewServerConfig()
-	serverConfig.ErrorStatusCode = 403
+	serverConfig.ErrorStatusCode = http.StatusForbidden
 	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
 	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
 	serverConfig.RedirectUriSeparator = config.Global().OauthRedirectUriSeparator

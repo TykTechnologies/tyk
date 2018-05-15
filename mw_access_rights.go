@@ -41,7 +41,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			)
 			logEntry.Info("Attempted access to unauthorised API.")
 
-			return errors.New("Access to this API has been disallowed"), 403
+			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 		}
 
 		// Find the version in their key access details
@@ -70,7 +70,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			)
 			logEntry.Info("Attempted access to unauthorised API version.")
 
-			return errors.New("Access to this API has been disallowed"), 403
+			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 		}
 	}
 
