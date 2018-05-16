@@ -45,6 +45,7 @@ type MiniRequestObject struct {
 	IgnoreBody      bool
 	Method          string
 	RequestURI      string
+	Proto           string
 }
 
 type VMReturnObject struct {
@@ -96,7 +97,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}).Error("Failed to read request body! ", err)
 		return nil, http.StatusOK
 	}
-
 	headers := r.Header
 	host := r.Host
 	if host == "" && r.URL != nil {
@@ -122,6 +122,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteParams:   []string{},
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
+		Proto:          r.Proto,
 	}
 
 	requestAsJson, err := json.Marshal(requestData)
