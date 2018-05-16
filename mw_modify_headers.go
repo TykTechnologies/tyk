@@ -52,5 +52,5 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	return nil, 200
+	return nil, http.StatusOK
 }

@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"sync"
+	"sync/atomic"
 
 	"github.com/kelseyhightower/envconfig"
 
@@ -16,7 +18,8 @@ import (
 
 var log = logger.Get()
 
-var Global Config
+var global atomic.Value
+var globalMu sync.Mutex
 
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
@@ -173,6 +176,7 @@ type CertificatesConfig struct {
 type SecurityConfig struct {
 	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
 	ControlAPIUseMutualTLS           bool               `json:"control_api_use_mutual_tls"`
+	PinnedPublicKeys                 map[string]string  `json:"pinned_public_keys"`
 	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
@@ -268,10 +272,13 @@ type Config struct {
 	EnableBundleDownloader            bool                                  `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
 	AllowRemoteConfig                 bool                                  `bson:"allow_remote_config" json:"allow_remote_config"`
 	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
+	MaxIdleConns                      int                                   `bson:"max_idle_connections" json:"max_idle_connections"`
 	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	MaxConnTime                       int64                                 `json:"max_conn_time"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
+	ProxySSLMinVersion                uint16                                `json:"proxy_ssl_min_version"`
+	ProxySSLCipherSuites              []string                              `json:"proxy_ssl_ciphers"`
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
 	LogLevel                          string                                `json:"log_level"`
 	Security                          SecurityConfig                        `json:"security"`
@@ -279,6 +286,7 @@ type Config struct {
 	NewRelic                          NewRelicConfig                        `json:"newrelic"`
 	VersionHeader                     string                                `json:"version_header"`
 	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
+	MinTokenLength                    int                                   `json:"min_token_length"`
 }
 
 type CertData struct {
@@ -318,6 +326,20 @@ var Default = Config{
 	AnalyticsConfig: AnalyticsConfigConfig{
 		IgnoredIPs: make([]string, 0),
 	},
+}
+
+func init() {
+	SetGlobal(Config{})
+}
+
+func Global() Config {
+	return global.Load().(Config)
+}
+
+func SetGlobal(conf Config) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+	global.Store(conf)
 }
 
 func WriteConf(path string, conf *Config) error {

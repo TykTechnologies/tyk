@@ -416,6 +416,9 @@ const confSchema = `{
 	"max_idle_connections_per_host": {
 		"type": "integer"
 	},
+	"max_idle_connections": {
+		"type": "integer"
+	},
 	"max_conn_time": {
 		"type": "integer"
 	},
@@ -508,6 +511,15 @@ const confSchema = `{
 	},
 	"proxy_ssl_insecure_skip_verify": {
 		"type": "boolean"
+	},
+	"proxy_ssl_min_version": {
+		"type": "integer"
+	},
+	"proxy_ssl_ciphers": {
+		"type": ["array", "null"],
+		"items": {
+			"type": "string"
+		}
 	},
 	"public_key_path": {
 		"type": "string",
@@ -660,6 +672,12 @@ const confSchema = `{
 			"control_api_use_mutual_tls": {
 				"type": "boolean"
 			},
+			"pinned_public_keys": {
+				"type": ["array", "null"],
+				"items": {
+					"type": "object"
+				}
+			},
 			"certificates": {
 				"type": ["object", "null"],
 				"additionalProperties": false,
@@ -712,6 +730,9 @@ const confSchema = `{
 	},
 	"enable_hashed_keys_listing": {
 		"type": "boolean"
-	}
+	},
+	"min_token_length": {
+		"type": "integer"
+ 	}
 }
 }`

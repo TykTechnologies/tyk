@@ -32,13 +32,13 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if len(parts) < 2 {
 		logEntry.Info("Attempted access with malformed header, no auth header found.")
 
-		return errors.New("Authorization field missing"), 400
+		return errors.New("Authorization field missing"), http.StatusBadRequest
 	}
 
 	if strings.ToLower(parts[0]) != "bearer" {
 		logEntry.Info("Bearer token malformed")
 
-		return errors.New("Bearer token malformed"), 400
+		return errors.New("Bearer token malformed"), http.StatusBadRequest
 	}
 
 	accessToken := parts[1]
@@ -53,7 +53,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "-1")
 
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusForbidden
 	}
 
 	// Set session state on context, we will need it later
@@ -64,5 +64,5 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Request is valid, carry on
-	return nil, 200
+	return nil, http.StatusOK
 }

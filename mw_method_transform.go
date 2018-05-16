@@ -31,7 +31,7 @@ func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	_, versionPaths, _, _ := t.Spec.Version(r)
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, MethodTransformed)
 	if !found {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 	mmeta := meta.(*apidef.MethodTransformMeta)
 	switch strings.ToUpper(mmeta.ToMethod) {
@@ -48,7 +48,7 @@ func (t *TransformMethod) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	case "PATCH":
 		r.Method = "PATCH"
 	default:
-		return errors.New("Method not allowed"), 405
+		return errors.New("Method not allowed"), http.StatusMethodNotAllowed
 	}
-	return nil, 200
+	return nil, http.StatusOK
 }

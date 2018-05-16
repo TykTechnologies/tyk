@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/url"
 	"sync"
 	"time"
@@ -83,7 +84,7 @@ func (hc *HostCheckerManager) Start() {
 	// Start loop to check if we are active instance
 	if hc.Id != "" {
 		go hc.CheckActivePollerLoop()
-		if config.Global.UptimeTests.Config.EnableUptimeAnalytics {
+		if config.Global().UptimeTests.Config.EnableUptimeAnalytics {
 			go hc.UptimePurgeLoop()
 		}
 	}
@@ -169,9 +170,9 @@ func (hc *HostCheckerManager) StartPoller() {
 		hc.checker = &HostUptimeChecker{}
 	}
 
-	hc.checker.Init(config.Global.UptimeTests.Config.CheckerPoolSize,
-		config.Global.UptimeTests.Config.FailureTriggerSampleSize,
-		config.Global.UptimeTests.Config.TimeWait,
+	hc.checker.Init(config.Global().UptimeTests.Config.CheckerPoolSize,
+		config.Global().UptimeTests.Config.FailureTriggerSampleSize,
+		config.Global().UptimeTests.Config.TimeWait,
 		hc.currentHostList,
 		hc.OnHostDown,   // On failure
 		hc.OnHostBackUp, // On success
@@ -201,7 +202,7 @@ func (hc *HostCheckerManager) getHostKey(report HostHealthReport) string {
 }
 
 func (hc *HostCheckerManager) OnHostReport(report HostHealthReport) {
-	if config.Global.UptimeTests.Config.EnableUptimeAnalytics {
+	if config.Global().UptimeTests.Config.EnableUptimeAnalytics {
 		go hc.RecordUptimeAnalytics(report)
 	}
 }
@@ -451,7 +452,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	t := time.Now()
 
 	var serverError bool
-	if report.ResponseCode > 200 {
+	if report.ResponseCode > http.StatusOK {
 		serverError = true
 	}
 

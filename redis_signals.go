@@ -89,7 +89,7 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 	case NoticeDashboardConfigRequest:
 		handleSendMiniConfig(notif.Payload)
 	case NoticeGatewayDRLNotification:
-		if config.Global.ManagementNode {
+		if config.Global().ManagementNode {
 			// DRL is not initialized, going through would
 			// be mostly harmless but would flood the log
 			// with warnings since DRLManager.Ready == false
@@ -139,8 +139,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if notification.Signature == "" && config.Global.AllowInsecureConfigs {
-
+  if notification.Signature == "" && config.Global().AllowInsecureConfigs {
 		redisInsecureWarn.Do(func() {
 			pubSubLog.Warning("Insecure configuration detected (allowing)!")
 		})
@@ -148,10 +147,10 @@ func isPayloadSignatureValid(notification Notification) bool {
 		return true
 	}
 
-	if config.Global.PublicKeyPath != "" && notificationVerifier == nil {
+	if config.Global().PublicKeyPath != "" && notificationVerifier == nil {
 		var err error
 
-		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global.PublicKeyPath)
+    notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 		if err != nil {
 
 			pubSubLog.Error("Notification signer: Failed loading private key from path: ", err)
@@ -247,28 +246,26 @@ func handleDashboardZeroConfMessage(payload string) {
 		return
 	}
 
-	if !config.Global.UseDBAppConfigs || config.Global.DisableDashboardZeroConf {
-
+  if !config.Global().UseDBAppConfigs || config.Global().DisableDashboardZeroConf {
 		return
 	}
 
 	hostname := createConnectionStringFromDashboardObject(dashPayload)
 	setHostname := false
 
-	if config.Global.DBAppConfOptions.ConnectionString == "" {
-
-		config.Global.DBAppConfOptions.ConnectionString = hostname
+  if config.Global().DBAppConfOptions.ConnectionString == "" {
+    config.Global().DBAppConfOptions.ConnectionString = hostname
 		setHostname = true
 	}
 
-	if config.Global.Policies.PolicyConnectionString == "" {
+  if config.Global().Policies.PolicyConnectionString == "" {
+    config.Global().Policies.PolicyConnectionString = hostname
 
-		config.Global.Policies.PolicyConnectionString = hostname
 		setHostname = true
 	}
 
 	if setHostname {
-
 		pubSubLog.Info("Hostname set with dashboard zeroconf signal")
+		config.SetGlobal(globalConf)
 	}
 }

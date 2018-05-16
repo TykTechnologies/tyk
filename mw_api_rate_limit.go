@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"strconv"
@@ -30,7 +29,7 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 	}
 
 	// We'll init here
-	k.keyName = fmt.Sprintf("apilimiter-%s%s", k.Spec.OrgID, k.Spec.APIID)
+	k.keyName = "apilimiter-" + k.Spec.OrgID + k.Spec.APIID
 
 	// Set last updated on each load to ensure we always use a new rate limit bucket
 	k.apiSess = &user.SessionState{
@@ -57,7 +56,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 	// Report in health check
 	reportHealthValue(k.Spec, Throttle, "-1")
 
-	return errors.New("API Rate limit exceeded"), 429
+	return errors.New("API Rate limit exceeded"), http.StatusTooManyRequests
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -67,12 +66,14 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		k.keyName,
 		storeRef,
 		true,
-		false)
+		false,
+		k.Spec.GlobalConfig,
+	)
 
 	if reason == sessionFailRateLimit {
 		return k.handleRateLimitFailure(r, k.keyName)
 	}
 
 	// Request is valid, carry on
-	return nil, 200
+	return nil, http.StatusOK
 }

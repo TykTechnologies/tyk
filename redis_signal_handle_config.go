@@ -63,7 +63,7 @@ func handleNewConfiguration(payload string) {
 		return
 	}
 
-	if !config.Global.AllowRemoteConfig {
+	if !config.Global().AllowRemoteConfig {
 		log.WithFields(logrus.Fields{
 			"prefix": "pub-sub",
 		}).Warning("Ignoring new config: Remote configuration is not allowed for this node.")
@@ -128,7 +128,7 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 }
 
 func getExistingConfig() (map[string]interface{}, error) {
-	f, err := os.Open(config.Global.OriginalPath)
+	f, err := os.Open(config.Global().OriginalPath)
 	if err != nil {
 		return nil, err
 	}

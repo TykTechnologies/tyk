@@ -51,7 +51,9 @@ type testAPIDefinition struct {
 }
 
 func TestHealthCheckEndpoint(t *testing.T) {
-	config.Global.HealthCheck.EnableHealthChecks = true
+	globalConf := config.Global()
+	globalConf.HealthCheck.EnableHealthChecks = true
+	config.SetGlobal(globalConf)
 	defer resetTestConfig()
 
 	ts := newTykTestServer()
@@ -249,17 +251,14 @@ func TestKeyHandler(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
+	globalConf := config.Global()
 	// make it to use hashes for Redis keys
-	hashKeys := config.Global.HashKeys
-	config.Global.HashKeys = true
+	globalConf.HashKeys = true
 	// enable hashed keys listing
-	enableListing := config.Global.EnableHashedKeysListing
-	config.Global.EnableHashedKeysListing = true
+	globalConf.EnableHashedKeysListing = true
+	config.SetGlobal(globalConf)
 
-	defer func() {
-		config.Global.HashKeys = hashKeys
-		config.Global.EnableHashedKeysListing = enableListing
-	}()
+	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -374,17 +373,14 @@ func TestHashKeyHandler(t *testing.T) {
 }
 
 func TestHashKeyListingDisabled(t *testing.T) {
+	globalConf := config.Global()
 	// make it to use hashes for Redis keys
-	hashKeys := config.Global.HashKeys
-	config.Global.HashKeys = true
+	globalConf.HashKeys = true
 	// disable hashed keys listing
-	enableListing := config.Global.EnableHashedKeysListing
-	config.Global.EnableHashedKeysListing = false
+	globalConf.EnableHashedKeysListing = false
+	config.SetGlobal(globalConf)
 
-	defer func() {
-		config.Global.HashKeys = hashKeys
-		config.Global.EnableHashedKeysListing = enableListing
-	}()
+	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -497,13 +493,12 @@ func TestHashKeyListingDisabled(t *testing.T) {
 }
 
 func TestHashKeyHandlerHashingDisabled(t *testing.T) {
+	globalConf := config.Global()
 	// make it to NOT use hashes for Redis keys
-	hashKeys := config.Global.HashKeys
-	config.Global.HashKeys = false
+	globalConf.HashKeys = false
+	config.SetGlobal(globalConf)
 
-	defer func() {
-		config.Global.HashKeys = hashKeys
-	}()
+	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -777,7 +772,10 @@ func TestContextSession(t *testing.T) {
 }
 
 func TestApiLoaderLongestPathFirst(t *testing.T) {
-	config.Global.EnableCustomDomains = true
+	globalConf := config.Global()
+	globalConf.EnableCustomDomains = true
+	config.SetGlobal(globalConf)
+
 	defer resetTestConfig()
 
 	type hostAndPath struct {

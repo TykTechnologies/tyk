@@ -128,7 +128,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 
 	// Handle the authorisation and write the JSON output to the resource provider
 	resp := o.Manager.HandleAuthorisation(r, true, sessionJSONData)
-	code := 200
+	code := http.StatusOK
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
 	if resp.IsError {
 		code = resp.ErrorStatusCode
@@ -170,6 +170,8 @@ func (o *OAuthHandlers) HandleAuthorizePassthrough(w http.ResponseWriter, r *htt
 // returns a response to the client and notifies the provider of the access request (in order to track identity against
 // OAuth tokens without revealing tokens before they are requested).
 func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	// Handle response
 	resp := o.Manager.HandleAccess(r)
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
@@ -211,7 +213,7 @@ func (o *OAuthHandlers) HandleAccessRequest(w http.ResponseWriter, r *http.Reque
 
 	o.notifyClientOfNewOauth(newNotification)
 
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	w.Write(msg)
 }
 
@@ -464,7 +466,7 @@ func (r *RedisOsinStorageInterface) GetClients(filter string, ignorePrefix bool)
 	}
 
 	var clientJSON map[string]string
-	if !config.Global.Storage.EnableCluster {
+	if !config.Global().Storage.EnableCluster {
 		clientJSON = r.store.GetKeysAndValuesWithFilter(key)
 	} else {
 		keyForSet := prefixClientset + prefixClient // Org ID
@@ -502,8 +504,8 @@ func (r *RedisOsinStorageInterface) GetClientTokens(id string) ([]OAuthClientTok
 	}
 
 	// clean up expired tokens in sorted set (remove all tokens with score up to current timestamp minus retention)
-	if config.Global.OauthTokenExpiredRetainPeriod > 0 {
-		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global.OauthTokenExpiredRetainPeriod), 10)
+	if config.Global().OauthTokenExpiredRetainPeriod > 0 {
+		cleanupStartScore := strconv.FormatInt(nowTs-int64(config.Global().OauthTokenExpiredRetainPeriod), 10)
 		go r.store.RemoveSortedSetRange(key, "-inf", cleanupStartScore)
 	}
 
@@ -619,8 +621,8 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
-	if config.Global.OauthTokenExpire != 0 {
-		accessData.ExpiresIn = config.Global.OauthTokenExpire
+	if oauthTokenExpire := config.Global().OauthTokenExpire; oauthTokenExpire != 0 {
+		accessData.ExpiresIn = oauthTokenExpire
 	}
 
 	r.store.SetKey(key, string(authDataJSON), int64(accessData.ExpiresIn))
@@ -678,8 +680,8 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 		key := prefixRefresh + accessData.RefreshToken
 		log.Debug("Saving REFRESH key: ", key)
 		refreshExpire := int64(1209600) // 14 days
-		if config.Global.OauthRefreshExpire != 0 {
-			refreshExpire = config.Global.OauthRefreshExpire
+		if oauthRefreshExpire := config.Global().OauthRefreshExpire; oauthRefreshExpire != 0 {
+			refreshExpire = oauthRefreshExpire
 		}
 		r.store.SetKey(key, string(accessDataJSON), refreshExpire)
 		log.Debug("STORING ACCESS DATA: ", string(accessDataJSON))

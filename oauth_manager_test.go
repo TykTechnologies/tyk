@@ -106,12 +106,12 @@ func createTestOAuthClient(spec *APISpec, clientID string) {
 
 	var redirectURI string
 	// If separator is not set that means multiple redirect uris not supported
-	if config.Global.OauthRedirectUriSeparator == "" {
+	if config.Global().OauthRedirectUriSeparator == "" {
 		redirectURI = "http://client.oauth.com"
 
 		// If separator config is set that means multiple redirect uris are supported
 	} else {
-		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.Global.OauthRedirectUriSeparator)
+		redirectURI = strings.Join([]string{"http://client.oauth.com", "http://client2.oauth.com", "http://client3.oauth.com"}, config.Global().OauthRedirectUriSeparator)
 	}
 	testClient := OAuthClient{
 		ClientID:          clientID,
@@ -151,12 +151,11 @@ func TestAuthCodeRedirect(t *testing.T) {
 }
 
 func TestAuthCodeRedirectMultipleURL(t *testing.T) {
-	oauthRedirectUriSeparator := config.Global.OauthRedirectUriSeparator
-	defer func() {
-		config.Global.OauthRedirectUriSeparator = oauthRedirectUriSeparator
-	}()
 	// Enable multiple Redirect URIs
-	config.Global.OauthRedirectUriSeparator = ","
+	globalConf := config.Global()
+	globalConf.OauthRedirectUriSeparator = ","
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -186,12 +185,11 @@ func TestAuthCodeRedirectMultipleURL(t *testing.T) {
 }
 
 func TestAuthCodeRedirectInvalidMultipleURL(t *testing.T) {
-	oauthRedirectUriSeparator := config.Global.OauthRedirectUriSeparator
-	defer func() {
-		config.Global.OauthRedirectUriSeparator = oauthRedirectUriSeparator
-	}()
 	// Disable multiple Redirect URIs
-	config.Global.OauthRedirectUriSeparator = ""
+	globalConf := config.Global()
+	globalConf.OauthRedirectUriSeparator = ""
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -362,18 +360,14 @@ func getAuthCode(t *testing.T, ts *tykTestServer) map[string]string {
 }
 
 func TestGetClientTokens(t *testing.T) {
-	// restore global config after test is done
-	oauthTokenExpire := config.Global.OauthTokenExpire
-	oauthTokenExpiredRetainPeriod := config.Global.OauthTokenExpiredRetainPeriod
-	defer func() {
-		config.Global.OauthTokenExpire = oauthTokenExpire
-		config.Global.OauthTokenExpiredRetainPeriod = oauthTokenExpiredRetainPeriod
-	}()
-
+	globalConf := config.Global()
 	// set tokens to be expired after 1 second
-	config.Global.OauthTokenExpire = 1
+	globalConf.OauthTokenExpire = 1
 	// cleanup tokens older than 3 seconds
-	config.Global.OauthTokenExpiredRetainPeriod = 3
+	globalConf.OauthTokenExpiredRetainPeriod = 3
+	config.SetGlobal(globalConf)
+
+	defer resetTestConfig()
 
 	ts := newTykTestServer()
 	defer ts.Close()

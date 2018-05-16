@@ -146,7 +146,6 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	if len(matchGroups) > 0 {
 		newpath = rewriteToPath
 		// get the indices for the replacements:
-		dollarMatch := regexp.MustCompile(`\$\d+`) // Prepare our regex
 		replaceGroups := dollarMatch.FindAllStringSubmatch(rewriteToPath, -1)
 
 		log.Debug(matchGroups)
@@ -318,7 +317,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	_, versionPaths, _, _ := m.Spec.Version(r)
 	found, meta := m.Spec.CheckSpecMatchesStatus(r, versionPaths, URLRewrite)
 	if !found {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	log.Debug("Rewriter active")
@@ -328,7 +327,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	p, err := urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
-		return err, 500
+		return err, http.StatusInternalServerError
 	}
 
 	m.CheckHostRewrite(oldPath, p, r)
@@ -339,7 +338,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	} else {
 		r.URL = newURL
 	}
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
@@ -352,7 +351,7 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 			for i, v := range vals {
 				b := mr.Check(v)
 				if len(b) > 0 {
-					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mhCN, i)
+					kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mhCN + "-" + strconv.Itoa(i)
 					contextData[kn] = b
 					fCount++
 				}
@@ -382,7 +381,8 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 			for i, v := range vals {
 				b := mr.Check(v)
 				if len(b) > 0 {
-					kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, i)
+					kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mv + "-" + strconv.Itoa(i)
+
 					contextData[kn] = b
 					fCount++
 				}
@@ -411,7 +411,8 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 		for _, part := range pathParts {
 			b := mr.Check(part)
 			if len(b) > 0 {
-				kn := fmt.Sprintf("trigger-%d-%s-%d", triggernum, mv, fCount)
+				kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mv + "-" + strconv.Itoa(fCount)
+
 				contextData[kn] = b
 				fCount++
 			}
@@ -440,7 +441,8 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 			if valOk {
 				b := mr.Check(val)
 				if len(b) > 0 {
-					kn := fmt.Sprintf("trigger-%d-%s", triggernum, mh)
+					kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mh
+
 					contextData[kn] = b
 					fCount++
 				}
@@ -467,7 +469,8 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 
 	b := options.Check(string(bodyBytes))
 	if len(b) > 0 {
-		kn := fmt.Sprintf("trigger-%d-payload", triggernum)
+		kn := "trigger-" + strconv.Itoa(triggernum) + "-payload"
+
 		contextData[kn] = string(b)
 		return true
 	}

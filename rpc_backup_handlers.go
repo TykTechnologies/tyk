@@ -21,8 +21,8 @@ const BackupPolicyKeyBase = "node-policy-backup:"
 
 func getTagListAsString() string {
 	tagList := ""
-	if len(config.Global.DBAppConfOptions.Tags) > 0 {
-		tagList = strings.Join(config.Global.DBAppConfOptions.Tags, "-")
+	if tags := config.Global().DBAppConfOptions.Tags; len(tags) > 0 {
+		tagList = strings.Join(tags, "-")
 	}
 
 	return tagList
@@ -41,7 +41,7 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 		return nil
 	}
 
-	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
@@ -70,7 +70,7 @@ func saveRPCDefinitionsBackup(list string) {
 		return
 	}
 
-	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
@@ -92,7 +92,7 @@ func LoadPoliciesFromRPCBackup() map[string]user.Policy {
 		return nil
 	}
 
-	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
 	listAsString := decrypt([]byte(secret), cryptoText)
 
@@ -127,7 +127,7 @@ func saveRPCPoliciesBackup(list string) {
 		return
 	}
 
-	secret := rightPad2Len(config.Global.Secret, "=", 32)
+	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {

@@ -57,7 +57,7 @@ do
 done
 
 echo "Building Tyk binaries"
-gox -osarch="linux/arm64 linux/amd64 linux/386" -tags 'coprocess grpc jq'
+gox -osarch="linux/arm64 linux/amd64 linux/386" -tags 'coprocess grpc'
 
 echo "Building Tyk CP binaries"
 export CPBINNAME_LUA=tyk_linux_amd64_lua
@@ -146,9 +146,9 @@ for arch in ${!ARCHTGZDIRS[@]}
 do
     archDir=${ARCHTGZDIRS[$arch]}
     echo "Creating DEB Package for $arch"
-    fpm "${FPMCOMMON[@]}" -C $archDir -a $arch -t deb "${CONFIGFILES[@]}" --deb-user tyk --deb-group tyk ./=/opt/tyk-gateway
+    fpm "${FPMCOMMON[@]}" -C $archDir -a $arch -t deb "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
     echo "Creating RPM Package for $arch"
-    fpm "${FPMCOMMON[@]}" "${FPMRPM[@]}" -C $archDir -a $arch -t rpm "${CONFIGFILES[@]}" --rpm-user tyk --rpm-group tyk ./=/opt/tyk-gateway
+    fpm "${FPMCOMMON[@]}" "${FPMRPM[@]}" -C $archDir -a $arch -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
 
     rpmName="tyk-gateway-$VERSION-1.${arch/amd64/x86_64}.rpm"
     echo "Signing $arch RPM"

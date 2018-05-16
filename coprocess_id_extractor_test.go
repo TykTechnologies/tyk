@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -42,7 +41,6 @@ counter = 0
 
 @Hook
 def MyAuthHook(request, session, metadata, spec):
-    print("MyAuthHook is called")
     global counter
     counter = counter + 1
     auth_header = request.get_header('Authorization')
@@ -86,19 +84,16 @@ counter = 0
 
 @Hook
 def MyAuthHook(request, session, metadata, spec):
-    print("MyAuthHook is called")
-    global counter
-    counter = counter + 1
-
-    auth_param = parse.parse_qs(request.object.body)["auth"]
-
-    if auth_param and auth_param[0] == 'valid_token' and counter < 2:
-        session.rate = 1000.0
-        session.per = 1.0
-        session.id_extractor_deadline = int(time.time()) + 60
-        metadata["token"] = "valid_token"
-    return request, session, metadata
-	`,
+	global counter
+	counter = counter + 1
+	auth_param = parse.parse_qs(request.object.body)["auth"]
+	if auth_param and auth_param[0] == 'valid_token' and counter < 2:
+		session.rate = 1000.0
+		session.per = 1.0
+		session.id_extractor_deadline = int(time.time()) + 60
+		metadata["token"] = "valid_token"
+	return request, session, metadata
+`,
 }
 
 var pythonIDExtractorHeaderRegex = map[string]string{
@@ -133,7 +128,7 @@ counter = 0
 
 @Hook
 def MyAuthHook(request, session, metadata, spec):
-    print("MyAuthHook is called")
+    print("MyAuthHook3 is called")
     global counter
     counter = counter + 1
     _, auth_header = request.get_header('Authorization').split('-')
@@ -160,16 +155,14 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		spec.UseKeylessAccess = false
 		spec.EnableCoProcessAuth = true
-		spec.CustomMiddleware.Pre = []apidef.MiddlewareDefinition{
-			{Name: "MyAuthHook"},
-		}
 	})[0]
-
 	t.Run("Header value", func(t *testing.T) {
 		bundleID := registerBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
 		spec.CustomMiddlewareBundle = bundleID
+		spec.APIID = "api1"
 
 		loadAPI(spec)
+		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: 200},
@@ -177,12 +170,13 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 			{Path: "/", Headers: map[string]string{"Authorization": "invalid_token"}, Code: 403},
 		}...)
 	})
-
 	t.Run("Form value", func(t *testing.T) {
 		bundleID := registerBundle("id_extractor_form_value", pythonIDExtractorFormValue)
 		spec.CustomMiddlewareBundle = bundleID
+		spec.APIID = "api2"
 
 		loadAPI(spec)
+		time.Sleep(1 * time.Second)
 
 		formHeaders := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
 
@@ -192,12 +186,13 @@ func TestValueExtractorHeaderSource(t *testing.T) {
 			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"invalid_token"}}.Encode(), Code: 403},
 		}...)
 	})
-
 	t.Run("Header regex", func(t *testing.T) {
 		bundleID := registerBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
 		spec.CustomMiddlewareBundle = bundleID
+		spec.APIID = "api3"
 
 		loadAPI(spec)
+		time.Sleep(1 * time.Second)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},

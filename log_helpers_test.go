@@ -10,6 +10,8 @@ import (
 )
 
 func TestGetLogEntryForRequest(t *testing.T) {
+	defer resetTestConfig()
+
 	testReq := httptest.NewRequest("GET", "http://tyk.io/test", nil)
 	testReq.RemoteAddr = "127.0.0.1:80"
 	testData := []struct {
@@ -111,8 +113,10 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			}),
 		},
 	}
+	globalConf := config.Global()
 	for _, test := range testData {
-		config.Global.EnableKeyLogging = test.EnableKeyLogging
+		globalConf.EnableKeyLogging = test.EnableKeyLogging
+		config.SetGlobal(globalConf)
 		logEntry := getLogEntryForRequest(testReq, test.Key, test.Data)
 		if logEntry.Data["path"] != test.Result.Data["path"] {
 			t.Error("Expected 'path':", test.Result.Data["path"], "Got:", logEntry.Data["path"])

@@ -6,7 +6,6 @@ import (
 
 	"errors"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -34,11 +33,11 @@ func (k *OrganizationMonitor) Name() string {
 func (k *OrganizationMonitor) EnabledForSpec() bool {
 	// If false, we aren't enforcing quotas so skip this mw
 	// altogether
-	return config.Global.EnforceOrgQuotas
+	return k.Spec.GlobalConfig.EnforceOrgQuotas
 }
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
-	if config.Global.ExperimentalProcessOrgOffThread {
+	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
 		return k.ProcessRequestOffThread(r)
 	}
 	return k.ProcessRequestLive(r)
@@ -50,7 +49,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 	session, found := k.OrgSession(k.Spec.OrgID)
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	// Is it active?
@@ -58,7 +57,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 	if session.IsInactive {
 		logEntry.Warning("Organisation access is disabled.")
 
-		return errors.New("this organisation access has been disabled, please contact your API administrator"), 403
+		return errors.New("this organisation access has been disabled, please contact your API administrator"), http.StatusForbidden
 	}
 
 	// We found a session, apply the quota and rate limiter
@@ -68,6 +67,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
+		k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
@@ -91,7 +91,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 				Key:    k.Spec.OrgID,
 			})
 
-		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), 403
+		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), http.StatusForbidden
 	case sessionFailRateLimit:
 		logEntry.Warning("Organisation rate limit has been exceeded.")
 
@@ -108,10 +108,10 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 				Key:    k.Spec.OrgID,
 			},
 		)
-		return errors.New("This organisation rate limit has been exceeded, please contact your API administrator"), 403
+		return errors.New("This organisation rate limit has been exceeded, please contact your API administrator"), http.StatusForbidden
 	}
 
-	if config.Global.Monitor.MonitorOrgKeys {
+	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}
@@ -120,7 +120,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 	setCtxValue(r, OrgSessionContext, session)
 
 	// Request is valid, carry on
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
@@ -134,7 +134,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 	session, found := k.OrgSession(k.Spec.OrgID)
 	if !found {
 		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	orgChanMap.Lock()
@@ -157,7 +157,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 
 	if found && !active.(bool) {
 		log.Debug("Is not active")
-		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), 403
+		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), http.StatusForbidden
 	}
 
 	// Lets keep a reference of the org
@@ -166,7 +166,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 	setCtxValue(r, OrgSessionContext, session)
 
 	// Request is valid, carry on
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (k *OrganizationMonitor) AllowAccessNext(
@@ -191,6 +191,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
+		k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
@@ -235,7 +236,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		)
 	}
 
-	if config.Global.Monitor.MonitorOrgKeys {
+	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
 		k.mon.Check(&session, "")
 	}

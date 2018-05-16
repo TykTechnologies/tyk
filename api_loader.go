@@ -29,11 +29,11 @@ type ChainObject struct {
 }
 
 func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys}
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
 	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
+	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys, UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
 
 	FallbackKeySesionManager.Init(&redisStore)
 
@@ -173,7 +173,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	case RPCStorageEngine:
 		authStore = rpcAuthStore
 		orgStore = rpcOrgStore
-		config.Global.EnforceOrgDataAge = true
+		spec.GlobalConfig.EnforceOrgDataAge = true
+		globalConf := config.Global()
+		globalConf.EnforceOrgDataAge = true
+		config.SetGlobal(globalConf)
 	}
 
 	sessionStore := redisStore
@@ -198,7 +201,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// TODO: use config.Global.EnableCoProcess
-	if config.Global.EnableJSVM || EnableCoProcess {
+  if config.Global().EnableJSVM || EnableCoProcess {
 		mainLog.WithFields(logrus.Fields{
 			"api_name": spec.Name,
 		}).Debug("Loading Middleware")
@@ -206,7 +209,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		var mwPaths []string
 		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
 
-		if config.Global.EnableJSVM && mwDriver == apidef.OttoDriver {
+		if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 			var pathPrefix string
 			if spec.CustomMiddlewareBundle != "" {
 				pathPrefix = spec.APIID + "-" + spec.CustomMiddlewareBundle
@@ -455,7 +458,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	chainDef.ThisHandler = chain
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
 
-	if config.Global.UseRedisLog {
+	if config.Global().UseRedisLog {
 		log.WithFields(logrus.Fields{
 			"prefix":      "gateway",
 			"user_ip":     "--",
@@ -486,7 +489,7 @@ func loadGlobalApps(router *mux.Router) {
 	apisMu.RUnlock()
 	loadApps(specs, router)
 
-	if config.Global.NewRelic.AppName != "" {
+  if config.Global().NewRelic.AppName != "" {
 		mainLog.Info("Adding NewRelic instrumentation")
 		AddNewRelicInstrumentation(NewRelicApplication, router)
 	}
@@ -494,7 +497,7 @@ func loadGlobalApps(router *mux.Router) {
 
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec, muxer *mux.Router) {
-	hostname := config.Global.HostName
+	hostname := config.Global().HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
 		mainLog.Info("API hostname set: ", hostname)
@@ -540,7 +543,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 		return h1 > h2
 	})
 	for _, host := range hosts {
-		if !config.Global.EnableCustomDomains {
+		if !config.Global().EnableCustomDomains {
 			continue // disabled
 		}
 		if hostRouters[host] != nil {
@@ -601,7 +604,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	mainLog.Debug("Checker host list")
 
 	// Kick off our host checkers
-	if !config.Global.UptimeTests.Disable {
+	if !config.Global().UptimeTests.Disable {
 		SetCheckerHostList()
 	}
 
