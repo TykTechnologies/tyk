@@ -104,7 +104,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if halt {
 		// Fire Authfailed Event
 		k.reportLoginFailure("[JWT]", r)
-		return errors.New("Key not authorised"), http.StatusForbidden
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	// 3. Create or set the session to match
@@ -116,7 +116,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), http.StatusForbidden
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	k.lock.RLock()
@@ -127,7 +127,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), http.StatusForbidden
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	policyID := ""
@@ -156,7 +156,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No matching policy found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), http.StatusForbidden
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	data := []byte(ouser.ID)
