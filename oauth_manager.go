@@ -128,7 +128,7 @@ func (o *OAuthHandlers) HandleGenerateAuthCodeData(w http.ResponseWriter, r *htt
 
 	// Handle the authorisation and write the JSON output to the resource provider
 	resp := o.Manager.HandleAuthorisation(r, true, sessionJSONData)
-	code := 200
+	code := http.StatusOK
 	msg := o.generateOAuthOutputFromOsinResponse(resp)
 	if resp.IsError {
 		code = resp.ErrorStatusCode

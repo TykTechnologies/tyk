@@ -45,7 +45,7 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	_, versionPaths, _, _ := t.Spec.Version(r)
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, TransformedJQ)
 	if !found {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	err := t.transformJQBody(r, meta.(*TransformJQSpec))
@@ -58,7 +58,7 @@ func (t *TransformJQMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}).Error(err)
 		return err, 415
 	}
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQSpec) error {
