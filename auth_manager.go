@@ -44,8 +44,9 @@ type DefaultAuthorisationManager struct {
 }
 
 type DefaultSessionManager struct {
-	store       storage.Handler
-	asyncWrites bool
+	store                    storage.Handler
+	asyncWrites              bool
+	disableCacheSessionState bool
 }
 
 func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
@@ -85,6 +86,7 @@ func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) 
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.asyncWrites = config.Global().UseAsyncSessionWrite
+	b.disableCacheSessionState = config.Global().LocalSessionCache.DisableCacheSessionState
 	b.store = store
 	b.store.Connect()
 }
@@ -120,10 +122,16 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 
 	v, _ := json.Marshal(session)
 
-	// Keep the TTL
+	if hashed {
+		keyName = b.store.GetKeyPrefix() + keyName
+	}
+
+	// async update and return if needed
 	if b.asyncWrites {
+		b.renewSessionState(keyName, session)
+
 		if hashed {
-			go b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
+			go b.store.SetRawKey(keyName, string(v), resetTTLTo)
 			return nil
 		}
 
@@ -131,11 +139,28 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 		return nil
 	}
 
+	// sync update
+	var err error
 	if hashed {
-		return b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
+		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
+	} else {
+		err = b.store.SetKey(keyName, string(v), resetTTLTo)
 	}
 
-	return b.store.SetKey(keyName, string(v), resetTTLTo)
+	if err == nil {
+		b.renewSessionState(keyName, session)
+	}
+
+	return err
+}
+
+func (b *DefaultSessionManager) renewSessionState(keyName string, session *user.SessionState) {
+	// we have new session state so renew first-seen hash to prevent
+	session.SetFirstSeenHash()
+	// delete it from session cache to have it re-populated next time
+	if !b.disableCacheSessionState {
+		SessionCache.Delete(keyName)
+	}
 }
 
 // RemoveSession removes session from storage

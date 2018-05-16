@@ -72,13 +72,11 @@ type SessionState struct {
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
 
-	FirstSeenHash string `bson:"-" json:"-"`
+	firstSeenHash string
 }
 
-var murmurHasher = murmur3.New32()
-
 func (s *SessionState) SetFirstSeenHash() {
-	s.FirstSeenHash = s.Hash()
+	s.firstSeenHash = s.Hash()
 }
 
 func (s *SessionState) Hash() string {
@@ -87,11 +85,14 @@ func (s *SessionState) Hash() string {
 		log.Error("Error encoding session data: ", err)
 		return ""
 	}
-	return string(murmurHasher.Sum(encoded)[:])
+	murmurHasher := murmur3.New32()
+	murmurHasher.Write(encoded)
+	murmurHasher.Sum32()
+	return string(murmurHasher.Sum(nil)[:])
 }
 
 func (s *SessionState) HasChanged() bool {
-	return s.FirstSeenHash == "" || s.FirstSeenHash != s.Hash()
+	return s.firstSeenHash == "" || s.firstSeenHash != s.Hash()
 }
 
 func (s *SessionState) Lifetime(fallback int64) int64 {
