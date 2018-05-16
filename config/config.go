@@ -287,7 +287,7 @@ type Config struct {
 	VersionHeader                     string                                `json:"version_header"`
 	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
 	MinTokenLength                    int                                   `json:"min_token_length"`
-    JWTSkipCheckKidAsId     bool           `json:"jwt_use_id_from_kid"`
+        JWTSkipCheckKidAsId               bool                                  `json:"jwt_use_id_from_kid"`
 }
 
 type CertData struct {
