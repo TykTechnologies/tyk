@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -71,7 +70,9 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		token,
 		storeRef,
 		!k.Spec.DisableRateLimit,
-		!k.Spec.DisableQuota)
+		!k.Spec.DisableQuota,
+		k.Spec.GlobalConfig,
+	)
 
 	// If either are disabled, save the write roundtrip
 	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
@@ -91,7 +92,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		return errors.New("Access denied"), 403
 	}
 	// Run the trigger monitor
-	if config.Global.Monitor.MonitorUserKeys {
+	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
 		sessionMonitor.Check(session, token)
 	}
 

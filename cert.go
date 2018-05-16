@@ -53,7 +53,7 @@ var cipherSuites = map[string]uint16{
 func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
 
-	certMaps := []map[string]string{config.Global.Security.Certificates.Upstream}
+	certMaps := []map[string]string{config.Global().Security.Certificates.Upstream}
 
 	if spec != nil && spec.UpstreamCertificates != nil {
 		certMaps = append(certMaps, spec.UpstreamCertificates)
@@ -96,7 +96,7 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 }
 
 func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
-	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global.Security.PinnedPublicKeys) == 0 {
+	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
@@ -137,7 +137,7 @@ func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string
 func getPinnedPublicKeys(host string, spec *APISpec) (fingerprint []string) {
 	var keyIDs string
 
-	pinMaps := []map[string]string{config.Global.Security.PinnedPublicKeys}
+	pinMaps := []map[string]string{config.Global().Security.PinnedPublicKeys}
 
 	if spec != nil && spec.PinnedPublicKeys != nil {
 		pinMaps = append(pinMaps, spec.PinnedPublicKeys)
@@ -184,7 +184,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	serverCerts := []tls.Certificate{}
 	certNameMap := map[string]*tls.Certificate{}
 
-	for _, certData := range config.Global.HttpServerOptions.Certificates {
+	for _, certData := range config.Global().HttpServerOptions.Certificates {
 		cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
 		if err != nil {
 			log.Errorf("Server error: loadkeys: %s", err)
@@ -194,7 +194,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		certNameMap[certData.Name] = &cert
 	}
 
-	for _, cert := range CertificateManager.List(config.Global.HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
+	for _, cert := range CertificateManager.List(config.Global().HttpServerOptions.SSLCertificates, certs.CertificatePrivate) {
 		serverCerts = append(serverCerts, *cert)
 	}
 
@@ -206,16 +206,13 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 	}
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-		configMu.Lock()
-		defer configMu.Unlock()
-
 		newConfig := baseConfig.Clone()
 
-		isControlAPI := (listenPort != 0 && config.Global.ControlAPIPort == listenPort) || (config.Global.ControlAPIHostname == hello.ServerName)
+		isControlAPI := (listenPort != 0 && config.Global().ControlAPIPort == listenPort) || (config.Global().ControlAPIHostname == hello.ServerName)
 
-		if isControlAPI && config.Global.Security.ControlAPIUseMutualTLS {
+		if isControlAPI && config.Global().Security.ControlAPIUseMutualTLS {
 			newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			newConfig.ClientCAs = CertificateManager.CertPool(config.Global.Security.Certificates.ControlAPI)
+			newConfig.ClientCAs = CertificateManager.CertPool(config.Global().Security.Certificates.ControlAPI)
 
 			return newConfig, nil
 		}
@@ -224,7 +221,7 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 		for _, spec := range apiSpecs {
 			if spec.UseMutualTLSAuth && spec.Domain != "" && spec.Domain == hello.ServerName {
 				newConfig.ClientAuth = tls.RequireAndVerifyClientCert
-				certIDs := append(spec.ClientCertificates, config.Global.Security.Certificates.API...)
+				certIDs := append(spec.ClientCertificates, config.Global().Security.Certificates.API...)
 				newConfig.ClientCAs = CertificateManager.CertPool(certIDs)
 				break
 			}

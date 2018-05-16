@@ -416,6 +416,9 @@ const confSchema = `{
 	"max_idle_connections_per_host": {
 		"type": "integer"
 	},
+	"max_idle_connections": {
+		"type": "integer"
+	},
 	"max_conn_time": {
 		"type": "integer"
 	},
@@ -727,6 +730,9 @@ const confSchema = `{
 	},
 	"enable_hashed_keys_listing": {
 		"type": "boolean"
-	}
+	},
+	"min_token_length": {
+		"type": "integer"
+ 	}
 }
 }`

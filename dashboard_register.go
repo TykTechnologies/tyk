@@ -37,7 +37,7 @@ type HTTPDashboardHandler struct {
 }
 
 func reLogin() {
-	if !config.Global.UseDBAppConfigs {
+	if !config.Global().UseDBAppConfigs {
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.RegistrationEndpoint = buildConnStr("/register/node")
 	h.DeRegistrationEndpoint = buildConnStr("/system/node")
 	h.HeartBeatEndpoint = buildConnStr("/register/ping")
-	if h.Secret = config.Global.NodeSecret; h.Secret == "" {
+	if h.Secret = config.Global().NodeSecret; h.Secret == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Fatal("Node secret is not set, required for dashboard connection")
@@ -184,11 +184,15 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 
 	c := &http.Client{Timeout: 5 * time.Second}
 	resp, err := c.Do(req)
-	if err != nil || resp.StatusCode != 200 {
-		return fmt.Errorf("request failed with code %d and error %v", resp.StatusCode, err)
+
+	if err != nil {
+		return fmt.Errorf("deregister request failed with error %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("deregister request failed with status %v", resp.StatusCode)
 	}
 
-	defer resp.Body.Close()
 	val := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err

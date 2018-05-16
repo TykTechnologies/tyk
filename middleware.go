@@ -57,7 +57,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if config.Global.NewRelic.AppName != "" {
+			if config.Global().NewRelic.AppName != "" {
 				if txn, ok := w.(newrelic.Transaction); ok {
 					defer newrelic.StartSegment(txn, mw.Name()).End()
 				}
@@ -143,7 +143,7 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 	// Try and get the session from the session store
 	session, found := t.Spec.OrgSessionManager.SessionDetail(key, false)
-	if found && config.Global.EnforceOrgDataAge {
+	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		log.Debug("Setting data expiry: ", session.OrgID)
@@ -281,14 +281,24 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.SessionState, bool) {
+	minLength := t.Spec.GlobalConfig.MinTokenLength
+	if minLength == 0 {
+		// See https://github.com/TykTechnologies/tyk/issues/1681
+		minLength = 3
+	}
+
+	if len(key) <= minLength {
+		return user.SessionState{IsInactive: true}, false
+	}
+
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
 	cacheKey := key
-	if config.Global.HashKeys {
+	if t.Spec.GlobalConfig.HashKeys {
 		cacheKey = storage.HashStr(key)
 	}
 	// Check in-memory cache
-	if !config.Global.LocalSessionCache.DisableCacheSessionState {
+	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
 			log.Debug("--> Key found in local cache")

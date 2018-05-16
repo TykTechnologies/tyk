@@ -26,14 +26,14 @@ func setupInstrumentation() {
 		return
 	}
 
-	if config.Global.StatsdConnectionString == "" {
+	if config.Global().StatsdConnectionString == "" {
 		log.Error("Instrumentation is enabled, but no connectionstring set for statsd")
 		return
 	}
 
-	log.Info("Sending stats to: ", config.Global.StatsdConnectionString, " with prefix: ", config.Global.StatsdPrefix)
-	statsdSink, err := NewStatsDSink(config.Global.StatsdConnectionString,
-		&StatsDSinkOptions{Prefix: config.Global.StatsdPrefix})
+	log.Info("Sending stats to: ", config.Global().StatsdConnectionString, " with prefix: ", config.Global().StatsdPrefix)
+	statsdSink, err := NewStatsDSink(config.Global().StatsdConnectionString,
+		&StatsDSinkOptions{Prefix: config.Global().StatsdPrefix})
 
 	if err != nil {
 		log.Fatal("Failed to start StatsD check: ", err)

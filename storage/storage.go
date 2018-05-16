@@ -53,7 +53,7 @@ func HashStr(in string) string {
 }
 
 func HashKey(in string) string {
-	if !config.Global.HashKeys {
+	if !config.Global().HashKeys {
 		// Not hashing? Return the raw key
 		return in
 	}

@@ -54,7 +54,7 @@ func IsConnected() bool {
 	testClusters := []*RedisCluster{
 		{},
 	}
-	if config.Global.EnableSeperateCacheStore {
+	if config.Global().EnableSeperateCacheStore {
 		testClusters = append(testClusters, &RedisCluster{IsCache: true})
 	}
 	for _, cluster := range testClusters {
@@ -93,9 +93,9 @@ func IsConnected() bool {
 
 func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 	// redisSingletonMu is locked and we know the singleton is nil
-	cfg := config.Global.Storage
-	if isCache && config.Global.EnableSeperateCacheStore {
-		cfg = config.Global.CacheStorage
+	cfg := config.Global().Storage
+	if isCache && config.Global().EnableSeperateCacheStore {
+		cfg = config.Global().CacheStorage
 	}
 
 	log.Debug("Creating new Redis connection pool")

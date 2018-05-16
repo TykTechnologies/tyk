@@ -284,9 +284,14 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	if _, err := io.WriteString(tfile, `var globalVar = "globalValue"`); err != nil {
 		t.Fatal(err)
 	}
-	old := config.Global.TykJSPath
-	config.Global.TykJSPath = tfile.Name()
-	defer func() { config.Global.TykJSPath = old }()
+	globalConf := config.Global()
+	old := globalConf.TykJSPath
+	globalConf.TykJSPath = tfile.Name()
+	config.SetGlobal(globalConf)
+	defer func() {
+		globalConf.TykJSPath = old
+		config.SetGlobal(globalConf)
+	}()
 	jsvm := JSVM{}
 	jsvm.Init(nil)
 	if _, err := jsvm.VM.Run(js); err != nil {
