@@ -29,11 +29,10 @@ func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 
 	if sa.Spec.Auth.UseParam {
 		sa.stripFromParams(r)
-	} else {
-		sa.stripFromHeaders(r)
 	}
+	sa.stripFromHeaders(r)
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 // strips auth from query string params

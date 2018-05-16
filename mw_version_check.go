@@ -47,7 +47,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			Origin:           request.RealIP(r),
 			Reason:           string(stat),
 		})
-		return errors.New(string(stat)), 403
+		return errors.New(string(stat)), http.StatusForbidden
 	}
 
 	// We handle redirects before ignores in case we aren't using a whitelist
@@ -65,5 +65,5 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		return nil, mwStatusRespond
 	}
 
-	return nil, 200
+	return nil, http.StatusOK
 }

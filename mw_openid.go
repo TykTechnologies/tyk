@@ -186,7 +186,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			log.WithFields(logrus.Fields{
 				"prefix": OIDPREFIX,
 			}).Error("Could not find a valid policy to apply to this token!")
-			return errors.New("Key not authorized: no matching policy"), 403
+			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
 
 		session = newSession
@@ -207,7 +207,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {

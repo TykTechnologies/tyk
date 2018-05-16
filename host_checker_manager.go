@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/url"
 	"sync"
 	"time"
@@ -451,7 +452,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	t := time.Now()
 
 	var serverError bool
-	if report.ResponseCode > 200 {
+	if report.ResponseCode > http.StatusOK {
 		serverError = true
 	}
 
