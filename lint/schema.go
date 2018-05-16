@@ -733,6 +733,9 @@ const confSchema = `{
 	},
 	"min_token_length": {
 		"type": "integer"
+ 	},
+	"jwt_skip_check_kid_as_id": {
+		"type": "boolean"
  	}
 }
 }`
