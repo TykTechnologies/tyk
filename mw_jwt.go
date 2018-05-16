@@ -239,7 +239,7 @@ func (k *JWTMiddleware) getUserIdFromClaim(token *jwt.Token) (string, error) {
 	if !found {
 		userId, found = token.Claims.(jwt.MapClaims)[SUB].(string)
 		if !found {
-			message := fmt.Sprintf("key not authorized: user id was not found in claims: %s", userId)
+			message := fmt.Sprintf("user id was not found in claims: %s", userId)
 			log.Error(message)
 			return "", errors.New(message)
 		}
@@ -438,15 +438,15 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		switch k.Spec.JWTSigningMethod {
 		case HMACSign:
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				return nil, fmt.Errorf("Unexpected signing method: %v and not HMACSign", token.Header["alg"])
 			}
 		case RSASign:
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				return nil, fmt.Errorf("Unexpected signing method: %v and not RSASign", token.Header["alg"])
 			}
 		case ECDSASing:
 			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				return nil, fmt.Errorf("Unexpected signing method: %v and not ECDSASing", token.Header["alg"])
 			}
 		default:
 			log.Warning("No signing method found in API Definition, defaulting to HMAC")
@@ -464,7 +464,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		if k.Spec.JWTSigningMethod == "rsa" {
 			asRSA, err := jwt.ParseRSAPublicKeyFromPEM(val)
 			if err != nil {
-				log.Error("Failed to deccode JWT to RSA type")
+				log.Error("Failed to decode JWT to RSA type")
 				return nil, err
 			}
 			return asRSA, nil

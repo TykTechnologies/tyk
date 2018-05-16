@@ -1,0 +1,20 @@
+func prepareJWTSessionRSA(testName string) (*APISpec, string) {
+	spec := buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.JWTSigningMethod = "rsa"
+		spec.EnableJWT = true
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	session := createJWTSessionWithRSA()
+	tokenKID := testKey(testName, "token")
+	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
+
+	jwtToken := createJWKToken(func(t *jwt.Token) {
+		t.Header["kid"] = tokenKID
+		t.Claims.(jwt.MapClaims)["foo"] = "bar"
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	})
+
+	return spec, jwtToken
+}

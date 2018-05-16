@@ -1,0 +1,7 @@
+time="May 16 13:39:52" level=info msg="Disabled feature" 
+goos: darwin
+goarch: amd64
+pkg: github.com/TykTechnologies/tyk
+BenchmarkIPBlacklistMiddleware-4   	   30000	     34567 ns/op	   32323 B/op	     148 allocs/op
+PASS
+ok  	github.com/TykTechnologies/tyk	1.527s

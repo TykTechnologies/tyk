@@ -92,7 +92,15 @@ type JwtCreator func() *user.SessionState
 var createHmacJWKSession = func() *user.SessionState { return createJWTSession() }
 var createRsaJWKSession = func() *user.SessionState { return createJWTSessionWithRSA() }
 
-func prepareGenericJWTSession(testName string, method string, putIdInSub bool, GlobalSkipKidAsId bool, ApiSkipKidAsId bool) (*APISpec, string) {
+func prepareGenericJWTSession(testName string, method string, claimName string, GlobalSkipKidAsId bool, ApiSkipKidAsId bool) (*APISpec, string) {
+
+	tokenKID := testKey(testName, "token")
+
+	globalConf := config.Global()
+	globalConf.JWTSkipCheckKidAsId = GlobalSkipKidAsId
+	config.SetGlobal(globalConf)
+
+
 	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.JWTSigningMethod = method
@@ -100,72 +108,64 @@ func prepareGenericJWTSession(testName string, method string, putIdInSub bool, G
 		spec.Proxy.ListenPath = "/"
 		spec.JWTSkipCheckKidAsId = ApiSkipKidAsId
 
+		if claimName != KID {
+			spec.JWTIdentityBaseField = claimName
+		}
+
 	})[0]
 
+	var jwtToken string
 	var sessionFunc JwtCreator
-
 	switch method {
 	case HMACSign:
 		sessionFunc = createHmacJWKSession
-	default:
+
+		jwtToken = createJWKTokenHMAC(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["foo"] = "bar"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+
+			if claimName != KID {
+				t.Claims.(jwt.MapClaims)[claimName] = tokenKID
+				t.Header[KID] = "ignore-this-id"
+			} else {
+				t.Header[KID] = tokenKID
+			}
+		})
 	case RSASign:
 		sessionFunc = createRsaJWKSession
 
+		jwtToken = createJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["foo"] = "bar"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
+
+			if claimName != KID {
+				t.Claims.(jwt.MapClaims)[claimName] = tokenKID
+				t.Header[KID] = "ignore-this-id"
+			} else {
+				t.Header[KID] = tokenKID
+			}
+		})
+	default:
+		panic("Bad signing method")
+
 	}
 
-	tokenKID := testKey(testName, "token")
 	spec.SessionManager.UpdateSession(tokenKID, sessionFunc(), 60, false)
 
-	jwtToken := createJWKToken(func(t *jwt.Token) {
-		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-
-		if putIdInSub {
-			t.Header[SUB] = tokenKID
-			t.Header[KID] = "blabla123"
-		} else {
-			t.Header[KID] = tokenKID
-		}
-	})
-
-	config.Global.JWTSkipCheckKidAsId = GlobalSkipKidAsId
-
 	return spec, jwtToken
-}
 
-// JWTSessionHMAC
-
-func prepareJWTSessionHMAC(testName string) string {
-	spec := buildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = false
-		spec.JWTSigningMethod = "hmac"
-		spec.EnableJWT = true
-		spec.Proxy.ListenPath = "/"
-	})[0]
-
-	session := createJWTSession()
-	tokenKID := testKey(testName, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
-
-	jwtToken := createJWKTokenHMAC(func(t *jwt.Token) {
-		t.Header["kid"] = tokenKID
-		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-	})
-
-	return jwtToken
 }
 
 func TestJWTSessionHMAC(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionHMAC(t.Name())
-
+	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, KID, false, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT signed with HMAC", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -176,138 +176,109 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionHMAC(b.Name())
-
+	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	_, jwtToken := prepareGenericJWTSession(b.Name(), HMACSign, KID, false, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	}
 }
 
-func TestJWTHMACIdSubClaim(t *testing.T) {
+func TestJWTHMACIdInSubClaim(t *testing.T) {
 
 	ts := newTykTestServer()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
-	config.Global.JWTSkipCheckKidAsId = true
-
-	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, true, true, false)
+	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, SUB, true, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/HMAC/Id in SuB/Global-skip-kid/Api-dont-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 
-	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, true, true, true)
+	//Same as above
+	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, SUB, true, true)
 	authHeaders = map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/HMAC/Id in SuB/Global-skip-kid/Api-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 
-	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, true, false, false)
+	// For backward compatibility, if the new config are not set, and the id is in the 'sub' claim while the 'kid' claim
+	// in the header is not empty, then the jwt will return 403 - "Key not authorized:token invalid, key not found"
+	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, SUB, false, false)
 	authHeaders = map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/HMAC/Id in SuB/Global-dont-skip-kid/Api-dont-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
 
-	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, true, false, true)
+	// Case where the gw always check the 'kid' claim first but if this JWTSkipCheckKidAsId is set on the api level,
+	// then it'll work
+	_, jwtToken = prepareGenericJWTSession(t.Name(), HMACSign, SUB, false, true)
 	authHeaders = map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/HMAC/Id in SuB/Global-dont-skip-kid/Api-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
 
-func TestJWTRSAIdSubClaim(t *testing.T) {
+func TestJWTRSAIdInSubClaim(t *testing.T) {
 
 	ts := newTykTestServer()
 	defer ts.Close()
 
 	//If we skip the check then the Id will be taken from SUB and the call will succeed
-	config.Global.JWTSkipCheckKidAsId = true
-
-	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, true, true, false)
+	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, SUB, true, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/RSA/Id in SuB/Global-skip-kid/Api-dont-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 
-	_, jwtToken = prepareGenericJWTSession(t.Name(), RSASign, true, true, true)
+	_, jwtToken = prepareGenericJWTSession(t.Name(), RSASign, SUB, true, true)
 	authHeaders = map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/RSA/Id in SuB/Global-skip-kid/Api-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 
-	_, jwtToken = prepareGenericJWTSession(t.Name(), RSASign, true, false, false)
+	_, jwtToken = prepareGenericJWTSession(t.Name(), RSASign, SUB, false, false)
 	authHeaders = map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/RSA/Id in SuB/Global-dont-skip-kid/Api-dont-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
 
-	_, jwtToken = prepareGenericJWTSession(t.Name(), RSASign, true, false, true)
+	_, jwtToken = prepareGenericJWTSession(t.Name(), RSASign, SUB, false, true)
 	authHeaders = map[string]string{"authorization": jwtToken}
-
 	t.Run("Request with valid JWT/RSA/Id in SuB/Global-dont-skip-kid/Api-skip-kid", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
-}
-
-// JWTSessionRSA
-func prepareJWTSessionRSA(testName string) (*APISpec, string) {
-	spec := buildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = false
-		spec.JWTSigningMethod = "rsa"
-		spec.EnableJWT = true
-		spec.Proxy.ListenPath = "/"
-	})[0]
-
-	session := createJWTSessionWithRSA()
-	tokenKID := testKey(testName, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
-
-	jwtToken := createJWKToken(func(t *jwt.Token) {
-		t.Header["kid"] = tokenKID
-		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-	})
-
-	return spec, jwtToken
 }
 
 func TestJWTSessionRSA(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	_, jwtToken := prepareJWTSessionRSA(t.Name())
-
+	//default values, keep backward compatibility
+	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -318,12 +289,12 @@ func BenchmarkJWTSessionRSA(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	_, jwtToken := prepareJWTSessionRSA(b.Name())
-
+	//default values, keep backward compatibility
+	_, jwtToken := prepareGenericJWTSession(b.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	}
 }
@@ -332,8 +303,8 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	prepareJWTSessionRSA(t.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": ""}
 	t.Run("Request with empty authorization header", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
@@ -346,12 +317,12 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	prepareJWTSessionRSA(t.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{}
 	t.Run("Request without authorization header", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 400,
+			Headers: authHeaders, Code: http.StatusBadRequest,
 		})
 	})
 }
@@ -360,12 +331,12 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	_, jwtToken := prepareJWTSessionRSA(t.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": jwtToken + "ajhdkjhsdfkjashdkajshdkajhsdkajhsd"}
 	t.Run("Request with malformed JWT", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
 }
@@ -374,13 +345,13 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	spec, jwtToken := prepareJWTSessionRSA(t.Name())
+	//default values, same as before (keeps backward compatibility)
+	spec, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	spec.DoNotTrack = true
-
 	authHeaders := map[string]string{"authorization": jwtToken + "ajhdkjhsdfkjashdkajshdkajhsdkajhsd"}
 	t.Run("Request with malformed JWT no track", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
 }
@@ -389,49 +360,26 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	prepareJWTSessionRSA(t.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": "123"}
 	t.Run("Request with invalid JWT", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
-}
-
-// TestJWTSessionRSABearer
-
-func prepareJWTSessionRSABearer(testName string) string {
-	spec := buildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = false
-		spec.JWTSigningMethod = "rsa"
-		spec.EnableJWT = true
-		spec.Proxy.ListenPath = "/"
-	})[0]
-
-	session := createJWTSessionWithRSA()
-	tokenKID := testKey(testName, "token")
-	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
-
-	jwtToken := createJWKToken(func(t *jwt.Token) {
-		t.Header[KID] = tokenKID
-		t.Claims.(jwt.MapClaims)["foo"] = "bar"
-		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
-	})
-
-	return jwtToken
 }
 
 func TestJWTSessionRSABearer(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSABearer(t.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": "Bearer " + jwtToken}
 	t.Run("Request with valid Bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -442,13 +390,13 @@ func BenchmarkJWTSessionRSABearer(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSABearer(b.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	_, jwtToken := prepareGenericJWTSession(b.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": "Bearer " + jwtToken}
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	}
 }
@@ -457,12 +405,12 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSABearer(t.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders := map[string]string{"authorization": "Bearer: " + jwtToken} // extra ":" makes the value invalid
 	t.Run("Request with invalid Bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
 }
@@ -471,19 +419,19 @@ func TestJWTSessionRSABearerInvalidTwoBears(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSABearer(t.Name())
-
+	//default values, same as before (keeps backward compatibility)
+	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, KID, false, false)
 	authHeaders1 := map[string]string{"authorization": "Bearer bearer" + jwtToken}
 	t.Run("Request with Bearer bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders1, Code: 200, //fix code since it should be 403
+			Headers: authHeaders1, Code: http.StatusOK, //fix code since it should be http.StatusForbidden
 		})
 	})
 
 	authHeaders2 := map[string]string{"authorization": "bearer Bearer" + jwtToken}
 	t.Run("Request with bearer Bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders2, Code: 200, //fix code since it should be 403
+			Headers: authHeaders2, Code: http.StatusOK, //fix code since it should be http.StatusForbidden
 		})
 	})
 }
@@ -540,7 +488,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 
 	t.Run("Initial request with no policy base field in JWT", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -556,7 +504,7 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	}
 }
@@ -596,7 +544,7 @@ func TestJWTSessionRSAWithRawSource(t *testing.T) {
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with invalid policy", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -616,7 +564,7 @@ func BenchmarkJWTSessionRSAWithRawSource(b *testing.B) {
 			b,
 			test.TestCase{
 				Headers: authHeaders,
-				Code:    200,
+				Code:    http.StatusOK,
 			},
 		)
 	}
@@ -651,7 +599,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with invalid policy", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
 }
@@ -700,7 +648,7 @@ func TestJWTSessionInvalidClaims(t *testing.T) {
 		authHeaders := map[string]string{"authorization": jwtToken}
 
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -734,7 +682,7 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with valid policy", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 
@@ -750,7 +698,7 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	authHeaders = map[string]string{"authorization": jwtTokenInvalidPolicy}
 	t.Run("Request with invalid policy in JWT", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 403,
+			Headers: authHeaders, Code: http.StatusForbidden,
 		})
 	})
 }
@@ -793,13 +741,13 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		ts.Run(
 			t,
 			test.TestCase{
-				Headers: authHeaders, Code: 200,
+				Headers: authHeaders, Code: http.StatusOK,
 			},
 			test.TestCase{
 				Method:    http.MethodGet,
 				Path:      "/tyk/keys/" + sessionID,
 				AdminAuth: true,
-				Code:      200,
+				Code:      http.StatusOK,
 				BodyMatch: `"quota_max":111`,
 			},
 		)
@@ -820,13 +768,13 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	t.Run("Request with new valid policy in JWT", func(t *testing.T) {
 		ts.Run(t,
 			test.TestCase{
-				Headers: authHeaders, Code: 200,
+				Headers: authHeaders, Code: http.StatusOK,
 			},
 			test.TestCase{
 				Method:    http.MethodGet,
 				Path:      "/tyk/keys/" + sessionID,
 				AdminAuth: true,
-				Code:      200,
+				Code:      http.StatusOK,
 				BodyMatch: `"quota_max":999`,
 			},
 		)
@@ -867,7 +815,7 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 
 	t.Run("JWTSessionRSAWithJWK", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -886,7 +834,7 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 			b,
 			test.TestCase{
 				Headers: authHeaders,
-				Code:    200,
+				Code:    http.StatusOK,
 			},
 		)
 	}
@@ -930,7 +878,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 		loadAPI(spec)
 
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 
@@ -939,7 +887,7 @@ func TestJWTSessionRSAWithEncodedJWK(t *testing.T) {
 		loadAPI(spec)
 
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: 200,
+			Headers: authHeaders, Code: http.StatusOK,
 		})
 	})
 }
@@ -962,8 +910,36 @@ func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
 			b,
 			test.TestCase{
 				Headers: authHeaders,
-				Code:    200,
+				Code:    http.StatusOK,
 			},
 		)
 	}
+}
+
+func TestJWTHMACIdNewClaim(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	_, jwtToken := prepareGenericJWTSession(t.Name(), HMACSign, "user-id", false, true)
+	authHeaders := map[string]string{"authorization": jwtToken}
+	t.Run("Request with valid JWT/HMAC signature/id in user-id claim", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
+}
+
+func TestJWTRSAIdNewClaim(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	//If we skip the check then the Id will be taken from SUB and the call will succeed
+	_, jwtToken := prepareGenericJWTSession(t.Name(), RSASign, "user-id", false, true)
+	authHeaders := map[string]string{"authorization": jwtToken}
+	t.Run("Request with valid JWT/RSA signature/id in user-id claim", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
 }

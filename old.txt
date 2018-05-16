@@ -1,0 +1,7 @@
+time="May 16 13:02:57" level=info msg="Disabled feature" 
+goos: darwin
+goarch: amd64
+pkg: github.com/TykTechnologies/tyk
+BenchmarkBasicAuth-4   	      10	 152870840 ns/op	 1342874 B/op	   26003 allocs/op
+PASS
+ok  	github.com/TykTechnologies/tyk	2.385s
