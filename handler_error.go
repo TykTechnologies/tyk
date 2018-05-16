@@ -3,14 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -48,20 +46,20 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	w.Header().Set("Content-Type", contentType)
 
-	templateName := fmt.Sprintf("error_%s.%s", strconv.Itoa(errCode), templateExtension)
+	templateName := "error_" + strconv.Itoa(errCode) + "." + templateExtension
 
 	// Try to use an error template that matches the HTTP error code and the content type: 500.json, 400.xml, etc.
 	tmpl := templates.Lookup(templateName)
 
 	// Fallback to a generic error template, but match the content type: error.json, error.xml, etc.
 	if tmpl == nil {
-		templateName = fmt.Sprintf("%s.%s", defaultTemplateName, templateExtension)
+		templateName = defaultTemplateName + "." + templateExtension
 		tmpl = templates.Lookup(templateName)
 	}
 
 	// If no template is available for this content type, fallback to "error.json".
 	if tmpl == nil {
-		templateName = fmt.Sprintf("%s.%s", defaultTemplateName, defaultTemplateFormat)
+		templateName = defaultTemplateName + "." + defaultTemplateFormat
 		tmpl = templates.Lookup(templateName)
 		w.Header().Set("Content-Type", defaultContentType)
 	}
@@ -84,10 +82,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	var alias string
 
 	ip := request.RealIP(r)
-	if config.Global.StoreAnalytics(ip) {
+	if e.Spec.GlobalConfig.StoreAnalytics(ip) {
 		t := time.Now()
 
-		addVersionHeader(w, r)
+		addVersionHeader(w, r, e.Spec.GlobalConfig)
 
 		version := e.Spec.getVersionFromRequest(r)
 		if version == "" {
@@ -120,7 +118,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		rawRequest := ""
 		rawResponse := ""
-		if recordDetail(r) {
+		if recordDetail(r, e.Spec.GlobalConfig) {
 			requestCopy := copyRequest(r)
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
@@ -167,7 +165,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		record.GetGeo(ip)
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
-		if config.Global.EnforceOrgDataAge {
+		if e.Spec.GlobalConfig.EnforceOrgDataAge {
 			orgExpireDataTime := e.OrgSessionExpiry(e.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -177,7 +175,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		record.SetExpiry(expiresAfter)
-		if config.Global.AnalyticsConfig.NormaliseUrls.Enabled {
+		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 
@@ -188,12 +186,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 
 	//If the config option is not set or is false, add the header
-	if !config.Global.HideGeneratorHeader {
+	if !e.Spec.GlobalConfig.HideGeneratorHeader {
 		w.Header().Add("X-Generator", "tyk.io")
 	}
 
 	// Close connections
-	if config.Global.CloseConnections {
+	if e.Spec.GlobalConfig.CloseConnections {
 		w.Header().Add("Connection", "close")
 	}
 

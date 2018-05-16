@@ -64,7 +64,7 @@ func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 		}
 		src = f
 	case "blob":
-		if config.Global.DisableVirtualPathBlobs {
+		if config.Global().DisableVirtualPathBlobs {
 			log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
@@ -89,7 +89,7 @@ func (d *VirtualEndpoint) Init() {
 }
 
 func (d *VirtualEndpoint) EnabledForSpec() bool {
-	if !config.Global.EnableJSVM {
+	if !d.Spec.GlobalConfig.EnableJSVM {
 		return false
 	}
 	for _, version := range d.Spec.VersionData.Versions {
@@ -109,7 +109,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	var copiedRequest *http.Request
-	if recordDetail(r) {
+	if recordDetail(r, d.Spec.GlobalConfig) {
 		copiedRequest = copyRequest(r)
 	}
 
@@ -264,7 +264,7 @@ func forceResponse(w http.ResponseWriter,
 	// Clone the response so we can save it
 	copiedRes := copyResponse(newResponse)
 
-	handleForcedResponse(w, newResponse, session)
+	handleForcedResponse(w, newResponse, session, spec)
 
 	// Record analytics
 	return copiedRes
@@ -284,14 +284,14 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
 	// Externalising this from the MW so we can re-use it elsewhere
-	handleForcedResponse(rw, res, ses)
+	handleForcedResponse(rw, res, ses, d.Spec)
 }
 
-func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {
+func handleForcedResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState, spec *APISpec) {
 	defer res.Body.Close()
 
 	// Close connections
-	if config.Global.CloseConnections {
+	if spec.GlobalConfig.CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 

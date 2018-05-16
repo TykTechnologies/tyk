@@ -319,7 +319,7 @@ func (j *JSVM) Init(spec *APISpec) {
 	}
 
 	// Load user's TykJS on top, if any
-	if path := config.Global.TykJSPath; path != "" {
+	if path := config.Global().TykJSPath; path != "" {
 		f, err := os.Open(path)
 		if err == nil {
 			_, err = vm.Run(f)
@@ -339,13 +339,13 @@ func (j *JSVM) Init(spec *APISpec) {
 	// Add environment API
 	j.LoadTykJSApi()
 
-	if config.Global.JSVMTimeout <= 0 {
+	if jsvmTimeout := config.Global().JSVMTimeout; jsvmTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Debugf("Default JSVM timeout used: %v", j.Timeout)
 	} else {
-		j.Timeout = time.Duration(config.Global.JSVMTimeout) * time.Second
+		j.Timeout = time.Duration(jsvmTimeout) * time.Second
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Debugf("Custom JSVM timeout: %v", j.Timeout)
@@ -357,7 +357,7 @@ func (j *JSVM) Init(spec *APISpec) {
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
 func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
-	tykBundlePath := filepath.Join(config.Global.MiddlewarePath, "bundles")
+	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 	for _, mwPath := range paths {
 		if pathPrefix != "" {
 			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
@@ -492,7 +492,7 @@ func (j *JSVM) LoadTykJSApi() {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
 
-		if config.Global.ProxySSLInsecureSkipVerify {
+		if config.Global().ProxySSLInsecureSkipVerify {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
 

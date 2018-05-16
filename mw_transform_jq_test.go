@@ -9,10 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestJQMiddleware(t *testing.T) {
-	ts := newTykTestServer()
-	defer ts.Close()
-
+func testPrepareJQMiddleware() {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.EnableContextVars = true
@@ -25,6 +22,13 @@ func TestJQMiddleware(t *testing.T) {
 			}}
 		})
 	})
+}
+
+func TestJQMiddleware(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareJQMiddleware()
 
 	bodyContextVar := `\"path\":\"/jq\"`
 	headersBodyVar := `"X-Added-Rewrite-Headers":"bar"`
@@ -34,4 +38,24 @@ func TestJQMiddleware(t *testing.T) {
 		{Path: "/jq", Method: "POST", Data: `{"foo": "bar"}`, Code: 200, BodyMatch: headersBodyVar},
 		{Path: "/jq", Method: "POST", Data: `wrong json`, Code: 415},
 	}...)
+}
+
+func BenchmarkJQMiddleware(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareJQMiddleware()
+
+	bodyContextVar := `\"path\":\"/jq\"`
+	headersBodyVar := `"X-Added-Rewrite-Headers":"bar"`
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, []test.TestCase{
+			{Path: "/jq", Method: "POST", Data: `{"foo": "bar"}`, Code: 200, BodyMatch: bodyContextVar},
+			{Path: "/jq", Method: "POST", Data: `{"foo": "bar"}`, Code: 200, BodyMatch: headersBodyVar},
+			{Path: "/jq", Method: "POST", Data: `wrong json`, Code: 415},
+		}...)
+	}
 }

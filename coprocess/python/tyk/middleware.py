@@ -1,27 +1,48 @@
-from importlib import reload as reload_module
 from importlib import invalidate_caches as invalidate_caches
 
-from importlib.machinery import SourceFileLoader
+from types import ModuleType
 
-import inspect
+import imp, inspect, sys, os, json
+from time import sleep
+
 import tyk.decorators as decorators
-
+from tyk.loader import MiddlewareLoader
 from gateway import TykGateway as tyk
 
-HandlerDecorators = list(map(lambda m: m[1], inspect.getmembers(decorators, inspect.isclass)))
-
+HandlerDecorators = list( map( lambda m: m[1], inspect.getmembers(decorators, inspect.isclass) ) )
 
 class TykMiddleware:
-    def __init__(self, module_path, module_name):
-        tyk.log("Loading module: '{0}'".format(module_name), "info")
-        self.module_path = module_path
+    def __init__(self, filepath, bundle_root_path=None):
+        tyk.log( "Loading module: '{0}'".format(filepath), "info")
+        self.filepath = filepath
         self.handlers = {}
+
+        self.bundle_id = filepath
+        self.bundle_root_path = bundle_root_path
+
+        self.imported_modules = []
+        
+        module_splits = filepath.split('_')
+        self.api_id, self.middleware_id = module_splits[0], module_splits[1]
+
+        self.module_path = os.path.join(self.bundle_root_path, filepath)
+        self.parse_manifest()
+
+        self.mw_path = os.path.join(self.module_path, "/middleware.py")
+
+        # Fallback for single file bundles:
+        if len(self.manifest['file_list']) == 1:
+            self.mw_path = os.path.join(self.module_path, self.manifest['file_list'][0])
+
         try:
-            source = SourceFileLoader(module_name, self.module_path)
-            self.module = source.load_module()
+            self.loader = MiddlewareLoader(self)
+            sys.meta_path.append(self.loader)
+            invalidate_caches()
+            self.module = imp.load_source(filepath, self.mw_path)
             self.register_handlers()
+            self.cleanup()
         except:
-            tyk.log_error("Middleware initialization error:")
+            tyk.log_error( "Middleware initialization error:" )
 
     def register_handlers(self):
         new_handlers = {}
@@ -36,18 +57,32 @@ class TykMiddleware:
                     new_handlers[handler_type].append(attr_value)
         self.handlers = new_handlers
 
-    def reload(self):
-        try:
-            invalidate_caches()
-            reload_module(self.module)
-            self.register_handlers()
-        except:
-            tyk.log_error("Reload error:")
+    def build_hooks_and_event_handlers(self):
+        hooks = {}
+        for hook_type in self.handlers:
+            for handler in self.handlers[hook_type]:
+                handler.middleware = self
+                hooks[handler.name] = handler
+        return hooks
+
+    def cleanup(self):
+        sys.meta_path.pop()
+        for m in self.imported_modules:
+            del sys.modules[m]
 
     def process(self, handler, object):
-        if handler.arg_count == 4:
-            object.request, object.session, object.metadata = handler(
-                object.request, object.session, object.metadata, object.spec)
+        handlerType = type(handler)
+
+        if handlerType == decorators.Event:
+            handler(object, object.spec)
+            return
+        elif handler.arg_count == 4:
+            object.request, object.session, object.metadata = handler(object.request, object.session, object.metadata, object.spec)
         elif handler.arg_count == 3:
             object.request, object.session = handler(object.request, object.session, object.spec)
         return object
+
+    def parse_manifest(self):
+        manifest_path = os.path.join(self.module_path, "manifest.json")
+        with open(manifest_path, 'r') as f:
+            self.manifest = json.load(f)

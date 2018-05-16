@@ -234,15 +234,13 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	config.Global.UseDBAppConfigs = true
-	config.Global.AllowInsecureConfigs = true
-	config.Global.DBAppConfOptions.ConnectionString = ts.URL
+	globalConf := config.Global()
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	config.SetGlobal(globalConf)
 
-	defer func() {
-		config.Global.UseDBAppConfigs = false
-		config.Global.AllowInsecureConfigs = false
-		config.Global.DBAppConfOptions.ConnectionString = ""
-	}()
+	defer resetTestConfig()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -336,6 +334,42 @@ func TestDefaultVersion(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
+	key := testPrepareDefaultVersion()
+
+	authHeaders := map[string]string{"authorization": key}
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
+		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
+		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
+		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+	}...)
+}
+
+func BenchmarkDefaultVersion(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	key := testPrepareDefaultVersion()
+
+	authHeaders := map[string]string{"authorization": key}
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(
+			b,
+			[]test.TestCase{
+				{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
+				{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
+				{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
+				{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+			}...,
+		)
+	}
+}
+
+func testPrepareDefaultVersion() string {
 	buildAndLoadAPI(func(spec *APISpec) {
 		v1 := apidef.VersionInfo{Name: "v1"}
 		v1.Name = "v1"
@@ -356,18 +390,121 @@ func TestDefaultVersion(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})
 
-	key := createSession(func(s *user.SessionState) {
+	return createSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
 	})
+}
 
-	authHeaders := map[string]string{"authorization": key}
+func TestGetVersionFromRequest(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	ts.Run(t, []test.TestCase{
-		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
-		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
-		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
-		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
-	}...)
+	versionInfo := apidef.VersionInfo{}
+	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar"}
+
+	t.Run("Header location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionData.Versions["v1"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
+			{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+		}...)
+	})
+
+	t.Run("URL param location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Key = "version"
+			spec.VersionData.Versions["v2"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo?version=v2", Code: 200},
+			{Path: "/bar?version=v2", Code: 403},
+		}...)
+	})
+
+	t.Run("URL location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url"
+			spec.VersionData.Versions["v3"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/v3/foo", Code: 200},
+			{Path: "/v3/bar", Code: 403},
+		}...)
+	})
+}
+
+func BenchmarkGetVersionFromRequest(b *testing.B) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	versionInfo := apidef.VersionInfo{}
+	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar"}
+
+	b.Run("Header location", func(b *testing.B) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionData.Versions["v1"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
+				{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+			}...)
+		}
+	})
+
+	b.Run("URL param location", func(b *testing.B) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Key = "version"
+			spec.VersionData.Versions["v2"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/foo?version=v2", Code: 200},
+				{Path: "/bar?version=v2", Code: 403},
+			}...)
+		}
+	})
+
+	b.Run("URL location", func(b *testing.B) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url"
+			spec.VersionData.Versions["v3"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/v3/foo", Code: 200},
+				{Path: "/v3/bar", Code: 403},
+			}...)
+		}
+	})
 }

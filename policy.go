@@ -161,7 +161,7 @@ func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
 		return LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
+	store := &RPCStorageHandler{UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
 	if !store.Connect() {
 		return nil
 	}

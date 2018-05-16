@@ -1,3 +1,4 @@
+.DS_Store
 .idea/
 .vagrant/
 .vscode/
@@ -36,6 +37,8 @@ petstore.json
 *.pem
 *.csr
 *.prof
+*.blockprof
+*.mutexprof
 *.pdf
 *.mmdb
 *.cov

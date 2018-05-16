@@ -44,7 +44,8 @@ type DefaultAuthorisationManager struct {
 }
 
 type DefaultSessionManager struct {
-	store storage.Handler
+	store       storage.Handler
+	asyncWrites bool
 }
 
 func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
@@ -83,6 +84,7 @@ func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) 
 }
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
+	b.asyncWrites = config.Global().UseAsyncSessionWrite
 	b.store = store
 	b.store.Connect()
 }
@@ -119,7 +121,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 	v, _ := json.Marshal(session)
 
 	// Keep the TTL
-	if config.Global.UseAsyncSessionWrite {
+	if b.asyncWrites {
 		if hashed {
 			go b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
 			return nil

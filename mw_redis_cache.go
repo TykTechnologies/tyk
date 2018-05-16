@@ -133,7 +133,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	var copiedRequest *http.Request
-	if recordDetail(r) {
+	if recordDetail(r, m.Spec.GlobalConfig) {
 		copiedRequest = copyRequest(r)
 	}
 
