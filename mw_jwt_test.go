@@ -100,7 +100,6 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 	globalConf.JWTSkipCheckKidAsId = GlobalSkipKidAsId
 	config.SetGlobal(globalConf)
 
-
 	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.JWTSigningMethod = method
