@@ -22,8 +22,8 @@ func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		certIDs := append(m.Spec.ClientCertificates, m.Spec.GlobalConfig.Security.Certificates.API...)
 
 		if err := CertificateManager.ValidateRequestCertificate(certIDs, r); err != nil {
-			return err, 403
+			return err, http.StatusForbidden
 		}
 	}
-	return nil, 200
+	return nil, http.StatusOK
 }

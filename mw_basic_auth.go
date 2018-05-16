@@ -30,7 +30,7 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 	authReply := "Basic realm=\"" + k.Spec.Name + "\""
 
 	w.Header().Add("WWW-Authenticate", authReply)
-	return errors.New(msg), 401
+	return errors.New(msg), http.StatusUnauthorized
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -49,7 +49,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Header malformed
 		logEntry.Info("Attempted access with malformed header, header not in basic auth format.")
 
-		return errors.New("Attempted access with malformed header, header not in basic auth format"), 400
+		return errors.New("Attempted access with malformed header, header not in basic auth format"), http.StatusBadRequest
 	}
 
 	// Decode the username:password string
@@ -57,7 +57,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		logEntry.Info("Base64 Decoding failed of basic auth data: ", err)
 
-		return errors.New("Attempted access with malformed header, auth data not encoded correctly"), 400
+		return errors.New("Attempted access with malformed header, auth data not encoded correctly"), http.StatusBadRequest
 	}
 
 	authValues := strings.Split(string(authvaluesStr), ":")
@@ -65,7 +65,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		// Header malformed
 		logEntry.Info("Attempted access with malformed header, values not in basic auth format.")
 
-		return errors.New("Attempted access with malformed header, values not in basic auth format"), 400
+		return errors.New("Attempted access with malformed header, values not in basic auth format"), http.StatusBadRequest
 	}
 
 	// Check if API key valid
@@ -118,5 +118,5 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Request is valid, carry on
-	return nil, 200
+	return nil, http.StatusOK
 }

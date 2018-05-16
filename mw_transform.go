@@ -41,7 +41,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	_, versionPaths, _, _ := t.Spec.Version(r)
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, Transformed)
 	if !found {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 	err := transformBody(r, meta.(*TransformSpec), t.Spec.EnableContextVars)
 	if err != nil {
@@ -56,7 +56,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		)
 		logEntry.Error(err)
 	}
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) error {

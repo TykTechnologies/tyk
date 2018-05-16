@@ -102,7 +102,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Only allow idempotent (safe) methods
 	if r.Method != "GET" && r.Method != "HEAD" {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	var stat RequestStatus
@@ -123,7 +123,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Cached route matched, let go
 	if stat != StatusCached {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 	token := ctxGetAuthToken(r)
 
@@ -160,7 +160,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 		if reqVal == nil {
 			log.Warning("Upstream request must have failed, response is empty")
-			return nil, 200
+			return nil, http.StatusOK
 		}
 
 		// make sure the status codes match if specified
@@ -222,12 +222,12 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		// Tere was an issue with this cache entry - lets remove it:
 		m.CacheStore.DeleteKey(key)
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	if m.isTimeStampExpired(timestamp) || len(cachedData) == 0 {
 		m.CacheStore.DeleteKey(key)
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	log.Debug("Cache got: ", cachedData)

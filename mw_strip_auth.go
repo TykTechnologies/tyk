@@ -32,7 +32,7 @@ func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	}
 	sa.stripFromHeaders(r)
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 // strips auth from query string params

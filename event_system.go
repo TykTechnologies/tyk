@@ -133,13 +133,16 @@ func EventHandlerByName(handlerConf apidef.EventHandlerTriggerConfig, spec *APIS
 }
 
 func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
+	log.Debug("EVENT FIRED: ", name)
 	if handlers, e := handlers[name]; e {
+		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
 		eventMessage := config.EventMessage{
 			Meta:      meta,
 			Type:      name,
 			TimeStamp: time.Now().Local().String(),
 		}
 		for _, handler := range handlers {
+			log.Debug("FIRING HANDLER: ", handler)
 			go handler.HandleEvent(eventMessage)
 		}
 	}

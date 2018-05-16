@@ -13,5 +13,5 @@ func (m *RateCheckMW) Name() string {
 func (m *RateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Let's track r/ps
 	GlobalRate.Incr(1)
-	return nil, 200
+	return nil, http.StatusOK
 }
