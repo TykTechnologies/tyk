@@ -1,203 +1,424 @@
-// +build coprocess
-// +build python
-
 package main
 
 import (
+	"crypto/md5"
+	"fmt"
+	"net/http"
 	"net/url"
+	"strings"
 	"testing"
-	"time"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
-var pythonIDExtractorHeaderValue = map[string]string{
-	"manifest.json": `
-		{
-		    "file_list": [
-		        "middleware.py"
-		    ],
-		    "custom_middleware": {
-		        "driver": "python",
-		        "auth_check": {
-		            "name": "MyAuthHook"
-		        },
-		        "id_extractor": {
-		        	"extract_from": "header",
-		        	"extract_with": "value",
-		        	"extractor_config": {
-		        		"header_name": "Authorization"
-		        	}
-		        }
-		    }
-		}
-	`,
-	"middleware.py": `
-import time
-from tyk.decorators import *
-from gateway import TykGateway as tyk
+const (
+	extractorTestOrgID = "testorg"
 
-counter = 0
+	extractorValueInput = "testkey"
 
-@Hook
-def MyAuthHook(request, session, metadata, spec):
-    global counter
-    counter = counter + 1
-    auth_header = request.get_header('Authorization')
-    if auth_header == 'valid_token' and counter < 2:
-        session.rate = 1000.0
-        session.per = 1.0
-        session.id_extractor_deadline = int(time.time()) + 60
-        metadata["token"] = "valid_token"
-    return request, session, metadata
-	`,
+	extractorRegexExpr       = "prefix-(.*)"
+	extractorRegexInput      = "prefix-testkey123"
+	extractorRegexMatchIndex = 0
+
+	extractorXPathExpr  = "//object/key"
+	extractorXPathInput = "<object><key>thevalue</key></object>"
+
+	extractorHeaderName = "testheader"
+	extractorParamName  = "testparam"
+)
+
+func createSpecTestFrom(t testing.TB, def *apidef.APIDefinition) *APISpec {
+	loader := APIDefinitionLoader{}
+	spec := loader.MakeSpec(def)
+	tname := t.Name()
+	redisStore := storage.RedisCluster{KeyPrefix: tname + "-apikey."}
+	healthStore := storage.RedisCluster{KeyPrefix: tname + "-apihealth."}
+	orgStore := storage.RedisCluster{KeyPrefix: tname + "-orgKey."}
+	spec.Init(redisStore, redisStore, healthStore, orgStore)
+	return spec
 }
 
-var pythonIDExtractorFormValue = map[string]string{
-	"manifest.json": `
-		{
-		    "file_list": [
-		        "middleware.py"
-		    ],
-		    "custom_middleware": {
-		        "driver": "python",
-		        "auth_check": {
-		            "name": "MyAuthHook"
-		        },
-		        "id_extractor": {
-		        	"extract_from": "form",
-		        	"extract_with": "value",
-		        	"extractor_config": {
-		        		"param_name": "auth"
-		        	}
-		        }
-		    }
-		}
-	`,
-	"middleware.py": `
-import time
-from tyk.decorators import *
-from gateway import TykGateway as tyk
-from urllib import parse
-
-counter = 0
-
-@Hook
-def MyAuthHook(request, session, metadata, spec):
-	global counter
-	counter = counter + 1
-	auth_param = parse.parse_qs(request.object.body)["auth"]
-	if auth_param and auth_param[0] == 'valid_token' and counter < 2:
-		session.rate = 1000.0
-		session.per = 1.0
-		session.id_extractor_deadline = int(time.time()) + 60
-		metadata["token"] = "valid_token"
-	return request, session, metadata
-`,
+func prepareExtractor(t testing.TB, extractorSource apidef.IdExtractorSource, extractorType apidef.IdExtractorType, config map[string]interface{}) (IdExtractor, *APISpec) {
+	def := &apidef.APIDefinition{
+		OrgID: extractorTestOrgID,
+		CustomMiddleware: apidef.MiddlewareSection{
+			IdExtractor: apidef.MiddlewareIdExtractor{
+				ExtractFrom:     extractorSource,
+				ExtractWith:     extractorType,
+				ExtractorConfig: config,
+			},
+		},
+	}
+	spec := createSpecTestFrom(t, def)
+	mw := BaseMiddleware{Spec: spec}
+	newExtractor(spec, mw)
+	return spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor), spec
 }
 
-var pythonIDExtractorHeaderRegex = map[string]string{
-	"manifest.json": `
-		{
-		    "file_list": [
-		        "middleware.py"
-		    ],
-		    "custom_middleware": {
-		        "driver": "python",
-		        "auth_check": {
-		            "name": "MyAuthHook"
-		        },
-		        "id_extractor": {
-		        	"extract_from": "header",
-		        	"extract_with": "regex",
-		        	"extractor_config": {
-		        		"header_name": "Authorization",
-						"regex_expression": "[0-9]+",
-						"regex_match_index": 0
-		        	}
-		        }
-		    }
-		}
-	`,
-	"middleware.py": `
-import time
-from tyk.decorators import *
-from gateway import TykGateway as tyk
-
-counter = 0
-
-@Hook
-def MyAuthHook(request, session, metadata, spec):
-    print("MyAuthHook3 is called")
-    global counter
-    counter = counter + 1
-    _, auth_header = request.get_header('Authorization').split('-')
-    if auth_header and auth_header == '12345' and counter < 2:
-        session.rate = 1000.0
-        session.per = 1.0
-        session.id_extractor_deadline = int(time.time()) + 60
-        metadata["token"] = "valid_token"
-    return request, session, metadata
-	`,
+func prepareHeaderExtractorRequest(headers map[string]string) *http.Request {
+	r, _ := http.NewRequest(http.MethodGet, "/", nil)
+	if headers == nil {
+		return r
+	}
+	for k, v := range headers {
+		r.Header.Add(k, v)
+	}
+	return r
 }
 
-/* Value Extractor tests, using "header" source */
-// Goal of ID extractor is to cache auth plugin calls
-// Our `pythonBundleWithAuthCheck` plugin restrict more then 1 call
-// With ID extractor, it should run multiple times (because cache)
-func TestValueExtractorHeaderSource(t *testing.T) {
-	ts := newTykTestServer(tykTestServerConfig{
-		delay: 10 * time.Millisecond,
+func prepareBodyExtractorRequest(input string) *http.Request {
+	r, _ := http.NewRequest(http.MethodPost, "/", strings.NewReader(input))
+	return r
+}
+
+func prepareExtractorFormRequest(values map[string]string) *http.Request {
+	formData := url.Values{}
+	if values != nil {
+		for k, v := range values {
+			formData.Set(k, v)
+		}
+	}
+	r, _ := http.NewRequest(http.MethodPost, "/", strings.NewReader(formData.Encode()))
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	return r
+}
+
+func generateSessionID(input string) string {
+	data := []byte(input)
+	tokenID := fmt.Sprintf("%x", md5.Sum(data))
+	return extractorTestOrgID + tokenID
+}
+
+func TestValueExtractor(t *testing.T) {
+	testSessionID := generateSessionID(extractorValueInput)
+
+	t.Run("HeaderSource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.HeaderSource, apidef.ValueExtractor, map[string]interface{}{
+			"header_name": extractorHeaderName,
+		})
+
+		r := prepareHeaderExtractorRequest(nil)
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
+
+		r = prepareHeaderExtractorRequest(map[string]string{extractorHeaderName: extractorValueInput})
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
 	})
-	defer ts.Close()
 
-	spec := buildAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = false
-		spec.EnableCoProcessAuth = true
-	})[0]
-	t.Run("Header value", func(t *testing.T) {
-		bundleID := registerBundle("id_extractor_header_value", pythonIDExtractorHeaderValue)
-		spec.CustomMiddlewareBundle = bundleID
-		spec.APIID = "api1"
+	t.Run("FormSource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.FormSource, apidef.ValueExtractor, map[string]interface{}{
+			"param_name": extractorParamName,
+		})
 
-		loadAPI(spec)
-		time.Sleep(1 * time.Second)
+		r := prepareExtractorFormRequest(nil)
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "valid_token"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "invalid_token"}, Code: 403},
-		}...)
+		r = prepareExtractorFormRequest(map[string]string{extractorParamName: extractorValueInput})
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
 	})
-	t.Run("Form value", func(t *testing.T) {
-		bundleID := registerBundle("id_extractor_form_value", pythonIDExtractorFormValue)
-		spec.CustomMiddlewareBundle = bundleID
-		spec.APIID = "api2"
+}
 
-		loadAPI(spec)
-		time.Sleep(1 * time.Second)
+func TestRegexExtractor(t *testing.T) {
+	testSessionID := generateSessionID(extractorRegexInput)
 
-		formHeaders := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
+	t.Run("HeaderSource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.HeaderSource, apidef.RegexExtractor, map[string]interface{}{
+			"regex_expression":  extractorRegexExpr,
+			"regex_match_index": extractorRegexMatchIndex,
+			"header_name":       extractorHeaderName,
+		})
 
-		ts.Run(t, []test.TestCase{
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: 200},
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"valid_token"}}.Encode(), Code: 200},
-			{Method: "POST", Path: "/", Headers: formHeaders, Data: url.Values{"auth": []string{"invalid_token"}}.Encode(), Code: 403},
-		}...)
+		r := prepareHeaderExtractorRequest(nil)
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
+
+		r = prepareHeaderExtractorRequest(map[string]string{extractorHeaderName: extractorRegexInput})
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
 	})
-	t.Run("Header regex", func(t *testing.T) {
-		bundleID := registerBundle("id_extractor_header_regex", pythonIDExtractorHeaderRegex)
-		spec.CustomMiddlewareBundle = bundleID
-		spec.APIID = "api3"
 
-		loadAPI(spec)
-		time.Sleep(1 * time.Second)
+	t.Run("BodySource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.BodySource, apidef.RegexExtractor, map[string]interface{}{
+			"regex_expression":  extractorRegexExpr,
+			"regex_match_index": extractorRegexMatchIndex,
+		})
 
-		ts.Run(t, []test.TestCase{
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-12345"}, Code: 200},
-			{Path: "/", Headers: map[string]string{"Authorization": "prefix-123456"}, Code: 403},
-		}...)
+		r := prepareBodyExtractorRequest("")
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
+
+		r = prepareBodyExtractorRequest(extractorRegexInput)
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
+	})
+
+	t.Run("FormSource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.FormSource, apidef.RegexExtractor, map[string]interface{}{
+			"regex_expression":  extractorRegexExpr,
+			"regex_match_index": extractorRegexMatchIndex,
+			"param_name":        extractorParamName,
+		})
+
+		r := prepareExtractorFormRequest(nil)
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
+
+		r = prepareExtractorFormRequest(map[string]string{extractorParamName: extractorRegexInput})
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
+	})
+}
+
+func TestXPathExtractor(t *testing.T) {
+	testSessionID := generateSessionID("thevalue")
+
+	t.Run("HeaderSource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.HeaderSource, apidef.XPathExtractor, map[string]interface{}{
+			"xpath_expression": extractorXPathExpr,
+			"header_name":      extractorHeaderName,
+		})
+
+		r := prepareHeaderExtractorRequest(nil)
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
+
+		r = prepareHeaderExtractorRequest(map[string]string{extractorHeaderName: extractorXPathInput})
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
+	})
+
+	t.Run("BodySource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.BodySource, apidef.XPathExtractor, map[string]interface{}{
+			"xpath_expression": extractorXPathExpr,
+		})
+
+		r := prepareBodyExtractorRequest("")
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
+
+		r = prepareBodyExtractorRequest(extractorXPathInput)
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
+	})
+
+	t.Run("FormSource", func(t *testing.T) {
+		extractor, spec := prepareExtractor(t, apidef.FormSource, apidef.XPathExtractor, map[string]interface{}{
+			"xpath_expression": extractorXPathExpr,
+			"param_name":       extractorParamName,
+		})
+
+		r := prepareExtractorFormRequest(nil)
+		sessionID, overrides := extractor.ExtractAndCheck(r)
+		if sessionID != "" {
+			t.Fatalf("should return an empty session ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 400 {
+			t.Fatalf("should return 400, got %d", overrides.ResponseCode)
+		}
+
+		r = prepareExtractorFormRequest(map[string]string{extractorParamName: extractorXPathInput})
+		sessionID, overrides = extractor.ExtractAndCheck(r)
+		if sessionID != testSessionID {
+			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
+		}
+		if !strings.HasPrefix(sessionID, spec.OrgID) {
+			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
+		}
+		if overrides.ResponseCode != 0 {
+			t.Fatalf("response code should be 0, got %d", overrides.ResponseCode)
+		}
+	})
+}
+
+func BenchmarkValueExtractor(b *testing.B) {
+	b.ReportAllocs()
+	b.Run("HeaderSource", func(b *testing.B) {
+		extractor, _ := prepareExtractor(b, apidef.HeaderSource, apidef.ValueExtractor, map[string]interface{}{
+			"header_name": extractorHeaderName,
+		})
+		headers := map[string]string{extractorHeaderName: extractorValueInput}
+		for i := 0; i < b.N; i++ {
+			r := prepareHeaderExtractorRequest(headers)
+			extractor.ExtractAndCheck(r)
+		}
+	})
+	b.Run("FormSource", func(b *testing.B) {
+		extractor, _ := prepareExtractor(b, apidef.FormSource, apidef.ValueExtractor, map[string]interface{}{
+			"param_name": extractorParamName,
+		})
+		params := map[string]string{extractorParamName: extractorValueInput}
+		for i := 0; i < b.N; i++ {
+			r := prepareExtractorFormRequest(params)
+			extractor.ExtractAndCheck(r)
+		}
+	})
+}
+
+func BenchmarkRegexExtractor(b *testing.B) {
+	b.ReportAllocs()
+	b.Run("HeaderSource", func(b *testing.B) {
+		headerName := "testheader"
+		extractor, _ := prepareExtractor(b, apidef.HeaderSource, apidef.RegexExtractor, map[string]interface{}{
+			"regex_expression":  extractorRegexExpr,
+			"regex_match_index": extractorRegexMatchIndex,
+			"header_name":       headerName,
+		})
+		headers := map[string]string{extractorHeaderName: extractorRegexInput}
+		for i := 0; i < b.N; i++ {
+			r := prepareHeaderExtractorRequest(headers)
+			extractor.ExtractAndCheck(r)
+		}
+	})
+	b.Run("BodySource", func(b *testing.B) {
+		extractor, _ := prepareExtractor(b, apidef.BodySource, apidef.RegexExtractor, map[string]interface{}{
+			"regex_expression":  extractorRegexExpr,
+			"regex_match_index": extractorRegexMatchIndex,
+		})
+		for i := 0; i < b.N; i++ {
+			r := prepareBodyExtractorRequest(extractorRegexInput)
+			extractor.ExtractAndCheck(r)
+		}
+	})
+	b.Run("FormSource", func(b *testing.B) {
+		extractor, _ := prepareExtractor(b, apidef.FormSource, apidef.RegexExtractor, map[string]interface{}{
+			"regex_expression":  extractorRegexExpr,
+			"regex_match_index": extractorRegexMatchIndex,
+			"param_name":        extractorParamName,
+		})
+		params := map[string]string{extractorParamName: extractorRegexInput}
+		for i := 0; i < b.N; i++ {
+			r := prepareExtractorFormRequest(params)
+			extractor.ExtractAndCheck(r)
+		}
+	})
+}
+
+func BenchmarkXPathExtractor(b *testing.B) {
+	b.ReportAllocs()
+	b.Run("HeaderSource", func(b *testing.B) {
+		extractor, _ := prepareExtractor(b, apidef.HeaderSource, apidef.XPathExtractor, map[string]interface{}{
+			"xpath_expression": extractorXPathExpr,
+			"header_name":      extractorHeaderName,
+		})
+		headers := map[string]string{extractorHeaderName: extractorXPathInput}
+		for i := 0; i < b.N; i++ {
+			r := prepareHeaderExtractorRequest(headers)
+			extractor.ExtractAndCheck(r)
+		}
+	})
+	b.Run("BodySource", func(b *testing.B) {
+		extractor, _ := prepareExtractor(b, apidef.BodySource, apidef.XPathExtractor, map[string]interface{}{
+			"xpath_expression": extractorXPathExpr,
+		})
+		for i := 0; i < b.N; i++ {
+			r := prepareBodyExtractorRequest(extractorXPathInput)
+			extractor.ExtractAndCheck(r)
+		}
+	})
+	b.Run("FormSource", func(b *testing.B) {
+		extractor, _ := prepareExtractor(b, apidef.FormSource, apidef.XPathExtractor, map[string]interface{}{
+			"xpath_expression": extractorXPathExpr,
+			"param_name":       extractorParamName,
+		})
+		params := map[string]string{extractorParamName: extractorXPathInput}
+		for i := 0; i < b.N; i++ {
+			r := prepareExtractorFormRequest(params)
+			extractor.ExtractAndCheck(r)
+		}
 	})
 }
