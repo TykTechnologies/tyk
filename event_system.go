@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -159,11 +160,20 @@ func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
 	prefix string
+	logger *logrus.Logger
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
 func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
-	l.prefix = handlerConf.(map[string]interface{})["prefix"].(string)
+	conf := handlerConf.(map[string]interface{})
+	l.prefix = conf["prefix"].(string)
+	l.logger = log
+	if runningTests {
+		logger, ok := conf["logger"]
+		if ok {
+			l.logger = logger.(*logrus.Logger)
+		}
+	}
 	return nil
 }
 
@@ -182,7 +192,7 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 		logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + string(msgConf.CircuitEvent)
 	}
 
-	log.Warning(logMsg)
+	l.logger.Warning(logMsg)
 }
 
 func initGenericEventHandlers(conf *config.Config) {
