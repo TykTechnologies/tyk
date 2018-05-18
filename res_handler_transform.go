@@ -27,6 +27,7 @@ func (h *ResponseTransformMiddleware) Init(c interface{}, spec *APISpec) error {
 }
 
 func respBodyReader(req *http.Request, resp *http.Response) io.ReadCloser {
+
 	if req.Header.Get("Accept-Encoding") == "" {
 		return resp.Body
 	}
@@ -64,6 +65,14 @@ func compressBuffer(in bytes.Buffer, encoding string) (out bytes.Buffer) {
 }
 
 func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+
+	logger := log.WithFields(logrus.Fields{
+		"prefix":      "outbound-transform",
+		"server_name": h.Spec.Proxy.TargetURL,
+		"api_id":      h.Spec.APIID,
+		"path":        req.URL.Path,
+	})
+
 	_, versionPaths, _, _ := h.Spec.Version(req)
 	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedResponse)
 
@@ -82,35 +91,27 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		mxj.XmlCharsetReader = WrappedCharsetReader
 		var err error
 
-		bodyData, err = mxj.NewMapXmlReader(respBody) // unmarshal
+		bodyBytes, err := ioutil.ReadAll(respBody)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix":      "outbound-transform",
-				"server_name": h.Spec.Proxy.TargetURL,
-				"api_id":      h.Spec.APIID,
-				"path":        req.URL.Path,
-			}).Error("Error unmarshalling XML: ", err)
+			logger.WithError(err).Error("Error reading XML body")
+			// not returning error, just break out of switch.
+			break
+		}
+
+		bodyData, err = mxj.NewMapXml(bodyBytes) // unmarshal
+		if err != nil {
+			logger.WithError(err).Error("Error unmarshalling XML")
 		}
 	default: // apidef.RequestJSON
 		if err := json.NewDecoder(respBody).Decode(&bodyData); err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix":      "outbound-transform",
-				"server_name": h.Spec.Proxy.TargetURL,
-				"api_id":      h.Spec.APIID,
-				"path":        req.URL.Path,
-			}).Error("Error unmarshalling JSON: ", err)
+			logger.WithError(err).Error("Error unmarshalling JSON")
 		}
 	}
 
 	// Apply to template
 	var bodyBuffer bytes.Buffer
 	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":      "outbound-transform",
-			"server_name": h.Spec.Proxy.TargetURL,
-			"api_id":      h.Spec.APIID,
-			"path":        req.URL.Path,
-		}).Error("Failed to apply template to request: ", err)
+		logger.WithError(err).Error("Failed to apply template to request")
 	}
 
 	// Re-compress if original upstream response was compressed
