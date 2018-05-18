@@ -457,6 +457,13 @@ func (a *APIDefinition) EncodeForDB() {
 	}
 	a.UpstreamCertificates = newUpstreamCerts
 
+	newPinnedPublicKeys := make(map[string]string)
+	for domain, cert := range a.PinnedPublicKeys {
+		newD := base64.StdEncoding.EncodeToString([]byte(domain))
+		newPinnedPublicKeys[newD] = cert
+	}
+	a.PinnedPublicKeys = newPinnedPublicKeys
+
 	for i, version := range a.VersionData.Versions {
 		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
 
@@ -494,6 +501,18 @@ func (a *APIDefinition) DecodeFromDB() {
 		}
 	}
 	a.UpstreamCertificates = newUpstreamCerts
+
+	newPinnedPublicKeys := make(map[string]string)
+	for domain, cert := range a.PinnedPublicKeys {
+		newD, err := base64.StdEncoding.DecodeString(domain)
+		if err != nil {
+			log.Error("Couldn't Decode, leaving as it may be legacy...")
+			newPinnedPublicKeys[domain] = cert
+		} else {
+			newPinnedPublicKeys[string(newD)] = cert
+		}
+	}
+	a.PinnedPublicKeys = newPinnedPublicKeys
 
 	for i, version := range a.VersionData.Versions {
 		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
