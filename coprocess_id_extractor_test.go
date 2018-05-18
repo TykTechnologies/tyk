@@ -326,8 +326,8 @@ func TestXPathExtractor(t *testing.T) {
 }
 
 func BenchmarkValueExtractor(b *testing.B) {
-	b.ReportAllocs()
 	b.Run("HeaderSource", func(b *testing.B) {
+		b.ReportAllocs()
 		extractor, _ := prepareExtractor(b, apidef.HeaderSource, apidef.ValueExtractor, map[string]interface{}{
 			"header_name": extractorHeaderName,
 		})
@@ -338,6 +338,7 @@ func BenchmarkValueExtractor(b *testing.B) {
 		}
 	})
 	b.Run("FormSource", func(b *testing.B) {
+		b.ReportAllocs()
 		extractor, _ := prepareExtractor(b, apidef.FormSource, apidef.ValueExtractor, map[string]interface{}{
 			"param_name": extractorParamName,
 		})
@@ -350,8 +351,8 @@ func BenchmarkValueExtractor(b *testing.B) {
 }
 
 func BenchmarkRegexExtractor(b *testing.B) {
-	b.ReportAllocs()
 	b.Run("HeaderSource", func(b *testing.B) {
+		b.ReportAllocs()
 		headerName := "testheader"
 		extractor, _ := prepareExtractor(b, apidef.HeaderSource, apidef.RegexExtractor, map[string]interface{}{
 			"regex_expression":  extractorRegexExpr,
@@ -365,6 +366,7 @@ func BenchmarkRegexExtractor(b *testing.B) {
 		}
 	})
 	b.Run("BodySource", func(b *testing.B) {
+		b.ReportAllocs()
 		extractor, _ := prepareExtractor(b, apidef.BodySource, apidef.RegexExtractor, map[string]interface{}{
 			"regex_expression":  extractorRegexExpr,
 			"regex_match_index": extractorRegexMatchIndex,
@@ -375,6 +377,7 @@ func BenchmarkRegexExtractor(b *testing.B) {
 		}
 	})
 	b.Run("FormSource", func(b *testing.B) {
+		b.ReportAllocs()
 		extractor, _ := prepareExtractor(b, apidef.FormSource, apidef.RegexExtractor, map[string]interface{}{
 			"regex_expression":  extractorRegexExpr,
 			"regex_match_index": extractorRegexMatchIndex,
@@ -389,8 +392,8 @@ func BenchmarkRegexExtractor(b *testing.B) {
 }
 
 func BenchmarkXPathExtractor(b *testing.B) {
-	b.ReportAllocs()
 	b.Run("HeaderSource", func(b *testing.B) {
+		b.ReportAllocs()
 		extractor, _ := prepareExtractor(b, apidef.HeaderSource, apidef.XPathExtractor, map[string]interface{}{
 			"xpath_expression": extractorXPathExpr,
 			"header_name":      extractorHeaderName,
@@ -402,6 +405,7 @@ func BenchmarkXPathExtractor(b *testing.B) {
 		}
 	})
 	b.Run("BodySource", func(b *testing.B) {
+		b.ReportAllocs()
 		extractor, _ := prepareExtractor(b, apidef.BodySource, apidef.XPathExtractor, map[string]interface{}{
 			"xpath_expression": extractorXPathExpr,
 		})
@@ -411,6 +415,7 @@ func BenchmarkXPathExtractor(b *testing.B) {
 		}
 	})
 	b.Run("FormSource", func(b *testing.B) {
+		b.ReportAllocs()
 		extractor, _ := prepareExtractor(b, apidef.FormSource, apidef.XPathExtractor, map[string]interface{}{
 			"xpath_expression": extractorXPathExpr,
 			"param_name":       extractorParamName,

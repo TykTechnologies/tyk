@@ -459,6 +459,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	b.Run("Header location", func(b *testing.B) {
+		b.ReportAllocs()
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
@@ -476,6 +477,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 	})
 
 	b.Run("URL param location", func(b *testing.B) {
+		b.ReportAllocs()
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
@@ -493,6 +495,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 	})
 
 	b.Run("URL location", func(b *testing.B) {
+		b.ReportAllocs()
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
