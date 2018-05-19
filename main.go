@@ -1132,7 +1132,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         httpServerOptions.ServerName,
 			MinVersion:         httpServerOptions.MinVersion,
-			ClientAuth:         tls.RequestClientCert,
+			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
 		}

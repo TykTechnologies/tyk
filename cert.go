@@ -226,6 +226,17 @@ func getTLSConfigForClient(baseConfig *tls.Config, listenPort int) func(hello *t
 				break
 			}
 		}
+
+		// No mutual tls APIs with matched domain found
+		// Check if one of APIs without domain, require asking client cert
+		if newConfig.ClientAuth == tls.NoClientCert {
+			for _, spec := range apiSpecs {
+				if spec.Auth.UseCertificate || (spec.Domain == "" && spec.UseMutualTLSAuth) {
+					newConfig.ClientAuth = tls.RequestClientCert
+					break
+				}
+			}
+		}
 		apisMu.RUnlock()
 
 		return newConfig, nil
