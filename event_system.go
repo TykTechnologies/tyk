@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -159,11 +160,20 @@ func FireSystemEvent(name apidef.TykEvent, meta interface{}) {
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
 	prefix string
+	logger *logrus.Logger
 }
 
 // New enables the intitialisation of event handler instances when they are created on ApiSpec creation
 func (l *LogMessageEventHandler) Init(handlerConf interface{}) error {
-	l.prefix = handlerConf.(map[string]interface{})["prefix"].(string)
+	conf := handlerConf.(map[string]interface{})
+	l.prefix = conf["prefix"].(string)
+	l.logger = log
+	if runningTests {
+		logger, ok := conf["logger"]
+		if ok {
+			l.logger = logger.(*logrus.Logger)
+		}
+	}
 	return nil
 }
 
@@ -182,12 +192,12 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 		logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + string(msgConf.CircuitEvent)
 	}
 
-	log.Warning(logMsg)
+	l.logger.Warning(logMsg)
 }
 
-func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[apidef.TykEvent][]config.TykEventHandler {
-	actualEventHandlers := make(map[apidef.TykEvent][]config.TykEventHandler)
-	for eventName, eventHandlerConfs := range theseEvents.Events {
+func initGenericEventHandlers(conf *config.Config) {
+	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
+	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
 			log.Debug("CREATING EVENT HANDLERS")
@@ -197,10 +207,10 @@ func InitGenericEventHandlers(theseEvents apidef.EventHandlerMetaConfig) map[api
 				log.Error("Failed to init event handler: ", err)
 			} else {
 				log.Debug("Init Event Handler: ", eventName)
-				actualEventHandlers[eventName] = append(actualEventHandlers[eventName], eventHandlerInstance)
+				handlers[eventName] = append(handlers[eventName], eventHandlerInstance)
 			}
 
 		}
 	}
-	return actualEventHandlers
+	conf.EventTriggers = handlers
 }
