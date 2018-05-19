@@ -827,11 +827,11 @@ func initialiseSystem() error {
 		case "", "info":
 			// default, do nothing
 		case "error":
-			mainLog.Level = logrus.ErrorLevel
+			log.Level = logrus.ErrorLevel
 		case "warn":
-			mainLog.Level = logrus.WarnLevel
+			log.Level = logrus.WarnLevel
 		case "debug":
-			mainLog.Level = logrus.DebugLevel
+			log.Level = logrus.DebugLevel
 		default:
 			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
 		}
