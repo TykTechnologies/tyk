@@ -72,7 +72,7 @@ func (r *RPCPurger) PurgeCache() {
 	// Send keys to RPC
 	if _, err := RPCFuncClientSingleton.Call("PurgeAnalyticsData", string(data)); err != nil {
 		emitRPCErrorEvent(rpcFuncClientSingletonCall, "PurgeAnalyticsData", err)
-		log.Error("Failed to call purge: ", err)
+		log.Warn("Failed to call purge, retrying: ", err)
 	}
 
 }

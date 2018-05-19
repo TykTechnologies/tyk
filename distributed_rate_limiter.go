@@ -94,7 +94,7 @@ func onServerStatusReceivedHandler(payload string) {
 		if err := DRLManager.AddOrUpdateServer(serverData); err != nil {
 			log.WithError(err).
 				WithField("serverData", serverData).
-				Error("AddOrUpdateServer error")
+				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
 			return
 		}
 		log.Debug(DRLManager.Report())
