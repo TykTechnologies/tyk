@@ -253,68 +253,6 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			Path: "/tyk/certs", Code: 200, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
 	})
-
-	t.Run("Same domain", func(t *testing.T) {
-		certID, _ := CertificateManager.Add(combinedPEM, "")
-		defer CertificateManager.Delete(certID)
-
-		globalConf = config.Global()
-		globalConf.ControlAPIHostname = "localhost"
-		globalConf.HttpServerOptions.SSLCertificates = []string{certID}
-		config.SetGlobal(globalConf)
-
-		defer func() {
-			globalConf = config.Global()
-			globalConf.HttpServerOptions.SSLCertificates = nil
-			globalConf.Security.Certificates.ControlAPI = nil
-			config.SetGlobal(globalConf)
-			CertificateManager.FlushCache()
-
-		}()
-
-		ts := newTykTestServer()
-		defer ts.Close()
-
-		certNotMatchErr := `Certificate with SHA256 ` + certs.HexSHA256(clientCert.Certificate[0]) + ` not allowed`
-
-		t.Run("Without or not valid certificates", func(t *testing.T) {
-			ts.Run(t, []test.TestCase{
-				// Should acess tyk without client certificates
-				{Client: clientWithoutCert},
-
-				// Error for client without certificate
-				{Path: "/tyk/certs", AdminAuth: true, Code: 403, BodyMatch: `"message":"Client TLS certificate is required"`, Client: clientWithoutCert},
-
-				// Error for client with unknown certificate
-				{Path: "/tyk/certs", AdminAuth: true, Code: 403, BodyMatch: `"message":"` + certNotMatchErr, Client: clientWithCert},
-			}...)
-		})
-
-		t.Run("Redis certificate", func(t *testing.T) {
-			clientCertID, _ := CertificateManager.Add(clientCertPem, "")
-			defer CertificateManager.Delete(clientCertID)
-			globalConf = config.Global()
-			globalConf.Security.Certificates.ControlAPI = []string{clientCertID}
-			config.SetGlobal(globalConf)
-
-			ts.Run(t, []test.TestCase{
-				{Path: "/tyk/certs", AdminAuth: true, Code: 200, Client: clientWithCert},
-			}...)
-		})
-
-		t.Run("File certificate", func(t *testing.T) {
-			certPath := filepath.Join(dir, "client.pem")
-			ioutil.WriteFile(certPath, clientCertPem, 0666)
-
-			globalConf = config.Global()
-			globalConf.Security.Certificates.ControlAPI = []string{certPath}
-			config.SetGlobal(globalConf)
-
-			ts.Run(t, []test.TestCase{
-				{Path: "/tyk/certs", AdminAuth: true, Code: 200, Client: clientWithCert},
-			}...)
-		})
-	})
 }
 
 func TestAPIMutualTLS(t *testing.T) {
