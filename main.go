@@ -1086,7 +1086,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         config.Global.HttpServerOptions.ServerName,
 			MinVersion:         config.Global.HttpServerOptions.MinVersion,
-			ClientAuth:         tls.RequestClientCert,
+			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: config.Global.HttpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(config.Global.HttpServerOptions.Ciphers),
 		}
