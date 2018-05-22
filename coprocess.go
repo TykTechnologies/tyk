@@ -101,7 +101,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		},
 		Method:     r.Method,
 		RequestUri: r.RequestURI,
-		Proto:      r.Proto,
+		Scheme:     r.URL.Scheme,
 	}
 
 	object := &coprocess.Object{
