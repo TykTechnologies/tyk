@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='coprocess_mini_request_object.proto',
   package='coprocess',
   syntax='proto3',
-  serialized_pb=_b('\n#coprocess_mini_request_object.proto\x12\tcoprocess\x1a coprocess_return_overrides.proto\"\x87\x06\n\x11MiniRequestObject\x12:\n\x07headers\x18\x01 \x03(\x0b\x32).coprocess.MiniRequestObject.HeadersEntry\x12\x41\n\x0bset_headers\x18\x02 \x03(\x0b\x32,.coprocess.MiniRequestObject.SetHeadersEntry\x12\x16\n\x0e\x64\x65lete_headers\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\x0b\n\x03url\x18\x05 \x01(\t\x12\x38\n\x06params\x18\x06 \x03(\x0b\x32(.coprocess.MiniRequestObject.ParamsEntry\x12?\n\nadd_params\x18\x07 \x03(\x0b\x32+.coprocess.MiniRequestObject.AddParamsEntry\x12I\n\x0f\x65xtended_params\x18\x08 \x03(\x0b\x32\x30.coprocess.MiniRequestObject.ExtendedParamsEntry\x12\x15\n\rdelete_params\x18\t \x03(\t\x12\x34\n\x10return_overrides\x18\n \x01(\x0b\x32\x1a.coprocess.ReturnOverrides\x12\x0e\n\x06method\x18\x0b \x01(\t\x12\x13\n\x0brequest_uri\x18\x0c \x01(\t\x12\r\n\x05proto\x18\r \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fSetHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a-\n\x0bParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x30\n\x0e\x41\x64\x64ParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x35\n\x13\x45xtendedParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
+  serialized_pb=_b('\n#coprocess_mini_request_object.proto\x12\tcoprocess\x1a coprocess_return_overrides.proto\"\x88\x06\n\x11MiniRequestObject\x12:\n\x07headers\x18\x01 \x03(\x0b\x32).coprocess.MiniRequestObject.HeadersEntry\x12\x41\n\x0bset_headers\x18\x02 \x03(\x0b\x32,.coprocess.MiniRequestObject.SetHeadersEntry\x12\x16\n\x0e\x64\x65lete_headers\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\x0b\n\x03url\x18\x05 \x01(\t\x12\x38\n\x06params\x18\x06 \x03(\x0b\x32(.coprocess.MiniRequestObject.ParamsEntry\x12?\n\nadd_params\x18\x07 \x03(\x0b\x32+.coprocess.MiniRequestObject.AddParamsEntry\x12I\n\x0f\x65xtended_params\x18\x08 \x03(\x0b\x32\x30.coprocess.MiniRequestObject.ExtendedParamsEntry\x12\x15\n\rdelete_params\x18\t \x03(\t\x12\x34\n\x10return_overrides\x18\n \x01(\x0b\x32\x1a.coprocess.ReturnOverrides\x12\x0e\n\x06method\x18\x0b \x01(\t\x12\x13\n\x0brequest_uri\x18\x0c \x01(\t\x12\x0e\n\x06scheme\x18\r \x01(\t\x1a.\n\x0cHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fSetHeadersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a-\n\x0bParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x30\n\x0e\x41\x64\x64ParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x35\n\x13\x45xtendedParamsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x62\x06proto3')
   ,
   dependencies=[coprocess__return__overrides__pb2.DESCRIPTOR,])
 
@@ -60,8 +60,8 @@ _MINIREQUESTOBJECT_HEADERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=611,
-  serialized_end=657,
+  serialized_start=612,
+  serialized_end=658,
 )
 
 _MINIREQUESTOBJECT_SETHEADERSENTRY = _descriptor.Descriptor(
@@ -97,8 +97,8 @@ _MINIREQUESTOBJECT_SETHEADERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=659,
-  serialized_end=708,
+  serialized_start=660,
+  serialized_end=709,
 )
 
 _MINIREQUESTOBJECT_PARAMSENTRY = _descriptor.Descriptor(
@@ -134,8 +134,8 @@ _MINIREQUESTOBJECT_PARAMSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=710,
-  serialized_end=755,
+  serialized_start=711,
+  serialized_end=756,
 )
 
 _MINIREQUESTOBJECT_ADDPARAMSENTRY = _descriptor.Descriptor(
@@ -171,8 +171,8 @@ _MINIREQUESTOBJECT_ADDPARAMSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=757,
-  serialized_end=805,
+  serialized_start=758,
+  serialized_end=806,
 )
 
 _MINIREQUESTOBJECT_EXTENDEDPARAMSENTRY = _descriptor.Descriptor(
@@ -208,8 +208,8 @@ _MINIREQUESTOBJECT_EXTENDEDPARAMSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=807,
-  serialized_end=860,
+  serialized_start=808,
+  serialized_end=861,
 )
 
 _MINIREQUESTOBJECT = _descriptor.Descriptor(
@@ -304,7 +304,7 @@ _MINIREQUESTOBJECT = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='proto', full_name='coprocess.MiniRequestObject.proto', index=12,
+      name='scheme', full_name='coprocess.MiniRequestObject.scheme', index=12,
       number=13, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -323,7 +323,7 @@ _MINIREQUESTOBJECT = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=85,
-  serialized_end=860,
+  serialized_end=861,
 )
 
 _MINIREQUESTOBJECT_HEADERSENTRY.containing_type = _MINIREQUESTOBJECT
