@@ -23,6 +23,9 @@ matrix:
   include:
     - go: 1.9.x
       env: LATEST_GO=true # run linters and report coverage
+    - go: 1.10.x
+      env: LATEST_GO=true # run linters and report coverage
+
 
 services:
   - redis-server

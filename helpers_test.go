@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -629,4 +630,98 @@ func initDNSMock() {
 			},
 		}).DialContext,
 	}
+}
+
+// Taken from https://medium.com/@mlowicki/http-s-proxy-in-golang-in-less-than-100-lines-of-code-6a51c2f2c38c
+type httpProxyHandler struct {
+	proto    string
+	URL      string
+	server   *http.Server
+	listener net.Listener
+}
+
+func (p *httpProxyHandler) handleTunneling(w http.ResponseWriter, r *http.Request) {
+	dest_conn, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return
+	}
+	client_conn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	}
+	go p.transfer(dest_conn, client_conn)
+	go p.transfer(client_conn, dest_conn)
+}
+
+func (p *httpProxyHandler) transfer(destination io.WriteCloser, source io.ReadCloser) {
+	defer destination.Close()
+	defer source.Close()
+	io.Copy(destination, source)
+}
+func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) {
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer resp.Body.Close()
+	p.copyHeader(w.Header(), resp.Header)
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+func (p *httpProxyHandler) Stop() error {
+	return p.server.Close()
+}
+
+func (p *httpProxyHandler) copyHeader(dst, src http.Header) {
+	for k, vv := range src {
+		for _, v := range vv {
+			dst.Add(k, v)
+		}
+	}
+}
+
+func initProxy(proto string, tlsConfig *tls.Config) *httpProxyHandler {
+	proxy := &httpProxyHandler{proto: proto}
+
+	proxy.server = &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodConnect {
+				proxy.handleTunneling(w, r)
+			} else {
+				proxy.handleHTTP(w, r)
+			}
+		}),
+		// Disable HTTP/2.
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+	}
+
+	var err error
+
+	switch proto {
+	case "http":
+		proxy.listener, err = net.Listen("tcp", ":0")
+	case "https":
+		proxy.listener, err = tls.Listen("tcp", ":0", tlsConfig)
+	default:
+		log.Fatal("Unsupported proto scheme", proto)
+	}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	proxy.URL = proto + "://" + proxy.listener.Addr().String()
+
+	go proxy.server.Serve(proxy.listener)
+
+	return proxy
 }

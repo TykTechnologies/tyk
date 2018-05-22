@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
-	_ "crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -472,78 +471,6 @@ func TestUpstreamMutualTLS(t *testing.T) {
 	})
 }
 
-func TestPublicKeyPinning(t *testing.T) {
-	_, _, _, serverCert := genServerCertificate()
-	x509Cert, _ := x509.ParseCertificate(serverCert.Certificate[0])
-	pubDer, _ := x509.MarshalPKIXPublicKey(x509Cert.PublicKey)
-	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDer})
-	pubID, _ := CertificateManager.Add(pubPem, "")
-	defer CertificateManager.Delete(pubID)
-
-	if pubID != certs.HexSHA256(pubDer) {
-		t.Error("Certmanager returned wrong pub key fingerprint:", certs.HexSHA256(pubDer), pubID)
-	}
-
-	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	}))
-	upstream.TLS = &tls.Config{
-		InsecureSkipVerify: true,
-		Certificates:       []tls.Certificate{serverCert},
-	}
-
-	upstream.StartTLS()
-	defer upstream.Close()
-
-	t.Run("Pub key match", func(t *testing.T) {
-		globalConf := config.Global()
-		// For host using pinning, it should ignore standard verification in all cases, e.g setting variable below does nothing
-		globalConf.ProxySSLInsecureSkipVerify = false
-		config.SetGlobal(globalConf)
-		defer resetTestConfig()
-
-		ts := newTykTestServer()
-		defer ts.Close()
-
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": pubID}
-			spec.Proxy.TargetURL = upstream.URL
-		})
-
-		ts.Run(t, test.TestCase{Code: 200})
-	})
-
-	t.Run("Pub key not match", func(t *testing.T) {
-		ts := newTykTestServer()
-		defer ts.Close()
-
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
-			spec.Proxy.TargetURL = upstream.URL
-		})
-
-		ts.Run(t, test.TestCase{Code: 500})
-	})
-
-	t.Run("Global setting", func(t *testing.T) {
-		globalConf := config.Global()
-		globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
-		config.SetGlobal(globalConf)
-		defer resetTestConfig()
-
-		ts := newTykTestServer()
-		defer ts.Close()
-
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-		})
-
-		ts.Run(t, test.TestCase{Code: 500})
-	})
-}
-
 func TestKeyWithCertificateTLS(t *testing.T) {
 	_, _, combinedPEM, _ := genServerCertificate()
 	serverCertID, _ := CertificateManager.Add(combinedPEM, "")
@@ -681,81 +608,5 @@ func TestCipherSuites(t *testing.T) {
 		}}}
 
 		ts.Run(t, test.TestCase{Client: client, Path: "/", ErrorMatch: "tls: handshake failure"})
-	})
-}
-
-func TestProxyTransport(t *testing.T) {
-	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("test"))
-	}))
-	defer upstream.Close()
-
-	globalConf := config.Global()
-	globalConf.ProxySSLInsecureSkipVerify = true
-	// force creating new transport on each reque
-	globalConf.MaxConnTime = -1
-	config.SetGlobal(globalConf)
-	defer resetTestConfig()
-
-	ts := newTykTestServer()
-	defer ts.Close()
-
-	//matching ciphers
-	t.Run("Global: Cipher match", func(t *testing.T) {
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
-		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-		})
-		ts.Run(t, test.TestCase{Path: "/", Code: 200})
-	})
-
-	t.Run("Global: Cipher not match", func(t *testing.T) {
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
-		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-		})
-		ts.Run(t, test.TestCase{Path: "/", Code: 500})
-	})
-
-	t.Run("API: Cipher override", func(t *testing.T) {
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
-		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
-		})
-
-		ts.Run(t, test.TestCase{Path: "/", Code: 200})
-	})
-
-	t.Run("API: MinTLS not match", func(t *testing.T) {
-		globalConf.ProxySSLMinVersion = 772
-		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
-		})
-
-		ts.Run(t, test.TestCase{Path: "/", Code: 500})
-	})
-
-	t.Run("API: Proxy", func(t *testing.T) {
-		globalConf.ProxySSLMinVersion = 771
-		config.SetGlobal(globalConf)
-		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
-			// Invalid proxy
-			spec.Proxy.Transport.ProxyURL = upstream.URL
-		})
-
-		ts.Run(t, test.TestCase{Path: "/", Code: 500})
 	})
 }

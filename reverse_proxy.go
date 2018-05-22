@@ -438,7 +438,13 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
-	transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+	// When request routed through the proxy `DialTLS` is not used, and only VerifyPeerCertificate is supported
+	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
+	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
+		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+	} else {
+		transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+	}
 
 	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
 		transport.TLSClientConfig.MinVersion = p.TykAPISpec.GlobalConfig.ProxySSLMinVersion
