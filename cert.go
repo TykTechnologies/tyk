@@ -95,6 +95,39 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 	return certs[0]
 }
 
+func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global().Security.PinnedPublicKeys) == 0 {
+		return nil
+	}
+
+	tlsConfig.InsecureSkipVerify = true
+
+	whitelist := getPinnedPublicKeys("*", spec)
+	if len(whitelist) == 0 {
+		return nil
+	}
+
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		for _, rawCert := range rawCerts {
+			cert, _ := x509.ParseCertificate(rawCert)
+			pub, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+			if err != nil {
+				continue
+			}
+
+			fingerprint := certs.HexSHA256(pub)
+
+			for _, w := range whitelist {
+				if w == fingerprint {
+					return nil
+				}
+			}
+		}
+
+		return errors.New("Certificate public key pinning error. Public keys do not match.")
+	}
+}
+
 func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
 	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global().Security.PinnedPublicKeys) == 0 {
 		return nil
