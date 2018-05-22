@@ -20,6 +20,7 @@ import (
 
 	"sync"
 
+	"fmt"
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -225,7 +226,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*APISpec {
+func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -244,16 +245,20 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 	resp, err := c.Do(newRequest)
 	if err != nil {
-		log.Error("Request failed: ", err)
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Login failure, Response was: ", string(body))
 		reLogin()
-		return nil
+		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		reLogin()
+		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
 	// Extract tagged APIs#
@@ -264,9 +269,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 		Nonce string
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		log.Error("Failed to decode body: ", err)
-		log.Info("--> Retrying in 5s")
-		return nil
+		body, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only
@@ -308,7 +312,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	ServiceNonce = list.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
-	return specs
+	return specs, nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
