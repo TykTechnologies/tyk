@@ -31,11 +31,15 @@ import (
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
 
 	var objectMsg []byte
+	var err error
 	switch MessageType {
 	case coprocess.ProtobufMessage:
-		objectMsg, _ = proto.Marshal(object)
+		objectMsg, err = proto.Marshal(object)
 	case coprocess.JsonMessage:
-		objectMsg, _ = json.Marshal(object)
+		objectMsg, err = json.Marshal(object)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	objectMsgStr := string(objectMsg)
