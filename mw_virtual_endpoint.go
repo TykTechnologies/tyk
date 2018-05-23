@@ -216,6 +216,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	if vmeta.UseSession {
 		session.MetaData = mapStrsToIfaces(newResponseData.SessionMeta)
 		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime), false)
+		ctxSetSession(r, session)
 	}
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
