@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -147,6 +148,9 @@ def MyAuthHook(request, session, metadata, spec):
 // With ID extractor, it should run multiple times (because cache)
 func TestValueExtractorHeaderSource(t *testing.T) {
 	ts := newTykTestServer(tykTestServerConfig{
+		coprocessConfig: config.CoProcessConfig{
+			EnableCoProcess: true,
+		},
 		delay: 10 * time.Millisecond,
 	})
 	defer ts.Close()
