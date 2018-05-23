@@ -323,7 +323,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it
-		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
@@ -341,7 +343,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		log.Info("Recreating session for key: ", key)
 
 		// cache it
-		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {

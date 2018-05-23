@@ -97,9 +97,9 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 		b,
 		ts,
 		map[string]interface{}{
-			"quota_max":          1000000,
-			"quota_remaining":    1000000,
-			"quota_renewal_rate": 3,
+			"quota_max":          100000000,
+			"quota_remaining":    100000000,
+			"quota_renewal_rate": 300,
 		},
 	)
 
@@ -199,9 +199,9 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 		b,
 		ts,
 		map[string]interface{}{
-			"quota_max":          1000000,
-			"quota_remaining":    1000000,
-			"quota_renewal_rate": 3,
+			"quota_max":          100000000,
+			"quota_remaining":    100000000,
+			"quota_renewal_rate": 300,
 		},
 	)
 
