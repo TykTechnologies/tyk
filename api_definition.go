@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/rubyist/circuitbreaker"
 
+	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -41,9 +43,11 @@ const (
 	BlackList
 	Cached
 	Transformed
+	TransformedJQ
 	HeaderInjected
 	HeaderInjectedResponse
 	TransformedResponse
+	TransformedJQResponse
 	HardTimeout
 	CircuitBreaker
 	URLRewrite
@@ -70,6 +74,8 @@ const (
 	StatusCached                   RequestStatus = "Cached path"
 	StatusTransform                RequestStatus = "Transformed path"
 	StatusTransformResponse        RequestStatus = "Transformed response"
+	StatusTransformJQ              RequestStatus = "Transformed path with JQ"
+	StatusTransformJQResponse      RequestStatus = "Transformed response with JQ"
 	StatusHeaderInjected           RequestStatus = "Header injected"
 	StatusMethodTransformed        RequestStatus = "Method Transformed"
 	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
@@ -85,25 +91,27 @@ const (
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
-// path is on any of the white, plack or ignored lists. This is generated as part of the
+// path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec                    *regexp.Regexp
-	Status                  URLStatus
-	MethodActions           map[string]apidef.EndpointMethodMeta
-	TransformAction         TransformSpec
-	TransformResponseAction TransformSpec
-	InjectHeaders           apidef.HeaderInjectionMeta
-	InjectHeadersResponse   apidef.HeaderInjectionMeta
-	HardTimeout             apidef.HardTimeoutMeta
-	CircuitBreaker          ExtendedCircuitBreakerMeta
-	URLRewrite              apidef.URLRewriteMeta
-	VirtualPathSpec         apidef.VirtualMeta
-	RequestSize             apidef.RequestSizeMeta
-	MethodTransform         apidef.MethodTransformMeta
-	TrackEndpoint           apidef.TrackEndpointMeta
-	DoNotTrackEndpoint      apidef.TrackEndpointMeta
-	ValidatePathMeta        apidef.ValidatePathMeta
+	Spec                      *regexp.Regexp
+	Status                    URLStatus
+	MethodActions             map[string]apidef.EndpointMethodMeta
+	TransformAction           TransformSpec
+	TransformResponseAction   TransformSpec
+	TransformJQAction         TransformJQSpec
+	TransformJQResponseAction TransformJQSpec
+	InjectHeaders             apidef.HeaderInjectionMeta
+	InjectHeadersResponse     apidef.HeaderInjectionMeta
+	HardTimeout               apidef.HardTimeoutMeta
+	CircuitBreaker            ExtendedCircuitBreakerMeta
+	URLRewrite                *apidef.URLRewriteMeta
+	VirtualPathSpec           apidef.VirtualMeta
+	RequestSize               apidef.RequestSizeMeta
+	MethodTransform           apidef.MethodTransformMeta
+	TrackEndpoint             apidef.TrackEndpointMeta
+	DoNotTrackEndpoint        apidef.TrackEndpointMeta
+	ValidatePathMeta          apidef.ValidatePathMeta
 }
 
 type TransformSpec struct {
@@ -142,6 +150,7 @@ type APISpec struct {
 	ServiceRefreshInProgress bool
 	HTTPTransport            http.RoundTripper
 	HTTPTransportCreated     time.Time
+	GlobalConfig             config.Config
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
@@ -168,8 +177,10 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 	spec.SessionManager = &DefaultSessionManager{}
 	spec.OrgSessionManager = &DefaultSessionManager{}
 
+	spec.GlobalConfig = config.Global()
+
 	// Create and init the virtual Machine
-	if config.Global.EnableJSVM {
+	if config.Global().EnableJSVM {
 		spec.JSVM.Init(spec)
 	}
 
@@ -214,7 +225,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*APISpec {
+func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -233,16 +244,20 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 	resp, err := c.Do(newRequest)
 	if err != nil {
-		log.Error("Request failed: ", err)
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 403 {
+	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Login failure, Response was: ", string(body))
 		reLogin()
-		return nil
+		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		reLogin()
+		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
 	// Extract tagged APIs#
@@ -253,19 +268,18 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 		Nonce string
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		log.Error("Failed to decode body: ", err)
-		log.Info("--> Retrying in 5s")
-		return nil
+		body, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only
 	apiDefs := make([]*apidef.APIDefinition, 0)
 
-	if config.Global.DBAppConfOptions.NodeIsSegmented {
-		tagList := make(map[string]bool, len(config.Global.DBAppConfOptions.Tags))
+	if config.Global().DBAppConfOptions.NodeIsSegmented {
+		tagList := make(map[string]bool, len(config.Global().DBAppConfOptions.Tags))
 		toLoad := make(map[string]*apidef.APIDefinition)
 
-		for _, mt := range config.Global.DBAppConfOptions.Tags {
+		for _, mt := range config.Global().DBAppConfOptions.Tags {
 			tagList[mt] = true
 		}
 
@@ -297,7 +311,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	ServiceNonce = list.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
-	return specs
+	return specs, nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -306,16 +320,16 @@ func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 		return LoadDefinitionsFromRPCBackup()
 	}
 
-	store := RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
+	store := RPCStorageHandler{UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
 	if !store.Connect() {
 		return nil
 	}
 
 	// enable segments
 	var tags []string
-	if config.Global.DBAppConfOptions.NodeIsSegmented {
-		log.Info("Segmented node, loading: ", config.Global.DBAppConfOptions.Tags)
-		tags = config.Global.DBAppConfOptions.Tags
+	if config.Global().DBAppConfOptions.NodeIsSegmented {
+		log.Info("Segmented node, loading: ", config.Global().DBAppConfOptions.Tags)
+		tags = config.Global().DBAppConfOptions.Tags
 	}
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
@@ -341,7 +355,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APIS
 	for _, def := range apiDefs {
 		def.DecodeFromDB()
 
-		if config.Global.SlaveOptions.BindToSlugsInsteadOfListenPaths {
+		if config.Global().SlaveOptions.BindToSlugsInsteadOfListenPaths {
 			newListenPath := "/" + def.Slug //+ "/"
 			log.Warning("Binding to ",
 				newListenPath,
@@ -667,7 +681,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
-		newSpec.URLRewrite = stringSpec
+		newSpec.URLRewrite = &stringSpec
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -676,7 +690,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 }
 
 func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec) []URLSpec {
-	if !config.Global.EnableJSVM {
+	if !config.Global().EnableJSVM {
 		return nil
 	}
 
@@ -725,6 +739,8 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
+
+		stringSpec.SchemaCache = gojsonschema.NewGoLoader(stringSpec.Schema)
 		newSpec.ValidatePathMeta = stringSpec
 		urlSpec[i] = newSpec
 	}
@@ -755,6 +771,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	cachedPaths := a.compileCachedPathSpec(apiVersionDef.ExtendedPaths.Cached)
 	transformPaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.Transform, Transformed)
 	transformResponsePaths := a.compileTransformPathSpec(apiVersionDef.ExtendedPaths.TransformResponse, TransformedResponse)
+	transformJQPaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQ, TransformedJQ)
+	transformJQResponsePaths := a.compileTransformJQPathSpec(apiVersionDef.ExtendedPaths.TransformJQResponse, TransformedJQResponse)
 	headerTransformPaths := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformHeader, HeaderInjected)
 	headerTransformPathsOnResponse := a.compileInjectedHeaderSpec(apiVersionDef.ExtendedPaths.TransformResponseHeader, HeaderInjectedResponse)
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout)
@@ -774,6 +792,8 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, cachedPaths...)
 	combinedPath = append(combinedPath, transformPaths...)
 	combinedPath = append(combinedPath, transformResponsePaths...)
+	combinedPath = append(combinedPath, transformJQPaths...)
+	combinedPath = append(combinedPath, transformJQResponsePaths...)
 	combinedPath = append(combinedPath, headerTransformPaths...)
 	combinedPath = append(combinedPath, headerTransformPathsOnResponse...)
 	combinedPath = append(combinedPath, hardTimeouts...)
@@ -808,12 +828,16 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusCached
 	case Transformed:
 		return StatusTransform
+	case TransformedJQ:
+		return StatusTransformJQ
 	case HeaderInjected:
 		return StatusHeaderInjected
 	case HeaderInjectedResponse:
 		return StatusHeaderInjectedResponse
 	case TransformedResponse:
 		return StatusTransformResponse
+	case TransformedJQResponse:
+		return StatusTransformJQResponse
 	case HardTimeout:
 		return StatusHardTimeout
 	case CircuitBreaker:
@@ -849,33 +873,32 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := v.MethodActions[r.Method]
-			if matchMethodOk {
-				// Matched the method, check what status it is:
-				if methodMeta.Action == apidef.NoAction {
-					// NoAction status means we're not treating this request in any special or exceptional way
-					return a.getURLStatus(v.Status), nil
-				}
-				// TODO: Extend here for additional reply options
-				switch methodMeta.Action {
-				case apidef.Reply:
-					return StatusRedirectFlowByReply, &methodMeta
-				default:
-					log.Error("URL Method Action was not set to NoAction, blocking.")
-					return EndPointNotAllowed, nil
-				}
+
+			if !matchMethodOk {
+				continue
 			}
 
-			if whiteListStatus {
-				// We have a whitelist, nothing gets through unless specifically defined
+			// Matched the method, check what status it is:
+			if methodMeta.Action == apidef.NoAction {
+				// NoAction status means we're not treating this request in any special or exceptional way
+				return a.getURLStatus(v.Status), nil
+			}
+			// TODO: Extend here for additional reply options
+			switch methodMeta.Action {
+			case apidef.Reply:
+				return StatusRedirectFlowByReply, &methodMeta
+			default:
+				log.Error("URL Method Action was not set to NoAction, blocking.")
 				return EndPointNotAllowed, nil
 			}
-
-			// Method not matched in an extended set, means it can be passed through
-			return StatusOk, nil
 		}
 
 		if v.TransformAction.Template != nil {
 			return a.getURLStatus(v.Status), &v.TransformAction
+		}
+
+		if v.TransformJQAction.Filter != "" {
+			return a.getURLStatus(v.Status), &v.TransformJQAction
 		}
 
 		// TODO: Fix, Not a great detection method
@@ -904,23 +927,45 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if mode != v.Status {
 			continue
 		}
-		match := v.Spec.MatchString(r.URL.Path)
+
+		matchPath := r.URL.Path
+		if !strings.HasPrefix(matchPath, "/") {
+			matchPath = "/" + matchPath
+		}
+		match := v.Spec.MatchString(matchPath)
+
 		// only return it it's what we are looking for
 		if !match {
 			// check for special case when using url_rewrites with transform_response
 			// and specifying the same "path" expression
-			if mode != TransformedResponse {
-				continue
-			} else if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
+
+			if mode == TransformedResponse {
+				if v.TransformResponseAction.Path != ctxGetUrlRewritePath(r) {
+					continue
+				}
+			} else if mode == HeaderInjectedResponse {
+				if v.InjectHeadersResponse.Path != ctxGetUrlRewritePath(r) {
+					continue
+				}
+			} else if mode == TransformedJQResponse {
+				if v.TransformJQResponseAction.Path != ctxGetUrlRewritePath(r) {
+					continue
+				}
+			} else {
 				continue
 			}
 		}
+
 		switch v.Status {
 		case Ignored, BlackList, WhiteList, Cached:
 			return true, nil
 		case Transformed:
 			if r.Method == v.TransformAction.Method {
 				return true, &v.TransformAction
+			}
+		case TransformedJQ:
+			if r.Method == v.TransformJQAction.Method {
+				return true, &v.TransformJQAction
 			}
 		case HeaderInjected:
 			if r.Method == v.InjectHeaders.Method {
@@ -934,6 +979,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			if r.Method == v.TransformResponseAction.Method {
 				return true, &v.TransformResponseAction
 			}
+		case TransformedJQResponse:
+			if r.Method == v.TransformJQResponseAction.Method {
+				return true, &v.TransformJQResponseAction
+			}
 		case HardTimeout:
 			if r.Method == v.HardTimeout.Method {
 				return true, &v.HardTimeout.TimeOut
@@ -944,7 +993,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			}
 		case URLRewrite:
 			if r.Method == v.URLRewrite.Method {
-				return true, &v.URLRewrite
+				return true, v.URLRewrite
 			}
 		case VirtualPath:
 			if r.Method == v.VirtualPathSpec.Method {
@@ -1092,7 +1141,6 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 
 		// cache for the future
 		ctxSetVersionInfo(r, &version)
-
 	}
 
 	// Load path data and whitelist data for version

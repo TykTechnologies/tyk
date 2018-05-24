@@ -42,7 +42,7 @@ type DefaultHealthChecker struct {
 var healthWarn sync.Once
 
 func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
-	if config.Global.HealthCheck.EnableHealthChecks {
+	if config.Global().HealthCheck.EnableHealthChecks {
 		log.Debug("Health Checker initialised.")
 		healthWarn.Do(func() {
 			log.Warning("The Health Checker is deprecated and we do no longer recommend its use.")
@@ -60,12 +60,9 @@ func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
 
 // reportHealthValue is a shortcut we can use throughout the app to push a health check value
 func reportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
-	configMu.Lock()
-	if !config.Global.HealthCheck.EnableHealthChecks {
-		configMu.Unlock()
+	if !spec.GlobalConfig.HealthCheck.EnableHealthChecks {
 		return
 	}
-	configMu.Unlock()
 
 	spec.Health.StoreCounterVal(counter, value)
 }
@@ -81,16 +78,16 @@ func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value s
 		value = now_string + "." + value
 		log.Debug("Set value to: ", value)
 	}
-	go h.storage.SetRollingWindow(searchStr, config.Global.HealthCheck.HealthCheckValueTimeout, value, false)
+	go h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, value, false)
 }
 
 func (h *DefaultHealthChecker) getAvgCount(prefix HealthPrefix) float64 {
 	searchStr := h.CreateKeyName(prefix)
 	log.Debug("Searching for: ", searchStr)
 
-	count, _ := h.storage.SetRollingWindow(searchStr, config.Global.HealthCheck.HealthCheckValueTimeout, "-1", false)
+	count, _ := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
 	log.Debug("Count is: ", count)
-	divisor := float64(config.Global.HealthCheck.HealthCheckValueTimeout)
+	divisor := float64(config.Global().HealthCheck.HealthCheckValueTimeout)
 	if divisor == 0 {
 		log.Warning("The Health Check sample timeout is set to 0, samples will never be deleted!!!")
 		divisor = 60.0
@@ -118,7 +115,7 @@ func (h *DefaultHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	// Get the micro latency graph, an average upstream latency
 	searchStr := h.APIID + "." + string(RequestLog)
 	log.Debug("Searching KV for: ", searchStr)
-	_, vals := h.storage.SetRollingWindow(searchStr, config.Global.HealthCheck.HealthCheckValueTimeout, "-1", false)
+	_, vals := h.storage.SetRollingWindow(searchStr, config.Global().HealthCheck.HealthCheckValueTimeout, "-1", false)
 	log.Debug("Found: ", vals)
 	if len(vals) == 0 {
 		return values, nil

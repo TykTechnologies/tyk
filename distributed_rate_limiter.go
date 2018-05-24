@@ -21,7 +21,7 @@ func setupDRL() {
 }
 
 func startRateLimitNotifications() {
-	notificationFreq := config.Global.DRLNotificationFrequency
+	notificationFreq := config.Global().DRLNotificationFrequency
 	if notificationFreq == 0 {
 		notificationFreq = 2
 	}
@@ -42,7 +42,7 @@ func startRateLimitNotifications() {
 
 func getTagHash() string {
 	th := ""
-	for _, tag := range config.Global.DBAppConfOptions.Tags {
+	for _, tag := range config.Global().DBAppConfOptions.Tags {
 		th += tag
 	}
 	return th
@@ -91,7 +91,12 @@ func onServerStatusReceivedHandler(payload string) {
 	log.Debug("Received DRL data: ", serverData)
 
 	if DRLManager.Ready {
-		DRLManager.AddOrUpdateServer(serverData)
+		if err := DRLManager.AddOrUpdateServer(serverData); err != nil {
+			log.WithError(err).
+				WithField("serverData", serverData).
+				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
+			return
+		}
 		log.Debug(DRLManager.Report())
 	} else {
 		log.Warning("DRL not ready, skipping this notification")

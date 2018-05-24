@@ -2,11 +2,13 @@ package apidef
 
 import (
 	"encoding/base64"
-
+	"encoding/json"
 	"regexp"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/TykTechnologies/gojsonschema"
 )
 
 type AuthProviderCode string
@@ -90,6 +92,12 @@ type TemplateMeta struct {
 	Method       string       `bson:"method" json:"method"`
 }
 
+type TransformJQMeta struct {
+	Filter string `bson:"filter" json:"filter"`
+	Path   string `bson:"path" json:"path"`
+	Method string `bson:"method" json:"method"`
+}
+
 type HeaderInjectionMeta struct {
 	DeleteHeaders []string          `bson:"delete_headers" json:"delete_headers"`
 	AddHeaders    map[string]string `bson:"add_headers" json:"add_headers"`
@@ -148,6 +156,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
+	MatchRegexp  *regexp.Regexp
 }
 
 type VirtualMeta struct {
@@ -166,11 +175,11 @@ type MethodTransformMeta struct {
 }
 
 type ValidatePathMeta struct {
-	Path   string                 `bson:"path" json:"path"`
-	Method string                 `bson:"method" json:"method"`
-	Schema map[string]interface{} `bson:"schema" json:"schema"`
-	// TODO: Implement multi schema support
-	SchemaVersion string `bson:"schema_version" json:"schema_version"`
+	Path        string                  `bson:"path" json:"path"`
+	Method      string                  `bson:"method" json:"method"`
+	Schema      map[string]interface{}  `bson:"schema" json:"schema"`
+	SchemaB64   string                  `bson:"schema_b64" json:"schema_b64,omitempty"`
+	SchemaCache gojsonschema.JSONLoader `bson:"-" json:"-"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
@@ -182,6 +191,8 @@ type ExtendedPathsSet struct {
 	Cached                  []string              `bson:"cache" json:"cache,omitempty"`
 	Transform               []TemplateMeta        `bson:"transform" json:"transform,omitempty"`
 	TransformResponse       []TemplateMeta        `bson:"transform_response" json:"transform_response,omitempty"`
+	TransformJQ             []TransformJQMeta     `bson:"transform_jq" json:"transform_jq,omitempty"`
+	TransformJQResponse     []TransformJQMeta     `bson:"transform_jq_response" json:"transform_jq_response,omitempty"`
 	TransformHeader         []HeaderInjectionMeta `bson:"transform_headers" json:"transform_headers,omitempty"`
 	TransformResponseHeader []HeaderInjectionMeta `bson:"transform_response_headers" json:"transform_response_headers,omitempty"`
 	HardTimeouts            []HardTimeoutMeta     `bson:"hard_timeouts" json:"hard_timeouts,omitempty"`
@@ -315,24 +326,28 @@ type APIDefinition struct {
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
-	Auth                    Auth                 `bson:"auth" json:"auth"`
-	UseBasicAuth            bool                 `bson:"use_basic_auth" json:"use_basic_auth"`
-	UseMutualTLSAuth        bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
-	ClientCertificates      []string             `bson:"client_certificates" json:"client_certificates"`
-	UpstreamCertificates    map[string]string    `bson:"upstream_certificates" json:"upstream_certificates"`
-	EnableJWT               bool                 `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth         bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
-	EnableCoProcessAuth     bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
-	JWTSigningMethod        string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
-	JWTSource               string               `bson:"jwt_source" json:"jwt_source"`
-	JWTIdentityBaseField    string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
-	JWTClientIDBaseField    string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
-	JWTPolicyFieldName      string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
-	NotificationsDetails    NotificationsManager `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	HmacAllowedClockSkew    float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
-	BaseIdentityProvidedBy  AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
-	VersionDefinition       struct {
+	Auth                          Auth                 `bson:"auth" json:"auth"`
+	UseBasicAuth                  bool                 `bson:"use_basic_auth" json:"use_basic_auth"`
+	UseMutualTLSAuth              bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
+	ClientCertificates            []string             `bson:"client_certificates" json:"client_certificates"`
+	UpstreamCertificates          map[string]string    `bson:"upstream_certificates" json:"upstream_certificates"`
+	PinnedPublicKeys              map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
+	EnableJWT                     bool                 `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth               bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	EnableCoProcessAuth           bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+	JWTSigningMethod              string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTSource                     string               `bson:"jwt_source" json:"jwt_source"`
+	JWTIdentityBaseField          string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
+	JWTClientIDBaseField          string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
+	JWTPolicyFieldName            string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDisableIssuedAtValidation  bool                 `bson:"jwt_disable_issued_at_validation" json:"jwt_disable_issued_at_validation"`
+	JWTDisableExpiresAtValidation bool                 `bson:"jwt_disable_expires_at_validation" json:"jwt_disable_expires_at_validation"`
+	JWTDisableNotBeforeValidation bool                 `bson:"jwt_disable_not_before_validation" json:"jwt_disable_not_before_validation"`
+	NotificationsDetails          NotificationsManager `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking       bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
+	HmacAllowedClockSkew          float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	BaseIdentityProvidedBy        AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
+	VersionDefinition             struct {
 		Location string `bson:"location" json:"location"`
 		Key      string `bson:"key" json:"key"`
 	} `bson:"definition" json:"definition"`
@@ -359,6 +374,11 @@ type APIDefinition struct {
 		StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 		CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 		ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+		Transport                   struct {
+			SSLCipherSuites []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
+			SSLMinVersion   uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
+			ProxyURL        string   `bson:"proxy_url" json:"proxy_url"`
+		} `bson:"transport" json:"transport"`
 	} `bson:"proxy" json:"proxy"`
 	DisableRateLimit          bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
 	DisableQuota              bool                   `bson:"disable_quota" json:"disable_quota"`
@@ -373,6 +393,8 @@ type APIDefinition struct {
 	EnableBatchRequestSupport bool                   `bson:"enable_batch_request_support" json:"enable_batch_request_support"`
 	EnableIpWhiteListing      bool                   `mapstructure:"enable_ip_whitelisting" bson:"enable_ip_whitelisting" json:"enable_ip_whitelisting"`
 	AllowedIPs                []string               `mapstructure:"allowed_ips" bson:"allowed_ips" json:"allowed_ips"`
+	EnableIpBlacklisting      bool                   `mapstructure:"enable_ip_blacklisting" bson:"enable_ip_blacklisting" json:"enable_ip_blacklisting"`
+	BlacklistedIPs            []string               `mapstructure:"blacklisted_ips" bson:"blacklisted_ips" json:"blacklisted_ips"`
 	DontSetQuotasOnCreate     bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
 	ExpireAnalyticsAfter      int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
 	ResponseProcessors        []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
@@ -420,49 +442,88 @@ type BundleManifest struct {
 
 // Clean will URL encode map[string]struct variables for saving
 func (a *APIDefinition) EncodeForDB() {
-	new_version := make(map[string]VersionInfo)
+	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
 		newK := base64.StdEncoding.EncodeToString([]byte(k))
 		v.Name = newK
-		new_version[newK] = v
+		newVersion[newK] = v
 	}
-	a.VersionData.Versions = new_version
+	a.VersionData.Versions = newVersion
 
-	new_upstream_certificates := make(map[string]string)
+	newUpstreamCerts := make(map[string]string)
 	for domain, cert := range a.UpstreamCertificates {
 		newD := base64.StdEncoding.EncodeToString([]byte(domain))
-		new_upstream_certificates[newD] = cert
+		newUpstreamCerts[newD] = cert
 	}
-	a.UpstreamCertificates = new_upstream_certificates
+	a.UpstreamCertificates = newUpstreamCerts
+
+	newPinnedPublicKeys := make(map[string]string)
+	for domain, cert := range a.PinnedPublicKeys {
+		newD := base64.StdEncoding.EncodeToString([]byte(domain))
+		newPinnedPublicKeys[newD] = cert
+	}
+	a.PinnedPublicKeys = newPinnedPublicKeys
+
+	for i, version := range a.VersionData.Versions {
+		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
+
+			jsBytes, _ := json.Marshal(oldSchema.Schema)
+			oldSchema.SchemaB64 = base64.StdEncoding.EncodeToString(jsBytes)
+			oldSchema.Schema = nil
+
+			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
+		}
+	}
 }
 
 func (a *APIDefinition) DecodeFromDB() {
-	new_version := make(map[string]VersionInfo)
+	newVersion := make(map[string]VersionInfo)
 	for k, v := range a.VersionData.Versions {
 		newK, err := base64.StdEncoding.DecodeString(k)
 		if err != nil {
 			log.Error("Couldn't Decode, leaving as it may be legacy...")
-			new_version[k] = v
+			newVersion[k] = v
 		} else {
 			v.Name = string(newK)
-			new_version[string(newK)] = v
+			newVersion[string(newK)] = v
 		}
 	}
+	a.VersionData.Versions = newVersion
 
-	a.VersionData.Versions = new_version
-
-	new_upstream_certificates := make(map[string]string)
+	newUpstreamCerts := make(map[string]string)
 	for domain, cert := range a.UpstreamCertificates {
 		newD, err := base64.StdEncoding.DecodeString(domain)
 		if err != nil {
 			log.Error("Couldn't Decode, leaving as it may be legacy...")
-			new_upstream_certificates[domain] = cert
+			newUpstreamCerts[domain] = cert
 		} else {
-			new_upstream_certificates[string(newD)] = cert
+			newUpstreamCerts[string(newD)] = cert
 		}
 	}
+	a.UpstreamCertificates = newUpstreamCerts
 
-	a.UpstreamCertificates = new_upstream_certificates
+	newPinnedPublicKeys := make(map[string]string)
+	for domain, cert := range a.PinnedPublicKeys {
+		newD, err := base64.StdEncoding.DecodeString(domain)
+		if err != nil {
+			log.Error("Couldn't Decode, leaving as it may be legacy...")
+			newPinnedPublicKeys[domain] = cert
+		} else {
+			newPinnedPublicKeys[string(newD)] = cert
+		}
+	}
+	a.PinnedPublicKeys = newPinnedPublicKeys
+
+	for i, version := range a.VersionData.Versions {
+		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
+			jsBytes, _ := base64.StdEncoding.DecodeString(oldSchema.SchemaB64)
+
+			json.Unmarshal(jsBytes, &oldSchema.Schema)
+			oldSchema.SchemaB64 = ""
+
+			a.VersionData.Versions[i].ExtendedPaths.ValidateJSON[j] = oldSchema
+		}
+	}
 }
 
 func (s *StringRegexMap) Check(value string) string {

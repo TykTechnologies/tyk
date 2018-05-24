@@ -104,7 +104,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	if halt {
 		// Fire Authfailed Event
 		k.reportLoginFailure("[JWT]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	// 3. Create or set the session to match
@@ -116,7 +116,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	k.lock.RLock()
@@ -127,7 +127,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	policyID := ""
@@ -156,7 +156,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			"prefix": OIDPREFIX,
 		}).Error("No matching policy found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
-		return errors.New("Key not authorised"), 403
+		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
 
 	data := []byte(ouser.ID)
@@ -186,7 +186,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 			log.WithFields(logrus.Fields{
 				"prefix": OIDPREFIX,
 			}).Error("Could not find a valid policy to apply to this token!")
-			return errors.New("Key not authorized: no matching policy"), 403
+			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
 
 		session = newSession
@@ -194,7 +194,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		session.Alias = clientID + ":" + ouser.ID
 
 		// Update the session in the session manager in case it gets called again
-		k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime))
+		k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
 		log.Debug("Policy applied to key")
 
 	}
@@ -205,9 +205,9 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		ctxSetSession(r, &session)
 		ctxSetAuthToken(r, sessionID)
 	}
-	k.setContextVars(r, token)
+	ctxSetJWTContextVars(k.Spec, r, token)
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
@@ -221,26 +221,4 @@ func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
 
 	// Report in health check
 	reportHealthValue(k.Spec, KeyFailure, "1")
-}
-
-func (k *OpenIDMW) setContextVars(r *http.Request, token *jwt.Token) {
-	if !k.Spec.EnableContextVars {
-		return
-	}
-	// Flatten claims and add to context
-	cnt := ctxGetData(r)
-	if cnt == nil {
-		return
-	}
-	claimPrefix := "jwt_claims_"
-
-	for claimName, claimValue := range token.Claims.(jwt.MapClaims) {
-		claim := claimPrefix + claimName
-		cnt[claim] = claimValue
-	}
-
-	// Key data
-	cnt["token"] = ctxGetAuthToken(r)
-
-	ctxSetData(r, cnt)
 }

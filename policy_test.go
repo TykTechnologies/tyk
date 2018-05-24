@@ -20,12 +20,17 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	oldUseDBAppConfigs := config.Global.UseDBAppConfigs
-	config.Global.UseDBAppConfigs = false
+	globalConf := config.Global()
+	oldUseDBAppConfigs := globalConf.UseDBAppConfigs
+	globalConf.UseDBAppConfigs = false
+	config.SetGlobal(globalConf)
 
-	defer func() { config.Global.UseDBAppConfigs = oldUseDBAppConfigs }()
+	defer func() {
+		globalConf.UseDBAppConfigs = oldUseDBAppConfigs
+		config.SetGlobal(globalConf)
+	}()
 
-	allowExplicitPolicyID := config.Global.Policies.AllowExplicitPolicyID
+	allowExplicitPolicyID := config.Global().Policies.AllowExplicitPolicyID
 
 	policyMap := LoadPoliciesFromDashboard(ts.URL, "", allowExplicitPolicyID)
 
@@ -38,11 +43,18 @@ type dummySessionManager struct {
 	DefaultSessionManager
 }
 
-func (dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64) error {
+func (dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64, hashed bool) error {
 	return nil
 }
 
-func TestApplyPolicies(t *testing.T) {
+type testApplyPoliciesData struct {
+	name      string
+	policies  []string
+	errMatch  string                               // substring
+	sessMatch func(*testing.T, *user.SessionState) // ignored if nil
+}
+
+func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 	policiesMu.RLock()
 	policiesByID = map[string]user.Policy{
 		"nonpart1": {},
@@ -82,18 +94,16 @@ func TestApplyPolicies(t *testing.T) {
 			Partitions:   user.PolicyPartitions{Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
+		"acl3": {
+			AccessRights: map[string]user.AccessDefinition{"c": {}},
+		},
 	}
 	policiesMu.RUnlock()
 	bmid := &BaseMiddleware{Spec: &APISpec{
 		APIDefinition:  &apidef.APIDefinition{},
 		SessionManager: &dummySessionManager{},
 	}}
-	tests := []struct {
-		name      string
-		policies  []string
-		errMatch  string                               // substring
-		sessMatch func(*testing.T, *user.SessionState) // ignored if nil
-	}{
+	tests := []testApplyPoliciesData{
 		{
 			"Empty", nil,
 			"", nil,
@@ -186,7 +196,33 @@ func TestApplyPolicies(t *testing.T) {
 				}
 			},
 		},
+		{
+			"RightsUpdate", []string{"acl3"},
+			"", func(t *testing.T, s *user.SessionState) {
+				newPolicy := user.Policy{
+					AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}, "c": {}},
+				}
+				policiesMu.Lock()
+				policiesByID["acl3"] = newPolicy
+				policiesMu.Unlock()
+				err := bmid.ApplyPolicies("", s)
+				if err != nil {
+					t.Fatalf("couldn't apply policy: %s", err.Error())
+				}
+				want := newPolicy.AccessRights
+				if !reflect.DeepEqual(want, s.AccessRights) {
+					t.Fatalf("want %v got %v", want, s.AccessRights)
+				}
+			},
+		},
 	}
+
+	return bmid, tests
+}
+
+func TestApplyPolicies(t *testing.T) {
+	bmid, tests := testPrepareApplyPolicies()
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			sess := &user.SessionState{}
@@ -205,5 +241,19 @@ func TestApplyPolicies(t *testing.T) {
 				tc.sessMatch(t, sess)
 			}
 		})
+	}
+}
+
+func BenchmarkApplyPolicies(b *testing.B) {
+	b.ReportAllocs()
+
+	bmid, tests := testPrepareApplyPolicies()
+
+	for i := 0; i < b.N; i++ {
+		for _, tc := range tests {
+			sess := &user.SessionState{}
+			sess.SetPolicies(tc.policies...)
+			bmid.ApplyPolicies("", sess)
+		}
 	}
 }

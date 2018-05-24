@@ -12,8 +12,11 @@ import (
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -54,7 +57,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if config.Global.NewRelic.AppName != "" {
+			if config.Global().NewRelic.AppName != "" {
 				if txn, ok := w.(newrelic.Transaction); ok {
 					defer newrelic.StartSegment(txn, mw.Name()).End()
 				}
@@ -62,7 +65,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 			job := instrument.NewJob("MiddlewareCall")
 			meta := health.Kvs{
-				"from_ip":  requestIP(r),
+				"from_ip":  request.RealIP(r),
 				"method":   r.Method,
 				"endpoint": r.URL.Path,
 				"raw_url":  r.URL.String(),
@@ -139,8 +142,8 @@ func (t BaseMiddleware) Config() (interface{}, error) {
 
 func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 	// Try and get the session from the session store
-	session, found := t.Spec.OrgSessionManager.SessionDetail(key)
-	if found && config.Global.EnforceOrgDataAge {
+	session, found := t.Spec.OrgSessionManager.SessionDetail(key, false)
+	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
 		log.Debug("Setting data expiry: ", session.OrgID)
@@ -168,6 +171,7 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) error {
+	rights := session.AccessRights
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
 	policies := session.PolicyIDs()
@@ -176,19 +180,25 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 		policy, ok := policiesByID[polID]
 		policiesMu.RUnlock()
 		if !ok {
-			return fmt.Errorf("policy not found: %q", polID)
+			err := fmt.Errorf("policy not found: %q", polID)
+			log.Error(err)
+			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise youcould overwrite a session key with a policy from a different org!
 		if policy.OrgID != t.Spec.OrgID {
-			return fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
+			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
+			log.Error(err)
+			return err
 		}
 
 		if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
 			// This is a partitioned policy, only apply what is active
 			if policy.Partitions.Quota {
 				if didQuota {
-					return fmt.Errorf("cannot apply multiple quota policies")
+					err := fmt.Errorf("cannot apply multiple quota policies")
+					log.Error(err)
+					return err
 				}
 				didQuota = true
 				// Quotas
@@ -198,7 +208,9 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 
 			if policy.Partitions.RateLimit {
 				if didRateLimit {
-					return fmt.Errorf("cannot apply multiple rate limit policies")
+					err := fmt.Errorf("cannot apply multiple rate limit policies")
+					log.Error(err)
+					return err
 				}
 				didRateLimit = true
 				// Rate limting
@@ -213,19 +225,21 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			if policy.Partitions.Acl {
 				// ACL
 				if !didACL { // first, overwrite rights
-					session.AccessRights = policy.AccessRights
+					rights = make(map[string]user.AccessDefinition)
 					didACL = true
-				} else { // second or later, merge
-					for k, v := range policy.AccessRights {
-						session.AccessRights[k] = v
-					}
+				}
+				// Second or later, merge
+				for k, v := range policy.AccessRights {
+					rights[k] = v
 				}
 				session.HMACEnabled = policy.HMACEnabled
 			}
 
 		} else {
 			if len(policies) > 1 {
-				return fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
+				err := fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
+				log.Error(err)
+				return err
 			}
 			// This is not a partitioned policy, apply everything
 			// Quotas
@@ -241,7 +255,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			}
 
 			// ACL
-			session.AccessRights = policy.AccessRights
+			rights = policy.AccessRights
 			session.HMACEnabled = policy.HMACEnabled
 		}
 
@@ -259,18 +273,33 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 	for tag := range tags {
 		session.Tags = append(session.Tags, tag)
 	}
+	session.AccessRights = rights
 	// Update the session in the session manager in case it gets called again
-	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime))
+	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime), false)
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.SessionState, bool) {
+	minLength := t.Spec.GlobalConfig.MinTokenLength
+	if minLength == 0 {
+		// See https://github.com/TykTechnologies/tyk/issues/1681
+		minLength = 3
+	}
+
+	if len(key) <= minLength {
+		return user.SessionState{IsInactive: true}, false
+	}
+
 	// Try and get the session from the session store
 	log.Debug("Querying local cache")
+	cacheKey := key
+	if t.Spec.GlobalConfig.HashKeys {
+		cacheKey = storage.HashStr(key)
+	}
 	// Check in-memory cache
-	if !config.Global.LocalSessionCache.DisableCacheSessionState {
-		cachedVal, found := SessionCache.Get(key)
+	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
 			log.Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState)
@@ -283,11 +312,11 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 
 	// Check session store
 	log.Debug("Querying keystore")
-	session, found := t.Spec.SessionManager.SessionDetail(key)
+	session, found := t.Spec.SessionManager.SessionDetail(key, false)
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it
-		go SessionCache.Set(key, session, cache.DefaultExpiration)
+		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
@@ -305,7 +334,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		log.Info("Recreating session for key: ", key)
 
 		// cache it
-		go SessionCache.Set(key, session, cache.DefaultExpiration)
+		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
@@ -315,7 +344,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		log.Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		// Need to set this in order for the write to work!
 		session.LastUpdated = time.Now().String()
-		t.Spec.SessionManager.UpdateSession(key, &session, session.Lifetime(t.Spec.SessionLifetime))
+		t.Spec.SessionManager.UpdateSession(key, &session, session.Lifetime(t.Spec.SessionLifetime), false)
 	}
 
 	return session, found
@@ -337,6 +366,8 @@ func responseProcessorByName(name string) TykResponseHandler {
 		return &HeaderInjector{}
 	case "response_body_transform":
 		return &ResponseTransformMiddleware{}
+	case "response_body_transform_jq":
+		return &ResponseTransformJQMiddleware{}
 	case "header_transform":
 		return &HeaderTransform{}
 	}

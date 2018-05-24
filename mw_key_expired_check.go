@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/request"
 )
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.
@@ -18,7 +20,7 @@ func (k *KeyExpired) Name() string {
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	session := ctxGetSession(r)
 	if session == nil {
-		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), 400
+		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), http.StatusBadRequest
 	}
 
 	token := ctxGetAuthToken(r)
@@ -29,23 +31,29 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           requestIP(r),
+			Origin:           request.RealIP(r),
 			Key:              token,
 		})
 
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "-1")
 
-		return errors.New("Key is inactive, please renew"), 403
+		return errors.New("Key is inactive, please renew"), http.StatusForbidden
 	}
 
 	if !k.Spec.AuthManager.KeyExpired(session) {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 	logEntry.Info("Attempted access from expired key.")
 
+	k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key.", OriginatingRequest: EncodeRequestToEvent(r)},
+		Path:             r.URL.Path,
+		Origin:           request.RealIP(r),
+		Key:              token,
+	})
 	// Report in health check
 	reportHealthValue(k.Spec, KeyFailure, "-1")
 
-	return errors.New("Key has expired, please renew"), 401
+	return errors.New("Key has expired, please renew"), http.StatusUnauthorized
 }

@@ -33,17 +33,17 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *user.SessionState, store storage.Handler) bool {
+func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *user.SessionState, store storage.Handler, globalConf config.Config) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
-	pipeline := config.Global.EnableNonTransactionalRateLimiter
+	pipeline := globalConf.EnableNonTransactionalRateLimiter
 	ratePerPeriodNow, _ := store.SetRollingWindow(rateLimiterKey, int64(currentSession.Per), "-1", pipeline)
 
 	//log.Info("Num Requests: ", ratePerPeriodNow)
 
 	// Subtract by 1 because of the delayed add in the window
 	subtractor := 1
-	if config.Global.EnableSentinelRateLImiter {
+	if globalConf.EnableSentinelRateLImiter {
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
@@ -52,7 +52,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	if ratePerPeriodNow > int(currentSession.Rate)-subtractor {
 		// Set a sentinel value with expire
-		if config.Global.EnableSentinelRateLImiter {
+		if globalConf.EnableSentinelRateLImiter {
 			store.SetRawKey(rateLimiterSentinelKey, "1", int64(currentSession.Per))
 		}
 		return true
@@ -73,13 +73,13 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf config.Config) sessionFailReason {
 	rateLimiterKey := RateLimitKeyPrefix + storage.HashKey(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(key) + ".BLOCKED"
 
 	if enableRL {
-		if config.Global.EnableSentinelRateLImiter {
-			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store)
+		if globalConf.EnableSentinelRateLImiter {
+			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf)
 
 			// Check sentinel
 			_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
@@ -87,8 +87,8 @@ func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key s
 				// Sentinel is set, fail
 				return sessionFailRateLimit
 			}
-		} else if config.Global.EnableRedisRollingLimiter {
-			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store) {
+		} else if globalConf.EnableRedisRollingLimiter {
+			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf) {
 				return sessionFailRateLimit
 			}
 		} else {
@@ -124,7 +124,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key s
 	}
 
 	if enableQ {
-		if config.Global.LegacyEnableAllowanceCountdown {
+		if globalConf.LegacyEnableAllowanceCountdown {
 			currentSession.Allowance--
 		}
 

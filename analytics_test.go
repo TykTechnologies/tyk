@@ -27,10 +27,13 @@ func TestGeoIPLookup(t *testing.T) {
 }
 
 func TestURLReplacer(t *testing.T) {
-	config.Global.AnalyticsConfig.NormaliseUrls.Enabled = true
-	config.Global.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
-	config.Global.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
-	config.Global.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	defer resetTestConfig()
+	globalConf := config.Global()
+	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	config.SetGlobal(globalConf)
 
 	recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
 	recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
@@ -39,7 +42,8 @@ func TestURLReplacer(t *testing.T) {
 	recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
 	recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
 
-	config.Global.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+	config.SetGlobal(globalConf)
 
 	recordUUID1.NormalisePath()
 	recordUUID2.NormalisePath()
@@ -51,7 +55,7 @@ func TestURLReplacer(t *testing.T) {
 	if recordUUID1.Path != "/{uuid}/search" {
 		t.Error("Path not altered, is:")
 		t.Error(recordUUID1.Path)
-		t.Error(config.Global.AnalyticsConfig.NormaliseUrls)
+		t.Error(config.Global().AnalyticsConfig.NormaliseUrls)
 	}
 
 	if recordUUID2.Path != "/{uuid}/search" {
@@ -77,6 +81,36 @@ func TestURLReplacer(t *testing.T) {
 	if recordCust.Path != "/widgets/{id}/getParams/{var}" {
 		t.Error("Path not altered, is:")
 		t.Error(recordCust.Path)
+	}
+}
+
+func BenchmarkURLReplacer(b *testing.B) {
+	b.ReportAllocs()
+
+	defer resetTestConfig()
+
+	globalConf := config.Global()
+	globalConf.AnalyticsConfig.NormaliseUrls.Enabled = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs = true
+	globalConf.AnalyticsConfig.NormaliseUrls.NormaliseNumbers = true
+	globalConf.AnalyticsConfig.NormaliseUrls.Custom = []string{"ihatethisstring"}
+	globalConf.AnalyticsConfig.NormaliseUrls.CompiledPatternSet = initNormalisationPatterns()
+	config.SetGlobal(globalConf)
+
+	for i := 0; i < b.N; i++ {
+		recordUUID1 := AnalyticsRecord{Path: "/15873a748894492162c402d67e92283b/search"}
+		recordUUID2 := AnalyticsRecord{Path: "/CA761232-ED42-11CE-BACD-00AA0057B223/search"}
+		recordUUID3 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordUUID4 := AnalyticsRecord{Path: "/ca761232-ed42-11ce-BAcd-00aa0057b223/search"}
+		recordID1 := AnalyticsRecord{Path: "/widgets/123456/getParams"}
+		recordCust := AnalyticsRecord{Path: "/widgets/123456/getParams/ihatethisstring"}
+
+		recordUUID1.NormalisePath()
+		recordUUID2.NormalisePath()
+		recordUUID3.NormalisePath()
+		recordUUID4.NormalisePath()
+		recordID1.NormalisePath()
+		recordCust.NormalisePath()
 	}
 }
 
@@ -120,4 +154,33 @@ func TestTagHeaders(t *testing.T) {
 		t.Fatalf("Header values not proerly set, got: %v, remnainder: %v", existingTags, check)
 	}
 
+}
+
+func BenchmarkTagHeaders(b *testing.B) {
+	b.ReportAllocs()
+
+	req := testReq(b, "GET", "/tagmeplease", nil)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tag-Me", "1")
+	req.Header.Set("X-Tag-Me2", "2")
+	req.Header.Set("X-Tag-Me3", "3")
+	req.Header.Set("X-Ignore-Me", "4")
+
+	existingTags := []string{"first", "second"}
+
+	var newExistingTags []string
+	for i := 0; i < b.N; i++ {
+		newExistingTags = tagHeaders(
+			req,
+			[]string{
+				"x-tag-me",
+				"x-tag-me2",
+				"x-tag-me3",
+			},
+			existingTags,
+		)
+		if len(newExistingTags) == 2 {
+			b.Fatal("Existing tags have not been expanded")
+		}
+	}
 }

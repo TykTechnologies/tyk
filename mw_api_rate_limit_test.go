@@ -35,6 +35,7 @@ func getRLOpenChain(spec *APISpec) http.Handler {
 	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
+		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&RateLimitForAPI{BaseMiddleware: baseMid},
 	)...).Then(proxyHandler)
@@ -48,6 +49,7 @@ func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 	baseMid := BaseMiddleware{spec, proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
+		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&AuthKey{baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&KeyExpired{baseMid},
@@ -95,7 +97,7 @@ func TestRLClosed(t *testing.T) {
 	session := createRLSession()
 	customToken := uuid.NewV4().String()
 	// AuthKey sessions are stored by {token}
-	spec.SessionManager.UpdateSession(customToken, session, 60)
+	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 	req.Header.Set("authorization", "Bearer "+customToken)
 
 	DRLManager.CurrentTokenValue = 1

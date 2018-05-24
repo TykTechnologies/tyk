@@ -45,6 +45,7 @@ type MiniRequestObject struct {
 	IgnoreBody      bool
 	Method          string
 	RequestURI      string
+	Proto           string
 }
 
 type VMReturnObject struct {
@@ -94,9 +95,8 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Error("Failed to read request body! ", err)
-		return nil, 200
+		return nil, http.StatusOK
 	}
-
 	headers := r.Header
 	host := r.Host
 	if host == "" && r.URL != nil {
@@ -122,6 +122,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteParams:   []string{},
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
+		Proto:          r.Proto,
 	}
 
 	requestAsJson, err := json.Marshal(requestData)
@@ -129,7 +130,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Error("Failed to encode request object for dynamic middleware: ", err)
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	specAsJson := specToJson(d.Spec)
@@ -147,7 +148,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Error("Failed to encode session for VM: ", err)
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	// Run the middleware
@@ -180,7 +181,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			log.WithFields(logrus.Fields{
 				"prefix": "jsvm",
 			}).Error("Failed to run JS middleware: ", err)
-			return nil, 200
+			return nil, http.StatusOK
 		}
 		t.Stop()
 	case <-t.C:
@@ -193,7 +194,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 			// that panics.
 			panic("stop")
 		}
-		return nil, 200
+		return nil, http.StatusOK
 	}
 	returnDataStr, _ := returnRaw.ToString()
 
@@ -206,7 +207,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Debug(returnDataStr)
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
 	// Reconstruct the request parts
@@ -250,18 +251,18 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the sesison data (if modified)
 	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
 		session.MetaData = mapStrsToIfaces(newRequestData.SessionMeta)
-		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime))
+		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime), false)
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "jsvm",
 	}).Debug("JSVM middleware execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	if newRequestData.Request.ReturnOverrides.ResponseCode >= 400 {
+	if newRequestData.Request.ReturnOverrides.ResponseCode >= http.StatusBadRequest {
 		return errors.New(newRequestData.Request.ReturnOverrides.ResponseError), newRequestData.Request.ReturnOverrides.ResponseCode
 	}
 
-	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode < 300 {
+	if newRequestData.Request.ReturnOverrides.ResponseCode != 0 && newRequestData.Request.ReturnOverrides.ResponseCode < http.StatusMultipleChoices {
 
 		responseObject := VMResponseObject{
 			Response: ResponseObject{
@@ -280,7 +281,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		ctxSetAuthToken(r, newRequestData.AuthValue)
 	}
 
-	return nil, 200
+	return nil, http.StatusOK
 }
 
 func mapStrsToIfaces(m map[string]string) map[string]interface{} {
@@ -319,7 +320,7 @@ func (j *JSVM) Init(spec *APISpec) {
 	}
 
 	// Load user's TykJS on top, if any
-	if path := config.Global.TykJSPath; path != "" {
+	if path := config.Global().TykJSPath; path != "" {
 		f, err := os.Open(path)
 		if err == nil {
 			_, err = vm.Run(f)
@@ -339,13 +340,13 @@ func (j *JSVM) Init(spec *APISpec) {
 	// Add environment API
 	j.LoadTykJSApi()
 
-	if config.Global.JSVMTimeout <= 0 {
+	if jsvmTimeout := config.Global().JSVMTimeout; jsvmTimeout <= 0 {
 		j.Timeout = time.Duration(defaultJSVMTimeout) * time.Second
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Debugf("Default JSVM timeout used: %v", j.Timeout)
 	} else {
-		j.Timeout = time.Duration(config.Global.JSVMTimeout) * time.Second
+		j.Timeout = time.Duration(jsvmTimeout) * time.Second
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",
 		}).Debugf("Custom JSVM timeout: %v", j.Timeout)
@@ -357,7 +358,7 @@ func (j *JSVM) Init(spec *APISpec) {
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
 func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
-	tykBundlePath := filepath.Join(config.Global.MiddlewarePath, "bundles")
+	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 	for _, mwPath := range paths {
 		if pathPrefix != "" {
 			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
@@ -492,9 +493,13 @@ func (j *JSVM) LoadTykJSApi() {
 			tr.TLSClientConfig.Certificates = []tls.Certificate{*cert}
 		}
 
-		if config.Global.ProxySSLInsecureSkipVerify {
+		if config.Global().ProxySSLInsecureSkipVerify {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
+
+		tr.DialTLS = dialTLSPinnedCheck(j.Spec, tr.TLSClientConfig)
+
+		tr.Proxy = proxyFromAPI(j.Spec)
 
 		// using new Client each time should be ok, since we closing connection every time
 		client := &http.Client{Transport: tr}
@@ -530,7 +535,7 @@ func (j *JSVM) LoadTykJSApi() {
 		apiKey := call.Argument(0).String()
 		apiId := call.Argument(1).String()
 
-		obj, _ := handleGetDetail(apiKey, apiId)
+		obj, _ := handleGetDetail(apiKey, apiId, false)
 		bs, _ := json.Marshal(obj)
 
 		returnVal, err := j.VM.ToValue(string(bs))

@@ -9,18 +9,24 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func TestTransformNonAscii(t *testing.T) {
+func testPrepareTransformNonAscii(tb testing.TB) (*TransformSpec, string) {
 	in := `<?xml version="1.0" encoding="utf-8"?>
 <names>
 	<name>Jyväskylä</name>
 	<name>Hyvinkää</name>
 </names>`
-	want := `["Jyväskylä", "Hyvinkää"]`
 	tmpl := `[{{range $x, $s := .names.name}}"{{$s}}"{{if not $x}}, {{end}}{{end}}]`
-	r := testReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
 	tmeta.Template = template.Must(template.New("blob").Parse(tmpl))
+	return tmeta, in
+}
+
+func TestTransformNonAscii(t *testing.T) {
+	tmeta, in := testPrepareTransformNonAscii(t)
+	want := `["Jyväskylä", "Hyvinkää"]`
+
+	r := testReq(t, "GET", "/", in)
 	if err := transformBody(r, tmeta, false); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
@@ -33,10 +39,22 @@ func TestTransformNonAscii(t *testing.T) {
 	}
 }
 
+func BenchmarkTransformNonAscii(b *testing.B) {
+	b.ReportAllocs()
+
+	tmeta, in := testPrepareTransformNonAscii(b)
+	for i := 0; i < b.N; i++ {
+		r := testReq(b, "GET", "/", in)
+		if err := transformBody(r, tmeta, false); err != nil {
+			b.Fatalf("wanted nil error, got %v", err)
+		}
+	}
+}
+
 func TestTransformXMLCrash(t *testing.T) {
 	// mxj.NewMapXmlReader used to take forever and crash the
 	// process by eating up all the memory.
-	in := strings.NewReader("")
+	in := strings.NewReader("not xml")
 	r := testReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
@@ -46,17 +64,23 @@ func TestTransformXMLCrash(t *testing.T) {
 	}
 }
 
-func TestTransformJSONMarshal(t *testing.T) {
+func testPrepareTransformJSONMarshal(tb testing.TB) (*TransformSpec, string) {
 	in := `<names>
 	<name>Foo"oo</name>
 	<name>Bàr</name>
 </names>`
-	want := `["Foo\"oo", "Bàr"]`
 	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
-	r := testReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
 	tmeta.Template = template.Must(apiTemplate.New("").Parse(tmpl))
+	return tmeta, in
+}
+
+func TestTransformJSONMarshal(t *testing.T) {
+	tmeta, in := testPrepareTransformJSONMarshal(t)
+
+	want := `["Foo\"oo", "Bàr"]`
+	r := testReq(t, "GET", "/", in)
 	if err := transformBody(r, tmeta, false); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
@@ -66,5 +90,18 @@ func TestTransformJSONMarshal(t *testing.T) {
 	}
 	if got := string(gotBs); got != want {
 		t.Fatalf("wanted body %q, got %q", want, got)
+	}
+}
+
+func BenchmarkTransformJSONMarshal(b *testing.B) {
+	b.ReportAllocs()
+
+	tmeta, in := testPrepareTransformJSONMarshal(b)
+
+	for i := 0; i < b.N; i++ {
+		r := testReq(b, "GET", "/", in)
+		if err := transformBody(r, tmeta, false); err != nil {
+			b.Fatalf("wanted nil error, got %v", err)
+		}
 	}
 }

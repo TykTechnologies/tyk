@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -71,6 +72,7 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 type testHttpResponse struct {
 	Method  string
 	Url     string
+	Body    string
 	Headers map[string]string
 	Form    map[string]string
 }
@@ -127,11 +129,15 @@ func testHttpHandler() *mux.Router {
 			return
 		}
 		r.URL.Opaque = r.URL.RawPath
+		w.Header().Set("X-Tyk-Mock", "1")
+		body, _ := ioutil.ReadAll(r.Body)
+
 		err := json.NewEncoder(w).Encode(testHttpResponse{
 			Method:  r.Method,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
 			Form:    firstVals(r.Form),
+			Body:    string(body),
 		})
 		if err != nil {
 			httpError(w, http.StatusInternalServerError)
@@ -177,7 +183,7 @@ const jwkTestJson = `{
 
 func withAuth(r *http.Request) *http.Request {
 	// This is the default config secret
-	r.Header.Set("x-tyk-authorization", config.Global.Secret)
+	r.Header.Set("x-tyk-authorization", config.Global().Secret)
 	return r
 }
 
@@ -192,7 +198,7 @@ func createSession(sGen ...func(s *user.SessionState)) string {
 		key = session.Certificate
 	}
 
-	FallbackKeySesionManager.UpdateSession(key, session, 60)
+	FallbackKeySesionManager.UpdateSession(key, session, 60, false)
 	return key
 }
 
@@ -290,20 +296,28 @@ type tykTestServer struct {
 func (s *tykTestServer) Start() {
 	s.ln, _ = generateListener(0)
 	_, port, _ := net.SplitHostPort(s.ln.Addr().String())
-	config.Global.ListenPort, _ = strconv.Atoi(port)
+	globalConf := config.Global()
+	globalConf.ListenPort, _ = strconv.Atoi(port)
 
 	if s.config.sepatateControlAPI {
 		s.cln, _ = net.Listen("tcp", "127.0.0.1:0")
 
 		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
-		config.Global.ControlAPIPort, _ = strconv.Atoi(port)
+		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
+
+	config.SetGlobal(globalConf)
 
 	setupGlobals()
 	// This is emulate calling start()
 	// But this lines is the only thing needed for this tests
-	if config.Global.ControlAPIPort == 0 {
+	if config.Global().ControlAPIPort == 0 {
 		loadAPIEndpoints(mainRouter)
+	}
+	// Set up a default org manager so we can traverse non-live paths
+	if !config.Global().SupressDefaultOrgStore {
+		DefaultOrgStore.Init(getGlobalStorageHandler("orgkey.", false))
+		DefaultQuotaStore.Init(getGlobalStorageHandler("orgkey.", false))
 	}
 
 	if s.config.hotReload {
@@ -313,6 +327,7 @@ func (s *tykTestServer) Start() {
 	}
 
 	s.URL = "http://" + s.ln.Addr().String()
+	s.globalConfig = globalConf
 }
 
 func (s *tykTestServer) Close() {
@@ -320,13 +335,15 @@ func (s *tykTestServer) Close() {
 
 	if s.config.sepatateControlAPI {
 		s.cln.Close()
-		config.Global.ControlAPIPort = 0
+		globalConf := config.Global()
+		globalConf.ControlAPIPort = 0
+		config.SetGlobal(globalConf)
 	}
 }
 
 func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	scheme := "http://"
-	if config.Global.HttpServerOptions.UseSSL {
+	if s.globalConfig.HttpServerOptions.UseSSL {
 		scheme = "https://"
 	}
 
@@ -340,8 +357,8 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	if tc.ControlRequest {
 		if s.config.sepatateControlAPI {
 			baseUrl = scheme + s.cln.Addr().String()
-		} else if config.Global.ControlAPIHostname != "" {
-			baseUrl = strings.Replace(baseUrl, "127.0.0.1", config.Global.ControlAPIHostname, 1)
+		} else if s.globalConfig.ControlAPIHostname != "" {
+			baseUrl = strings.Replace(baseUrl, "127.0.0.1", s.globalConfig.ControlAPIHostname, 1)
 		}
 	}
 
@@ -353,13 +370,17 @@ func (s *tykTestServer) Do(tc test.TestCase) (*http.Response, error) {
 	}
 
 	if tc.Client == nil {
-		tc.Client = http.DefaultClient
+		tc.Client = &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
 	}
 
 	return tc.Client.Do(req)
 }
 
-func (s *tykTestServer) Run(t *testing.T, testCases ...test.TestCase) (*http.Response, error) {
+func (s *tykTestServer) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, error) {
 	var lastResponse *http.Response
 	var lastError error
 
@@ -381,7 +402,8 @@ func (s *tykTestServer) Run(t *testing.T, testCases ...test.TestCase) (*http.Res
 			continue
 		}
 
-		if lastError = test.AssertResponse(lastResponse, tc); lastError != nil {
+		respCopy := copyResponse(lastResponse)
+		if lastError = test.AssertResponse(respCopy, tc); lastError != nil {
 			t.Errorf("[%d] %s. %s", ti, lastError.Error(), string(tcJSON))
 		}
 
@@ -518,17 +540,21 @@ func buildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func loadAPI(specs ...*APISpec) (out []*APISpec) {
-	oldPath := config.Global.AppPath
-	config.Global.AppPath, _ = ioutil.TempDir("", "apps")
+	globalConf := config.Global()
+	oldPath := globalConf.AppPath
+	globalConf.AppPath, _ = ioutil.TempDir("", "apps")
+	config.SetGlobal(globalConf)
 
 	defer func() {
-		os.RemoveAll(config.Global.AppPath)
-		config.Global.AppPath = oldPath
+		globalConf := config.Global()
+		os.RemoveAll(globalConf.AppPath)
+		globalConf.AppPath = oldPath
+		config.SetGlobal(globalConf)
 	}()
 
 	for i, spec := range specs {
 		specBytes, _ := json.Marshal(spec)
-		specFilePath := filepath.Join(config.Global.AppPath, spec.APIID+strconv.Itoa(i)+".json")
+		specFilePath := filepath.Join(config.Global().AppPath, spec.APIID+strconv.Itoa(i)+".json")
 		if err := ioutil.WriteFile(specFilePath, specBytes, 0644); err != nil {
 			panic(err)
 		}
@@ -604,4 +630,98 @@ func initDNSMock() {
 			},
 		}).DialContext,
 	}
+}
+
+// Taken from https://medium.com/@mlowicki/http-s-proxy-in-golang-in-less-than-100-lines-of-code-6a51c2f2c38c
+type httpProxyHandler struct {
+	proto    string
+	URL      string
+	server   *http.Server
+	listener net.Listener
+}
+
+func (p *httpProxyHandler) handleTunneling(w http.ResponseWriter, r *http.Request) {
+	dest_conn, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return
+	}
+	client_conn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	}
+	go p.transfer(dest_conn, client_conn)
+	go p.transfer(client_conn, dest_conn)
+}
+
+func (p *httpProxyHandler) transfer(destination io.WriteCloser, source io.ReadCloser) {
+	defer destination.Close()
+	defer source.Close()
+	io.Copy(destination, source)
+}
+func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) {
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer resp.Body.Close()
+	p.copyHeader(w.Header(), resp.Header)
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+func (p *httpProxyHandler) Stop() error {
+	return p.server.Close()
+}
+
+func (p *httpProxyHandler) copyHeader(dst, src http.Header) {
+	for k, vv := range src {
+		for _, v := range vv {
+			dst.Add(k, v)
+		}
+	}
+}
+
+func initProxy(proto string, tlsConfig *tls.Config) *httpProxyHandler {
+	proxy := &httpProxyHandler{proto: proto}
+
+	proxy.server = &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodConnect {
+				proxy.handleTunneling(w, r)
+			} else {
+				proxy.handleHTTP(w, r)
+			}
+		}),
+		// Disable HTTP/2.
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+	}
+
+	var err error
+
+	switch proto {
+	case "http":
+		proxy.listener, err = net.Listen("tcp", ":0")
+	case "https":
+		proxy.listener, err = tls.Listen("tcp", ":0", tlsConfig)
+	default:
+		log.Fatal("Unsupported proto scheme", proto)
+	}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	proxy.URL = proto + "://" + proxy.listener.Addr().String()
+
+	go proxy.server.Serve(proxy.listener)
+
+	return proxy
 }

@@ -22,10 +22,7 @@ function testVirtData(request, session, config) {
 }
 `
 
-func TestVirtualEndpoint(t *testing.T) {
-	ts := newTykTestServer()
-	defer ts.Close()
-
+func testPrepareVirtualEndpoint() {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 
@@ -56,6 +53,13 @@ func TestVirtualEndpoint(t *testing.T) {
 			CacheAllSafeRequests: true,
 		}
 	})
+}
+
+func TestVirtualEndpoint(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareVirtualEndpoint()
 
 	ts.Run(t, test.TestCase{
 		Path:      "/virt",
@@ -66,4 +70,25 @@ func TestVirtualEndpoint(t *testing.T) {
 			"data-bar-y": "3",
 		},
 	})
+}
+
+func BenchmarkVirtualEndpoint(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareVirtualEndpoint()
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Path:      "/virt",
+			Code:      202,
+			BodyMatch: "foobar",
+			HeadersMatch: map[string]string{
+				"data-foo":   "x",
+				"data-bar-y": "3",
+			},
+		})
+	}
 }

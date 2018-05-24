@@ -179,8 +179,8 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if ServiceCache == nil {
 			log.Debug("[PROXY] Service cache initialising")
 			expiry := 120
-			if config.Global.ServiceDiscovery.DefaultCacheTimeout > 0 {
-				expiry = config.Global.ServiceDiscovery.DefaultCacheTimeout
+			if spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout > 0 {
+				expiry = spec.GlobalConfig.ServiceDiscovery.DefaultCacheTimeout
 			}
 			ServiceCache = cache.New(time.Duration(expiry)*time.Second, 15*time.Second)
 		}
@@ -253,7 +253,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 			req.Header.Set("User-Agent", defaultUserAgent)
 		}
 
-		if config.Global.HttpServerOptions.SkipTargetPathEscaping {
+		if spec.GlobalConfig.HttpServerOptions.SkipTargetPathEscaping {
 			// force RequestURI to skip escaping if API's proxy is set for this
 			// if we set opaque here it will force URL.RequestURI to skip escaping
 			if req.URL.RawPath != "" {
@@ -268,7 +268,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 	proxy := &ReverseProxy{
 		Director:      director,
 		TykAPISpec:    spec,
-		FlushInterval: time.Duration(config.Global.HttpServerOptions.FlushInterval) * time.Millisecond,
+		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
 	}
 	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{spec, proxy}
 	return proxy
@@ -306,14 +306,13 @@ func defaultTransport() *http.Transport {
 	// allocate a new one every time for now, to avoid modifying a
 	// global variable for each request's needs (e.g. timeouts).
 	return &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		}).DialContext,
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: config.Global.MaxIdleConnsPerHost, // default is 100
+		MaxIdleConns:        config.Global().MaxIdleConns,
+		MaxIdleConnsPerHost: config.Global().MaxIdleConnsPerHost, // default is 100
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
 }
@@ -360,7 +359,7 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, recordDetail(req))
+	return p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
 	// return nil
 }
 
@@ -370,7 +369,7 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
 	if !spec.EnforcedTimeoutEnabled {
-		return false, config.Global.ProxyDefaultTimeout
+		return false, spec.GlobalConfig.ProxyDefaultTimeout
 	}
 
 	_, versionPaths, _, _ := spec.Version(req)
@@ -381,7 +380,7 @@ func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request
 		return true, *intMeta
 	}
 
-	return false, config.Global.ProxyDefaultTimeout
+	return false, spec.GlobalConfig.ProxyDefaultTimeout
 }
 
 func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *http.Request) bool {
@@ -421,12 +420,46 @@ func (p *ReverseProxy) CheckCircuitBreakerEnforced(spec *APISpec, req *http.Requ
 	return false, nil
 }
 
+func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
+	return func(req *http.Request) (*url.URL, error) {
+		if api != nil && api.Proxy.Transport.ProxyURL != "" {
+			return url.Parse(api.Proxy.Transport.ProxyURL)
+		}
+		return http.ProxyFromEnvironment(req)
+	}
+}
+
 func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *ReverseProxy) http.RoundTripper {
 	transport := defaultTransport() // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
+	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
-	if config.Global.ProxySSLInsecureSkipVerify {
+	if config.Global().ProxySSLInsecureSkipVerify {
 		transport.TLSClientConfig.InsecureSkipVerify = true
+	}
+
+	// When request routed through the proxy `DialTLS` is not used, and only VerifyPeerCertificate is supported
+	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
+	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
+		transport.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+	} else {
+		transport.DialTLS = dialTLSPinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
+	}
+
+	if p.TykAPISpec.GlobalConfig.ProxySSLMinVersion > 0 {
+		transport.TLSClientConfig.MinVersion = p.TykAPISpec.GlobalConfig.ProxySSLMinVersion
+	}
+
+	if p.TykAPISpec.Proxy.Transport.SSLMinVersion > 0 {
+		transport.TLSClientConfig.MinVersion = p.TykAPISpec.Proxy.Transport.SSLMinVersion
+	}
+
+	if len(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites) > 0 {
+		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.GlobalConfig.ProxySSLCipherSuites)
+	}
+
+	if len(p.TykAPISpec.Proxy.Transport.SSLCipherSuites) > 0 {
+		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
 	}
 
 	// Use the default unless we've modified the timout
@@ -439,9 +472,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.ResponseHeaderTimeout = time.Duration(timeOut) * time.Second
 	}
 
-	if config.Global.CloseConnections {
-		transport.DisableKeepAlives = true
-	}
+	transport.DisableKeepAlives = p.TykAPISpec.GlobalConfig.ProxyCloseConnections
 
 	if IsWebsocket(req) {
 		wsTransport := &WSDialer{transport, rw, p.TLSClientConfig}
@@ -456,13 +487,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.TykAPISpec.Lock()
 
 	createTransport := p.TykAPISpec.HTTPTransport == nil
-	if !createTransport && config.Global.MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global.MaxConnTime)*time.Second
+
+	if !createTransport && config.Global().MaxConnTime != 0 {
+		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
 	}
 
 	if createTransport {
 		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
 		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+		p.TykAPISpec.HTTPTransportCreated = time.Now()
 	} else if IsWebsocket(req) { // check if it is an upgrade request to NEW WS-connection
 		// overwrite transport's ResponseWriter from previous upgrade request
 		// as it was already hijacked and now is being used for other connection
@@ -573,7 +606,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return nil
 		}
 		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
-		if err != nil || res.StatusCode == 500 {
+		if err != nil || res.StatusCode == http.StatusInternalServerError {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
@@ -618,11 +651,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return nil
 		}
 		if strings.Contains(err.Error(), "no such host") {
-			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", 500)
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError)
 			return nil
 		}
 
-		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", 500)
+		p.ErrorHandler.HandleError(rw, logreq, "There was a problem proxying the request", http.StatusInternalServerError)
 		return nil
 
 	}
@@ -685,7 +718,7 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	defer res.Body.Close()
 
 	// Close connections
-	if config.Global.CloseConnections {
+	if config.Global().CloseConnections {
 		res.Header.Set("Connection", "close")
 	}
 
@@ -788,26 +821,6 @@ func (m *maxLatencyWriter) flushLoop() {
 }
 
 func (m *maxLatencyWriter) stop() { m.done <- true }
-
-func requestIP(r *http.Request) string {
-	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-		return realIP
-	}
-	if fw := r.Header.Get("X-Forwarded-For"); fw != "" {
-		// X-Forwarded-For has no port
-		if i := strings.IndexByte(fw, ','); i >= 0 {
-			return fw[:i]
-		}
-		return fw
-	}
-
-	// From net/http.Request.RemoteAddr:
-	//   The HTTP server in this package sets RemoteAddr to an
-	//   "IP:port" address before invoking a handler.
-	// So we can ignore the case of the port missing.
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host
-}
 
 func requestIPHops(r *http.Request) string {
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)

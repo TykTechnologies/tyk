@@ -94,7 +94,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 403 {
+	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
 		reLogin()
@@ -161,7 +161,7 @@ func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
 		return LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
+	store := &RPCStorageHandler{UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
 	if !store.Connect() {
 		return nil
 	}

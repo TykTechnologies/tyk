@@ -18,4 +18,5 @@ message MiniRequestObject {
   ReturnOverrides return_overrides = 10;
   string method = 11;
   string request_uri = 12;
+  string proto = 13;
 }

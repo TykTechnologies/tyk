@@ -100,8 +100,7 @@ func genCertificateFromCommonName(cn string) ([]byte, []byte) {
 }
 
 func leafSubjectName(cert *tls.Certificate) string {
-	x509сert, _ := x509.ParseCertificate(cert.Certificate[0])
-	return x509сert.Subject.CommonName
+	return cert.Leaf.Subject.CommonName
 }
 
 func TestAddCertificate(t *testing.T) {
@@ -111,25 +110,34 @@ func TestAddCertificate(t *testing.T) {
 	cert2Pem, key2Pem := genCertificateFromCommonName("test2")
 	combinedPem := append(cert2Pem, key2Pem...)
 	combinedPemWrongPrivate := append(cert2Pem, keyPem...)
+	priv, _ := rsa.GenerateKey(rand.Reader, 512)
+	privDer, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
+	pubID := HexSHA256(privDer)
 
-	certRaw, _ := pem.Decode(cert2Pem)
+	certRaw, _ := pem.Decode(certPem)
 	certID := HexSHA256(certRaw.Bytes)
 
+	cert2Raw, _ := pem.Decode(cert2Pem)
+	cert2ID := HexSHA256(cert2Raw.Bytes)
+
 	tests := [...]struct {
-		data []byte
-		err  string
+		data   []byte
+		certID string
+		err    string
 	}{
-		{[]byte(""), "Failed to decode certificate. It should be PEM encoded."},
-		{[]byte("-----BEGIN PRIVATE KEY-----\nYQ==\n-----END PRIVATE KEY-----"), "Failed to decode certificate. It should be PEM encoded."},
-		{[]byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), "Error while parsing certificate: asn1: syntax error"},
-		{certPem, ""},
-		{combinedPemWrongPrivate, "tls: private key does not match public key"},
-		{combinedPem, ""},
-		{combinedPem, "Certificate with " + certID + " id already exists"},
+		{[]byte(""), "", "Failed to decode certificate. It should be PEM encoded."},
+		{[]byte("-----BEGIN PRIVATE KEY-----\nYQ==\n-----END PRIVATE KEY-----"), "", "Failed to decode certificate. It should be PEM encoded."},
+		{[]byte("-----BEGIN CERTIFICATE-----\nYQ==\n-----END CERTIFICATE-----"), "", "Error while parsing certificate: asn1: syntax error"},
+		{certPem, certID, ""},
+		{combinedPemWrongPrivate, "", "tls: private key does not match public key"},
+		{combinedPem, cert2ID, ""},
+		{combinedPem, "", "Certificate with " + cert2ID + " id already exists"},
+		{pubPem, pubID, ""},
 	}
 
 	for _, tc := range tests {
-		_, err := m.Add(tc.data, "")
+		cid, err := m.Add(tc.data, "")
 		if tc.err != "" {
 			if err == nil {
 				t.Error("Should error with", tc.err)
@@ -142,6 +150,10 @@ func TestAddCertificate(t *testing.T) {
 			if err != nil {
 				t.Error("Should not error", err)
 			}
+		}
+
+		if cid != tc.certID {
+			t.Error("Wrong certficate ID:", cid, tc.certID)
 		}
 	}
 }
@@ -163,6 +175,11 @@ func TestCertificateStorage(t *testing.T) {
 
 	storageCert, _ := genCertificateFromCommonName("dummy")
 	storageCertID, _ := m.Add(storageCert, "")
+
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privDer, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	pubPem := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: privDer})
+	publicKeyID, _ := m.Add(pubPem, "")
 
 	t.Run("File certificates", func(t *testing.T) {
 		certs := m.List([]string{certPath, "wrong"}, CertificatePublic)
@@ -203,6 +220,18 @@ func TestCertificateStorage(t *testing.T) {
 		}
 
 		if leafSubjectName(certs[0]) != "private" || isPrivateKeyEmpty(certs[0]) {
+			t.Error("Wrong cert", leafSubjectName(certs[0]))
+		}
+	})
+
+	t.Run("Public keys", func(t *testing.T) {
+		certs := m.List([]string{publicKeyID}, CertificateAny)
+
+		if len(certs) != 1 {
+			t.Error("Should return only private certificate")
+		}
+
+		if leafSubjectName(certs[0]) != ("Public Key: " + publicKeyID) {
 			t.Error("Wrong cert", leafSubjectName(certs[0]))
 		}
 	})

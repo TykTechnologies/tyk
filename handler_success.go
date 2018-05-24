@@ -12,7 +12,7 @@ import (
 
 	cache "github.com/pmylund/go-cache"
 
-	"fmt"
+	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -60,7 +60,7 @@ func tagHeaders(r *http.Request, th []string, tags []string) []string {
 
 		if ok {
 			for _, val := range v {
-				tagName := fmt.Sprintf("%s-%s", cleanK, val)
+				tagName := cleanK + "-" + val
 				tags = append(tags, tagName)
 			}
 		}
@@ -69,11 +69,11 @@ func tagHeaders(r *http.Request, th []string, tags []string) []string {
 	return tags
 }
 
-func addVersionHeader(w http.ResponseWriter, r *http.Request) {
+func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.Config) {
 	if ctxGetDefaultVersion(r) {
 		if vinfo := ctxGetVersionInfo(r); vinfo != nil {
-			if config.Global.VersionHeader != "" {
-				w.Header().Set(config.Global.VersionHeader, vinfo.Name)
+			if globalConf.VersionHeader != "" {
+				w.Header().Set(globalConf.VersionHeader, vinfo.Name)
 			}
 		}
 	}
@@ -85,8 +85,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		return
 	}
 
-	ip := requestIP(r)
-	if config.Global.StoreAnalytics(ip) {
+	ip := request.RealIP(r)
+	if s.Spec.GlobalConfig.StoreAnalytics(ip) {
 
 		t := time.Now()
 
@@ -118,7 +118,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		rawRequest := ""
 		rawResponse := ""
 
-		if recordDetail(r) {
+		if recordDetail(r, s.Spec.GlobalConfig) {
 			// Get the wire format representation
 			var wireFormatReq bytes.Buffer
 			requestCopy.Write(&wireFormatReq)
@@ -177,7 +177,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		record.GetGeo(ip)
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
-		if config.Global.EnforceOrgDataAge {
+		if s.Spec.GlobalConfig.EnforceOrgDataAge {
 			orgExpireDataTime := s.OrgSessionExpiry(s.Spec.OrgID)
 
 			if orgExpireDataTime > 0 {
@@ -187,7 +187,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		record.SetExpiry(expiresAfter)
 
-		if config.Global.AnalyticsConfig.NormaliseUrls.Enabled {
+		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
 			record.NormalisePath()
 		}
 
@@ -202,17 +202,17 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 	}
 }
 
-func recordDetail(r *http.Request) bool {
+func recordDetail(r *http.Request, globalConf config.Config) bool {
 	// Are we even checking?
-	if !config.Global.EnforceOrgDataDeailLogging {
-		return config.Global.AnalyticsConfig.EnableDetailedRecording
+	if !globalConf.EnforceOrgDataDetailLogging {
+		return globalConf.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// We are, so get session data
 	ses := r.Context().Value(OrgSessionContext)
 	if ses == nil {
 		// no session found, use global config
-		return config.Global.AnalyticsConfig.EnableDetailedRecording
+		return globalConf.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// Session found
@@ -232,10 +232,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		log.Debug("Upstream Path is: ", r.URL.Path)
 	}
 
-	addVersionHeader(w, r)
+	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
 	var copiedRequest *http.Request
-	if recordDetail(r) {
+	if recordDetail(r, s.Spec.GlobalConfig) {
 		copiedRequest = copyRequest(r)
 	}
 
@@ -248,7 +248,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	if resp != nil {
 		var copiedResponse *http.Response
-		if recordDetail(r) {
+		if recordDetail(r, s.Spec.GlobalConfig) {
 			copiedResponse = copyResponse(resp)
 		}
 
@@ -269,7 +269,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	var copiedRequest *http.Request
-	if recordDetail(r) {
+	if recordDetail(r, s.Spec.GlobalConfig) {
 		copiedRequest = copyRequest(r)
 	}
 
@@ -277,10 +277,10 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
 	t2 := time.Now()
 
-	addVersionHeader(w, r)
+	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
 	var copiedResponse *http.Response
-	if recordDetail(r) {
+	if recordDetail(r, s.Spec.GlobalConfig) {
 		copiedResponse = copyResponse(inRes)
 	}
 

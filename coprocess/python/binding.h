@@ -6,7 +6,7 @@ static int Python_Init();
 static void Python_SetEnv(char*);
 
 static int Python_LoadDispatcher();
-static int Python_NewDispatcher(char*, char*, char*);
+static int Python_NewDispatcher(char*);
 static void Python_ReloadDispatcher();
 
 static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage*);

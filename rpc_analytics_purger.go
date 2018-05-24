@@ -72,7 +72,7 @@ func (r *RPCPurger) PurgeCache() {
 	// Send keys to RPC
 	if _, err := RPCFuncClientSingleton.Call("PurgeAnalyticsData", string(data)); err != nil {
 		emitRPCErrorEvent(rpcFuncClientSingletonCall, "PurgeAnalyticsData", err)
-		log.Error("Failed to call purge: ", err)
+		log.Warn("Failed to call purge, retrying: ", err)
 	}
 
 }
@@ -89,9 +89,7 @@ func (r RedisPurger) PurgeLoop(ticker <-chan time.Time) {
 }
 
 func (r *RedisPurger) PurgeCache() {
-	configMu.Lock()
-	expireAfter := config.Global.AnalyticsConfig.StorageExpirationTime
-	configMu.Unlock()
+	expireAfter := config.Global().AnalyticsConfig.StorageExpirationTime
 	if expireAfter == 0 {
 		expireAfter = 60 // 1 minute
 	}

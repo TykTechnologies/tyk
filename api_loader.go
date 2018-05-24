@@ -29,11 +29,11 @@ type ChainObject struct {
 }
 
 func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys}
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
 	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global.HashKeys, UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global.SlaveOptions.APIKey, Address: config.Global.SlaveOptions.ConnectionString}
+	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys, UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
 
 	FallbackKeySesionManager.Init(&redisStore)
 
@@ -175,7 +175,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	case RPCStorageEngine:
 		authStore = rpcAuthStore
 		orgStore = rpcOrgStore
-		config.Global.EnforceOrgDataAge = true
+		spec.GlobalConfig.EnforceOrgDataAge = true
+		globalConf := config.Global()
+		globalConf.EnforceOrgDataAge = true
+		config.SetGlobal(globalConf)
 	}
 
 	sessionStore := redisStore
@@ -199,8 +202,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		loadBundle(spec)
 	}
 
-	// TODO: use config.Global.EnableCoProcess
-	if config.Global.EnableJSVM || EnableCoProcess {
+	// TODO: use config.Global().EnableCoProcess
+	if config.Global().EnableJSVM || EnableCoProcess {
 		log.WithFields(logrus.Fields{
 			"prefix":   "main",
 			"api_name": spec.Name,
@@ -209,7 +212,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		var mwPaths []string
 		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
 
-		if config.Global.EnableJSVM && mwDriver == apidef.OttoDriver {
+		if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 			var pathPrefix string
 			if spec.CustomMiddlewareBundle != "" {
 				pathPrefix = spec.APIID + "-" + spec.CustomMiddlewareBundle
@@ -254,7 +257,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Create the response processors
-	creeateResponseMiddlewareChain(spec)
+	createResponseMiddlewareChain(spec)
 
 	baseMid := BaseMiddleware{spec, proxy}
 	for _, v := range baseMid.Spec.VersionData.Versions {
@@ -297,6 +300,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
@@ -307,6 +311,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
 		mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
@@ -349,6 +354,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
@@ -440,6 +446,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, CacheStore: cacheStore})
@@ -470,6 +477,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		var simpleArray []alice.Constructor
 		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
+		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
@@ -494,7 +502,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	chainDef.ThisHandler = chain
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
 
-	if config.Global.UseRedisLog {
+	if config.Global().UseRedisLog {
 		log.WithFields(logrus.Fields{
 			"prefix":      "gateway",
 			"user_ip":     "--",
@@ -525,7 +533,7 @@ func loadGlobalApps(router *mux.Router) {
 	apisMu.RUnlock()
 	loadApps(specs, router)
 
-	if config.Global.NewRelic.AppName != "" {
+	if config.Global().NewRelic.AppName != "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("Adding NewRelic instrumentation")
@@ -535,7 +543,7 @@ func loadGlobalApps(router *mux.Router) {
 
 // Create the individual API (app) specs based on live configurations and assign middleware
 func loadApps(specs []*APISpec, muxer *mux.Router) {
-	hostname := config.Global.HostName
+	hostname := config.Global().HostName
 	if hostname != "" {
 		muxer = muxer.Host(hostname).Subrouter()
 		log.WithFields(logrus.Fields{
@@ -585,7 +593,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 		return h1 > h2
 	})
 	for _, host := range hosts {
-		if !config.Global.EnableCustomDomains {
+		if !config.Global().EnableCustomDomains {
 			continue // disabled
 		}
 		if hostRouters[host] != nil {
@@ -652,7 +660,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 	log.Debug("Checker host list")
 
 	// Kick off our host checkers
-	if !config.Global.UptimeTests.Disable {
+	if !config.Global().UptimeTests.Disable {
 		SetCheckerHostList()
 	}
 

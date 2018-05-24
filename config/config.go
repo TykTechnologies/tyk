@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"sync"
+	"sync/atomic"
 
 	"github.com/kelseyhightower/envconfig"
 
@@ -16,7 +18,8 @@ import (
 
 var log = logger.Get()
 
-var Global Config
+var global atomic.Value
+var globalMu sync.Mutex
 
 type PoliciesConfig struct {
 	PolicySource           string `json:"policy_source"`
@@ -32,16 +35,18 @@ type DBAppConfOptionsConfig struct {
 }
 
 type StorageOptionsConf struct {
-	Type          string            `json:"type"`
-	Host          string            `json:"host"`
-	Port          int               `json:"port"`
-	Hosts         map[string]string `json:"hosts"`
-	Username      string            `json:"username"`
-	Password      string            `json:"password"`
-	Database      int               `json:"database"`
-	MaxIdle       int               `json:"optimisation_max_idle"`
-	MaxActive     int               `json:"optimisation_max_active"`
-	EnableCluster bool              `json:"enable_cluster"`
+	Type                  string            `json:"type"`
+	Host                  string            `json:"host"`
+	Port                  int               `json:"port"`
+	Hosts                 map[string]string `json:"hosts"`
+	Username              string            `json:"username"`
+	Password              string            `json:"password"`
+	Database              int               `json:"database"`
+	MaxIdle               int               `json:"optimisation_max_idle"`
+	MaxActive             int               `json:"optimisation_max_active"`
+	EnableCluster         bool              `json:"enable_cluster"`
+	UseSSL                bool              `json:"use_ssl"`
+	SSLInsecureSkipVerify bool              `json:"ssl_insecure_skip_verify"`
 }
 
 type NormalisedURLConfig struct {
@@ -171,6 +176,7 @@ type CertificatesConfig struct {
 type SecurityConfig struct {
 	PrivateCertificateEncodingSecret string             `json:"private_certificate_encoding_secret"`
 	ControlAPIUseMutualTLS           bool               `json:"control_api_use_mutual_tls"`
+	PinnedPublicKeys                 map[string]string  `json:"pinned_public_keys"`
 	Certificates                     CertificatesConfig `json:"certificates"`
 }
 
@@ -223,7 +229,7 @@ type Config struct {
 	StatsdConnectionString            string                                `json:"statsd_connection_string"`
 	StatsdPrefix                      string                                `json:"statsd_prefix"`
 	EnforceOrgDataAge                 bool                                  `json:"enforce_org_data_age"`
-	EnforceOrgDataDeailLogging        bool                                  `json:"enforce_org_data_detail_logging"`
+	EnforceOrgDataDetailLogging       bool                                  `json:"enforce_org_data_detail_logging"`
 	EnforceOrgQuotas                  bool                                  `json:"enforce_org_quotas"`
 	ExperimentalProcessOrgOffThread   bool                                  `json:"experimental_process_org_off_thread"`
 	EnableNonTransactionalRateLimiter bool                                  `json:"enable_non_transactional_rate_limiter"`
@@ -233,12 +239,14 @@ type Config struct {
 	Monitor                           MonitorConfig                         `json:"monitor"`
 	OauthRefreshExpire                int64                                 `json:"oauth_refresh_token_expire"`
 	OauthTokenExpire                  int32                                 `json:"oauth_token_expire"`
+	OauthTokenExpiredRetainPeriod     int32                                 `json:"oauth_token_expired_retain_period"`
 	OauthRedirectUriSeparator         string                                `json:"oauth_redirect_uri_separator"`
 	SlaveOptions                      SlaveOptionsConfig                    `json:"slave_options"`
 	DisableVirtualPathBlobs           bool                                  `json:"disable_virtual_path_blobs"`
 	LocalSessionCache                 LocalSessionCacheConf                 `json:"local_session_cache"`
 	HttpServerOptions                 HttpServerOptionsConfig               `json:"http_server_options"`
 	ServiceDiscovery                  ServiceDiscoveryConf                  `json:"service_discovery"`
+	ProxyCloseConnections             bool                                  `json:"proxy_close_connections"`
 	CloseConnections                  bool                                  `json:"close_connections"`
 	AuthOverride                      AuthOverrideConf                      `json:"auth_override"`
 	UptimeTests                       UptimeTestsConfig                     `json:"uptime_tests"`
@@ -264,16 +272,21 @@ type Config struct {
 	EnableBundleDownloader            bool                                  `bson:"enable_bundle_downloader" json:"enable_bundle_downloader"`
 	AllowRemoteConfig                 bool                                  `bson:"allow_remote_config" json:"allow_remote_config"`
 	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
+	MaxIdleConns                      int                                   `bson:"max_idle_connections" json:"max_idle_connections"`
 	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	MaxConnTime                       int64                                 `json:"max_conn_time"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	ProxySSLInsecureSkipVerify        bool                                  `json:"proxy_ssl_insecure_skip_verify"`
+	ProxySSLMinVersion                uint16                                `json:"proxy_ssl_min_version"`
+	ProxySSLCipherSuites              []string                              `json:"proxy_ssl_ciphers"`
 	ProxyDefaultTimeout               int                                   `json:"proxy_default_timeout"`
 	LogLevel                          string                                `json:"log_level"`
 	Security                          SecurityConfig                        `json:"security"`
 	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
 	NewRelic                          NewRelicConfig                        `json:"newrelic"`
 	VersionHeader                     string                                `json:"version_header"`
+	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
+	MinTokenLength                    int                                   `json:"min_token_length"`
 }
 
 type CertData struct {
@@ -313,6 +326,20 @@ var Default = Config{
 	AnalyticsConfig: AnalyticsConfigConfig{
 		IgnoredIPs: make([]string, 0),
 	},
+}
+
+func init() {
+	SetGlobal(Config{})
+}
+
+func Global() Config {
+	return global.Load().(Config)
+}
+
+func SetGlobal(conf Config) {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+	global.Store(conf)
 }
 
 func WriteConf(path string, conf *Config) error {

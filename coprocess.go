@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	// EnableCoProcess will be overridden by config.Global.EnableCoProcess.
+	// EnableCoProcess will be overridden by config.Global().EnableCoProcess.
 	EnableCoProcess = false
 
 	// GlobalDispatcher will be implemented by the current CoProcess driver.
@@ -101,6 +101,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		},
 		Method:     r.Method,
 		RequestUri: r.RequestURI,
+		Proto:      r.Proto,
 	}
 
 	object := &coprocess.Object{
@@ -133,9 +134,15 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 
 	// Encode the session object (if not a pre-process & not a custom key check):
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
-		session := ctxGetSession(r)
-		if session != nil {
+		if session := ctxGetSession(r); session != nil {
 			object.Session = ProtoSessionState(session)
+			// If the session contains metadata, add items to the object's metadata map:
+			if len(session.MetaData) > 0 {
+				object.Metadata = make(map[string]string)
+				for k, v := range session.MetaData {
+					object.Metadata[k] = v.(string)
+				}
+			}
 		}
 	}
 
@@ -170,8 +177,11 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
 func CoProcessInit() error {
+	if runningTests && GlobalDispatcher != nil {
+		return nil
+	}
 	var err error
-	if config.Global.CoProcessOptions.EnableCoProcess {
+	if config.Global().CoProcessOptions.EnableCoProcess {
 		GlobalDispatcher, err = NewCoProcessDispatcher()
 		EnableCoProcess = true
 	}
@@ -181,7 +191,7 @@ func CoProcessInit() error {
 // EnabledForSpec checks if this middleware should be enabled for a given API.
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	// This flag is true when Tyk has been compiled with CP support and when the configuration enables it.
-	enableCoProcess := config.Global.CoProcessOptions.EnableCoProcess && EnableCoProcess
+	enableCoProcess := config.Global().CoProcessOptions.EnableCoProcess && EnableCoProcess
 	// This flag indicates if the current spec specifies any CP custom middleware.
 	var usesCoProcessMiddleware bool
 
@@ -307,10 +317,14 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		returnedSession := TykSessionState(returnObject.Session)
 
+		// If the returned object contains metadata, add them to the session:
+		for k, v := range returnObject.Metadata {
+			returnedSession.MetaData[k] = string(v)
+		}
 		if extractor == nil {
 			sessionLifetime := returnedSession.Lifetime(m.Spec.SessionLifetime)
 			// This API is not using the ID extractor, but we've got a session:
-			m.Spec.SessionManager.UpdateSession(token, returnedSession, sessionLifetime)
+			m.Spec.SessionManager.UpdateSession(token, returnedSession, sessionLifetime, false)
 			ctxSetSession(r, returnedSession)
 			ctxSetAuthToken(r, token)
 		} else {

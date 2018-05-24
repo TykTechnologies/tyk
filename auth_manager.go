@@ -29,9 +29,9 @@ type AuthorisationHandler interface {
 // user.SessionState objects, not identity
 type SessionHandler interface {
 	Init(store storage.Handler)
-	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64) error
-	RemoveSession(keyName string)
-	SessionDetail(keyName string) (user.SessionState, bool)
+	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
+	RemoveSession(keyName string, hashed bool)
+	SessionDetail(keyName string, hashed bool) (user.SessionState, bool)
 	Sessions(filter string) []string
 	Store() storage.Handler
 	ResetQuota(string, *user.SessionState)
@@ -44,7 +44,8 @@ type DefaultAuthorisationManager struct {
 }
 
 type DefaultSessionManager struct {
-	store storage.Handler
+	store       storage.Handler
+	asyncWrites bool
 }
 
 func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
@@ -83,6 +84,7 @@ func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) 
 }
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
+	b.asyncWrites = config.Global().UseAsyncSessionWrite
 	b.store = store
 	b.store.Connect()
 }
@@ -109,7 +111,8 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 }
 
 // UpdateSession updates the session state in the storage engine
-func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64) error {
+func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
+	resetTTLTo int64, hashed bool) error {
 	if !session.HasChanged() {
 		log.Debug("Session has not changed, not updating")
 		return nil
@@ -118,21 +121,45 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 	v, _ := json.Marshal(session)
 
 	// Keep the TTL
-	if config.Global.UseAsyncSessionWrite {
+	if b.asyncWrites {
+		if hashed {
+			go b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
+			return nil
+		}
+
 		go b.store.SetKey(keyName, string(v), resetTTLTo)
 		return nil
 	}
+
+	if hashed {
+		return b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
+	}
+
 	return b.store.SetKey(keyName, string(v), resetTTLTo)
 }
 
-func (b *DefaultSessionManager) RemoveSession(keyName string) {
-	b.store.DeleteKey(keyName)
+// RemoveSession removes session from storage
+func (b *DefaultSessionManager) RemoveSession(keyName string, hashed bool) {
+	if hashed {
+		b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
+	} else {
+		b.store.DeleteKey(keyName)
+	}
 }
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
-func (b *DefaultSessionManager) SessionDetail(keyName string) (user.SessionState, bool) {
-	jsonKeyVal, err := b.store.GetKey(keyName)
+func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user.SessionState, bool) {
+	var jsonKeyVal string
+	var err error
 	var session user.SessionState
+
+	// get session by key
+	if hashed {
+		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
+	} else {
+		jsonKeyVal, err = b.store.GetKey(keyName)
+	}
+
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix":      "auth-mgr",

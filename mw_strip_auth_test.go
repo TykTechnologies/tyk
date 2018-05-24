@@ -28,8 +28,7 @@ func randStringBytes(n int) string {
 	return string(b)
 }
 
-func TestStripAuth_stripFromHeaders(t *testing.T) {
-
+func testPrepareStripAuthStripFromHeaders() ([]string, []TestAuth) {
 	testCases := []TestAuth{
 		{Auth: apidef.Auth{AuthHeaderName: "Authorization"}, HeaderKey: "Authorization"},
 		{Auth: apidef.Auth{AuthHeaderName: ""}, HeaderKey: "Authorization"},
@@ -42,6 +41,12 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 		"GHI",
 		"Authorisation",
 	}
+
+	return miscHeaders, testCases
+}
+
+func TestStripAuth_stripFromHeaders(t *testing.T) {
+	miscHeaders, testCases := testPrepareStripAuthStripFromHeaders()
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("stripping %+v", tc), func(t *testing.T) {
@@ -81,8 +86,38 @@ func TestStripAuth_stripFromHeaders(t *testing.T) {
 	}
 }
 
-func TestStripAuth_stripFromParams(t *testing.T) {
+func BenchmarkStripAuth_stripFromHeaders(b *testing.B) {
+	b.ReportAllocs()
 
+	miscHeaders, testCases := testPrepareStripAuthStripFromHeaders()
+
+	for i := 0; i < b.N; i++ {
+		for _, tc := range testCases {
+			sa := StripAuth{}
+			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			sa.Spec.Auth = tc.Auth
+
+			req, err := http.NewRequest("GET", "http://example.com", nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			req.Header.Add(tc.HeaderKey, randStringBytes(5))
+
+			if req.Header.Get(tc.HeaderKey) == "" {
+				b.Fatal("headerkey not in headers to start with", tc.HeaderKey)
+			}
+
+			for _, h := range miscHeaders {
+				req.Header.Add(h, randStringBytes(5))
+			}
+
+			sa.stripFromHeaders(req)
+		}
+	}
+}
+
+func testPrepareStripAuthStripFromParams() ([]string, []TestAuth) {
 	testCases := []TestAuth{
 		// ParamName set, use it
 		{Auth: apidef.Auth{UseParam: true, ParamName: "password1"}, QueryParam: "password1"},
@@ -100,6 +135,12 @@ func TestStripAuth_stripFromParams(t *testing.T) {
 		"GHI",
 		"Authorisation",
 	}
+
+	return miscQueryStrings, testCases
+}
+
+func TestStripAuth_stripFromParams(t *testing.T) {
+	miscQueryStrings, testCases := testPrepareStripAuthStripFromParams()
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("stripping %s", tc.QueryParam), func(t *testing.T) {
@@ -137,5 +178,38 @@ func TestStripAuth_stripFromParams(t *testing.T) {
 				t.Error("stripFromParams didn't strip ", sa.Spec.Auth.ParamName)
 			}
 		})
+	}
+}
+
+func BenchmarkStripAuth_stripFromParams(b *testing.B) {
+	b.ReportAllocs()
+
+	miscQueryStrings, testCases := testPrepareStripAuthStripFromParams()
+
+	for i := 0; i < b.N; i++ {
+		for _, tc := range testCases {
+			sa := StripAuth{}
+			sa.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			sa.Spec.Auth = tc.Auth
+
+			req, err := http.NewRequest("GET", "http://example.com/abc", nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			newQs := url.Values{}
+			for _, qs := range miscQueryStrings {
+				newQs.Add(qs, randStringBytes(5))
+			}
+			newQs.Add(tc.QueryParam, randStringBytes(10))
+
+			req.URL.RawQuery = newQs.Encode()
+
+			if req.URL.Query().Get(tc.QueryParam) == "" {
+				b.Fatal("params not present", tc.QueryParam)
+			}
+
+			sa.stripFromParams(req)
+		}
 	}
 }

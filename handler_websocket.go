@@ -12,6 +12,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -32,11 +34,12 @@ type WSDialer struct {
 
 func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
-	if !config.Global.HttpServerOptions.EnableWebSockets {
+	if !config.Global().HttpServerOptions.EnableWebSockets {
 		return nil, errors.New("WebSockets has been disabled on this host")
 	}
 
 	target := canonicalAddr(req.URL)
+	ip := request.RealIP(req)
 
 	// TLS
 	dial := ws.DialContext
@@ -61,10 +64,10 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	d, err := dial(context.TODO(), "tcp", target)
 	if err != nil {
-		http.Error(ws.RW, "Error contacting backend server.", 500)
+		http.Error(ws.RW, "Error contacting backend server.", http.StatusInternalServerError)
 		log.WithFields(logrus.Fields{
 			"path":   target,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Error("Error dialing websocket backend", target, ": ", err)
 		return nil, err
 	}
@@ -72,7 +75,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	hj, ok := ws.RW.(http.Hijacker)
 	if !ok {
-		http.Error(ws.RW, "Not a hijacker?", 500)
+		http.Error(ws.RW, "Not a hijacker?", http.StatusInternalServerError)
 		return nil, errors.New("Not a hjijacker?")
 	}
 
@@ -80,7 +83,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Errorf("Hijack error: %v", err)
 		return nil, err
 	}
@@ -89,7 +92,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := req.Write(d); err != nil {
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Errorf("Error copying request to target: %v", err)
 		return nil, err
 	}
@@ -110,7 +113,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 		err = cerr
 		log.WithFields(logrus.Fields{
 			"path":   req.URL.Path,
-			"origin": requestIP(req),
+			"origin": ip,
 		}).Errorf("Error transmitting request: %v", err)
 	}
 
@@ -118,7 +121,7 @@ func (ws *WSDialer) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func IsWebsocket(req *http.Request) bool {
-	if !config.Global.HttpServerOptions.EnableWebSockets {
+	if !config.Global().HttpServerOptions.EnableWebSockets {
 		return false
 	}
 

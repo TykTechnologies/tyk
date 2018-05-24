@@ -53,12 +53,11 @@ func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
 }
 func (l *CoProcessEventHandler) HandleEvent(em config.EventMessage) {}
 
-func CoProcessInit() {
+func CoProcessInit() error {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Info("Disabled feature")
+	return nil
 }
 
 func doCoprocessReload() {}
-
-func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {}

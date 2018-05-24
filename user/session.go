@@ -1,8 +1,6 @@
 package user
 
 import (
-	"fmt"
-
 	"github.com/spaolacci/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
@@ -89,7 +87,7 @@ func (s *SessionState) Hash() string {
 		log.Error("Error encoding session data: ", err)
 		return ""
 	}
-	return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
+	return string(murmurHasher.Sum(encoded)[:])
 }
 
 func (s *SessionState) HasChanged() bool {
@@ -97,8 +95,8 @@ func (s *SessionState) HasChanged() bool {
 }
 
 func (s *SessionState) Lifetime(fallback int64) int64 {
-	if config.Global.ForceGlobalSessionLifetime {
-		return config.Global.GlobalSessionLifetime
+	if config.Global().ForceGlobalSessionLifetime {
+		return config.Global().GlobalSessionLifetime
 	}
 	if s.SessionLifetime > 0 {
 		return s.SessionLifetime

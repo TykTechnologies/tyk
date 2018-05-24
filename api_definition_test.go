@@ -134,6 +134,34 @@ func TestBlacklist(t *testing.T) {
 	})
 }
 
+func TestConflictingPaths(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			json.Unmarshal([]byte(`[
+				{
+					"path": "/metadata/{id}",
+					"method_actions": {"GET": {"action": "no_action"}}
+				},
+				{
+					"path": "/metadata/purge",
+					"method_actions": {"POST": {"action": "no_action"}}
+				}
+			]`), &v.ExtendedPaths.WhiteList)
+		})
+
+		spec.Proxy.ListenPath = "/"
+	})
+
+	ts.Run(t, []test.TestCase{
+		// Should ignore auth check
+		{Method: "POST", Path: "/customer-servicing/documents/metadata/purge", Code: 200},
+		{Method: "GET", Path: "/customer-servicing/documents/metadata/{id}", Code: 200},
+	}...)
+}
+
 func TestIgnored(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
@@ -206,15 +234,13 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	apisByID = make(map[string]*APISpec)
 	apisMu.Unlock()
 
-	config.Global.UseDBAppConfigs = true
-	config.Global.AllowInsecureConfigs = true
-	config.Global.DBAppConfOptions.ConnectionString = ts.URL
+	globalConf := config.Global()
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	config.SetGlobal(globalConf)
 
-	defer func() {
-		config.Global.UseDBAppConfigs = false
-		config.Global.AllowInsecureConfigs = false
-		config.Global.DBAppConfOptions.ConnectionString = ""
-	}()
+	defer resetTestConfig()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -308,6 +334,42 @@ func TestDefaultVersion(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
+	key := testPrepareDefaultVersion()
+
+	authHeaders := map[string]string{"authorization": key}
+
+	ts.Run(t, []test.TestCase{
+		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
+		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
+		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
+		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+	}...)
+}
+
+func BenchmarkDefaultVersion(b *testing.B) {
+	b.ReportAllocs()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	key := testPrepareDefaultVersion()
+
+	authHeaders := map[string]string{"authorization": key}
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(
+			b,
+			[]test.TestCase{
+				{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
+				{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
+				{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
+				{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+			}...,
+		)
+	}
+}
+
+func testPrepareDefaultVersion() string {
 	buildAndLoadAPI(func(spec *APISpec) {
 		v1 := apidef.VersionInfo{Name: "v1"}
 		v1.Name = "v1"
@@ -328,18 +390,194 @@ func TestDefaultVersion(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})
 
-	key := createSession(func(s *user.SessionState) {
+	return createSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
 			APIID: "test", Versions: []string{"v1", "v2"},
 		}}
 	})
+}
 
-	authHeaders := map[string]string{"authorization": key}
+func TestGetVersionFromRequest(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
 
-	ts.Run(t, []test.TestCase{
-		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
-		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
-		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
-		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
-	}...)
+	versionInfo := apidef.VersionInfo{}
+	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar"}
+
+	t.Run("Header location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionData.Versions["v1"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
+			{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+		}...)
+	})
+
+	t.Run("URL param location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Key = "version"
+			spec.VersionData.Versions["v2"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo?version=v2", Code: 200},
+			{Path: "/bar?version=v2", Code: 403},
+		}...)
+	})
+
+	t.Run("URL location", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url"
+			spec.VersionData.Versions["v3"] = versionInfo
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/v3/foo", Code: 200},
+			{Path: "/v3/bar", Code: 403},
+		}...)
+	})
+}
+
+func BenchmarkGetVersionFromRequest(b *testing.B) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	versionInfo := apidef.VersionInfo{}
+	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar"}
+
+	b.Run("Header location", func(b *testing.B) {
+		b.ReportAllocs()
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Key = "X-API-Version"
+			spec.VersionData.Versions["v1"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
+				{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+			}...)
+		}
+	})
+
+	b.Run("URL param location", func(b *testing.B) {
+		b.ReportAllocs()
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Key = "version"
+			spec.VersionData.Versions["v2"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/foo?version=v2", Code: 200},
+				{Path: "/bar?version=v2", Code: 403},
+			}...)
+		}
+	})
+
+	b.Run("URL location", func(b *testing.B) {
+		b.ReportAllocs()
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.VersionData.NotVersioned = false
+			spec.VersionDefinition.Location = "url"
+			spec.VersionData.Versions["v3"] = versionInfo
+		})
+
+		for i := 0; i < b.N; i++ {
+			ts.Run(b, []test.TestCase{
+				{Path: "/v3/foo", Code: 200},
+				{Path: "/v3/bar", Code: 403},
+			}...)
+		}
+	})
+}
+
+func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
+	// Mock Dashboard
+	callNum := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/system/apis" {
+			if callNum == 0 {
+				w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+			} else {
+				w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": "this is a string"`))
+			}
+
+			callNum += 1
+		} else {
+			t.Fatal("Unknown dashboard API request", r)
+		}
+	}))
+	defer ts.Close()
+
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
+
+	globalConf := config.Global()
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	config.SetGlobal(globalConf)
+
+	defer resetTestConfig()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
+	handled := func(got NotificationCommand) {
+		if want := NoticeApiUpdated; got != want {
+			t.Fatalf("want %q, got %q", want, got)
+		}
+	}
+	handleRedisEvent(msg, handled, wg.Done)
+
+	// Since we already know that reload is queued
+	reloadTick <- time.Time{}
+
+	// Wait for the reload to finish, then check it worked
+	wg.Wait()
+	apisMu.RLock()
+	if len(apisByID) != 1 {
+		t.Error("should return array with one spec", apisByID)
+	}
+	apisMu.RUnlock()
+
+	// Second call
+
+	var wg2 sync.WaitGroup
+	wg2.Add(1)
+	handleRedisEvent(msg, handled, wg2.Done)
+
+	// Since we already know that reload is queued
+	reloadTick <- time.Time{}
+
+	// Wait for the reload to finish, then check it worked
+	wg2.Wait()
+	apisMu.RLock()
+	if len(apisByID) != 1 {
+		t.Error("second call should return array with one spec", apisByID)
+	}
+	apisMu.RUnlock()
+
 }

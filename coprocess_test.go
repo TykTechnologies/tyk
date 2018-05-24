@@ -9,9 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
@@ -74,12 +72,9 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 }
 
 func TestCoProcessReload(t *testing.T) {
-	testDispatcher.reloaded = false
-	var wg sync.WaitGroup
-	wg.Add(1)
-	reloadURLStructure(wg.Done)
-	reloadTick <- time.Time{}
-	wg.Wait()
+	// Use this as the GlobalDispatcher:
+	GlobalDispatcher = testDispatcher
+	doCoprocessReload()
 	if !testDispatcher.reloaded {
 		t.Fatal("coprocess reload wasn't run")
 	}
@@ -143,7 +138,7 @@ func TestCoProcessMiddleware(t *testing.T) {
 	chain := buildCoProcessChain(spec, "hook_test", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
 	session := createStandardSession()
-	spec.SessionManager.UpdateSession("abc", session, 60)
+	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
@@ -159,7 +154,7 @@ func TestCoProcessObjectPostProcess(t *testing.T) {
 	chain := buildCoProcessChain(spec, "hook_test_object_postprocess", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 
 	session := createStandardSession()
-	spec.SessionManager.UpdateSession("abc", session, 60)
+	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
@@ -213,7 +208,7 @@ func TestCoProcessAuth(t *testing.T) {
 	chain := buildCoProcessChain(spec, "hook_test_bad_auth", coprocess.HookType_CustomKeyCheck, apidef.MiddlewareDriver("python"))
 
 	session := createStandardSession()
-	spec.SessionManager.UpdateSession("abc", session, 60)
+	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
@@ -232,7 +227,7 @@ func TestCoProcessReturnOverrides(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 	chain := buildCoProcessChain(spec, "hook_test_return_overrides", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 	session := createStandardSession()
-	spec.SessionManager.UpdateSession("abc", session, 60)
+	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 
@@ -252,7 +247,7 @@ func TestCoProcessReturnOverridesErrorMessage(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 	chain := buildCoProcessChain(spec, "hook_test_return_overrides_error", coprocess.HookType_Pre, apidef.MiddlewareDriver("python"))
 	session := createStandardSession()
-	spec.SessionManager.UpdateSession("abc", session, 60)
+	spec.SessionManager.UpdateSession("abc", session, 60, false)
 
 	recorder := httptest.NewRecorder()
 

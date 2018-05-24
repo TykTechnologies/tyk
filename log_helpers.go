@@ -5,6 +5,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -15,12 +17,12 @@ func getLogEntryForRequest(r *http.Request, key string, data map[string]interfac
 	// populate http request fields
 	fields := logrus.Fields{
 		"path":   r.URL.Path,
-		"origin": requestIP(r),
+		"origin": request.RealIP(r),
 	}
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !config.Global.EnableKeyLogging {
+		if !config.Global().EnableKeyLogging {
 			fields["key"] = logHiddenValue
 		}
 	}
@@ -40,7 +42,7 @@ func getExplicitLogEntryForRequest(path string, IP string, key string, data map[
 	// add key to log if configured to do so
 	if key != "" {
 		fields["key"] = key
-		if !config.Global.EnableKeyLogging {
+		if !config.Global().EnableKeyLogging {
 			fields["key"] = logHiddenValue
 		}
 	}
