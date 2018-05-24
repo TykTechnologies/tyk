@@ -96,7 +96,7 @@ func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) 
 }
 
 func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global().Security.PinnedPublicKeys) == 0 {
+	if (spec == nil || len(spec.PinnedPublicKeys) == 0) && len(config.Global.Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
