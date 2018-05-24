@@ -45,7 +45,7 @@ type MiniRequestObject struct {
 	IgnoreBody      bool
 	Method          string
 	RequestURI      string
-	Proto           string
+	Scheme          string
 }
 
 type VMReturnObject struct {
@@ -122,7 +122,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteParams:   []string{},
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
-		Proto:          r.Proto,
+		Scheme:         r.URL.Scheme,
 	}
 
 	requestAsJson, err := json.Marshal(requestData)
