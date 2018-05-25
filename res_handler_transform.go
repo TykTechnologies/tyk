@@ -76,7 +76,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	defer respBody.Close()
 
 	// Put into an interface:
-	var bodyData map[string]interface{}
+	var bodyData interface{}
 	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
 		mxj.XmlCharsetReader = WrappedCharsetReader
