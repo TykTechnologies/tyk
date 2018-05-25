@@ -24,7 +24,11 @@ func (c *regexpStrRetBoolCache) do(r *regexp.Regexp, s string, noCacheFn func(st
 		return noCacheFn(s)
 	}
 
+	// generate key, check key size
 	key := r.String() + s
+	if len(key) > maxKeySize {
+		return noCacheFn(s)
+	}
 
 	// cache hit
 	if res, found := c.getBool(key); found {

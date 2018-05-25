@@ -895,7 +895,7 @@ func afterConfSetup(conf *config.Config) {
 	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
-	tykregexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), conf.DisableRegexpCache)
+	tykregexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
 }
 
 var hostDetails struct {

@@ -10,6 +10,9 @@ import (
 const (
 	defaultCacheItemTTL         = 60 * time.Second
 	defaultCacheCleanupInterval = 5 * time.Minute
+
+	maxKeySize   = 1024
+	maxValueSize = 2048
 )
 
 type cache struct {

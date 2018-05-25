@@ -28,6 +28,10 @@ type Regexp struct {
 
 // ResetCache resets cache to initial state
 func ResetCache(ttl time.Duration, isEnabled bool) {
+	if ttl == 0 {
+		ttl = defaultCacheItemTTL
+	}
+
 	compileCache.reset(ttl, isEnabled)
 	compilePOSIXCache.reset(ttl, isEnabled)
 	matchStringCache.reset(ttl, isEnabled)

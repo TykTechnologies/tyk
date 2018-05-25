@@ -24,7 +24,11 @@ func (c *regexpByteRetBoolCache) do(r *regexp.Regexp, b []byte, noCacheFn func([
 		return noCacheFn(b)
 	}
 
+	// generate key, check key size
 	key := r.String() + string(b)
+	if len(key) > maxKeySize {
+		return noCacheFn(b)
+	}
 
 	// cache hit
 	if res, found := c.getBool(key); found {
