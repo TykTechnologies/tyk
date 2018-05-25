@@ -287,6 +287,8 @@ type Config struct {
 	VersionHeader                     string                                `json:"version_header"`
 	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
 	MinTokenLength                    int                                   `json:"min_token_length"`
+	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
+	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
 }
 
 type CertData struct {

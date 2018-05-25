@@ -7,16 +7,17 @@ import (
 	"io"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 var (
-	compileRegexpCache                 = compileCache{}
-	compileRegexpPOSIXCache            = compilePOSIXCache{}
-	matchStringRegexpCache             = matchStringCache{}
-	matchRegexpCache                   = matchCache{}
-	replaceAllStringRegexpCache        = replaceAllStringCache{}
-	replaceAllLiteralStringRegexpCache = replaceAllLiteralStringCache{}
-	replaceAllStringFuncRegexpCache    = replaceAllStringFuncCache{}
+	compileCache                 = newRegexpCache(defaultCacheItemTTL, true, regexp.Compile)
+	compilePOSIXCache            = newRegexpCache(defaultCacheItemTTL, true, regexp.CompilePOSIX)
+	matchStringCache             = newRegexpStrRetBoolCache(defaultCacheItemTTL, true)
+	matchCache                   = newRegexpByteRetBoolCache(defaultCacheItemTTL, true)
+	replaceAllStringCache        = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
+	replaceAllLiteralStringCache = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
+	replaceAllStringFuncCache    = newRegexpStrFuncRetStrCache(defaultCacheItemTTL, true)
 )
 
 // Regexp is a wrapper around regexp.Regexp but with caching
@@ -25,29 +26,25 @@ type Regexp struct {
 	FromCache bool
 }
 
-func init() {
-	ResetCache()
-}
-
 // ResetCache resets cache to initial state
-func ResetCache() {
-	compileRegexpCache.reset()
-	compileRegexpPOSIXCache.reset()
-	matchStringRegexpCache.reset()
-	matchRegexpCache.reset()
-	replaceAllStringRegexpCache.reset()
-	replaceAllLiteralStringRegexpCache.reset()
-	replaceAllStringFuncRegexpCache.reset()
+func ResetCache(ttl time.Duration, isEnabled bool) {
+	compileCache.reset(ttl, isEnabled)
+	compilePOSIXCache.reset(ttl, isEnabled)
+	matchStringCache.reset(ttl, isEnabled)
+	matchCache.reset(ttl, isEnabled)
+	replaceAllStringCache.reset(ttl, isEnabled)
+	replaceAllLiteralStringCache.reset(ttl, isEnabled)
+	replaceAllStringFuncCache.reset(ttl, isEnabled)
 }
 
 // Compile does the same as regexp.Compile but returns cached *Regexp instead.
 func Compile(expr string) (*Regexp, error) {
-	return compileRegexpCache.compile(expr)
+	return compileCache.do(expr)
 }
 
 // CompilePOSIX does the same as regexp.CompilePOSIX but returns cached *Regexp instead.
 func CompilePOSIX(expr string) (*Regexp, error) {
-	return compileRegexpPOSIXCache.compilePOSIX(expr)
+	return compilePOSIXCache.do(expr)
 }
 
 // MustCompile is the same as regexp.MustCompile but returns cached *Regexp instead.
@@ -168,7 +165,7 @@ func (re *Regexp) MatchString(s string) bool {
 	if re.Regexp == nil {
 		return false
 	}
-	return matchStringRegexpCache.matchString(re.Regexp, s)
+	return matchStringCache.do(re.Regexp, s, re.Regexp.MatchString)
 }
 
 // Match reports whether the Regexp matches the byte slice b.
@@ -176,7 +173,7 @@ func (re *Regexp) Match(b []byte) bool {
 	if re.Regexp == nil {
 		return false
 	}
-	return matchRegexpCache.match(re.Regexp, b)
+	return matchCache.do(re.Regexp, b, re.Regexp.Match)
 }
 
 // ReplaceAllString is the same as regexp.Regexp.ReplaceAllString but returns cached result instead.
@@ -184,7 +181,7 @@ func (re *Regexp) ReplaceAllString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllStringRegexpCache.replaceAllString(re.Regexp, src, repl)
+	return replaceAllStringCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllString)
 }
 
 // ReplaceAllLiteralString is the same as regexp.Regexp.ReplaceAllLiteralString but returns cached result instead.
@@ -192,7 +189,7 @@ func (re *Regexp) ReplaceAllLiteralString(src, repl string) string {
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllLiteralStringRegexpCache.replaceAllLiteralString(re.Regexp, src, repl)
+	return replaceAllLiteralStringCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllLiteralString)
 }
 
 // ReplaceAllStringFunc is the same as regexp.Regexp.ReplaceAllStringFunc but returns cached result instead.
@@ -200,7 +197,7 @@ func (re *Regexp) ReplaceAllStringFunc(src string, repl func(string) string) str
 	if re.Regexp == nil {
 		return ""
 	}
-	return replaceAllStringFuncRegexpCache.replaceAllStringFunc(re.Regexp, src, repl)
+	return replaceAllStringFuncCache.do(re.Regexp, src, repl, re.Regexp.ReplaceAllStringFunc)
 }
 
 // ReplaceAll is the same as regexp.Regexp.ReplaceAll but returns cached result instead.

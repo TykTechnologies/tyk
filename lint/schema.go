@@ -733,6 +733,12 @@ const confSchema = `{
 	},
 	"min_token_length": {
 		"type": "integer"
+ 	},
+	"disable_regexp_cache": {
+		"type": "boolean"
+	},
+	"regexp_cache_expire": {
+		"type": "integer"
  	}
 }
 }`
