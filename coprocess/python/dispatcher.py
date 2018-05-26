@@ -64,18 +64,14 @@ class TykDispatcher:
             raise Exception('Hook is not defined: {0}'.format(hook_name))
 
     def dispatch_hook(self, object_msg):
-        try:
-            object = TykCoProcessObject(object_msg)
-            api_id = object.spec['APIID']
-            middleware, hook_handler = self.find_hook(api_id, object.hook_name)
-            if hook_handler:
-                object = middleware.process(hook_handler, object)
-            else:
-                tyk.log( "Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
-            return object.dump()
-        except:
-            tyk.log_error( "Can't dispatch, error:" )
-            return object_msg
+        object = TykCoProcessObject(object_msg)
+        api_id = object.spec['APIID']
+        middleware, hook_handler = self.find_hook(api_id, object.hook_name)
+        if hook_handler:
+            object = middleware.process(hook_handler, object)
+        else:
+            tyk.log("Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
+        return object.dump()
 
     def dispatch_event(self, event_json):
         try:

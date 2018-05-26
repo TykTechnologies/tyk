@@ -266,6 +266,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	returnObject, err := coProcessor.Dispatch(object)
 	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).WithError(err).Error("Dispatch error")
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
 			return errors.New("Key not authorised"), 403
 		} else {
