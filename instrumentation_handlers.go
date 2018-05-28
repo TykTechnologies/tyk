@@ -9,6 +9,7 @@ import (
 
 	"github.com/gocraft/health"
 
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/request"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -20,7 +21,7 @@ var instrument = health.NewStream()
 // setupInstrumentation handles all the intialisation of the instrumentation handler
 func setupInstrumentation() {
 	switch {
-	case *logInstrumentation:
+	case *cli.LogInstrumentation:
 	case os.Getenv("TYK_INSTRUMENTATION") == "1":
 	default:
 		return
