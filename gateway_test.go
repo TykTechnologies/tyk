@@ -24,6 +24,7 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -130,6 +131,8 @@ func TestMain(m *testing.M) {
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
+
+	cli.Init(VERSION, confPaths)
 
 	initialiseSystem()
 	// Small part of start()
@@ -713,8 +716,8 @@ func TestControlListener(t *testing.T) {
 }
 
 func TestHttpPprof(t *testing.T) {
-	old := httpProfile
-	defer func() { httpProfile = old }()
+	old := cli.HTTPProfile
+	defer func() { cli.HTTPProfile = old }()
 
 	ts := newTykTestServer(tykTestServerConfig{
 		sepatateControlAPI: true,
@@ -726,7 +729,7 @@ func TestHttpPprof(t *testing.T) {
 	}...)
 	ts.Close()
 
-	*httpProfile = true
+	*cli.HTTPProfile = true
 
 	ts.Start()
 	ts.Run(t, []test.TestCase{

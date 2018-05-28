@@ -13,7 +13,7 @@ import (
 func TestMain(m *testing.M) {
 	// Use the root package, as that's where the directories and
 	// files required to run the gateway are.
-	os.Chdir("..")
+	os.Chdir("../..")
 	os.Exit(m.Run())
 }
 
