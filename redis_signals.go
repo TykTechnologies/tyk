@@ -149,6 +149,10 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 	if config.Global().PublicKeyPath != "" && notificationVerifier == nil {
 		var err error
+<<<<<<< HEAD
+=======
+
+>>>>>>> Fix typos and formatting
 		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 		if err != nil {
 
@@ -245,14 +249,15 @@ func handleDashboardZeroConfMessage(payload string) {
 		return
 	}
 
-	if !config.Global().UseDBAppConfigs || config.Global().DisableDashboardZeroConf {
+	globalConf := config.Global()
+
+	if !globalConf.UseDBAppConfigs || globalConf.DisableDashboardZeroConf {
 		return
 	}
 
 	hostname := createConnectionStringFromDashboardObject(dashPayload)
 	setHostname := false
 
-    globalConf := config.Global()
 	if globalConf.DBAppConfOptions.ConnectionString == "" {
 		globalConf.DBAppConfOptions.ConnectionString = hostname
 		setHostname = true
