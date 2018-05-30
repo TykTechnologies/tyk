@@ -51,6 +51,7 @@ import (
 var (
 	log                      = logger.Get()
 	mainLog                  = log.WithField("prefix", "main")
+	pubSubLog                = log.WithField("prefix", "pub-sub")
 	rawLog                   = logger.GetRaw()
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
