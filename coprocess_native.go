@@ -19,6 +19,8 @@ package main
 import "C"
 
 import (
+	"errors"
+
 	"github.com/golang/protobuf/proto"
 
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -29,6 +31,10 @@ import (
 
 // Dispatch prepares a CoProcessMessage, sends it to the GlobalDispatcher and gets a reply.
 func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+	if GlobalDispatcher == nil {
+		return nil, errors.New("Dispatcher not initialized")
+	}
+
 	var objectMsg []byte
 	var err error
 	switch MessageType {
@@ -53,6 +59,10 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 
 	newObjectPtr := (*C.struct_CoProcessMessage)(GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr)))
 	defer C.free(unsafe.Pointer(newObjectPtr))
+
+  if newObjectPtr == nil {
+		return nil, errors.New("Dispatch error")
+	}
 
 	newObjectBytes := C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 

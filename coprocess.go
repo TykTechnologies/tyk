@@ -101,7 +101,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		},
 		Method:     r.Method,
 		RequestUri: r.RequestURI,
-		Proto:      r.Proto,
+		Scheme:     r.URL.Scheme,
 	}
 
 	object := &coprocess.Object{
@@ -266,6 +266,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	returnObject, err := coProcessor.Dispatch(object)
 	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).WithError(err).Error("Dispatch error")
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
 			return errors.New("Key not authorised"), 403
 		} else {
@@ -309,7 +312,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Is this a CP authentication middleware?
 	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
 		// The CP middleware didn't setup a session:
-		if returnObject.Session == nil {
+		if returnObject.Session == nil || token == "" {
 			authHeaderValue := r.Header.Get(m.Spec.Auth.AuthHeaderName)
 			AuthFailed(m, r, authHeaderValue)
 			return errors.New("Key not authorised"), 403

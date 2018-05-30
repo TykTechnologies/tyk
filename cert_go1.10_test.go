@@ -189,6 +189,9 @@ func TestProxyTransport(t *testing.T) {
 	})
 
 	t.Run("API: Valid proxy", func(t *testing.T) {
+		globalConf.ProxySSLMinVersion = 771
+		config.SetGlobal(globalConf)
+
 		_, _, _, proxyCert := genServerCertificate()
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},

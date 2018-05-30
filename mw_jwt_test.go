@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -88,7 +89,7 @@ func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 
 // JWTSessionHMAC
 
-func prepareJWTSessionHMAC(tb testing.TB) string {
+func prepareJWTSessionHMAC(tb testing.TB, isBench bool) string {
 	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.JWTSigningMethod = "hmac"
@@ -98,6 +99,9 @@ func prepareJWTSessionHMAC(tb testing.TB) string {
 
 	session := createJWTSession()
 	tokenKID := testKey(tb, "token")
+	if isBench {
+		tokenKID += "-" + uuid.New()
+	}
 	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKTokenHMAC(func(t *jwt.Token) {
@@ -113,7 +117,7 @@ func TestJWTSessionHMAC(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionHMAC(t)
+	jwtToken := prepareJWTSessionHMAC(t, false)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT signed with HMAC", func(t *testing.T) {
@@ -129,7 +133,7 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionHMAC(b)
+	jwtToken := prepareJWTSessionHMAC(b, true)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	for i := 0; i < b.N; i++ {
@@ -140,7 +144,7 @@ func BenchmarkJWTSessionHMAC(b *testing.B) {
 }
 
 // JWTSessionRSA
-func prepareJWTSessionRSA(tb testing.TB) (*APISpec, string) {
+func prepareJWTSessionRSA(tb testing.TB, isBench bool) (*APISpec, string) {
 	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.JWTSigningMethod = "rsa"
@@ -150,6 +154,9 @@ func prepareJWTSessionRSA(tb testing.TB) (*APISpec, string) {
 
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(tb, "token")
+	if isBench {
+		tokenKID += "-" + uuid.New()
+	}
 	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -165,7 +172,7 @@ func TestJWTSessionRSA(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	_, jwtToken := prepareJWTSessionRSA(t)
+	_, jwtToken := prepareJWTSessionRSA(t, false)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Request with valid JWT", func(t *testing.T) {
@@ -181,7 +188,7 @@ func BenchmarkJWTSessionRSA(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	_, jwtToken := prepareJWTSessionRSA(b)
+	_, jwtToken := prepareJWTSessionRSA(b, true)
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	for i := 0; i < b.N; i++ {
@@ -195,7 +202,7 @@ func TestJWTSessionFailRSA_EmptyJWT(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	prepareJWTSessionRSA(t)
+	prepareJWTSessionRSA(t, false)
 
 	authHeaders := map[string]string{"authorization": ""}
 	t.Run("Request with empty authorization header", func(t *testing.T) {
@@ -209,7 +216,7 @@ func TestJWTSessionFailRSA_NoAuthHeader(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	prepareJWTSessionRSA(t)
+	prepareJWTSessionRSA(t, false)
 
 	authHeaders := map[string]string{}
 	t.Run("Request without authorization header", func(t *testing.T) {
@@ -223,7 +230,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	_, jwtToken := prepareJWTSessionRSA(t)
+	_, jwtToken := prepareJWTSessionRSA(t, false)
 
 	authHeaders := map[string]string{"authorization": jwtToken + "ajhdkjhsdfkjashdkajshdkajhsdkajhsd"}
 	t.Run("Request with malformed JWT", func(t *testing.T) {
@@ -237,7 +244,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	spec, jwtToken := prepareJWTSessionRSA(t)
+	spec, jwtToken := prepareJWTSessionRSA(t, false)
 	spec.DoNotTrack = true
 
 	authHeaders := map[string]string{"authorization": jwtToken + "ajhdkjhsdfkjashdkajshdkajhsdkajhsd"}
@@ -252,7 +259,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	prepareJWTSessionRSA(t)
+	prepareJWTSessionRSA(t, false)
 
 	authHeaders := map[string]string{"authorization": "123"}
 	t.Run("Request with invalid JWT", func(t *testing.T) {
@@ -264,7 +271,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 
 // TestJWTSessionRSABearer
 
-func prepareJWTSessionRSABearer(tb testing.TB) string {
+func prepareJWTSessionRSABearer(tb testing.TB, isBench bool) string {
 	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.JWTSigningMethod = "rsa"
@@ -274,6 +281,9 @@ func prepareJWTSessionRSABearer(tb testing.TB) string {
 
 	session := createJWTSessionWithRSA()
 	tokenKID := testKey(tb, "token")
+	if isBench {
+		tokenKID += "-" + uuid.New()
+	}
 	spec.SessionManager.UpdateSession(tokenKID, session, 60, false)
 
 	jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -289,7 +299,7 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSABearer(t)
+	jwtToken := prepareJWTSessionRSABearer(t, false)
 
 	authHeaders := map[string]string{"authorization": "Bearer " + jwtToken}
 	t.Run("Request with valid Bearer", func(t *testing.T) {
@@ -305,7 +315,7 @@ func BenchmarkJWTSessionRSABearer(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSABearer(b)
+	jwtToken := prepareJWTSessionRSABearer(b, true)
 
 	authHeaders := map[string]string{"authorization": "Bearer " + jwtToken}
 
@@ -320,7 +330,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSABearer(t)
+	jwtToken := prepareJWTSessionRSABearer(t, false)
 
 	authHeaders := map[string]string{"authorization": "Bearer: " + jwtToken} // extra ":"
 	t.Run("Request with invalid Bearer", func(t *testing.T) {
@@ -332,7 +342,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 
 // JWTSessionRSAWithRawSourceOnWithClientID
 
-func prepareJWTSessionRSAWithRawSourceOnWithClientID() string {
+func prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) string {
 	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "777888"
 		spec.OrgID = "default"
@@ -356,7 +366,12 @@ func prepareJWTSessionRSAWithRawSourceOnWithClientID() string {
 		}
 	})
 
-	tokenID := "1234567891010101"
+	tokenID := ""
+	if isBench {
+		tokenID = uuid.New()
+	} else {
+		tokenID = "1234567891010101"
+	}
 	session := createJWTSessionWithRSAWithPolicy(policyID)
 
 	spec.SessionManager.ResetQuota(tokenID, session)
@@ -377,7 +392,7 @@ func TestJWTSessionRSAWithRawSourceOnWithClientID(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID()
+	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(false)
 	authHeaders := map[string]string{"authorization": jwtToken}
 
 	t.Run("Initial request with no policy base field in JWT", func(t *testing.T) {
@@ -393,7 +408,7 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID()
+	jwtToken := prepareJWTSessionRSAWithRawSourceOnWithClientID(true)
 	authHeaders := map[string]string{"authorization": jwtToken}
 
 	for i := 0; i < b.N; i++ {

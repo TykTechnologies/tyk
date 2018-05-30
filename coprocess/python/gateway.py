@@ -27,7 +27,12 @@ class TykGateway:
     @classmethod
     def log_error(cls, *args):
         excp = exc_info()
-        if len(args) == 0:
+        nargs = len(args)
+        # For simpler errors:
+        if nargs == 1:
+            cls.log(args[0], "error")
+            return
+        if nargs == 0:
             cls.log("{0} {1}".format(excp[0], excp[1]), "error")
         else:
             cls.log("{0} {1} {2}".format(args[0], excp[0], excp[1]), "error")

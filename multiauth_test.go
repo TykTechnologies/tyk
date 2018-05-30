@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
+	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -34,7 +35,7 @@ const multiAuthDev = `{
 	}
 }`
 
-func createMultiAuthKeyAuthSession() *user.SessionState {
+func createMultiAuthKeyAuthSession(isBench bool) *user.SessionState {
 	session := new(user.SessionState)
 	session.Rate = 100.0
 	session.Allowance = session.Rate
@@ -42,13 +43,18 @@ func createMultiAuthKeyAuthSession() *user.SessionState {
 	session.Per = 1.0
 	session.QuotaRenewalRate = 300 // 5 minutes
 	session.QuotaRenews = time.Now().Unix()
-	session.QuotaRemaining = 900
-	session.QuotaMax = 10
+	if isBench {
+		session.QuotaRemaining = 100000000
+		session.QuotaMax = 100000000
+	} else {
+		session.QuotaRemaining = 900
+		session.QuotaMax = 10
+	}
 	session.AccessRights = map[string]user.AccessDefinition{"55": {APIName: "Tyk Multi Key Test", APIID: "55", Versions: []string{"default"}}}
 	return session
 }
 
-func createMultiBasicAuthSession() *user.SessionState {
+func createMultiBasicAuthSession(isBench bool) *user.SessionState {
 	session := new(user.SessionState)
 	session.Rate = 8.0
 	session.Allowance = session.Rate
@@ -81,24 +87,34 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	return chain
 }
 
-func testPrepareMultiSessionBA(t testing.TB) (*APISpec, *http.Request) {
+func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Request) {
 	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
-	baSession := createMultiBasicAuthSession()
-	username := "0987876"
+	baSession := createMultiBasicAuthSession(isBench)
+	username := ""
+	if isBench {
+		username = uuid.New()
+	} else {
+		username = "0987876"
+	}
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
+	spec.SessionManager.UpdateSession("default"+username, baSession, 60, false)
 
 	// Create key
-	session := createMultiAuthKeyAuthSession()
-	customToken := "84573485734587384888723487243"
+	session := createMultiAuthKeyAuthSession(isBench)
+	customToken := ""
+	if isBench {
+		customToken = uuid.New()
+	} else {
+		customToken = "84573485734587384888723487243"
+	}
 	// AuthKey sessions are stored by {token}
 	spec.SessionManager.UpdateSession(customToken, session, 60, false)
 
-	to_encode := strings.Join([]string{username, password}, ":")
-	encodedPass := base64.StdEncoding.EncodeToString([]byte(to_encode))
+	toEncode := strings.Join([]string{username, password}, ":")
+	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))
 
 	req := testReq(t, "GET", "/", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedPass))
@@ -108,7 +124,7 @@ func testPrepareMultiSessionBA(t testing.TB) (*APISpec, *http.Request) {
 }
 
 func TestMultiSession_BA_Standard_OK(t *testing.T) {
-	spec, req := testPrepareMultiSessionBA(t)
+	spec, req := testPrepareMultiSessionBA(t, false)
 
 	recorder := httptest.NewRecorder()
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
@@ -122,7 +138,7 @@ func TestMultiSession_BA_Standard_OK(t *testing.T) {
 func BenchmarkMultiSession_BA_Standard_OK(b *testing.B) {
 	b.ReportAllocs()
 
-	spec, req := testPrepareMultiSessionBA(b)
+	spec, req := testPrepareMultiSessionBA(b, true)
 
 	recorder := httptest.NewRecorder()
 	chain := getMultiAuthStandardAndBasicAuthChain(spec)
@@ -139,14 +155,14 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
-	baSession := createMultiBasicAuthSession()
+	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
-	session := createMultiAuthKeyAuthSession()
+	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
 	spec.SessionManager.UpdateSession(customToken, session, 60, false)
@@ -176,14 +192,14 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
-	baSession := createMultiBasicAuthSession()
+	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "WRONG"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
-	session := createMultiAuthKeyAuthSession()
+	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
 	spec.SessionManager.UpdateSession(customToken, session, 60, false)
@@ -208,14 +224,14 @@ func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
 	spec := createSpecTest(t, multiAuthDev)
 
 	// Create BA
-	baSession := createMultiBasicAuthSession()
+	baSession := createMultiBasicAuthSession(false)
 	username := "0987876"
 	password := "TEST"
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
 	spec.SessionManager.UpdateSession("default0987876", baSession, 60, false)
 
 	// Create key
-	session := createMultiAuthKeyAuthSession()
+	session := createMultiAuthKeyAuthSession(false)
 	customToken := "84573485734587384888723487243"
 	// AuthKey sessions are stored by {token}
 	spec.SessionManager.UpdateSession(customToken, session, 60, false)

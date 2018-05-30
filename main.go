@@ -251,9 +251,14 @@ func syncAPISpecs() int {
 	defer apisMu.Unlock()
 
 	if config.Global().UseDBAppConfigs {
-
 		connStr := buildConnStr("/system/apis")
-		apiSpecs = loader.FromDashboardService(connStr, config.Global().NodeSecret)
+		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
+		if err != nil {
+			log.Error("failed to load API specs: ", err)
+			return 0
+		}
+
+		apiSpecs = tmpSpecs
 
 		mainLog.Debug("Downloading API Configurations from Dashboard Service")
 	} else if config.Global().SlaveOptions.UseRPC {

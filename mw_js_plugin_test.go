@@ -306,3 +306,44 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
+func TestJSVMRequestScheme(t *testing.T) {
+	dynMid := &DynamicMiddleware{
+		BaseMiddleware: BaseMiddleware{
+			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		},
+		MiddlewareClassName: "leakMid",
+		Pre:                 true,
+	}
+	req := httptest.NewRequest("GET", "/foo", nil)
+	req.URL.Scheme = "http"
+	jsvm := JSVM{}
+	jsvm.Init(nil)
+
+	const js = `
+var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
+
+leakMid.NewProcessRequest(function(request, session) {
+	var test = request.Scheme += " appended"
+
+	var responseObject = {
+        Body: test,
+        Code: 200
+    }
+	return leakMid.ReturnData(responseObject, session.meta_data)
+});`
+	if _, err := jsvm.VM.Run(js); err != nil {
+		t.Fatalf("failed to set up js plugin: %v", err)
+	}
+	dynMid.Spec.JSVM = jsvm
+	dynMid.ProcessRequest(nil, req, nil)
+
+	bs, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("failed to read final body: %v", err)
+	}
+	want := "http" + " appended"
+	if got := string(bs); want != got {
+		t.Fatalf("JS plugin broke non-UTF8 body %q into %q",
+			want, got)
+	}
+}

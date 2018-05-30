@@ -18,7 +18,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :return_overrides, :message, 10, "coprocess.ReturnOverrides"
     optional :method, :string, 11
     optional :request_uri, :string, 12
-    optional :proto, :string, 13
+    optional :scheme, :string, 13
   end
 end
 

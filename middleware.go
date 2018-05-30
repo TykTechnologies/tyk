@@ -269,10 +269,17 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			tags[tag] = true
 		}
 	}
-	session.Tags = make([]string, 0, len(tags))
-	for tag := range tags {
-		session.Tags = append(session.Tags, tag)
+
+	// set tags
+	if len(tags) > 0 {
+		session.Tags = make([]string, 0, len(tags))
+		for tag := range tags {
+			session.Tags = append(session.Tags, tag)
+		}
+	} else {
+		session.Tags = nil
 	}
+
 	session.AccessRights = rights
 	// Update the session in the session manager in case it gets called again
 	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime), false)
@@ -316,7 +323,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 	if found {
 		// If exists, assume it has been authorized and pass on
 		// cache it
-		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
@@ -334,7 +343,9 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		log.Info("Recreating session for key: ", key)
 
 		// cache it
-		go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+		}
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
