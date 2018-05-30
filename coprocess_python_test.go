@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -42,7 +43,10 @@ def MyAuthHook(request, session, metadata, spec):
 }
 
 func TestPythonBundles(t *testing.T) {
-	ts := newTykTestServer()
+	ts := newTykTestServer(tykTestServerConfig{
+		coprocessConfig: config.CoProcessConfig{
+			EnableCoProcess: true,
+		}})
 	defer ts.Close()
 
 	bundleID := registerBundle("python_with_auth_check", pythonBundleWithAuthCheck)

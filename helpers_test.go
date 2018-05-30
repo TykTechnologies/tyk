@@ -282,6 +282,7 @@ type tykTestServerConfig struct {
 	delay              time.Duration
 	hotReload          bool
 	overrideDefaults   bool
+	coprocessConfig    config.CoProcessConfig
 }
 
 type tykTestServer struct {
@@ -305,6 +306,8 @@ func (s *tykTestServer) Start() {
 		_, port, _ = net.SplitHostPort(s.cln.Addr().String())
 		globalConf.ControlAPIPort, _ = strconv.Atoi(port)
 	}
+
+	globalConf.CoProcessOptions = s.config.coprocessConfig
 
 	config.SetGlobal(globalConf)
 
