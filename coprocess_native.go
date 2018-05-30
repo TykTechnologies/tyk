@@ -60,7 +60,7 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 	newObjectPtr := (*C.struct_CoProcessMessage)(GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr)))
 	defer C.free(unsafe.Pointer(newObjectPtr))
 
-  if newObjectPtr == nil {
+	if newObjectPtr == nil {
 		return nil, errors.New("Dispatch error")
 	}
 
