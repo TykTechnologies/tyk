@@ -135,22 +135,21 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 	PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
 
 	PyObject *result = PyObject_CallObject( dispatcher_hook, args );
-
 	if( result == NULL ) {
 		PyErr_Print();
-	} else {
-		PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
-		char* output = PyBytes_AsString(new_object_msg_item);
-
-		PyObject* new_object_msg_length = PyTuple_GetItem( result, 1 );
-		int msg_length = PyLong_AsLong(new_object_msg_length);
-
-		outputObject->p_data = (void*)output;
-		outputObject->length = msg_length;
+		PyGILState_Release(gilState);
+		return NULL;
 	}
+	PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
+	char* output = PyBytes_AsString(new_object_msg_item);
+
+	PyObject* new_object_msg_length = PyTuple_GetItem( result, 1 );
+	int msg_length = PyLong_AsLong(new_object_msg_length);
+
+	outputObject->p_data = (void*)output;
+	outputObject->length = msg_length;
 
 	PyGILState_Release(gilState);
-
 	return outputObject;
 }
 
@@ -261,6 +260,11 @@ func PythonNewDispatcher(bundleRootPath string) (coprocess.Dispatcher, error) {
 
 // PythonSetEnv sets PYTHONPATH, it's called before initializing the interpreter.
 func PythonSetEnv(pythonPaths ...string) {
+	if config.Global().CoProcessOptions.PythonPathPrefix == "" {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).Warning("Python path prefix isn't set (check \"python_path_prefix\" in tyk.conf)")
+	}
 	CPythonPath := C.CString(strings.Join(pythonPaths, ":"))
 	defer C.free(unsafe.Pointer(CPythonPath))
 	C.Python_SetEnv(CPythonPath)

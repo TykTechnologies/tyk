@@ -41,8 +41,8 @@ class TykMiddleware:
             self.module = imp.load_source(filepath, self.mw_path)
             self.register_handlers()
             self.cleanup()
-        except:
-            tyk.log_error( "Middleware initialization error:" )
+        except Exception as e:
+            tyk.log_error("Middleware initialization error: {0}".format(e))
 
     def register_handlers(self):
         new_handlers = {}
@@ -63,6 +63,7 @@ class TykMiddleware:
             for handler in self.handlers[hook_type]:
                 handler.middleware = self
                 hooks[handler.name] = handler
+                tyk.log("Loading hook '{0}' ({1})".format(handler.name, self.filepath), "debug")
         return hooks
 
     def cleanup(self):
