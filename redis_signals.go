@@ -149,10 +149,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 	if config.Global().PublicKeyPath != "" && notificationVerifier == nil {
 		var err error
-<<<<<<< HEAD
-=======
 
->>>>>>> Fix typos and formatting
 		notificationVerifier, err = goverify.LoadPublicKeyFromFile(config.Global().PublicKeyPath)
 		if err != nil {
 
@@ -270,6 +267,6 @@ func handleDashboardZeroConfMessage(payload string) {
 
 	if setHostname {
 		config.SetGlobal(globalConf)
-        pubSubLog.Info("Hostname set with dashboard zeroconf signal")
+		pubSubLog.Info("Hostname set with dashboard zeroconf signal")
 	}
 }
