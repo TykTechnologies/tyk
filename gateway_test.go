@@ -1218,3 +1218,47 @@ func TestKeepAliveConns(t *testing.T) {
 		ts.Run(t, test.TestCase{Code: 200})
 	})
 }
+
+// TestRateLimitForAPIAndRateLimitAndQuotaCheck ensures that the Rate Limit for the key is applied before the rate limit
+// for the API. Meaning that a single token cannot reduce service availability for other tokens by simply going over the
+// API's global rate limit.
+func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
+
+	globalCfg := config.Global()
+	globalCfg.EnableNonTransactionalRateLimiter = false
+	globalCfg.EnableSentinelRateLImiter = true
+	config.SetGlobal(globalCfg)
+
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.DisableRateLimit = false
+		spec.OrgID = "default"
+		spec.GlobalRateLimit = apidef.GlobalRateLimit{
+			Per:  60,
+			Rate: 2,
+		}
+		spec.Proxy.ListenPath = "/"
+	})
+
+	sess1token := createSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+
+	sess2token := createSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusTooManyRequests, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusOK, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusTooManyRequests, Path: "/"},
+	}...)
+}
