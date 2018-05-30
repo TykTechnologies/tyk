@@ -865,16 +865,20 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+
+	whitelistConflictPaths := make(map[string]bool, len(rxPaths))
 	// Check if ignored
 	for _, v := range rxPaths {
 		if !v.Spec.MatchString(strings.ToLower(r.URL.Path)) {
 			continue
 		}
+
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := v.MethodActions[r.Method]
 
 			if !matchMethodOk {
+				whitelistConflictPaths[r.URL.Path] = true
 				continue
 			}
 
@@ -900,14 +904,15 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		if v.TransformJQAction.Filter != "" {
 			return a.getURLStatus(v.Status), &v.TransformJQAction
 		}
-
 		// TODO: Fix, Not a great detection method
-		if len(v.InjectHeaders.Path) > 0 {
+		if !whitelistConflictPaths[r.URL.Path] && len(v.InjectHeaders.Path) > 0 {
 			return a.getURLStatus(v.Status), &v.InjectHeaders
 		}
 
 		// Using a legacy path, handle it raw.
-		return a.getURLStatus(v.Status), nil
+		if !whitelistConflictPaths[r.URL.Path] {
+			return a.getURLStatus(v.Status), nil
+		}
 	}
 
 	// Nothing matched - should we still let it through?
