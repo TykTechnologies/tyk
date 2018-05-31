@@ -84,3 +84,46 @@ func TestTransformResponseWithURLRewrite(t *testing.T) {
 		})
 	})
 }
+
+func TestTransformResponse_ContextVars(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	transformResponseConf := apidef.TemplateMeta{
+		Path:   "get",
+		Method: "GET",
+		TemplateData: apidef.TemplateData{
+			Mode:           "blob",
+			TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"foo":"{{._tyk_context.headers_Foo}}"}`)),
+		},
+	}
+
+	responseProcessorConf := []apidef.ResponseProcessor{{Name: "response_body_transform"}}
+
+	// When Context Vars are disabled
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.ResponseProcessors = responseProcessorConf
+		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
+		})
+	})
+
+	ts.Run(t, test.TestCase{
+		Headers: map[string]string{"Foo": "Bar"}, Path: "/get", Code: 200, BodyMatch: `{"foo":"<no value>"}`,
+	})
+
+	// When Context Vars are enabled
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
+		spec.ResponseProcessors = responseProcessorConf
+		updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{transformResponseConf}
+		})
+	})
+
+	ts.Run(t, test.TestCase{
+		Headers: map[string]string{"Foo": "Bar"}, Path: "/get", Code: 200, BodyMatch: `{"foo":"Bar"}`,
+	})
+}

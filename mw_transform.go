@@ -87,7 +87,6 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 			case map[string]interface{}:
 				bodyData = tempBody.(map[string]interface{})
 			}
-
 		default:
 			return fmt.Errorf("unsupported request input type: %v", tmeta.TemplateData.Input)
 		}
