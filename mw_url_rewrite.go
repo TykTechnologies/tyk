@@ -1,16 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"fmt"
-	"io/ioutil"
-	"net/textproto"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"

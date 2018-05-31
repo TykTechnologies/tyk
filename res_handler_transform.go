@@ -102,7 +102,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		if err != nil {
 			logger.WithError(err).Error("Error unmarshalling XML")
 		}
-	default:
+	default: // apidef.RequestJSON
 		var tempBody interface{}
 		if err := json.NewDecoder(respBody).Decode(&tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
@@ -114,6 +114,15 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		case map[string]interface{}:
 			bodyData = tempBody.(map[string]interface{})
 		}
+	}
+
+	if h.Spec.EnableContextVars {
+		bodyData["_tyk_context"] = ctxGetData(req)
+	}
+
+	if tmeta.TemplateData.EnableSession {
+		session := ctxGetSession(req)
+		bodyData["_tyk_meta"] = session.MetaData
 	}
 
 	// Apply to template
