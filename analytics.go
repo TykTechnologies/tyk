@@ -65,7 +65,6 @@ const analyticsKeyName = "tyk-system-analytics"
 
 const (
 	minRecordsBufferSize       = 1000
-	minRecordsWriteBatchSize   = 200
 	recordsBufferFlushInterval = 200 * time.Millisecond
 )
 
@@ -225,8 +224,8 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 	defer r.poolWg.Done()
 
 	// this is buffer to send one pipelined command to redis
-	// use minRecordsWriteBatchSize as cap to reduce slice re-allocations
-	recordsBuffer := make([]string, 0, minRecordsWriteBatchSize)
+	// use r.recordsBufferSize as cap to reduce slice re-allocations
+	recordsBuffer := make([]string, 0, r.recordsBufferSize)
 
 	// read records from channel and process
 	for {
@@ -274,7 +273,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			}
 
 			// identify that buffer is ready to be sent
-			readyToSend = uint64(len(recordsBuffer)) == minRecordsWriteBatchSize
+			readyToSend = uint64(len(recordsBuffer)) == r.recordsBufferSize
 
 		case <-time.After(recordsBufferFlushInterval):
 			// nothing was received for that period of time
@@ -285,7 +284,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		// send data to Redis and reset buffer
 		if readyToSend && len(recordsBuffer) > 0 {
 			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
-			recordsBuffer = make([]string, 0, minRecordsWriteBatchSize)
+			recordsBuffer = make([]string, 0, r.recordsBufferSize)
 		}
 	}
 }
