@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	ldap "github.com/mavricknz/ldap"
+	"github.com/mavricknz/ldap"
 )
 
 // LDAPStorageHandler implements storage.Handler, this is a read-only implementation to access keys from an LDAP service
@@ -174,6 +174,10 @@ func (l LDAPStorageHandler) AddToSet(keyName, value string) {
 }
 
 func (l LDAPStorageHandler) AppendToSet(keyName, value string) {
+	log.Error("Not implemented")
+}
+
+func (r *LDAPStorageHandler) AppendToSetPipelined(key string, values []string) {
 	log.Error("Not implemented")
 }
 
