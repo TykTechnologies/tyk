@@ -870,6 +870,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		if !v.Spec.MatchString(strings.ToLower(r.URL.Path)) {
 			continue
 		}
+
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := v.MethodActions[r.Method]
@@ -889,6 +890,15 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				return StatusRedirectFlowByReply, &methodMeta
 			default:
 				log.Error("URL Method Action was not set to NoAction, blocking.")
+				return EndPointNotAllowed, nil
+			}
+		}
+
+		if whiteListStatus {
+			// We have a whitelist, nothing gets through unless specifically defined
+			switch v.Status {
+			case WhiteList, BlackList, Ignored:
+			default:
 				return EndPointNotAllowed, nil
 			}
 		}

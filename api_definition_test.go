@@ -219,6 +219,48 @@ func TestIgnored(t *testing.T) {
 	})
 }
 
+func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	t.Run("Extended Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+
+				json.Unmarshal([]byte(`[
+					{
+						"path": "/get",
+						"method_actions": {"GET": {"action": "no_action"}}
+					}
+				]`), &v.ExtendedPaths.WhiteList)
+				json.Unmarshal([]byte(`[
+					{
+						"add_headers": {"foo": "bar"},
+						"path": "/get",
+						"method": "GET",
+						"act_on": false
+					}
+				]`), &v.ExtendedPaths.TransformResponseHeader)
+			})
+			spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
+
+		})
+
+		//headers := map[string]string{"foo": "bar"}
+		ts.Run(t, []test.TestCase{
+
+			//Should get original upstream response
+			//{Method: "GET", Path: "/get", Code: 200, HeadersMatch: headers},
+			//Reject not whitelisted (but know by upstream) path
+			{Method: "POST", Path: "/get", Code: 403},
+		}...)
+	})
+}
+
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	// Mock Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
