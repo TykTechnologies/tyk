@@ -895,6 +895,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		}
 
 		if whiteListStatus {
+			// We have a whitelist, nothing gets through unless specifically defined
 			switch v.Status {
 			case WhiteList, BlackList, Ignored:
 			default:
