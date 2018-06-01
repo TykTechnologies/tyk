@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +31,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tykregexp "github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -94,7 +94,7 @@ func urlFromService(spec *APISpec) (*apidef.HostList, error) {
 }
 
 // httpScheme matches http://* and https://*, case insensitive
-var httpScheme = regexp.MustCompile(`^(?i)https?://`)
+var httpScheme = tykregexp.MustCompile(`^(?i)https?://`)
 
 func EnsureTransport(host string) string {
 	if httpScheme.MatchString(host) {

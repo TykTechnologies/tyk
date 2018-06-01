@@ -8,13 +8,13 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tykregexp "github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -24,7 +24,7 @@ const altHeaderSpec = "x-aux-date"
 // HMACMiddleware will check if the request has a signature, and if the request is allowed through
 type HMACMiddleware struct {
 	BaseMiddleware
-	lowercasePattern *regexp.Regexp
+	lowercasePattern *tykregexp.Regexp
 }
 
 func (hm *HMACMiddleware) Name() string {
@@ -36,7 +36,7 @@ func (k *HMACMiddleware) EnabledForSpec() bool {
 }
 
 func (hm *HMACMiddleware) Init() {
-	hm.lowercasePattern = regexp.MustCompile(`%[a-f0-9][a-f0-9]`)
+	hm.lowercasePattern = tykregexp.MustCompile(`%[a-f0-9][a-f0-9]`)
 }
 
 func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {

@@ -3,12 +3,12 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
-	"regexp"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/TykTechnologies/gojsonschema"
+	tykregexp "github.com/TykTechnologies/tyk/regexp"
 )
 
 type AuthProviderCode string
@@ -133,7 +133,7 @@ type CircuitBreakerMeta struct {
 
 type StringRegexMap struct {
 	MatchPattern string `bson:"match_rx" json:"match_rx"`
-	matchRegex   *regexp.Regexp
+	matchRegex   *tykregexp.Regexp
 }
 
 type RoutingTriggerOptions struct {
@@ -156,7 +156,7 @@ type URLRewriteMeta struct {
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
 	RewriteTo    string           `bson:"rewrite_to" json:"rewrite_to"`
 	Triggers     []RoutingTrigger `bson:"triggers" json:"triggers"`
-	MatchRegexp  *regexp.Regexp
+	MatchRegexp  *tykregexp.Regexp
 }
 
 type VirtualMeta struct {
@@ -533,7 +533,7 @@ func (s *StringRegexMap) Check(value string) string {
 
 func (s *StringRegexMap) Init() error {
 	var err error
-	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {
+	if s.matchRegex, err = tykregexp.Compile(s.MatchPattern); err != nil {
 		log.WithError(err).WithField("MatchPattern", s.MatchPattern).
 			Error("Could not compile regexp for StringRegexMap")
 		return err

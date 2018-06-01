@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"gopkg.in/xmlpath.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tykregexp "github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -162,7 +162,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 type RegexExtractor struct {
 	BaseExtractor
-	compiledExpr *regexp.Regexp
+	compiledExpr *tykregexp.Regexp
 	cfg          *RegexExtractorConfig
 }
 
@@ -191,7 +191,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	var err error
 	if e.compiledExpr == nil {
-		e.compiledExpr, err = regexp.Compile(e.cfg.RegexExpression)
+		e.compiledExpr, err = tykregexp.Compile(e.cfg.RegexExpression)
 		if err != nil {
 			returnOverrides = e.Error(r, nil, "RegexExtractor found an invalid expression")
 			return SessionID, returnOverrides
