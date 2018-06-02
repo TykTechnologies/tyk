@@ -119,6 +119,35 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	}
 }
 
+func testPrepareTransformJSONMarshalArray(tb testing.TB) (tmeta *TransformSpec, in string) {
+	tmeta = &TransformSpec{}
+	tmpl := `[{{ range $key, $value := .array }}{{ if $key }},{{ end }}{{ .abc }}{{ end }}]`
+	tmeta.TemplateData.Input = apidef.RequestXML
+	tmeta.Template = template.Must(apiTemplate.New("").Parse(tmpl))
+
+	tmeta.TemplateData.Input = apidef.RequestJSON
+	in = `[{"abc": 123}, {"abc": 456}]`
+
+	return tmeta, in
+}
+
+func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
+	tmeta, in := testPrepareTransformJSONMarshalArray(t)
+
+	want := `[123,456]`
+	r := testReq(t, "GET", "/", in)
+	if err := transformBody(r, tmeta, false); err != nil {
+		t.Fatalf("wanted nil error, got %v", err)
+	}
+	gotBs, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(gotBs); got != want {
+		t.Fatalf("wanted body %q, got %q", want, got)
+	}
+}
+
 func BenchmarkTransformJSONMarshal(b *testing.B) {
 	b.ReportAllocs()
 
