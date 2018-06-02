@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/spaolacci/murmur3"
+	"github.com/TykTechnologies/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"

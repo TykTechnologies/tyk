@@ -214,6 +214,7 @@ type Config struct {
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	AllowMasterKeys                   bool                                  `json:"allow_master_keys"`
 	HashKeys                          bool                                  `json:"hash_keys"`
+	HashKeyFunction                   string                                `json:"hash_key_function"`
 	SuppressRedisSignalReload         bool                                  `json:"suppress_redis_signal_reload"`
 	SupressDefaultOrgStore            bool                                  `json:"suppress_default_org_store"`
 	UseRedisLog                       bool                                  `json:"use_redis_log"`

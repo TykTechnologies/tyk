@@ -79,6 +79,12 @@
 			"revisionTime": "2016-12-01T17:12:39Z"
 		},
 		{
+			"checksumSHA1": "FfOYh5n7gVJDqDcBbxySdCzzs1Y=",
+			"path": "github.com/TykTechnologies/murmur3",
+			"revision": "1915e687e465f5085f46a3a1339fb2d004e29dfb",
+			"revisionTime": "2018-06-02T12:20:59Z"
+		},
+		{
 			"checksumSHA1": "v64AG0uGiKryWV/kqq5360zw1ts=",
 			"path": "github.com/TykTechnologies/openid2go/openid",
 			"revision": "aab5ce1231ab090ca20af7b7b45a86ae34235eef",

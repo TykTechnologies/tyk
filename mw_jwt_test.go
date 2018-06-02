@@ -643,7 +643,7 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	})
 
-	sessionID := fmt.Sprintf("%x", md5.Sum([]byte("user")))
+	sessionID := generateToken("", fmt.Sprintf("%x", md5.Sum([]byte("user"))))
 
 	authHeaders := map[string]string{"authorization": jwtToken}
 	t.Run("Initial request with 1st policy", func(t *testing.T) {
