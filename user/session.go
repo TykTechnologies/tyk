@@ -1,8 +1,9 @@
 package user
 
 import (
-	"github.com/TykTechnologies/murmur3"
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"github.com/TykTechnologies/murmur3"
 
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
