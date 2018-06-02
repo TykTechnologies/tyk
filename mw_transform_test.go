@@ -46,17 +46,32 @@ func TestTransformXMLCrash(t *testing.T) {
 	}
 }
 
-func TestTransformJSONMarshal(t *testing.T) {
-	in := `<names>
+func testPrepareTransformJSONMarshal(tb testing.TB, inputType string) (tmeta *TransformSpec, in string) {
+	tmeta = &TransformSpec{}
+	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
+	tmeta.TemplateData.Input = apidef.RequestXML
+	tmeta.Template = template.Must(apiTemplate.New("").Parse(tmpl))
+
+	switch inputType {
+	case "json":
+		tmeta.TemplateData.Input = apidef.RequestJSON
+		in = `{"names": { "name": ["Foo\"oo", "Bàr"] }}`
+	case "xml":
+		tmeta.TemplateData.Input = apidef.RequestXML
+		in = `<names>
 	<name>Foo"oo</name>
 	<name>Bàr</name>
 </names>`
+	}
+
+	return tmeta, in
+}
+
+func TestTransformJSONMarshalXMLInput(t *testing.T) {
+	tmeta, in := testPrepareTransformJSONMarshal(t, "xml")
+
 	want := `["Foo\"oo", "Bàr"]`
-	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
 	r := testReq(t, "GET", "/", in)
-	tmeta := &TransformSpec{}
-	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(apiTemplate.New("").Parse(tmpl))
 	if err := transformBody(r, tmeta, false); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
@@ -68,3 +83,21 @@ func TestTransformJSONMarshal(t *testing.T) {
 		t.Fatalf("wanted body %q, got %q", want, got)
 	}
 }
+
+func TestTransformJSONMarshalJSONInput(t *testing.T) {
+	tmeta, in := testPrepareTransformJSONMarshal(t, "json")
+
+	want := `["Foo\"oo", "Bàr"]`
+	r := testReq(t, "GET", "/", in)
+	if err := transformBody(r, tmeta, false); err != nil {
+		t.Fatalf("wanted nil error, got %v", err)
+	}
+	gotBs, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(gotBs); got != want {
+		t.Fatalf("wanted body %q, got %q", want, got)
+	}
+}
+

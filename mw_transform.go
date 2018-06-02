@@ -76,7 +76,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, contextVars bool) erro
 				return fmt.Errorf("error unmarshalling XML: %v", err)
 			}
 		case apidef.RequestJSON:
-			if err := json.Unmarshal(body, bodyData); err != nil {
+			if err := json.Unmarshal(body, &bodyData); err != nil {
 				return err
 			}
 		default:
