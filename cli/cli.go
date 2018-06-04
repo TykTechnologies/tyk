@@ -6,8 +6,11 @@ import (
 
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
+	"github.com/TykTechnologies/tyk/cli/bundler"
 	"github.com/TykTechnologies/tyk/cli/importer"
 	"github.com/TykTechnologies/tyk/cli/lint"
+
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 const (
@@ -35,7 +38,12 @@ var (
 	// LogInstrumentation outputs instrumentation data to stdout.
 	LogInstrumentation *bool
 
+	// DefaultMode is set when default command is used.
+	DefaultMode bool
+
 	app *kingpin.Application
+
+	log = logger.Get()
 )
 
 // Init sets all flags and subcommands.
@@ -57,6 +65,7 @@ func Init(version string, confPaths []string) {
 	LogInstrumentation = startCmd.Flag("log-intrumentation", "output intrumentation output to stdout").Bool()
 
 	startCmd.Action(func(ctx *kingpin.ParseContext) error {
+		DefaultMode = true
 		return nil
 	})
 	startCmd.Default()
@@ -81,8 +90,11 @@ func Init(version string, confPaths []string) {
 		return nil
 	})
 
-	// Import command:
+	// Add import command:
 	importer.AddTo(app)
+
+	// Add bundler commands:
+	bundler.AddTo(app)
 }
 
 // Parse parses the command-line arguments.
