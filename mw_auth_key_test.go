@@ -85,7 +85,7 @@ func TestMurmur3CharBug(t *testing.T) {
 	t.Run("murmur64 hashing", func(t *testing.T) {
 		globalConf := config.Global()
 		globalConf.HashKeys = true
-		globalConf.HashKeyFunction = "sha256"
+		globalConf.HashKeyFunction = "murmur64"
 		config.SetGlobal(globalConf)
 
 		loadAPI(api)
