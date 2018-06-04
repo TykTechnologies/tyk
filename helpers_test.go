@@ -29,6 +29,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -198,7 +199,7 @@ func createSession(sGen ...func(s *user.SessionState)) string {
 		key = generateToken("", session.Certificate)
 	}
 
-	FallbackKeySesionManager.UpdateSession(key, session, 60, false)
+	FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
 	return key
 }
 
