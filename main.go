@@ -886,6 +886,10 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 func main() {
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
+	// Stop gateway process if not running in "start" mode:
+	if !cli.DefaultMode {
+		os.Exit(0)
+	}
 
 	NodeID = "solo-" + uuid.NewV4().String()
 
