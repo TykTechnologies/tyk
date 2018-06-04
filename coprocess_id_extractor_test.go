@@ -87,7 +87,7 @@ func prepareExtractorFormRequest(values map[string]string) *http.Request {
 func generateSessionID(input string) string {
 	data := []byte(input)
 	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	return extractorTestOrgID + tokenID
+	return generateToken(extractorTestOrgID, tokenID)
 }
 
 func TestValueExtractor(t *testing.T) {
@@ -112,7 +112,7 @@ func TestValueExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -139,7 +139,7 @@ func TestValueExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -172,7 +172,7 @@ func TestRegexExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -200,7 +200,7 @@ func TestRegexExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -229,7 +229,7 @@ func TestRegexExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -261,7 +261,7 @@ func TestXPathExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -288,7 +288,7 @@ func TestXPathExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -316,7 +316,7 @@ func TestXPathExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if !strings.HasPrefix(sessionID, spec.OrgID) {
+		if storage.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {

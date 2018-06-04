@@ -81,13 +81,29 @@ const B64JSONPrefix = "ey"
 
 func TokenHashAlgo(token string) string {
 	// Legacy tokens not b64 and not JSON records
-	if !strings.HasPrefix(token, B64JSONPrefix) {
-		return ""
+	if strings.HasPrefix(token, B64JSONPrefix) {
+		if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {
+			hashAlgo, _ := jsonparser.GetString(jsonToken, "h")
+			return hashAlgo
+		}
 	}
 
-	if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {
-		hashAlgo, _ := jsonparser.GetString(jsonToken, "h")
-		return hashAlgo
+	return ""
+}
+
+func TokenOrg(token string) string {
+	if strings.HasPrefix(token, B64JSONPrefix) {
+		if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {
+			// Checking error in case if it is a legacy tooken which just by accided has the same b64JSON prefix
+			if org, err := jsonparser.GetString(jsonToken, "org"); err == nil {
+				return org
+			}
+		}
+	}
+
+	// 24 is mongo bson id length
+	if len(token) > 24 {
+		return token[:24]
 	}
 
 	return ""

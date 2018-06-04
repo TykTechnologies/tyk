@@ -189,13 +189,13 @@ func withAuth(r *http.Request) *http.Request {
 
 // TODO: replace with /tyk/keys/create call
 func createSession(sGen ...func(s *user.SessionState)) string {
-	key := keyGen.GenerateAuthKey("")
+	key := generateToken("", "")
 	session := createStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 	if session.Certificate != "" {
-		key = session.Certificate
+		key = generateToken("", session.Certificate)
 	}
 
 	FallbackKeySesionManager.UpdateSession(key, session, 60, false)
