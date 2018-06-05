@@ -157,6 +157,8 @@ func TestInitGenericEventHandlers(t *testing.T) {
 }
 
 func BenchmarkInitGenericEventHandlers(b *testing.B) {
+	b.ReportAllocs()
+
 	conf := prepareEventsConf()
 	for i := 0; i < b.N; i++ {
 		initGenericEventHandlers(conf)

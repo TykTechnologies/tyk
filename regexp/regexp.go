@@ -18,6 +18,8 @@ var (
 	replaceAllStringCache        = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
 	replaceAllLiteralStringCache = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
 	replaceAllStringFuncCache    = newRegexpStrFuncRetStrCache(defaultCacheItemTTL, true)
+	findAllStringCache           = newRegexpStrIntRetSliceStrCache(defaultCacheItemTTL, true)
+	findAllStringSubmatchCache   = newRegexpStrIntRetSliceSliceStrCache(defaultCacheItemTTL, true)
 )
 
 // Regexp is a wrapper around regexp.Regexp but with caching
@@ -39,6 +41,8 @@ func ResetCache(ttl time.Duration, isEnabled bool) {
 	replaceAllStringCache.reset(ttl, isEnabled)
 	replaceAllLiteralStringCache.reset(ttl, isEnabled)
 	replaceAllStringFuncCache.reset(ttl, isEnabled)
+	findAllStringCache.reset(ttl, isEnabled)
+	findAllStringSubmatchCache.reset(ttl, isEnabled)
 }
 
 // Compile does the same as regexp.Compile but returns cached *Regexp instead.
@@ -360,8 +364,7 @@ func (re *Regexp) FindAllString(s string, n int) []string {
 	if re.Regexp == nil {
 		return []string{}
 	}
-	// TODO: add cache for FindAllString
-	return re.Regexp.FindAllString(s, n)
+	return findAllStringCache.do(re.Regexp, s, n, re.Regexp.FindAllString)
 }
 
 // FindAllStringIndex is the same as regexp.Regexp.FindAllStringIndex but returns cached result instead.
@@ -396,8 +399,7 @@ func (re *Regexp) FindAllStringSubmatch(s string, n int) [][]string {
 	if re.Regexp == nil {
 		return [][]string{}
 	}
-	// TODO: add cache for FindAllStringSubmatch
-	return re.Regexp.FindAllStringSubmatch(s, n)
+	return findAllStringSubmatchCache.do(re.Regexp, s, n, re.Regexp.FindAllStringSubmatch)
 }
 
 // FindAllStringSubmatchIndex is the same as regexp.Regexp.FindAllStringSubmatchIndex but returns cached result instead.

@@ -53,6 +53,22 @@ func (c *cache) getString(key string) (string, bool) {
 	return "", false
 }
 
+func (c *cache) getStrSlice(key string) ([]string, bool) {
+	if val, found := c.Get(key); found {
+		return val.([]string), true
+	}
+
+	return []string{}, false
+}
+
+func (c *cache) getStrSliceOfSlices(key string) ([][]string, bool) {
+	if val, found := c.Get(key); found {
+		return val.([][]string), true
+	}
+
+	return [][]string{}, false
+}
+
 func (c *cache) getBool(key string) (bool, bool) {
 	if val, found := c.Get(key); found {
 		return val.(bool), true
