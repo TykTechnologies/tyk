@@ -1,6 +1,7 @@
 package regexp
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -349,7 +350,7 @@ func TestReplaceAllString(t *testing.T) {
 	rx := MustCompile("abc")
 	newStr := rx.ReplaceAllString("qweabcxyz", "123")
 	if newStr != "qwe123xyz" {
-		t.Error("Eexpected 'qwe123xyz'. Got:", newStr)
+		t.Error("Expected 'qwe123xyz'. Got:", newStr)
 	}
 	// 2nd hit
 	newStr2 := rx.ReplaceAllString("qweabcxyz", "123")
@@ -389,7 +390,7 @@ func TestReplaceAllLiteralString(t *testing.T) {
 	rx := MustCompile("abc")
 	newStr := rx.ReplaceAllLiteralString("qweabcxyz", "123")
 	if newStr != "qwe123xyz" {
-		t.Error("Eexpected 'qwe123xyz'. Got:", newStr)
+		t.Error("Expected 'qwe123xyz'. Got:", newStr)
 	}
 	// 2nd hit
 	newStr2 := rx.ReplaceAllLiteralString("qweabcxyz", "123")
@@ -434,7 +435,7 @@ func TestReplaceAllStringFunc(t *testing.T) {
 	rx := MustCompile("abc")
 	newStr := rx.ReplaceAllStringFunc("qweabcxyz", f)
 	if newStr != "qweABCxyz" {
-		t.Error("Eexpected 'qweABCxyz'. Got:", newStr)
+		t.Error("Expected 'qweABCxyz'. Got:", newStr)
 	}
 	// 2nd hit
 	newStr2 := rx.ReplaceAllStringFunc("qweabcxyz", f)
@@ -457,7 +458,7 @@ func TestReplaceAllStringFuncRegexpNotSet(t *testing.T) {
 	}
 }
 
-func BenchmarkReplaceAllStringFunc(b *testing.B) {
+func BenchmarkRegexpReplaceAllStringFunc(b *testing.B) {
 	b.ReportAllocs()
 
 	ResetCache(defaultCacheItemTTL, true)
@@ -475,4 +476,94 @@ func BenchmarkReplaceAllStringFunc(b *testing.B) {
 
 	b.Log(str)
 
+}
+
+func TestFindAllString(t *testing.T) {
+	ResetCache(defaultCacheItemTTL, true)
+
+	// 1st miss
+	rx := MustCompile("abc")
+	res := rx.FindAllString("qweabcxyzabc123abcz", -1)
+	expectedRes := []string{"abc", "abc", "abc"}
+	if !reflect.DeepEqual(res, expectedRes) {
+		t.Error("Expected :", expectedRes, " Got:", res)
+	}
+	// 2nd hit
+	res2 := rx.FindAllString("qweabcxyzabc123abcz", -1)
+	if !reflect.DeepEqual(res2, expectedRes) {
+		t.Error("Expected :", expectedRes, " Got:", res2)
+	}
+}
+
+func TestFindAllStringRegexpNotSet(t *testing.T) {
+	ResetCache(defaultCacheItemTTL, true)
+
+	rx := &Regexp{}
+
+	res := rx.FindAllString("qweabcxyzabc123abcz", -1)
+	if len(res) > 0 {
+		t.Error("Expected 0 length slice returned. Got:", res)
+	}
+}
+
+func BenchmarkRegexpFindAllString(b *testing.B) {
+	b.ReportAllocs()
+
+	ResetCache(defaultCacheItemTTL, true)
+
+	rx := MustCompile("abc")
+	var res []string
+
+	for i := 0; i < b.N; i++ {
+		res = rx.FindAllString("qweabcxyzabc123abcz", -1)
+	}
+
+	b.Log(res)
+}
+
+func TestFindAllStringSubmatch(t *testing.T) {
+	ResetCache(defaultCacheItemTTL, true)
+
+	// 1st miss
+	rx := MustCompile("abc")
+	res := rx.FindAllStringSubmatch("qweabcxyzabc123abcz", -1)
+	expectedRes := [][]string{
+		{"abc"},
+		{"abc"},
+		{"abc"},
+	}
+	if !reflect.DeepEqual(res, expectedRes) {
+		t.Error("Expected :", expectedRes, " Got:", res)
+	}
+	// 2nd hit
+	res2 := rx.FindAllStringSubmatch("qweabcxyzabc123abcz", -1)
+	if !reflect.DeepEqual(res2, expectedRes) {
+		t.Error("Expected :", expectedRes, " Got:", res2)
+	}
+}
+
+func TestTestFindAllStringSubmatchRegexpNotSet(t *testing.T) {
+	ResetCache(defaultCacheItemTTL, true)
+
+	rx := &Regexp{}
+
+	res := rx.FindAllStringSubmatch("qweabcxyzabc123abcz", -1)
+	if len(res) > 0 {
+		t.Error("Expected 0 length slice returned. Got:", res)
+	}
+}
+
+func BenchmarkRegexpFindAllStringSubmatch(b *testing.B) {
+	b.ReportAllocs()
+
+	ResetCache(defaultCacheItemTTL, true)
+
+	rx := MustCompile("abc")
+	var res [][]string
+
+	for i := 0; i < b.N; i++ {
+		res = rx.FindAllStringSubmatch("qweabcxyzabc123abcz", -1)
+	}
+
+	b.Log(res)
 }

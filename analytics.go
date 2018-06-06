@@ -10,7 +10,7 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
-	tykregexp "github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -105,11 +105,11 @@ func geoIPLookup(ipStr string) (*GeoData, error) {
 }
 
 func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
-	pats.UUIDs = tykregexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
-	pats.IDs = tykregexp.MustCompile(`\/(\d+)`)
+	pats.UUIDs = regexp.MustCompile(`[0-9a-fA-F]{8}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{4}(-)?[0-9a-fA-F]{12}`)
+	pats.IDs = regexp.MustCompile(`\/(\d+)`)
 
 	for _, pattern := range config.Global().AnalyticsConfig.NormaliseUrls.Custom {
-		if patRe, err := tykregexp.Compile(pattern); err != nil {
+		if patRe, err := regexp.Compile(pattern); err != nil {
 			log.Error("failed to compile custom pattern: ", err)
 		} else {
 			pats.Custom = append(pats.Custom, patRe)

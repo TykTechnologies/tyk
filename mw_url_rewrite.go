@@ -12,7 +12,7 @@ import (
 	"net/textproto"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	tykregexp "github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -21,9 +21,9 @@ const (
 	contextLabel = "$tyk_context."
 )
 
-var dollarMatch = tykregexp.MustCompile(`\$\d+`)
-var contextMatch = tykregexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
-var metaMatch = tykregexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
+var dollarMatch = regexp.MustCompile(`\$\d+`)
+var contextMatch = regexp.MustCompile(`\$tyk_context.([A-Za-z0-9_\-\.]+)`)
+var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 
 func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	path := r.URL.String()
@@ -32,7 +32,7 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 
 	if meta.MatchRegexp == nil {
 		var err error
-		meta.MatchRegexp, err = tykregexp.Compile(meta.MatchPattern)
+		meta.MatchRegexp, err = regexp.Compile(meta.MatchPattern)
 		if err != nil {
 			return path, fmt.Errorf("URLRewrite regexp error %s", meta.MatchPattern)
 		}

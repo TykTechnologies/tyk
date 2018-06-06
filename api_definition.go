@@ -22,7 +22,7 @@ import (
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	tykregexp "github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -94,7 +94,7 @@ const (
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec                      *tykregexp.Regexp
+	Spec                      *regexp.Regexp
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
 	TransformAction           TransformSpec
@@ -415,9 +415,9 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 }
 
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
-	apiLangIDsRegex := tykregexp.MustCompile(`{(.*?)}`)
+	apiLangIDsRegex := regexp.MustCompile(`{(.*?)}`)
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `(.*?)`)
-	asRegex, _ := tykregexp.Compile(asRegexStr)
+	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
 }
