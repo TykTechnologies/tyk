@@ -276,8 +276,6 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 		for tag := range tags {
 			session.Tags = append(session.Tags, tag)
 		}
-	} else {
-		session.Tags = nil
 	}
 
 	session.AccessRights = rights
