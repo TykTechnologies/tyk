@@ -999,6 +999,13 @@ func main() {
 		analytics.Stop()
 	}
 
+	//if using async session writes stop workers
+	if config.Global().UseAsyncSessionWrite {
+		DefaultOrgStore.Stop()
+		DefaultQuotaStore.Stop()
+		FallbackKeySesionManager.Stop()
+	}
+
 	// write pprof profiles
 	writeProfiles()
 
