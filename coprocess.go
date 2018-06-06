@@ -273,6 +273,16 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	var token string
 	if returnObject.Session != nil {
+		// For compatibility purposes, inject coprocess.Object.Metadata fields:
+		if returnObject.Metadata != nil {
+			if returnObject.Session.Metadata == nil {
+				returnObject.Session.Metadata = make(map[string]string)
+			}
+			for k, v := range returnObject.Metadata {
+				returnObject.Session.Metadata[k] = v
+			}
+		}
+
 		token = returnObject.Session.Metadata["token"]
 	}
 
