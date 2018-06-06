@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"regexp"
 	"sync"
 	"sync/atomic"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 var log = logger.Get()
@@ -287,6 +287,8 @@ type Config struct {
 	VersionHeader                     string                                `json:"version_header"`
 	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
 	MinTokenLength                    int                                   `json:"min_token_length"`
+	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
+	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
 }
 
 type CertData struct {

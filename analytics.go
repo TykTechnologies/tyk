@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net"
-	"regexp"
 	"time"
 
 	"github.com/jeffail/tunny"
@@ -11,6 +10,7 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -118,14 +118,14 @@ func initNormalisationPatterns() (pats config.NormaliseURLPatterns) {
 	return
 }
 
-func (a *AnalyticsRecord) NormalisePath() {
-	if config.Global().AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
-		a.Path = config.Global().AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
+func (a *AnalyticsRecord) NormalisePath(globalConfig *config.Config) {
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseUUIDs {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.UUIDs.ReplaceAllString(a.Path, "{uuid}")
 	}
-	if config.Global().AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
-		a.Path = config.Global().AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
+	if globalConfig.AnalyticsConfig.NormaliseUrls.NormaliseNumbers {
+		a.Path = globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.IDs.ReplaceAllString(a.Path, "/{id}")
 	}
-	for _, r := range config.Global().AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
+	for _, r := range globalConfig.AnalyticsConfig.NormaliseUrls.CompiledPatternSet.Custom {
 		a.Path = r.ReplaceAllString(a.Path, "{var}")
 	}
 }

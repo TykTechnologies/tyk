@@ -7,11 +7,11 @@ import (
 	"net/textproto"
 	"net/url"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
