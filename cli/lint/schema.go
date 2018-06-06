@@ -494,6 +494,9 @@ const confSchema = `{
 	"session_update_pool_size":{
 		"type": "integer"
 	},
+	"session_update_buffer_size":{
+		"type": "integer"
+	},
 	"pid_file_location": {
 		"type": "string"
 	},

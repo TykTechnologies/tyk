@@ -999,11 +999,13 @@ func main() {
 		analytics.Stop()
 	}
 
-	//if using async session writes stop workers
+	// if using async session writes stop workers
 	if config.Global().UseAsyncSessionWrite {
 		DefaultOrgStore.Stop()
-		DefaultQuotaStore.Stop()
-		FallbackKeySesionManager.Stop()
+		for i := range apiSpecs {
+			apiSpecs[i].StopSessionManagerPool()
+		}
+
 	}
 
 	// write pprof profiles
