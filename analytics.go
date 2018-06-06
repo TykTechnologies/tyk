@@ -64,8 +64,9 @@ type GeoData struct {
 const analyticsKeyName = "tyk-system-analytics"
 
 const (
-	minRecordsBufferSize       = 1000
-	recordsBufferFlushInterval = 200 * time.Millisecond
+	minRecordsBufferSize             = 1000
+	recordsBufferFlushInterval       = 200 * time.Millisecond
+	recordsBufferForcedFlushInterval = 1 * time.Second
 )
 
 func (a *AnalyticsRecord) GetGeo(ipStr string) {
@@ -148,14 +149,14 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store             storage.Handler
-	Clean             Purger
-	GeoIPDB           *maxminddb.Reader
-	globalConf        config.Config
-	recordsChan       chan *AnalyticsRecord
-	recordsBufferSize uint64
-	shouldStop        uint32
-	poolWg            sync.WaitGroup
+	Store            storage.Handler
+	Clean            Purger
+	GeoIPDB          *maxminddb.Reader
+	globalConf       config.Config
+	recordsChan      chan *AnalyticsRecord
+	workerBufferSize uint64
+	shouldStop       uint32
+	poolWg           sync.WaitGroup
 }
 
 func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
@@ -177,15 +178,16 @@ func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
 	}
 	log.WithField("ps", ps).Debug("Analytics pool workers number")
 
-	r.recordsBufferSize = r.globalConf.AnalyticsConfig.RecordsBufferSize
-	if r.recordsBufferSize < minRecordsBufferSize {
-		r.recordsBufferSize = minRecordsBufferSize // force it to this value
+	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
+	if recordsBufferSize < minRecordsBufferSize {
+		recordsBufferSize = minRecordsBufferSize // force it to this value
 	}
-	log.WithField("recordsBufferSize", r.recordsBufferSize).Debug("Analytics records buffer size")
+	log.WithField("recordsBufferSize", recordsBufferSize).Debug("Analytics total buffer (channel) size")
 
-	chanSize := uint64(ps) * r.recordsBufferSize
-	log.WithField("chanSize", chanSize).Debug("Analytics channel size")
-	r.recordsChan = make(chan *AnalyticsRecord, chanSize)
+	r.workerBufferSize = recordsBufferSize / uint64(ps)
+	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
+
+	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
 
 	// start worker pool
 	atomic.SwapUint32(&r.shouldStop, 0)
@@ -225,9 +227,10 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 
 	// this is buffer to send one pipelined command to redis
 	// use r.recordsBufferSize as cap to reduce slice re-allocations
-	recordsBuffer := make([]string, 0, r.recordsBufferSize)
+	recordsBuffer := make([]string, 0, r.workerBufferSize)
 
 	// read records from channel and process
+	lastSentTs := time.Now()
 	for {
 		readyToSend := false
 		select {
@@ -273,7 +276,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			}
 
 			// identify that buffer is ready to be sent
-			readyToSend = uint64(len(recordsBuffer)) == r.recordsBufferSize
+			readyToSend = uint64(len(recordsBuffer)) == r.workerBufferSize
 
 		case <-time.After(recordsBufferFlushInterval):
 			// nothing was received for that period of time
@@ -282,9 +285,10 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 		}
 
 		// send data to Redis and reset buffer
-		if readyToSend && len(recordsBuffer) > 0 {
+		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
 			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
-			recordsBuffer = make([]string, 0, r.recordsBufferSize)
+			recordsBuffer = make([]string, 0, r.workerBufferSize)
+			lastSentTs = time.Now()
 		}
 	}
 }

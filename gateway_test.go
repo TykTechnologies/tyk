@@ -593,7 +593,7 @@ func TestAnalytics(t *testing.T) {
 
 	// Cleanup before test
 	// let records to to be sent
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(recordsBufferFlushInterval + 50)
 	analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 	t.Run("Log errors", func(t *testing.T) {
@@ -603,7 +603,7 @@ func TestAnalytics(t *testing.T) {
 		}...)
 
 		// let records to to be sent
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(recordsBufferFlushInterval + 50)
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
@@ -629,7 +629,7 @@ func TestAnalytics(t *testing.T) {
 		})
 
 		// let records to to be sent
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(recordsBufferFlushInterval + 50)
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
