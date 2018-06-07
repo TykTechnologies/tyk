@@ -7,6 +7,8 @@ import (
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 
+	"time"
+
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -207,9 +209,10 @@ type ExtendedPathsSet struct {
 }
 
 type VersionInfo struct {
-	Name    string `bson:"name" json:"name"`
-	Expires string `bson:"expires" json:"expires"`
-	Paths   struct {
+	Name      string    `bson:"name" json:"name"`
+	Expires   string    `bson:"expires" json:"expires"`
+	ExpiresTs time.Time `bson:"-" json:"-"`
+	Paths     struct {
 		Ignored   []string `bson:"ignored" json:"ignored"`
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`

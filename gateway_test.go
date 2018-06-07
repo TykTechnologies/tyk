@@ -592,6 +592,8 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	// Cleanup before test
+	// let records to to be sent
+	time.Sleep(recordsBufferFlushInterval + 50)
 	analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 	t.Run("Log errors", func(t *testing.T) {
@@ -599,6 +601,9 @@ func TestAnalytics(t *testing.T) {
 			{Path: "/", Code: 401},
 			{Path: "/", Code: 401},
 		}...)
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
@@ -622,6 +627,9 @@ func TestAnalytics(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Path: "/", Headers: authHeaders, Code: 200,
 		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {

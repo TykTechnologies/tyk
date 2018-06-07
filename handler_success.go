@@ -79,6 +79,21 @@ func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.
 	}
 }
 
+func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
+	size := 5 // that number of tags expected to be added at least before we record hit
+	if session != nil {
+		size += len(session.Tags)
+	}
+
+	if apiSpec.GlobalConfig.DBAppConfOptions.NodeIsSegmented {
+		size += len(apiSpec.GlobalConfig.DBAppConfOptions.Tags)
+	}
+
+	size += len(apiSpec.TagHeaders)
+
+	return size
+}
+
 func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack {
@@ -101,13 +116,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		// If OAuth, we need to grab it from the session, which may or may not exist
 		oauthClientID := ""
-		tags := make([]string, 0)
 		var alias string
 		session := ctxGetSession(r)
-
+		tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
 		if session != nil {
 			oauthClientID = session.OauthClientID
-			tags = session.Tags
+			tags = append(tags, session.Tags...)
 			alias = session.Alias
 		}
 
@@ -171,10 +185,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			tags,
 			alias,
 			trackEP,
-			time.Now(),
+			t,
 		}
 
-		record.GetGeo(ip)
+		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+			record.GetGeo(ip)
+		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -191,7 +207,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		go analytics.RecordHit(record)
+		analytics.RecordHit(&record)
 	}
 
 	// Report in health check

@@ -164,6 +164,21 @@ var ServiceNonce string
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 	spec := &APISpec{}
+
+	// parse version expiration time stamps
+	for key, ver := range def.VersionData.Versions {
+		if ver.Expires == "" || ver.Expires == "-1" {
+			continue
+		}
+		// calculate the time
+		if t, err := time.Parse("2006-01-02 15:04", ver.Expires); err != nil {
+			log.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
+		} else {
+			ver.ExpiresTs = t
+			def.VersionData.Versions[key] = ver
+		}
+	}
+
 	spec.APIDefinition = def
 
 	// We'll push the default HealthChecker:
@@ -874,18 +889,16 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := v.MethodActions[r.Method]
-
 			if !matchMethodOk {
 				continue
 			}
 
-			// Matched the method, check what status it is:
-			if methodMeta.Action == apidef.NoAction {
-				// NoAction status means we're not treating this request in any special or exceptional way
-				return a.getURLStatus(v.Status), nil
-			}
+			// Matched the method, check what status it is
 			// TODO: Extend here for additional reply options
 			switch methodMeta.Action {
+			case apidef.NoAction:
+				// NoAction status means we're not treating this request in any special or exceptional way
+				return a.getURLStatus(v.Status), nil
 			case apidef.Reply:
 				return StatusRedirectFlowByReply, &methodMeta
 			default:
@@ -1043,7 +1056,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case "url":
-		uPath := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
+		uPath := r.URL.Path[len(a.Proxy.ListenPath):]
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
@@ -1067,16 +1080,15 @@ func (a *APISpec) VersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Ti
 		return false, nil
 	}
 
-	// otherwise - calculate the time
-	t, err := time.Parse("2006-01-02 15:04", versionDef.Expires)
-	if err != nil {
-		log.Error("Could not parse expiry date for API, dissallow: ", err)
+	// otherwise use parsed timestamp
+	if versionDef.ExpiresTs.IsZero() {
+		log.Error("Could not parse expiry date for API, disallow")
 		return true, nil
 	}
 
 	// It's in the past, expire
 	// It's in the future, keep going
-	return time.Since(t) >= 0, &t
+	return time.Since(versionDef.ExpiresTs) >= 0, &versionDef.ExpiresTs
 }
 
 // RequestValid will check if an incoming request has valid version
@@ -1134,17 +1146,17 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 		} else {
 			// Extract Version Info
 			// First checking for if default version is set
-			vname := a.getVersionFromRequest(r)
-			if vname == "" && a.VersionData.DefaultVersion != "" {
-				vname = a.VersionData.DefaultVersion
+			vName := a.getVersionFromRequest(r)
+			if vName == "" {
+				if a.VersionData.DefaultVersion == "" {
+					return &version, nil, false, VersionNotFound
+				}
+				vName = a.VersionData.DefaultVersion
 				ctxSetDefaultVersion(r)
-			}
-			if vname == "" && a.VersionData.DefaultVersion == "" {
-				return &version, nil, false, VersionNotFound
 			}
 			// Load Version Data - General
 			var ok bool
-			if version, ok = a.VersionData.Versions[vname]; !ok {
+			if version, ok = a.VersionData.Versions[vName]; !ok {
 				return &version, nil, false, VersionDoesNotExist
 			}
 		}
@@ -1155,13 +1167,12 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 
 	// Load path data and whitelist data for version
 	rxPaths, rxOk := a.RxPaths[version.Name]
-	whiteListStatus, wlOk := a.WhiteListEnabled[version.Name]
-
 	if !rxOk {
 		log.Error("no RX Paths found for version ", version.Name)
 		return &version, nil, false, VersionDoesNotExist
 	}
 
+	whiteListStatus, wlOk := a.WhiteListEnabled[version.Name]
 	if !wlOk {
 		log.Error("No whitelist data found")
 		return &version, nil, false, VersionWhiteListStatusNotFound

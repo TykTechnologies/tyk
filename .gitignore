@@ -47,5 +47,6 @@ petstore.json
 coprocess_gen_test.go
 session_state_gen_test.go
 __pycache__/
+tyk.test
 
 tyk_linux_*

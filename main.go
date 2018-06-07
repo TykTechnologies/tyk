@@ -167,7 +167,7 @@ func setupGlobals() {
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		analytics.Store = &analyticsStore
-		analytics.Init()
+		analytics.Init(globalConf)
 
 		redisPurgeOnce.Do(func() {
 			store := storage.RedisCluster{KeyPrefix: "analytics-"}
@@ -1052,6 +1052,12 @@ func main() {
 
 	mainLog.Info("Stop signal received.")
 
+	// stop analytics workers
+	if config.Global().EnableAnalytics && analytics.Store == nil {
+		analytics.Stop()
+	}
+
+	// write pprof profiles
 	writeProfiles()
 
 	if config.Global().UseDBAppConfigs {

@@ -98,6 +98,9 @@ const confSchema = `{
 			"pool_size": {
 				"type": "integer"
 			},
+			"records_buffer_size": {
+				"type": "integer"
+			},
 			"storage_expiration_time": {
 				"type": "integer"
 			},

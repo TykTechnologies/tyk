@@ -103,13 +103,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		oauthClientID := ""
-		tags := make([]string, 0)
 		session := ctxGetSession(r)
-
+		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
 		if session != nil {
 			oauthClientID = session.OauthClientID
 			alias = session.Alias
-			tags = session.Tags
+			tags = append(tags, session.Tags...)
 		}
 
 		if len(e.Spec.TagHeaders) > 0 {
@@ -159,10 +158,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tags,
 			alias,
 			trackEP,
-			time.Now(),
+			t,
 		}
 
-		record.GetGeo(ip)
+		if e.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+			record.GetGeo(ip)
+		}
 
 		expiresAfter := e.Spec.ExpireAnalyticsAfter
 		if e.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -179,7 +180,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
 
-		go analytics.RecordHit(record)
+		analytics.RecordHit(&record)
 	}
 
 	// Report in health check

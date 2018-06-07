@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/jeffail/tunny"
 	"github.com/oschwald/maxminddb-golang"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
@@ -62,10 +63,13 @@ type GeoData struct {
 
 const analyticsKeyName = "tyk-system-analytics"
 
+const (
+	minRecordsBufferSize             = 1000
+	recordsBufferFlushInterval       = 200 * time.Millisecond
+	recordsBufferForcedFlushInterval = 1 * time.Second
+)
+
 func (a *AnalyticsRecord) GetGeo(ipStr string) {
-	if !config.Global().AnalyticsConfig.EnableGeoIP {
-		return
-	}
 	// Not great, tightly coupled
 	if analytics.GeoIPDB == nil {
 		return
@@ -145,18 +149,21 @@ func (a *AnalyticsRecord) SetExpiry(expiresInSeconds int64) {
 // RedisAnalyticsHandler will record analytics data to a redis back end
 // as defined in the Config object
 type RedisAnalyticsHandler struct {
-	Store   storage.Handler
-	Clean   Purger
-	GeoIPDB *maxminddb.Reader
-
-	AnalyticsPool *tunny.WorkPool
+	Store            storage.Handler
+	Clean            Purger
+	GeoIPDB          *maxminddb.Reader
+	globalConf       config.Config
+	recordsChan      chan *AnalyticsRecord
+	workerBufferSize uint64
+	shouldStop       uint32
+	poolWg           sync.WaitGroup
 }
 
-func (r *RedisAnalyticsHandler) Init() {
-	var err error
-	if config.Global().AnalyticsConfig.EnableGeoIP {
-		db, err := maxminddb.Open(config.Global().AnalyticsConfig.GeoIPDBLocation)
-		if err != nil {
+func (r *RedisAnalyticsHandler) Init(globalConf config.Config) {
+	r.globalConf = globalConf
+
+	if r.globalConf.AnalyticsConfig.EnableGeoIP {
+		if db, err := maxminddb.Open(r.globalConf.AnalyticsConfig.GeoIPDBLocation); err != nil {
 			log.Error("Failed to init GeoIP Database: ", err)
 		} else {
 			r.GeoIPDB = db
@@ -165,53 +172,123 @@ func (r *RedisAnalyticsHandler) Init() {
 
 	analytics.Store.Connect()
 
-	ps := config.Global().AnalyticsConfig.PoolSize
+	ps := r.globalConf.AnalyticsConfig.PoolSize
 	if ps == 0 {
 		ps = 50
 	}
+	log.WithField("ps", ps).Debug("Analytics pool workers number")
 
-	r.AnalyticsPool, err = tunny.CreatePoolGeneric(ps).Open()
-	if err != nil {
-		log.Error("Failed to init analytics pool")
+	recordsBufferSize := r.globalConf.AnalyticsConfig.RecordsBufferSize
+	if recordsBufferSize < minRecordsBufferSize {
+		recordsBufferSize = minRecordsBufferSize // force it to this value
+	}
+	log.WithField("recordsBufferSize", recordsBufferSize).Debug("Analytics total buffer (channel) size")
+
+	r.workerBufferSize = recordsBufferSize / uint64(ps)
+	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
+
+	r.recordsChan = make(chan *AnalyticsRecord, recordsBufferSize)
+
+	// start worker pool
+	atomic.SwapUint32(&r.shouldStop, 0)
+	for i := 0; i < ps; i++ {
+		r.poolWg.Add(1)
+		go r.recordWorker()
 	}
 }
 
+func (r *RedisAnalyticsHandler) Stop() {
+	// flag to stop sending records into channel
+	atomic.SwapUint32(&r.shouldStop, 1)
+
+	// close channel to stop workers
+	close(r.recordsChan)
+
+	// wait for all workers to be done
+	r.poolWg.Wait()
+}
+
 // RecordHit will store an AnalyticsRecord in Redis
-func (r *RedisAnalyticsHandler) RecordHit(record AnalyticsRecord) error {
-	r.AnalyticsPool.SendWork(func() {
-		// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-		record.APIKey = storage.HashKey(record.APIKey)
+func (r *RedisAnalyticsHandler) RecordHit(record *AnalyticsRecord) error {
+	// check if we should stop sending records 1st
+	if atomic.LoadUint32(&r.shouldStop) > 0 {
+		return nil
+	}
 
-		if config.Global().SlaveOptions.UseRPC {
-			// Extend tag list to include this data so wecan segment by node if necessary
-			record.Tags = append(record.Tags, "tyk-hybrid-rpc")
-		}
-
-		if config.Global().DBAppConfOptions.NodeIsSegmented {
-			// Extend tag list to include this data so wecan segment by node if necessary
-			record.Tags = append(record.Tags, config.Global().DBAppConfOptions.Tags...)
-		}
-
-		// Lets add some metadata
-		if record.APIKey != "" {
-			record.Tags = append(record.Tags, "key-"+record.APIKey)
-		}
-
-		if record.OrgID != "" {
-			record.Tags = append(record.Tags, "org-"+record.OrgID)
-		}
-
-		record.Tags = append(record.Tags, "api-"+record.APIID)
-
-		encoded, err := msgpack.Marshal(record)
-
-		if err != nil {
-			log.Error("Error encoding analytics data: ", err)
-		}
-
-		r.Store.AppendToSet(analyticsKeyName, string(encoded))
-	})
+	// just send record to channel consumed by pool of workers
+	// leave all data crunching and Redis I/O work for pool workers
+	r.recordsChan <- record
 
 	return nil
+}
 
+func (r *RedisAnalyticsHandler) recordWorker() {
+	defer r.poolWg.Done()
+
+	// this is buffer to send one pipelined command to redis
+	// use r.recordsBufferSize as cap to reduce slice re-allocations
+	recordsBuffer := make([]string, 0, r.workerBufferSize)
+
+	// read records from channel and process
+	lastSentTs := time.Now()
+	for {
+		readyToSend := false
+		select {
+
+		case record, ok := <-r.recordsChan:
+			// check if channel was closed and it is time to exit from worker
+			if !ok {
+				// send what is left in buffer
+				r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
+				return
+			}
+
+			// we have new record - prepare it and add to buffer
+
+			// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
+			record.APIKey = storage.HashKey(record.APIKey)
+
+			if r.globalConf.SlaveOptions.UseRPC {
+				// Extend tag list to include this data so wecan segment by node if necessary
+				record.Tags = append(record.Tags, "tyk-hybrid-rpc")
+			}
+
+			if r.globalConf.DBAppConfOptions.NodeIsSegmented {
+				// Extend tag list to include this data so we can segment by node if necessary
+				record.Tags = append(record.Tags, r.globalConf.DBAppConfOptions.Tags...)
+			}
+
+			// Lets add some metadata
+			if record.APIKey != "" {
+				record.Tags = append(record.Tags, "key-"+record.APIKey)
+			}
+
+			if record.OrgID != "" {
+				record.Tags = append(record.Tags, "org-"+record.OrgID)
+			}
+
+			record.Tags = append(record.Tags, "api-"+record.APIID)
+
+			if encoded, err := msgpack.Marshal(record); err != nil {
+				log.WithError(err).Error("Error encoding analytics data")
+			} else {
+				recordsBuffer = append(recordsBuffer, string(encoded))
+			}
+
+			// identify that buffer is ready to be sent
+			readyToSend = uint64(len(recordsBuffer)) == r.workerBufferSize
+
+		case <-time.After(recordsBufferFlushInterval):
+			// nothing was received for that period of time
+			// anyways send whatever we have, don't hold data too long in buffer
+			readyToSend = true
+		}
+
+		// send data to Redis and reset buffer
+		if len(recordsBuffer) > 0 && (readyToSend || time.Since(lastSentTs) >= recordsBufferForcedFlushInterval) {
+			r.Store.AppendToSetPipelined(analyticsKeyName, recordsBuffer)
+			recordsBuffer = make([]string, 0, r.workerBufferSize)
+			lastSentTs = time.Now()
+		}
+	}
 }

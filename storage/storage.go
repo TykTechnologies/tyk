@@ -37,6 +37,7 @@ type Handler interface {
 	GetSet(string) (map[string]string, error)
 	AddToSet(string, string)
 	AppendToSet(string, string)
+	AppendToSetPipelined(string, []string)
 	GetAndDeleteSet(string) []interface{}
 	RemoveFromSet(string, string)
 	DeleteScanMatch(string) bool
