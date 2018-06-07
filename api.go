@@ -59,6 +59,12 @@ func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 	}
 }
 
+type MethodNotAllowedHandler struct{}
+
+func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
+}
+
 func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		for _, method := range methods {
