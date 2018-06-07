@@ -177,7 +177,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		record.SetExpiry(expiresAfter)
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath()
+			record.NormalisePath(&e.Spec.GlobalConfig)
 		}
 
 		analytics.RecordHit(&record)

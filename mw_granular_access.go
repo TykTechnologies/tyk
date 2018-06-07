@@ -3,7 +3,8 @@ package main
 import (
 	"errors"
 	"net/http"
-	"regexp"
+
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key

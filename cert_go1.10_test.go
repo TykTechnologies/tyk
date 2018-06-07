@@ -200,9 +200,7 @@ func TestProxyTransport(t *testing.T) {
 
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
-			spec.Proxy.TargetURL = upstream.URL
 			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
-			// Invalid proxy
 			spec.Proxy.Transport.ProxyURL = proxy.URL
 		})
 

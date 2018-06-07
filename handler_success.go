@@ -204,7 +204,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath()
+			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
 		analytics.RecordHit(&record)

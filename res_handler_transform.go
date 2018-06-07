@@ -85,7 +85,7 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	defer respBody.Close()
 
 	// Put into an interface:
-	var bodyData interface{}
+	bodyData := make(map[string]interface{})
 	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
 		mxj.XmlCharsetReader = WrappedCharsetReader
@@ -103,9 +103,26 @@ func (h *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 			logger.WithError(err).Error("Error unmarshalling XML")
 		}
 	default: // apidef.RequestJSON
-		if err := json.NewDecoder(respBody).Decode(&bodyData); err != nil {
+		var tempBody interface{}
+		if err := json.NewDecoder(respBody).Decode(&tempBody); err != nil {
 			logger.WithError(err).Error("Error unmarshalling JSON")
 		}
+
+		switch tempBody.(type) {
+		case []interface{}:
+			bodyData["array"] = tempBody
+		case map[string]interface{}:
+			bodyData = tempBody.(map[string]interface{})
+		}
+	}
+
+	if h.Spec.EnableContextVars {
+		bodyData["_tyk_context"] = ctxGetData(req)
+	}
+
+	if tmeta.TemplateData.EnableSession {
+		session := ctxGetSession(req)
+		bodyData["_tyk_meta"] = session.MetaData
 	}
 
 	// Apply to template

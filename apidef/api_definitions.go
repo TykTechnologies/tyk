@@ -3,7 +3,6 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
-	"regexp"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type AuthProviderCode string

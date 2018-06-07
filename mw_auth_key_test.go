@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/justinas/alice"
-
 	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/user"

@@ -395,6 +395,11 @@ type TykJSHttpResponse struct {
 	Code    int
 	Body    string
 	Headers map[string][]string
+
+	// Make this compatible with BatchReplyUnit
+	CodeComp    int                 `json:"code"`
+	BodyComp    string              `json:"body"`
+	HeadersComp map[string][]string `json:"headers"`
 }
 
 func (j *JSVM) LoadTykJSApi() {
@@ -512,10 +517,14 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		body, _ := ioutil.ReadAll(resp.Body)
+		bodyStr := string(body)
 		tykResp := TykJSHttpResponse{
-			Code:    resp.StatusCode,
-			Body:    string(body),
-			Headers: resp.Header,
+			Code:        resp.StatusCode,
+			Body:        bodyStr,
+			Headers:     resp.Header,
+			CodeComp:    resp.StatusCode,
+			BodyComp:    bodyStr,
+			HeadersComp: resp.Header,
 		}
 
 		retAsStr, _ := json.Marshal(tykResp)
