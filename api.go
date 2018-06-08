@@ -1550,6 +1550,10 @@ func ctxScheduleSessionUpdate(r *http.Request) {
 	setCtxValue(r, UpdateSession, true)
 }
 
+func ctxDisableSessionUpdate(r *http.Request) {
+	setCtxValue(r, UpdateSession, false)
+}
+
 func ctxSessionUpdateScheduled(r *http.Request) bool {
 	if v := r.Context().Value(UpdateSession); v != nil {
 		return v.(bool)

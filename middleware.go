@@ -188,6 +188,10 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
+	// Set context state back
+	// Useful for benchmarks when request object stays same
+	ctxDisableSessionUpdate(r)
+
 	return true
 }
 
