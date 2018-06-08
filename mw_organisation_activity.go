@@ -38,7 +38,9 @@ func (k *OrganizationMonitor) EnabledForSpec() bool {
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
-		return k.ProcessRequestOffThread(r)
+		// Make a copy of request before before sending to goroutine
+		r2 := r.WithContext(r.Context())
+		return k.ProcessRequestOffThread(r2)
 	}
 	return k.ProcessRequestLive(r)
 }
