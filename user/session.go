@@ -1,9 +1,6 @@
 package user
 
 import (
-	"github.com/spaolacci/murmur3"
-	"gopkg.in/vmihailenco/msgpack.v2"
-
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
@@ -71,28 +68,6 @@ type SessionState struct {
 	LastUpdated             string                 `json:"last_updated" msg:"last_updated"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
-
-	firstSeenHash string
-}
-
-func (s *SessionState) SetFirstSeenHash() {
-	s.firstSeenHash = s.Hash()
-}
-
-func (s *SessionState) Hash() string {
-	encoded, err := msgpack.Marshal(s)
-	if err != nil {
-		log.Error("Error encoding session data: ", err)
-		return ""
-	}
-	murmurHasher := murmur3.New32()
-	murmurHasher.Write(encoded)
-	murmurHasher.Sum32()
-	return string(murmurHasher.Sum(nil)[:])
-}
-
-func (s *SessionState) HasChanged() bool {
-	return s.firstSeenHash == "" || s.firstSeenHash != s.Hash()
 }
 
 func (s *SessionState) Lifetime(fallback int64) int64 {

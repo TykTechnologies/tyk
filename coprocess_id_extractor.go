@@ -42,9 +42,7 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 
 // PostProcess sets context variables and updates the storage.
 func (e *BaseExtractor) PostProcess(r *http.Request, session *user.SessionState, sessionID string) {
-	sessionLifetime := session.Lifetime(e.Spec.SessionLifetime)
-	e.Spec.SessionManager.UpdateSession(sessionID, session, sessionLifetime, false)
-
+	ctxScheduleSessionUpdate(r)
 	ctxSetSession(r, session)
 	ctxSetAuthToken(r, sessionID)
 }
@@ -146,7 +144,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMid)
 
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID, r)
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
@@ -219,7 +217,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMid)
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
@@ -295,7 +293,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	SessionID = e.GenerateSessionID(output, e.BaseMid)
 
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
 			e.PostProcess(r, &previousSession, SessionID)

@@ -91,6 +91,8 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
+
+				mw.Base().UpdateRequestSession(r)
 				return
 			}
 
@@ -103,6 +105,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 			job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 			job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
+			mw.Base().UpdateRequestSession(r)
 		})
 	}
 }
@@ -166,6 +169,26 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	}
 
 	return cachedVal.(int64)
+}
+
+func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
+	session := ctxGetSession(r)
+	token := ctxGetAuthToken(r)
+
+	if session == nil || token == "" {
+		return false
+	}
+
+	if !ctxSessionUpdateScheduled(r) {
+		return false
+	}
+
+	lifetime := session.Lifetime(t.Spec.SessionLifetime)
+	if err := t.Spec.SessionManager.UpdateSession(token, session, lifetime, false); err != nil {
+		return false
+	}
+
+	return true
 }
 
 // ApplyPolicies will check if any policies are loaded. If any are, it
@@ -279,13 +302,13 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 	}
 
 	session.AccessRights = rights
-	// Update the session in the session manager in case it gets called again
-	return t.Spec.SessionManager.UpdateSession(key, session, session.Lifetime(t.Spec.SessionLifetime), false)
+
+	return nil
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.SessionState, bool) {
+func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.Request) (user.SessionState, bool) {
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
 		// See https://github.com/TykTechnologies/tyk/issues/1681
@@ -351,9 +374,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string) (user.Ses
 		}
 
 		log.Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
-		// Need to set this in order for the write to work!
-		session.LastUpdated = time.Now().String()
-		t.Spec.SessionManager.UpdateSession(key, &session, session.Lifetime(t.Spec.SessionLifetime), false)
+		ctxScheduleSessionUpdate(r)
 	}
 
 	return session, found

@@ -73,7 +73,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Get a session for the Key ID
-	secret, session, err := hm.getSecretAndSessionForKeyID(fieldValues.KeyID)
+	secret, session, err := hm.getSecretAndSessionForKeyID(r, fieldValues.KeyID)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "hmac",
@@ -222,8 +222,8 @@ type HMACFieldValues struct {
 	Signature string
 }
 
-func (hm *HMACMiddleware) getSecretAndSessionForKeyID(keyId string) (string, user.SessionState, error) {
-	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId)
+func (hm *HMACMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId string) (string, user.SessionState, error) {
+	session, keyExists := hm.CheckSessionAndIdentityForValidKey(keyId, r)
 	if !keyExists {
 		return "", session, errors.New("Key ID does not exist")
 	}

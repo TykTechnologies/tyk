@@ -62,6 +62,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 
 	// We found a session, apply the quota and rate limiter
 	reason := k.sessionlimiter.ForwardMessage(
+		r,
 		&session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),
@@ -186,6 +187,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 
 	// We found a session, apply the quota and rate limiter
 	reason := k.sessionlimiter.ForwardMessage(
+		r,
 		&session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),

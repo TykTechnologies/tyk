@@ -325,9 +325,8 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.MetaData[k] = string(v)
 		}
 		if extractor == nil {
-			sessionLifetime := returnedSession.Lifetime(m.Spec.SessionLifetime)
 			// This API is not using the ID extractor, but we've got a session:
-			m.Spec.SessionManager.UpdateSession(token, returnedSession, sessionLifetime, false)
+			ctxScheduleSessionUpdate(r)
 			ctxSetSession(r, returnedSession)
 			ctxSetAuthToken(r, token)
 		} else {

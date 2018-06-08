@@ -62,7 +62,7 @@ func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	storeRef := k.Spec.SessionManager.Store()
-	reason := sessionLimiter.ForwardMessage(k.apiSess,
+	reason := sessionLimiter.ForwardMessage(r, k.apiSess,
 		k.keyName,
 		storeRef,
 		true,

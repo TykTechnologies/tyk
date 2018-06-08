@@ -72,7 +72,6 @@ func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.Sessio
 		return newSession, false
 	}
 
-	newSession.SetFirstSeenHash()
 	return newSession, true
 }
 
@@ -115,11 +114,6 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 // UpdateSession updates the session state in the storage engine
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
-	if !session.HasChanged() {
-		log.Debug("Session has not changed, not updating")
-		return nil
-	}
-
 	v, _ := json.Marshal(session)
 
 	if hashed {
@@ -128,8 +122,6 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 
 	// async update and return if needed
 	if b.asyncWrites {
-		b.renewSessionState(keyName, session)
-
 		if hashed {
 			go b.store.SetRawKey(keyName, string(v), resetTTLTo)
 			return nil
@@ -147,20 +139,7 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 		err = b.store.SetKey(keyName, string(v), resetTTLTo)
 	}
 
-	if err == nil {
-		b.renewSessionState(keyName, session)
-	}
-
 	return err
-}
-
-func (b *DefaultSessionManager) renewSessionState(keyName string, session *user.SessionState) {
-	// we have new session state so renew first-seen hash to prevent
-	session.SetFirstSeenHash()
-	// delete it from session cache to have it re-populated next time
-	if !b.disableCacheSessionState {
-		SessionCache.Delete(keyName)
-	}
 }
 
 // RemoveSession removes session from storage
@@ -198,8 +177,6 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
 		return session, false
 	}
-
-	session.SetFirstSeenHash()
 
 	return session, true
 }

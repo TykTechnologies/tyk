@@ -42,7 +42,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	accessToken := parts[1]
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)
 
 	if !keyExists {
 		logEntry = getLogEntryForRequest(r, accessToken, nil)

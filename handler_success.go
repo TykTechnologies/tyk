@@ -22,6 +22,7 @@ import (
 // these to be implemented and is lifted pretty much from docs
 const (
 	SessionData = iota
+	UpdateSession
 	AuthHeaderValue
 	VersionData
 	VersionDefault
@@ -282,6 +283,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
 	log.Debug("Done proxy")
+
+	s.Base().UpdateRequestSession(r)
 	return nil
 }
 

@@ -85,7 +85,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	key = stripBearer(key)
 
 	// Check if API key valid
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(key)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
 	if !keyExists {
 		logEntry := getLogEntryForRequest(r, key, nil)
 		logEntry.Info("Attempted access with non-existent key.")

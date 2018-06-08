@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
@@ -73,7 +74,7 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf config.Config) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf config.Config) sessionFailReason {
 	rateLimiterKey := RateLimitKeyPrefix + storage.HashKey(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(key) + ".BLOCKED"
 
@@ -128,7 +129,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key s
 			currentSession.Allowance--
 		}
 
-		if l.RedisQuotaExceeded(currentSession, key, store) {
+		if l.RedisQuotaExceeded(r, currentSession, key, store) {
 			return sessionFailQuota
 		}
 	}
@@ -137,7 +138,7 @@ func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key s
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(currentSession *user.SessionState, key string, store storage.Handler) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler) bool {
 	// Are they unlimited?
 	if currentSession.QuotaMax == -1 {
 		// No quota set
@@ -176,6 +177,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(currentSession *user.SessionState, k
 	if qInt == 1 {
 		current := time.Now().Unix()
 		currentSession.QuotaRenews = current + currentSession.QuotaRenewalRate
+		ctxScheduleSessionUpdate(r)
 	}
 
 	// If not, pass and set the values of the session to quotamax - counter
@@ -186,5 +188,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(currentSession *user.SessionState, k
 	} else {
 		currentSession.QuotaRemaining = remaining
 	}
+
 	return false
 }
