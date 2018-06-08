@@ -1,16 +1,19 @@
 package main
 
 import (
-	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func testPreparetContextVarsMiddleware() {
+func testPrepareContextVarsMiddleware() {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		spec.EnableContextVars = true
@@ -32,7 +35,7 @@ func TestContextVarsMiddleware(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	testPreparetContextVarsMiddleware()
+	testPrepareContextVarsMiddleware()
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/test/path", Code: 200, BodyMatch: `"X-Remote-Addr":"127.0.0.1"`},
@@ -48,7 +51,7 @@ func BenchmarkContextVarsMiddleware(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	testPreparetContextVarsMiddleware()
+	testPrepareContextVarsMiddleware()
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, []test.TestCase{
@@ -60,53 +63,180 @@ func BenchmarkContextVarsMiddleware(b *testing.B) {
 	}
 }
 
-func TestMiddlewareContextVars_ProcessRequest_cookies(t *testing.T) {
+type testContextVarsData struct {
+	Method                string
+	URL                   string
+	Data                  string
+	ExpectedCtxDataObject map[string]interface{}
+	Header                http.Header
+}
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
-	res := httptest.NewRecorder()
-
-	req.Header.Set("Cookie", "abc=123; def=456")
-
-	err, code := (&MiddlewareContextVars{}).ProcessRequest(res, req, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if code != http.StatusOK {
-		t.Fatal(errors.New("non 200 status code"))
-	}
-
-	ctx := ctxGetData(req)
-
-	if ctx["cookies_abc"].(string) != "123" {
-		t.Error("abc should be 123")
-	}
-
-	if ctx["cookies_def"].(string) != "456" {
-		t.Error("def should be 456")
-	}
-
-	if ctx["cookies_ghi"] != nil {
-		t.Error("ghi should be nil")
+func testPrepareTestContextVarsMiddleware() map[string]testContextVarsData {
+	return map[string]testContextVarsData{
+		"GET with query string": {
+			Method: http.MethodGet,
+			URL:    "http://abc.com/aaa/bbb/111/222?x=123&y=test",
+			Header: http.Header{
+				"x-header-a": {"A"},
+				"x-header-b": {"B"},
+				"x-header-c": {"C"},
+			},
+			ExpectedCtxDataObject: map[string]interface{}{
+				"remote_addr": "192.0.2.1",
+				"request_data": url.Values{
+					"x": {"123"},
+					"y": {"test"},
+				},
+				"headers": map[string][]string{
+					"x-header-a": {"A"},
+					"x-header-b": {"B"},
+					"x-header-c": {"C"},
+				},
+				"headers_x_header_a": "A",
+				"headers_x_header_b": "B",
+				"headers_x_header_c": "C",
+				"headers_Host":       "abc.com",
+				"path_parts":         []string{"", "aaa", "bbb", "111", "222"},
+				"path":               "/aaa/bbb/111/222",
+			},
+		},
+		"POST with query string and encoded form data": {
+			Method: http.MethodPost,
+			URL:    "http://abc.com/aaa/bbb/111/222?x=123&y=test",
+			Data:   "i=1&j=2&str=abc",
+			Header: http.Header{
+				"Content-Type": {"application/x-www-form-urlencoded"},
+				"x-header-a":   {"A"},
+				"x-header-b":   {"B"},
+				"x-header-c":   {"C"},
+			},
+			ExpectedCtxDataObject: map[string]interface{}{
+				"remote_addr": "192.0.2.1",
+				"request_data": url.Values{
+					"x":   {"123"},
+					"y":   {"test"},
+					"i":   {"1"},
+					"j":   {"2"},
+					"str": {"abc"},
+				},
+				"headers": map[string][]string{
+					"x-header-a":   {"A"},
+					"x-header-b":   {"B"},
+					"x-header-c":   {"C"},
+					"Content-Type": {"application/x-www-form-urlencoded"},
+				},
+				"headers_x_header_a":   "A",
+				"headers_x_header_b":   "B",
+				"headers_x_header_c":   "C",
+				"headers_Content_Type": "application/x-www-form-urlencoded",
+				"headers_Host":         "abc.com",
+				"path_parts":           []string{"", "aaa", "bbb", "111", "222"},
+				"path":                 "/aaa/bbb/111/222",
+			},
+		},
+		"POST with query string and encoded form data and cookies": {
+			Method: http.MethodPost,
+			URL:    "http://abc.com/aaa/bbb/111/222?x=123&y=test",
+			Data:   "i=1&j=2&str=abc",
+			Header: http.Header{
+				"Content-Type": {"application/x-www-form-urlencoded"},
+				"Cookie":       {"c-1=cookie1;c-2=cookie2"},
+				"x-header-a":   {"A"},
+				"x-header-b":   {"B"},
+				"x-header-c":   {"C"},
+			},
+			ExpectedCtxDataObject: map[string]interface{}{
+				"remote_addr": "192.0.2.1",
+				"request_data": url.Values{
+					"x":   {"123"},
+					"y":   {"test"},
+					"i":   {"1"},
+					"j":   {"2"},
+					"str": {"abc"},
+				},
+				"headers": map[string][]string{
+					"x-header-a":   {"A"},
+					"x-header-b":   {"B"},
+					"x-header-c":   {"C"},
+					"Content-Type": {"application/x-www-form-urlencoded"},
+					"Cookie":       {"c-1=cookie1;c-2=cookie2"},
+				},
+				"headers_x_header_a":   "A",
+				"headers_x_header_b":   "B",
+				"headers_x_header_c":   "C",
+				"headers_Content_Type": "application/x-www-form-urlencoded",
+				"headers_Cookie":       "c-1=cookie1;c-2=cookie2",
+				"headers_Host":         "abc.com",
+				"cookies_c_1":          "cookie1",
+				"cookies_c_2":          "cookie2",
+				"path_parts":           []string{"", "aaa", "bbb", "111", "222"},
+				"path":                 "/aaa/bbb/111/222",
+			},
+		},
 	}
 }
 
-func BenchmarkMiddlewareContextVars_ProcessRequest_cookies(b *testing.B) {
-	b.ReportAllocs()
+func TestContextVarsMiddlewareProcessRequest(t *testing.T) {
+	mw := &MiddlewareContextVars{}
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
-	res := httptest.NewRecorder()
+	tests := testPrepareTestContextVarsMiddleware()
 
-	req.Header.Set("Cookie", "abc=123; def=456")
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var bodyReader io.Reader
+			if test.Data != "" {
+				bodyReader = strings.NewReader(test.Data)
+			}
+			req := httptest.NewRequest(test.Method, test.URL, bodyReader)
+			req.Header = test.Header
+			err, code := mw.ProcessRequest(nil, req, nil)
+			if err != nil {
+				t.Error(err)
+			}
+			if code != http.StatusOK {
+				t.Errorf("Wrong response code: %d Eexpected 200.", code)
+			}
 
-	for i := 0; i < b.N; i++ {
-		err, code := (&MiddlewareContextVars{}).ProcessRequest(res, req, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
-		if code != http.StatusOK {
-			b.Fatal(errors.New("non 200 status code"))
-		}
+			ctxDataObject := ctxGetData(req)
+
+			// check request_id
+			if _, ok := ctxDataObject["request_id"].(string); !ok {
+				t.Error("Missing 'request_id' field")
+			}
+
+			// delete request_if to do DeepEqual
+			delete(ctxDataObject, "request_id")
+
+			if !reflect.DeepEqual(ctxDataObject, test.ExpectedCtxDataObject) {
+				t.Errorf("Expected: %v\n Got: %v\n", test.ExpectedCtxDataObject, ctxDataObject)
+			}
+		})
 	}
+}
 
+func BenchmarkContextVarsMiddlewareProcessRequest(b *testing.B) {
+	mw := &MiddlewareContextVars{}
+	tests := testPrepareTestContextVarsMiddleware()
+	var err error
+	var code int
+	for name, test := range tests {
+		b.Run(name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				var bodyReader io.Reader
+				if test.Data != "" {
+					bodyReader = strings.NewReader(test.Data)
+				}
+				req := httptest.NewRequest(test.Method, test.URL, bodyReader)
+				req.Header = test.Header
+				err, code = mw.ProcessRequest(nil, req, nil)
+				if err != nil {
+					b.Error(err)
+				}
+				if code != http.StatusOK {
+					b.Errorf("Wrong response code: %d Eexpected 200.", code)
+				}
+			}
+		})
+	}
 }
