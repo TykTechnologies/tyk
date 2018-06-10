@@ -531,8 +531,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	pID := createPolicy()
 
 	t.Run("Expiry_After_now--Valid_jwt", func(t *testing.T) {
-		spec.JWTDisableExpiresAtValidation = false //Default value
-		spec.JWTExpiresAtValidationSkew = 0        //Default value
+		spec.JWTExpiresAtValidationSkew = 0 //Default value
 		loadAPI(spec)
 
 		jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -541,16 +540,11 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(+time.Second).Unix() //the jwt will be 1 second ahead
 		})
 		authHeaders := map[string]string{"authorization": jwtToken}
-		ts.Run(t, test.TestCase{
-			Headers:   authHeaders,
-			Code:      http.StatusUnauthorized,
-			BodyMatch: "Key not authorized: token has expired",
-		})
+		ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
 	})
 
 	t.Run("Expiry_after_now--Invalid_jwt", func(t *testing.T) {
-		spec.JWTDisableExpiresAtValidation = false //Default value
-		spec.JWTExpiresAtValidationSkew = 0        //Default value
+		spec.JWTExpiresAtValidationSkew = 0 //Default value
 		loadAPI(spec)
 
 		jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -567,8 +561,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("Expired_token-JWTDisableExpiresAtValidation--Valid_jwt", func(t *testing.T) {
-		spec.JWTDisableExpiresAtValidation = true
-		spec.JWTExpiresAtValidationSkew = 1000 // This value doesn't matter since validation is disabled
+		spec.JWTExpiresAtValidationSkew = 1000 // This value is so high that it actually disable validation
 		loadAPI(spec)
 
 		jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -583,8 +576,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("Expired_token-EnableExpiresAtValidation-Add_skew--Valid_jwt", func(t *testing.T) {
-		spec.JWTDisableExpiresAtValidation = false //Default value
-		spec.JWTExpiresAtValidationSkew = 1        //Default value
+		spec.JWTExpiresAtValidationSkew = 1 //Default value
 		loadAPI(spec)
 
 		jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -618,7 +610,6 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	pID := createPolicy()
 
 	t.Run("IssuedAt_Before_now-no_skew--Valid_jwt", func(t *testing.T) {
-		spec.JWTDisableIssuedAtValidation = false
 		spec.JWTIssuedAtValidationSkew = 0
 
 		loadAPI(spec)
@@ -636,8 +627,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("IssueAt-JWTDisableIssuedAtValidation--valid_jwt", func(t *testing.T) {
-		spec.JWTDisableIssuedAtValidation = true
-		spec.JWTIssuedAtValidationSkew = 1000 // This value doesn't matter since validation is disabled
+		spec.JWTIssuedAtValidationSkew = 1000 // This value is so high that it actually disable validation
 		loadAPI(spec)
 
 		jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -652,7 +642,6 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("IssueAt-After_now-no_skew--Invalid_jwt", func(t *testing.T) {
-		spec.JWTDisableIssuedAtValidation = false
 		spec.JWTIssuedAtValidationSkew = 0
 
 		loadAPI(spec)
@@ -672,7 +661,6 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("IssueAt-After_now-Add_skew--Valid_jwt", func(t *testing.T) {
-		spec.JWTDisableIssuedAtValidation = false
 		spec.JWTIssuedAtValidationSkew = 1
 
 		loadAPI(spec)
@@ -709,7 +697,6 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	pID := createPolicy()
 
 	t.Run("NotBefore_Before_now-Valid_jwt", func(t *testing.T) {
-		spec.JWTDisableNotBeforeValidation = false
 		spec.JWTNotBeforeValidationSkew = 0
 
 		loadAPI(spec)
@@ -728,7 +715,6 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	//IssuedAt_Before_now-no_skew--Valid_jwt
 
 	t.Run("NotBefore_After_now--Invalid_jwt", func(t *testing.T) {
-		spec.JWTDisableNotBeforeValidation = false
 		spec.JWTNotBeforeValidationSkew = 0
 
 		loadAPI(spec)
@@ -745,8 +731,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("NotBefore_After_now-JWTDisableNotBeforeValidation--valid_jwt", func(t *testing.T) {
-		spec.JWTDisableNotBeforeValidation = true
-		spec.JWTNotBeforeValidationSkew = 1000 // This value doesn't matter since validation is disabled
+		spec.JWTNotBeforeValidationSkew = 1000 // This value is so high that it's actually similar to disableing the claim.
 		loadAPI(spec)
 
 		jwtToken := createJWKToken(func(t *jwt.Token) {
@@ -761,7 +746,6 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("NotBefore_After_now-Add_skew--valid_jwt", func(t *testing.T) {
-		spec.JWTDisableNotBeforeValidation = false
 		spec.JWTNotBeforeValidationSkew = 1
 
 		loadAPI(spec)

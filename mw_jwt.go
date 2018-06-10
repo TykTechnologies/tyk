@@ -465,25 +465,19 @@ func (k *JWTMiddleware) validateJWTClaims(c jwt.MapClaims) *jwt.ValidationError 
 	vErr := new(jwt.ValidationError)
 	now := time.Now().Unix()
 
-	if !k.Spec.JWTDisableExpiresAtValidation {
-		if !c.VerifyExpiresAt(now-int64(k.Spec.JWTExpiresAtValidationSkew), false) {
-			vErr.Inner = errors.New("token has expired")
-			vErr.Errors |= jwt.ValidationErrorExpired
-		}
+	if !c.VerifyExpiresAt(now-int64(k.Spec.JWTExpiresAtValidationSkew), false) {
+		vErr.Inner = errors.New("token has expired")
+		vErr.Errors |= jwt.ValidationErrorExpired
 	}
 
-	if !k.Spec.JWTDisableIssuedAtValidation {
-		if c.VerifyIssuedAt(now+int64(k.Spec.JWTIssuedAtValidationSkew), false) == false {
-			vErr.Inner = errors.New("token used before issued")
-			vErr.Errors |= jwt.ValidationErrorIssuedAt
-		}
+	if c.VerifyIssuedAt(now+int64(k.Spec.JWTIssuedAtValidationSkew), false) == false {
+		vErr.Inner = errors.New("token used before issued")
+		vErr.Errors |= jwt.ValidationErrorIssuedAt
 	}
 
-	if !k.Spec.JWTDisableNotBeforeValidation {
-		if c.VerifyNotBefore(now+int64(k.Spec.JWTNotBeforeValidationSkew), false) == false {
-			vErr.Inner = errors.New("token is not valid yet")
-			vErr.Errors |= jwt.ValidationErrorNotValidYet
-		}
+	if c.VerifyNotBefore(now+int64(k.Spec.JWTNotBeforeValidationSkew), false) == false {
+		vErr.Inner = errors.New("token is not valid yet")
+		vErr.Errors |= jwt.ValidationErrorNotValidYet
 	}
 
 	if vErr.Errors == 0 {
