@@ -512,7 +512,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar",
 				},
-			})
+			}, "", false)
 
 			got, err := urlRewrite(&testConf, tc.req)
 			if err != nil {

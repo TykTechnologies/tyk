@@ -1539,11 +1539,23 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState) {
+func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
-	setCtxValue(r, SessionData, s)
+
+	if token == "" {
+		token = ctxGetAuthToken(r)
+	}
+
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, SessionData, s)
+	ctx = context.WithValue(ctx, AuthHeaderValue, token)
+	if scheduleUpdate {
+		ctx = context.WithValue(ctx, UpdateSession, true)
+	}
+
+	setContext(r, ctx)
 }
 
 func ctxScheduleSessionUpdate(r *http.Request) {
@@ -1566,13 +1578,6 @@ func ctxGetAuthToken(r *http.Request) string {
 		return v.(string)
 	}
 	return ""
-}
-
-func ctxSetAuthToken(r *http.Request, t string) {
-	if t == "" {
-		panic("setting a nil context AuthHeaderValue")
-	}
-	setCtxValue(r, AuthHeaderValue, t)
 }
 
 func ctxGetTrackedPath(r *http.Request) string {

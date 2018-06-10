@@ -123,8 +123,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Set session state on context, we will need it later
 	switch hm.Spec.BaseIdentityProvidedBy {
 	case apidef.HMACKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session)
-		ctxSetAuthToken(r, fieldValues.KeyID)
+		ctxSetSession(r, &session, fieldValues.KeyID, false)
 		hm.setContextVars(r, fieldValues.KeyID)
 	}
 

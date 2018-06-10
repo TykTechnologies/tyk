@@ -260,9 +260,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 		switch k.Spec.BaseIdentityProvidedBy {
 		case apidef.JWTClaim, apidef.UnsetAuth:
-			ctxScheduleSessionUpdate(r)
-			ctxSetSession(r, &session)
-			ctxSetAuthToken(r, sessionID)
+			ctxSetSession(r, &session, sessionID, true)
 		}
 		ctxSetJWTContextVars(k.Spec, r, token)
 		return nil, http.StatusOK
@@ -316,8 +314,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	log.Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session)
-		ctxSetAuthToken(r, sessionID)
+		ctxSetSession(r, &session, sessionID, false)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
@@ -347,8 +344,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	log.Debug("Raw key ID found.")
-	ctxSetSession(r, &session)
-	ctxSetAuthToken(r, tykId)
+	ctxSetSession(r, &session, tykId, false)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }

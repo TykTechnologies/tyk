@@ -200,9 +200,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	// 4. Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
-		ctxScheduleSessionUpdate(r)
-		ctxSetSession(r, &session)
-		ctxSetAuthToken(r, sessionID)
+		ctxSetSession(r, &session, sessionID, true)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 

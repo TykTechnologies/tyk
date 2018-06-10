@@ -280,9 +280,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		ctxScheduleSessionUpdate(r)
-		ctxSetSession(r, &newRequestData.Session)
-		ctxSetAuthToken(r, newRequestData.AuthValue)
+		ctxSetSession(r, &newRequestData.Session, newRequestData.AuthValue, true)
 	}
 
 	return nil, http.StatusOK

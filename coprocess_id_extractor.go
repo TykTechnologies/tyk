@@ -42,9 +42,7 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 
 // PostProcess sets context variables and updates the storage.
 func (e *BaseExtractor) PostProcess(r *http.Request, session *user.SessionState, sessionID string) {
-	ctxScheduleSessionUpdate(r)
-	ctxSetSession(r, session)
-	ctxSetAuthToken(r, sessionID)
+	ctxSetSession(r, session, sessionID, true)
 }
 
 // ExtractHeader is used when a HeaderSource is specified.

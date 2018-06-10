@@ -217,9 +217,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		newMeta := mapStrsToIfaces(newResponseData.SessionMeta)
 		if !reflect.DeepEqual(session.MetaData, newMeta) {
 			session.MetaData = newMeta
-
-			ctxScheduleSessionUpdate(r)
-			ctxSetSession(r, session)
+			ctxSetSession(r, session, "", true)
 		}
 	}
 

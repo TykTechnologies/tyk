@@ -76,11 +76,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		k.Spec.GlobalConfig,
 	)
 
-	// If either are disabled, save the write roundtrip
-	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
-		ctxSetSession(r, session)
-	}
-
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
