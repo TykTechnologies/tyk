@@ -325,7 +325,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.MetaData[k] = string(v)
 		}
 		if extractor == nil {
-			ctxSetSession(r, returnedSession, t, true)
+			ctxSetSession(r, returnedSession, sessionID, true)
 		} else {
 			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
 			extractor.PostProcess(r, returnedSession, sessionID)

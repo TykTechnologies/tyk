@@ -1,0 +1,56 @@
+time="Jun 11 05:39:49" level=info msg="Disabled feature" 
+goos: darwin
+goarch: amd64
+pkg: github.com/TykTechnologies/tyk
+BenchmarkURLReplacer-4                                    	  500000	      2351 ns/op	    1088 B/op	      12 allocs/op
+BenchmarkTagHeaders-4                                     	 1000000	      1220 ns/op	     384 B/op	      15 allocs/op
+BenchmarkDefaultVersion-4                                 	    1000	   1501562 ns/op	  190056 B/op	    1340 allocs/op
+BenchmarkGetVersionFromRequest/Header_location-4          	    2000	    703549 ns/op	   86351 B/op	     564 allocs/op
+BenchmarkGetVersionFromRequest/URL_param_location-4       	    2000	    734280 ns/op	   86034 B/op	     548 allocs/op
+BenchmarkGetVersionFromRequest/URL_location-4             	    2000	    747636 ns/op	   83288 B/op	     529 allocs/op
+BenchmarkApiReload-4                                      	     200	   5858318 ns/op	 1789305 B/op	   23909 allocs/op
+BenchmarkValueExtractor/HeaderSource-4                    	    2000	   1011728 ns/op	    5184 B/op	      74 allocs/op
+BenchmarkValueExtractor/FormSource-4                      	    2000	   1022131 ns/op	   11279 B/op	     101 allocs/op
+BenchmarkRegexExtractor/HeaderSource-4                    	    2000	    936368 ns/op	    5208 B/op	      76 allocs/op
+BenchmarkRegexExtractor/BodySource-4                      	    2000	    986241 ns/op	    9667 B/op	      86 allocs/op
+BenchmarkRegexExtractor/FormSource-4                      	    2000	   1029310 ns/op	   11319 B/op	     103 allocs/op
+BenchmarkXPathExtractor/HeaderSource-4                    	    2000	   1044817 ns/op	    9992 B/op	     132 allocs/op
+BenchmarkXPathExtractor/BodySource-4                      	    2000	   1014181 ns/op	   14404 B/op	     140 allocs/op
+BenchmarkXPathExtractor/FormSource-4                      	    2000	   1056668 ns/op	   16599 B/op	     164 allocs/op
+BenchmarkInitGenericEventHandlers-4                       	 1000000	      1022 ns/op	     528 B/op	       8 allocs/op
+BenchmarkMultiSession_BA_Standard_OK-4                    	    1000	   1374786 ns/op	   60464 B/op	     321 allocs/op
+BenchmarkBearerTokenAuthKeySession-4                      	    1000	   1382167 ns/op	   58083 B/op	     289 allocs/op
+BenchmarkMultiAuthBackwardsCompatibleSession-4            	    2000	   1946584 ns/op	   58578 B/op	     266 allocs/op
+BenchmarkBasicAuth-4                                      	      10	 184018566 ns/op	 1036911 B/op	   19893 allocs/op
+BenchmarkContextVarsMiddleware-4                          	    1000	   1930676 ns/op	  280941 B/op	    1710 allocs/op
+BenchmarkMiddlewareContextVars_ProcessRequest_cookies-4   	   20000	    236501 ns/op	    2401 B/op	      28 allocs/op
+BenchmarkHMACAuthSessionPass-4                            	    3000	   1447617 ns/op	   56631 B/op	     268 allocs/op
+BenchmarkHMACAuthSessionPassWithHeaderField-4             	    3000	   1492679 ns/op	   60034 B/op	     299 allocs/op
+BenchmarkIPBlacklistMiddleware-4                          	   50000	     37694 ns/op	   32313 B/op	     152 allocs/op
+BenchmarkIPMiddlewarePass-4                               	   50000	     24570 ns/op	   26712 B/op	      95 allocs/op
+BenchmarkJWTSessionHMAC-4                                 	    3000	    495488 ns/op	   75894 B/op	     499 allocs/op
+BenchmarkJWTSessionRSA-4                                  	    2000	    657780 ns/op	   96851 B/op	     608 allocs/op
+BenchmarkJWTSessionRSABearer-4                            	    2000	    667341 ns/op	   98076 B/op	     610 allocs/op
+BenchmarkJWTSessionRSAWithRawSourceOnWithClientID-4       	    2000	    679524 ns/op	   99197 B/op	     629 allocs/op
+BenchmarkJWTSessionRSAWithRawSource-4                     	    2000	    666049 ns/op	   99034 B/op	     627 allocs/op
+BenchmarkJWTSessionRSAWithJWK-4                           	    2000	    665930 ns/op	   98035 B/op	     630 allocs/op
+BenchmarkJWTSessionRSAWithEncodedJWK-4                    	    2000	    662621 ns/op	   98261 B/op	     635 allocs/op
+BenchmarkProcessRequestLiveQuotaLimit-4                   	     500	   2521197 ns/op	   88794 B/op	     746 allocs/op
+BenchmarkProcessRequestOffThreadQuotaLimit-4              	    1000	   1715698 ns/op	   80573 B/op	     564 allocs/op
+BenchmarkProcessRequestLiveRedisRollingLimiter-4          	     500	   2871772 ns/op	  108089 B/op	    1233 allocs/op
+BenchmarkProcessRequestOffThreadRedisRollingLimiter-4     	    1000	   2037269 ns/op	  111109 B/op	    1329 allocs/op
+BenchmarkStripAuth_stripFromHeaders-4                     	  200000	     10430 ns/op	    2801 B/op	      66 allocs/op
+BenchmarkStripAuth_stripFromParams-4                      	   30000	     49301 ns/op	   14164 B/op	     220 allocs/op
+BenchmarkTransformNonAscii-4                              	  100000	     20855 ns/op	   11059 B/op	      98 allocs/op
+BenchmarkTransformJSONMarshal-4                           	  100000	     21190 ns/op	   11507 B/op	     101 allocs/op
+BenchmarkRewriter-4                                       	   30000	     47460 ns/op	   45598 B/op	     238 allocs/op
+BenchmarkValidateJSONSchema-4                             	     200	   5569919 ns/op	  296415 B/op	    2995 allocs/op
+BenchmarkVersioning-4                                     	     200	   7119762 ns/op	  273945 B/op	    2784 allocs/op
+BenchmarkVirtualEndpoint-4                                	    1000	   1542226 ns/op	   72249 B/op	     468 allocs/op
+BenchmarkApplyPolicies-4                                  	   50000	     24858 ns/op	    5924 B/op	      86 allocs/op
+BenchmarkResponseHeaderInjection-4                        	     200	   6085702 ns/op	  401316 B/op	    2813 allocs/op
+BenchmarkRequestIPHops-4                                  	 2000000	       575 ns/op	     432 B/op	       4 allocs/op
+BenchmarkWrappedServeHTTP-4                               	   10000	    198973 ns/op	   48367 B/op	     144 allocs/op
+BenchmarkCopyRequestResponse-4                            	  100000	     23169 ns/op	   35585 B/op	      76 allocs/op
+PASS
+ok  	github.com/TykTechnologies/tyk	121.038s
