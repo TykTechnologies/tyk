@@ -212,13 +212,13 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 type DefaultKeyGenerator struct{}
 
 func generateToken(orgID, keyID string) string {
+	keyID = strings.TrimPrefix(keyID, orgID)
 	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		log.WithError(err).WithFields(logrus.Fields{
 			"prefix": "auth-mgr",
 			"orgID":  orgID,
-			"err":    err,
 		}).Warning("Issue during token generation")
 	}
 

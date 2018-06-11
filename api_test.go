@@ -265,10 +265,10 @@ func TestHashKeyHandler(t *testing.T) {
 		desc             string
 	}{
 		{"", 8, " Legacy tokens, fallback to murmur32"},
-		{"murmur32", 8, ""},
-		{"murmur64", 16, ""},
-		{"murmur128", 32, ""},
-		{"sha256", 64, ""},
+		{storage.HashMurmur32, 8, ""},
+		{storage.HashMurmur64, 16, ""},
+		{storage.HashMurmur128, 32, ""},
+		{storage.HashSha256, 64, ""},
 		{"wrong", 16, " Should fallback to murmur64 if wrong alg"},
 	}
 

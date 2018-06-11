@@ -109,15 +109,22 @@ func TokenOrg(token string) string {
 	return ""
 }
 
+var (
+	HashSha256 = "sha256"
+	HashMurmur32 = "murmur32"
+	HashMurmur64 = "murmur64"
+	HashMurmur128 = "murmur128"
+)
+
 func hashFunction(algorithm string) (hash.Hash, error) {
 	switch algorithm {
-	case "sha256":
+	case HashSha256:
 		return sha256.New(), nil
-	case "murmur64":
+	case HashMurmur64:
 		return murmur3.New64(), nil
-	case "murmur128":
+	case HashMurmur128:
 		return murmur3.New128(), nil
-	case "", "murmur32":
+	case "", HashMurmur32:
 		return murmur3.New32(), nil
 	default:
 		return murmur3.New32(), fmt.Errorf("Unknown key hash function: %s. Falling back to murmur32.", algorithm)

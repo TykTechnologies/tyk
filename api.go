@@ -235,7 +235,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		// Only if it's NEW
 		switch r.Method {
 		case "POST":
-			keyName = generateToken(newSession.OrgID, strings.TrimPrefix(keyName, newSession.OrgID))
+			keyName = generateToken(newSession.OrgID, keyName)
 			// It's a create, so lets hash the password
 			setSessionPassword(&newSession)
 		case "PUT":
@@ -900,7 +900,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if newSession.Certificate != "" {
-		newKey = generateToken(newSession.OrgID, strings.TrimPrefix(newSession.Certificate, newSession.OrgID))
+		newKey = generateToken(newSession.OrgID, newSession.Certificate)
 	}
 
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
