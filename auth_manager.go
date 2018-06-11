@@ -216,10 +216,10 @@ func generateToken(orgID, keyID string) string {
 	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
 
 	if err != nil {
-		log.WithError(err).WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"prefix": "auth-mgr",
 			"orgID":  orgID,
-		}).Warning("Issue during token generation")
+		}).WithError(err).Warning("Issue during token generation")
 	}
 
 	return token
