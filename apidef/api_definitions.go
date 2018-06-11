@@ -343,9 +343,9 @@ type APIDefinition struct {
 	JWTDisableIssuedAtValidation  bool                 `bson:"jwt_disable_issued_at_validation" json:"jwt_disable_issued_at_validation"`
 	JWTDisableExpiresAtValidation bool                 `bson:"jwt_disable_expires_at_validation" json:"jwt_disable_expires_at_validation"`
 	JWTDisableNotBeforeValidation bool                 `bson:"jwt_disable_not_before_validation" json:"jwt_disable_not_before_validation"`
-	JWTIssuedAtValidationSkew     uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
-	JWTExpiresAtValidationSkew    uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
-	JWTNotBeforeValidationSkew    uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTIssuedAtValidationSkew     int64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
+	JWTExpiresAtValidationSkew    int64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
+	JWTNotBeforeValidationSkew    int64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	NotificationsDetails          NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking       bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew          float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`

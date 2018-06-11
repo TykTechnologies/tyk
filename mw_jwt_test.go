@@ -642,6 +642,16 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 		})
 	})
 
+	t.Run("IssueAt-JWTDisableIssuedAtValidation--not_valid_jwt", func(t *testing.T) {
+		spec.JWTDisableIssuedAtValidation = false
+		spec.JWTIssuedAtValidationSkew = 2 // 2 seconds
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(-3 * time.Second), Code: http.StatusOK,
+		})
+	})
+
 	t.Run("IssueAt-After_now-Add_skew--Valid_jwt", func(t *testing.T) {
 		spec.JWTDisableIssuedAtValidation = false
 		spec.JWTIssuedAtValidationSkew = 1

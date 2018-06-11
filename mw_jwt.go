@@ -466,21 +466,21 @@ func (k *JWTMiddleware) validateJWTClaims(c jwt.MapClaims) *jwt.ValidationError 
 	now := time.Now().Unix()
 
 	if !k.Spec.JWTDisableExpiresAtValidation {
-		if !c.VerifyExpiresAt(now-int64(k.Spec.JWTExpiresAtValidationSkew), false) {
+		if !c.VerifyExpiresAt(now - k.Spec.JWTExpiresAtValidationSkew, false) {
 			vErr.Inner = errors.New("token has expired")
 			vErr.Errors |= jwt.ValidationErrorExpired
 		}
 	}
 
 	if !k.Spec.JWTDisableIssuedAtValidation {
-		if c.VerifyIssuedAt(now+int64(k.Spec.JWTIssuedAtValidationSkew), false) == false {
+		if c.VerifyIssuedAt(now + k.Spec.JWTIssuedAtValidationSkew, false) == false {
 			vErr.Inner = errors.New("token used before issued")
 			vErr.Errors |= jwt.ValidationErrorIssuedAt
 		}
 	}
 
 	if !k.Spec.JWTDisableNotBeforeValidation {
-		if c.VerifyNotBefore(now+int64(k.Spec.JWTNotBeforeValidationSkew), false) == false {
+		if c.VerifyNotBefore(now + k.Spec.JWTNotBeforeValidationSkew, false) == false {
 			vErr.Inner = errors.New("token is not valid yet")
 			vErr.Errors |= jwt.ValidationErrorNotValidYet
 		}
