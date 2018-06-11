@@ -110,9 +110,9 @@ func TokenOrg(token string) string {
 }
 
 var (
-	HashSha256 = "sha256"
-	HashMurmur32 = "murmur32"
-	HashMurmur64 = "murmur64"
+	HashSha256    = "sha256"
+	HashMurmur32  = "murmur32"
+	HashMurmur64  = "murmur64"
 	HashMurmur128 = "murmur128"
 )
 
