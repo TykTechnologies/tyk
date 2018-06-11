@@ -33,7 +33,7 @@ type SessionLimiter struct {
 	bucketStore leakybucket.Storage
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *user.SessionState, store storage.Handler, globalConf config.Config) bool {
+func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string, currentSession *user.SessionState, store storage.Handler, globalConf *config.Config) bool {
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
@@ -73,7 +73,7 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf config.Config) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config) sessionFailReason {
 	rateLimiterKey := RateLimitKeyPrefix + storage.HashKey(key)
 	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(key) + ".BLOCKED"
 
