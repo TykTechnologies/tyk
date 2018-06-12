@@ -46,7 +46,6 @@ type DefaultAuthorisationManager struct {
 type DefaultSessionManager struct {
 	store                    storage.Handler
 	asyncWrites              bool
-	disableCacheSessionState bool
 }
 
 func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
@@ -85,7 +84,6 @@ func (b *DefaultAuthorisationManager) KeyExpired(newSession *user.SessionState) 
 
 func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.asyncWrites = config.Global().UseAsyncSessionWrite
-	b.disableCacheSessionState = config.Global().LocalSessionCache.DisableCacheSessionState
 	b.store = store
 	b.store.Connect()
 }
