@@ -241,6 +241,7 @@ func recordDetail(r *http.Request, globalConf config.Config) bool {
 // Spec states the path is Ignored
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
+	defer s.Base().UpdateRequestSession(r)
 
 	versionDef := s.Spec.VersionDefinition
 	if versionDef.Location == "url" && versionDef.StripPath {
@@ -283,8 +284,6 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, int64(millisec), resp.StatusCode, copiedRequest, copiedResponse)
 	}
 	log.Debug("Done proxy")
-
-	s.Base().UpdateRequestSession(r)
 	return nil
 }
 

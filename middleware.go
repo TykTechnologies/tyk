@@ -91,8 +91,6 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 
 				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
-
-				mw.Base().UpdateRequestSession(r)
 				return
 			}
 
@@ -101,11 +99,12 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 				// No error, carry on...
 				meta["bypass"] = "1"
 				h.ServeHTTP(w, r)
+			} else {
+				mw.Base().UpdateRequestSession(r)
 			}
 
 			job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
 			job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
-			mw.Base().UpdateRequestSession(r)
 		})
 	}
 }
