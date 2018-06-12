@@ -184,6 +184,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	lifetime := session.Lifetime(t.Spec.SessionLifetime)
 	if err := t.Spec.SessionManager.UpdateSession(token, session, lifetime, false); err != nil {
+		log.WithError(err).Error("Can't update session")
 		return false
 	}
 
