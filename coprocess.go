@@ -333,7 +333,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 			returnedSession.MetaData[k] = string(v)
 		}
 
-		ctxSetSession(r, returnedSession, sessionID, true)
+		if extractor == nil {
+			ctxSetSession(r, returnedSession, token, true)
+		} else {
+			ctxSetSession(r, returnedSession, sessionID, true)
+		}
 	}
 
 	return nil, 200
