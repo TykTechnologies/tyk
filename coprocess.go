@@ -136,6 +136,8 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
 		if session := ctxGetSession(r); session != nil {
 			object.Session = ProtoSessionState(session)
+			// For compatibility purposes:
+			object.Metadata = object.Session.Metadata
 		}
 	}
 
