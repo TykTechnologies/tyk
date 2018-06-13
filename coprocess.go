@@ -328,15 +328,15 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 		returnedSession := TykSessionState(returnObject.Session)
 
+		// If the returned object contains metadata, add them to the session:
+		for k, v := range returnObject.Metadata {
+			returnedSession.MetaData[k] = string(v)
+		}
+
 		if extractor == nil {
-			sessionLifetime := returnedSession.Lifetime(m.Spec.SessionLifetime)
-			// This API is not using the ID extractor, but we've got a session:
-			m.Spec.SessionManager.UpdateSession(token, returnedSession, sessionLifetime, false)
-			ctxSetSession(r, returnedSession)
-			ctxSetAuthToken(r, token)
+			ctxSetSession(r, returnedSession, token, true)
 		} else {
-			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
-			extractor.PostProcess(r, returnedSession, sessionID)
+			ctxSetSession(r, returnedSession, sessionID, true)
 		}
 	}
 

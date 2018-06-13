@@ -42,7 +42,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	accessToken := parts[1]
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)
 
 	if !keyExists {
 		logEntry = getLogEntryForRequest(r, accessToken, nil)
@@ -59,8 +59,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OAuthKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session)
-		ctxSetAuthToken(r, accessToken)
+		ctxSetSession(r, &session, accessToken, false)
 	}
 
 	// Request is valid, carry on

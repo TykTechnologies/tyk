@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -136,7 +137,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	specAsJson := specToJson(d.Spec)
 
 	session := new(user.SessionState)
-	token := ctxGetAuthToken(r)
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
@@ -249,9 +249,12 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	r.URL.RawQuery = values.Encode()
 
 	// Save the sesison data (if modified)
-	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
-		session.MetaData = mapStrsToIfaces(newRequestData.SessionMeta)
-		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime), false)
+	if !d.Pre && d.UseSession {
+		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
+		if !reflect.DeepEqual(session.MetaData, newMeta) {
+			session.MetaData = newMeta
+			ctxScheduleSessionUpdate(r)
+		}
 	}
 
 	log.WithFields(logrus.Fields{
@@ -277,8 +280,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		ctxSetSession(r, &newRequestData.Session)
-		ctxSetAuthToken(r, newRequestData.AuthValue)
+		ctxSetSession(r, &newRequestData.Session, newRequestData.AuthValue, true)
 	}
 
 	return nil, http.StatusOK
