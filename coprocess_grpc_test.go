@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 
 	"context"
@@ -18,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -36,6 +38,56 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 		object.Request.SetHeaders = map[string]string{
 			testHeaderName: testHeaderValue,
 		}
+	case "testPostHook1":
+		testKeyValue, ok := object.Session.Metadata["testkey"]
+		if !ok {
+			object.Request.ReturnOverrides.ResponseError = "'testkey' not found in session metadata"
+			object.Request.ReturnOverrides.ResponseCode = 400
+			break
+		}
+		jsonObject := make(map[string]string)
+		if err := json.Unmarshal([]byte(testKeyValue), &jsonObject); err != nil {
+			object.Request.ReturnOverrides.ResponseError = "couldn't decode 'testkey' nested value"
+			object.Request.ReturnOverrides.ResponseCode = 400
+			break
+		}
+		nestedKeyValue, ok := jsonObject["nestedkey"]
+		if !ok {
+			object.Request.ReturnOverrides.ResponseError = "'nestedkey' not found in JSON object"
+			object.Request.ReturnOverrides.ResponseCode = 400
+			break
+		}
+		if nestedKeyValue != "nestedvalue" {
+			object.Request.ReturnOverrides.ResponseError = "'nestedvalue' value doesn't match"
+			object.Request.ReturnOverrides.ResponseCode = 400
+			break
+		}
+		testKey2Value, ok := object.Session.Metadata["testkey2"]
+		if !ok {
+			object.Request.ReturnOverrides.ResponseError = "'testkey' not found in session metadata"
+			object.Request.ReturnOverrides.ResponseCode = 400
+			break
+		}
+		if testKey2Value != "testvalue" {
+			object.Request.ReturnOverrides.ResponseError = "'testkey2' value doesn't match"
+			object.Request.ReturnOverrides.ResponseCode = 400
+			break
+		}
+
+		// Check for compatibility (object.Metadata should contain the same keys as object.Session.Metadata)
+		for k, v := range object.Metadata {
+			sessionKeyValue, ok := object.Session.Metadata[k]
+			if !ok {
+				object.Request.ReturnOverrides.ResponseError = k + " not found in object.Session.Metadata"
+				object.Request.ReturnOverrides.ResponseCode = 400
+				break
+			}
+			if strings.Compare(sessionKeyValue, v) != 0 {
+				object.Request.ReturnOverrides.ResponseError = k + " doesn't match value in object.Session.Metadata"
+				object.Request.ReturnOverrides.ResponseCode = 400
+				break
+			}
+		}
 	}
 	return object, nil
 }
@@ -50,13 +102,14 @@ func newTestGRPCServer() (s *grpc.Server) {
 	return s
 }
 
-func loadTestGRPCSpec() *APISpec {
-	spec := buildAndLoadAPI(func(spec *APISpec) {
-		spec.APIID = "999999"
+func loadTestGRPCAPIs() {
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "1"
 		spec.OrgID = "default"
 		spec.Auth = apidef.Auth{
 			AuthHeaderName: "authorization",
 		}
+		spec.UseKeylessAccess = false
 		spec.VersionData = struct {
 			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
 			DefaultVersion string                        `bson:"default_version" json:"default_version"`
@@ -77,9 +130,34 @@ func loadTestGRPCSpec() *APISpec {
 			},
 			Driver: apidef.GrpcDriver,
 		}
-	})[0]
-
-	return spec
+	}, func(spec *APISpec) {
+		spec.APIID = "2"
+		spec.OrgID = "default"
+		spec.Auth = apidef.Auth{
+			AuthHeaderName: "authorization",
+		}
+		spec.UseKeylessAccess = false
+		spec.VersionData = struct {
+			NotVersioned   bool                          `bson:"not_versioned" json:"not_versioned"`
+			DefaultVersion string                        `bson:"default_version" json:"default_version"`
+			Versions       map[string]apidef.VersionInfo `bson:"versions" json:"versions"`
+		}{
+			NotVersioned: true,
+			Versions: map[string]apidef.VersionInfo{
+				"v1": {
+					Name: "v1",
+				},
+			},
+		}
+		spec.Proxy.ListenPath = "/grpc-test-api-2/"
+		spec.Proxy.StripListenPath = true
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Post: []apidef.MiddlewareDefinition{
+				{Name: "testPostHook1"},
+			},
+			Driver: apidef.GrpcDriver,
+		}
+	})
 }
 
 func startTykWithGRPC() (*tykTestServer, *grpc.Server) {
@@ -95,8 +173,8 @@ func startTykWithGRPC() (*tykTestServer, *grpc.Server) {
 	}
 	ts := newTykTestServer(tykTestServerConfig{coprocessConfig: cfg})
 
-	// Load a test API:
-	loadTestGRPCSpec()
+	// Load test APIs:
+	loadTestGRPCAPIs()
 	return &ts, grpcServer
 }
 
@@ -105,11 +183,20 @@ func TestGRPCDispatch(t *testing.T) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
+	keyID := createSession(func(s *user.SessionState) {
+		s.MetaData = map[string]interface{}{
+			"testkey":  map[string]interface{}{"nestedkey": "nestedvalue"},
+			"testkey2": "testvalue",
+		}
+	})
+	headers := map[string]string{"authorization": keyID}
+
 	t.Run("Pre Hook with SetHeaders", func(t *testing.T) {
 		res, err := ts.Run(t, test.TestCase{
-			Path:   "/grpc-test-api/",
-			Method: http.MethodGet,
-			Code:   http.StatusOK,
+			Path:    "/grpc-test-api/",
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+			Headers: headers,
 		})
 		if err != nil {
 			t.Fatalf("Request failed: %s", err.Error())
@@ -132,6 +219,15 @@ func TestGRPCDispatch(t *testing.T) {
 		}
 	})
 
+	t.Run("Post Hook with metadata", func(t *testing.T) {
+		ts.Run(t, test.TestCase{
+			Path:    "/grpc-test-api-2/",
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+			Headers: headers,
+		})
+	})
+
 }
 
 func BenchmarkGRPCDispatch(b *testing.B) {
@@ -139,14 +235,18 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
+	keyID := createSession(func(s *user.SessionState) {})
+	headers := map[string]string{"authorization": keyID}
+
 	b.Run("Pre Hook with SetHeaders", func(b *testing.B) {
 		path := "/grpc-test-api/"
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, test.TestCase{
-				Path:   path,
-				Method: http.MethodGet,
-				Code:   http.StatusOK,
+				Path:    path,
+				Method:  http.MethodGet,
+				Code:    http.StatusOK,
+				Headers: headers,
 			})
 		}
 	})
