@@ -160,12 +160,12 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 
 	data := []byte(ouser.ID)
-	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Spec.OrgID + tokenID
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	sessionID := generateToken(k.Spec.OrgID, keyID)
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
 		log.Debug("Client ID:", clientID)
-		sessionID = k.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(clientID))) + tokenID
+		sessionID = generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
 	}
 
 	log.Debug("Generated Session ID: ", sessionID)

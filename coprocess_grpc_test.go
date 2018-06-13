@@ -105,7 +105,7 @@ func newTestGRPCServer() (s *grpc.Server) {
 func loadTestGRPCAPIs() {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "1"
-		spec.OrgID = "default"
+		spec.OrgID = mockOrgID
 		spec.Auth = apidef.Auth{
 			AuthHeaderName: "authorization",
 		}

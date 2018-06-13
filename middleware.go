@@ -335,6 +335,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	if t.Spec.GlobalConfig.HashKeys {
 		cacheKey = storage.HashStr(key)
 	}
+
 	// Check in-memory cache
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(cacheKey)

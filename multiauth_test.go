@@ -99,8 +99,9 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 		username = "0987876"
 	}
 	password := "TEST"
+	keyName := generateToken("default", username)
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default"+username, baSession, 60, false)
+	spec.SessionManager.UpdateSession(keyName, baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(isBench)

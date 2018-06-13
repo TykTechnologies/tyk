@@ -70,7 +70,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
-		k.Spec.GlobalConfig,
+		&k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
@@ -195,7 +195,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
-		k.Spec.GlobalConfig,
+		&k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)

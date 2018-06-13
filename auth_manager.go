@@ -185,11 +185,23 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 
 type DefaultKeyGenerator struct{}
 
+func generateToken(orgID, keyID string) string {
+	keyID = strings.TrimPrefix(keyID, orgID)
+	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "auth-mgr",
+			"orgID":  orgID,
+		}).WithError(err).Warning("Issue during token generation")
+	}
+
+	return token
+}
+
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
 func (DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
-	u5 := uuid.NewV4()
-	cleanSting := strings.Replace(u5.String(), "-", "", -1)
-	return orgID + cleanSting
+	return generateToken(orgID, "")
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key

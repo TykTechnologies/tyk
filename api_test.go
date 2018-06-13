@@ -172,8 +172,6 @@ func TestKeyHandler(t *testing.T) {
 	}
 	withBadPolicyJSON, _ := json.Marshal(withBadPolicy)
 
-	knownKey := createSession()
-
 	t.Run("Create key", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			// Master keys should be disabled by default
@@ -214,6 +212,8 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 	})
+
+	knownKey := createSession()
 
 	t.Run("Get key", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
@@ -257,9 +257,32 @@ func TestHashKeyHandler(t *testing.T) {
 	// enable hashed keys listing
 	globalConf.EnableHashedKeysListing = true
 	config.SetGlobal(globalConf)
-
 	defer resetTestConfig()
 
+	hashTests := []struct {
+		hashFunction     string
+		expectedHashSize int
+		desc             string
+	}{
+		{"", 8, " Legacy tokens, fallback to murmur32"},
+		{storage.HashMurmur32, 8, ""},
+		{storage.HashMurmur64, 16, ""},
+		{storage.HashMurmur128, 32, ""},
+		{storage.HashSha256, 64, ""},
+		{"wrong", 16, " Should fallback to murmur64 if wrong alg"},
+	}
+
+	for _, tc := range hashTests {
+		globalConf.HashKeyFunction = tc.hashFunction
+		config.SetGlobal(globalConf)
+
+		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
+			testHashKeyHandlerHelper(t, tc.expectedHashSize)
+		})
+	}
+}
+
+func testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
@@ -271,8 +294,12 @@ func TestHashKeyHandler(t *testing.T) {
 	}}
 	withAccessJSON, _ := json.Marshal(withAccess)
 
-	myKey := "my_key_id"
+	myKey := generateToken("", "")
 	myKeyHash := storage.HashKey(myKey)
+
+	if len(myKeyHash) != expectedHashSize {
+		t.Errorf("Expected hash size: %d, got %d. Hash: %s. Key: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
+	}
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{

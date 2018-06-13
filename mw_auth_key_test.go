@@ -11,8 +11,95 @@ import (
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
 
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+func TestMurmur3CharBug(t *testing.T) {
+	defer resetTestConfig()
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	api := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	genTestCase := func(key string, status int) test.TestCase {
+		return test.TestCase{Path: "/", Headers: map[string]string{"Authorization": key}, Code: status}
+	}
+
+	t.Run("Without hashing", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.HashKeys = false
+		config.SetGlobal(globalConf)
+
+		loadAPI(api)
+
+		key := createSession()
+
+		ts.Run(t, []test.TestCase{
+			genTestCase("wrong", 403),
+			genTestCase(key+"abc", 403),
+			genTestCase(key, 200),
+		}...)
+	})
+
+	t.Run("murmur32 hashing, legacy", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.HashKeys = true
+		globalConf.HashKeyFunction = ""
+		config.SetGlobal(globalConf)
+
+		loadAPI(api)
+
+		key := createSession()
+
+		ts.Run(t, []test.TestCase{
+			genTestCase("wrong", 403),
+			// Should reject instead, just to show bug
+			genTestCase(key+"abc", 200),
+			genTestCase(key, 200),
+		}...)
+	})
+
+	t.Run("murmur32 hashing, json keys", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.HashKeys = true
+		globalConf.HashKeyFunction = "murmur32"
+		config.SetGlobal(globalConf)
+
+		loadAPI(api)
+
+		key := createSession()
+
+		ts.Run(t, []test.TestCase{
+			genTestCase("wrong", 403),
+			// Should reject instead, just to show bug
+			genTestCase(key+"abc", 200),
+			genTestCase(key, 200),
+		}...)
+	})
+
+	t.Run("murmur64 hashing", func(t *testing.T) {
+		globalConf := config.Global()
+		globalConf.HashKeys = true
+		globalConf.HashKeyFunction = "murmur64"
+		config.SetGlobal(globalConf)
+
+		loadAPI(api)
+
+		key := createSession()
+
+		ts.Run(t, []test.TestCase{
+			genTestCase("wrong", 403),
+			// New hashing fixes the bug
+			genTestCase(key+"abc", 403),
+			genTestCase(key, 200),
+		}...)
+	})
+}
 
 func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 	session := new(user.SessionState)

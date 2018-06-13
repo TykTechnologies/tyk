@@ -46,6 +46,7 @@ var (
 )
 
 const defaultListenPort = 8080
+const mockOrgID = "507f1f77bcf86cd799439011"
 
 var defaultTestConfig config.Config
 var testServerRouter *mux.Router

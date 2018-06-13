@@ -70,7 +70,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 	// If key not provided in header or cookie and client certificate is provided, try to find certificate based key
 	if config.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		key = k.Spec.OrgID + certs.HexSHA256(r.TLS.PeerCertificates[0].Raw)
+		key = generateToken(k.Spec.OrgID, certs.HexSHA256(r.TLS.PeerCertificates[0].Raw))
 	}
 
 	if key == "" {

@@ -223,8 +223,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 	log.Debug("Base Field ID set to: ", baseFieldData)
 	data := []byte(baseFieldData)
-	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Spec.OrgID + tokenID
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	sessionID := generateToken(k.Spec.OrgID, keyID)
 
 	log.Debug("JWT Temporary session ID is: ", sessionID)
 
