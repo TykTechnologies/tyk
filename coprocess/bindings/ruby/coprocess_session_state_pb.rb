@@ -47,7 +47,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :data_expires, :int64, 20
     optional :monitor, :message, 21, "coprocess.Monitor"
     optional :enable_detailed_recording, :bool, 22
-    optional :metadata, :string, 23
+    map :metadata, :string, :string, 23
     repeated :tags, :string, 24
     optional :alias, :string, 25
     optional :last_updated, :string, 26
