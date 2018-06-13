@@ -136,13 +136,8 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
 		if session := ctxGetSession(r); session != nil {
 			object.Session = ProtoSessionState(session)
-			// If the session contains metadata, add items to the object's metadata map:
-			if len(session.MetaData) > 0 {
-				object.Metadata = make(map[string]string)
-				for k, v := range session.MetaData {
-					object.Metadata[k] = v.(string)
-				}
-			}
+			// For compatibility purposes:
+			object.Metadata = object.Session.Metadata
 		}
 	}
 
@@ -278,7 +273,20 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	coProcessor.ObjectPostProcess(returnObject, r)
 
-	token := returnObject.Metadata["token"]
+	var token string
+	if returnObject.Session != nil {
+		// For compatibility purposes, inject coprocess.Object.Metadata fields:
+		if returnObject.Metadata != nil {
+			if returnObject.Session.Metadata == nil {
+				returnObject.Session.Metadata = make(map[string]string)
+			}
+			for k, v := range returnObject.Metadata {
+				returnObject.Session.Metadata[k] = v
+			}
+		}
+
+		token = returnObject.Session.Metadata["token"]
+	}
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {

@@ -5,6 +5,8 @@ package main
 import (
 	"encoding/json"
 
+	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -54,10 +56,9 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 	}
 
 	metadata := make(map[string]interface{})
-	if session.Metadata != "" {
-		err := json.Unmarshal([]byte(session.Metadata), &metadata)
-		if err != nil {
-			log.Error("Error interpreting metadata: ", err)
+	if session.Metadata != nil {
+		for k, v := range session.Metadata {
+			metadata[k] = v
 		}
 	}
 
@@ -129,6 +130,25 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		TriggerLimits: session.Monitor.TriggerLimits,
 	}
 
+	metadata := make(map[string]string)
+	if len(session.MetaData) > 0 {
+		for k, v := range session.MetaData {
+			switch v.(type) {
+			case string:
+				metadata[k] = v.(string)
+			default:
+				jsonValue, err := json.Marshal(v)
+				if err != nil {
+					log.WithFields(logrus.Fields{
+						"prefix": "coprocess",
+					}).WithError(err).Error("Couldn't encode session metadata")
+					continue
+				}
+				metadata[k] = string(jsonValue)
+			}
+		}
+	}
+
 	return &coprocess.SessionState{
 		LastCheck:               session.LastCheck,
 		Allowance:               session.Allowance,
@@ -152,6 +172,7 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		ApplyPolicies:           session.ApplyPolicies,
 		DataExpires:             session.DataExpires,
 		Monitor:                 monitor,
+		Metadata:                metadata,
 		EnableDetailedRecording: session.EnableDetailedRecording,
 		Tags:                session.Tags,
 		Alias:               session.Alias,
