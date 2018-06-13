@@ -73,7 +73,7 @@ const (
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf config.Config) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config) sessionFailReason {
 	if enableRL {
 		if globalConf.EnableSentinelRateLImiter {
 			rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
