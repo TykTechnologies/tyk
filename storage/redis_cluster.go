@@ -545,7 +545,7 @@ func (r RedisCluster) GetAndDeleteSet(keyName string) []interface{} {
 		return nil
 	}
 
-	log.Debug("Analytics returned: ", redVal)
+	log.Debug("Analytics returned: ", len(redVal))
 	if len(redVal) == 0 {
 		return nil
 	}

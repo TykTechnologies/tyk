@@ -7,7 +7,7 @@ notifications:
 
 env:
   global:
-    - TYK_LOGLEVEL=debug
+    - TYK_LOGLEVEL=info
 
 addons:
   apt:
