@@ -113,7 +113,16 @@ func applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APIS
 	mw := BaseMiddleware{
 		Spec: spec,
 	}
-	return mw.ApplyPolicies(keyName, session)
+	if err := mw.ApplyPolicies(keyName, session); err != nil {
+		return err
+	}
+
+	lifetime := session.Lifetime(spec.SessionLifetime)
+	if err := spec.SessionManager.UpdateSession(keyName, session, lifetime, false); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool) error {
@@ -307,8 +316,25 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	var session user.SessionState
 	var ok bool
 	session, ok = sessionManager.SessionDetail(sessionKey, byHash)
+
 	if !ok {
 		return apiError("Key not found"), http.StatusNotFound
+	}
+
+	quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey)
+	if byHash {
+		quotaKey = QuotaKeyPrefix + sessionKey
+	}
+
+	if usedQuota, err := sessionManager.Store().GetKey(quotaKey); err == nil {
+		qInt, _ := strconv.Atoi(usedQuota)
+		remaining := session.QuotaMax - int64(qInt)
+
+		if remaining < 0 {
+			session.QuotaRemaining = 0
+		} else {
+			session.QuotaRemaining = remaining
+		}
 	}
 
 	log.WithFields(logrus.Fields{
@@ -1513,25 +1539,50 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return nil
 }
 
-func ctxSetSession(r *http.Request, s *user.SessionState) {
+func ctxSetSession(r *http.Request, s *user.SessionState, token string, scheduleUpdate bool) {
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
-	setCtxValue(r, SessionData, s)
+
+	if token == "" {
+		token = ctxGetAuthToken(r)
+	}
+
+	if s.KeyHashEmpty() {
+		s.SetKeyHash(storage.HashKey(token))
+	}
+
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, SessionData, s)
+	ctx = context.WithValue(ctx, AuthToken, token)
+
+	if scheduleUpdate {
+		ctx = context.WithValue(ctx, UpdateSession, true)
+	}
+
+	setContext(r, ctx)
+}
+
+func ctxScheduleSessionUpdate(r *http.Request) {
+	setCtxValue(r, UpdateSession, true)
+}
+
+func ctxDisableSessionUpdate(r *http.Request) {
+	setCtxValue(r, UpdateSession, false)
+}
+
+func ctxSessionUpdateScheduled(r *http.Request) bool {
+	if v := r.Context().Value(UpdateSession); v != nil {
+		return v.(bool)
+	}
+	return false
 }
 
 func ctxGetAuthToken(r *http.Request) string {
-	if v := r.Context().Value(AuthHeaderValue); v != nil {
+	if v := r.Context().Value(AuthToken); v != nil {
 		return v.(string)
 	}
 	return ""
-}
-
-func ctxSetAuthToken(r *http.Request, t string) {
-	if t == "" {
-		panic("setting a nil context AuthHeaderValue")
-	}
-	setCtxValue(r, AuthHeaderValue, t)
 }
 
 func ctxGetTrackedPath(r *http.Request) string {

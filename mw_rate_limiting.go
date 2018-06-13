@@ -66,20 +66,15 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	token := ctxGetAuthToken(r)
 
 	storeRef := k.Spec.SessionManager.Store()
-	reason := sessionLimiter.ForwardMessage(session,
+	reason := sessionLimiter.ForwardMessage(
+		r,
+		session,
 		token,
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
 		k.Spec.GlobalConfig,
 	)
-
-	// If either are disabled, save the write roundtrip
-	if !k.Spec.DisableRateLimit || !k.Spec.DisableQuota {
-		// Ensure quota and rate data for this session are recorded
-		k.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(k.Spec.SessionLifetime), false)
-		ctxSetSession(r, session)
-	}
 
 	switch reason {
 	case sessionFailNone:

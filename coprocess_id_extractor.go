@@ -15,13 +15,11 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/user"
 )
 
 // IdExtractor is the base interface for an ID extractor.
 type IdExtractor interface {
 	ExtractAndCheck(*http.Request) (string, ReturnOverrides)
-	PostProcess(*http.Request, *user.SessionState, string)
 	GenerateSessionID(string, BaseMiddleware) string
 }
 
@@ -38,15 +36,6 @@ func (e *BaseExtractor) ExtractAndCheck(r *http.Request) (sessionID string, retu
 		"prefix": "idextractor",
 	}).Error("This extractor doesn't implement an extraction method, rejecting.")
 	return "", ReturnOverrides{ResponseCode: 403, ResponseError: "Key not authorised"}
-}
-
-// PostProcess sets context variables and updates the storage.
-func (e *BaseExtractor) PostProcess(r *http.Request, session *user.SessionState, sessionID string) {
-	sessionLifetime := session.Lifetime(e.Spec.SessionLifetime)
-	e.Spec.SessionManager.UpdateSession(sessionID, session, sessionLifetime, false)
-
-	ctxSetSession(r, session)
-	ctxSetAuthToken(r, sessionID)
 }
 
 // ExtractHeader is used when a HeaderSource is specified.
@@ -146,11 +135,11 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 
 	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMid)
 
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(sessionID, r)
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			e.PostProcess(r, &previousSession, sessionID)
+			ctxSetSession(r, &previousSession, sessionID, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -219,11 +208,11 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 	}
 
 	SessionID = e.GenerateSessionID(regexOutput[e.cfg.RegexMatchIndex], e.BaseMid)
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
 
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			e.PostProcess(r, &previousSession, SessionID)
+			ctxSetSession(r, &previousSession, SessionID, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}
@@ -295,10 +284,10 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 
 	SessionID = e.GenerateSessionID(output, e.BaseMid)
 
-	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID)
+	previousSession, keyExists := e.BaseMid.CheckSessionAndIdentityForValidKey(SessionID, r)
 	if keyExists {
 		if previousSession.IdExtractorDeadline > time.Now().Unix() {
-			e.PostProcess(r, &previousSession, SessionID)
+			ctxSetSession(r, &previousSession, SessionID, true)
 			returnOverrides = ReturnOverrides{
 				ResponseCode: 200,
 			}

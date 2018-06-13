@@ -22,7 +22,9 @@ import (
 // these to be implemented and is lifted pretty much from docs
 const (
 	SessionData = iota
-	AuthHeaderValue
+	UpdateSession
+	AuthToken
+	HashedAuthToken
 	VersionData
 	VersionDefault
 	OrgSessionContext
@@ -240,6 +242,7 @@ func recordDetail(r *http.Request, globalConf config.Config) bool {
 // Spec states the path is Ignored
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
+	defer s.Base().UpdateRequestSession(r)
 
 	versionDef := s.Spec.VersionDefinition
 	if versionDef.Location == "url" && versionDef.StripPath {

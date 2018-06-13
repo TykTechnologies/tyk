@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -145,7 +146,6 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	specAsJson := specToJson(d.Spec)
 
 	session := new(user.SessionState)
-	token := ctxGetAuthToken(r)
 
 	// Encode the session object (if not a pre-process)
 	if vmeta.UseSession {
@@ -214,9 +214,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	// Save the sesison data (if modified)
 	if vmeta.UseSession {
-		session.MetaData = mapStrsToIfaces(newResponseData.SessionMeta)
-		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime), false)
-		ctxSetSession(r, session)
+		newMeta := mapStrsToIfaces(newResponseData.SessionMeta)
+		if !reflect.DeepEqual(session.MetaData, newMeta) {
+			session.MetaData = newMeta
+			ctxSetSession(r, session, "", true)
+		}
 	}
 
 	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)

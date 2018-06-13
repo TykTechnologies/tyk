@@ -1231,7 +1231,6 @@ func TestKeepAliveConns(t *testing.T) {
 // for the API. Meaning that a single token cannot reduce service availability for other tokens by simply going over the
 // API's global rate limit.
 func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
-
 	globalCfg := config.Global()
 	globalCfg.EnableNonTransactionalRateLimiter = false
 	globalCfg.EnableSentinelRateLImiter = true

@@ -71,7 +71,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Check if API key valid
 	keyName := k.Spec.OrgID + authValues[0]
 	logEntry = getLogEntryForRequest(r, keyName, nil)
-	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName)
+	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
 	if !keyExists {
 		logEntry.Info("Attempted access with non-existent user.")
 
@@ -113,8 +113,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.BasicAuthUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session)
-		ctxSetAuthToken(r, keyName)
+		ctxSetSession(r, &session, keyName, false)
 	}
 
 	// Request is valid, carry on
