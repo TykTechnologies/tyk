@@ -50,7 +50,6 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	}
 
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
-
 	if ratePerPeriodNow > int(currentSession.Rate)-subtractor {
 		// Set a sentinel value with expire
 		if globalConf.EnableSentinelRateLImiter {
@@ -75,11 +74,11 @@ const (
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf config.Config) sessionFailReason {
-	rateLimiterKey := RateLimitKeyPrefix + storage.HashKey(key)
-	rateLimiterSentinelKey := RateLimitKeyPrefix + storage.HashKey(key) + ".BLOCKED"
-
 	if enableRL {
 		if globalConf.EnableSentinelRateLImiter {
+			rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
+			rateLimiterSentinelKey := RateLimitKeyPrefix + currentSession.KeyHash() + ".BLOCKED"
+
 			go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf)
 
 			// Check sentinel
@@ -89,6 +88,9 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				return sessionFailRateLimit
 			}
 		} else if globalConf.EnableRedisRollingLimiter {
+			rateLimiterKey := RateLimitKeyPrefix + currentSession.KeyHash()
+			rateLimiterSentinelKey := RateLimitKeyPrefix + currentSession.KeyHash() + ".BLOCKED"
+
 			if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf) {
 				return sessionFailRateLimit
 			}
@@ -147,7 +149,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 
 	// Create the key
 	log.Debug("[QUOTA] Inbound raw key is: ", key)
-	rawKey := QuotaKeyPrefix + storage.HashKey(key)
+	rawKey := QuotaKeyPrefix + currentSession.KeyHash()
 	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
 	log.Debug("Renewing with TTL: ", currentSession.QuotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)

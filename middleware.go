@@ -151,6 +151,8 @@ func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 		log.Debug("Setting data expiry: ", session.OrgID)
 		go t.SetOrgExpiry(session.OrgID, session.DataExpires)
 	}
+
+	session.SetKeyHash(storage.HashKey(key))
 	return session, found
 }
 
@@ -191,6 +193,10 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	// Set context state back
 	// Useful for benchmarks when request object stays same
 	ctxDisableSessionUpdate(r)
+
+	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+		SessionCache.Set(session.KeyHash(), *session, cache.DefaultExpiration)
+	}
 
 	return true
 }
@@ -346,6 +352,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	log.Debug("Querying keystore")
 	session, found := t.Spec.SessionManager.SessionDetail(key, false)
 	if found {
+		session.SetKeyHash(cacheKey)
 		// If exists, assume it has been authorized and pass on
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
@@ -364,6 +371,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
 	if found {
+		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		log.Info("Recreating session for key: ", key)
 

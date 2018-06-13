@@ -68,6 +68,25 @@ type SessionState struct {
 	LastUpdated             string                 `json:"last_updated" msg:"last_updated"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
+
+	// Used to store token hash
+	keyHash                 string
+}
+
+func (s *SessionState) KeyHash() string {
+	if s.keyHash == "" {
+		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
+	}
+
+	return s.keyHash
+}
+
+func (s *SessionState) SetKeyHash(hash string) {
+	s.keyHash = hash
+}
+
+func (s *SessionState) KeyHashEmpty() bool {
+	return s.keyHash == ""
 }
 
 func (s *SessionState) Lifetime(fallback int64) int64 {

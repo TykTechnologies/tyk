@@ -23,7 +23,8 @@ import (
 const (
 	SessionData = iota
 	UpdateSession
-	AuthHeaderValue
+	AuthToken
+	HashedAuthToken
 	VersionData
 	VersionDefault
 	OrgSessionContext

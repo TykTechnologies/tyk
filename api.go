@@ -1548,9 +1548,14 @@ func ctxSetSession(r *http.Request, s *user.SessionState, token string, schedule
 		token = ctxGetAuthToken(r)
 	}
 
+	if s.KeyHashEmpty() {
+		s.SetKeyHash(storage.HashKey(token))
+	}
+
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, SessionData, s)
-	ctx = context.WithValue(ctx, AuthHeaderValue, token)
+	ctx = context.WithValue(ctx, AuthToken, token)
+
 	if scheduleUpdate {
 		ctx = context.WithValue(ctx, UpdateSession, true)
 	}
@@ -1574,7 +1579,7 @@ func ctxSessionUpdateScheduled(r *http.Request) bool {
 }
 
 func ctxGetAuthToken(r *http.Request) string {
-	if v := r.Context().Value(AuthHeaderValue); v != nil {
+	if v := r.Context().Value(AuthToken); v != nil {
 		return v.(string)
 	}
 	return ""

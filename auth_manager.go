@@ -44,8 +44,8 @@ type DefaultAuthorisationManager struct {
 }
 
 type DefaultSessionManager struct {
-	store                    storage.Handler
-	asyncWrites              bool
+	store       storage.Handler
+	asyncWrites bool
 }
 
 func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
@@ -93,7 +93,6 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 }
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState) {
-
 	rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",

@@ -302,12 +302,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
 			}
 
-			cacheKey := sessionID
-			if k.Spec.GlobalConfig.HashKeys {
-				cacheKey = storage.HashStr(sessionID)
-			}
-			// update session in cache
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
 		}
 	}
 
