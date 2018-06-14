@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -45,10 +46,10 @@ func TestReverseProxyRetainHost(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}, URLRewriteEnabled: true}
 			spec.URLRewriteEnabled = true
 
-			req := testReq(t, "GET", tc.inURL, nil)
+			req := testReq(t, http.MethodGet, tc.inURL, nil)
 			req.URL.Path = tc.inPath
 			if tc.retainHost {
 				setCtxValue(req, RetainHost, true)
@@ -61,6 +62,50 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testNewWrappedServeHTTP() *ReverseProxy {
+	target, _ := url.Parse(testHttpGet)
+	def := apidef.APIDefinition{}
+	def.VersionData.DefaultVersion = "Default"
+	def.VersionData.Versions = map[string]apidef.VersionInfo{
+		"Default": {
+			Name:             "v2",
+			UseExtendedPaths: true,
+			ExtendedPaths: apidef.ExtendedPathsSet{
+				TransformHeader: []apidef.HeaderInjectionMeta{
+					{
+						DeleteHeaders: []string{"header"},
+						AddHeaders:    map[string]string{"newheader": "newvalue"},
+						Path:          "/abc",
+						Method:        "GET",
+						ActOnResponse: true,
+					},
+				},
+				URLRewrite: []apidef.URLRewriteMeta{
+					{
+						Path:         "/get",
+						Method:       "GET",
+						MatchPattern: "/get",
+						RewriteTo:    "/post",
+					},
+				},
+			},
+		},
+	}
+	spec := &APISpec{
+		APIDefinition:          &def,
+		EnforcedTimeoutEnabled: true,
+		CircuitBreakerEnabled:  true,
+	}
+	return TykNewSingleHostReverseProxy(target, spec)
+}
+
+func TestWrappedServeHTTP(t *testing.T) {
+	proxy := testNewWrappedServeHTTP()
+	recorder := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	proxy.WrappedServeHTTP(recorder, req, false)
 }
 
 func TestSingleJoiningSlash(t *testing.T) {
@@ -215,7 +260,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s:%t", tc.header, tc.expected), func(t *testing.T) {
 			rp := &ReverseProxy{}
-			r, err := http.NewRequest("GET", "http://test/test", nil)
+			r, err := http.NewRequest(http.MethodGet, "http://test/test", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -234,6 +279,39 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 	}
 }
 
+func testRequestIPHops(t testing.TB) {
+	req := &http.Request{
+		Header:     http.Header{},
+		RemoteAddr: "test.com:80",
+	}
+	req.Header.Set("X-Forwarded-For", "abc")
+	match := "abc, test.com"
+	clientIP := requestIPHops(req)
+	if clientIP != match {
+		t.Fatalf("Got %s, expected %s", clientIP, match)
+	}
+}
+
+func TestRequestIPHops(t *testing.T) {
+	testRequestIPHops(t)
+}
+
+func BenchmarkRequestIPHops(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		testRequestIPHops(b)
+	}
+}
+
+func BenchmarkWrappedServeHTTP(b *testing.B) {
+	b.ReportAllocs()
+	proxy := testNewWrappedServeHTTP()
+	recorder := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	for i := 0; i < b.N; i++ {
+		proxy.WrappedServeHTTP(recorder, req, false)
+	}
+}
 func BenchmarkCopyRequestResponse(b *testing.B) {
 	b.ReportAllocs()
 

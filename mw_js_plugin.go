@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -45,6 +46,7 @@ type MiniRequestObject struct {
 	IgnoreBody      bool
 	Method          string
 	RequestURI      string
+	Scheme          string
 }
 
 type VMReturnObject struct {
@@ -96,7 +98,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}).Error("Failed to read request body! ", err)
 		return nil, http.StatusOK
 	}
-
 	headers := r.Header
 	host := r.Host
 	if host == "" && r.URL != nil {
@@ -122,6 +123,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteParams:   []string{},
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
+		Scheme:         r.URL.Scheme,
 	}
 
 	requestAsJson, err := json.Marshal(requestData)
@@ -135,7 +137,6 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	specAsJson := specToJson(d.Spec)
 
 	session := new(user.SessionState)
-	token := ctxGetAuthToken(r)
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
@@ -248,9 +249,12 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	r.URL.RawQuery = values.Encode()
 
 	// Save the sesison data (if modified)
-	if !d.Pre && d.UseSession && len(newRequestData.SessionMeta) > 0 {
-		session.MetaData = mapStrsToIfaces(newRequestData.SessionMeta)
-		d.Spec.SessionManager.UpdateSession(token, session, session.Lifetime(d.Spec.SessionLifetime), false)
+	if !d.Pre && d.UseSession {
+		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
+		if !reflect.DeepEqual(session.MetaData, newMeta) {
+			session.MetaData = newMeta
+			ctxScheduleSessionUpdate(r)
+		}
 	}
 
 	log.WithFields(logrus.Fields{
@@ -276,8 +280,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	if d.Auth {
-		ctxSetSession(r, &newRequestData.Session)
-		ctxSetAuthToken(r, newRequestData.AuthValue)
+		ctxSetSession(r, &newRequestData.Session, newRequestData.AuthValue, true)
 	}
 
 	return nil, http.StatusOK
@@ -394,6 +397,11 @@ type TykJSHttpResponse struct {
 	Code    int
 	Body    string
 	Headers map[string][]string
+
+	// Make this compatible with BatchReplyUnit
+	CodeComp    int                 `json:"code"`
+	BodyComp    string              `json:"body"`
+	HeadersComp map[string][]string `json:"headers"`
 }
 
 func (j *JSVM) LoadTykJSApi() {
@@ -511,10 +519,14 @@ func (j *JSVM) LoadTykJSApi() {
 		}
 
 		body, _ := ioutil.ReadAll(resp.Body)
+		bodyStr := string(body)
 		tykResp := TykJSHttpResponse{
-			Code:    resp.StatusCode,
-			Body:    string(body),
-			Headers: resp.Header,
+			Code:        resp.StatusCode,
+			Body:        bodyStr,
+			Headers:     resp.Header,
+			CodeComp:    resp.StatusCode,
+			BodyComp:    bodyStr,
+			HeadersComp: resp.Header,
 		}
 
 		retAsStr, _ := json.Marshal(tykResp)

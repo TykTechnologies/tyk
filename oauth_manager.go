@@ -321,7 +321,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			log.Debug("New token: ", new_token.(string))
 			log.Debug("Keys: ", session.OauthKeys)
 
-			keyName := o.API.OrgID + username
+			keyName := generateToken(o.API.OrgID, username)
 
 			log.Debug("Updating user:", keyName)
 			err := o.API.SessionManager.UpdateSession(keyName, session, session.Lifetime(o.API.SessionLifetime), false)

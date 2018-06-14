@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"regexp"
 	"sync"
 	"sync/atomic"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 var log = logger.Get()
@@ -71,6 +71,7 @@ type AnalyticsConfigConfig struct {
 	GeoIPDBLocation         string              `json:"geo_ip_db_path"`
 	NormaliseUrls           NormalisedURLConfig `json:"normalise_urls"`
 	PoolSize                int                 `json:"pool_size"`
+	RecordsBufferSize       uint64              `json:"records_buffer_size"`
 	StorageExpirationTime   int                 `json:"storage_expiration_time"`
 	ignoredIPsCompiled      map[string]bool
 }
@@ -213,6 +214,7 @@ type Config struct {
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
 	AllowMasterKeys                   bool                                  `json:"allow_master_keys"`
 	HashKeys                          bool                                  `json:"hash_keys"`
+	HashKeyFunction                   string                                `json:"hash_key_function"`
 	SuppressRedisSignalReload         bool                                  `json:"suppress_redis_signal_reload"`
 	SupressDefaultOrgStore            bool                                  `json:"suppress_default_org_store"`
 	UseRedisLog                       bool                                  `json:"use_redis_log"`
@@ -287,7 +289,8 @@ type Config struct {
 	VersionHeader                     string                                `json:"version_header"`
 	EnableHashedKeysListing           bool                                  `json:"enable_hashed_keys_listing"`
 	MinTokenLength                    int                                   `json:"min_token_length"`
-	JWTSkipCheckKidAsId               bool                                  `json:"jwt_skip_check_kid_as_id"`
+	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
+	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
 }
 
 type CertData struct {

@@ -35,15 +35,15 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"github.com/satori/go.uuid"
-	"gopkg.in/alecthomas/kingpin.v2"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	cli "github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/lint"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -51,6 +51,7 @@ import (
 var (
 	log                      = logger.Get()
 	mainLog                  = log.WithField("prefix", "main")
+	pubSubLog                = log.WithField("prefix", "pub-sub")
 	rawLog                   = logger.GetRaw()
 	templates                *template.Template
 	analytics                RedisAnalyticsHandler
@@ -83,27 +84,6 @@ var (
 	NodeID string
 
 	runningTests = false
-
-	version            = kingpin.Version(VERSION)
-	help               = kingpin.CommandLine.HelpFlag.Short('h')
-	conf               = kingpin.Flag("conf", "load a named configuration file").PlaceHolder("FILE").String()
-	port               = kingpin.Flag("port", "listen on PORT (overrides config file)").String()
-	memProfile         = kingpin.Flag("memprofile", "generate a memory profile").Bool()
-	cpuProfile         = kingpin.Flag("cpuprofile", "generate a cpu profile").Bool()
-	blockProfile       = kingpin.Flag("blockprofile", "generate a block profile").Bool()
-	mutexProfile       = kingpin.Flag("mutexprofile", "generate a mutex profile").Bool()
-	httpProfile        = kingpin.Flag("httpprofile", "expose runtime profiling data via HTTP").Bool()
-	debugMode          = kingpin.Flag("debug", "enable debug mode").Bool()
-	importBlueprint    = kingpin.Flag("import-blueprint", "import an API Blueprint file").PlaceHolder("FILE").String()
-	importSwagger      = kingpin.Flag("import-swagger", "import a Swagger file").PlaceHolder("FILE").String()
-	createAPI          = kingpin.Flag("create-api", "creates a new API definition from the blueprint").Bool()
-	orgID              = kingpin.Flag("org-id", "assign the API Definition to this org_id (required with create-api").String()
-	upstreamTarget     = kingpin.Flag("upstream-target", "set the upstream target for the definition").PlaceHolder("URL").String()
-	asMock             = kingpin.Flag("as-mock", "creates the API as a mock based on example fields").Bool()
-	forAPI             = kingpin.Flag("for-api", "adds blueprint to existing API Definition as version").PlaceHolder("PATH").String()
-	asVersion          = kingpin.Flag("as-version", "the version number to use when inserting").PlaceHolder("VERSION").String()
-	logInstrumentation = kingpin.Flag("log-intrumentation", "output intrumentation output to stdout").Bool()
-	subcmd             = kingpin.Arg("subcmd", "run a Tyk subcommand i.e. lint").String()
 
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
@@ -165,7 +145,7 @@ func setupGlobals() {
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-"}
 		analytics.Store = &analyticsStore
-		analytics.Init()
+		analytics.Init(globalConf)
 
 		redisPurgeOnce.Do(func() {
 			store := storage.RedisCluster{KeyPrefix: "analytics-"}
@@ -188,11 +168,6 @@ func setupGlobals() {
 	// Load all the files that have the "error" prefix.
 	templatesDir := filepath.Join(config.Global().TemplatePath, "error*")
 	templates = template.Must(template.ParseGlob(templatesDir))
-
-	// Set up global JSVM
-	if config.Global().EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
-	}
 
 	if config.Global().CoProcessOptions.EnableCoProcess {
 		if err := CoProcessInit(); err != nil {
@@ -256,9 +231,14 @@ func syncAPISpecs() int {
 	defer apisMu.Unlock()
 
 	if config.Global().UseDBAppConfigs {
-
 		connStr := buildConnStr("/system/apis")
-		apiSpecs = loader.FromDashboardService(connStr, config.Global().NodeSecret)
+		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
+		if err != nil {
+			log.Error("failed to load API specs: ", err)
+			return 0
+		}
+
+		apiSpecs = tmpSpecs
 
 		mainLog.Debug("Downloading API Configurations from Dashboard Service")
 	} else if config.Global().SlaveOptions.UseRPC {
@@ -373,7 +353,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		mainLog.Info("Control API hostname set: ", hostname)
 	}
 
-	if *httpProfile {
+	if *cli.HTTPProfile {
 		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
@@ -609,6 +589,11 @@ func doReload() {
 	reloadMu.Lock()
 	defer reloadMu.Unlock()
 
+	// Initialize/reset the JSVM
+	if config.Global().EnableJSVM {
+		GlobalEventsJSVM.Init(nil)
+	}
+
 	// Load the API Policies
 	syncPolicies()
 	// load the specs
@@ -621,12 +606,6 @@ func doReload() {
 	}
 
 	// We have updated specs, lets load those...
-
-	// Reset the JSVM
-	if config.Global().EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
-	}
-
 	mainLog.Info("Preparing new router")
 	newRouter := mux.NewRouter()
 	if config.Global().HttpServerOptions.OverrideDefaults {
@@ -776,26 +755,6 @@ func setupLogger() {
 }
 
 func initialiseSystem() error {
-
-	// Enable command mode
-	for _, opt := range commandModeOptions {
-		switch x := opt.(type) {
-		case *string:
-			if *x == "" {
-				continue
-			}
-		case *bool:
-			if !*x {
-				continue
-			}
-		default:
-			panic("unexpected type")
-		}
-		handleCommandModeArgs()
-		os.Exit(0)
-
-	}
-
 	if runningTests && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
@@ -803,14 +762,14 @@ func initialiseSystem() error {
 		log.Out = ioutil.Discard
 		gorpc.SetErrorLogger(func(string, ...interface{}) {})
 		stdlog.SetOutput(ioutil.Discard)
-	} else if *debugMode {
+	} else if *cli.DebugMode {
 		log.Level = logrus.DebugLevel
 		mainLog.Debug("Enabling debug-level output")
 	}
 
-	if *conf != "" {
-		mainLog.Debugf("Using %s for configuration", *conf)
-		confPaths = []string{*conf}
+	if *cli.Conf != "" {
+		mainLog.Debugf("Using %s for configuration", *cli.Conf)
+		confPaths = []string{*cli.Conf}
 	} else {
 		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
@@ -827,17 +786,17 @@ func initialiseSystem() error {
 		config.SetGlobal(globalConf)
 	}
 
-	if os.Getenv("TYK_LOGLEVEL") == "" && !*debugMode {
+	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
 		level := strings.ToLower(config.Global().LogLevel)
 		switch level {
 		case "", "info":
 			// default, do nothing
 		case "error":
-			mainLog.Level = logrus.ErrorLevel
+			log.Level = logrus.ErrorLevel
 		case "warn":
-			mainLog.Level = logrus.WarnLevel
+			log.Level = logrus.WarnLevel
 		case "debug":
-			mainLog.Level = logrus.DebugLevel
+			log.Level = logrus.DebugLevel
 		default:
 			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
 		}
@@ -849,8 +808,8 @@ func initialiseSystem() error {
 
 	setupGlobals()
 
-	if *port != "" {
-		portNum, err := strconv.Atoi(*port)
+	if *cli.Port != "" {
+		portNum, err := strconv.Atoi(*cli.Port)
 		if err != nil {
 			mainLog.Error("Port specified in flags must be a number: ", err)
 		} else {
@@ -893,7 +852,8 @@ func afterConfSetup(conf *config.Config) {
 
 	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
-	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
+	initGenericEventHandlers(conf)
+	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
 }
 
 var hostDetails struct {
@@ -924,24 +884,8 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 }
 
 func main() {
-	kingpin.Parse()
-
-	if *subcmd == "lint" {
-		path, lines, err := lint.Run(confPaths)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		if len(lines) == 0 {
-			fmt.Printf("found no issues in %s\n", path)
-			return
-		}
-		fmt.Printf("issues found in %s:\n", path)
-		for _, line := range lines {
-			fmt.Println(line)
-		}
-		os.Exit(1)
-	}
+	cli.Init(VERSION, confPaths)
+	cli.Parse()
 
 	NodeID = "solo-" + uuid.NewV4().String()
 
@@ -994,7 +938,7 @@ func main() {
 	}
 	mainLog.Info("Redis connection pools are ready")
 
-	if *memProfile {
+	if *cli.MemProfile {
 		mainLog.Debug("Memory profiling active")
 		var err error
 		if memProfFile, err = os.Create("tyk.mprof"); err != nil {
@@ -1002,7 +946,7 @@ func main() {
 		}
 		defer memProfFile.Close()
 	}
-	if *cpuProfile {
+	if *cli.CPUProfile {
 		mainLog.Info("Cpu profiling active")
 		cpuProfFile, err := os.Create("tyk.prof")
 		if err != nil {
@@ -1011,11 +955,11 @@ func main() {
 		pprof.StartCPUProfile(cpuProfFile)
 		defer pprof.StopCPUProfile()
 	}
-	if *blockProfile {
+	if *cli.BlockProfile {
 		mainLog.Info("Block profiling active")
 		runtime.SetBlockProfileRate(1)
 	}
-	if *mutexProfile {
+	if *cli.MutexProfile {
 		mainLog.Info("Mutex profiling active")
 		runtime.SetMutexProfileFraction(1)
 	}
@@ -1050,6 +994,12 @@ func main() {
 
 	mainLog.Info("Stop signal received.")
 
+	// stop analytics workers
+	if config.Global().EnableAnalytics && analytics.Store == nil {
+		analytics.Stop()
+	}
+
+	// write pprof profiles
 	writeProfiles()
 
 	if config.Global().UseDBAppConfigs {
@@ -1065,7 +1015,7 @@ func main() {
 }
 
 func writeProfiles() {
-	if *blockProfile {
+	if *cli.BlockProfile {
 		f, err := os.Create("tyk.blockprof")
 		if err != nil {
 			panic(err)
@@ -1075,7 +1025,7 @@ func writeProfiles() {
 		}
 		f.Close()
 	}
-	if *mutexProfile {
+	if *cli.MutexProfile {
 		f, err := os.Create("tyk.mutexprof")
 		if err != nil {
 			panic(err)
@@ -1138,7 +1088,7 @@ func generateListener(listenPort int) (net.Listener, error) {
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         httpServerOptions.ServerName,
 			MinVersion:         httpServerOptions.MinVersion,
-			ClientAuth:         tls.RequestClientCert,
+			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
 		}

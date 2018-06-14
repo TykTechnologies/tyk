@@ -24,6 +24,7 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -46,6 +47,7 @@ var (
 )
 
 const defaultListenPort = 8080
+const mockOrgID = "507f1f77bcf86cd799439011"
 
 var defaultTestConfig config.Config
 var testServerRouter *mux.Router
@@ -129,6 +131,8 @@ func TestMain(m *testing.M) {
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
+
+	cli.Init(VERSION, confPaths)
 
 	initialiseSystem()
 	// Small part of start()
@@ -592,6 +596,8 @@ func TestAnalytics(t *testing.T) {
 	})
 
 	// Cleanup before test
+	// let records to to be sent
+	time.Sleep(recordsBufferFlushInterval + 50)
 	analytics.Store.GetAndDeleteSet(analyticsKeyName)
 
 	t.Run("Log errors", func(t *testing.T) {
@@ -599,6 +605,9 @@ func TestAnalytics(t *testing.T) {
 			{Path: "/", Code: 401},
 			{Path: "/", Code: 401},
 		}...)
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 2 {
@@ -622,6 +631,9 @@ func TestAnalytics(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Path: "/", Headers: authHeaders, Code: 200,
 		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
 
 		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(results) != 1 {
@@ -704,8 +716,8 @@ func TestControlListener(t *testing.T) {
 }
 
 func TestHttpPprof(t *testing.T) {
-	old := httpProfile
-	defer func() { httpProfile = old }()
+	old := cli.HTTPProfile
+	defer func() { cli.HTTPProfile = old }()
 
 	ts := newTykTestServer(tykTestServerConfig{
 		sepatateControlAPI: true,
@@ -717,7 +729,7 @@ func TestHttpPprof(t *testing.T) {
 	}...)
 	ts.Close()
 
-	*httpProfile = true
+	*cli.HTTPProfile = true
 
 	ts.Start()
 	ts.Run(t, []test.TestCase{
@@ -1217,4 +1229,47 @@ func TestKeepAliveConns(t *testing.T) {
 		// We already made 2 requests above, so 3th in same not allowed
 		ts.Run(t, test.TestCase{Code: 200})
 	})
+}
+
+// TestRateLimitForAPIAndRateLimitAndQuotaCheck ensures that the Rate Limit for the key is applied before the rate limit
+// for the API. Meaning that a single token cannot reduce service availability for other tokens by simply going over the
+// API's global rate limit.
+func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
+	globalCfg := config.Global()
+	globalCfg.EnableNonTransactionalRateLimiter = false
+	globalCfg.EnableSentinelRateLImiter = true
+	config.SetGlobal(globalCfg)
+
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.DisableRateLimit = false
+		spec.OrgID = "default"
+		spec.GlobalRateLimit = apidef.GlobalRateLimit{
+			Per:  60,
+			Rate: 2,
+		}
+		spec.Proxy.ListenPath = "/"
+	})
+
+	sess1token := createSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+
+	sess2token := createSession(func(s *user.SessionState) {
+		s.Rate = 1
+		s.Per = 60
+	})
+
+	ts.Run(t, []test.TestCase{
+		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusTooManyRequests, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusOK, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusTooManyRequests, Path: "/"},
+	}...)
 }

@@ -4,25 +4,25 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"text/template"
 	"time"
 
 	"github.com/rubyist/circuitbreaker"
 
-	"sync"
-
 	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -105,7 +105,7 @@ type URLSpec struct {
 	InjectHeadersResponse     apidef.HeaderInjectionMeta
 	HardTimeout               apidef.HardTimeoutMeta
 	CircuitBreaker            ExtendedCircuitBreakerMeta
-	URLRewrite                apidef.URLRewriteMeta
+	URLRewrite                *apidef.URLRewriteMeta
 	VirtualPathSpec           apidef.VirtualMeta
 	RequestSize               apidef.RequestSizeMeta
 	MethodTransform           apidef.MethodTransformMeta
@@ -164,6 +164,21 @@ var ServiceNonce string
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 	spec := &APISpec{}
+
+	// parse version expiration time stamps
+	for key, ver := range def.VersionData.Versions {
+		if ver.Expires == "" || ver.Expires == "-1" {
+			continue
+		}
+		// calculate the time
+		if t, err := time.Parse("2006-01-02 15:04", ver.Expires); err != nil {
+			log.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
+		} else {
+			ver.ExpiresTs = t
+			def.VersionData.Versions[key] = ver
+		}
+	}
+
 	spec.APIDefinition = def
 
 	// We'll push the default HealthChecker:
@@ -225,7 +240,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
-func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*APISpec {
+func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*APISpec, error) {
 	// Get the definitions
 	log.Debug("Calling: ", endpoint)
 	newRequest, err := http.NewRequest("GET", endpoint, nil)
@@ -244,16 +259,20 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	}
 	resp, err := c.Do(newRequest)
 	if err != nil {
-		log.Error("Request failed: ", err)
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		log.Error("Login failure, Response was: ", string(body))
 		reLogin()
-		return nil
+		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		reLogin()
+		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
 	// Extract tagged APIs#
@@ -264,9 +283,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 		Nonce string
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		log.Error("Failed to decode body: ", err)
-		log.Info("--> Retrying in 5s")
-		return nil
+		body, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only
@@ -308,7 +326,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) []*AP
 	ServiceNonce = list.Nonce
 	log.Debug("Loading APIS Finished: Nonce Set: ", ServiceNonce)
 
-	return specs
+	return specs, nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -678,7 +696,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
-		newSpec.URLRewrite = stringSpec
+		newSpec.URLRewrite = &stringSpec
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -867,25 +885,33 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 		if !v.Spec.MatchString(strings.ToLower(r.URL.Path)) {
 			continue
 		}
+
 		if v.MethodActions != nil {
 			// We are using an extended path set, check for the method
 			methodMeta, matchMethodOk := v.MethodActions[r.Method]
-
 			if !matchMethodOk {
 				continue
 			}
 
-			// Matched the method, check what status it is:
-			if methodMeta.Action == apidef.NoAction {
-				// NoAction status means we're not treating this request in any special or exceptional way
-				return a.getURLStatus(v.Status), nil
-			}
+			// Matched the method, check what status it is
 			// TODO: Extend here for additional reply options
 			switch methodMeta.Action {
+			case apidef.NoAction:
+				// NoAction status means we're not treating this request in any special or exceptional way
+				return a.getURLStatus(v.Status), nil
 			case apidef.Reply:
 				return StatusRedirectFlowByReply, &methodMeta
 			default:
 				log.Error("URL Method Action was not set to NoAction, blocking.")
+				return EndPointNotAllowed, nil
+			}
+		}
+
+		if whiteListStatus {
+			// We have a whitelist, nothing gets through unless specifically defined
+			switch v.Status {
+			case WhiteList, BlackList, Ignored:
+			default:
 				return EndPointNotAllowed, nil
 			}
 		}
@@ -990,7 +1016,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 			}
 		case URLRewrite:
 			if r.Method == v.URLRewrite.Method {
-				return true, &v.URLRewrite
+				return true, v.URLRewrite
 			}
 		case VirtualPath:
 			if r.Method == v.VirtualPathSpec.Method {
@@ -1030,9 +1056,9 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case "url":
-		url := strings.Replace(r.URL.Path, a.Proxy.ListenPath, "", 1)
+		uPath := r.URL.Path[len(a.Proxy.ListenPath):]
 		// First non-empty part of the path is the version ID
-		for _, part := range strings.Split(url, "/") {
+		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
 				return part
 			}
@@ -1054,16 +1080,15 @@ func (a *APISpec) VersionExpired(versionDef *apidef.VersionInfo) (bool, *time.Ti
 		return false, nil
 	}
 
-	// otherwise - calculate the time
-	t, err := time.Parse("2006-01-02 15:04", versionDef.Expires)
-	if err != nil {
-		log.Error("Could not parse expiry date for API, dissallow: ", err)
+	// otherwise use parsed timestamp
+	if versionDef.ExpiresTs.IsZero() {
+		log.Error("Could not parse expiry date for API, disallow")
 		return true, nil
 	}
 
 	// It's in the past, expire
 	// It's in the future, keep going
-	return time.Since(t) >= 0, &t
+	return time.Since(versionDef.ExpiresTs) >= 0, &versionDef.ExpiresTs
 }
 
 // RequestValid will check if an incoming request has valid version
@@ -1121,17 +1146,17 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 		} else {
 			// Extract Version Info
 			// First checking for if default version is set
-			vname := a.getVersionFromRequest(r)
-			if vname == "" && a.VersionData.DefaultVersion != "" {
-				vname = a.VersionData.DefaultVersion
+			vName := a.getVersionFromRequest(r)
+			if vName == "" {
+				if a.VersionData.DefaultVersion == "" {
+					return &version, nil, false, VersionNotFound
+				}
+				vName = a.VersionData.DefaultVersion
 				ctxSetDefaultVersion(r)
-			}
-			if vname == "" && a.VersionData.DefaultVersion == "" {
-				return &version, nil, false, VersionNotFound
 			}
 			// Load Version Data - General
 			var ok bool
-			if version, ok = a.VersionData.Versions[vname]; !ok {
+			if version, ok = a.VersionData.Versions[vName]; !ok {
 				return &version, nil, false, VersionDoesNotExist
 			}
 		}
@@ -1142,20 +1167,18 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, []URLSpec, bool
 
 	// Load path data and whitelist data for version
 	rxPaths, rxOk := a.RxPaths[version.Name]
-	whiteListStatus, wlOk := a.WhiteListEnabled[version.Name]
-
 	if !rxOk {
 		log.Error("no RX Paths found for version ", version.Name)
 		return &version, nil, false, VersionDoesNotExist
 	}
 
+	whiteListStatus, wlOk := a.WhiteListEnabled[version.Name]
 	if !wlOk {
 		log.Error("No whitelist data found")
 		return &version, nil, false, VersionWhiteListStatusNotFound
 	}
 
 	return &version, rxPaths, whiteListStatus, StatusOk
-
 }
 
 type RoundRobin struct {

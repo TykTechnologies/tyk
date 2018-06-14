@@ -1,9 +1,6 @@
 package user
 
 import (
-	"github.com/spaolacci/murmur3"
-	"gopkg.in/vmihailenco/msgpack.v2"
-
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
@@ -72,26 +69,24 @@ type SessionState struct {
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
 
-	FirstSeenHash string `bson:"-" json:"-"`
+	// Used to store token hash
+	keyHash string
 }
 
-var murmurHasher = murmur3.New32()
-
-func (s *SessionState) SetFirstSeenHash() {
-	s.FirstSeenHash = s.Hash()
-}
-
-func (s *SessionState) Hash() string {
-	encoded, err := msgpack.Marshal(s)
-	if err != nil {
-		log.Error("Error encoding session data: ", err)
-		return ""
+func (s *SessionState) KeyHash() string {
+	if s.keyHash == "" {
+		panic("KeyHash cache not found. You should call `SetKeyHash` before.")
 	}
-	return string(murmurHasher.Sum(encoded)[:])
+
+	return s.keyHash
 }
 
-func (s *SessionState) HasChanged() bool {
-	return s.FirstSeenHash == "" || s.FirstSeenHash != s.Hash()
+func (s *SessionState) SetKeyHash(hash string) {
+	s.keyHash = hash
+}
+
+func (s *SessionState) KeyHashEmpty() bool {
+	return s.keyHash == ""
 }
 
 func (s *SessionState) Lifetime(fallback int64) int64 {

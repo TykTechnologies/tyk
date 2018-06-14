@@ -22,7 +22,9 @@ import (
 // these to be implemented and is lifted pretty much from docs
 const (
 	SessionData = iota
-	AuthHeaderValue
+	UpdateSession
+	AuthToken
+	HashedAuthToken
 	VersionData
 	VersionDefault
 	OrgSessionContext
@@ -79,6 +81,21 @@ func addVersionHeader(w http.ResponseWriter, r *http.Request, globalConf config.
 	}
 }
 
+func estimateTagsCapacity(session *user.SessionState, apiSpec *APISpec) int {
+	size := 5 // that number of tags expected to be added at least before we record hit
+	if session != nil {
+		size += len(session.Tags)
+	}
+
+	if apiSpec.GlobalConfig.DBAppConfOptions.NodeIsSegmented {
+		size += len(apiSpec.GlobalConfig.DBAppConfOptions.Tags)
+	}
+
+	size += len(apiSpec.TagHeaders)
+
+	return size
+}
+
 func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requestCopy *http.Request, responseCopy *http.Response) {
 
 	if s.Spec.DoNotTrack {
@@ -101,13 +118,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 
 		// If OAuth, we need to grab it from the session, which may or may not exist
 		oauthClientID := ""
-		tags := make([]string, 0)
 		var alias string
 		session := ctxGetSession(r)
-
+		tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
 		if session != nil {
 			oauthClientID = session.OauthClientID
-			tags = session.Tags
+			tags = append(tags, session.Tags...)
 			alias = session.Alias
 		}
 
@@ -171,10 +187,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 			tags,
 			alias,
 			trackEP,
-			time.Now(),
+			t,
 		}
 
-		record.GetGeo(ip)
+		if s.Spec.GlobalConfig.AnalyticsConfig.EnableGeoIP {
+			record.GetGeo(ip)
+		}
 
 		expiresAfter := s.Spec.ExpireAnalyticsAfter
 		if s.Spec.GlobalConfig.EnforceOrgDataAge {
@@ -188,10 +206,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, requ
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
-			record.NormalisePath()
+			record.NormalisePath(&s.Spec.GlobalConfig)
 		}
 
-		go analytics.RecordHit(record)
+		analytics.RecordHit(&record)
 	}
 
 	// Report in health check
@@ -224,6 +242,18 @@ func recordDetail(r *http.Request, globalConf config.Config) bool {
 // Spec states the path is Ignored
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
+	defer s.Base().UpdateRequestSession(r)
+
+	versionDef := s.Spec.VersionDefinition
+	if versionDef.Location == "url" && versionDef.StripPath {
+		part := s.Spec.getVersionFromRequest(r)
+
+		log.Info("Stripping version from url: ", part)
+
+		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
+		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
+	}
+
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
 		log.Debug("Stripping: ", s.Spec.Proxy.ListenPath)
@@ -262,6 +292,17 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 // final destination, this is invoked by the ProxyHandler or right at the start of a request chain if the URL
 // Spec states the path is Ignored Itwill also return a response object for the cache
 func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
+
+	versionDef := s.Spec.VersionDefinition
+	if versionDef.Location == "url" && versionDef.StripPath {
+		part := s.Spec.getVersionFromRequest(r)
+
+		log.Info("Stripping version from url: ", part)
+
+		r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
+		r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
+	}
+
 	// Make sure we get the correct target URL
 	if s.Spec.Proxy.StripListenPath {
 		r.URL.Path = strings.Replace(r.URL.Path, s.Spec.Proxy.ListenPath, "", 1)

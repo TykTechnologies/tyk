@@ -3,12 +3,14 @@ package apidef
 import (
 	"encoding/base64"
 	"encoding/json"
-	"regexp"
 
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 
+	"time"
+
 	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type AuthProviderCode string
@@ -207,9 +209,10 @@ type ExtendedPathsSet struct {
 }
 
 type VersionInfo struct {
-	Name    string `bson:"name" json:"name"`
-	Expires string `bson:"expires" json:"expires"`
-	Paths   struct {
+	Name      string    `bson:"name" json:"name"`
+	Expires   string    `bson:"expires" json:"expires"`
+	ExpiresTs time.Time `bson:"-" json:"-"`
+	Paths     struct {
 		Ignored   []string `bson:"ignored" json:"ignored"`
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
@@ -349,8 +352,9 @@ type APIDefinition struct {
 	HmacAllowedClockSkew          float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
 	BaseIdentityProvidedBy        AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
 	VersionDefinition             struct {
-		Location string `bson:"location" json:"location"`
-		Key      string `bson:"key" json:"key"`
+		Location  string `bson:"location" json:"location"`
+		Key       string `bson:"key" json:"key"`
+		StripPath bool   `bson:"strip_path" json:"strip_path"`
 	} `bson:"definition" json:"definition"`
 	VersionData struct {
 		NotVersioned   bool                   `bson:"not_versioned" json:"not_versioned"`
@@ -458,6 +462,13 @@ func (a *APIDefinition) EncodeForDB() {
 	}
 	a.UpstreamCertificates = newUpstreamCerts
 
+	newPinnedPublicKeys := make(map[string]string)
+	for domain, cert := range a.PinnedPublicKeys {
+		newD := base64.StdEncoding.EncodeToString([]byte(domain))
+		newPinnedPublicKeys[newD] = cert
+	}
+	a.PinnedPublicKeys = newPinnedPublicKeys
+
 	for i, version := range a.VersionData.Versions {
 		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {
 
@@ -495,6 +506,18 @@ func (a *APIDefinition) DecodeFromDB() {
 		}
 	}
 	a.UpstreamCertificates = newUpstreamCerts
+
+	newPinnedPublicKeys := make(map[string]string)
+	for domain, cert := range a.PinnedPublicKeys {
+		newD, err := base64.StdEncoding.DecodeString(domain)
+		if err != nil {
+			log.Error("Couldn't Decode, leaving as it may be legacy...")
+			newPinnedPublicKeys[domain] = cert
+		} else {
+			newPinnedPublicKeys[string(newD)] = cert
+		}
+	}
+	a.PinnedPublicKeys = newPinnedPublicKeys
 
 	for i, version := range a.VersionData.Versions {
 		for j, oldSchema := range version.ExtendedPaths.ValidateJSON {

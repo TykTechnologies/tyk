@@ -20,6 +20,7 @@ func testPrepareBasicAuth() *user.SessionState {
 	session := createStandardSession()
 	session.BasicAuthData.Password = "password"
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
+	session.OrgID = "default"
 
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseBasicAuth = true

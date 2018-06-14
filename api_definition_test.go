@@ -219,6 +219,48 @@ func TestIgnored(t *testing.T) {
 	})
 }
 
+func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	t.Run("Extended Paths", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/"
+
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+
+				json.Unmarshal([]byte(`[
+					{
+						"path": "/get",
+						"method_actions": {"GET": {"action": "no_action"}}
+					}
+				]`), &v.ExtendedPaths.WhiteList)
+				json.Unmarshal([]byte(`[
+					{
+						"add_headers": {"foo": "bar"},
+						"path": "/get",
+						"method": "GET",
+						"act_on": false
+					}
+				]`), &v.ExtendedPaths.TransformResponseHeader)
+			})
+			spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
+
+		})
+
+		//headers := map[string]string{"foo": "bar"}
+		ts.Run(t, []test.TestCase{
+
+			//Should get original upstream response
+			//{Method: "GET", Path: "/get", Code: 200, HeadersMatch: headers},
+			//Reject not whitelisted (but know by upstream) path
+			{Method: "POST", Path: "/get", Code: 403},
+		}...)
+	})
+}
+
 func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 	// Mock Dashboard
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -459,6 +501,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	b.Run("Header location", func(b *testing.B) {
+		b.ReportAllocs()
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
@@ -476,6 +519,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 	})
 
 	b.Run("URL param location", func(b *testing.B) {
+		b.ReportAllocs()
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
@@ -493,6 +537,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 	})
 
 	b.Run("URL location", func(b *testing.B) {
+		b.ReportAllocs()
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
@@ -507,4 +552,74 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 			}...)
 		}
 	})
+}
+
+func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
+	// Mock Dashboard
+	callNum := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/system/apis" {
+			if callNum == 0 {
+				w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": [{"api_definition": {}}]}`))
+			} else {
+				w.Write([]byte(`{"Status": "OK", "Nonce": "1", "Message": "this is a string"`))
+			}
+
+			callNum += 1
+		} else {
+			t.Fatal("Unknown dashboard API request", r)
+		}
+	}))
+	defer ts.Close()
+
+	apisMu.Lock()
+	apisByID = make(map[string]*APISpec)
+	apisMu.Unlock()
+
+	globalConf := config.Global()
+	globalConf.UseDBAppConfigs = true
+	globalConf.AllowInsecureConfigs = true
+	globalConf.DBAppConfOptions.ConnectionString = ts.URL
+	config.SetGlobal(globalConf)
+
+	defer resetTestConfig()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	msg := redis.Message{Data: []byte(`{"Command": "ApiUpdated"}`)}
+	handled := func(got NotificationCommand) {
+		if want := NoticeApiUpdated; got != want {
+			t.Fatalf("want %q, got %q", want, got)
+		}
+	}
+	handleRedisEvent(msg, handled, wg.Done)
+
+	// Since we already know that reload is queued
+	reloadTick <- time.Time{}
+
+	// Wait for the reload to finish, then check it worked
+	wg.Wait()
+	apisMu.RLock()
+	if len(apisByID) != 1 {
+		t.Error("should return array with one spec", apisByID)
+	}
+	apisMu.RUnlock()
+
+	// Second call
+
+	var wg2 sync.WaitGroup
+	wg2.Add(1)
+	handleRedisEvent(msg, handled, wg2.Done)
+
+	// Since we already know that reload is queued
+	reloadTick <- time.Time{}
+
+	// Wait for the reload to finish, then check it worked
+	wg2.Wait()
+	apisMu.RLock()
+	if len(apisByID) != 1 {
+		t.Error("second call should return array with one spec", apisByID)
+	}
+	apisMu.RUnlock()
+
 }

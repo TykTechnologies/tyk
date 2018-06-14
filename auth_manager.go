@@ -71,7 +71,6 @@ func (b *DefaultAuthorisationManager) KeyAuthorised(keyName string) (user.Sessio
 		return newSession, false
 	}
 
-	newSession.SetFirstSeenHash()
 	return newSession, true
 }
 
@@ -94,7 +93,6 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 }
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState) {
-
 	rawKey := QuotaKeyPrefix + storage.HashKey(keyName)
 	log.WithFields(logrus.Fields{
 		"prefix":      "auth-mgr",
@@ -113,17 +111,16 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 // UpdateSession updates the session state in the storage engine
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
-	if !session.HasChanged() {
-		log.Debug("Session has not changed, not updating")
-		return nil
-	}
-
 	v, _ := json.Marshal(session)
 
-	// Keep the TTL
+	if hashed {
+		keyName = b.store.GetKeyPrefix() + keyName
+	}
+
+	// async update and return if needed
 	if b.asyncWrites {
 		if hashed {
-			go b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
+			go b.store.SetRawKey(keyName, string(v), resetTTLTo)
 			return nil
 		}
 
@@ -131,11 +128,15 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 		return nil
 	}
 
+	// sync update
+	var err error
 	if hashed {
-		return b.store.SetRawKey(b.store.GetKeyPrefix()+keyName, string(v), resetTTLTo)
+		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
+	} else {
+		err = b.store.SetKey(keyName, string(v), resetTTLTo)
 	}
 
-	return b.store.SetKey(keyName, string(v), resetTTLTo)
+	return err
 }
 
 // RemoveSession removes session from storage
@@ -174,8 +175,6 @@ func (b *DefaultSessionManager) SessionDetail(keyName string, hashed bool) (user
 		return session, false
 	}
 
-	session.SetFirstSeenHash()
-
 	return session, true
 }
 
@@ -186,11 +185,23 @@ func (b *DefaultSessionManager) Sessions(filter string) []string {
 
 type DefaultKeyGenerator struct{}
 
+func generateToken(orgID, keyID string) string {
+	keyID = strings.TrimPrefix(keyID, orgID)
+	token, err := storage.GenerateToken(orgID, keyID, config.Global().HashKeyFunction)
+
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "auth-mgr",
+			"orgID":  orgID,
+		}).WithError(err).Warning("Issue during token generation")
+	}
+
+	return token
+}
+
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
 func (DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
-	u5 := uuid.NewV4()
-	cleanSting := strings.Replace(u5.String(), "-", "", -1)
-	return orgID + cleanSting
+	return generateToken(orgID, "")
 }
 
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key

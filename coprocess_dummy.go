@@ -61,5 +61,3 @@ func CoProcessInit() error {
 }
 
 func doCoprocessReload() {}
-
-func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {}

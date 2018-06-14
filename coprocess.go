@@ -101,6 +101,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		},
 		Method:     r.Method,
 		RequestUri: r.RequestURI,
+		Scheme:     r.URL.Scheme,
 	}
 
 	object := &coprocess.Object{
@@ -135,13 +136,8 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
 		if session := ctxGetSession(r); session != nil {
 			object.Session = ProtoSessionState(session)
-			// If the session contains metadata, add items to the object's metadata map:
-			if len(session.MetaData) > 0 {
-				object.Metadata = make(map[string]string)
-				for k, v := range session.MetaData {
-					object.Metadata[k] = v.(string)
-				}
-			}
+			// For compatibility purposes:
+			object.Metadata = object.Session.Metadata
 		}
 	}
 
@@ -265,6 +261,9 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	returnObject, err := coProcessor.Dispatch(object)
 	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "coprocess",
+		}).WithError(err).Error("Dispatch error")
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
 			return errors.New("Key not authorised"), 403
 		} else {
@@ -274,7 +273,20 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	coProcessor.ObjectPostProcess(returnObject, r)
 
-	token := returnObject.Metadata["token"]
+	var token string
+	if returnObject.Session != nil {
+		// For compatibility purposes, inject coprocess.Object.Metadata fields:
+		if returnObject.Metadata != nil {
+			if returnObject.Session.Metadata == nil {
+				returnObject.Session.Metadata = make(map[string]string)
+			}
+			for k, v := range returnObject.Metadata {
+				returnObject.Session.Metadata[k] = v
+			}
+		}
+
+		token = returnObject.Session.Metadata["token"]
+	}
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
@@ -308,7 +320,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Is this a CP authentication middleware?
 	if m.Spec.EnableCoProcessAuth && m.HookType == coprocess.HookType_CustomKeyCheck {
 		// The CP middleware didn't setup a session:
-		if returnObject.Session == nil {
+		if returnObject.Session == nil || token == "" {
 			authHeaderValue := r.Header.Get(m.Spec.Auth.AuthHeaderName)
 			AuthFailed(m, r, authHeaderValue)
 			return errors.New("Key not authorised"), 403
@@ -320,15 +332,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		for k, v := range returnObject.Metadata {
 			returnedSession.MetaData[k] = string(v)
 		}
+
 		if extractor == nil {
-			sessionLifetime := returnedSession.Lifetime(m.Spec.SessionLifetime)
-			// This API is not using the ID extractor, but we've got a session:
-			m.Spec.SessionManager.UpdateSession(token, returnedSession, sessionLifetime, false)
-			ctxSetSession(r, returnedSession)
-			ctxSetAuthToken(r, token)
+			ctxSetSession(r, returnedSession, token, true)
 		} else {
-			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
-			extractor.PostProcess(r, returnedSession, sessionID)
+			ctxSetSession(r, returnedSession, sessionID, true)
 		}
 	}
 

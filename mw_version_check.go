@@ -42,10 +42,13 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	if !requestValid {
 		// Fire a versioning failure event
 		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Attempted access to disallowed version / path.", OriginatingRequest: EncodeRequestToEvent(r)},
-			Path:             r.URL.Path,
-			Origin:           request.RealIP(r),
-			Reason:           string(stat),
+			EventMetaDefault: EventMetaDefault{
+				Message:            "Attempted access to disallowed version / path.",
+				OriginatingRequest: EncodeRequestToEvent(r),
+			},
+			Path:   r.URL.Path,
+			Origin: request.RealIP(r),
+			Reason: string(stat),
 		})
 		return errors.New(string(stat)), http.StatusForbidden
 	}

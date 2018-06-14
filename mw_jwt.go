@@ -14,7 +14,6 @@ import (
 	cache "github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -109,13 +108,6 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 }
 
 func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
-	// Try using a kid or configured claim or sub claim
-
-	// Global config overrides and sets the api def
-	if k.Spec.GlobalConfig.JWTSkipCheckKidAsId {
-		k.Spec.APIDefinition.JWTSkipCheckKidAsId = true
-	}
-
 	// Check which claim is used for the id - kid or sub header
 	// If is not supposed to ignore KID - will use this as ID if not empty
 	if !k.Spec.APIDefinition.JWTSkipCheckKidAsId {
@@ -129,7 +121,7 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	return tykId, err
 }
 
-func (k *JWTMiddleware) getSecretToVerifySignature(token *jwt.Token) ([]byte, error) {
+func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) ([]byte, error) {
 	config := k.Spec.APIDefinition
 	// Check for central JWT source
 	if config.JWTSource != "" {
@@ -172,7 +164,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(token *jwt.Token) ([]byte, er
 
 	// Couldn't base64 decode the kid, so lets try it raw
 	log.Debug("Getting key: ", tykId)
-	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId)
+	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
 	if !rawKeyExists {
 		log.Info("Not found!")
 		return nil, errors.New("token invalid, key not found")
@@ -190,7 +182,7 @@ func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool
 	return policyID, true
 }
 
-func (k *JWTMiddleware) getBasePolicyID(claims jwt.MapClaims) (string, bool) {
+func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (string, bool) {
 	if k.Spec.JWTPolicyFieldName != "" {
 		return k.getPolicyIDFromToken(claims)
 	} else if k.Spec.JWTClientIDBaseField != "" {
@@ -201,7 +193,7 @@ func (k *JWTMiddleware) getBasePolicyID(claims jwt.MapClaims) (string, bool) {
 		}
 
 		// Check for a regular token that matches this client ID
-		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID)
+		clientSession, exists := k.CheckSessionAndIdentityForValidKey(clientID, r)
 		if !exists {
 			return "", false
 		}
@@ -266,19 +258,19 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	// Generate a virtual token
 	data := []byte(baseFieldData)
-	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Spec.OrgID + tokenID
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	sessionID := generateToken(k.Spec.OrgID, keyID)
 
 	log.Debug("JWT Temporary session ID is: ", sessionID)
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID)
+	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
 		session = user.SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
-		basePolicyID, foundPolicy := k.getBasePolicyID(claims)
+		basePolicyID, foundPolicy := k.getBasePolicyID(r, claims)
 		if !foundPolicy {
 			k.reportLoginFailure(baseFieldData, r)
 			return errors.New("Key not authorized: no matching policy found"), http.StatusForbidden
@@ -298,13 +290,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
-		k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
 		log.Debug("Policy applied to key")
 
 		switch k.Spec.BaseIdentityProvidedBy {
 		case apidef.JWTClaim, apidef.UnsetAuth:
-			ctxSetSession(r, &session)
-			ctxSetAuthToken(r, sessionID)
+			ctxSetSession(r, &session, sessionID, true)
 		}
 		ctxSetJWTContextVars(k.Spec, r, token)
 		return nil, http.StatusOK
@@ -346,20 +336,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
 			}
 
-			cacheKey := sessionID
-			if k.Spec.GlobalConfig.HashKeys {
-				cacheKey = storage.HashStr(sessionID)
-			}
-			// update session in cache
-			go SessionCache.Set(cacheKey, session, cache.DefaultExpiration)
+			go SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
 		}
 	}
 
 	log.Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
-		ctxSetSession(r, &session)
-		ctxSetAuthToken(r, sessionID)
+		ctxSetSession(r, &session, sessionID, false)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
@@ -382,16 +366,14 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 	}
 
 	log.Debug("Using raw key ID: ", tykId)
-
-	session, exists := k.CheckSessionAndIdentityForValidKey(tykId)
+	session, exists := k.CheckSessionAndIdentityForValidKey(tykId, r)
 	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), http.StatusForbidden
 	}
 
 	log.Debug("Raw key ID found.")
-	ctxSetSession(r, &session)
-	ctxSetAuthToken(r, tykId)
+	ctxSetSession(r, &session, tykId, false)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
@@ -458,7 +440,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			}
 		}
 
-		val, err := k.getSecretToVerifySignature(token)
+		val, err := k.getSecretToVerifySignature(r, token)
 		if err != nil {
 			log.Error("Couldn't get token: ", err)
 			return nil, err

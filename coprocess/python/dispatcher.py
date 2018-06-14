@@ -1,6 +1,5 @@
 from glob import glob
 from os import getcwd, chdir, path
-import sys
 
 import tyk
 from tyk.middleware import TykMiddleware
@@ -9,11 +8,17 @@ from tyk.event import TykEvent
 
 from gateway import TykGateway as tyk
 
+import sys
+def except_hook(type, value, traceback):
+    tyk.log_error("{0}".format(value))
+
+sys.excepthook = except_hook
+
 class TykDispatcher:
     '''A simple dispatcher'''
 
     def __init__(self, bundle_root_path):
-        tyk.log( "Initializing dispatcher", "info" )
+        tyk.log("Initializing dispatcher", "info")
         self.bundle_root_path = bundle_root_path
         self.bundles = []
         self.hook_table = {}
@@ -64,18 +69,14 @@ class TykDispatcher:
             raise Exception('Hook is not defined: {0}'.format(hook_name))
 
     def dispatch_hook(self, object_msg):
+        object = TykCoProcessObject(object_msg)
+        api_id = object.spec['APIID']
+        middleware, hook_handler = self.find_hook(api_id, object.hook_name)
         try:
-            object = TykCoProcessObject(object_msg)
-            api_id = object.spec['APIID']
-            middleware, hook_handler = self.find_hook(api_id, object.hook_name)
-            if hook_handler:
-                object = middleware.process(hook_handler, object)
-            else:
-                tyk.log( "Can't dispatch '{0}', hook is not defined.".format(object.hook_name), "error")
-            return object.dump()
-        except:
-            tyk.log_error( "Can't dispatch, error:" )
-            return object_msg
+            object = middleware.process(hook_handler, object)
+        except Exception as e:
+            raise Exception("Hook '{0}' returned an error: {1}".format(object.hook_name, e))
+        return object.dump()
 
     def dispatch_event(self, event_json):
         try:
@@ -83,8 +84,8 @@ class TykDispatcher:
             api_id = event.spec['APIID']
             middleware, hook_handler = self.find_hook(api_id, event.handler_name)
             middleware.process(hook_handler, event)
-        except:
-            tyk.log_error( "Can't dispatch: ")
+        except Exception as e:
+            raise Exception("Couldn't dispatch '{0}' event: {1}", event.handler_name, e)
 
     def reload(self):
-        tyk.log( "Reloading event handlers and middlewares.", "info" )
+        tyk.log("Reloading event handlers and middlewares.", "info")
