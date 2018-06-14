@@ -110,7 +110,7 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	// Check which claim is used for the id - kid or sub header
 	// If is not supposed to ignore KID - will use this as ID if not empty
-	if !k.Spec.APIDefinition.JWTSkipCheckKidAsId {
+	if !k.Spec.APIDefinition.JWTSkipKid {
 		if tykId, idFound := token.Header[KID].(string); idFound {
 			log.Debug("Found: ", tykId)
 			return tykId, nil

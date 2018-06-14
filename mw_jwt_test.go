@@ -101,7 +101,7 @@ func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 
 type JwtCreator func() *user.SessionState
 
-func prepareGenericJWTSession(testName string, method string, claimName string, ApiSkipKidAsId bool) (*APISpec, string) {
+func prepareGenericJWTSession(testName string, method string, claimName string, ApiSkipKid bool) (*APISpec, string) {
 	tokenKID := testKey(testName, "token")
 
 	var jwtToken string
@@ -146,7 +146,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 		spec.JWTSigningMethod = method
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
-		spec.JWTSkipCheckKidAsId = ApiSkipKidAsId
+		spec.JWTSkipKid = ApiSkipKid
 
 		if claimName != KID {
 			spec.JWTIdentityBaseField = claimName
