@@ -218,8 +218,8 @@ func createSpecTest(t testing.TB, def string) *APISpec {
 	return spec
 }
 
-func testKey(t testing.TB, name string) string {
-	return fmt.Sprintf("%s-%s", t.Name(), name)
+func testKey(testName string, name string) string {
+	return fmt.Sprintf("%s-%s", testName, name)
 }
 
 func testReqBody(t testing.TB, body interface{}) io.Reader {

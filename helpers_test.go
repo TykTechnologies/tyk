@@ -408,7 +408,7 @@ func (s *tykTestServer) Run(t testing.TB, testCases ...test.TestCase) (*http.Res
 
 		respCopy := copyResponse(lastResponse)
 		if lastError = test.AssertResponse(respCopy, tc); lastError != nil {
-			t.Errorf("[%d] %s. %s", ti, lastError.Error(), string(tcJSON))
+			t.Errorf("[%d] %s. %s\n", ti, lastError.Error(), string(tcJSON))
 		}
 
 		delay := tc.Delay
