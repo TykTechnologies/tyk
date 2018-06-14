@@ -839,36 +839,47 @@ func requestIPHops(r *http.Request) string {
 // nopCloser is just like ioutil's, but here to let us fetch the
 // underlying io.Reader.
 type nopCloser struct {
-	io.Reader
+	io.ReadSeeker
 }
 
-func (nopCloser) Close() error { return nil }
+func (n nopCloser) Close() error {
+	// seek to the start if body ever called to be closed
+	n.Seek(0, io.SeekStart)
 
-func copyBody(body io.ReadCloser) (b1, b2 io.ReadCloser) {
+	return nil
+}
+
+func copyBody(body io.ReadCloser) io.ReadCloser {
+	// check if body was already read and converted into our nopCloser
 	if nc, ok := body.(nopCloser); ok {
-		buf := *(nc.Reader.(*bytes.Buffer))
-		return body, nopCloser{&buf}
+		// seek to the beginning to have it ready for next read
+		nc.Seek(0, io.SeekStart)
+		return body
 	}
+
+	// body is http's io.ReadCloser - let's close it after we read data
 	defer body.Close()
 
-	var buf1, buf2 bytes.Buffer
-	io.Copy(&buf1, body)
-	buf2 = buf1
-	return nopCloser{&buf1}, nopCloser{&buf2}
+	// body is http's io.ReadCloser - read it up until EOF
+	var readBody bytes.Buffer
+	io.Copy(&readBody, body)
+
+	// use seekable reader for further body usage
+	reusableBody := bytes.NewReader(readBody.Bytes())
+
+	return nopCloser{reusableBody}
 }
 
 func copyRequest(r *http.Request) *http.Request {
-	r2 := *r
 	if r.Body != nil {
-		r.Body, r2.Body = copyBody(r.Body)
+		r.Body = copyBody(r.Body)
 	}
-	return &r2
+	return r
 }
 
 func copyResponse(r *http.Response) *http.Response {
-	r2 := *r
 	if r.Body != nil {
-		r.Body, r2.Body = copyBody(r.Body)
+		r.Body = copyBody(r.Body)
 	}
-	return &r2
+	return r
 }
