@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
 
@@ -67,15 +68,6 @@ type CoProcessor struct {
 
 // ObjectFromRequest constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
-	var body string
-	if r.Body == nil {
-		body = ""
-	} else {
-		defer r.Body.Close()
-		originalBody, _ := ioutil.ReadAll(r.Body)
-		body = string(originalBody)
-	}
-
 	headers := ProtoMap(r.Header)
 
 	host := r.Host
@@ -90,7 +82,6 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		Headers:        headers,
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
-		Body:           body,
 		Url:            r.URL.Path,
 		Params:         ProtoMap(r.URL.Query()),
 		AddParams:      map[string]string{},
@@ -102,6 +93,14 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		Method:     r.Method,
 		RequestUri: r.RequestURI,
 		Scheme:     r.URL.Scheme,
+	}
+
+	if r.Body != nil {
+		defer r.Body.Close()
+		miniRequestObject.RawBody, _ = ioutil.ReadAll(r.Body)
+		if utf8.Valid(miniRequestObject.RawBody) {
+			miniRequestObject.Body = string(miniRequestObject.RawBody)
+		}
 	}
 
 	object := &coprocess.Object{

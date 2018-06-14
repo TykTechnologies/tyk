@@ -19,4 +19,5 @@ message MiniRequestObject {
   string method = 11;
   string request_uri = 12;
   string scheme = 13;
+  bytes raw_body = 14;
 }
