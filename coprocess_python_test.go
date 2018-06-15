@@ -4,6 +4,8 @@
 package main
 
 import (
+	"bytes"
+	"mime/multipart"
 	"testing"
 	"time"
 
@@ -32,7 +34,6 @@ from gateway import TykGateway as tyk
 
 @Hook
 def MyAuthHook(request, session, metadata, spec):
-    print("MyAuthHook is called")
     auth_header = request.get_header('Authorization')
     if auth_header == 'valid_token':
         session.rate = 1000.0
@@ -64,7 +65,6 @@ import json
 
 @Hook
 def MyPostHook(request, session, spec):
-    print("called", session.metadata)
     if "testkey" not in session.metadata.keys():
         request.object.return_overrides.response_code = 400
         request.object.return_overrides.response_error = "'testkey' not found in metadata"
@@ -88,6 +88,48 @@ def MyPostHook(request, session, spec):
 `,
 }
 
+var pythonBundleWithPreHook = map[string]string{
+	"manifest.json": `
+		{
+		    "file_list": [
+		        "middleware.py"
+		    ],
+		    "custom_middleware": {
+		        "driver": "python",
+		        "pre": [{
+		            "name": "MyPreHook"
+		        }]
+		    }
+		}
+	`,
+	"middleware.py": `
+from tyk.decorators import *
+from gateway import TykGateway as tyk
+
+@Hook
+def MyPreHook(request, session, metadata, spec):
+    content_type = request.get_header("Content-Type")
+    if "json" in content_type:
+      if len(request.object.raw_body) <= 0:
+        request.object.return_overrides.response_code = 400
+        request.object.return_overrides.response_error = "Raw body field is empty"
+        return request, session, metadata
+      if "{}" not in request.object.body:
+        request.object.return_overrides.response_code = 400
+        request.object.return_overrides.response_error = "Body field doesn't match"
+        return request, session, metadata
+    if "multipart" in content_type:
+      if len(request.object.body) != 0:
+        request.object.return_overrides.response_code = 400
+        request.object.return_overrides.response_error = "Body field isn't empty"
+      if len(request.object.raw_body) <= 0:
+        request.object.return_overrides.response_code = 400
+        request.object.return_overrides.response_error = "Raw body field is empty"
+    return request, session, metadata
+
+`,
+}
+
 func TestPythonBundles(t *testing.T) {
 	ts := newTykTestServer(tykTestServerConfig{
 		coprocessConfig: config.CoProcessConfig{
@@ -95,15 +137,16 @@ func TestPythonBundles(t *testing.T) {
 		}})
 	defer ts.Close()
 
-	bundleID := registerBundle("python_with_auth_check", pythonBundleWithAuthCheck)
-	bundleID2 := registerBundle("python_with_post_hook", pythonBundleWithPostHook)
+	authCheckBundle := registerBundle("python_with_auth_check", pythonBundleWithAuthCheck)
+	postHookBundle := registerBundle("python_with_post_hook", pythonBundleWithPostHook)
+	preHookBundle := registerBundle("python_with_pre_hook", pythonBundleWithPreHook)
 
 	t.Run("Single-file bundle with authentication hook", func(t *testing.T) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/test-api/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = true
-			spec.CustomMiddlewareBundle = bundleID
+			spec.CustomMiddlewareBundle = authCheckBundle
 			spec.VersionData.NotVersioned = true
 		})
 
@@ -131,7 +174,7 @@ func TestPythonBundles(t *testing.T) {
 			spec.Proxy.ListenPath = "/test-api-2/"
 			spec.UseKeylessAccess = false
 			spec.EnableCoProcessAuth = false
-			spec.CustomMiddlewareBundle = bundleID2
+			spec.CustomMiddlewareBundle = postHookBundle
 			spec.VersionData.NotVersioned = true
 		})
 
@@ -141,6 +184,47 @@ func TestPythonBundles(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/test-api-2/", Code: 200, Headers: auth},
+		}...)
+	})
+
+	t.Run("Single-file bundle with pre hook and UTF-8/non-UTF-8 request data", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/test-api-2/"
+			spec.UseKeylessAccess = true
+			spec.EnableCoProcessAuth = false
+			spec.CustomMiddlewareBundle = preHookBundle
+			spec.VersionData.NotVersioned = true
+		})
+
+		time.Sleep(1 * time.Second)
+
+		fileData := generateTestBinaryData()
+		var buf bytes.Buffer
+		multipartWriter := multipart.NewWriter(&buf)
+		file, err := multipartWriter.CreateFormFile("file", "test.bin")
+		if err != nil {
+			t.Fatalf("Couldn't use multipart writer: %s", err.Error())
+		}
+		_, err = fileData.WriteTo(file)
+		if err != nil {
+			t.Fatalf("Couldn't write to multipart file: %s", err.Error())
+		}
+		field, err := multipartWriter.CreateFormField("testfield")
+		if err != nil {
+			t.Fatalf("Couldn't use multipart writer: %s", err.Error())
+		}
+		_, err = field.Write([]byte("testvalue"))
+		if err != nil {
+			t.Fatalf("Couldn't write to form field: %s", err.Error())
+		}
+		err = multipartWriter.Close()
+		if err != nil {
+			t.Fatalf("Couldn't close multipart writer: %s", err.Error())
+		}
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/test-api-2/", Code: 200, Data: &buf, Headers: map[string]string{"Content-Type": multipartWriter.FormDataContentType()}},
+			{Path: "/test-api-2/", Code: 200, Data: "{}", Headers: map[string]string{"Content-Type": "application/json"}},
 		}...)
 	})
 }
