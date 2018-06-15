@@ -5,8 +5,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
-	"math/rand"
 	"mime/multipart"
 	"testing"
 	"time"
@@ -229,18 +227,4 @@ func TestPythonBundles(t *testing.T) {
 			{Path: "/test-api-2/", Code: 200, Data: "{}", Headers: map[string]string{"Content-Type": "application/json"}},
 		}...)
 	})
-}
-
-func generateTestBinaryData() (buf *bytes.Buffer) {
-	buf = new(bytes.Buffer)
-	type testData struct {
-		a float32
-		b float64
-		c uint32
-	}
-	for i := 0; i < 10; i++ {
-		s := &testData{rand.Float32(), rand.Float64(), rand.Uint32()}
-		binary.Write(buf, binary.BigEndian, s)
-	}
-	return buf
 }

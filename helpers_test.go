@@ -2,12 +2,15 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -728,4 +731,18 @@ func initProxy(proto string, tlsConfig *tls.Config) *httpProxyHandler {
 	go proxy.server.Serve(proxy.listener)
 
 	return proxy
+}
+
+func generateTestBinaryData() (buf *bytes.Buffer) {
+	buf = new(bytes.Buffer)
+	type testData struct {
+		a float32
+		b float64
+		c uint32
+	}
+	for i := 0; i < 10; i++ {
+		s := &testData{rand.Float32(), rand.Float64(), rand.Uint32()}
+		binary.Write(buf, binary.BigEndian, s)
+	}
+	return buf
 }
