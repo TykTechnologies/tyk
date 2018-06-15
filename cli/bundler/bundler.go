@@ -68,8 +68,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	log.Infof("Building bundle using '%s'", manifestPath)
 	manifest, err := b.loadManifest(manifestPath)
 	if err != nil {
-		log.WithError(err).Error(errManifestLoad)
-		return nil
+		return err
 	}
 	if bundlePath == defaultBundlePath {
 		log.Warningf("Using default bundle path '%s'", defaultBundlePath)
@@ -86,8 +85,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 		bundleBuf.Write(data)
 	}
 	if err != nil {
-		log.WithError(err).Error(errBundleData)
-		return nil
+		return err
 	}
 
 	// Compute the checksum and append it to the manifest data structure:
@@ -109,15 +107,13 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	} else {
 		err = b.sign(key, manifest, bundleBuf)
 		if err != nil {
-			log.WithError(err).Error(errBundleSign)
-			return nil
+			return err
 		}
 	}
 
 	manifestData, err := json.Marshal(&manifest)
 	if err != nil {
-		log.WithError(err).Error(errBundleData)
-		return nil
+		return err
 	}
 
 	// Write the ZIP contents into a buffer:
@@ -139,8 +135,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 		}
 	}
 	if err != nil {
-		log.WithError(err).Error(errBundleData)
-		return nil
+		return err
 	}
 
 	// Append the updated manifest file to the ZIP file:
@@ -149,8 +144,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	zipWriter.Close()
 	err = ioutil.WriteFile(bundlePath, buf.Bytes(), defaultBundlePerm)
 	if err != nil {
-		log.WithError(err).Error(errBundleData)
-		return nil
+		return err
 	}
 	log.Infof("Wrote '%s' (%d bytes)", bundlePath, buf.Len())
 	return nil
@@ -174,13 +168,8 @@ func (b *Bundler) validateManifest(manifest *apidef.BundleManifest) (err error) 
 	for _, f := range manifest.FileList {
 		if _, err := os.Stat(f); err != nil {
 			err = errors.New("Referencing a nonexistent file: " + f)
-			break
+			return err
 		}
-	}
-
-	// The file list references a nonexistent file:
-	if err != nil {
-		return err
 	}
 
 	// The custom middleware block must specify at least one hook:
@@ -206,7 +195,7 @@ func (b *Bundler) validateManifest(manifest *apidef.BundleManifest) (err error) 
 func (b *Bundler) loadManifest(path string) (manifest *apidef.BundleManifest, err error) {
 	rawManifest, err := ioutil.ReadFile(path)
 	if err != nil {
-		return manifest, err
+		return manifest, errManifestLoad
 	}
 	err = json.Unmarshal(rawManifest, &manifest)
 	if err != nil {
