@@ -359,8 +359,12 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
-	// return nil
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
+
+	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
+	nopCloseResponseBody(resp)
+
+	return resp
 }
 
 func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) *http.Response {
@@ -836,12 +840,23 @@ func requestIPHops(r *http.Request) string {
 	return clientIP
 }
 
-// nopCloser is just like ioutil's, but here to let us fetch the
-// underlying io.Reader.
+// nopCloser is just like ioutil's, but here to let us re-read the same
+// buffer inside by moving position to the start every time we done with reading
 type nopCloser struct {
 	io.ReadSeeker
 }
 
+// Read just a wrapper around real Read which also moves position to the start if we get EOF
+// to have it ready for next read-cycle
+func (n nopCloser) Read(p []byte) (int, error) {
+	num, err := n.ReadSeeker.Read(p)
+	if err == io.EOF { // move to start to have it ready for next read cycle
+		n.Seek(0, io.SeekStart)
+	}
+	return num, err
+}
+
+// Close is a no-op Close plus moves position to the start just in case
 func (n nopCloser) Close() error {
 	// seek to the start if body ever called to be closed
 	n.Seek(0, io.SeekStart)
@@ -861,11 +876,11 @@ func copyBody(body io.ReadCloser) io.ReadCloser {
 	defer body.Close()
 
 	// body is http's io.ReadCloser - read it up until EOF
-	var readBody bytes.Buffer
-	io.Copy(&readBody, body)
+	var bodyRead bytes.Buffer
+	io.Copy(&bodyRead, body)
 
-	// use seekable reader for further body usage
-	reusableBody := bytes.NewReader(readBody.Bytes())
+	// use seek-able reader for further body usage
+	reusableBody := bytes.NewReader(bodyRead.Bytes())
 
 	return nopCloser{reusableBody}
 }
@@ -882,4 +897,20 @@ func copyResponse(r *http.Response) *http.Response {
 		r.Body = copyBody(r.Body)
 	}
 	return r
+}
+
+func nopCloseRequestBody(r *http.Request) {
+	if r == nil {
+		return
+	}
+
+	copyRequest(r)
+}
+
+func nopCloseResponseBody(r *http.Response) {
+	if r == nil {
+		return
+	}
+
+	copyResponse(r)
 }
