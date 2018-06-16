@@ -31,6 +31,7 @@ const (
 
 var (
 	bundler *Bundler
+	server  *Server
 
 	errNoHooks      = errors.New("No hooks defined")
 	errNoDriver     = errors.New("No driver specified")
@@ -218,4 +219,7 @@ func AddTo(app *kingpin.Application) {
 	bundler.skipSigning = buildCmd.Flag("skip-signing", "Skip bundle signing").Short('y').Bool()
 	bundler.manifestPath = buildCmd.Flag("manifest", "Path to manifest file").Default(defaultManifestPath).Short('m').String()
 	buildCmd.Action(bundler.Build)
+
+	serverCmd := cmd.Command("server", "Start a HTTP server for custom middleware testing.")
+	serverCmd.Action(server.Start)
 }
