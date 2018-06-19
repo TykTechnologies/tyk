@@ -296,6 +296,96 @@ func TestRequestIPHops(t *testing.T) {
 	testRequestIPHops(t)
 }
 
+func TestNopCloseRequestBody(t *testing.T) {
+	// try to pass nil request
+	var req *http.Request
+	nopCloseRequestBody(req)
+	if req != nil {
+		t.Error("nil Request should remain nil")
+	}
+
+	// try to pass nil body
+	req = &http.Request{}
+	nopCloseRequestBody(req)
+	if req.Body != nil {
+		t.Error("Request nil body should remain nil")
+	}
+
+	// try to pass not nil body and check that it was replaced with nopCloser
+	req = httptest.NewRequest(http.MethodGet, "/test", strings.NewReader("abcxyz"))
+	nopCloseRequestBody(req)
+	if body, ok := req.Body.(nopCloser); !ok {
+		t.Error("Request's body was not replaced with nopCloser")
+	} else {
+		// try to read body 1st time
+		if data, err := ioutil.ReadAll(body); err != nil {
+			t.Error("1st read, error while reading body:", err)
+		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
+			t.Error("1st read, body's data is not as expectd")
+		}
+
+		// try to read body again without closing
+		if data, err := ioutil.ReadAll(body); err != nil {
+			t.Error("2nd read, error while reading body:", err)
+		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
+			t.Error("2nd read, body's data is not as expectd")
+		}
+
+		// close body and try to read "closed" one
+		body.Close()
+		if data, err := ioutil.ReadAll(body); err != nil {
+			t.Error("3rd read, error while reading body:", err)
+		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
+			t.Error("3rd read, body's data is not as expectd")
+		}
+	}
+}
+
+func TestNopCloseResponseBody(t *testing.T) {
+	var resp *http.Response
+	nopCloseResponseBody(resp)
+	if resp != nil {
+		t.Error("nil Response should remain nil")
+	}
+
+	// try to pass nil body
+	resp = &http.Response{}
+	nopCloseResponseBody(resp)
+	if resp.Body != nil {
+		t.Error("Response nil body should remain nil")
+	}
+
+	// try to pass not nil body and check that it was replaced with nopCloser
+	resp = &http.Response{}
+	resp.Body = ioutil.NopCloser(strings.NewReader("abcxyz"))
+	nopCloseResponseBody(resp)
+	if body, ok := resp.Body.(nopCloser); !ok {
+		t.Error("Response's body was not replaced with nopCloser")
+	} else {
+		// try to read body 1st time
+		if data, err := ioutil.ReadAll(body); err != nil {
+			t.Error("1st read, error while reading body:", err)
+		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
+			t.Error("1st read, body's data is not as expectd")
+		}
+
+		// try to read body again without closing
+		if data, err := ioutil.ReadAll(body); err != nil {
+			t.Error("2nd read, error while reading body:", err)
+		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
+			t.Error("2nd read, body's data is not as expectd")
+		}
+
+		// close body and try to read "closed" one
+		body.Close()
+		if data, err := ioutil.ReadAll(body); err != nil {
+			t.Error("3rd read, error while reading body:", err)
+		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
+			t.Error("3rd read, body's data is not as expectd")
+		}
+	}
+}
+
 func BenchmarkRequestIPHops(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
