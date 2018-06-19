@@ -693,10 +693,11 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		curStringSpec := stringSpec
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(curStringSpec.Path, &newSpec, stat)
 		// Extend with method actions
-		newSpec.URLRewrite = &stringSpec
+		newSpec.URLRewrite = &curStringSpec
 
 		urlSpec = append(urlSpec, newSpec)
 	}
