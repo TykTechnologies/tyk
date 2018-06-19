@@ -75,6 +75,7 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 
 type testHttpResponse struct {
 	Method  string
+	URI     string
 	Url     string
 	Body    string
 	Headers map[string]string
@@ -138,6 +139,7 @@ func testHttpHandler() *mux.Router {
 
 		err := json.NewEncoder(w).Encode(testHttpResponse{
 			Method:  r.Method,
+			URI:     r.RequestURI,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
 			Form:    firstVals(r.Form),
