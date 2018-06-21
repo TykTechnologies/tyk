@@ -6,6 +6,8 @@ import (
 
 	"errors"
 
+	"time"
+
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -36,27 +38,60 @@ func (k *OrganizationMonitor) EnabledForSpec() bool {
 	return k.Spec.GlobalConfig.EnforceOrgQuotas
 }
 
-func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
-	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
-		// Make a copy of request before before sending to goroutine
-		r2 := r.WithContext(r.Context())
-		return k.ProcessRequestOffThread(r2)
-	}
-	return k.ProcessRequestLive(r)
+func (k *OrganizationMonitor) getOrgHasNoSession() bool {
+	k.Spec.RLock()
+	defer k.Spec.RUnlock()
+	return k.Spec.OrgHasNoSession
 }
 
-// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
+func (k *OrganizationMonitor) setOrgHasNoSession(val bool) {
+	k.Spec.Lock()
+	defer k.Spec.Unlock()
+	k.Spec.OrgHasNoSession = val
+}
 
-	session, found := k.OrgSession(k.Spec.OrgID)
-	if !found {
-		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
+func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	// short path for specs which have organization limiter enabled but organization has no session
+	if k.getOrgHasNoSession() {
 		return nil, http.StatusOK
 	}
 
+	var orgSession user.SessionState
+	var found bool
+
+	// try to check in in-app cache 1st
+	if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+		var cachedSession interface{}
+		if cachedSession, found = SessionCache.Get(k.Spec.OrgID); found {
+			orgSession = cachedSession.(user.SessionState)
+		}
+	}
+
+	// try to get from Redis
+	if !found {
+		// not found in in-app cache, let's read from Redis
+		orgSession, found = k.OrgSession(k.Spec.OrgID)
+		if !found {
+			// prevent reads from in-app cache and from Redis for next runs
+			k.setOrgHasNoSession(true)
+			// No organisation session has not been created, should not be a pre-requisite in site setups, so we pass the request on
+			return nil, http.StatusOK
+		}
+	}
+
+	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
+		// Make a copy of request before before sending to goroutine
+		r2 := r.WithContext(r.Context())
+		return k.ProcessRequestOffThread(r2, &orgSession)
+	}
+	return k.ProcessRequestLive(r, &orgSession)
+}
+
+// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
+func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *user.SessionState) (error, int) {
 	// Is it active?
 	logEntry := getLogEntryForRequest(r, k.Spec.OrgID, nil)
-	if session.IsInactive {
+	if orgSession.IsInactive {
 		logEntry.Warning("Organisation access is disabled.")
 
 		return errors.New("this organisation access has been disabled, please contact your API administrator"), http.StatusForbidden
@@ -65,15 +100,24 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 	// We found a session, apply the quota and rate limiter
 	reason := k.sessionlimiter.ForwardMessage(
 		r,
-		&session,
+		orgSession,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),
-		session.Per > 0 && session.Rate > 0,
+		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
 		&k.Spec.GlobalConfig,
 	)
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
+	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime)
+
+	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, orgSession, sessionLifeTime, false); err == nil {
+		// update in-app cache if needed
+		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			SessionCache.Set(k.Spec.OrgID, *orgSession, time.Second*time.Duration(sessionLifeTime))
+		}
+	} else {
+		log.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")
+	}
 
 	switch reason {
 	case sessionFailNone:
@@ -116,11 +160,11 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 
 	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
-		k.mon.Check(&session, "")
+		k.mon.Check(orgSession, "")
 	}
 
 	// Lets keep a reference of the org
-	setCtxValue(r, OrgSessionContext, session)
+	setCtxValue(r, OrgSessionContext, *orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -133,13 +177,7 @@ func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	}
 }
 
-func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, int) {
-	session, found := k.OrgSession(k.Spec.OrgID)
-	if !found {
-		// No organisation session has been created, should not be a pre-requisite in site setups, so we pass the request on
-		return nil, http.StatusOK
-	}
-
+func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSession *user.SessionState) (error, int) {
 	orgChanMap.Lock()
 	orgChan, ok := orgChanMap.channels[k.Spec.OrgID]
 	if !ok {
@@ -155,7 +193,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 		r.URL.Path,
 		request.RealIP(r),
 		r,
-		session,
+		orgSession,
 	)
 
 	if found && !active.(bool) {
@@ -166,7 +204,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request) (error, i
 	// Lets keep a reference of the org
 	// session might be updated by go-routine AllowAccessNext and we loose those changes here
 	// but it is OK as we need it in context for detailed org logging
-	setCtxValue(r, OrgSessionContext, session)
+	setCtxValue(r, OrgSessionContext, *orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -177,7 +215,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	path string,
 	IP string,
 	r *http.Request,
-	session user.SessionState) {
+	session *user.SessionState) {
 
 	// Is it active?
 	logEntry := getExplicitLogEntryForRequest(path, IP, k.Spec.OrgID, nil)
@@ -190,7 +228,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	// We found a session, apply the quota and rate limiter
 	reason := k.sessionlimiter.ForwardMessage(
 		r,
-		&session,
+		session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
@@ -198,7 +236,16 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		&k.Spec.GlobalConfig,
 	)
 
-	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
+	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime)
+
+	if err := k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, session, sessionLifeTime, false); err == nil {
+		// update in-app cache if needed
+		if !k.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
+			SessionCache.Set(k.Spec.OrgID, *session, time.Second*time.Duration(sessionLifeTime))
+		}
+	} else {
+		log.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")
+	}
 
 	isExceeded := false
 	switch reason {
@@ -242,7 +289,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 
 	if k.Spec.GlobalConfig.Monitor.MonitorOrgKeys {
 		// Run the trigger monitor
-		k.mon.Check(&session, "")
+		k.mon.Check(session, "")
 	}
 
 	if isExceeded {

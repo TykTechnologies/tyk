@@ -827,6 +827,13 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		return apiError("Error writing to key store " + err.Error()), http.StatusInternalServerError
 	}
 
+	// identify that spec has org session
+	if spec != nil {
+		spec.Lock()
+		spec.OrgHasNoSession = false
+		spec.Unlock()
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"org":    keyName,
@@ -907,6 +914,13 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 		"key":    orgID,
 		"status": "ok",
 	}).Info("Org key deleted.")
+
+	// identify that spec has no org session
+	if spec != nil {
+		spec.Lock()
+		spec.OrgHasNoSession = true
+		spec.Unlock()
+	}
 
 	statusObj := apiModifyKeySuccess{
 		Key:    orgID,
