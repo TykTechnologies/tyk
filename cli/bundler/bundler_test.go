@@ -16,10 +16,22 @@ import (
 
 var (
 	testApp *kingpin.Application
+
+	standardManifest = &apidef.BundleManifest{
+		FileList: []string{},
+		CustomMiddleware: apidef.MiddlewareSection{
+			Pre: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyPreHook",
+				},
+			},
+			Driver: "python",
+		},
+	}
 )
 
 func init() {
-	testApp = kingpin.New("test", "")
+	testApp = kingpin.New("tyk-cli", "")
 	AddTo(testApp)
 
 	// Setup default values:
@@ -38,6 +50,9 @@ func writeManifestFile(t testing.TB, manifest interface{}, filename string) *str
 		if err != nil {
 			t.Fatalf("Couldn't marshal manifest file: %s", err.Error())
 		}
+	case string:
+		manifestString := manifest.(string)
+		data = []byte(manifestString)
 	}
 	ioutil.WriteFile(filename, data, 0600)
 	if err != nil {
@@ -47,7 +62,9 @@ func writeManifestFile(t testing.TB, manifest interface{}, filename string) *str
 }
 
 func TestCommands(t *testing.T) {
-	_, err := testApp.Parse([]string{"bundle", "build"})
+	defer os.Remove(defaultManifestPath)
+	writeManifestFile(t, standardManifest, defaultManifestPath)
+	_, err := testApp.Parse([]string{"bundle", "build", "-y"})
 	if err != nil {
 		t.Fatalf("Command not found")
 	}
@@ -72,7 +89,7 @@ func TestBuild(t *testing.T) {
 			FileList: []string{},
 			CustomMiddleware: apidef.MiddlewareSection{
 				Pre: []apidef.MiddlewareDefinition{
-					apidef.MiddlewareDefinition{
+					{
 						Name: "MyPreHook",
 					},
 				},
@@ -98,7 +115,7 @@ func TestBuild(t *testing.T) {
 			},
 			CustomMiddleware: apidef.MiddlewareSection{
 				Pre: []apidef.MiddlewareDefinition{
-					apidef.MiddlewareDefinition{
+					{
 						Name: "MyPreHook",
 					},
 				},
@@ -126,7 +143,7 @@ func TestBuild(t *testing.T) {
 			},
 			CustomMiddleware: apidef.MiddlewareSection{
 				Pre: []apidef.MiddlewareDefinition{
-					apidef.MiddlewareDefinition{
+					{
 						Name: "MyPreHook",
 					},
 				},
