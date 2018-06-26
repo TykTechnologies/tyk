@@ -1,7 +1,6 @@
-// +build !go1.7
+// +build !go1.6
 
 /*
- *
  * Copyright 2016, Google Inc.
  * All rights reserved.
  *
@@ -33,42 +32,20 @@
  *
  */
 
-package credentials
+package transport
 
 import (
-	"crypto/tls"
+	"net"
+	"time"
+
+	"golang.org/x/net/context"
 )
 
-// cloneTLSConfig returns a shallow clone of the exported
-// fields of cfg, ignoring the unexported sync.Once, which
-// contains a mutex and must not be copied.
-//
-// If cfg is nil, a new zero tls.Config is returned.
-//
-// TODO replace this function with official clone function.
-func cloneTLSConfig(cfg *tls.Config) *tls.Config {
-	if cfg == nil {
-		return &tls.Config{}
+// dialContext connects to the address on the named network.
+func dialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	var dialer net.Dialer
+	if deadline, ok := ctx.Deadline(); ok {
+		dialer.Timeout = deadline.Sub(time.Now())
 	}
-	return &tls.Config{
-		Rand:                     cfg.Rand,
-		Time:                     cfg.Time,
-		Certificates:             cfg.Certificates,
-		NameToCertificate:        cfg.NameToCertificate,
-		GetCertificate:           cfg.GetCertificate,
-		RootCAs:                  cfg.RootCAs,
-		NextProtos:               cfg.NextProtos,
-		ServerName:               cfg.ServerName,
-		ClientAuth:               cfg.ClientAuth,
-		ClientCAs:                cfg.ClientCAs,
-		InsecureSkipVerify:       cfg.InsecureSkipVerify,
-		CipherSuites:             cfg.CipherSuites,
-		PreferServerCipherSuites: cfg.PreferServerCipherSuites,
-		SessionTicketsDisabled:   cfg.SessionTicketsDisabled,
-		SessionTicketKey:         cfg.SessionTicketKey,
-		ClientSessionCache:       cfg.ClientSessionCache,
-		MinVersion:               cfg.MinVersion,
-		MaxVersion:               cfg.MaxVersion,
-		CurvePreferences:         cfg.CurvePreferences,
-	}
+	return dialer.Dial(network, address)
 }

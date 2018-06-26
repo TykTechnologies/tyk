@@ -39,7 +39,6 @@ func NewEncoder(w io.Writer) *Encoder {
 		tableSizeUpdate: false,
 		w:               w,
 	}
-	e.dynTab.table.init()
 	e.dynTab.setMaxSize(initialHeaderTableSize)
 	return e
 }
@@ -89,17 +88,29 @@ func (e *Encoder) WriteField(f HeaderField) error {
 // only name matches, i points to that index and nameValueMatch
 // becomes false.
 func (e *Encoder) searchTable(f HeaderField) (i uint64, nameValueMatch bool) {
-	i, nameValueMatch = staticTable.search(f)
-	if nameValueMatch {
-		return i, true
+	for idx, hf := range staticTable {
+		if !constantTimeStringCompare(hf.Name, f.Name) {
+			continue
+		}
+		if i == 0 {
+			i = uint64(idx + 1)
+		}
+		if f.Sensitive {
+			continue
+		}
+		if !constantTimeStringCompare(hf.Value, f.Value) {
+			continue
+		}
+		i = uint64(idx + 1)
+		nameValueMatch = true
+		return
 	}
 
-	j, nameValueMatch := e.dynTab.table.search(f)
+	j, nameValueMatch := e.dynTab.search(f)
 	if nameValueMatch || (i == 0 && j != 0) {
-		return j + uint64(staticTable.len()), nameValueMatch
+		i = j + uint64(len(staticTable))
 	}
-
-	return i, false
+	return
 }
 
 // SetMaxDynamicTableSize changes the dynamic header table size to v.
@@ -206,7 +217,7 @@ func appendVarInt(dst []byte, n byte, i uint64) []byte {
 }
 
 // appendHpackString appends s, as encoded in "String Literal"
-// representation, to dst and returns the extended buffer.
+// representation, to dst and returns the the extended buffer.
 //
 // s will be encoded in Huffman codes only when it produces strictly
 // shorter byte string.
