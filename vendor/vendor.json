@@ -121,6 +121,12 @@
 			"revisionTime": "2017-01-02T09:48:09Z"
 		},
 		{
+			"checksumSHA1": "yqETaGs43hbxuaBGUP7YT/tiRDg=",
+			"path": "github.com/buger/jsonparser",
+			"revision": "bb14bb6c38f6cf1706ef55278891d184b6a51b0e",
+			"revisionTime": "2017-06-03T06:26:59Z"
+		},
+		{
 			"checksumSHA1": "m6QMy+u/IX6knzP28DqMn4sdLSw=",
 			"path": "github.com/cenk/backoff",
 			"revision": "b02f2bbce11d7ea6b97f282ef1771b0fe2f65ef3",
