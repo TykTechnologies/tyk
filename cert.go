@@ -50,6 +50,8 @@ var cipherSuites = map[string]uint16{
 	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  0xcca9,
 }
 
+var certLog = log.WithField("prefix", "certs")
+
 func getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string
 
@@ -108,6 +110,8 @@ func verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func
 	}
 
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		certLog.Debug("Checking certificate public key")
+
 		for _, rawCert := range rawCerts {
 			cert, _ := x509.ParseCertificate(rawCert)
 			pub, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
@@ -147,6 +151,8 @@ func dialTLSPinnedCheck(spec *APISpec, tc *tls.Config) func(network, addr string
 		if len(whitelist) == 0 {
 			return c, nil
 		}
+
+		certLog.Debug("Checking certificate public key for host:", host)
 
 		state := c.ConnectionState()
 		for _, peercert := range state.PeerCertificates {
