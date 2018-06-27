@@ -245,7 +245,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	defer s.Base().UpdateRequestSession(r)
 
 	versionDef := s.Spec.VersionDefinition
-	if versionDef.Location == "url" && versionDef.StripPath {
+	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
 		log.Info("Stripping version from url: ", part)
@@ -294,7 +294,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Request) *http.Response {
 
 	versionDef := s.Spec.VersionDefinition
-	if versionDef.Location == "url" && versionDef.StripPath {
+	if !s.Spec.VersionData.NotVersioned && versionDef.Location == "url" && versionDef.StripPath {
 		part := s.Spec.getVersionFromRequest(r)
 
 		log.Info("Stripping version from url: ", part)
