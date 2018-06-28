@@ -621,3 +621,19 @@ func TestInitTriggerRx(t *testing.T) {
 		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
 	}
 }
+
+func TestValToStr(t *testing.T) {
+
+	example := []interface{}{
+		"abc",      // string
+		int64(456), // int64
+		12.22,      // float
+	}
+
+	str := valToStr(example)
+	expected := "abc,456,12.22"
+
+	if str != expected {
+		t.Errorf("expected (%s) got (%s)", expected, str)
+	}
+}
