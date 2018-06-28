@@ -13,7 +13,8 @@
     "username": "",
     "password": "",
     "database": 0,
-    "optimisation_max_idle": 500
+    "optimisation_max_idle": 2000,
+    "optimisation_max_active": 4000
   },
   "enable_analytics": false,
   "analytics_config": {
@@ -26,5 +27,7 @@
     "policy_source": "file"
   },
   "hash_keys": true,
-  "suppress_redis_signal_reload": false
+  "suppress_redis_signal_reload": false,
+  "force_global_session_lifetime": false,
+  "max_idle_connections_per_host": 500
 }
