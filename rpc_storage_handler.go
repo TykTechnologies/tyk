@@ -928,6 +928,10 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 	for {
 
 		if err := r.SetKey("0000", "0000", 10); err != nil {
+			log.WithError(err).WithFields(logrus.Fields{
+				"prefix": "RPC Conn Mgr",
+			}).Info("Can't connect to RPC layer")
+
 			if r.IsAccessError(err) {
 				if r.Login() {
 					continue
@@ -935,16 +939,9 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 			}
 
 			if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
-				log.WithFields(logrus.Fields{
-					"prefix": "RPC Conn Mgr",
-				}).Info("Can't connect to RPC layer")
 				continue
 			}
 		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "RPC Conn Mgr",
-		}).Info("RPC is alive")
 
 		time.Sleep(10 * time.Second)
 	}
