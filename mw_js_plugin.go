@@ -422,11 +422,16 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("b64dec", func(call otto.FunctionCall) otto.Value {
 		in := call.Argument(0).String()
 		out, err := base64.StdEncoding.DecodeString(in)
+
+		// Fallback to RawStdEncoding:
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "jsvm",
-			}).Error("Failed to base64 decode: ", err)
-			return otto.Value{}
+			out, err = base64.RawStdEncoding.DecodeString(in)
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("Failed to base64 decode: ", err)
+				return otto.Value{}
+			}
 		}
 		returnVal, err := j.VM.ToValue(string(out))
 		if err != nil {
