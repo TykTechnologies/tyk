@@ -22,6 +22,8 @@ import (
 
 const mwStatusRespond = 666
 
+const emptyToken = "00000000"
+
 var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddleware interface {
@@ -176,7 +178,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
-	if session == nil || token == "" {
+	if session == nil || token == "" || token == emptyToken {
 		return false
 	}
 
