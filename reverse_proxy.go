@@ -442,6 +442,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
+	if p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify {
+		transport.TLSClientConfig.InsecureSkipVerify = true
+	}
+
 	// When request routed through the proxy `DialTLS` is not used, and only VerifyPeerCertificate is supported
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
