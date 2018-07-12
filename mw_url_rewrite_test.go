@@ -628,10 +628,11 @@ func TestValToStr(t *testing.T) {
 		"abc",      // string
 		int64(456), // int64
 		12.22,      // float
+		"abc,def",  // string url encode
 	}
 
 	str := valToStr(example)
-	expected := "abc,456,12.22"
+	expected := "abc,456,12.22,abc%2Cdef"
 
 	if str != expected {
 		t.Errorf("expected (%s) got (%s)", expected, str)

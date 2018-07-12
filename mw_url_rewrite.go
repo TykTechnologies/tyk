@@ -243,7 +243,7 @@ func valToStr(v interface{}) string {
 		tmpSlice := make([]string, 0, len(x))
 		for _, val := range x {
 			if rec := valToStr(val); rec != "" {
-				tmpSlice = append(tmpSlice, rec)
+				tmpSlice = append(tmpSlice, url.QueryEscape(rec))
 			}
 		}
 		s = strings.Join(tmpSlice, ",")
