@@ -483,24 +483,47 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
-	// 1. Check if timeouts are set for this endpoint
+	outReqIsWebsocket := IsWebsocket(req)
+
+	var roundTripper http.RoundTripper
+
 	p.TykAPISpec.Lock()
+	if !outReqIsWebsocket { // check if it is a regular HTTP request
+		// create HTTP transport
+		createTransport := p.TykAPISpec.HTTPTransport == nil
 
-	createTransport := p.TykAPISpec.HTTPTransport == nil
+		// Check if timeouts are set for this endpoint
+		if !createTransport && config.Global().MaxConnTime != 0 {
+			createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
+		}
 
-	if !createTransport && config.Global().MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
-	}
+		if createTransport {
+			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+			p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+			p.TykAPISpec.HTTPTransportCreated = time.Now()
+		}
 
-	if createTransport {
-		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
-		p.TykAPISpec.HTTPTransportCreated = time.Now()
-	} else if IsWebsocket(req) { // check if it is an upgrade request to NEW WS-connection
+		roundTripper = p.TykAPISpec.HTTPTransport
+	} else { // this is NEW WS-connection upgrade request
+		// create WS transport
+		createTransport := p.TykAPISpec.WSTransport == nil
+
+		// Check if timeouts are set for this endpoint
+		if !createTransport && config.Global().MaxConnTime != 0 {
+			createTransport = time.Since(p.TykAPISpec.WSTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
+		}
+
+		if createTransport {
+			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+			p.TykAPISpec.WSTransport = httpTransport(timeout, rw, req, p)
+			p.TykAPISpec.WSTransportCreated = time.Now()
+		}
+
 		// overwrite transport's ResponseWriter from previous upgrade request
 		// as it was already hijacked and now is being used for other connection
-		p.TykAPISpec.HTTPTransportCreated = time.Now()
-		p.TykAPISpec.HTTPTransport.(*WSDialer).RW = rw
+		p.TykAPISpec.WSTransport.(*WSDialer).RW = rw
+
+		roundTripper = p.TykAPISpec.WSTransport
 	}
 	p.TykAPISpec.Unlock()
 
@@ -550,7 +573,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq.Close = false
 
 	log.Debug("Outbound Request: ", outreq.URL.String())
-	outReqIsWebsocket := IsWebsocket(outreq)
 
 	// Do not modify outbound request headers if they are WS
 	if !outReqIsWebsocket {
@@ -590,9 +612,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 	if outReqIsWebsocket {
-		p.TykAPISpec.HTTPTransport.(*WSDialer).TLSClientConfig.Certificates = tlsCertificates
+		roundTripper.(*WSDialer).TLSClientConfig.Certificates = tlsCertificates
 	} else {
-		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
+		roundTripper.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
 	}
 	p.TykAPISpec.Unlock()
 
@@ -605,14 +627,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
 			return nil
 		}
-		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
+		res, err = roundTripper.RoundTrip(outreq)
 		if err != nil || res.StatusCode == http.StatusInternalServerError {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
+		res, err = roundTripper.RoundTrip(outreq)
 	}
 
 	if err != nil {
