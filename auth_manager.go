@@ -40,6 +40,9 @@ type SessionHandler interface {
 	Stop()
 }
 
+const sessionPoolDefaultSize = 50
+const sessionBufferDefaultSize = 1000
+
 // DefaultAuthorisationManager implements AuthorisationHandler,
 // requires a storage.Handler to interact with key store
 type DefaultAuthorisationManager struct {
@@ -108,15 +111,15 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 		// check pool size in config and set to 50 if unset
 		b.poolSize = config.Global().SessionUpdatePoolSize
 		if b.poolSize <= 0 {
-			b.poolSize = 50
+			b.poolSize = sessionPoolDefaultSize
 		}
 		//check size for channel buffer and set to 1000 if unset
 		b.bufferSize = config.Global().SessionUpdateBufferSize
 		if b.bufferSize <= 0 {
-			b.bufferSize = 1000
+			b.bufferSize = sessionBufferDefaultSize
 		}
 
-		log.WithField("Auth Manager", b.poolSize).Debug("Session update async pool size")
+		log.WithField("SessionManager poolsize", b.poolSize).Debug("Session update async pool size")
 
 		b.updateChan = make(chan *SessionUpdate, b.bufferSize)
 
@@ -134,13 +137,11 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 func (b *DefaultSessionManager) updateWorker() {
 	defer b.poolWG.Done()
 
-	for range b.updateChan {
-		// grab update object from channel
-		u := <-b.updateChan
+	for u := range b.updateChan {
 
 		v, err := json.Marshal(u.session)
 		if err != nil {
-			log.Error("Error marshalling session for async session update")
+			log.WithError(err).Error("Error marshalling session for async session update")
 			continue
 		}
 
@@ -148,7 +149,7 @@ func (b *DefaultSessionManager) updateWorker() {
 			u.keyVal = b.keyPrefix + u.keyVal
 			err := b.store.SetRawKey(u.keyVal, string(v), u.ttl)
 			if err != nil {
-				log.Errorf("Error updating hashed key: %v", err)
+				log.WithError(err).Error("Error updating hashed key")
 			}
 			continue
 
@@ -156,7 +157,7 @@ func (b *DefaultSessionManager) updateWorker() {
 
 		err = b.store.SetKey(u.keyVal, string(v), u.ttl)
 		if err != nil {
-			log.Errorf("Error updating non-hashed key: %v", err)
+			log.WithError(err).Error("Error updating key")
 		}
 	}
 }
@@ -221,12 +222,9 @@ func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.Sess
 		return err
 	}
 
-	if hashed {
-		keyName = b.store.GetKeyPrefix() + keyName
-	}
-
 	// sync update
 	if hashed {
+		keyName = b.store.GetKeyPrefix() + keyName
 		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
 	} else {
 		err = b.store.SetKey(keyName, string(v), resetTTLTo)
