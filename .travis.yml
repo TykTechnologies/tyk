@@ -1,4 +1,4 @@
-sudo: false
+sudo: required
 language: go
 
 notifications:
@@ -14,7 +14,7 @@ addons:
     sources:
     - sourceline: 'ppa:opencpu/jq'
     packages:
-    - python3-dev
+    - python3.5
     - python3-pip
     - libluajit-5.1-dev
     - libjq-dev
