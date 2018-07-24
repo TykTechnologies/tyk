@@ -359,11 +359,10 @@ func (j *JSVM) Init(spec *APISpec) {
 }
 
 // LoadJSPaths will load JS classes and functionality in to the VM by file
-func (j *JSVM) LoadJSPaths(paths []string, pathPrefix string) {
-	tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
+func (j *JSVM) LoadJSPaths(paths []string, prefix string) {
 	for _, mwPath := range paths {
-		if pathPrefix != "" {
-			mwPath = filepath.Join(tykBundlePath, pathPrefix, mwPath)
+		if prefix != "" {
+			mwPath = filepath.Join(prefix, mwPath)
 		}
 		log.WithFields(logrus.Fields{
 			"prefix": "jsvm",

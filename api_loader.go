@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -196,27 +199,26 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var mwDriver apidef.MiddlewareDriver
 
-	if EnableCoProcess {
-		loadBundle(spec)
-	}
-
-	// TODO: use config.Global.EnableCoProcess
-	if config.Global().EnableJSVM || EnableCoProcess {
-		mainLog.WithFields(logrus.Fields{
-			"api_name": spec.Name,
-		}).Debug("Loading Middleware")
-
-		var mwPaths []string
-		mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
-
-		if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
-			var pathPrefix string
-			if spec.CustomMiddlewareBundle != "" {
-				pathPrefix = spec.APIID + "-" + spec.CustomMiddlewareBundle
-			}
-			spec.JSVM.LoadJSPaths(mwPaths, pathPrefix)
+	var prefix string
+	if spec.CustomMiddlewareBundle != "" {
+		if err := loadBundle(spec); err != nil {
+			mainLog.WithFields(logrus.Fields{
+				"api_name": spec.Name,
+			}).Error("Couldn't load bundle")
 		}
+		tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
+		bundleNameHash := md5.New()
+		io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
+		bundlePath := fmt.Sprintf("%s_%x", spec.APIID, bundleNameHash.Sum(nil))
+		prefix = filepath.Join(tykBundlePath, bundlePath)
 	}
+
+	mainLog.WithFields(logrus.Fields{
+		"api_name": spec.Name,
+	}).Debug("Loading Middleware")
+	var mwPaths []string
+	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
+	spec.JSVM.LoadJSPaths(mwPaths, prefix)
 
 	if spec.EnableBatchRequestSupport {
 		addBatchEndpoint(spec, subrouter)
