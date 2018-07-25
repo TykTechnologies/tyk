@@ -999,12 +999,55 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
+func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, error) {
+	//session := user.SessionState{}
+	// Not cached
+	newKeyName := "apikey-" + r.hashKey(keyName)
+	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", keyName, GlobalRPCCallTimeout)
+	if err != nil {
+		emitRPCErrorEventKv(
+			rpcFuncClientSingletonCall,
+			"GetKey",
+			err,
+			map[string]string{
+				"keyName":      keyName,
+				"fixedKeyName": newKeyName,
+			},
+		)
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.getKeyForCreate(keyName)
+			}
+		}
+
+		log.Debug("Error trying to get value:", err)
+		return "", storage.ErrKeyNotFound
+	}
+	//elapsed := time.Since(start)
+	//log.Debug("GetKey took ", elapsed)
+
+	if config.Global().SlaveOptions.EnableRPCCache {
+		// Cache it
+		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
+	}
+
+	return value.(string), nil
+}
+
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 {
 			key = splitKeys[0]
-			if splitKeys[1] == "hashed" {
+			if splitKeys[1] == "create" {
+
+				sessionString, err := r.getKeyForCreate(splitKeys[0])
+				if err != nil {
+					log.Debug("problem")
+				}
+				handleAddKey(splitKeys[0], sessionString, "-1")
+
+			} else if splitKeys[1] == "hashed" {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "")
 			}

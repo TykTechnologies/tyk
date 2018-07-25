@@ -376,6 +376,37 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
+func handleAddKey(keyName, sessionString, apiID string) {
+	sessionManager := FallbackKeySesionManager
+	if spec := getApiSpec(apiID); spec != nil {
+		sessionManager = spec.SessionManager
+	}
+
+	sess := user.SessionState{}
+	json.Unmarshal([]byte(sessionString), &sess)
+
+	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	sess.SetPolicies(sess.ApplyPolicyID)
+
+	err := sessionManager.UpdateSession(keyName, &sess, 0, true)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to update hashed key.")
+
+		log.Error("FUCK")
+	}
+
+	log.WithFields(logrus.Fields{
+		"prefix": "RPC",
+		"key":    keyName,
+		"status": "ok",
+	}).Info("Updated hashed key in slave storage.")
+}
+
 func handleDeleteKey(keyName, apiID string) (interface{}, int) {
 	if apiID == "-1" {
 		// Go through ALL managed API's and delete the key
