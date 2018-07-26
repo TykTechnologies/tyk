@@ -218,7 +218,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}).Debug("Loading Middleware")
 	var mwPaths []string
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
-	spec.JSVM.LoadJSPaths(mwPaths, prefix)
+
+	if spec.CustomMiddleware.Driver == apidef.OttoDriver {
+		spec.JSVM.LoadJSPaths(mwPaths, prefix)
+	}
 
 	if spec.EnableBatchRequestSupport {
 		addBatchEndpoint(spec, subrouter)
