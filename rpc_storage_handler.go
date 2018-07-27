@@ -999,11 +999,13 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, error) {
-	//session := user.SessionState{}
-	// Not cached
-	newKeyName := "apikey-" + r.hashKey(keyName)
-	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", keyName, GlobalRPCCallTimeout)
+func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, string, error) {
+	//we want the key with this prefix from the master
+	log.Info(keyName)
+	newKeyName := "apikey-" + storage.HashStr(keyName)
+	log.Info(newKeyName)
+	//is the key in master redis
+	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", newKeyName, GlobalRPCCallTimeout)
 	if err != nil {
 		emitRPCErrorEventKv(
 			rpcFuncClientSingletonCall,
@@ -1021,17 +1023,17 @@ func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, error) {
 		}
 
 		log.Debug("Error trying to get value:", err)
-		return "", storage.ErrKeyNotFound
+		return "", "", storage.ErrKeyNotFound
 	}
 	//elapsed := time.Since(start)
 	//log.Debug("GetKey took ", elapsed)
 
 	if config.Global().SlaveOptions.EnableRPCCache {
 		// Cache it
-		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
+		RPCGlobalCache.Set(r.fixKey(newKeyName), value, cache.DefaultExpiration)
 	}
-
-	return value.(string), nil
+	//return hash key without prefix so it doesnt get double prefixed
+	return value.(string), newKeyName[7:], nil
 }
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
@@ -1039,21 +1041,22 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 {
 			key = splitKeys[0]
-			if splitKeys[1] == "create" {
+			switch splitKeys[1] {
 
-				sessionString, err := r.getKeyForCreate(splitKeys[0])
+			case "create":
+				sessionString, hashedKeyName, err := r.getKeyForCreate(splitKeys[0])
 				if err != nil {
-					log.Debug("problem")
+					log.Info("problem")
 				}
-				handleAddKey(splitKeys[0], sessionString, "-1")
-
-			} else if splitKeys[1] == "hashed" {
+				log.Info(hashedKeyName)
+				handleAddKey(splitKeys[0], hashedKeyName, sessionString, "-1")
+			case "delete":
+				log.Info("--> removing cached key: ", key)
+				handleDeleteKey(key, "-1")
+			case "deletehashed":
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "")
 			}
-		} else {
-			log.Info("--> removing cached key: ", key)
-			handleDeleteKey(key, "-1")
 		}
 
 		SessionCache.Delete(key)

@@ -376,19 +376,19 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func handleAddKey(keyName, sessionString, apiID string) {
-	sessionManager := FallbackKeySesionManager
-	if spec := getApiSpec(apiID); spec != nil {
-		sessionManager = spec.SessionManager
+func handleAddKey(keyName, hashedName, sessionString, apiID string) {
+	mw := BaseMiddleware{
+		Spec: &APISpec{
+			SessionManager: FallbackKeySesionManager,
+		},
 	}
 
 	sess := user.SessionState{}
 	json.Unmarshal([]byte(sessionString), &sess)
 
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	sess.SetPolicies(sess.ApplyPolicyID)
-
-	err := sessionManager.UpdateSession(keyName, &sess, 0, true)
+	//mw.ApplyPolicies(keyName, &sess)
+	err := mw.Spec.SessionManager.UpdateSession(hashedName, &sess, 0, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -396,8 +396,6 @@ func handleAddKey(keyName, sessionString, apiID string) {
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update hashed key.")
-
-		log.Error("FUCK")
 	}
 
 	log.WithFields(logrus.Fields{
