@@ -303,7 +303,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		policyID, foundPolicy := k.getPolicyIDFromToken(claims)
 		if !foundPolicy {
 			k.reportLoginFailure(baseFieldData, r)
-			return errors.New("Key not authorized: no matching policy found"), http.StatusForbidden
+			return errors.New("key not authorized: no matching policy claim found"), http.StatusForbidden
 		}
 		// check if we received a valid policy ID in claim
 		policiesMu.RLock()
@@ -312,14 +312,14 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
 			log.Error("Policy ID found in token is invalid!")
-			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
+			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
 		pols := session.PolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			log.Error("No policies for the found session. Failing Request.")
-			return errors.New("Key not authorized: no matching policy found"), http.StatusForbidden
+			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 		}
 		if pols[0] != policyID { // switch session to new policy and update session storage and cache
 			// check ownership before updating session
