@@ -96,7 +96,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "1")
 
-		return errors.New("Key not authorised"), http.StatusForbidden
+		return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 	}
 
 	// Set session state on context, we will need it later
