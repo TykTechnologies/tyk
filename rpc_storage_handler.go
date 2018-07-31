@@ -1025,50 +1025,55 @@ func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, string, err
 		log.Debug("Error trying to get value:", err)
 		return "", "", storage.ErrKeyNotFound
 	}
-	//elapsed := time.Since(start)
-	//log.Debug("GetKey took ", elapsed)
 
 	if config.Global().SlaveOptions.EnableRPCCache {
-		// Cache it
-		RPCGlobalCache.Set(r.fixKey(newKeyName), value, cache.DefaultExpiration)
+		// Cache key
+		RPCGlobalCache.Set(newKeyName, value, cache.DefaultExpiration)
 	}
-	//return hash key without prefix so it doesnt get double prefixed
+	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), newKeyName[7:], nil
 }
 
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
+	var deletePayload []string
 	for _, key := range keys {
+		//split key from keyspace event type i.e. key:create
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 {
 			key = splitKeys[0]
 			switch splitKeys[1] {
 
-			case "create":
+			case "create", "createhashed":
 				sessionString, hashedKeyName, err := r.getKeyForCreate(splitKeys[0])
 				if err != nil {
-					log.Info("problem")
+					log.Error("Key not found in master - skipping")
+					continue
 				}
-				log.Info(hashedKeyName)
 				handleAddKey(splitKeys[0], hashedKeyName, sessionString, "-1")
+
 			case "delete":
 				log.Info("--> removing cached key: ", key)
 				handleDeleteKey(key, "-1")
+				SessionCache.Delete(key)
+				RPCGlobalCache.Delete(r.KeyPrefix + key)
+				deletePayload = append(deletePayload, splitKeys[0])
 			case "deletehashed":
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "")
+				SessionCache.Delete(key)
+				RPCGlobalCache.Delete(r.KeyPrefix + key)
+				deletePayload = append(deletePayload, splitKeys[0])
 			}
 		}
-
-		SessionCache.Delete(key)
-		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
-
-	// Notify rest of gateways in cluster to flush cache
-	n := Notification{
-		Command: KeySpaceUpdateNotification,
-		Payload: strings.Join(keys, ","),
+	if len(deletePayload) > 0 {
+		// Notify rest of gateways in cluster to flush cache
+		n := Notification{
+			Command: KeySpaceUpdateNotification,
+			Payload: strings.Join(deletePayload, ","),
+		}
+		MainNotifier.Notify(n)
 	}
-	MainNotifier.Notify(n)
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
