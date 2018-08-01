@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,6 +37,34 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
+func initialiseClient(timeout time.Duration) *http.Client {
+	client := &http.Client{}
+	if config.Global().HttpServerOptions.UseSSL {
+		certs := make([]tls.Certificate, len(config.Global().HttpServerOptions.Certificates))
+		certNameMap := make(map[string]*tls.Certificate)
+		for i, certData := range config.Global().HttpServerOptions.Certificates {
+			cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
+			if err != nil {
+				log.Fatalf("Server error: loadkeys: %s", err)
+			}
+			certs[i] = cert
+			certNameMap[certData.Name] = &certs[i]
+		}
+		// Setup HTTPS client
+		tlsConfig := &tls.Config{
+			Certificates:       certs,
+			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+			NameToCertificate:  certNameMap,
+		}
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+		client = &http.Client{Transport: transport, Timeout: timeout}
+
+	} else {
+
+		client = &http.Client{Timeout: timeout}
+	}
+	return client
+}
 func reLogin() {
 	if !config.Global().UseDBAppConfigs {
 		return
@@ -84,8 +113,7 @@ func (h *HTTPDashboardHandler) Init() error {
 
 func (h *HTTPDashboardHandler) Register() error {
 	req := h.newRequest(h.RegistrationEndpoint)
-
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 
 	if err != nil {
@@ -156,8 +184,8 @@ func (h *HTTPDashboardHandler) sendHeartBeat() error {
 	req := h.newRequest(h.HeartBeatEndpoint)
 	req.Header.Set("x-tyk-nodeid", NodeID)
 	req.Header.Set("x-tyk-nonce", ServiceNonce)
+	c := initialiseClient(5 * time.Second)
 
-	c := &http.Client{Timeout: 5 * time.Second}
 	resp, err := c.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return errors.New("dashboard is down? Heartbeat is failing")
@@ -182,7 +210,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	req.Header.Set("x-tyk-nodeid", NodeID)
 	req.Header.Set("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 
 	if err != nil {
