@@ -1,3 +1,27 @@
+// Tyk Gateway API
+//
+// Code below describes Tyk Gateway API
+//
+//     Schemes: http, https
+//     Host: localhost
+//     BasePath: /tyk/
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Security:
+//     - api_key:
+//
+//     SecurityDefinitions:
+//     api_key:
+//          type: apiKey
+//          name: X-Tyk-Authorization
+//          in: header
+//
+// swagger:meta
 package main
 
 import (
@@ -28,6 +52,8 @@ import (
 )
 
 // apiModifyKeySuccess represents when a Key modification was successful
+//
+// swagger:response
 type apiModifyKeySuccess struct {
 	Key     string `json:"key"`
 	Status  string `json:"status"`
@@ -36,8 +62,12 @@ type apiModifyKeySuccess struct {
 }
 
 // apiStatusMessage represents an API status message
+//
+// swagger:response
 type apiStatusMessage struct {
+	// Status can be either `ok` or `error`
 	Status  string `json:"status"`
+	// Response details
 	Message string `json:"message"`
 }
 
@@ -732,6 +762,50 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
+// swagger:route GET /apis apis listApis
+//
+// List APIs
+// Only if used without dashboard
+//---
+// responses:
+//   200:
+//     description: List of API definitions
+//     schema:
+//       type: array
+//       items:
+//         "$ref": "#/definitions/APIDefinition"
+
+// swagger:route POST /apis apis createApi
+//
+// Create API
+//
+//     responses:
+//       '200':
+//         description: API created
+//         schema:
+//           "$ref": "#/responses/apiModifyKeySuccess"
+//         examples:
+//           status: "ok"
+//           action: "created"
+//		     key: "{...API JSON definition...}"
+//       '400':
+//         description: Malformed data
+//         schema:
+//           "$ref": "#/responses/apiStatusMessage"
+//         examples:
+//           status: "error"
+//           message: "Malformed API data"
+
+// swagger:route GET /apis/{apiID} apis getApi
+//
+// Get API
+// Only if used without dashboard
+//
+//     Responses:
+//       200:
+//         description: API definition
+//         schema:
+//           $ref: "#/definitions/APIDefinition"
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
@@ -1081,6 +1155,12 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
+// swagger:route GET /reload/group reloadGroup
+//
+// Reload all gateways in cluser
+//
+//     Responses:
+//       200: apiStatusMessage
 func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -1101,6 +1181,13 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // was in the URL parameters, it will block until the reload is done.
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
+//
+// swagger:route GET /reload reload
+//
+// Reload single gateway instance
+//
+//     Responses:
+//       200: apiStatusMessage
 func resetHandler(fn func()) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var wg sync.WaitGroup
