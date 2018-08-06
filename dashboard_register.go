@@ -40,31 +40,18 @@ type HTTPDashboardHandler struct {
 func initialiseClient(timeout time.Duration) *http.Client {
 	client := &http.Client{}
 	if config.Global().HttpServerOptions.UseSSL {
-		certs := make([]tls.Certificate, len(config.Global().HttpServerOptions.Certificates))
-		certNameMap := make(map[string]*tls.Certificate)
-		for i, certData := range config.Global().HttpServerOptions.Certificates {
-			cert, err := tls.LoadX509KeyPair(certData.CertFile, certData.KeyFile)
-			if err != nil {
-				log.Fatalf("Server error: loadkeys: %s", err)
-			}
-			certs[i] = cert
-			certNameMap[certData.Name] = &certs[i]
-		}
 		// Setup HTTPS client
 		tlsConfig := &tls.Config{
-			Certificates:       certs,
 			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
-			NameToCertificate:  certNameMap,
 		}
 		transport := &http.Transport{TLSClientConfig: tlsConfig}
 		client = &http.Client{Transport: transport, Timeout: timeout}
-
 	} else {
-
 		client = &http.Client{Timeout: timeout}
 	}
 	return client
 }
+
 func reLogin() {
 	if !config.Global().UseDBAppConfigs {
 		return
