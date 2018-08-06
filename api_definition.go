@@ -151,6 +151,8 @@ type APISpec struct {
 	HTTPTransport            http.RoundTripper
 	HTTPTransportCreated     time.Time
 	GlobalConfig             config.Config
+
+	middlewareChain *ChainObject
 }
 
 // APIDefinitionLoader will load an Api definition from a storage

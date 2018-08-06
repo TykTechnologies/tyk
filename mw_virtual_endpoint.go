@@ -7,9 +7,11 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/robertkrimen/otto"
@@ -220,10 +222,11 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false)
 
-	go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedResponse)
+	if copiedResponse != nil {
+		go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedResponse)
+	}
 
 	return copiedResponse
-
 }
 
 func forceResponse(w http.ResponseWriter,
@@ -253,6 +256,23 @@ func forceResponse(w http.ResponseWriter,
 	newResponse.ProtoMinor = 0
 	newResponse.Header.Set("Server", "tyk")
 	newResponse.Header.Set("Date", requestTime)
+
+	// Check if it is a loop
+	loc := newResponse.Header.Get("Location")
+	if (newResponse.StatusCode == 301 || newResponse.StatusCode == 302) && strings.HasPrefix(loc, "tyk://") {
+		loopURL, err := url.Parse(newResponse.Header.Get("Location"))
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+				"loop":   loc,
+			}).Error("Failed to parse loop url: ", err)
+		} else {
+			ctxSetOrigRequestURL(r, r.URL)
+			r.URL = loopURL
+		}
+
+		return nil
+	}
 
 	if !isPre {
 		// Handle response middleware

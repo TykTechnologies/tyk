@@ -487,6 +487,7 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
+
 	// 1. Check if timeouts are set for this endpoint
 	p.TykAPISpec.Lock()
 

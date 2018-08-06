@@ -474,12 +474,48 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	return &chainDef
 }
 
+// Check for recursion
+const LoopLevelLimit = 5
+
+func isLoop(r *http.Request) (bool, error) {
+	if r.URL.Scheme != "tyk" {
+		return false, nil
+	}
+
+	if ctxLoopLevel(r) > LoopLevelLimit {
+		return true, fmt.Errorf("Loop level too deep. Found more than %d loops in single request", LoopLevelLimit)
+	}
+
+	return true, nil
+}
+
 type DummyProxyHandler struct {
 	SH SuccessHandler
 }
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	d.SH.ServeHTTP(w, r)
+	if found, err := isLoop(r); found {
+		if err != nil {
+			handler := ErrorHandler{d.SH.Base()}
+			handler.HandleError(w, r, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		ctxIncLoopLevel(r)
+		r.URL.Scheme = "http"
+		if methodOverride := r.URL.Query().Get("method"); methodOverride != "" {
+			r.Method = methodOverride
+		}
+
+		if origURL := ctxGetOrigRequestURL(r); origURL != nil {
+			r.URL.RawQuery = origURL.RawQuery
+			ctxSetOrigRequestURL(r, nil)
+		}
+
+		d.SH.Spec.middlewareChain.ThisHandler.ServeHTTP(w, r)
+	} else {
+		d.SH.ServeHTTP(w, r)
+	}
 }
 
 func loadGlobalApps(router *mux.Router) {
@@ -569,6 +605,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
+			spec.middlewareChain = chainObj
 		}(spec, i)
 
 		// TODO: This will not deal with skipped APis well

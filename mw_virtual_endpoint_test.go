@@ -22,16 +22,16 @@ function testVirtData(request, session, config) {
 }
 `
 
-func testPrepareVirtualEndpoint() {
+func testPrepareVirtualEndpoint(js string, method string) {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "testVirtData",
 			FunctionSourceType:   "blob",
-			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(virtTestJS)),
+			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
-			Method:               "GET",
+			Method:               method,
 		}
 		v := spec.VersionData.Versions["v1"]
 		v.UseExtendedPaths = true
@@ -59,7 +59,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint()
+	testPrepareVirtualEndpoint(virtTestJS, "GET")
 
 	ts.Run(t, test.TestCase{
 		Path:      "/virt",
@@ -78,7 +78,7 @@ func BenchmarkVirtualEndpoint(b *testing.B) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint()
+	testPrepareVirtualEndpoint(virtTestJS, "GET")
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{
