@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1617,6 +1618,20 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, VersionData, v)
 }
 
+func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {
+	setCtxValue(r, OrigRequestURL, url)
+}
+
+func ctxGetOrigRequestURL(r *http.Request) *url.URL {
+	if v := r.Context().Value(OrigRequestURL); v != nil {
+		if urlVal, ok := v.(*url.URL); ok {
+			return urlVal
+		}
+	}
+
+	return nil
+}
+
 func ctxSetUrlRewritePath(r *http.Request, path string) {
 	setCtxValue(r, UrlRewritePath, path)
 }
@@ -1629,10 +1644,29 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	}
 	return ""
 }
+
 func ctxGetDefaultVersion(r *http.Request) bool {
 	return r.Context().Value(VersionDefault) != nil
 }
 
 func ctxSetDefaultVersion(r *http.Request) {
 	setCtxValue(r, VersionDefault, true)
+}
+
+func ctxLoopLevel(r *http.Request) int {
+	if v := r.Context().Value(LoopLevel); v != nil {
+		if intVal, ok := v.(int); ok {
+			return intVal
+		}
+	}
+
+	return 0
+}
+
+func ctxSetLoopLevel(r *http.Request, value int) {
+	setCtxValue(r, LoopLevel, value)
+}
+
+func ctxIncLoopLevel(r *http.Request) {
+	ctxSetLoopLevel(r, ctxLoopLevel(r)+1)
 }

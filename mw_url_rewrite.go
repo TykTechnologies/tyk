@@ -313,7 +313,7 @@ func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
 	oldAsURL, _ := url.Parse(oldPath)
 	newAsURL, _ := url.Parse(newTarget)
-	if oldAsURL.Host != newAsURL.Host {
+	if newAsURL.Scheme != "tyk" && oldAsURL.Host != newAsURL.Host {
 		log.Debug("Detected a host rewrite in pattern!")
 		setCtxValue(r, RetainHost, true)
 	}
@@ -326,6 +326,8 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if !found {
 		return nil, http.StatusOK
 	}
+
+	ctxSetOrigRequestURL(r, r.URL)
 
 	log.Debug("Rewriter active")
 	umeta := meta.(*apidef.URLRewriteMeta)
