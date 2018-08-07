@@ -999,24 +999,67 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
+func (r *RPCStorageHandler) getKeyForCreation(keyName string) (string, string, error) {
+	//we want the key with this prefix from the master
+	newKeyName := "apikey-" + storage.HashStr(keyName)
+	//is the key in master redis
+	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", newKeyName, GlobalRPCCallTimeout)
+	if err != nil {
+		emitRPCErrorEventKv(
+			rpcFuncClientSingletonCall,
+			"GetKey",
+			err,
+			map[string]string{
+				"keyName":      keyName,
+				"fixedKeyName": newKeyName,
+			},
+		)
+		if r.IsAccessError(err) {
+			if r.Login() {
+				return r.getKeyForCreation(keyName)
+			}
+		}
+		log.Debug("Error trying to get value:", err)
+		return "", "", storage.ErrKeyNotFound
+	}
+	if config.Global().SlaveOptions.EnableRPCCache {
+		// Cache key
+		RPCGlobalCache.Set(newKeyName, value, cache.DefaultExpiration)
+	}
+	//return hash key without prefix so it doesnt get double prefixed in redis
+	return value.(string), newKeyName[7:], nil
+}
+
+func (r *RPCStorageHandler) getSessionAndCreate(keyName string) {
+	sessionString, hashedKeyName, err := r.getKeyForCreation(keyName)
+	if err != nil {
+		log.Error("Key not found in master - skipping")
+	} else {
+		handleAddKey(keyName, hashedKeyName, sessionString, "-1")
+	}
+}
+
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
 		if len(splitKeys) > 1 {
 			key = splitKeys[0]
+			log.Info(key)
 			if splitKeys[1] == "hashed" {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "")
+				SessionCache.Delete(key)
+				RPCGlobalCache.Delete(r.KeyPrefix + key)
+				r.getSessionAndCreate(splitKeys[0])
 			}
 		} else {
 			log.Info("--> removing cached key: ", key)
 			handleDeleteKey(key, "-1")
+			SessionCache.Delete(key)
+			RPCGlobalCache.Delete(r.KeyPrefix + key)
+			r.getSessionAndCreate(splitKeys[0])
 		}
-
-		SessionCache.Delete(key)
-		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
-
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
