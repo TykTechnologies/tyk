@@ -999,11 +999,9 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, string, error) {
+func (r *RPCStorageHandler) getKeyForCreation(keyName string) (string, string, error) {
 	//we want the key with this prefix from the master
-	log.Info(keyName)
 	newKeyName := "apikey-" + storage.HashStr(keyName)
-	log.Info(newKeyName)
 	//is the key in master redis
 	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", newKeyName, GlobalRPCCallTimeout)
 	if err != nil {
@@ -1018,7 +1016,7 @@ func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, string, err
 		)
 		if r.IsAccessError(err) {
 			if r.Login() {
-				return r.getKeyForCreate(keyName)
+				return r.getKeyForCreation(keyName)
 			}
 		}
 
@@ -1033,7 +1031,13 @@ func (r *RPCStorageHandler) getKeyForCreate(keyName string) (string, string, err
 	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), newKeyName[7:], nil
 }
-
+func (r *RPCStorageHandler) getSessionAndCreate(keyName string) {
+	sessionString, hashedKeyName, err := r.getKeyForCreation(keyName)
+	if err != nil {
+		log.Error("Key not found in master - skipping")
+	}
+	handleAddKey(keyName, hashedKeyName, sessionString, "-1")
+}
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	var deletePayload []string
 	for _, key := range keys {
@@ -1042,15 +1046,23 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 		if len(splitKeys) > 1 {
 			key = splitKeys[0]
 			switch splitKeys[1] {
-
+			//both treated the same currently
 			case "create", "createhashed":
-				sessionString, hashedKeyName, err := r.getKeyForCreate(splitKeys[0])
-				if err != nil {
-					log.Error("Key not found in master - skipping")
-					continue
-				}
-				handleAddKey(splitKeys[0], hashedKeyName, sessionString, "-1")
-
+				r.getSessionAndCreate(splitKeys[0])
+			case "update":
+				log.Info("--> removing cached key: ", key)
+				handleDeleteKey(key, "-1")
+				SessionCache.Delete(key)
+				RPCGlobalCache.Delete(r.KeyPrefix + key)
+				deletePayload = append(deletePayload, splitKeys[0])
+				r.getSessionAndCreate(splitKeys[0])
+			case "updatehashed":
+				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
+				handleDeleteHashedKey(splitKeys[0], "")
+				SessionCache.Delete(key)
+				RPCGlobalCache.Delete(r.KeyPrefix + key)
+				deletePayload = append(deletePayload, splitKeys[0])
+				r.getSessionAndCreate(splitKeys[0])
 			case "delete":
 				log.Info("--> removing cached key: ", key)
 				handleDeleteKey(key, "-1")
