@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
 
@@ -67,15 +68,6 @@ type CoProcessor struct {
 
 // ObjectFromRequest constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
-	var body string
-	if r.Body == nil {
-		body = ""
-	} else {
-		defer r.Body.Close()
-		originalBody, _ := ioutil.ReadAll(r.Body)
-		body = string(originalBody)
-	}
-
 	headers := ProtoMap(r.Header)
 
 	host := r.Host
@@ -90,7 +82,6 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		Headers:        headers,
 		SetHeaders:     map[string]string{},
 		DeleteHeaders:  []string{},
-		Body:           body,
 		Url:            r.URL.Path,
 		Params:         ProtoMap(r.URL.Query()),
 		AddParams:      map[string]string{},
@@ -102,6 +93,14 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		Method:     r.Method,
 		RequestUri: r.RequestURI,
 		Scheme:     r.URL.Scheme,
+	}
+
+	if r.Body != nil {
+		defer r.Body.Close()
+		miniRequestObject.RawBody, _ = ioutil.ReadAll(r.Body)
+		if utf8.Valid(miniRequestObject.RawBody) {
+			miniRequestObject.Body = string(miniRequestObject.RawBody)
+		}
 	}
 
 	object := &coprocess.Object{
@@ -136,13 +135,8 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	if c.HookType != coprocess.HookType_Pre && c.HookType != coprocess.HookType_CustomKeyCheck {
 		if session := ctxGetSession(r); session != nil {
 			object.Session = ProtoSessionState(session)
-			// If the session contains metadata, add items to the object's metadata map:
-			if len(session.MetaData) > 0 {
-				object.Metadata = make(map[string]string)
-				for k, v := range session.MetaData {
-					object.Metadata[k] = v.(string)
-				}
-			}
+			// For compatibility purposes:
+			object.Metadata = object.Session.Metadata
 		}
 	}
 
@@ -278,7 +272,20 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	coProcessor.ObjectPostProcess(returnObject, r)
 
-	token := returnObject.Metadata["token"]
+	var token string
+	if returnObject.Session != nil {
+		// For compatibility purposes, inject coprocess.Object.Metadata fields:
+		if returnObject.Metadata != nil {
+			if returnObject.Session.Metadata == nil {
+				returnObject.Session.Metadata = make(map[string]string)
+			}
+			for k, v := range returnObject.Metadata {
+				returnObject.Session.Metadata[k] = v
+			}
+		}
+
+		token = returnObject.Session.Metadata["token"]
+	}
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
@@ -324,15 +331,11 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		for k, v := range returnObject.Metadata {
 			returnedSession.MetaData[k] = string(v)
 		}
+
 		if extractor == nil {
-			sessionLifetime := returnedSession.Lifetime(m.Spec.SessionLifetime)
-			// This API is not using the ID extractor, but we've got a session:
-			m.Spec.SessionManager.UpdateSession(token, returnedSession, sessionLifetime, false)
-			ctxSetSession(r, returnedSession)
-			ctxSetAuthToken(r, token)
+			ctxSetSession(r, returnedSession, token, true)
 		} else {
-			// The CP middleware did setup a session, we should pass it to the ID extractor (caching):
-			extractor.PostProcess(r, returnedSession, sessionID)
+			ctxSetSession(r, returnedSession, sessionID, true)
 		}
 	}
 

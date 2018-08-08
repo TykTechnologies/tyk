@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -260,11 +261,15 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 }
 
 var rpcLoginMu sync.Mutex
+var reLoginRunning uint32
 
 func (r *RPCStorageHandler) ReAttemptLogin(err error) bool {
-	rpcLoginMu.Lock()
-	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
+	if atomic.LoadUint32(&reLoginRunning) == 1 {
+		return false
+	}
+	atomic.StoreUint32(&reLoginRunning, 1)
 
+	rpcLoginMu.Lock()
 	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
 		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
 		log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
@@ -274,10 +279,15 @@ func (r *RPCStorageHandler) ReAttemptLogin(err error) bool {
 	rpcLoginMu.Unlock()
 
 	time.Sleep(time.Second * 3)
+	atomic.StoreUint32(&reLoginRunning, 0)
+
 	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
 		r.ReConnect()
 		return false
 	}
+
+	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
+
 	return r.Login()
 }
 
@@ -887,6 +897,8 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
+
+		time.Sleep(1 * time.Second)
 	} else if reload == true {
 		// Do the reload!
 		log.Warning("[RPC STORE] Received Reload instruction!")
@@ -916,6 +928,10 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 	for {
 
 		if err := r.SetKey("0000", "0000", 10); err != nil {
+			log.WithError(err).WithFields(logrus.Fields{
+				"prefix": "RPC Conn Mgr",
+			}).Info("Can't connect to RPC layer")
+
 			if r.IsAccessError(err) {
 				if r.Login() {
 					continue
@@ -923,16 +939,9 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 			}
 
 			if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
-				log.WithFields(logrus.Fields{
-					"prefix": "RPC Conn Mgr",
-				}).Info("Can't connect to RPC layer")
 				continue
 			}
 		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "RPC Conn Mgr",
-		}).Info("RPC is alive")
 
 		time.Sleep(10 * time.Second)
 	}

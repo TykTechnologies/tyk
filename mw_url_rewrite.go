@@ -239,6 +239,14 @@ func valToStr(v interface{}) string {
 			}
 			i++
 		}
+	case []interface{}:
+		tmpSlice := make([]string, 0, len(x))
+		for _, val := range x {
+			if rec := valToStr(val); rec != "" {
+				tmpSlice = append(tmpSlice, url.QueryEscape(rec))
+			}
+		}
+		s = strings.Join(tmpSlice, ",")
 	default:
 		log.Error("Context variable type is not supported: ", reflect.TypeOf(v))
 	}

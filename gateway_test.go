@@ -24,6 +24,7 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -46,6 +47,7 @@ var (
 )
 
 const defaultListenPort = 8080
+const mockOrgID = "507f1f77bcf86cd799439011"
 
 var defaultTestConfig config.Config
 var testServerRouter *mux.Router
@@ -129,6 +131,8 @@ func TestMain(m *testing.M) {
 	if err := emptyRedis(); err != nil {
 		panic(err)
 	}
+
+	cli.Init(VERSION, confPaths)
 
 	initialiseSystem()
 	// Small part of start()
@@ -214,8 +218,8 @@ func createSpecTest(t testing.TB, def string) *APISpec {
 	return spec
 }
 
-func testKey(t testing.TB, name string) string {
-	return fmt.Sprintf("%s-%s", t.Name(), name)
+func testKey(testName string, name string) string {
+	return fmt.Sprintf("%s-%s", testName, name)
 }
 
 func testReqBody(t testing.TB, body interface{}) io.Reader {
@@ -712,8 +716,8 @@ func TestControlListener(t *testing.T) {
 }
 
 func TestHttpPprof(t *testing.T) {
-	old := httpProfile
-	defer func() { httpProfile = old }()
+	old := cli.HTTPProfile
+	defer func() { cli.HTTPProfile = old }()
 
 	ts := newTykTestServer(tykTestServerConfig{
 		sepatateControlAPI: true,
@@ -725,7 +729,7 @@ func TestHttpPprof(t *testing.T) {
 	}...)
 	ts.Close()
 
-	*httpProfile = true
+	*cli.HTTPProfile = true
 
 	ts.Start()
 	ts.Run(t, []test.TestCase{
@@ -1231,7 +1235,6 @@ func TestKeepAliveConns(t *testing.T) {
 // for the API. Meaning that a single token cannot reduce service availability for other tokens by simply going over the
 // API's global rate limit.
 func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
-
 	globalCfg := config.Global()
 	globalCfg.EnableNonTransactionalRateLimiter = false
 	globalCfg.EnableSentinelRateLImiter = true

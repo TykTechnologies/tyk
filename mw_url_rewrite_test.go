@@ -512,7 +512,7 @@ func TestRewriterTriggers(t *testing.T) {
 				MetaData: map[string]interface{}{
 					"rewrite": "bar",
 				},
-			})
+			}, "", false)
 
 			got, err := urlRewrite(&testConf, tc.req)
 			if err != nil {
@@ -619,5 +619,22 @@ func TestInitTriggerRx(t *testing.T) {
 		PayloadMatches
 	if payloadMatch.Check("ghi") == "" {
 		t.Errorf("Expected PayloadMatches initalized and matched, received no match")
+	}
+}
+
+func TestValToStr(t *testing.T) {
+
+	example := []interface{}{
+		"abc",      // string
+		int64(456), // int64
+		12.22,      // float
+		"abc,def",  // string url encode
+	}
+
+	str := valToStr(example)
+	expected := "abc,456,12.22,abc%2Cdef"
+
+	if str != expected {
+		t.Errorf("expected (%s) got (%s)", expected, str)
 	}
 }

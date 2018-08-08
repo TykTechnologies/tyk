@@ -12,6 +12,7 @@ import (
 
 	"github.com/justinas/alice"
 	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -77,7 +78,7 @@ func getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handler {
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
-		&BasicAuthKeyIsValid{baseMid},
+		&BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute)},
 		&AuthKey{baseMid},
 		&VersionCheck{BaseMiddleware: baseMid},
 		&KeyExpired{baseMid},
@@ -99,8 +100,9 @@ func testPrepareMultiSessionBA(t testing.TB, isBench bool) (*APISpec, *http.Requ
 		username = "0987876"
 	}
 	password := "TEST"
+	keyName := generateToken("default", username)
 	// Basic auth sessions are stored as {org-id}{username}, so we need to append it here when we create the session.
-	spec.SessionManager.UpdateSession("default"+username, baSession, 60, false)
+	spec.SessionManager.UpdateSession(keyName, baSession, 60, false)
 
 	// Create key
 	session := createMultiAuthKeyAuthSession(isBench)

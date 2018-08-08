@@ -288,6 +288,10 @@ const confSchema = `{
 	"hash_keys": {
 		"type": "boolean"
 	},
+	"hash_key_function": {
+		"type": "string",
+		"enum": ["", "murmur32", "murmur64", "murmur128", "sha256"]
+	},
 	"health_check": {
 		"type": ["object", "null"],
 		"additionalProperties": false,
@@ -736,12 +740,12 @@ const confSchema = `{
 	},
 	"min_token_length": {
 		"type": "integer"
- 	},
+	},
 	"disable_regexp_cache": {
 		"type": "boolean"
 	},
 	"regexp_cache_expire": {
 		"type": "integer"
- 	}
+	}
 }
 }`

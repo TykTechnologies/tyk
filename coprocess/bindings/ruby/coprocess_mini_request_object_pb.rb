@@ -19,6 +19,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :method, :string, 11
     optional :request_uri, :string, 12
     optional :scheme, :string, 13
+    optional :raw_body, :bytes, 14
   end
 end
 

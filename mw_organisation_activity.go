@@ -38,7 +38,9 @@ func (k *OrganizationMonitor) EnabledForSpec() bool {
 
 func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
 	if k.Spec.GlobalConfig.ExperimentalProcessOrgOffThread {
-		return k.ProcessRequestOffThread(r)
+		// Make a copy of request before before sending to goroutine
+		r2 := r.WithContext(r.Context())
+		return k.ProcessRequestOffThread(r2)
 	}
 	return k.ProcessRequestLive(r)
 }
@@ -62,12 +64,13 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request) (error, int) {
 
 	// We found a session, apply the quota and rate limiter
 	reason := k.sessionlimiter.ForwardMessage(
+		r,
 		&session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
-		k.Spec.GlobalConfig,
+		&k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
@@ -186,12 +189,13 @@ func (k *OrganizationMonitor) AllowAccessNext(
 
 	// We found a session, apply the quota and rate limiter
 	reason := k.sessionlimiter.ForwardMessage(
+		r,
 		&session,
 		k.Spec.OrgID,
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
-		k.Spec.GlobalConfig,
+		&k.Spec.GlobalConfig,
 	)
 
 	k.Spec.OrgSessionManager.UpdateSession(k.Spec.OrgID, &session, session.Lifetime(k.Spec.SessionLifetime), false)

@@ -329,8 +329,12 @@ type APIDefinition struct {
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
 	} `bson:"oauth_meta" json:"oauth_meta"`
-	Auth                       Auth                 `bson:"auth" json:"auth"`
-	UseBasicAuth               bool                 `bson:"use_basic_auth" json:"use_basic_auth"`
+	Auth         Auth `bson:"auth" json:"auth"`
+	UseBasicAuth bool `bson:"use_basic_auth" json:"use_basic_auth"`
+	BasicAuth    struct {
+		DisableCaching bool `bson:"disable_caching" json:"disable_caching"`
+		CacheTTL       int  `bson:"cache_ttl" json:"cache_ttl"`
+	} `bson:"basic_auth" json:"basic_auth"`
 	UseMutualTLSAuth           bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
 	ClientCertificates         []string             `bson:"client_certificates" json:"client_certificates"`
 	UpstreamCertificates       map[string]string    `bson:"upstream_certificates" json:"upstream_certificates"`
@@ -346,6 +350,7 @@ type APIDefinition struct {
 	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
 	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
 	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
 	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
 	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
 	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`

@@ -60,7 +60,7 @@ message SessionState {
 
   bool enable_detailed_recording = 22;
 
-  string metadata = 23;
+  map<string, string> metadata = 23;
 
   repeated string tags = 24;
   string alias = 25;

@@ -693,10 +693,11 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		curStringSpec := stringSpec
 		newSpec := URLSpec{}
-		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		a.generateRegex(curStringSpec.Path, &newSpec, stat)
 		// Extend with method actions
-		newSpec.URLRewrite = &stringSpec
+		newSpec.URLRewrite = &curStringSpec
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -1048,6 +1049,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 }
 
 func (a *APISpec) getVersionFromRequest(r *http.Request) string {
+	if a.VersionData.NotVersioned {
+		return ""
+	}
+
 	switch a.VersionDefinition.Location {
 	case "header":
 		return r.Header.Get(a.VersionDefinition.Key)
@@ -1056,7 +1061,9 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
 	case "url":
-		uPath := r.URL.Path[len(a.Proxy.ListenPath):]
+		uPath := strings.TrimPrefix(r.URL.Path, a.Proxy.ListenPath)
+		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
+
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {

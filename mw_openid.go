@@ -160,17 +160,17 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 
 	data := []byte(ouser.ID)
-	tokenID := fmt.Sprintf("%x", md5.Sum(data))
-	sessionID := k.Spec.OrgID + tokenID
+	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	sessionID := generateToken(k.Spec.OrgID, keyID)
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
 		log.Debug("Client ID:", clientID)
-		sessionID = k.Spec.OrgID + fmt.Sprintf("%x", md5.Sum([]byte(clientID))) + tokenID
+		sessionID = generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
 	}
 
 	log.Debug("Generated Session ID: ", sessionID)
 
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID)
+	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	if !exists {
 		// Create it
 		log.Debug("Key does not exist, creating")
@@ -194,16 +194,13 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		session.Alias = clientID + ":" + ouser.ID
 
 		// Update the session in the session manager in case it gets called again
-		k.Spec.SessionManager.UpdateSession(sessionID, &session, session.Lifetime(k.Spec.SessionLifetime), false)
 		log.Debug("Policy applied to key")
-
 	}
 
 	// 4. Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OIDCUser, apidef.UnsetAuth:
-		ctxSetSession(r, &session)
-		ctxSetAuthToken(r, sessionID)
+		ctxSetSession(r, &session, sessionID, true)
 	}
 	ctxSetJWTContextVars(k.Spec, r, token)
 

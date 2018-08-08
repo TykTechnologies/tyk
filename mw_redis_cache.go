@@ -101,7 +101,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	// Only allow idempotent (safe) methods
-	if r.Method != "GET" && r.Method != "HEAD" {
+	if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
 		return nil, http.StatusOK
 	}
 

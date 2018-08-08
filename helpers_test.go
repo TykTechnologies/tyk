@@ -2,12 +2,15 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,6 +32,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -71,6 +75,7 @@ func bundleHandleFunc(w http.ResponseWriter, r *http.Request) {
 
 type testHttpResponse struct {
 	Method  string
+	URI     string
 	Url     string
 	Body    string
 	Headers map[string]string
@@ -134,6 +139,7 @@ func testHttpHandler() *mux.Router {
 
 		err := json.NewEncoder(w).Encode(testHttpResponse{
 			Method:  r.Method,
+			URI:     r.RequestURI,
 			Url:     r.URL.String(),
 			Headers: firstVals(r.Header),
 			Form:    firstVals(r.Form),
@@ -189,16 +195,16 @@ func withAuth(r *http.Request) *http.Request {
 
 // TODO: replace with /tyk/keys/create call
 func createSession(sGen ...func(s *user.SessionState)) string {
-	key := keyGen.GenerateAuthKey("")
+	key := generateToken("", "")
 	session := createStandardSession()
 	if len(sGen) > 0 {
 		sGen[0](session)
 	}
 	if session.Certificate != "" {
-		key = session.Certificate
+		key = generateToken("", session.Certificate)
 	}
 
-	FallbackKeySesionManager.UpdateSession(key, session, 60, false)
+	FallbackKeySesionManager.UpdateSession(storage.HashKey(key), session, 60, config.Global().HashKeys)
 	return key
 }
 
@@ -407,7 +413,7 @@ func (s *tykTestServer) Run(t testing.TB, testCases ...test.TestCase) (*http.Res
 
 		respCopy := copyResponse(lastResponse)
 		if lastError = test.AssertResponse(respCopy, tc); lastError != nil {
-			t.Errorf("[%d] %s. %s", ti, lastError.Error(), string(tcJSON))
+			t.Errorf("[%d] %s. %s\n", ti, lastError.Error(), string(tcJSON))
 		}
 
 		delay := tc.Delay
@@ -727,4 +733,18 @@ func initProxy(proto string, tlsConfig *tls.Config) *httpProxyHandler {
 	go proxy.server.Serve(proxy.listener)
 
 	return proxy
+}
+
+func generateTestBinaryData() (buf *bytes.Buffer) {
+	buf = new(bytes.Buffer)
+	type testData struct {
+		a float32
+		b float64
+		c uint32
+	}
+	for i := 0; i < 10; i++ {
+		s := &testData{rand.Float32(), rand.Float64(), rand.Uint32()}
+		binary.Write(buf, binary.BigEndian, s)
+	}
+	return buf
 }

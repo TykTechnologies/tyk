@@ -314,6 +314,12 @@ func (c *CertificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 		}
 
 		block, _ := pem.Decode(rawKey)
+		if block == nil {
+			c.logger.Error("Can't parse public key:", id)
+			out = append(out, "")
+			continue
+		}
+
 		fingerprint := HexSHA256(block.Bytes)
 		c.cache.Set("pub-"+id, fingerprint, cache.DefaultExpiration)
 		out = append(out, fingerprint)

@@ -26,6 +26,60 @@ func createDefinitionFromString(defStr string) *APISpec {
 	return spec
 }
 
+func TestURLRewrites(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	t.Run("Extended Paths with url_rewrites", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				json.Unmarshal([]byte(`[
+						{
+                            "path": "/rewrite1",
+                            "method": "GET",
+                            "match_pattern": "/rewrite1",
+                            "rewrite_to": "",
+                            "triggers": [
+                                {
+                                    "on": "all",
+                                    "options": {
+                                        "header_matches": {},
+                                        "query_val_matches": {
+                                            "show_env": {
+                                                "match_rx": "1"
+                                            }
+                                        },
+                                        "path_part_matches": {},
+                                        "session_meta_matches": {},
+                                        "payload_matches": {
+                                            "match_rx": ""
+                                        }
+                                    },
+                                    "rewrite_to": "/get?show_env=2"
+                                }
+                            ],
+                            "MatchRegexp": null
+                        },
+                        {
+                            "path": "/rewrite",
+                            "method": "GET",
+                            "match_pattern": "/rewrite",
+                            "rewrite_to": "/get?just_rewrite",
+                            "triggers": [],
+                            "MatchRegexp": null
+						}
+				]`), &v.ExtendedPaths.URLRewrite)
+			})
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/rewrite1?show_env=1", Code: 200, BodyMatch: `"URI":"/get?show_env=2"`},
+			{Path: "/rewrite", Code: 200, BodyMatch: `"URI":"/get?just_rewrite"`},
+		}...)
+	})
+}
+
 func TestWhitelist(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
