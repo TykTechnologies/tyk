@@ -621,9 +621,20 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	})
 }
 
-func TestJWTSessionInvalidClaims(t *testing.T) {
+func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
+
+	pID := createPolicy()
+	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
+		jwtToken := createJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["user_id"] = "user123"
+			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(skew).Unix()
+		})
+
+		return map[string]string{"authorization": jwtToken}
+	}
 
 	spec := buildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -635,39 +646,209 @@ func TestJWTSessionInvalidClaims(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	pID := createPolicy()
-
-	t.Run("Fail if token expired", func(t *testing.T) {
-		spec.JWTDisableExpiresAtValidation = false
+	// This test is successful by definition
+	t.Run("Expiry_After_now--Valid_jwt", func(t *testing.T) {
+		spec.JWTExpiresAtValidationSkew = 0 //Default value
 		loadAPI(spec)
 
-		jwtToken := createJWKToken(func(t *jwt.Token) {
-			t.Claims.(jwt.MapClaims)["policy_id"] = pID
-			t.Claims.(jwt.MapClaims)["user_id"] = "user"
-			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(-time.Hour * 72).Unix()
-		})
-		authHeaders := map[string]string{"authorization": jwtToken}
-
 		ts.Run(t, test.TestCase{
-			Headers:   authHeaders,
-			Code:      401,
-			BodyMatch: "Key not authorized: Token is expired",
+			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
 		})
 	})
 
-	t.Run("Pass if token expired and validation disabled", func(t *testing.T) {
-		spec.JWTDisableExpiresAtValidation = true
+	// This test is successful by definition, so it's true also with skew, but just to avoid confusion.
+	t.Run("Expiry_After_now-Add_skew--Valid_jwt", func(t *testing.T) {
+		spec.JWTExpiresAtValidationSkew = 1
 		loadAPI(spec)
 
-		jwtToken := createJWKToken(func(t *jwt.Token) {
-			t.Claims.(jwt.MapClaims)["policy_id"] = pID
-			t.Claims.(jwt.MapClaims)["user_id"] = "user"
-			t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(-time.Hour * 72).Unix()
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
 		})
-		authHeaders := map[string]string{"authorization": jwtToken}
+	})
+
+	t.Run("Expiry_Before_now--Invalid_jwt", func(t *testing.T) {
+		spec.JWTExpiresAtValidationSkew = 0 //Default value
+		loadAPI(spec)
 
 		ts.Run(t, test.TestCase{
-			Headers: authHeaders, Code: http.StatusOK,
+			Headers:   jwtAuthHeaderGen(-time.Second),
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Key not authorized: token has expired",
+		})
+	})
+
+	t.Run("Expired_token-Before_now-Huge_skew--Valid_jwt", func(t *testing.T) {
+		spec.JWTExpiresAtValidationSkew = 1000 // This value doesn't matter since validation is disabled
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
+		})
+	})
+
+	t.Run("Expired_token-Before_now-Add_skew--Valid_jwt", func(t *testing.T) {
+		spec.JWTExpiresAtValidationSkew = 1
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
+		})
+	})
+}
+
+func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	pID := createPolicy()
+	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
+		jwtToken := createJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["user_id"] = "user123"
+			t.Claims.(jwt.MapClaims)["iat"] = time.Now().Add(skew).Unix()
+		})
+
+		return map[string]string{"authorization": jwtToken}
+	}
+
+	spec := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	// This test is successful by definition
+	t.Run("IssuedAt_Before_now-no_skew--Valid_jwt", func(t *testing.T) {
+		spec.JWTIssuedAtValidationSkew = 0
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
+		})
+	})
+
+	t.Run("Expiry_after_now--Invalid_jwt", func(t *testing.T) {
+		spec.JWTExpiresAtValidationSkew = 0 //Default value
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
+		})
+	})
+
+	t.Run("IssueAt-After_now-no_skew--Invalid_jwt", func(t *testing.T) {
+		spec.JWTIssuedAtValidationSkew = 0
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers:   jwtAuthHeaderGen(+time.Minute),
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Key not authorized: token used before issued",
+		})
+	})
+
+	t.Run("IssueAt--After_now-Huge_skew--valid_jwt", func(t *testing.T) {
+		spec.JWTIssuedAtValidationSkew = 1000 // This value doesn't matter since validation is disabled
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(+time.Second),
+			Code:    http.StatusOK,
+		})
+	})
+
+	// True by definition
+	t.Run("IssueAt-Before_now-Add_skew--not_valid_jwt", func(t *testing.T) {
+		spec.JWTIssuedAtValidationSkew = 2 // 2 seconds
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(-3 * time.Second), Code: http.StatusOK,
+		})
+	})
+
+	t.Run("IssueAt-After_now-Add_skew--Valid_jwt", func(t *testing.T) {
+		spec.JWTIssuedAtValidationSkew = 1
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
+		})
+	})
+}
+
+func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	pID := createPolicy()
+	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
+		jwtToken := createJWKToken(func(t *jwt.Token) {
+			t.Claims.(jwt.MapClaims)["policy_id"] = pID
+			t.Claims.(jwt.MapClaims)["user_id"] = "user123"
+			t.Claims.(jwt.MapClaims)["nbf"] = time.Now().Add(skew).Unix()
+		})
+		return map[string]string{"authorization": jwtToken}
+	}
+
+	spec := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.Proxy.ListenPath = "/"
+		spec.JWTSigningMethod = "rsa"
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+	})[0]
+
+	// This test is successful by definition
+	t.Run("NotBefore_Before_now-Valid_jwt", func(t *testing.T) {
+		spec.JWTNotBeforeValidationSkew = 0
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(-time.Second), Code: http.StatusOK,
+		})
+	})
+
+	t.Run("NotBefore_After_now--Invalid_jwt", func(t *testing.T) {
+		spec.JWTNotBeforeValidationSkew = 0 //Default value
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers:   jwtAuthHeaderGen(+time.Second),
+			Code:      http.StatusUnauthorized,
+			BodyMatch: "Key not authorized: token is not valid yet",
+		})
+	})
+
+	t.Run("NotBefore_After_now-Add_skew--valid_jwt", func(t *testing.T) {
+		spec.JWTNotBeforeValidationSkew = 1
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
+		})
+	})
+
+	t.Run("NotBefore_After_now-Huge_skew--valid_jwt", func(t *testing.T) {
+		spec.JWTNotBeforeValidationSkew = 1000 // This value is so high that it's actually similar to disabling the claim.
+
+		loadAPI(spec)
+
+		ts.Run(t, test.TestCase{
+			Headers: jwtAuthHeaderGen(+time.Second), Code: http.StatusOK,
 		})
 	})
 }
@@ -930,7 +1111,8 @@ func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
 		ts.Run(
 			b,
 			test.TestCase{
-				Headers: authHeaders, Code: http.StatusOK,
+				Headers: authHeaders,
+				Code:    http.StatusOK,
 			},
 		)
 	}
