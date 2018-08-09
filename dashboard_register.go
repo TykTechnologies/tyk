@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,21 @@ type HTTPDashboardHandler struct {
 	Secret                 string
 
 	heartBeatStopSentinel bool
+}
+
+func initialiseClient(timeout time.Duration) *http.Client {
+	client := &http.Client{}
+	if config.Global().HttpServerOptions.UseSSL {
+		// Setup HTTPS client
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+		}
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+		client = &http.Client{Transport: transport, Timeout: timeout}
+	} else {
+		client = &http.Client{Timeout: timeout}
+	}
+	return client
 }
 
 func reLogin() {
@@ -80,8 +96,7 @@ func (h *HTTPDashboardHandler) Init() error {
 
 func (h *HTTPDashboardHandler) Register() error {
 	req := h.newRequest(h.RegistrationEndpoint)
-
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 
 	if err != nil {
@@ -152,8 +167,8 @@ func (h *HTTPDashboardHandler) sendHeartBeat() error {
 	req := h.newRequest(h.HeartBeatEndpoint)
 	req.Header.Set("x-tyk-nodeid", NodeID)
 	req.Header.Set("x-tyk-nonce", ServiceNonce)
+	c := initialiseClient(5 * time.Second)
 
-	c := &http.Client{Timeout: 5 * time.Second}
 	resp, err := c.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return errors.New("dashboard is down? Heartbeat is failing")
@@ -178,7 +193,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	req.Header.Set("x-tyk-nodeid", NodeID)
 	req.Header.Set("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 
 	if err != nil {
