@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -51,7 +50,7 @@ func reLogin() {
 		}).Error("Could not deregister: ", err)
 	}
 
-	time.Sleep(30 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	if err := DashService.Register(); err != nil {
 		log.WithFields(logrus.Fields{
@@ -64,10 +63,7 @@ func reLogin() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Recovering configurations, reloading...")
-	var wg sync.WaitGroup
-	wg.Add(1)
-	reloadURLStructure(wg.Done)
-	wg.Wait()
+	reloadURLStructure(nil)
 }
 
 func (h *HTTPDashboardHandler) Init() error {
