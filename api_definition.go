@@ -638,7 +638,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 			for e := range events {
 				switch e {
 				case circuit.BreakerTripped:
-					log.Warning("[PROXY] [CIRCUIT BREKER] Breaker tripped for path: ", path)
+					log.Warning("[PROXY] [CIRCUIT BREAKER] Breaker tripped for path: ", path)
 					log.Debug("Breaker tripped: ", e)
 					// Start a timer function
 

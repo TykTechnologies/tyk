@@ -606,7 +606,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	if breakerEnforced {
 		log.Debug("ON REQUEST: Breaker status: ", breakerConf.CB.Ready())
 		if !breakerConf.CB.Ready() {
-			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
+			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503)
 			return nil
 		}
 		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
