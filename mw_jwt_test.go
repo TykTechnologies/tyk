@@ -616,7 +616,7 @@ func TestJWTSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized: no matching policy",
+			BodyMatch: "key not authorized: no matching policy",
 		})
 	})
 }
@@ -899,8 +899,8 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	t.Run("Request with invalid policy in JWT", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
+			BodyMatch: "key not authorized: no matching policy",
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized: no matching policy",
 		})
 	})
 }
