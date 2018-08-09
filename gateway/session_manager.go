@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/TykTechnologies/leakybucket"
@@ -26,12 +27,109 @@ type PublicSession struct {
 const (
 	QuotaKeyPrefix     = "quota-"
 	RateLimitKeyPrefix = "rate-limit-"
+
+	quotaChanBufferSize = 256
 )
+
+type keyQuota struct {
+	key        string
+	session    *user.SessionState
+	isExceeded bool
+	reqChan    chan bool
+}
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
 	bucketStore leakybucket.Storage
+
+	keyQuotas   map[string]keyQuota
+	keyQuotasMu sync.Mutex
+}
+
+func (l *SessionLimiter) getKeyQuota(key string, session *user.SessionState, store storage.Handler, globalConf *config.Config) keyQuota {
+	l.keyQuotasMu.Lock()
+	defer l.keyQuotasMu.Unlock()
+
+	// check if key quota counter is already running
+	if quota, ok := l.keyQuotas[key]; ok {
+		return quota
+	}
+
+	// create and start new key quota counter
+	quota := keyQuota{
+		key:     key,
+		session: session,
+		reqChan: make(chan bool, quotaChanBufferSize),
+	}
+	l.keyQuotas[key] = quota
+	syncEvery := time.Duration(session.QuotaRenewalRate*1000/int64(globalConf.DistributedQuotaSyncFrequency)) * time.Millisecond
+	go l.startCounter(quota, store, syncEvery)
+
+	return quota
+}
+
+func (l *SessionLimiter) setQuotaIsExceeded(key string, isExceeded bool) {
+	l.keyQuotasMu.Lock()
+	defer l.keyQuotasMu.Unlock()
+	if quota, ok := l.keyQuotas[key]; ok {
+		quota.isExceeded = isExceeded
+		l.keyQuotas[key] = quota
+	}
+}
+
+func (l *SessionLimiter) startCounter(quota keyQuota, store storage.Handler, syncEvery time.Duration) {
+	// initialize total counter with current value from centralized Redis storage
+	// by supplying 0 increment
+	totalCounter := store.IncrementByWithExpire(quota.key, 0, quota.session.QuotaRenewalRate)
+
+	// this var will be used to count requests per aggregation period
+	var localCounter int64
+
+	for {
+		select {
+		case _, ok := <-quota.reqChan:
+			// check if channel was closed and it is time to stop go-routine
+			if !ok {
+				return
+			}
+
+			// check if quota was exceeded
+			if totalCounter >= quota.session.QuotaMax {
+				l.setQuotaIsExceeded(quota.key, true)
+				localCounter = 0
+				continue
+			}
+
+			// increment last known total counter and local aggregated counter
+			totalCounter++
+			localCounter++
+
+			// update remaining
+			remaining := quota.session.QuotaMax - totalCounter
+			if remaining < 0 {
+				quota.session.QuotaRemaining = 0
+			} else {
+				quota.session.QuotaRemaining = remaining
+			}
+
+		case <-time.After(syncEvery):
+			// aggregation period is done
+			// overwrite totalCounter from centralized Redis storage
+			totalCounter = store.IncrementByWithExpire(quota.key, localCounter, quota.session.QuotaRenewalRate)
+			// reset
+			localCounter = 0
+			l.setQuotaIsExceeded(quota.key, false)
+		}
+	}
+}
+
+func (l *SessionLimiter) stopCounters() {
+	l.keyQuotasMu.Lock()
+	defer l.keyQuotasMu.Unlock()
+	for _, quota := range l.keyQuotas {
+		close(quota.reqChan)
+	}
 }
 
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
@@ -189,7 +287,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			currentSession.Allowance--
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, key, store, apiID) {
+		if globalConf.DistributedQuotaEnabled {
+			if l.DistributedRedisQuotaExceeded(currentSession, key, store, globalConf) {
+				return sessionFailQuota
+			}
+		} else if l.RedisQuotaExceeded(r, currentSession, key, store, apiID) {
 			return sessionFailQuota
 		}
 	}
@@ -288,4 +390,23 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	return false
+}
+
+func (l *SessionLimiter) DistributedRedisQuotaExceeded(currentSession *user.SessionState, key string, store storage.Handler, globalConf *config.Config) bool {
+	// Are they unlimited?
+	if currentSession.QuotaMax == -1 {
+		// No quota set
+		return false
+	}
+
+	rawKey := QuotaKeyPrefix + currentSession.KeyHash()
+	quotaCounter := l.getKeyQuota(rawKey, currentSession, store, globalConf)
+
+	// count request if quota is not exceeded for the given key
+	if !quotaCounter.isExceeded {
+		quotaCounter.reqChan <- true
+		return false
+	}
+
+	return true
 }

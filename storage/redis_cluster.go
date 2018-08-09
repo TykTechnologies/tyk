@@ -336,6 +336,29 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 	return val
 }
 
+// IncrementByWithExpire increments given key by value in Redis
+// and sets expiration if it is a new key
+func (r RedisCluster) IncrementByWithExpire(keyName string, incBy int64, expire int64) int64 {
+	logEntry := log.WithFields(logrus.Fields{
+		"keyName": keyName,
+		"incBy":   incBy,
+		"expire":  expire,
+	})
+	logEntry.Debug("Incrementing raw key by number")
+	r.ensureConnection()
+	val, err := redis.Int64(r.singleton().Do("INCRBY", keyName, incBy))
+	if err != nil {
+		logEntry.WithError(err).Error("Error trying to increment value")
+	} else {
+		logEntry.Debug("Incremented key by number")
+	}
+	if val == incBy {
+		logEntry.Debug("--> Setting Expire")
+		r.singleton().Do("EXPIRE", keyName, expire)
+	}
+	return val
+}
+
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RedisCluster) GetKeys(filter string) []string {
 	r.ensureConnection()

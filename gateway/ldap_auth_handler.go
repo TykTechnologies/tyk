@@ -154,6 +154,11 @@ func (l *LDAPStorageHandler) IncrememntWithExpire(keyName string, timeout int64)
 	return 999
 }
 
+func (l *LDAPStorageHandler) IncrementByWithExpire(keyName string, incBy int64, timeout int64) int64 {
+	l.notifyReadOnly()
+	return 999
+}
+
 func (l *LDAPStorageHandler) notifyReadOnly() bool {
 	log.Warning("LDAP storage is READ ONLY")
 	return false

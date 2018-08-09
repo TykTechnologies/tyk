@@ -398,6 +398,9 @@ type Config struct {
 	GlobalSessionLifetime          int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 	HideGeneratorHeader            bool  `json:"hide_generator_header"`
+
+	DistributedQuotaEnabled       bool  `json:"distributed_quota_enabled"`
+	DistributedQuotaSyncFrequency int32 `json:"distributed_quota_sync_frequency"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
