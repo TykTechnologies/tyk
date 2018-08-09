@@ -132,11 +132,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		token = request.RealIP(r)
 	}
 
-	var copiedRequest *http.Request
-	if recordDetail(r, m.Spec.GlobalConfig) {
-		copiedRequest = copyRequest(r)
-	}
-
 	key := m.CreateCheckSum(r, token)
 	retBlob, err := m.CacheStore.GetKey(key)
 	if err != nil {
@@ -268,7 +263,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		go m.sh.RecordHit(r, 0, newRes.StatusCode, copiedRequest, nil)
+		go m.sh.RecordHit(r, 0, newRes.StatusCode, nil)
 	}
 
 	// Stop any further execution

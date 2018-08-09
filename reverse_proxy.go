@@ -359,8 +359,12 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
-	// return nil
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
+
+	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
+	nopCloseResponseBody(resp)
+
+	return resp
 }
 
 func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) *http.Response {
@@ -836,39 +840,77 @@ func requestIPHops(r *http.Request) string {
 	return clientIP
 }
 
-// nopCloser is just like ioutil's, but here to let us fetch the
-// underlying io.Reader.
+// nopCloser is just like ioutil's, but here to let us re-read the same
+// buffer inside by moving position to the start every time we done with reading
 type nopCloser struct {
-	io.Reader
+	io.ReadSeeker
 }
 
-func (nopCloser) Close() error { return nil }
-
-func copyBody(body io.ReadCloser) (b1, b2 io.ReadCloser) {
-	if nc, ok := body.(nopCloser); ok {
-		buf := *(nc.Reader.(*bytes.Buffer))
-		return body, nopCloser{&buf}
+// Read just a wrapper around real Read which also moves position to the start if we get EOF
+// to have it ready for next read-cycle
+func (n nopCloser) Read(p []byte) (int, error) {
+	num, err := n.ReadSeeker.Read(p)
+	if err == io.EOF { // move to start to have it ready for next read cycle
+		n.Seek(0, io.SeekStart)
 	}
+	return num, err
+}
+
+// Close is a no-op Close plus moves position to the start just in case
+func (n nopCloser) Close() error {
+	// seek to the start if body ever called to be closed
+	n.Seek(0, io.SeekStart)
+
+	return nil
+}
+
+func copyBody(body io.ReadCloser) io.ReadCloser {
+	// check if body was already read and converted into our nopCloser
+	if nc, ok := body.(nopCloser); ok {
+		// seek to the beginning to have it ready for next read
+		nc.Seek(0, io.SeekStart)
+		return body
+	}
+
+	// body is http's io.ReadCloser - let's close it after we read data
 	defer body.Close()
 
-	var buf1, buf2 bytes.Buffer
-	io.Copy(&buf1, body)
-	buf2 = buf1
-	return nopCloser{&buf1}, nopCloser{&buf2}
+	// body is http's io.ReadCloser - read it up until EOF
+	var bodyRead bytes.Buffer
+	io.Copy(&bodyRead, body)
+
+	// use seek-able reader for further body usage
+	reusableBody := bytes.NewReader(bodyRead.Bytes())
+
+	return nopCloser{reusableBody}
 }
 
 func copyRequest(r *http.Request) *http.Request {
-	r2 := *r
 	if r.Body != nil {
-		r.Body, r2.Body = copyBody(r.Body)
+		r.Body = copyBody(r.Body)
 	}
-	return &r2
+	return r
 }
 
 func copyResponse(r *http.Response) *http.Response {
-	r2 := *r
 	if r.Body != nil {
-		r.Body, r2.Body = copyBody(r.Body)
+		r.Body = copyBody(r.Body)
 	}
-	return &r2
+	return r
+}
+
+func nopCloseRequestBody(r *http.Request) {
+	if r == nil {
+		return
+	}
+
+	copyRequest(r)
+}
+
+func nopCloseResponseBody(r *http.Response) {
+	if r == nil {
+		return
+	}
+
+	copyResponse(r)
 }
