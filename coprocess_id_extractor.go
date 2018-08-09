@@ -50,14 +50,13 @@ func (e *BaseExtractor) ExtractHeader(r *http.Request) (headerValue string, err 
 
 // ExtractForm is used when a FormSource is specified.
 func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValue string, err error) {
-	copiedRequest := copyRequest(r)
-	copiedRequest.ParseForm()
+	r.ParseForm()
 
 	if paramName == "" {
 		return "", errors.New("no form param name set")
 	}
 
-	values := copiedRequest.Form[paramName]
+	values := r.Form[paramName]
 	if len(values) == 0 {
 		return "", errors.New("no form value")
 	}
@@ -67,8 +66,7 @@ func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValu
 
 // ExtractBody is used when BodySource is specified.
 func (e *BaseExtractor) ExtractBody(r *http.Request) (string, error) {
-	copiedRequest := copyRequest(r)
-	body, err := ioutil.ReadAll(copiedRequest.Body)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return "", err
 	}

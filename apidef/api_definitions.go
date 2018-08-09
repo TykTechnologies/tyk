@@ -335,27 +335,27 @@ type APIDefinition struct {
 		DisableCaching bool `bson:"disable_caching" json:"disable_caching"`
 		CacheTTL       int  `bson:"cache_ttl" json:"cache_ttl"`
 	} `bson:"basic_auth" json:"basic_auth"`
-	UseMutualTLSAuth              bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
-	ClientCertificates            []string             `bson:"client_certificates" json:"client_certificates"`
-	UpstreamCertificates          map[string]string    `bson:"upstream_certificates" json:"upstream_certificates"`
-	PinnedPublicKeys              map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
-	EnableJWT                     bool                 `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth               bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
-	EnableCoProcessAuth           bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
-	JWTSigningMethod              string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
-	JWTSource                     string               `bson:"jwt_source" json:"jwt_source"`
-	JWTIdentityBaseField          string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
-	JWTClientIDBaseField          string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
-	JWTPolicyFieldName            string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
-	JWTDisableIssuedAtValidation  bool                 `bson:"jwt_disable_issued_at_validation" json:"jwt_disable_issued_at_validation"`
-	JWTDisableExpiresAtValidation bool                 `bson:"jwt_disable_expires_at_validation" json:"jwt_disable_expires_at_validation"`
-	JWTDisableNotBeforeValidation bool                 `bson:"jwt_disable_not_before_validation" json:"jwt_disable_not_before_validation"`
-	JWTSkipKid                    bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	NotificationsDetails          NotificationsManager `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking       bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	HmacAllowedClockSkew          float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
-	BaseIdentityProvidedBy        AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
-	VersionDefinition             struct {
+	UseMutualTLSAuth           bool                 `bson:"use_mutual_tls_auth" json:"use_mutual_tls_auth"`
+	ClientCertificates         []string             `bson:"client_certificates" json:"client_certificates"`
+	UpstreamCertificates       map[string]string    `bson:"upstream_certificates" json:"upstream_certificates"`
+	PinnedPublicKeys           map[string]string    `bson:"pinned_public_keys" json:"pinned_public_keys"`
+	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"`
+	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
+	JWTIdentityBaseField       string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
+	JWTClientIDBaseField       string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
+	JWTPolicyFieldName         string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
+	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
+	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
+	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
+	VersionDefinition          struct {
 		Location  string `bson:"location" json:"location"`
 		Key       string `bson:"key" json:"key"`
 		StripPath bool   `bson:"strip_path" json:"strip_path"`

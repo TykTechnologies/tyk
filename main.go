@@ -1159,6 +1159,10 @@ type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+
+	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
+	nopCloseRequestBody(r)
+
 	mainRouter.ServeHTTP(w, r)
 }
 

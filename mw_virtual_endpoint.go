@@ -109,11 +109,6 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
-	var copiedRequest *http.Request
-	if recordDetail(r, d.Spec.GlobalConfig) {
-		copiedRequest = copyRequest(r)
-	}
-
 	t1 := time.Now().UnixNano()
 	vmeta := meta.(*apidef.VirtualMeta)
 
@@ -225,7 +220,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false)
 
-	go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedRequest, copiedResponse)
+	go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedResponse)
 
 	return copiedResponse
 
@@ -249,7 +244,9 @@ func forceResponse(w http.ResponseWriter,
 	}
 
 	newResponse.ContentLength = int64(len(responseMessage))
-	newResponse.Body = ioutil.NopCloser(bytes.NewReader(responseMessage))
+	newResponse.Body = nopCloser{
+		ReadSeeker: bytes.NewReader(responseMessage),
+	}
 	newResponse.StatusCode = newResponseData.Response.Code
 	newResponse.Proto = "HTTP/1.0"
 	newResponse.ProtoMajor = 1
@@ -264,13 +261,10 @@ func forceResponse(w http.ResponseWriter,
 		}
 	}
 
-	// Clone the response so we can save it
-	copiedRes := copyResponse(newResponse)
-
 	handleForcedResponse(w, newResponse, session, spec)
 
 	// Record analytics
-	return copiedRes
+	return newResponse
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

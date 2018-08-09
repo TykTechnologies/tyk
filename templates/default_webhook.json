@@ -6,7 +6,7 @@
     "response_code": "{{.Meta.HostInfo.ResponseCode}}",
     "tcp_error": "{{.Meta.HostInfo.IsTCPError}}",
     "host": "{{.Meta.HostInfo.MetaData.host_name}}",
-    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}",
+    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}"
 }
 {{ else if eq .Type "HostUp"}}
 {
@@ -16,7 +16,7 @@
     "response_code": "{{.Meta.HostInfo.ResponseCode}}",
     "tcp_error": "{{.Meta.HostInfo.IsTCPError}}",
     "host": "{{.Meta.HostInfo.MetaData.host_name}}",
-    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}",
+    "api_id": "{{.Meta.HostInfo.MetaData.api_id}}"
 }
 {{ else if eq .Type "TriggerExceeded"}}
 {
