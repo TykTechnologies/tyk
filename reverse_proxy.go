@@ -604,11 +604,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var res *http.Response
 	var err error
 	if breakerEnforced {
-		log.Debug("ON REQUEST: Breaker status: ", breakerConf.CB.Ready())
 		if !breakerConf.CB.Ready() {
+			log.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
 			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503)
 			return nil
 		}
+		log.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
+
 		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
 		if err != nil || res.StatusCode == http.StatusInternalServerError {
 			breakerConf.CB.Fail()
