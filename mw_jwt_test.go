@@ -687,7 +687,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	})
 
 	t.Run("Expired_token-Before_now-Add_skew--Valid_jwt", func(t *testing.T) {
-		spec.JWTExpiresAtValidationSkew = 1
+		spec.JWTExpiresAtValidationSkew = 2
 		loadAPI(spec)
 
 		ts.Run(t, test.TestCase{
