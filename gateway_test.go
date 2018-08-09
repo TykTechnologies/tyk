@@ -1338,14 +1338,14 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		spec.DisableRateLimit = false
 		spec.OrgID = "default"
 		spec.GlobalRateLimit = apidef.GlobalRateLimit{
+			Rate: 2,
 			Per:  60,
-			Rate: 4,
 		}
 		spec.Proxy.ListenPath = "/"
 	})
 
 	sess1token := createSession(func(s *user.SessionState) {
-		s.Rate = 3
+		s.Rate = 1
 		s.Per = 60
 	})
 
