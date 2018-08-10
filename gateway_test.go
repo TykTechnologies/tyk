@@ -1108,6 +1108,94 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	conn3.Close()
 }
 
+func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
+	globalConf := config.Global()
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
+
+	// connect to ws, send 1st message and check reply
+	wsConn, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
+	if err != nil {
+		t.Fatalf("cannot make websocket connection: %v", err)
+	}
+	err = wsConn.WriteMessage(websocket.BinaryMessage, []byte("test message 1"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err := wsConn.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: test message 1" {
+		t.Error("Unexpected reply:", string(p))
+	}
+
+	// make 1st http request
+	ts.Run(t, test.TestCase{
+		Method: "GET",
+		Path:   "/abc",
+		Code:   http.StatusOK,
+	})
+
+	// send second WS connection upgrade request
+	// connect to ws, send 1st message and check reply
+	wsConn2, _, err := websocket.DefaultDialer.Dial(baseURL+"/ws", nil)
+	if err != nil {
+		t.Fatalf("cannot make websocket connection: %v", err)
+	}
+	err = wsConn2.WriteMessage(websocket.BinaryMessage, []byte("test message 1 to ws 2"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err = wsConn2.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: test message 1 to ws 2" {
+		t.Error("Unexpected reply:", string(p))
+	}
+	wsConn2.Close()
+
+	// send second message to WS and check reply
+	err = wsConn.WriteMessage(websocket.BinaryMessage, []byte("test message 2"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+	_, p, err = wsConn.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message: %v", err)
+	}
+	if string(p) != "reply to message: test message 2" {
+		t.Error("Unexpected reply:", string(p))
+	}
+
+	// make 2nd http request
+	ts.Run(t, test.TestCase{
+		Method: "GET",
+		Path:   "/abc",
+		Code:   http.StatusOK,
+	})
+
+	wsConn.Close()
+
+	// make 3d http request after closing WS connection
+	ts.Run(t, test.TestCase{
+		Method: "GET",
+		Path:   "/abc",
+		Code:   http.StatusOK,
+	})
+}
+
 func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Listener {
 	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	go func() {
