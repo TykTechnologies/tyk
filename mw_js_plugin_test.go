@@ -413,3 +413,64 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		}
 	})
 }
+
+func TestJSVMBase64(t *testing.T) {
+	jsvm := JSVM{}
+	jsvm.Init(nil)
+
+	inputString := "teststring"
+	inputB64 := "dGVzdHN0cmluZw=="
+	jwtPayload := "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ"
+	decodedJwtPayload := `{"sub":"1234567890","name":"John Doe","iat":1516239022}`
+
+	t.Run("b64dec with simple string input", func(t *testing.T) {
+		v, err := jsvm.VM.Run(`b64dec("` + inputB64 + `")`)
+		if err != nil {
+			t.Fatalf("b64dec call failed: %s", err.Error())
+		}
+		if s := v.String(); s != inputString {
+			t.Fatalf("wanted '%s', got '%s'", inputString, s)
+		}
+	})
+
+	t.Run("b64dec with a JWT payload", func(t *testing.T) {
+		v, err := jsvm.VM.Run(`b64dec("` + jwtPayload + `")`)
+		if err != nil {
+			t.Fatalf("b64dec call failed: %s", err.Error())
+		}
+		if s := v.String(); s != decodedJwtPayload {
+			t.Fatalf("wanted '%s', got '%s'", decodedJwtPayload, s)
+		}
+	})
+
+	t.Run("b64enc with simple string input", func(t *testing.T) {
+		v, err := jsvm.VM.Run(`b64enc("` + inputString + `")`)
+		if err != nil {
+			t.Fatalf("b64enc call failed: %s", err.Error())
+		}
+		if s := v.String(); s != inputB64 {
+			t.Fatalf("wanted '%s', got '%s'", inputB64, s)
+		}
+	})
+
+	t.Run("rawb64dec with simple string input", func(t *testing.T) {
+		v, err := jsvm.VM.Run(`rawb64dec("` + jwtPayload + `")`)
+		if err != nil {
+			t.Fatalf("rawb64dec call failed: %s", err.Error())
+		}
+		if s := v.String(); s != decodedJwtPayload {
+			t.Fatalf("wanted '%s', got '%s'", decodedJwtPayload, s)
+		}
+	})
+
+	t.Run("rawb64enc with simple string input", func(t *testing.T) {
+		jsvm.VM.Set("input", decodedJwtPayload)
+		v, err := jsvm.VM.Run(`rawb64enc(input)`)
+		if err != nil {
+			t.Fatalf("rawb64enc call failed: %s", err.Error())
+		}
+		if s := v.String(); s != jwtPayload {
+			t.Fatalf("wanted '%s', got '%s'", jwtPayload, s)
+		}
+	})
+}

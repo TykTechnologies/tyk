@@ -422,11 +422,16 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("b64dec", func(call otto.FunctionCall) otto.Value {
 		in := call.Argument(0).String()
 		out, err := base64.StdEncoding.DecodeString(in)
+
+		// Fallback to RawStdEncoding:
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "jsvm",
-			}).Error("Failed to base64 decode: ", err)
-			return otto.Value{}
+			out, err = base64.RawStdEncoding.DecodeString(in)
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("Failed to base64 decode: ", err)
+				return otto.Value{}
+			}
 		}
 		returnVal, err := j.VM.ToValue(string(out))
 		if err != nil {
@@ -440,6 +445,39 @@ func (j *JSVM) LoadTykJSApi() {
 	j.VM.Set("b64enc", func(call otto.FunctionCall) otto.Value {
 		in := []byte(call.Argument(0).String())
 		out := base64.StdEncoding.EncodeToString(in)
+		returnVal, err := j.VM.ToValue(out)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("Failed to base64 encode: ", err)
+			return otto.Value{}
+		}
+		return returnVal
+	})
+
+	j.VM.Set("rawb64dec", func(call otto.FunctionCall) otto.Value {
+		in := call.Argument(0).String()
+		out, err := base64.RawStdEncoding.DecodeString(in)
+		if err != nil {
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"prefix": "jsvm",
+				}).Error("Failed to base64 decode: ", err)
+				return otto.Value{}
+			}
+		}
+		returnVal, err := j.VM.ToValue(string(out))
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "jsvm",
+			}).Error("Failed to base64 decode: ", err)
+			return otto.Value{}
+		}
+		return returnVal
+	})
+	j.VM.Set("rawb64enc", func(call otto.FunctionCall) otto.Value {
+		in := []byte(call.Argument(0).String())
+		out := base64.RawStdEncoding.EncodeToString(in)
 		returnVal, err := j.VM.ToValue(out)
 		if err != nil {
 			log.WithFields(logrus.Fields{
