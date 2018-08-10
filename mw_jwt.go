@@ -287,7 +287,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		//override session expiry with JWT
 		if f, ok := claims["exp"].(float64); ok {
 			if int64(f) != session.Expires {
-				session.Expires = int64(f)
+				newSession.Expires = int64(f)
 			}
 		}
 

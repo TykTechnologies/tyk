@@ -1339,3 +1339,49 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 		})
 	})
 }
+
+func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
+	pID := keyGen.GenerateAuthKey("")
+	pol := createStandardPolicy()
+	pol.ID = pID
+	pol.KeyExpiresIn = 1
+
+	if len(pGen) > 0 {
+		pGen[0](pol)
+	}
+
+	policiesMu.Lock()
+	policiesByID[pID] = *pol
+	policiesMu.Unlock()
+
+	return pID
+}
+
+func TestJWTExpOverridesToken(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	//create policy which sets keys to have expiry in one second
+	pID := createExpiringPolicy()
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})
+
+	jwtToken := createJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["foo"] = "bar"
+		t.Claims.(jwt.MapClaims)["sub"] = "user123@test.com" //is ignored
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Second * 72).Unix()
+	})
+	authHeaders := map[string]string{"authorization": jwtToken}
+	//JWT expiry overrides internal token which gets expiry from policy so second request will pass
+	ts.Run(t, []test.TestCase{
+		{Headers: authHeaders, Code: http.StatusOK, Delay: 1100 * time.Millisecond},
+		{Headers: authHeaders, Code: http.StatusOK},
+	}...)
+}
