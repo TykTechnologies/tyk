@@ -284,9 +284,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			log.Error("Could not find a valid policy to apply to this token!")
 			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
-		//override session expiry with JWT
+		//override session expiry with JWT if longer lived
 		if f, ok := claims["exp"].(float64); ok {
-			if int64(f) != session.Expires {
+			if int64(f)-newSession.Expires > 0 {
 				newSession.Expires = int64(f)
 			}
 		}
@@ -342,9 +342,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
 			}
 
-			//override session expiry with JWT
+			//override session expiry with JWT if longer lived
 			if f, ok := claims["exp"].(float64); ok {
-				if int64(f) != session.Expires {
+				if int64(f)-session.Expires > 0 {
 					session.Expires = int64(f)
 				}
 			}
