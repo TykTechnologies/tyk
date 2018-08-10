@@ -48,7 +48,8 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
-
+	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
+	// will only work with ththese two lines here
 	//log.Info("break: ", (int(currentSession.Rate) - subtractor))
 	if ratePerPeriodNow > int(currentSession.Rate)-subtractor {
 		// Set a sentinel value with expire
