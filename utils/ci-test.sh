@@ -3,7 +3,6 @@
 set -e
 
 MATRIX=(
-	"-tags 'jq'"
 	"-tags 'coprocess python'"
 	"-tags 'coprocess grpc'"
 )
