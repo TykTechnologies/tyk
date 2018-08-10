@@ -1,11 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -36,6 +36,21 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
+func initialiseClient(timeout time.Duration) *http.Client {
+	client := &http.Client{}
+	if config.Global().HttpServerOptions.UseSSL {
+		// Setup HTTPS client
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: config.Global().HttpServerOptions.SSLInsecureSkipVerify,
+		}
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+		client = &http.Client{Transport: transport, Timeout: timeout}
+	} else {
+		client = &http.Client{Timeout: timeout}
+	}
+	return client
+}
+
 func reLogin() {
 	if !config.Global().UseDBAppConfigs {
 		return
@@ -51,7 +66,7 @@ func reLogin() {
 		}).Error("Could not deregister: ", err)
 	}
 
-	time.Sleep(30 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	if err := DashService.Register(); err != nil {
 		log.WithFields(logrus.Fields{
@@ -64,10 +79,7 @@ func reLogin() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Recovering configurations, reloading...")
-	var wg sync.WaitGroup
-	wg.Add(1)
-	reloadURLStructure(wg.Done)
-	wg.Wait()
+	reloadURLStructure(nil)
 }
 
 func (h *HTTPDashboardHandler) Init() error {
@@ -84,8 +96,7 @@ func (h *HTTPDashboardHandler) Init() error {
 
 func (h *HTTPDashboardHandler) Register() error {
 	req := h.newRequest(h.RegistrationEndpoint)
-
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 
 	if err != nil {
@@ -156,8 +167,8 @@ func (h *HTTPDashboardHandler) sendHeartBeat() error {
 	req := h.newRequest(h.HeartBeatEndpoint)
 	req.Header.Set("x-tyk-nodeid", NodeID)
 	req.Header.Set("x-tyk-nonce", ServiceNonce)
+	c := initialiseClient(5 * time.Second)
 
-	c := &http.Client{Timeout: 5 * time.Second}
 	resp, err := c.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return errors.New("dashboard is down? Heartbeat is failing")
@@ -182,7 +193,7 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	req.Header.Set("x-tyk-nodeid", NodeID)
 	req.Header.Set("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{Timeout: 5 * time.Second}
+	c := initialiseClient(5 * time.Second)
 	resp, err := c.Do(req)
 
 	if err != nil {

@@ -471,8 +471,7 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 
 func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
 	contextData := ctxGetData(r)
-	cp := copyRequest(r)
-	bodyBytes, _ := ioutil.ReadAll(cp.Body)
+	bodyBytes, _ := ioutil.ReadAll(r.Body)
 
 	b := options.Check(string(bodyBytes))
 	if len(b) > 0 {

@@ -4,10 +4,17 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
-var log = logger.Get()
+var (
+	log            = logger.Get()
+	defaultConfigs = config.Config{
+		Secret:     "352d20ee67be67f6340b4c0605b044b7",
+		NodeSecret: "352d20ee67be67f6340b4c0605b044b7",
+	}
+)
 
 const (
 	minCPU             = 2
@@ -32,5 +39,16 @@ func CheckCpus() {
 		log.Warningf("Num CPUs %d too low for production use. Min %d recommended.\n"+
 			"\tThis could have a significant negative impact on performance.\n"+
 			"\tPlease refer to https://tyk.io/docs/deploy-tyk-premise-production/#use-the-right-hardware for further guidance.", cpus, minCPU)
+	}
+}
+
+func CheckDefaultSecrets(c config.Config) {
+
+	if c.Secret == defaultConfigs.Secret {
+		log.Warningf("Default secret `%s` should be changed for production.", defaultConfigs.Secret)
+	}
+
+	if c.NodeSecret == defaultConfigs.NodeSecret {
+		log.Warningf("Default node_secret `%s` should be changed for production.", defaultConfigs.NodeSecret)
 	}
 }
