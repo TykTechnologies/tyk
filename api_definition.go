@@ -150,6 +150,8 @@ type APISpec struct {
 	ServiceRefreshInProgress bool
 	HTTPTransport            http.RoundTripper
 	HTTPTransportCreated     time.Time
+	WSTransport              http.RoundTripper
+	WSTransportCreated       time.Time
 	GlobalConfig             config.Config
 }
 
