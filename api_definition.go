@@ -832,6 +832,11 @@ func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Ha
 	a.OrgSessionManager.Init(orgStore)
 }
 
+func (a *APISpec) StopSessionManagerPool() {
+	a.SessionManager.Stop()
+	a.OrgSessionManager.Stop()
+}
+
 func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 	switch stat {
 	case Ignored:

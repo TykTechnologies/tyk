@@ -1004,6 +1004,15 @@ func main() {
 		analytics.Stop()
 	}
 
+	// if using async session writes stop workers
+	if config.Global().UseAsyncSessionWrite {
+		DefaultOrgStore.Stop()
+		for i := range apiSpecs {
+			apiSpecs[i].StopSessionManagerPool()
+		}
+
+	}
+
 	// write pprof profiles
 	writeProfiles()
 
