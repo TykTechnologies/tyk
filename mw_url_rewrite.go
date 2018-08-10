@@ -239,6 +239,14 @@ func valToStr(v interface{}) string {
 			}
 			i++
 		}
+	case []interface{}:
+		tmpSlice := make([]string, 0, len(x))
+		for _, val := range x {
+			if rec := valToStr(val); rec != "" {
+				tmpSlice = append(tmpSlice, url.QueryEscape(rec))
+			}
+		}
+		s = strings.Join(tmpSlice, ",")
 	default:
 		log.Error("Context variable type is not supported: ", reflect.TypeOf(v))
 	}
@@ -463,8 +471,7 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 
 func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
 	contextData := ctxGetData(r)
-	cp := copyRequest(r)
-	bodyBytes, _ := ioutil.ReadAll(cp.Body)
+	bodyBytes, _ := ioutil.ReadAll(r.Body)
 
 	b := options.Check(string(bodyBytes))
 	if len(b) > 0 {

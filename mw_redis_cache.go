@@ -101,7 +101,7 @@ func (m *RedisCacheMiddleware) decodePayload(payload string) (string, string, er
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 
 	// Only allow idempotent (safe) methods
-	if r.Method != "GET" && r.Method != "HEAD" {
+	if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
 		return nil, http.StatusOK
 	}
 
@@ -130,11 +130,6 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	// No authentication data? use the IP.
 	if token == "" {
 		token = request.RealIP(r)
-	}
-
-	var copiedRequest *http.Request
-	if recordDetail(r, m.Spec.GlobalConfig) {
-		copiedRequest = copyRequest(r)
 	}
 
 	key := m.CreateCheckSum(r, token)
@@ -268,7 +263,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		go m.sh.RecordHit(r, 0, newRes.StatusCode, copiedRequest, nil)
+		go m.sh.RecordHit(r, 0, newRes.StatusCode, nil)
 	}
 
 	// Stop any further execution

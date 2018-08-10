@@ -886,6 +886,10 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 func main() {
 	cli.Init(VERSION, confPaths)
 	cli.Parse()
+	// Stop gateway process if not running in "start" mode:
+	if !cli.DefaultMode {
+		os.Exit(0)
+	}
 
 	NodeID = "solo-" + uuid.NewV4().String()
 
@@ -931,6 +935,7 @@ func main() {
 
 	checkup.CheckFileDescriptors()
 	checkup.CheckCpus()
+	checkup.CheckDefaultSecrets(config.Global())
 
 	// Wait while Redis connection pools are ready before start serving traffic
 	if !storage.IsConnected() {
@@ -997,6 +1002,15 @@ func main() {
 	// stop analytics workers
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		analytics.Stop()
+	}
+
+	// if using async session writes stop workers
+	if config.Global().UseAsyncSessionWrite {
+		DefaultOrgStore.Stop()
+		for i := range apiSpecs {
+			apiSpecs[i].StopSessionManagerPool()
+		}
+
 	}
 
 	// write pprof profiles
@@ -1159,6 +1173,10 @@ type mainHandler struct{}
 
 func (_ mainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	AddNewRelicInstrumentation(NewRelicApplication, mainRouter)
+
+	// make request body to be nopCloser and re-readable before serve it through chain of middlewares
+	nopCloseRequestBody(r)
+
 	mainRouter.ServeHTTP(w, r)
 }
 

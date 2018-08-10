@@ -49,12 +49,11 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 
 	// Load input body into gojsonschema
-	rCopy := copyRequest(r)
-	bodyBytes, err := ioutil.ReadAll(rCopy.Body)
+	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err, http.StatusBadRequest
 	}
-	defer rCopy.Body.Close()
+	defer r.Body.Close()
 	inputLoader := gojsonschema.NewBytesLoader(bodyBytes)
 
 	// Perform validation

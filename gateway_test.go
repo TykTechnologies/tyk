@@ -1338,8 +1338,8 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		spec.DisableRateLimit = false
 		spec.OrgID = "default"
 		spec.GlobalRateLimit = apidef.GlobalRateLimit{
-			Per:  60,
-			Rate: 2,
+			Per:  2,
+			Rate: 60,
 		}
 		spec.Proxy.ListenPath = "/"
 	})
@@ -1355,9 +1355,9 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	})
 
 	ts.Run(t, []test.TestCase{
-		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusTooManyRequests, Path: "/"},
-		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusOK, Path: "/"},
+		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
 		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusTooManyRequests, Path: "/"},
 	}...)
 }

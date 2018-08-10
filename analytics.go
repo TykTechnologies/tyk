@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -268,6 +269,14 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			}
 
 			record.Tags = append(record.Tags, "api-"+record.APIID)
+
+			// fix paths in record as they might have omitted leading "/"
+			if !strings.HasPrefix(record.Path, "/") {
+				record.Path = "/" + record.Path
+			}
+			if !strings.HasPrefix(record.RawPath, "/") {
+				record.RawPath = "/" + record.RawPath
+			}
 
 			if encoded, err := msgpack.Marshal(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")

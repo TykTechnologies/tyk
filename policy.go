@@ -80,9 +80,7 @@ func LoadPoliciesFromDashboard(endpoint, secret string, allowExplicit bool) map[
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",
 	}).Info("Mutex lock acquired... calling")
-	c := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	c := initialiseClient(10 * time.Second)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "policy",

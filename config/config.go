@@ -212,6 +212,8 @@ type Config struct {
 	AnalyticsConfig                   AnalyticsConfigConfig                 `json:"analytics_config"`
 	HealthCheck                       HealthCheckConfig                     `json:"health_check"`
 	UseAsyncSessionWrite              bool                                  `json:"optimisations_use_async_session_write"`
+	SessionUpdatePoolSize             int                                   `json:"session_update_pool_size"`
+	SessionUpdateBufferSize           int                                   `json:"session_update_buffer_size"`
 	AllowMasterKeys                   bool                                  `json:"allow_master_keys"`
 	HashKeys                          bool                                  `json:"hash_keys"`
 	HashKeyFunction                   string                                `json:"hash_key_function"`

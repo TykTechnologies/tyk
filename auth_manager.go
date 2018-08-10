@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/satori/go.uuid"
@@ -35,7 +37,11 @@ type SessionHandler interface {
 	Sessions(filter string) []string
 	Store() storage.Handler
 	ResetQuota(string, *user.SessionState)
+	Stop()
 }
+
+const sessionPoolDefaultSize = 50
+const sessionBufferDefaultSize = 1000
 
 // DefaultAuthorisationManager implements AuthorisationHandler,
 // requires a storage.Handler to interact with key store
@@ -44,8 +50,22 @@ type DefaultAuthorisationManager struct {
 }
 
 type DefaultSessionManager struct {
-	store       storage.Handler
-	asyncWrites bool
+	store                    storage.Handler
+	asyncWrites              bool
+	disableCacheSessionState bool
+	updateChan               chan *SessionUpdate
+	poolSize                 int
+	shouldStop               uint32
+	poolWG                   sync.WaitGroup
+	bufferSize               int
+	keyPrefix                string
+}
+
+type SessionUpdate struct {
+	isHashed bool
+	keyVal   string
+	session  *user.SessionState
+	ttl      int64
 }
 
 func (b *DefaultAuthorisationManager) Init(store storage.Handler) {
@@ -86,6 +106,71 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.asyncWrites = config.Global().UseAsyncSessionWrite
 	b.store = store
 	b.store.Connect()
+
+	if b.asyncWrites {
+		// check pool size in config and set to 50 if unset
+		b.poolSize = config.Global().SessionUpdatePoolSize
+		if b.poolSize <= 0 {
+			b.poolSize = sessionPoolDefaultSize
+		}
+		//check size for channel buffer and set to 1000 if unset
+		b.bufferSize = config.Global().SessionUpdateBufferSize
+		if b.bufferSize <= 0 {
+			b.bufferSize = sessionBufferDefaultSize
+		}
+
+		log.WithField("SessionManager poolsize", b.poolSize).Debug("Session update async pool size")
+
+		b.updateChan = make(chan *SessionUpdate, b.bufferSize)
+
+		b.keyPrefix = b.store.GetKeyPrefix()
+
+		//start worker pool
+		atomic.SwapUint32(&b.shouldStop, 0)
+		for i := 0; i < b.poolSize; i++ {
+			b.poolWG.Add(1)
+			go b.updateWorker()
+		}
+	}
+}
+
+func (b *DefaultSessionManager) updateWorker() {
+	defer b.poolWG.Done()
+
+	for u := range b.updateChan {
+
+		v, err := json.Marshal(u.session)
+		if err != nil {
+			log.WithError(err).Error("Error marshalling session for async session update")
+			continue
+		}
+
+		if u.isHashed {
+			u.keyVal = b.keyPrefix + u.keyVal
+			err := b.store.SetRawKey(u.keyVal, string(v), u.ttl)
+			if err != nil {
+				log.WithError(err).Error("Error updating hashed key")
+			}
+			continue
+
+		}
+
+		err = b.store.SetKey(u.keyVal, string(v), u.ttl)
+		if err != nil {
+			log.WithError(err).Error("Error updating key")
+		}
+	}
+}
+
+func (b *DefaultSessionManager) Stop() {
+	if atomic.LoadUint32(&b.shouldStop) == 0 {
+		// flag to stop adding data to chan
+		atomic.SwapUint32(&b.shouldStop, 1)
+		// close update channel
+		close(b.updateChan)
+		// wait for workers to finish
+		b.poolWG.Wait()
+	}
 }
 
 func (b *DefaultSessionManager) Store() storage.Handler {
@@ -111,26 +196,35 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 // UpdateSession updates the session state in the storage engine
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
 	resetTTLTo int64, hashed bool) error {
-	v, _ := json.Marshal(session)
-
-	if hashed {
-		keyName = b.store.GetKeyPrefix() + keyName
-	}
 
 	// async update and return if needed
 	if b.asyncWrites {
-		if hashed {
-			go b.store.SetRawKey(keyName, string(v), resetTTLTo)
+		if atomic.LoadUint32(&b.shouldStop) > 0 {
 			return nil
 		}
 
-		go b.store.SetKey(keyName, string(v), resetTTLTo)
+		sessionUpdate := &SessionUpdate{
+			isHashed: hashed,
+			keyVal:   keyName,
+			session:  session,
+			ttl:      resetTTLTo,
+		}
+
+		// send sessionupdate object through channel to pool
+		b.updateChan <- sessionUpdate
+
 		return nil
 	}
 
+	v, err := json.Marshal(session)
+	if err != nil {
+		log.Error("Error marshalling session for sync update")
+		return err
+	}
+
 	// sync update
-	var err error
 	if hashed {
+		keyName = b.store.GetKeyPrefix() + keyName
 		err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
 	} else {
 		err = b.store.SetKey(keyName, string(v), resetTTLTo)
