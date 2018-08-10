@@ -15,7 +15,6 @@ addons:
     - python3.5
     - python3-pip
     - libluajit-5.1-dev
-    - libjq-dev
 
 matrix:
   include:
