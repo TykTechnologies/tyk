@@ -39,7 +39,7 @@ type WebHookHandler struct {
 	store    storage.Handler
 }
 
-// createConfigObject by default tyk will provide a ma[string]interface{} type as a conf, converting it
+// createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
 // specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
 func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (config.WebHookHandlerConf, error) {
 	newConf := config.WebHookHandlerConf{}

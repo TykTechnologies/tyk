@@ -359,8 +359,12 @@ var hopHeaders = []string{
 }
 
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
-	// return nil
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, config.Global()))
+
+	// make response body to be nopCloser and re-readable before serve it through chain of middlewares
+	nopCloseResponseBody(resp)
+
+	return resp
 }
 
 func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) *http.Response {
@@ -438,6 +442,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
+	if p.TykAPISpec.Proxy.Transport.SSLInsecureSkipVerify {
+		transport.TLSClientConfig.InsecureSkipVerify = true
+	}
+
 	// When request routed through the proxy `DialTLS` is not used, and only VerifyPeerCertificate is supported
 	// The reason behind two separate checks is that `DialTLS` supports specifying public keys per hostname, and `VerifyPeerCertificate` only global ones, e.g. `*`
 	if proxyURL, _ := transport.Proxy(req); proxyURL != nil {
@@ -483,25 +491,47 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 }
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
+	outReqIsWebsocket := IsWebsocket(req)
+	var roundTripper http.RoundTripper
 
-	// 1. Check if timeouts are set for this endpoint
+
 	p.TykAPISpec.Lock()
+	if !outReqIsWebsocket { // check if it is a regular HTTP request
+		// create HTTP transport
+		createTransport := p.TykAPISpec.HTTPTransport == nil
 
-	createTransport := p.TykAPISpec.HTTPTransport == nil
+		// Check if timeouts are set for this endpoint
+		if !createTransport && config.Global().MaxConnTime != 0 {
+			createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
+		}
 
-	if !createTransport && config.Global().MaxConnTime != 0 {
-		createTransport = time.Since(p.TykAPISpec.HTTPTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
-	}
+		if createTransport {
+			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+			p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
+			p.TykAPISpec.HTTPTransportCreated = time.Now()
+		}
 
-	if createTransport {
-		_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
-		p.TykAPISpec.HTTPTransport = httpTransport(timeout, rw, req, p)
-		p.TykAPISpec.HTTPTransportCreated = time.Now()
-	} else if IsWebsocket(req) { // check if it is an upgrade request to NEW WS-connection
+		roundTripper = p.TykAPISpec.HTTPTransport
+	} else { // this is NEW WS-connection upgrade request
+		// create WS transport
+		createTransport := p.TykAPISpec.WSTransport == nil
+
+		// Check if timeouts are set for this endpoint
+		if !createTransport && config.Global().MaxConnTime != 0 {
+			createTransport = time.Since(p.TykAPISpec.WSTransportCreated) > time.Duration(config.Global().MaxConnTime)*time.Second
+		}
+
+		if createTransport {
+			_, timeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, req)
+			p.TykAPISpec.WSTransport = httpTransport(timeout, rw, req, p)
+			p.TykAPISpec.WSTransportCreated = time.Now()
+		}
+
 		// overwrite transport's ResponseWriter from previous upgrade request
 		// as it was already hijacked and now is being used for other connection
-		p.TykAPISpec.HTTPTransportCreated = time.Now()
-		p.TykAPISpec.HTTPTransport.(*WSDialer).RW = rw
+		p.TykAPISpec.WSTransport.(*WSDialer).RW = rw
+
+		roundTripper = p.TykAPISpec.WSTransport
 	}
 	p.TykAPISpec.Unlock()
 
@@ -551,7 +581,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	outreq.Close = false
 
 	log.Debug("Outbound Request: ", outreq.URL.String())
-	outReqIsWebsocket := IsWebsocket(outreq)
 
 	// Do not modify outbound request headers if they are WS
 	if !outReqIsWebsocket {
@@ -591,9 +620,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 	if outReqIsWebsocket {
-		p.TykAPISpec.HTTPTransport.(*WSDialer).TLSClientConfig.Certificates = tlsCertificates
+		roundTripper.(*WSDialer).TLSClientConfig.Certificates = tlsCertificates
 	} else {
-		p.TykAPISpec.HTTPTransport.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
+		roundTripper.(*http.Transport).TLSClientConfig.Certificates = tlsCertificates
 	}
 	p.TykAPISpec.Unlock()
 
@@ -601,19 +630,20 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	var res *http.Response
 	var err error
 	if breakerEnforced {
-		log.Debug("ON REQUEST: Breaker status: ", breakerConf.CB.Ready())
 		if !breakerConf.CB.Ready() {
-			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unnavailable.", 503)
+			log.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
+			p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503)
 			return nil
 		}
-		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
+		log.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
+		res, err = roundTripper.RoundTrip(outreq)
 		if err != nil || res.StatusCode == http.StatusInternalServerError {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, err = p.TykAPISpec.HTTPTransport.RoundTrip(outreq)
+		res, err = roundTripper.RoundTrip(outreq)
 	}
 
 	if err != nil {
@@ -837,39 +867,77 @@ func requestIPHops(r *http.Request) string {
 	return clientIP
 }
 
-// nopCloser is just like ioutil's, but here to let us fetch the
-// underlying io.Reader.
+// nopCloser is just like ioutil's, but here to let us re-read the same
+// buffer inside by moving position to the start every time we done with reading
 type nopCloser struct {
-	io.Reader
+	io.ReadSeeker
 }
 
-func (nopCloser) Close() error { return nil }
-
-func copyBody(body io.ReadCloser) (b1, b2 io.ReadCloser) {
-	if nc, ok := body.(nopCloser); ok {
-		buf := *(nc.Reader.(*bytes.Buffer))
-		return body, nopCloser{&buf}
+// Read just a wrapper around real Read which also moves position to the start if we get EOF
+// to have it ready for next read-cycle
+func (n nopCloser) Read(p []byte) (int, error) {
+	num, err := n.ReadSeeker.Read(p)
+	if err == io.EOF { // move to start to have it ready for next read cycle
+		n.Seek(0, io.SeekStart)
 	}
+	return num, err
+}
+
+// Close is a no-op Close plus moves position to the start just in case
+func (n nopCloser) Close() error {
+	// seek to the start if body ever called to be closed
+	n.Seek(0, io.SeekStart)
+
+	return nil
+}
+
+func copyBody(body io.ReadCloser) io.ReadCloser {
+	// check if body was already read and converted into our nopCloser
+	if nc, ok := body.(nopCloser); ok {
+		// seek to the beginning to have it ready for next read
+		nc.Seek(0, io.SeekStart)
+		return body
+	}
+
+	// body is http's io.ReadCloser - let's close it after we read data
 	defer body.Close()
 
-	var buf1, buf2 bytes.Buffer
-	io.Copy(&buf1, body)
-	buf2 = buf1
-	return nopCloser{&buf1}, nopCloser{&buf2}
+	// body is http's io.ReadCloser - read it up until EOF
+	var bodyRead bytes.Buffer
+	io.Copy(&bodyRead, body)
+
+	// use seek-able reader for further body usage
+	reusableBody := bytes.NewReader(bodyRead.Bytes())
+
+	return nopCloser{reusableBody}
 }
 
 func copyRequest(r *http.Request) *http.Request {
-	r2 := *r
 	if r.Body != nil {
-		r.Body, r2.Body = copyBody(r.Body)
+		r.Body = copyBody(r.Body)
 	}
-	return &r2
+	return r
 }
 
 func copyResponse(r *http.Response) *http.Response {
-	r2 := *r
 	if r.Body != nil {
-		r.Body, r2.Body = copyBody(r.Body)
+		r.Body = copyBody(r.Body)
 	}
-	return &r2
+	return r
+}
+
+func nopCloseRequestBody(r *http.Request) {
+	if r == nil {
+		return
+	}
+
+	copyRequest(r)
+}
+
+func nopCloseResponseBody(r *http.Response) {
+	if r == nil {
+		return
+	}
+
+	copyResponse(r)
 }

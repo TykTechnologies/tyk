@@ -150,6 +150,8 @@ type APISpec struct {
 	ServiceRefreshInProgress bool
 	HTTPTransport            http.RoundTripper
 	HTTPTransportCreated     time.Time
+	WSTransport              http.RoundTripper
+	WSTransportCreated       time.Time
 	GlobalConfig             config.Config
 
 	middlewareChain *ChainObject
@@ -256,9 +258,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 	newRequest.Header.Set("x-tyk-nonce", ServiceNonce)
 
-	c := &http.Client{
-		Timeout: 120 * time.Second,
-	}
+	c := initialiseClient(120 * time.Second)
 	resp, err := c.Do(newRequest)
 	if err != nil {
 		return nil, err
@@ -642,7 +642,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 			for e := range events {
 				switch e {
 				case circuit.BreakerTripped:
-					log.Warning("[PROXY] [CIRCUIT BREKER] Breaker tripped for path: ", path)
+					log.Warning("[PROXY] [CIRCUIT BREAKER] Breaker tripped for path: ", path)
 					log.Debug("Breaker tripped: ", e)
 					// Start a timer function
 
@@ -659,7 +659,7 @@ func (a APIDefinitionLoader) compileCircuitBreakerPathSpec(paths []apidef.Circui
 
 					if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 						if ServiceCache != nil {
-							log.Warning("[PROXY] [CIRCUIT BREKER] Refreshing host list")
+							log.Warning("[PROXY] [CIRCUIT BREAKER] Refreshing host list")
 							ServiceCache.Delete(spec.APIID)
 						}
 					}
@@ -832,6 +832,11 @@ func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Ha
 	a.SessionManager.Init(sessionStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)
+}
+
+func (a *APISpec) StopSessionManagerPool() {
+	a.SessionManager.Stop()
+	a.OrgSessionManager.Stop()
 }
 
 func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
