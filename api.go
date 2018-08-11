@@ -1667,6 +1667,24 @@ func ctxSetLoopLevel(r *http.Request, value int) {
 	setCtxValue(r, LoopLevel, value)
 }
 
-func ctxIncLoopLevel(r *http.Request) {
+func ctxIncLoopLevel(r *http.Request, loopLimit int) {
+	ctxSetLoopLimit(r, loopLimit)
 	ctxSetLoopLevel(r, ctxLoopLevel(r)+1)
+}
+
+func ctxLoopLevelLimit(r *http.Request) int {
+	if v := r.Context().Value(LoopLevelLimit); v != nil {
+		if intVal, ok := v.(int); ok {
+			return intVal
+		}
+	}
+
+	return 0
+}
+
+func ctxSetLoopLimit(r *http.Request, limit int) {
+	// Can be set only one time per request
+	if ctxLoopLevelLimit(r) == 0 && limit > 0 {
+		setCtxValue(r, LoopLevelLimit, limit)
+	}
 }

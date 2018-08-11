@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -475,15 +476,20 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 }
 
 // Check for recursion
-const LoopLevelLimit = 5
+const defaultLoopLevelLimit = 5
 
 func isLoop(r *http.Request) (bool, error) {
 	if r.URL.Scheme != "tyk" {
 		return false, nil
 	}
 
-	if ctxLoopLevel(r) > LoopLevelLimit {
-		return true, fmt.Errorf("Loop level too deep. Found more than %d loops in single request", LoopLevelLimit)
+	limit := ctxLoopLevelLimit(r)
+	if limit == 0 {
+		limit = defaultLoopLevelLimit
+	}
+
+	if ctxLoopLevel(r) > limit {
+		return true, fmt.Errorf("Loop level too deep. Found more than %d loops in single request", limit)
 	}
 
 	return true, nil
@@ -501,16 +507,20 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ctxIncLoopLevel(r)
 		r.URL.Scheme = "http"
 		if methodOverride := r.URL.Query().Get("method"); methodOverride != "" {
 			r.Method = methodOverride
 		}
 
+		// No need to handle errors, in all error cases limit will be set to 0
+		loopLevelLimit, _ := strconv.Atoi(r.URL.Query().Get("loop_limit"))
+
 		if origURL := ctxGetOrigRequestURL(r); origURL != nil {
 			r.URL.RawQuery = origURL.RawQuery
 			ctxSetOrigRequestURL(r, nil)
 		}
+
+		ctxIncLoopLevel(r, loopLevelLimit)
 
 		d.SH.Spec.middlewareChain.ThisHandler.ServeHTTP(w, r)
 	} else {
