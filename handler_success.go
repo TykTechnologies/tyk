@@ -35,6 +35,7 @@ const (
 	UrlRewritePath
 	OrigRequestURL
 	LoopLevel
+	LoopLevelLimit
 )
 
 var SessionCache = cache.New(10*time.Second, 5*time.Second)
