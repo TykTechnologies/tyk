@@ -68,6 +68,7 @@ const (
 	RequestTracked
 	RequestNotTracked
 	ValidateJSONRequest
+	PrePluginRequest
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -99,6 +100,7 @@ const (
 	StatusRequesTracked            RequestStatus = "Request Tracked"
 	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
 	StatusValidateJSON             RequestStatus = "Validate JSON"
+	StatusPrePlugin                RequestStatus = "Custom Pre Plugin"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -123,6 +125,7 @@ type URLSpec struct {
 	TrackEndpoint             apidef.TrackEndpointMeta
 	DoNotTrackEndpoint        apidef.TrackEndpointMeta
 	ValidatePathMeta          apidef.ValidatePathMeta
+	PrePlugin                 apidef.PrePluginMeta
 }
 
 type TransformSpec struct {
@@ -785,6 +788,20 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compilePrePluginPathSpec(paths []apidef.PrePluginMeta, stat URLStatus) []URLSpec {
+	urlSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat)
+		newSpec.PrePlugin = stringSpec
+
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus) []URLSpec {
 	urlSpec := []URLSpec{}
 
@@ -821,6 +838,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked)
 	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked)
 	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest)
+	prePlugin := a.compilePrePluginPathSpec(apiVersionDef.ExtendedPaths.PrePlugin, PrePluginRequest)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, ignoredPaths...)
@@ -842,6 +860,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, trackedPaths...)
 	combinedPath = append(combinedPath, unTrackedPaths...)
 	combinedPath = append(combinedPath, validateJSON...)
+	combinedPath = append(combinedPath, prePlugin...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -898,6 +917,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusRequestNotTracked
 	case ValidateJSONRequest:
 		return StatusValidateJSON
+	case PrePluginRequest:
+		return StatusPrePlugin
 
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
@@ -1068,6 +1089,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case ValidateJSONRequest:
 			if r.Method == v.ValidatePathMeta.Method {
 				return true, &v.ValidatePathMeta
+			}
+		case PrePluginRequest:
+			if r.Method == v.PrePlugin.Method {
+				return true, &v.PrePlugin
 			}
 		}
 	}

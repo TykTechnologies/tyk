@@ -295,6 +295,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
+		mwAppendEnabled(&chainArray, &PrePlugin{BaseMiddleware: baseMid})
+
 		mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
@@ -342,6 +344,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 		mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 		mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+
+		mwAppendEnabled(&chainArray, &PrePlugin{BaseMiddleware: baseMid})
 
 		// Select the keying method to use for setting session states
 		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {

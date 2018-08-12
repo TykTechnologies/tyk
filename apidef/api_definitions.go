@@ -7,6 +7,8 @@ import (
 	"github.com/lonelycode/osin"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/TykTechnologies/tyk/plugin"
+
 	"time"
 
 	"github.com/TykTechnologies/gojsonschema"
@@ -188,6 +190,15 @@ type ValidatePathMeta struct {
 	ErrorResponseCode int `bson:"error_response_code" json:"error_response_code"`
 }
 
+type PrePluginMeta struct {
+	Path   string `bson:"path" json:"path"`
+	Method string `bson:"method" json:"method"`
+	// location of plugin so file
+	Plugin   string `bson:"plugin" json:"plugin"`
+	Fn       string `bson:"fn" json:"fn"`
+	Executor plugin.Executor
+}
+
 type ExtendedPathsSet struct {
 	Ignored                 []EndPointMeta        `bson:"ignored" json:"ignored,omitempty"`
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
@@ -208,6 +219,7 @@ type ExtendedPathsSet struct {
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
 	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
+	PrePlugin               []PrePluginMeta       `bson:"pre_plugin" json:"pre_plugin"`
 }
 
 type VersionInfo struct {
