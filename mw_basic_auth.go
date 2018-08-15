@@ -9,7 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/pmylund/go-cache"
-	"github.com/spaolacci/murmur3"
+	"github.com/TykTechnologies/murmur3"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/apidef"
