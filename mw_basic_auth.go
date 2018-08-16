@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/TykTechnologies/murmur3"
 	"github.com/pmylund/go-cache"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/murmur3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
