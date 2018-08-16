@@ -376,52 +376,25 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
+	value, err := r.GetRawKey(r.fixKey(keyName))
+
+	elapsed := time.Since(start)
+	log.Debug("GetKey took ", elapsed)
+
+	return value, err
+}
+
+func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
 	if config.Global().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := RPCGlobalCache.Get(r.fixKey(keyName))
+		cachedVal, found := RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
-			elapsed := time.Since(start)
-			log.Debug("GetKey took ", elapsed)
-			log.Debug(cachedVal.(string))
 			return cachedVal.(string), nil
 		}
 	}
 
-	// Not cached
-	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", r.fixKey(keyName), GlobalRPCCallTimeout)
-	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
-			"GetKey",
-			err,
-			map[string]string{
-				"keyName":      keyName,
-				"fixedKeyName": r.fixKey(keyName),
-			},
-		)
-		if r.IsAccessError(err) {
-			if r.Login() {
-				return r.GetKey(keyName)
-			}
-		}
-
-		log.Debug("Error trying to get value:", err)
-		return "", storage.ErrKeyNotFound
-	}
-	elapsed := time.Since(start)
-	log.Debug("GetKey took ", elapsed)
-
-	if config.Global().SlaveOptions.EnableRPCCache {
-		// Cache it
-		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
-	}
-
-	return value.(string), nil
-}
-
-func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", keyName, GlobalRPCCallTimeout)
 	if err != nil {
 		emitRPCErrorEventKv(
