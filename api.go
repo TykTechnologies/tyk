@@ -309,7 +309,8 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	}
 
 	sessionManager := FallbackKeySesionManager
-	if spec := getApiSpec(apiID); spec != nil {
+	spec := getApiSpec(apiID)
+	if spec != nil {
 		sessionManager = spec.SessionManager
 	}
 
@@ -335,7 +336,17 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		} else {
 			session.QuotaRemaining = remaining
 		}
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    obfuscateKey(sessionKey),
+			"error": err,
+			"status": "ok",
+		}).Info("Can't retrieve key quota")
 	}
+
+	mw := BaseMiddleware{Spec: spec}
+	mw.ApplyPolicies(sessionKey, &session)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
