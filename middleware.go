@@ -219,7 +219,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 		}
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise youcould overwrite a session key with a policy from a different org!
-		if policy.OrgID != t.Spec.OrgID {
+		if t.Spec != nil && policy.OrgID != t.Spec.OrgID {
 			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
 			log.Error(err)
 			return err
