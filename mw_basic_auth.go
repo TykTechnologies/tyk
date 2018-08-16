@@ -9,8 +9,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/pmylund/go-cache"
-	"github.com/TykTechnologies/murmur3"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/murmur3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
