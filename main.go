@@ -358,34 +358,36 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
+	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
+
 	mainLog.Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	r.HandleFunc("/reload/group", allowMethods(groupResetHandler, "GET"))
-	r.HandleFunc("/reload", allowMethods(resetHandler(nil), "GET"))
+	r.HandleFunc("/reload/group", groupResetHandler).Methods("GET")
+	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys", allowMethods(orgHandler, "GET"))
-		r.HandleFunc("/org/keys/{keyName:[^/]*}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
-		r.HandleFunc("/keys/policy/{keyName}", allowMethods(policyUpdateHandler, "POST"))
-		r.HandleFunc("/keys/create", allowMethods(createKeyHandler, "POST"))
-		r.HandleFunc("/apis", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
-		r.HandleFunc("/apis/{apiID}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
-		r.HandleFunc("/health", allowMethods(healthCheckhandler, "GET"))
-		r.HandleFunc("/oauth/clients/create", allowMethods(createOauthClient, "POST"))
-		r.HandleFunc("/oauth/refresh/{keyName}", allowMethods(invalidateOauthRefresh, "DELETE"))
-		r.HandleFunc("/cache/{apiID}", allowMethods(invalidateCacheHandler, "DELETE"))
+		r.HandleFunc("/org/keys", orgHandler).Methods("GET")
+		r.HandleFunc("/org/keys/{keyName:[^/]*}", orgHandler).Methods("POST", "PUT", "GET", "DELETE")
+		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
+		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
+		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
+		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
+		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
+		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 	} else {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/keys", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
-	r.HandleFunc("/keys/{keyName:[^/]*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
-	r.HandleFunc("/certs", allowMethods(certHandler, "POST", "GET"))
-	r.HandleFunc("/certs/{certID:[^/]*}", allowMethods(certHandler, "POST", "GET", "DELETE"))
-	r.HandleFunc("/oauth/clients/{apiID}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", allowMethods(oAuthClientTokensHandler, "GET"))
+	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
+	r.HandleFunc("/certs/{certID:[^/]*}", certHandler).Methods("POST", "GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
 
 	mainLog.Debug("Loaded API Endpoints")
 }

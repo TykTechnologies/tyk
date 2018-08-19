@@ -284,6 +284,12 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			log.Error("Could not find a valid policy to apply to this token!")
 			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
+		//override session expiry with JWT if longer lived
+		if f, ok := claims["exp"].(float64); ok {
+			if int64(f)-newSession.Expires > 0 {
+				newSession.Expires = int64(f)
+			}
+		}
 
 		session = newSession
 		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
@@ -334,6 +340,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 				k.reportLoginFailure(baseFieldData, r)
 				log.WithError(err).Error("Could not apply new policy from JWT to session")
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
+			}
+
+			//override session expiry with JWT if longer lived
+			if f, ok := claims["exp"].(float64); ok {
+				if int64(f)-session.Expires > 0 {
+					session.Expires = int64(f)
+				}
 			}
 
 			go SessionCache.Set(session.KeyHash(), session, cache.DefaultExpiration)
@@ -486,7 +499,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
 	vErr := new(jwt.ValidationError)
 	now := time.Now().Unix()
-
+	// The claims below are optional, by default, so if they are set to the
+	// default value in Go, let's not fail the verification for them.
 	if !c.VerifyExpiresAt(now-int64(k.Spec.JWTExpiresAtValidationSkew), false) {
 		vErr.Inner = errors.New("token has expired")
 		vErr.Errors |= jwt.ValidationErrorExpired

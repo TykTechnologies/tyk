@@ -11,13 +11,10 @@ env:
 
 addons:
   apt:
-    sources:
-    - sourceline: 'ppa:opencpu/jq'
     packages:
     - python3.5
     - python3-pip
     - libluajit-5.1-dev
-    - libjq-dev
 
 matrix:
   include:
@@ -39,7 +36,7 @@ install:
 script:
   - sudo pip3 install google
   - sudo pip3 install protobuf
-  - go build -tags 'coprocess python jq'
+  - go build -tags 'coprocess python'
   - go build -tags 'coprocess lua'
   - go build -tags 'coprocess grpc'
   - ./utils/ci-test.sh

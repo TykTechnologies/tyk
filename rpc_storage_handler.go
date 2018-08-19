@@ -376,54 +376,49 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
+	value, err := r.GetRawKey(r.fixKey(keyName))
+
+	elapsed := time.Since(start)
+	log.Debug("GetKey took ", elapsed)
+
+	return value, err
+}
+
+func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
 	if config.Global().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := RPCGlobalCache.Get(r.fixKey(keyName))
+		cachedVal, found := RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
-			elapsed := time.Since(start)
-			log.Debug("GetKey took ", elapsed)
-			log.Debug(cachedVal.(string))
 			return cachedVal.(string), nil
 		}
 	}
 
-	// Not cached
-	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", r.fixKey(keyName), GlobalRPCCallTimeout)
+	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", keyName, GlobalRPCCallTimeout)
 	if err != nil {
 		emitRPCErrorEventKv(
 			rpcFuncClientSingletonCall,
 			"GetKey",
 			err,
 			map[string]string{
-				"keyName":      keyName,
-				"fixedKeyName": r.fixKey(keyName),
+				"keyName": keyName,
 			},
 		)
 		if r.IsAccessError(err) {
 			if r.Login() {
-				return r.GetKey(keyName)
+				return r.GetRawKey(keyName)
 			}
 		}
-
 		log.Debug("Error trying to get value:", err)
 		return "", storage.ErrKeyNotFound
 	}
-	elapsed := time.Since(start)
-	log.Debug("GetKey took ", elapsed)
-
 	if config.Global().SlaveOptions.EnableRPCCache {
-		// Cache it
-		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
+		// Cache key
+		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
-
+	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
-}
-
-func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
-	log.Error("Not Implemented!")
-	return "", nil
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
@@ -999,6 +994,16 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
+func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
+	newKeyName := "apikey-" + storage.HashStr(keyName)
+	sessionString, err := r.GetRawKey(keyName)
+	if err != nil {
+		log.Error("Key not found in master - skipping")
+	} else {
+		handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+	}
+}
+
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1007,16 +1012,16 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			if splitKeys[1] == "hashed" {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "")
+				getSessionAndCreate(splitKeys[0], r)
 			}
 		} else {
 			log.Info("--> removing cached key: ", key)
 			handleDeleteKey(key, "-1")
+			getSessionAndCreate(splitKeys[0], r)
 		}
-
 		SessionCache.Delete(key)
 		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
-
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

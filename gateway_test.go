@@ -1338,8 +1338,8 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		spec.DisableRateLimit = false
 		spec.OrgID = "default"
 		spec.GlobalRateLimit = apidef.GlobalRateLimit{
-			Per:  2,
-			Rate: 60,
+			Rate: 2,
+			Per:  60,
 		}
 		spec.Proxy.ListenPath = "/"
 	})
