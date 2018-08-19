@@ -13,6 +13,17 @@ import (
 // identifies that field value was hidden before output to the log
 const logHiddenValue = "<hidden>"
 
+func obfuscateKey(keyName string) string {
+	if config.Global().EnableKeyLogging {
+		return keyName
+	}
+
+	if len(keyName) > 4 {
+		return "****" + keyName[len(keyName)-4:]
+	}
+	return "--"
+}
+
 func getLogEntryForRequest(r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
 	// populate http request fields
 	fields := logrus.Fields{
