@@ -445,7 +445,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		var simpleArray []alice.Constructor
 		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
