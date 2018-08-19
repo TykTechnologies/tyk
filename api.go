@@ -346,7 +346,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"key":    obfuscateKey(sessionKey),
-			"error": err,
+			"error":  err,
 			"status": "ok",
 		}).Info("Can't retrieve key quota")
 	}
@@ -391,6 +391,36 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	}).Info("Retrieved key list.")
 
 	return sessionsObj, http.StatusOK
+}
+
+func handleAddKey(keyName, hashedName, sessionString, apiID string) {
+	mw := BaseMiddleware{
+		Spec: &APISpec{
+			SessionManager: FallbackKeySesionManager,
+		},
+	}
+	sess := user.SessionState{}
+	json.Unmarshal([]byte(sessionString), &sess)
+	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	var err error
+	if config.Global().HashKeys {
+		err = mw.Spec.SessionManager.UpdateSession(hashedName, &sess, 0, true)
+	} else {
+		err = mw.Spec.SessionManager.UpdateSession(keyName, &sess, 0, false)
+	}
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to update key.")
+	}
+	log.WithFields(logrus.Fields{
+		"prefix": "RPC",
+		"key":    obfuscateKey(keyName),
+		"status": "ok",
+	}).Info("Updated hashed key in slave storage.")
 }
 
 func handleDeleteKey(keyName, apiID string) (interface{}, int) {
