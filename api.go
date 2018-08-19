@@ -205,13 +205,6 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 	return nil
 }
 
-func obfuscateKey(keyName string) string {
-	if len(keyName) > 4 {
-		return "****" + keyName[len(keyName)-4:]
-	}
-	return "--"
-}
-
 // ---- TODO: This changes the URL structure of the API completely ----
 // ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
