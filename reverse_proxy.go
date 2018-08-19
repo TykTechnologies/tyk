@@ -492,7 +492,6 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	outReqIsWebsocket := IsWebsocket(req)
-
 	var roundTripper http.RoundTripper
 
 	p.TykAPISpec.Lock()
