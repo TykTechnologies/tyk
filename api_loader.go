@@ -620,7 +620,9 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
 			chainObj.Index = i
 			chainChannel <- chainObj
+			apisMu.Lock()
 			spec.middlewareChain = chainObj
+			apisMu.Unlock()
 		}(spec, i)
 
 		// TODO: This will not deal with skipped APis well
