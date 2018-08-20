@@ -503,7 +503,7 @@ const sampleAPI = `{
     },
     "auth": {
         "auth_header_name": "authorization"
-    },
+	},
     "version_data": {
         "not_versioned": true,
         "versions": {
