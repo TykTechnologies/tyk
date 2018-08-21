@@ -208,7 +208,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 			{
 				Method: "GET",
-				Path:   "/sample/?key=wrong_key_id",
+				Path:   "/sample/?authorization=wrong_key_id",
 				Code:   403,
 			},
 			{
