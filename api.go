@@ -327,7 +327,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		quotaKey = QuotaKeyPrefix + sessionKey
 	}
 
-	if usedQuota, err := sessionManager.Store().GetKey(quotaKey); err == nil {
+	if usedQuota, err := sessionManager.Store().GetRawKey(quotaKey); err == nil {
 		qInt, _ := strconv.Atoi(usedQuota)
 		remaining := session.QuotaMax - int64(qInt)
 
