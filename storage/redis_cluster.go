@@ -20,6 +20,8 @@ import (
 const (
 	waitStorageRetriesNum      = 5
 	waitStorageRetriesInterval = 1 * time.Second
+
+	defaultRedisPort = 6379
 )
 
 var (
@@ -123,6 +125,11 @@ func NewRedisClusterPool(isCache bool) *rediscluster.RedisCluster {
 		IsCluster:     cfg.EnableCluster,
 		UseTLS:        cfg.UseSSL,
 		TLSSkipVerify: cfg.SSLInsecureSkipVerify,
+	}
+
+	// If Redis port isn't set, use default one:
+	if cfg.Port == 0 {
+		cfg.Port = defaultRedisPort
 	}
 
 	seed_redii := []map[string]string{}
