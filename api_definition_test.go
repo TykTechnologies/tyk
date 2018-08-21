@@ -474,7 +474,7 @@ func testPrepareDefaultVersion() string {
 		v2 := apidef.VersionInfo{Name: "v2"}
 		v2.Paths.WhiteList = []string{"/bar"}
 
-		spec.VersionDefinition.Location = "url-param"
+		spec.VersionDefinition.Location = urlParamLocation
 		spec.VersionDefinition.Key = "v"
 		spec.VersionData.NotVersioned = false
 
@@ -505,14 +505,16 @@ func TestGetVersionFromRequest(t *testing.T) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Location = headerLocation
 			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
 		})
 
+		headers := map[string]string{"X-API-Version": "v1"}
+
 		ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
-			{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+			{Path: "/foo", Code: 200, Headers: headers},
+			{Path: "/bar", Code: 403, Headers: headers},
 		}...)
 	})
 
@@ -520,7 +522,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Location = urlParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
 		})
@@ -535,7 +537,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = "url"
+			spec.VersionDefinition.Location = urlLocation
 			spec.VersionData.Versions["v3"] = versionInfo
 		})
 
@@ -547,6 +549,7 @@ func TestGetVersionFromRequest(t *testing.T) {
 }
 
 func BenchmarkGetVersionFromRequest(b *testing.B) {
+	b.ReportAllocs()
 	ts := newTykTestServer()
 	defer ts.Close()
 
@@ -559,15 +562,17 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = "header"
+			spec.VersionDefinition.Location = headerLocation
 			spec.VersionDefinition.Key = "X-API-Version"
 			spec.VersionData.Versions["v1"] = versionInfo
 		})
 
+		headers := map[string]string{"X-API-Version": "v1"}
+
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, []test.TestCase{
-				{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
-				{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+				{Path: "/foo", Code: 200, Headers: headers},
+				{Path: "/bar", Code: 403, Headers: headers},
 			}...)
 		}
 	})
@@ -577,7 +582,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = "url-param"
+			spec.VersionDefinition.Location = urlParamLocation
 			spec.VersionDefinition.Key = "version"
 			spec.VersionData.Versions["v2"] = versionInfo
 		})
@@ -595,7 +600,7 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.VersionData.NotVersioned = false
-			spec.VersionDefinition.Location = "url"
+			spec.VersionDefinition.Location = urlLocation
 			spec.VersionData.Versions["v3"] = versionInfo
 		})
 
