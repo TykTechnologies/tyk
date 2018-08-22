@@ -20,12 +20,24 @@ type AccessSpec struct {
 	Methods []string `json:"methods" msg:"methods"`
 }
 
+// APILimit stores quota and rate limit on ACL level (per API)
+type APILimit struct {
+	Rate             float64 `json:"rate" msg:"rate"`
+	Per              float64 `json:"per" msg:"per"`
+	QuotaMax         int64   `json:"quota_max" msg:"quota_max"`
+	QuotaRenews      int64   `json:"quota_renews" msg:"quota_renews"`
+	QuotaRemaining   int64   `json:"quota_remaining" msg:"quota_remaining"`
+	QuotaRenewalRate int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
+	SetByPolicy      bool    `json:"set_by_policy" msg:"set_by_policy"`
+}
+
 // AccessDefinition defines which versions of an API a key has access to
 type AccessDefinition struct {
 	APIName     string       `json:"api_name" msg:"api_name"`
 	APIID       string       `json:"api_id" msg:"api_id"`
 	Versions    []string     `json:"versions" msg:"versions"`
-	AllowedURLs []AccessSpec `bson:"allowed_urls"  json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
+	AllowedURLs []AccessSpec `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
+	Limit       *APILimit    `json:"limit" msg:"limit"`
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.

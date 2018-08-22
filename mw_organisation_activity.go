@@ -106,6 +106,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
 		&k.Spec.GlobalConfig,
+		k.Spec.APIID,
 	)
 
 	sessionLifeTime := orgSession.Lifetime(k.Spec.SessionLifetime)
@@ -235,6 +236,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		session.Per > 0 && session.Rate > 0,
 		true,
 		&k.Spec.GlobalConfig,
+		k.Spec.APIID,
 	)
 
 	sessionLifeTime := session.Lifetime(k.Spec.SessionLifetime)

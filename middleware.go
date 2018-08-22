@@ -206,6 +206,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 	rights := session.AccessRights
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
+	didPerAPI := make(map[string]bool)
 	policies := session.PolicyIDs()
 	for i, polID := range policies {
 		policiesMu.RLock()
@@ -226,31 +227,67 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 
 		if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
 			// This is a partitioned policy, only apply what is active
-			if policy.Partitions.Quota {
-				if didQuota {
-					err := fmt.Errorf("cannot apply multiple quota policies")
-					log.Error(err)
-					return err
-				}
-				didQuota = true
-				// Quotas
-				session.QuotaMax = policy.QuotaMax
-				session.QuotaRenewalRate = policy.QuotaRenewalRate
-			}
+			if policy.Partitions.PerAPI {
+				// new logic when you can specify quota or rate in more than one policy but for different APIs
+				// this new option will be applied to session ONLY when policy.Partitions.Acl == true
+				// as this is where we merging access rights from all policies into session
+				for apiID, accessRights := range policy.AccessRights {
+					if didPerAPI[apiID] {
+						err := fmt.Errorf("cannot apply multiple policies for API: %s", apiID)
+						log.Error(err)
+						return err
+					}
+					didPerAPI[apiID] = true
 
-			if policy.Partitions.RateLimit {
-				if didRateLimit {
-					err := fmt.Errorf("cannot apply multiple rate limit policies")
-					log.Error(err)
-					return err
+					// check if we already have limit on API level specified when policy was created
+					if accessRights.Limit != nil {
+						continue
+					}
+
+					// limit was not specified on API level so we will populate it from policy
+					apiLimitFromPolicy := &user.APILimit{
+						QuotaMax:    -1,
+						SetByPolicy: true,
+					}
+					if policy.Partitions.Quota {
+						apiLimitFromPolicy.QuotaMax = policy.QuotaMax
+						apiLimitFromPolicy.QuotaRenewalRate = policy.QuotaRenewalRate
+					}
+					if policy.Partitions.RateLimit {
+						apiLimitFromPolicy.Rate = policy.Rate
+						apiLimitFromPolicy.Per = policy.Per
+					}
+					accessRights.Limit = apiLimitFromPolicy
+					policy.AccessRights[apiID] = accessRights
 				}
-				didRateLimit = true
-				// Rate limting
-				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
-				session.Rate = policy.Rate
-				session.Per = policy.Per
-				if policy.LastUpdated != "" {
-					session.LastUpdated = policy.LastUpdated
+			} else {
+				// legacy logic when you can specify quota or rate only in no more than one policy
+				if policy.Partitions.Quota {
+					if didQuota {
+						err := fmt.Errorf("cannot apply multiple quota policies")
+						log.Error(err)
+						return err
+					}
+					didQuota = true
+					// Quotas
+					session.QuotaMax = policy.QuotaMax
+					session.QuotaRenewalRate = policy.QuotaRenewalRate
+				}
+
+				if policy.Partitions.RateLimit {
+					if didRateLimit {
+						err := fmt.Errorf("cannot apply multiple rate limit policies")
+						log.Error(err)
+						return err
+					}
+					didRateLimit = true
+					// Rate limiting
+					session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
+					session.Rate = policy.Rate
+					session.Per = policy.Per
+					if policy.LastUpdated != "" {
+						session.LastUpdated = policy.LastUpdated
+					}
 				}
 			}
 
@@ -278,7 +315,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			session.QuotaMax = policy.QuotaMax
 			session.QuotaRenewalRate = policy.QuotaRenewalRate
 
-			// Rate limting
+			// Rate limiting
 			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 			session.Rate = policy.Rate
 			session.Per = policy.Per

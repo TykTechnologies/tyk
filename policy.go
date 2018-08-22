@@ -17,7 +17,8 @@ type DBAccessDefinition struct {
 	APIName     string            `json:"apiname"`
 	APIID       string            `json:"apiid"`
 	Versions    []string          `json:"versions"`
-	AllowedURLs []user.AccessSpec `bson:"allowed_urls"  json:"allowed_urls"` // mapped string MUST be a valid regex
+	AllowedURLs []user.AccessSpec `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
+	Limit       *user.APILimit    `json:"limit"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
@@ -26,6 +27,7 @@ func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 		APIID:       d.APIID,
 		Versions:    d.Versions,
 		AllowedURLs: d.AllowedURLs,
+		Limit:       d.Limit,
 	}
 }
 
