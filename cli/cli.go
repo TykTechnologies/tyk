@@ -80,7 +80,7 @@ func Init(version string, confPaths []string) {
 		}
 		if len(lines) == 0 {
 			fmt.Printf("found no issues in %s\n", path)
-			return nil
+			os.Exit(0)
 		}
 		fmt.Printf("issues found in %s:\n", path)
 		for _, line := range lines {
