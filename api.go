@@ -67,7 +67,7 @@ type apiModifyKeySuccess struct {
 // swagger:response
 type apiStatusMessage struct {
 	// Status can be either `ok` or `error`
-	Status  string `json:"status"`
+	Status string `json:"status"`
 	// Response details
 	Message string `json:"message"`
 }
@@ -763,10 +763,11 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-// swagger:route GET /apis apis listApis
+// swagger:operation GET /apis apis listApis
 //
 // List APIs
 // Only if used without dashboard
+//
 //---
 // responses:
 //   200:
@@ -776,58 +777,61 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 //       items:
 //         "$ref": "#/definitions/APIDefinition"
 
-// swagger:route POST /apis apis createApi
+// swagger:operation POST /apis apis createApi
 //
 // Create API
 //
-//     responses:
-//       '200':
-//         description: API created
-//         schema:
-//           "$ref": "#/responses/apiModifyKeySuccess"
-//         examples:
-//           status: "ok"
-//           action: "created"
-//		     key: "{...API JSON definition...}"
-//       '400':
-//         description: Malformed data
-//         schema:
-//           "$ref": "#/responses/apiStatusMessage"
-//         examples:
-//           status: "error"
-//           message: "Malformed API data"
+//---
+// responses:
+//   200:
+//     description: API created
+//     schema:
+//       "$ref": "#/responses/apiModifyKeySuccess"
+//     examples:
+//       status: "ok"
+//       action: "created"
+//       key: "{...API JSON definition...}"
+//   400:
+//     description: Malformed data
+//     schema:
+//       "$ref": "#/responses/apiStatusMessage"
+//     examples:
+//       status: "error"
+//       message: "Malformed API data"
 
-// swagger:route GET /apis/{apiID} apis getApi
+// swagger:operation GET /apis/{apiID} apis getApi
 //
 // Get API
 // Only if used without dashboard
 //
-//     Responses:
-//       200:
-//         description: API definition
-//         schema:
-//           $ref: "#/definitions/APIDefinition"
+//---
+// responses:
+//   200:
+//     description: API definition
+//     schema:
+//       $ref: "#/definitions/APIDefinition"
 
-// swagger:route DELETE /apis/{apiID} apis deleteApi
+// swagger:operation DELETE /apis/{apiID} apis deleteApi
 //
 // Delete API
 // Only if used without dashboard
 //
-//     Responses:
-//       '200':
-//         description: API deleted
-//         schema:
-//           $ref: "#/responses/apiStatusMessage"
-//         examples:
-//           status: "ok"
-//           message: "API deleted"
-//			 '400':
-//				 description: No API ID specified
-//				 schema:
-//					 $ref: "#/responses/apiStatusMessage"
-//				 examples:
-//					 status: "error"
-//					 message: "API ID not specified"
+//---
+// responses:
+//   200:
+//     description: API deleted
+//     schema:
+//       $ref: "#/responses/apiStatusMessage"
+//     examples:
+//       status: "ok"
+//       message: "API deleted"
+//   400:
+//     description: No API ID specified
+//     schema:
+//         $ref: "#/responses/apiStatusMessage"
+//     examples:
+//         status: "error"
+//         message: "API ID not specified"
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
@@ -865,6 +869,72 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
+// swagger:operation GET /keys keys listKeys
+//
+// List Keys
+//
+//---
+// responses:
+//   200:
+//     description: List of API keys
+//     schema:
+//       type: array
+//       items:
+//         type: string
+
+// swagger:operation POST /keys keys createKey
+//
+// Create Key
+//
+//---
+// responses:
+//   200:
+//     description: Key created
+//     schema:
+//       "$ref": "#/responses/apiModifyKeySuccess"
+//     examples:
+//       status: "ok"
+//       action: "created"
+//       key: "{...KEY JSON definition...}"
+//   400:
+//     description: Malformed data
+//     schema:
+//       "$ref": "#/responses/apiStatusMessage"
+//     examples:
+//       status: "error"
+//       message: "Malformed Key data"
+
+// swagger:operation GET /keys/{keyID} keys getKey
+//
+// Get Key
+//
+//---
+// responses:
+//   200:
+//     description: Key object
+//     schema:
+//       $ref: "#/definitions/SessionState"
+
+// swagger:operation DELETE /keys/{keyID} keys deleteKey
+//
+// Delete Key
+//
+//---
+// responses:
+//   200:
+//     description: Key deleted
+//     schema:
+//       $ref: "#/responses/apiStatusMessage"
+//     examples:
+//       status: "ok"
+//       message: "Key deleted"
+//   400:
+//     description: No Key ID specified
+//     schema:
+//         $ref: "#/responses/apiStatusMessage"
+//     examples:
+//         status: "error"
+//         message: "Key ID not specified"
 func keyHandler(w http.ResponseWriter, r *http.Request) {
 	keyName := mux.Vars(r)["keyName"]
 	apiID := r.URL.Query().Get("api_id")
