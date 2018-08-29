@@ -220,9 +220,10 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		"api_name": spec.Name,
 	}).Debug("Loading Middleware")
 	var mwPaths []string
+
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
 
-	if spec.CustomMiddleware.Driver == apidef.OttoDriver {
+	if mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
 
