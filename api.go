@@ -1,7 +1,7 @@
 // Tyk Gateway API
 //
-// Code below describes Tyk Gateway API
-// version: 1.7.0
+// The code below describes the Tyk Gateway API
+// Version: 1.7.0
 //
 //     Schemes: http, https
 //     Host: localhost
@@ -763,10 +763,10 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 	return response, http.StatusOK
 }
 
-// swagger:operation GET /apis apis listApis
+// swagger:operation GET /apis APIs listApis
 //
 // List APIs
-// Only if used without dashboard
+// Only if used without the Tyk Dashboard
 //
 //---
 // responses:
@@ -777,7 +777,7 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 //       items:
 //         "$ref": "#/definitions/APIDefinition"
 
-// swagger:operation POST /apis apis createApi
+// swagger:operation POST /apis APIs createApi
 //
 // Create API
 //
@@ -799,24 +799,38 @@ func handleDeleteAPI(apiID string) (interface{}, int) {
 //       status: "error"
 //       message: "Malformed API data"
 
-// swagger:operation GET /apis/{apiID} apis getApi
+// swagger:operation GET /apis/{apiID} APIs getApi
 //
 // Get API
-// Only if used without dashboard
+// Only if used without the Tyk Dashboard
 //
 //---
+// parameters:
+// - in: path
+//   name: apiID
+//   required: true
+//   type: integer
+//   minimum: 1
+//   description: The API ID
 // responses:
 //   200:
 //     description: API definition
 //     schema:
 //       $ref: "#/definitions/APIDefinition"
 
-// swagger:operation DELETE /apis/{apiID} apis deleteApi
+// swagger:operation DELETE /apis/{apiID} APIs deleteApi
 //
 // Delete API
-// Only if used without dashboard
+// Only if used without the Tyk Dashboard
 //
 //---
+// parameters:
+// - in: path
+//   name: apiID
+//   required: true
+//   type: integer
+//   minimum: 1
+//   description: The API ID
 // responses:
 //   200:
 //     description: API deleted
@@ -869,27 +883,27 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-// swagger:operation GET /keys keys listKeys
+// swagger:operation GET /keys Keys listKeys
 //
-// List Keys
+// List All Keys
 //
 //---
 // responses:
 //   200:
-//     description: List of API keys
+//     description: List of all API keys
 //     schema:
 //       type: array
 //       items:
 //         type: string
 
-// swagger:operation POST /keys keys createKey
+// swagger:operation POST /keys Keys createKey
 //
-// Create Key
+// Create a new Key
 //
 //---
 // responses:
 //   200:
-//     description: Key created
+//     description: New Key created
 //     schema:
 //       "$ref": "#/responses/apiModifyKeySuccess"
 //     examples:
@@ -904,22 +918,86 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 //       status: "error"
 //       message: "Malformed Key data"
 
-// swagger:operation GET /keys/{keyID} keys getKey
+// swagger:operation POST /keys Keys addKey
 //
-// Get Key
+// Add an existing Key
 //
 //---
+// responses:
+//   200:
+//     description: New Key added
+//     schema:
+//       "$ref": "#/responses/apiModifyKeySuccess"
+//     examples:
+//       status: "ok"
+//       action: "created"
+//       key: "{...KEY JSON definition...}"
+//   400:
+//     description: Malformed data
+//     schema:
+//       "$ref": "#/responses/apiStatusMessage"
+//     examples:
+//       status: "error"
+//       message: "Malformed Key data"
+
+// swagger:operation PUT /keys/{keyID} Keys updateKey
+//
+// Update a Key
+//
+//---
+// parameters:
+// - in: path
+//   name: keyID
+//   required: true
+//   type: integer
+//   minimum: 1
+//   description: The Key ID
+// responses:
+//   200:
+//     description: Key updated
+//     schema:
+//       "$ref": "#/responses/apiModifyKeySuccess"
+//     examples:
+//       status: "ok"
+//       action: "updated"
+//   400:
+//     description: No or incorrect Key ID specified
+//     schema:
+//       "$ref": "#/responses/apiStatusMessage"
+//     examples:
+//       status: "error"
+//       message: "Key ID not specified"
+
+// swagger:operation GET /keys/{keyID} Keys getKey
+//
+// Get a Key
+//
+//---
+// parameters:
+// - in: path
+//   name: keyID
+//   required: true
+//   type: integer
+//   minimum: 1
+//   description: The Key ID
 // responses:
 //   200:
 //     description: Key object
 //     schema:
 //       $ref: "#/definitions/SessionState"
 
-// swagger:operation DELETE /keys/{keyID} keys deleteKey
+// swagger:operation DELETE /keys/{keyID} Keys deleteKey
 //
 // Delete Key
 //
 //---
+// parameters:
+// - in: path
+//   name: keyID
+//   required: true
+//   type: integer
+//   minimum: 1
+//   description: The Key ID
 // responses:
 //   200:
 //     description: Key deleted
@@ -1247,9 +1325,9 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 	return statusObj, http.StatusOK
 }
 
-// swagger:route GET /reload/group reloadGroup
+// swagger:route GET /reload/group Reload reloadGroup
 //
-// Reload all gateways in cluser
+// Reloads all the Tyk Gateways in a cluster
 //
 //     Responses:
 //       200: apiStatusMessage
@@ -1274,9 +1352,9 @@ func groupResetHandler(w http.ResponseWriter, r *http.Request) {
 // Otherwise, it won't block and fn will be called once the reload is
 // finished.
 //
-// swagger:route GET /reload reload
+// swagger:route GET /reload Reload reload
 //
-// Reload single gateway instance
+// Reloads a single Tyk Gateway instance
 //
 //     Responses:
 //       200: apiStatusMessage
