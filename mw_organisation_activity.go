@@ -189,6 +189,11 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	orgChanMap.Unlock()
 	active, found := orgActiveMap.Load(k.Spec.OrgID)
 
+	// Lets keep a reference of the org
+	// session might be updated by go-routine AllowAccessNext and we loose those changes here
+	// but it is OK as we need it in context for detailed org logging
+	setCtxValue(r, OrgSessionContext, orgSession)
+
 	orgSessionCopy := orgSession
 	go k.AllowAccessNext(
 		orgChan,
@@ -202,11 +207,6 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 		log.Debug("Is not active")
 		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), http.StatusForbidden
 	}
-
-	// Lets keep a reference of the org
-	// session might be updated by go-routine AllowAccessNext and we loose those changes here
-	// but it is OK as we need it in context for detailed org logging
-	setCtxValue(r, OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
