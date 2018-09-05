@@ -51,7 +51,6 @@ type traceHttpResponse struct {
 	Body    string      `json:"body"`
 }
 
-
 // swagger:operation POST /trace trace trace
 //
 // Tracing request

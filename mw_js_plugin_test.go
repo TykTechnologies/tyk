@@ -23,11 +23,12 @@ import (
 
 func TestJSVMLogs(t *testing.T) {
 	var buf bytes.Buffer
+	log := logrus.New()
+	log.Out = &buf
+	log.Formatter = new(prefixed.TextFormatter)
+
 	jsvm := JSVM{}
-	jsvm.Init(nil)
-	jsvm.Log = logrus.New()
-	jsvm.Log.Out = &buf
-	jsvm.Log.Formatter = new(prefixed.TextFormatter)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	jsvm.RawLog = logrus.New()
 	jsvm.RawLog.Out = &buf
@@ -81,7 +82,7 @@ func TestJSVMBody(t *testing.T) {
 	body := "foô \uffff \u0000 \xff bàr"
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -117,7 +118,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	jsvm.Timeout = time.Millisecond
 
 	// this js plugin just loops forever, keeping Otto at 100% CPU
@@ -160,12 +161,12 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -196,12 +197,12 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -242,12 +243,12 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -276,7 +277,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	return testJSVMCore.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMCore",
 		Pre:                 true,
 	}
@@ -296,7 +297,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		config.SetGlobal(globalConf)
 	}()
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -321,7 +322,7 @@ func TestJSVMRequestScheme(t *testing.T) {
 	req := httptest.NewRequest("GET", "/foo", nil)
 	req.URL.Scheme = "http"
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -419,7 +420,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 
 func TestJSVMBase64(t *testing.T) {
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	inputString := "teststring"
 	inputB64 := "dGVzdHN0cmluZw=="
