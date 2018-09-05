@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -34,7 +36,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 	size, err := strconv.ParseInt(statedCL, 0, 64)
 	if err != nil {
-		log.Error("String conversion for content length failed:", err)
+		t.Logger().WithError(err).Error("String conversion for content length failed")
 		return errors.New("content length is not a valid Integer"), http.StatusBadRequest
 	}
 	if r.ContentLength > size {
@@ -43,15 +45,7 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 	// Check stated size
 	if size > sizeLimit {
-		logEntry := getLogEntryForRequest(
-			r,
-			"",
-			map[string]interface{}{
-				"size":  size,
-				"limit": sizeLimit,
-			},
-		)
-		logEntry.Info("Attempted access with large request size, blocked.")
+		t.Logger().WithFields(logrus.Fields{"size": size, "limit": sizeLimit}).Info("Attempted access with large request size, blocked.")
 
 		return errors.New("Request is too large"), http.StatusBadRequest
 	}
@@ -61,14 +55,15 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 
 // RequestSizeLimit will check a request for maximum request size, this can be a global limit or a matched limit.
 func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	log.Debug("Request size limiter active")
+	logger := t.Logger()
+	logger.Debug("Request size limiter active")
 
 	vInfo, versionPaths, _, _ := t.Spec.Version(r)
 
-	log.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
+	logger.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
 	// Manage global headers first
 	if vInfo.GlobalSizeLimit > 0 {
-		log.Debug("Checking global limit")
+		logger.Debug("Checking global limit")
 		err, code := t.checkRequestLimit(r, vInfo.GlobalSizeLimit)
 		// If not OK, block
 		if code != http.StatusOK {
@@ -84,7 +79,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 	// If there's a potential match, try to match
 	found, meta := t.Spec.CheckSpecMatchesStatus(r, versionPaths, RequestSizeLimit)
 	if found {
-		log.Debug("Request size limit matched for this URL, checking...")
+		logger.Debug("Request size limit matched for this URL, checking...")
 		rmeta := meta.(*apidef.RequestSizeMeta)
 		return t.checkRequestLimit(r, rmeta.SizeLimit)
 	}

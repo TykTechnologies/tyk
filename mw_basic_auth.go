@@ -45,10 +45,10 @@ func (k *BasicAuthKeyIsValid) requestForBasicAuth(w http.ResponseWriter, msg str
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	token := r.Header.Get("Authorization")
-	logEntry := getLogEntryForRequest(r, token, nil)
+	logger := k.Logger().WithField("key", obfuscateKey(token))
 	if token == "" {
 		// No header value, fail
-		logEntry.Info("Attempted access with malformed header, no auth header found.")
+		logger.Info("Attempted access with malformed header, no auth header found.")
 
 		return k.requestForBasicAuth(w, "Authorization field missing")
 	}
@@ -56,7 +56,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	bits := strings.Split(token, " ")
 	if len(bits) != 2 {
 		// Header malformed
-		logEntry.Info("Attempted access with malformed header, header not in basic auth format.")
+		logger.Info("Attempted access with malformed header, header not in basic auth format.")
 
 		return errors.New("Attempted access with malformed header, header not in basic auth format"), http.StatusBadRequest
 	}
@@ -64,7 +64,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// Decode the username:password string
 	authvaluesStr, err := base64.StdEncoding.DecodeString(bits[1])
 	if err != nil {
-		logEntry.Info("Base64 Decoding failed of basic auth data: ", err)
+		logger.Info("Base64 Decoding failed of basic auth data: ", err)
 
 		return errors.New("Attempted access with malformed header, auth data not encoded correctly"), http.StatusBadRequest
 	}
@@ -72,32 +72,30 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	authValues := strings.Split(string(authvaluesStr), ":")
 	if len(authValues) != 2 {
 		// Header malformed
-		logEntry.Info("Attempted access with malformed header, values not in basic auth format.")
+		logger.Info("Attempted access with malformed header, values not in basic auth format.")
 
 		return errors.New("Attempted access with malformed header, values not in basic auth format"), http.StatusBadRequest
 	}
 
 	// Check if API key valid
 	keyName := generateToken(k.Spec.OrgID, authValues[0])
-	logEntry = getLogEntryForRequest(r, keyName, nil)
+	logger = k.Logger().WithField("key", obfuscateKey(keyName))
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(keyName, r)
 	if !keyExists {
-		logEntry.Info("Attempted access with non-existent user.")
+		logger.Info("Attempted access with non-existent user.")
 
 		return k.handleAuthFail(w, r, token)
 	}
 
 	switch session.BasicAuthData.Hash {
 	case user.HashBCrypt:
-
-		if err := k.compareHashAndPassword(session.BasicAuthData.Password, authValues[1], logEntry); err != nil {
-			logEntry.Warn("Attempted access with existing user, failed password check.")
+		if err := k.compareHashAndPassword(session.BasicAuthData.Password, authValues[1], logger); err != nil {
+			logger.Warn("Attempted access with existing user, failed password check.")
 			return k.handleAuthFail(w, r, token)
 		}
 	case user.HashPlainText:
 		if session.BasicAuthData.Password != authValues[1] {
-
-			logEntry.Warn("Attempted access with existing user, failed password check.")
+			logger.Warn("Attempted access with existing user, failed password check.")
 			return k.handleAuthFail(w, r, token)
 		}
 	}

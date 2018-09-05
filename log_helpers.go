@@ -24,7 +24,11 @@ func obfuscateKey(keyName string) string {
 	return "--"
 }
 
-func getLogEntryForRequest(r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
+func getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
+
 	// populate http request fields
 	fields := logrus.Fields{
 		"path":   r.URL.Path,
@@ -34,17 +38,17 @@ func getLogEntryForRequest(r *http.Request, key string, data map[string]interfac
 	if key != "" {
 		fields["key"] = key
 		if !config.Global().EnableKeyLogging {
-			fields["key"] = logHiddenValue
+			fields["key"] = obfuscateKey(key)
 		}
 	}
 	// add to log additional fields if any passed
 	for key, val := range data {
 		fields[key] = val
 	}
-	return log.WithFields(fields)
+	return logger.WithFields(fields)
 }
 
-func getExplicitLogEntryForRequest(path string, IP string, key string, data map[string]interface{}) *logrus.Entry {
+func getExplicitLogEntryForRequest(logger *logrus.Entry, path string, IP string, key string, data map[string]interface{}) *logrus.Entry {
 	// populate http request fields
 	fields := logrus.Fields{
 		"path":   path,
@@ -61,5 +65,5 @@ func getExplicitLogEntryForRequest(path string, IP string, key string, data map[
 	for key, val := range data {
 		fields[key] = val
 	}
-	return log.WithFields(fields)
+	return logger.WithFields(fields)
 }

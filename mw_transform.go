@@ -45,16 +45,7 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 	err := transformBody(r, meta.(*TransformSpec), t.Spec.EnableContextVars)
 	if err != nil {
-		logEntry := getLogEntryForRequest(
-			r,
-			"",
-			map[string]interface{}{
-				"prefix":      "inbound-transform",
-				"server_name": t.Spec.Proxy.TargetURL,
-				"api_id":      t.Spec.APIID,
-			},
-		)
-		logEntry.Error(err)
+		t.Logger().WithError(err).Error("Body transform failure")
 	}
 	return nil, http.StatusOK
 }

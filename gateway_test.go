@@ -201,7 +201,7 @@ type tykErrorResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseMid := BaseMiddleware{apiSpec, p}
+		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p}
 		handler := SuccessHandler{baseMid}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
@@ -1359,5 +1359,28 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusTooManyRequests, Path: "/"},
 		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
 		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusTooManyRequests, Path: "/"},
+	}...)
+}
+
+func TestTracing(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	prepareStorage()
+	spec := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+	})[0]
+
+	keyID := createSession(func(s *user.SessionState) {})
+	authHeaders := map[string][]string{"Authorization": {keyID}}
+
+	ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/tyk/trace", AdminAuth: true, Code: 405},
+		{Method: "POST", Path: "/tyk/trace", AdminAuth: true, Code: 400, BodyMatch: "Request malformed"},
+		{Method: "POST", Path: "/tyk/trace", Data: `{}`, AdminAuth: true, Code: 400, BodyMatch: "Spec field is missing"},
+		{Method: "POST", Path: "/tyk/trace", Data: `{"Spec": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Request field is missing"},
+		{Method: "POST", Path: "/tyk/trace", Data: `{"Spec": {}, "Request": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Spec not valid, skipped!"},
+		{Method: "POST", Path: "/tyk/trace", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `"code":401`},
+		{Method: "POST", Path: "/tyk/trace", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `"code":200`},
 	}...)
 }

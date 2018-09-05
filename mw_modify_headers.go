@@ -32,12 +32,13 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 
 	// Manage global headers first - remove
 	for _, gdKey := range vInfo.GlobalHeadersRemove {
-		log.Debug("Removing: ", gdKey)
+		t.Logger().Debug("Removing: ", gdKey)
 		r.Header.Del(gdKey)
 	}
 
 	// Add
 	for nKey, nVal := range vInfo.GlobalHeaders {
+		t.Logger().Debug("Adding: ", nKey)
 		r.Header.Set(nKey, replaceTykVariables(r, nVal, false))
 	}
 

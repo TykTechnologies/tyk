@@ -36,6 +36,7 @@ const (
 	OrigRequestURL
 	LoopLevel
 	LoopLevelLimit
+	Trace
 )
 
 var SessionCache = cache.New(10*time.Second, 5*time.Second)

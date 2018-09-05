@@ -1742,3 +1742,11 @@ func ctxSetLoopLimit(r *http.Request, limit int) {
 		setCtxValue(r, LoopLevelLimit, limit)
 	}
 }
+
+func ctxTraceEnabled(r *http.Request) bool {
+	return r.Context().Value(Trace) != nil
+}
+
+func ctxSetTrace(r *http.Request) {
+	setCtxValue(r, Trace, true)
+}

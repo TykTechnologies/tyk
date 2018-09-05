@@ -32,7 +32,7 @@ func getRLOpenChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -46,7 +46,7 @@ func getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy}
 	chain := alice.New(mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},

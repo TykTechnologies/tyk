@@ -75,7 +75,7 @@ func (e *BaseExtractor) ExtractBody(r *http.Request) (string, error) {
 
 // Error is a helper for logging the extractor errors. It always returns HTTP 400 (so we don't expose any details).
 func (e *BaseExtractor) Error(r *http.Request, err error, message string) (returnOverrides ReturnOverrides) {
-	logEntry := getLogEntryForRequest(r, "", nil)
+	logEntry := getLogEntryForRequest(e.BaseMid.Logger(), r, "", nil)
 	logEntry.Info("Extractor error: ", message, ", ", err)
 
 	return ReturnOverrides{
