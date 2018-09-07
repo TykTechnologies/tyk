@@ -40,8 +40,6 @@ Effort required by Resource Owner:
 */
 
 // OAuthClient is a representation within an APISpec of a client
-//
-// swagger:model
 type OAuthClient struct {
 	ClientID          string      `json:"id"`
 	ClientSecret      string      `json:"secret"`

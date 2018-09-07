@@ -1546,7 +1546,7 @@ func oauthClientStorageID(clientID string) string {
 //   200:
 //     description: Client created
 //     schema:
-//       "$ref": "#/responses/OAuthClient"
+//       "$ref": "#/responses/NewClientRequest"
 func createOauthClient(w http.ResponseWriter, r *http.Request) {
 	var newOauthClient NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&newOauthClient); err != nil {
