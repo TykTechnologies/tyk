@@ -161,17 +161,21 @@ func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
 }
 
 func (t *BaseMiddleware) SetName(name string) {
+	logger := t.Logger()
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.logger = t.Logger().WithField("mw", name)
+	t.logger = logger.WithField("mw", name)
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
+	logger := t.Logger()
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.logger = getLogEntryForRequest(t.logger, r, ctxGetAuthToken(r), nil)
+	t.logger = getLogEntryForRequest(logger, r, ctxGetAuthToken(r), nil)
 }
 
 func (t BaseMiddleware) Init() {}

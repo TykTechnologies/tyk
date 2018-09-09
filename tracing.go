@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
@@ -40,15 +41,9 @@ type traceRequest struct {
 //
 // swagger:model
 type traceResponse struct {
-	Message  string             `json:"message"`
-	Response *traceHttpResponse `json:"response"`
-	Logs     string             `json:"logs"`
-}
-
-type traceHttpResponse struct {
-	Code    int         `json:"code"`
-	Headers http.Header `json:"headers"`
-	Body    string      `json:"body"`
+	Message  string `json:"message"`
+	Response string `json:"response"`
+	Logs     string `json:"logs"`
 }
 
 // swagger:operation POST /trace trace trace
@@ -127,9 +122,12 @@ func traceHandler(w http.ResponseWriter, r *http.Request) {
 	wr := httptest.NewRecorder()
 	chainObj.ThisHandler.ServeHTTP(wr, traceReq.Request.toRequest())
 
-	traceHttpResp := traceHttpResponse{Code: wr.Code, Body: wr.Body.String(), Headers: wr.HeaderMap}
+	var response string
+	if dump, err := httputil.DumpResponse(wr.Result(), true); err == nil {
+		response = string(dump)
+	} else {
+		response = err.Error()
+	}
 
-	log.Error(logStorage.String())
-
-	doJSONWrite(w, http.StatusOK, traceResponse{Message: "ok", Response: &traceHttpResp, Logs: logStorage.String()})
+	doJSONWrite(w, http.StatusOK, traceResponse{Message: "ok", Response: response, Logs: logStorage.String()})
 }
