@@ -44,41 +44,30 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if token == "" {
 		return hm.authorizationError(r)
 	}
+	logger := hm.Logger().WithField("key", obfuscateKey(token))
 
 	// Clean it
 	token = stripSignature(token)
 
-	log.Debug(token)
-
 	// Separate out the field values
 	fieldValues, err := getFieldValues(token)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "hmac",
-			"error":  err,
-			"header": token,
-		}).Error("Field extraction failed")
+		logger.WithError(err).Error("Field extraction failed")
 		return hm.authorizationError(r)
 	}
 
 	// Generate a signature string
 	signatureString, err := generateHMACSignatureStringFromRequest(r, fieldValues)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":           "hmac",
-			"error":            err,
-			"signature_string": signatureString,
-		}).Error("Signature string generation failed")
+		logger.WithError(err).WithField("signature_string", signatureString).Error("Signature string generation failed")
 		return hm.authorizationError(r)
 	}
 
 	// Get a session for the Key ID
 	secret, session, err := hm.getSecretAndSessionForKeyID(r, fieldValues.KeyID)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "hmac",
-			"error":  err,
-			"keyID":  fieldValues.KeyID,
+		logger.WithError(err).WithFields(logrus.Fields{
+			"keyID": fieldValues.KeyID,
 		}).Error("No HMAC secret for this key")
 		return hm.authorizationError(r)
 	}
@@ -93,7 +82,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if !matchPass {
 		isLower, lowerList := hm.hasLowerCaseEscaped(fieldValues.Signature)
 		if isLower {
-			log.Debug("--- Detected lower case encoding! ---")
+			logger.Debug("--- Detected lower case encoding! ---")
 			upperedSignature := hm.replaceWithUpperCase(fieldValues.Signature, lowerList)
 			if encodedSignature == upperedSignature {
 				matchPass = true
@@ -103,8 +92,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	if !matchPass {
-		log.WithFields(logrus.Fields{
-			"prefix":   "hmac",
+		logger.WithFields(logrus.Fields{
 			"expected": encodedSignature,
 			"got":      fieldValues.Signature,
 		}).Error("Signature string does not match!")
@@ -114,9 +102,7 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Check clock skew
 	_, dateVal := getDateHeader(r)
 	if !hm.checkClockSkew(dateVal) {
-		log.WithFields(logrus.Fields{
-			"prefix": "hmac",
-		}).Error("Clock skew outside of acceptable bounds")
+		logger.Error("Clock skew outside of acceptable bounds")
 		return hm.authorizationError(r)
 	}
 
@@ -129,7 +115,6 @@ func (hm *HMACMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	// Everything seems in order let the request through
 	return nil, http.StatusOK
-
 }
 
 func stripSignature(token string) string {
@@ -166,8 +151,7 @@ func (hm *HMACMiddleware) setContextVars(r *http.Request, token string) {
 }
 
 func (hm *HMACMiddleware) authorizationError(r *http.Request) (error, int) {
-	logEntry := getLogEntryForRequest(r, "", nil)
-	logEntry.Info("Authorization field missing or malformed")
+	hm.Logger().Info("Authorization field missing or malformed")
 
 	AuthFailed(hm, r, r.Header.Get("Authorization"))
 
@@ -186,10 +170,7 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	}
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":      "hmac",
-			"date_string": tim,
-		}).Error("Date parsing failed")
+		hm.Logger().WithError(err).WithField("date_string", tim).Error("Date parsing failed")
 		return false
 	}
 
@@ -205,9 +186,7 @@ func (hm HMACMiddleware) checkClockSkew(dateHeaderValue string) bool {
 	}
 
 	if math.Abs(float64(in_ms)) > hm.Spec.HmacAllowedClockSkew {
-		log.WithFields(logrus.Fields{
-			"prefix": "hmac",
-		}).Debug("Difference is: ", math.Abs(float64(in_ms)))
+		hm.Logger().Debug("Difference is: ", math.Abs(float64(in_ms)))
 		return false
 	}
 
@@ -228,9 +207,7 @@ func (hm *HMACMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId str
 	}
 
 	if session.HmacSecret == "" || !session.HMACEnabled {
-		log.WithFields(logrus.Fields{
-			"prefix": "hmac",
-		}).Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
+		hm.Logger().Info("API Requires HMAC signature, session missing HMACSecret or HMAC not enabled for key")
 
 		return "", session, errors.New("This key ID is invalid")
 	}
@@ -239,7 +216,6 @@ func (hm *HMACMiddleware) getSecretAndSessionForKeyID(r *http.Request, keyId str
 }
 
 func getDateHeader(r *http.Request) (string, string) {
-
 	auxHeaderVal := r.Header.Get(altHeaderSpec)
 	// Prefer aux if present
 	if auxHeaderVal != "" {

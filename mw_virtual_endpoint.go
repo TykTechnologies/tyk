@@ -59,31 +59,31 @@ func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	var src interface{}
 	switch meta.FunctionSourceType {
 	case "file":
-		log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
 		f, err := os.Open(meta.FunctionSourceURI)
 		if err != nil {
-			log.Error("Failed to open Endpoint JS: ", err)
+			j.Log.WithError(err).Error("Failed to open Endpoint JS")
 			return
 		}
 		src = f
 	case "blob":
 		if config.Global().DisableVirtualPathBlobs {
-			log.Error("[JSVM] Blobs not allowed on this node")
+			j.Log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
-		log.Debug("Loading JS blob")
+		j.Log.Debug("Loading JS blob")
 		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 		if err != nil {
-			log.Error("Failed to load blob JS: ", err)
+			j.Log.WithError(err).Error("Failed to load blob JS")
 			return
 		}
 		src = js
 	default:
-		log.Error("Type must be either file or blob (base64)!")
+		j.Log.Error("Type must be either file or blob (base64)!")
 		return
 	}
 	if _, err := j.VM.Run(src); err != nil {
-		log.Error("Could not load virtual endpoint JS: ", err)
+		j.Log.WithError(err).Error("Could not load virtual endpoint JS")
 	}
 }
 
@@ -118,7 +118,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	defer r.Body.Close()
 	originalBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Error("Failed to read request body! ", err)
+		d.Logger().WithError(err).Error("Failed to read request body!")
 		return nil
 	}
 
@@ -135,7 +135,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	requestAsJson, err := json.Marshal(requestData)
 	if err != nil {
-		log.Error("Failed to encode request object for virtual endpoint: ", err)
+		d.Logger().WithError(err).Error("Failed to encode request object for virtual endpoint")
 		return nil
 	}
 
@@ -151,16 +151,14 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 
 	sessionAsJson, err := json.Marshal(session)
 	if err != nil {
-		log.Error("Failed to encode session for VM: ", err)
+		d.Logger().WithError(err).Error("Failed to encode session for VM")
 		return nil
 	}
 
 	// Run the middleware
 	vm := d.Spec.JSVM.VM.Copy()
 	vm.Interrupt = make(chan func(), 1)
-	log.WithFields(logrus.Fields{
-		"prefix": "jsvm",
-	}).Debug("Running: ", vmeta.ResponseFunctionName)
+	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)
 	// buffered, leaving no chance of a goroutine leak since the
 	// spawned goroutine will send 0 or 1 values.
 	ret := make(chan otto.Value, 1)
@@ -181,17 +179,13 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	select {
 	case returnRaw = <-ret:
 		if err := <-errRet; err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "jsvm",
-			}).Error("Failed to run JS middleware: ", err)
+			d.Logger().WithError(err).Error("Failed to run JS middleware")
 			return nil
 		}
 		t.Stop()
 	case <-t.C:
 		t.Stop()
-		log.WithFields(logrus.Fields{
-			"prefix": "jsvm",
-		}).Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
+		d.Logger().Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
 		vm.Interrupt <- func() {
 			// only way to stop the VM is to send it a func
 			// that panics.
@@ -204,7 +198,7 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Decode the return object
 	newResponseData := VMResponseObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
-		log.Error("Failed to decode virtual endpoint response data on return from VM: ", err,
+		d.Logger().WithError(err).Error("Failed to decode virtual endpoint response data on return from VM: ",
 			"; Returned: ", returnDataStr)
 		return nil
 	}
@@ -218,9 +212,9 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	log.Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
+	d.Logger().Debug("JSVM Virtual Endpoint execution took: (ns) ", time.Now().UnixNano()-t1)
 
-	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false)
+	copiedResponse := forceResponse(w, r, &newResponseData, d.Spec, session, false, d.Logger())
 
 	if copiedResponse != nil {
 		go d.sh.RecordHit(r, 0, copiedResponse.StatusCode, copiedResponse)
@@ -233,7 +227,7 @@ func forceResponse(w http.ResponseWriter,
 	r *http.Request,
 	newResponseData *VMResponseObject,
 	spec *APISpec,
-	session *user.SessionState, isPre bool) *http.Response {
+	session *user.SessionState, isPre bool, logger *logrus.Entry) *http.Response {
 	responseMessage := []byte(newResponseData.Response.Body)
 
 	// Create an http.Response object so we can send it tot he cache middleware
@@ -262,10 +256,7 @@ func forceResponse(w http.ResponseWriter,
 	if (newResponse.StatusCode == 301 || newResponse.StatusCode == 302) && strings.HasPrefix(loc, "tyk://") {
 		loopURL, err := url.Parse(newResponse.Header.Get("Location"))
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "jsvm",
-				"loop":   loc,
-			}).Error("Failed to parse loop url: ", err)
+			logger.WithError(err).WithField("loop", loc).Error("Failed to parse loop url")
 		} else {
 			ctxSetOrigRequestURL(r, r.URL)
 			r.URL = loopURL
@@ -277,7 +268,7 @@ func forceResponse(w http.ResponseWriter,
 	if !isPre {
 		// Handle response middleware
 		if err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
-			log.Error("Response chain failed! ", err)
+			logger.WithError(err).Error("Response chain failed! ")
 		}
 	}
 

@@ -381,6 +381,8 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}
 
+	r.HandleFunc("/debug", traceHandler).Methods("POST")
+
 	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
@@ -593,7 +595,7 @@ func doReload() {
 
 	// Initialize/reset the JSVM
 	if config.Global().EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
+		GlobalEventsJSVM.Init(nil, logrus.NewEntry(log))
 	}
 
 	// Load the API Policies

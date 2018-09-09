@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"sync"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/test"
@@ -125,4 +126,27 @@ func TestLooping(t *testing.T) {
 			{Method: "GET", Path: "/recursion", Code: 500, BodyMatch: "Loop level too deep. Found more than 2 loops in single request"},
 		}...)
 	})
+}
+
+func TestConcurrencyReloads(t *testing.T) {
+	var wg sync.WaitGroup
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	buildAndLoadAPI()
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			ts.Run(t, test.TestCase{Path: "/sample", Code: 200})
+			wg.Done()
+		}()
+	}
+
+	for j := 0; j < 5; j++ {
+		buildAndLoadAPI()
+	}
+
+	wg.Wait()
 }

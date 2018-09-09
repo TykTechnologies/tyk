@@ -25,8 +25,7 @@ func (k *RateLimitAndQuotaCheck) EnabledForSpec() bool {
 }
 
 func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	logEntry := getLogEntryForRequest(r, token, nil)
-	logEntry.Info("Key rate limit exceeded.")
+	k.Logger().WithField("key", obfuscateKey(token)).Info("Key rate limit exceeded.")
 
 	// Fire a rate limit exceeded event
 	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
@@ -43,8 +42,7 @@ func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token s
 }
 
 func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token string) (error, int) {
-	logEntry := getLogEntryForRequest(r, token, nil)
-	logEntry.Info("Key quota limit exceeded.")
+	k.Logger().WithField("key", obfuscateKey(token)).Info("Key quota limit exceeded.")
 
 	// Fire a quota exceeded event
 	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{

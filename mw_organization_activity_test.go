@@ -1,3 +1,5 @@
+// +build !race
+
 package main
 
 import (
@@ -129,7 +131,7 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 		map[string]interface{}{
 			"quota_max":          10,
 			"quota_remaining":    10,
-			"quota_renewal_rate": 3,
+			"quota_renewal_rate": 2,
 		},
 	)
 
@@ -144,7 +146,7 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 		// some of next request should fail with 403 as it is out of quota
 		failed := false
 		i := 0
-		for i = 0; i < 10; i++ {
+		for i = 0; i < 11; i++ {
 			res, _ := ts.Run(t, test.TestCase{})
 			res.Body.Close()
 			if res.StatusCode == http.StatusForbidden {
@@ -163,7 +165,7 @@ func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
 
 		// next 10 requests should be OK again
 		ok := false
-		for i = 0; i < 10; i++ {
+		for i = 0; i < 9; i++ {
 			res, _ := ts.Run(t, test.TestCase{})
 			res.Body.Close()
 			if res.StatusCode == http.StatusOK {

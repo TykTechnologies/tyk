@@ -17,6 +17,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/gojsonschema"
@@ -167,8 +168,12 @@ var ServiceNonce string
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
+func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
+
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
 
 	// parse version expiration time stamps
 	for key, ver := range def.VersionData.Versions {
@@ -177,7 +182,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 		}
 		// calculate the time
 		if t, err := time.Parse("2006-01-02 15:04", ver.Expires); err != nil {
-			log.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
+			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
 			def.VersionData.Versions[key] = ver
@@ -201,22 +206,24 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 
 	// Create and init the virtual Machine
 	if config.Global().EnableJSVM {
-		spec.JSVM.Init(spec)
+		spec.JSVM.Init(spec, logger)
 	}
 
 	// Set up Event Handlers
-	log.Debug("INITIALISING EVENT HANDLERS")
+	if len(def.EventHandlers.Events) > 0 {
+		logger.Debug("Initializing event handlers")
+	}
 	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
-		log.Debug("FOUND EVENTS TO INIT")
+		logger.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
-			log.Debug("CREATING EVENT HANDLERS")
+			logger.Debug("CREATING EVENT HANDLERS")
 			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
-				log.Error("Failed to init event handler: ", err)
+				logger.Error("Failed to init event handler: ", err)
 			} else {
-				log.Debug("Init Event Handler: ", eventName)
+				logger.Debug("Init Event Handler: ", eventName)
 				spec.EventPaths[eventName] = append(spec.EventPaths[eventName], eventHandlerInstance)
 			}
 
@@ -234,7 +241,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
 
 		} else {
-			log.Warning("Legacy path detected! Upgrade to extended.")
+			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
 		}
 		spec.RxPaths[v.Name] = pathSpecs
@@ -321,7 +328,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def)
+		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -383,7 +390,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APIS
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def)
+		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -413,7 +420,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		}
 		def := a.ParseDefinition(f)
 		f.Close()
-		spec := a.MakeSpec(def)
+		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 	return specs

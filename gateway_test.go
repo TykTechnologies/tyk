@@ -201,7 +201,7 @@ type tykErrorResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseMid := BaseMiddleware{apiSpec, p}
+		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p}
 		handler := SuccessHandler{baseMid}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
@@ -987,29 +987,6 @@ func TestWebsocketsUpstreamUpgradeRequest(t *testing.T) {
 	})
 }
 
-func TestConcurrencyReloads(t *testing.T) {
-	var wg sync.WaitGroup
-
-	ts := newTykTestServer()
-	defer ts.Close()
-
-	buildAndLoadAPI()
-
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			ts.Run(t, test.TestCase{Path: "/sample", Code: 200})
-			wg.Done()
-		}()
-	}
-
-	for j := 0; j < 5; j++ {
-		buildAndLoadAPI()
-	}
-
-	wg.Wait()
-}
-
 func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	globalConf := config.Global()
 	globalConf.HttpServerOptions.EnableWebSockets = true
@@ -1359,5 +1336,28 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 		{Headers: map[string]string{"Authorization": sess1token}, Code: http.StatusTooManyRequests, Path: "/"},
 		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusOK, Path: "/", Delay: 100 * time.Millisecond},
 		{Headers: map[string]string{"Authorization": sess2token}, Code: http.StatusTooManyRequests, Path: "/"},
+	}...)
+}
+
+func TestTracing(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	prepareStorage()
+	spec := buildAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+	})[0]
+
+	keyID := createSession(func(s *user.SessionState) {})
+	authHeaders := map[string][]string{"Authorization": {keyID}}
+
+	ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/tyk/debug", AdminAuth: true, Code: 405},
+		{Method: "POST", Path: "/tyk/debug", AdminAuth: true, Code: 400, BodyMatch: "Request malformed"},
+		{Method: "POST", Path: "/tyk/debug", Data: `{}`, AdminAuth: true, Code: 400, BodyMatch: "Spec field is missing"},
+		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Request field is missing"},
+		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}, "Request": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Spec not valid, skipped!"},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 	}...)
 }

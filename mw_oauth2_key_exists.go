@@ -24,19 +24,19 @@ func (k *Oauth2KeyExists) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
+	logger := k.Logger()
 	// We're using OAuth, start checking for access keys
 	token := r.Header.Get("Authorization")
 	parts := strings.Split(token, " ")
-	logEntry := getLogEntryForRequest(r, "", nil)
+
 	if len(parts) < 2 {
-		logEntry.Info("Attempted access with malformed header, no auth header found.")
+		logger.Info("Attempted access with malformed header, no auth header found.")
 
 		return errors.New("Authorization field missing"), http.StatusBadRequest
 	}
 
 	if strings.ToLower(parts[0]) != "bearer" {
-		logEntry.Info("Bearer token malformed")
+		logger.Info("Bearer token malformed")
 
 		return errors.New("Bearer token malformed"), http.StatusBadRequest
 	}
@@ -45,8 +45,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(accessToken, r)
 
 	if !keyExists {
-		logEntry = getLogEntryForRequest(r, accessToken, nil)
-		logEntry.Info("Attempted access with non-existent key.")
+		logger.WithField("key", obfuscateKey(accessToken)).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, accessToken)

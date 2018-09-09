@@ -41,18 +41,16 @@ func (k *OpenIDMW) Init() {
 		openid.ErrorHandler(k.dummyErrorHandler))
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": OIDPREFIX,
-		}).Error("OpenID configuration error: ", err)
+		k.Logger().WithError(err).Error("OpenID configuration error")
 	}
 }
 
 func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 	providers := []openid.Provider{}
-	log.Debug("Setting up providers: ", k.Spec.OpenIDOptions.Providers)
+	k.Logger().Debug("Setting up providers: ", k.Spec.OpenIDOptions.Providers)
 	for _, provider := range k.Spec.OpenIDOptions.Providers {
 		iss := provider.Issuer
-		log.Debug("Setting up Issuer: ", iss)
+		k.Logger().Debug("Setting up Issuer: ", iss)
 		providerClientArray := make([]string, len(provider.ClientIDs))
 
 		i := 0
@@ -68,7 +66,7 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 			}
 			k.lock.Unlock()
 
-			log.Debug("--> Setting up client: ", clientID, " with policy: ", policyID)
+			k.Logger().Debug("--> Setting up client: ", clientID, " with policy: ", policyID)
 			providerClientArray[i] = clientID
 			i++
 		}
@@ -76,10 +74,9 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 		p, err := openid.NewProvider(iss, providerClientArray)
 
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix":   OIDPREFIX,
+			k.Logger().WithError(err).WithFields(logrus.Fields{
 				"provider": iss,
-			}).Error("Failed to create provider: ", err)
+			}).Error("Failed to create provider")
 		} else {
 			providers = append(providers, p)
 		}
@@ -90,13 +87,12 @@ func (k *OpenIDMW) getProviders() ([]openid.Provider, error) {
 
 // We don't want any of the error handling, we use our own
 func (k *OpenIDMW) dummyErrorHandler(e error, w http.ResponseWriter, r *http.Request) bool {
-	log.WithFields(logrus.Fields{
-		"prefix": OIDPREFIX,
-	}).Warning("JWT Invalid: ", e)
+	k.Logger().WithError(e).Warning("JWT Invalid")
 	return true
 }
 
 func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	logger := k.Logger()
 	// 1. Validate the JWT
 	ouser, token, halt := openid.AuthenticateOIDWithUser(k.providerConfiguration, w, r)
 
@@ -112,9 +108,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	clients, cfound := token.Claims.(jwt.MapClaims)["aud"]
 
 	if !found && !cfound {
-		log.WithFields(logrus.Fields{
-			"prefix": OIDPREFIX,
-		}).Error("No issuer or audiences found!")
+		logger.Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
@@ -123,9 +117,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	clientSet, foundIssuer := k.provider_client_policymap[iss.(string)]
 	k.lock.RUnlock()
 	if !foundIssuer {
-		log.WithFields(logrus.Fields{
-			"prefix": OIDPREFIX,
-		}).Error("No issuer or audiences found!")
+		logger.Error("No issuer or audiences found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
@@ -152,9 +144,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	}
 
 	if policyID == "" {
-		log.WithFields(logrus.Fields{
-			"prefix": OIDPREFIX,
-		}).Error("No matching policy found!")
+		logger.Error("No matching policy found!")
 		k.reportLoginFailure("[NOT GENERATED]", r)
 		return errors.New("Key not authorised"), http.StatusUnauthorized
 	}
@@ -164,16 +154,16 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 	sessionID := generateToken(k.Spec.OrgID, keyID)
 	if k.Spec.OpenIDOptions.SegregateByClient {
 		// We are segregating by client, so use it as part of the internal token
-		log.Debug("Client ID:", clientID)
+		logger.Debug("Client ID:", clientID)
 		sessionID = generateToken(k.Spec.OrgID, fmt.Sprintf("%x", md5.Sum([]byte(clientID)))+keyID)
 	}
 
-	log.Debug("Generated Session ID: ", sessionID)
+	logger.Debug("Generated Session ID: ", sessionID)
 
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	if !exists {
 		// Create it
-		log.Debug("Key does not exist, creating")
+		logger.Debug("Key does not exist, creating")
 		session = user.SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
@@ -183,9 +173,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 
 		if err != nil {
 			k.reportLoginFailure(sessionID, r)
-			log.WithFields(logrus.Fields{
-				"prefix": OIDPREFIX,
-			}).Error("Could not find a valid policy to apply to this token!")
+			logger.Error("Could not find a valid policy to apply to this token!")
 			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
 
@@ -194,7 +182,7 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 		session.Alias = clientID + ":" + ouser.ID
 
 		// Update the session in the session manager in case it gets called again
-		log.Debug("Policy applied to key")
+		logger.Debug("Policy applied to key")
 	}
 
 	// 4. Set session state on context, we will need it later
@@ -208,9 +196,8 @@ func (k *OpenIDMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inte
 }
 
 func (k *OpenIDMW) reportLoginFailure(tykId string, r *http.Request) {
-	log.WithFields(logrus.Fields{
-		"prefix": OIDPREFIX,
-		"key":    tykId,
+	k.Logger().WithFields(logrus.Fields{
+		"key": obfuscateKey(tykId),
 	}).Warning("Attempted access with invalid key.")
 
 	// Fire Authfailed Event

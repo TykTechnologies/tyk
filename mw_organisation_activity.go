@@ -89,10 +89,10 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession user.SessionState) (error, int) {
-	// Is it active?
-	logEntry := getLogEntryForRequest(r, k.Spec.OrgID, nil)
+	logger := k.Logger()
+
 	if orgSession.IsInactive {
-		logEntry.Warning("Organisation access is disabled.")
+		logger.Warning("Organisation access is disabled.")
 
 		return errors.New("this organisation access has been disabled, please contact your API administrator"), http.StatusForbidden
 	}
@@ -117,14 +117,14 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 			SessionCache.Set(k.Spec.OrgID, orgSession, time.Second*time.Duration(sessionLifeTime))
 		}
 	} else {
-		log.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")
+		logger.WithError(err).Error("Could not update org session")
 	}
 
 	switch reason {
 	case sessionFailNone:
 		// all good, keep org active
 	case sessionFailQuota:
-		logEntry.Warning("Organisation quota has been exceeded.")
+		logger.Warning("Organisation quota has been exceeded.")
 
 		// Fire a quota exceeded event
 		k.FireEvent(
@@ -141,7 +141,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 
 		return errors.New("This organisation quota has been exceeded, please contact your API administrator"), http.StatusForbidden
 	case sessionFailRateLimit:
-		logEntry.Warning("Organisation rate limit has been exceeded.")
+		logger.Warning("Organisation rate limit has been exceeded.")
 
 		// Fire a rate limit exceeded event
 		k.FireEvent(
@@ -173,7 +173,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession use
 
 func (k *OrganizationMonitor) SetOrgSentinel(orgChan chan bool, orgId string) {
 	for isActive := range orgChan {
-		log.Debug("Chan got:", isActive)
+		k.Logger().Debug("Chan got:", isActive)
 		orgActiveMap.Store(orgId, isActive)
 	}
 }
@@ -204,7 +204,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	)
 
 	if found && !active.(bool) {
-		log.Debug("Is not active")
+		k.Logger().Debug("Is not active")
 		return errors.New("This organization access has been disabled or quota/rate limit is exceeded, please contact your API administrator"), http.StatusForbidden
 	}
 
@@ -220,7 +220,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 	session *user.SessionState) {
 
 	// Is it active?
-	logEntry := getExplicitLogEntryForRequest(path, IP, k.Spec.OrgID, nil)
+	logEntry := getExplicitLogEntryForRequest(k.Logger(), path, IP, k.Spec.OrgID, nil)
 	if session.IsInactive {
 		logEntry.Warning("Organisation access is disabled.")
 		orgChan <- false
@@ -247,7 +247,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 			SessionCache.Set(k.Spec.OrgID, *session, time.Second*time.Duration(sessionLifeTime))
 		}
 	} else {
-		log.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")
+		logEntry.WithError(err).WithField("orgID", k.Spec.OrgID).Error("Could not update org session")
 	}
 
 	isExceeded := false

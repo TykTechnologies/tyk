@@ -57,7 +57,7 @@ type JWKs struct {
 func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, error) {
 	// Implement a cache
 	if JWKCache == nil {
-		log.Debug("Creating JWK Cache")
+		k.Logger().Debug("Creating JWK Cache")
 		JWKCache = cache.New(240*time.Second, 30*time.Second)
 	}
 
@@ -65,28 +65,28 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
 	if !found {
 		// Get the JWK
-		log.Debug("Pulling JWK")
+		k.Logger().Debug("Pulling JWK")
 		resp, err := http.Get(url)
 		if err != nil {
-			log.Error("Failed to get resource URL: ", err)
+			k.Logger().WithError(err).Error("Failed to get resource URL")
 			return nil, err
 		}
 		defer resp.Body.Close()
 
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
-			log.Error("Failed to decode body JWK: ", err)
+			k.Logger().WithError(err).Error("Failed to decode body JWK")
 			return nil, err
 		}
 
 		// Cache it
-		log.Debug("Caching JWK")
+		k.Logger().Debug("Caching JWK")
 		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
 		jwkSet = cachedJWK.(JWKs)
 	}
 
-	log.Debug("Checking JWKs...")
+	k.Logger().Debug("Checking JWKs...")
 	for _, val := range jwkSet.Keys {
 		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
 			continue
@@ -97,8 +97,8 @@ func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) ([]byte, erro
 			if err != nil {
 				return nil, err
 			}
-			log.Debug("Found cert! Replying...")
-			log.Debug("Cert was: ", string(decodedCert))
+			k.Logger().Debug("Found cert! Replying...")
+			k.Logger().Debug("Cert was: ", string(decodedCert))
 			return decodedCert, nil
 		}
 		return nil, errors.New("no certificates in JWK")
@@ -112,7 +112,7 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 	// If is not supposed to ignore KID - will use this as ID if not empty
 	if !k.Spec.APIDefinition.JWTSkipKid {
 		if tykId, idFound := token.Header[KID].(string); idFound {
-			log.Debug("Found: ", tykId)
+			k.Logger().Debug("Found: ", tykId)
 			return tykId, nil
 		}
 	}
@@ -163,10 +163,9 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	}
 
 	// Couldn't base64 decode the kid, so lets try it raw
-	log.Debug("Getting key: ", tykId)
+	k.Logger().Debug("Getting key: ", tykId)
 	session, rawKeyExists := k.CheckSessionAndIdentityForValidKey(tykId, r)
 	if !rawKeyExists {
-		log.Info("Not found!")
 		return nil, errors.New("token invalid, key not found")
 	}
 	return []byte(session.JWTData.Secret), nil
@@ -175,7 +174,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
 	policyID, foundPolicy := claims[k.Spec.JWTPolicyFieldName].(string)
 	if !foundPolicy {
-		log.Error("Could not identify a policy to apply to this token from field!")
+		k.Logger().Error("Could not identify a policy to apply to this token from field!")
 		return "", false
 	}
 
@@ -188,7 +187,7 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 	} else if k.Spec.JWTClientIDBaseField != "" {
 		clientID, clientIDFound := claims[k.Spec.JWTClientIDBaseField].(string)
 		if !clientIDFound {
-			log.Error("Could not identify a policy to apply to this token from field!")
+			k.Logger().Error("Could not identify a policy to apply to this token from field!")
 			return "", false
 		}
 
@@ -217,37 +216,37 @@ func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error)
 	if k.Spec.JWTIdentityBaseField != "" {
 		if userId, found = claims[k.Spec.JWTIdentityBaseField].(string); found {
 			if len(userId) > 0 {
-				log.WithField("userId", userId).Debug("Found User Id in Base Field")
+				k.Logger().WithField("userId", userId).Debug("Found User Id in Base Field")
 				return userId, nil
 			}
 			message := "found an empty user ID in predefined base field claim " + k.Spec.JWTIdentityBaseField
-			log.Error(message)
+			k.Logger().Error(message)
 			return "", errors.New(message)
 		}
 
 		if !found {
-			log.WithField("Base Field", k.Spec.JWTIdentityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
+			k.Logger().WithField("Base Field", k.Spec.JWTIdentityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
 		}
 	}
 
 	if userId, found = claims[SUB].(string); found {
 		if len(userId) > 0 {
-			log.WithField("userId", userId).Debug("Found User Id in 'sub' claim")
+			k.Logger().WithField("userId", userId).Debug("Found User Id in 'sub' claim")
 			return userId, nil
 		}
 		message := "found an empty user ID in sub claim"
-		log.Error(message)
+		k.Logger().Error(message)
 		return "", errors.New(message)
 	}
 
 	message := "no suitable claims for user ID were found"
-	log.Error(message)
+	k.Logger().Error(message)
 	return "", errors.New(message)
 }
 
 // processCentralisedJWT Will check a JWT token centrally against the secret stored in the API Definition.
 func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token) (error, int) {
-	log.Debug("JWT authority is centralised")
+	k.Logger().Debug("JWT authority is centralised")
 
 	claims := token.Claims.(jwt.MapClaims)
 	baseFieldData, err := k.getUserIdFromClaim(claims)
@@ -261,12 +260,12 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
 	sessionID := generateToken(k.Spec.OrgID, keyID)
 
-	log.Debug("JWT Temporary session ID is: ", sessionID)
+	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
 	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
 	if !exists {
 		// Create it
-		log.Debug("Key does not exist, creating")
+		k.Logger().Debug("Key does not exist, creating")
 		session = user.SessionState{}
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
@@ -281,7 +280,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			true)
 		if err != nil {
 			k.reportLoginFailure(baseFieldData, r)
-			log.Error("Could not find a valid policy to apply to this token!")
+			k.Logger().Error("Could not find a valid policy to apply to this token!")
 			return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 		}
 		//override session expiry with JWT if longer lived
@@ -296,7 +295,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
-		log.Debug("Policy applied to key")
+		k.Logger().Debug("Policy applied to key")
 
 		switch k.Spec.BaseIdentityProvidedBy {
 		case apidef.JWTClaim, apidef.UnsetAuth:
@@ -317,28 +316,28 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		policiesMu.RUnlock()
 		if !ok {
 			k.reportLoginFailure(baseFieldData, r)
-			log.Error("Policy ID found in token is invalid!")
+			k.Logger().Error("Policy ID found in token is invalid!")
 			return errors.New("key not authorized: no matching policy"), http.StatusForbidden
 		}
 		// check if token for this session was switched to another valid policy
 		pols := session.PolicyIDs()
 		if len(pols) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
-			log.Error("No policies for the found session. Failing Request.")
+			k.Logger().Error("No policies for the found session. Failing Request.")
 			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
 		}
 		if pols[0] != policyID { // switch session to new policy and update session storage and cache
 			// check ownership before updating session
 			if policy.OrgID != k.Spec.OrgID {
 				k.reportLoginFailure(baseFieldData, r)
-				log.Error("Policy ID found in token is invalid (wrong ownership)!")
+				k.Logger().Error("Policy ID found in token is invalid (wrong ownership)!")
 				return errors.New("Key not authorized: no matching policy"), http.StatusForbidden
 			}
 			// apply new policy to session and update session
 			session.SetPolicies(policyID)
 			if err := k.ApplyPolicies(sessionID, &session); err != nil {
 				k.reportLoginFailure(baseFieldData, r)
-				log.WithError(err).Error("Could not apply new policy from JWT to session")
+				k.Logger().WithError(err).Error("Could not apply new policy from JWT to session")
 				return errors.New("Key not authorized: could not apply new policy"), http.StatusForbidden
 			}
 
@@ -353,7 +352,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
-	log.Debug("Key found")
+	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
 		ctxSetSession(r, &session, sessionID, false)
@@ -378,20 +377,21 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 		return err, http.StatusNotFound
 	}
 
-	log.Debug("Using raw key ID: ", tykId)
+	k.Logger().Debug("Using raw key ID: ", tykId)
 	session, exists := k.CheckSessionAndIdentityForValidKey(tykId, r)
 	if !exists {
 		k.reportLoginFailure(tykId, r)
 		return errors.New("Key not authorized"), http.StatusForbidden
 	}
 
-	log.Debug("Raw key ID found.")
+	k.Logger().Debug("Raw key ID found.")
 	ctxSetSession(r, &session, tykId, false)
 	ctxSetJWTContextVars(k.Spec, r, token)
 	return nil, http.StatusOK
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	logger := k.Logger()
 	config := k.Spec.Auth
 	var tykId string
 
@@ -413,8 +413,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if rawJWT == "" {
 		// No header value, fail
-		logEntry := getLogEntryForRequest(r, "", nil)
-		logEntry.Info("Attempted access with malformed header, no JWT auth header found.")
+		logger.Info("Attempted access with malformed header, no JWT auth header found.")
 
 		log.Debug("Looked in: ", config.AuthHeaderName)
 		log.Debug("Raw data was: ", rawJWT)
@@ -447,7 +446,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 				return nil, fmt.Errorf("Unexpected signing method: %v and not ECDSA signature", token.Header["alg"])
 			}
 		default:
-			log.Warning("No signing method found in API Definition, defaulting to HMAC signature")
+			logger.Warning("No signing method found in API Definition, defaulting to HMAC signature")
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
@@ -455,14 +454,14 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		val, err := k.getSecretToVerifySignature(r, token)
 		if err != nil {
-			log.Error("Couldn't get token: ", err)
+			k.Logger().WithError(err).Error("Couldn't get token")
 			return nil, err
 		}
 
 		if k.Spec.JWTSigningMethod == RSASign {
 			asRSA, err := jwt.ParseRSAPublicKeyFromPEM(val)
 			if err != nil {
-				log.WithError(err).Error("Failed to decode JWT to RSA type")
+				logger.WithError(err).Error("Failed to decode JWT to RSA type")
 				return nil, err
 			}
 			return asRSA, nil
@@ -486,11 +485,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// No, let's try one-to-one mapping
 		return k.processOneToOneTokenMap(r, token)
 	}
-	logEntry := getLogEntryForRequest(r, "", nil)
-	logEntry.Info("Attempted JWT access with non-existent key.")
+
+	logger.Info("Attempted JWT access with non-existent key.")
 	k.reportLoginFailure(tykId, r)
 	if err != nil {
-		logEntry.Error("JWT validation error: ", err)
+		logger.WithError(err).Error("JWT validation error")
 		return errors.New("Key not authorized:" + err.Error()), http.StatusForbidden
 	}
 	return errors.New("Key not authorized"), http.StatusForbidden

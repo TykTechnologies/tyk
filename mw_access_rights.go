@@ -25,21 +25,13 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	session := ctxGetSession(r)
-	token := ctxGetAuthToken(r)
 
 	// If there's nothing in our profile, we let them through to the next phase
 	if len(session.AccessRights) > 0 {
 		// Otherwise, run auth checks
 		versionList, apiExists := session.AccessRights[a.Spec.APIID]
 		if !apiExists {
-			logEntry := getLogEntryForRequest(
-				r,
-				token,
-				map[string]interface{}{
-					"api_found": false,
-				},
-			)
-			logEntry.Info("Attempted access to unauthorised API.")
+			a.Logger().Info("Attempted access to unauthorised API")
 
 			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 		}
@@ -59,17 +51,7 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 
 		if !found {
-			// Not found? Bounce
-			logEntry := getLogEntryForRequest(
-				r,
-				token,
-				map[string]interface{}{
-					"api_found":     true,
-					"version_found": false,
-				},
-			)
-			logEntry.Info("Attempted access to unauthorised API version.")
-
+			a.Logger().Info("Attempted access to unauthorised API version.")
 			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 		}
 	}

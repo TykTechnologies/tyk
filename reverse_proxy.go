@@ -270,7 +270,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
 	}
-	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{spec, proxy}
+	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy}
 	return proxy
 }
 
