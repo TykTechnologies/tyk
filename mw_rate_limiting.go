@@ -74,6 +74,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
 		&k.Spec.GlobalConfig,
+		k.Spec.APIID,
 	)
 
 	switch reason {

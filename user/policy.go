@@ -24,4 +24,5 @@ type PolicyPartitions struct {
 	Quota     bool `bson:"quota" json:"quota"`
 	RateLimit bool `bson:"rate_limit" json:"rate_limit"`
 	Acl       bool `bson:"acl" json:"acl"`
+	PerAPI    bool `bson:"per_api" json:"per_api"`
 }

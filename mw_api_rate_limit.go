@@ -70,6 +70,7 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		true,
 		false,
 		&k.Spec.GlobalConfig,
+		k.Spec.APIID,
 	)
 
 	if reason == sessionFailRateLimit {

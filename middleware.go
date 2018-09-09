@@ -204,8 +204,12 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) error {
 	rights := session.AccessRights
+	if rights == nil {
+		rights = make(map[string]user.AccessDefinition)
+	}
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
+	didPerAPI := make(map[string]bool)
 	policies := session.PolicyIDs()
 	for i, polID := range policies {
 		policiesMu.RLock()
@@ -224,8 +228,57 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			return err
 		}
 
-		if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
+		if policy.Partitions.PerAPI &&
+			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl) {
+			err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
+			log.Error(err)
+			return err
+		}
+
+		if policy.Partitions.PerAPI {
+			// new logic when you can specify quota or rate in more than one policy but for different APIs
+			if didQuota || didRateLimit || didACL { // no other partitions allowed
+				err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
+				log.Error(err)
+				return err
+			}
+			for apiID, accessRights := range policy.AccessRights {
+				// check if limit was already set for this API by other policy assigned to key
+				if didPerAPI[apiID] {
+					err := fmt.Errorf("cannot apply multiple policies for API: %s", apiID)
+					log.Error(err)
+					return err
+				}
+
+				// check if we already have limit on API level specified when policy was created
+				if accessRights.Limit == nil {
+					// limit was not specified on API level so we will populate it from policy
+					accessRights.Limit = &user.APILimit{
+						QuotaMax:         policy.QuotaMax,
+						QuotaRenewalRate: policy.QuotaRenewalRate,
+						Rate:             policy.Rate,
+						Per:              policy.Per,
+						SetByPolicy:      true,
+					}
+				}
+
+				// adjust policy access right with limit on API level
+				policy.AccessRights[apiID] = accessRights
+
+				// overwrite session access right for this API
+				rights[apiID] = accessRights
+
+				// identify that limit for that API is set (to allow set it only once)
+				didPerAPI[apiID] = true
+			}
+		} else if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
 			// This is a partitioned policy, only apply what is active
+			// legacy logic when you can specify quota or rate only in no more than one policy
+			if len(didPerAPI) > 0 { // no policies with per_api set allowed
+				err := fmt.Errorf("cannot apply multiple policies when some are partitioned and some have per_api set")
+				log.Error(err)
+				return err
+			}
 			if policy.Partitions.Quota {
 				if didQuota {
 					err := fmt.Errorf("cannot apply multiple quota policies")
@@ -245,7 +298,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 					return err
 				}
 				didRateLimit = true
-				// Rate limting
+				// Rate limiting
 				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 				session.Rate = policy.Rate
 				session.Per = policy.Per
@@ -266,7 +319,6 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 				}
 				session.HMACEnabled = policy.HMACEnabled
 			}
-
 		} else {
 			if len(policies) > 1 {
 				err := fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
@@ -278,7 +330,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			session.QuotaMax = policy.QuotaMax
 			session.QuotaRenewalRate = policy.QuotaRenewalRate
 
-			// Rate limting
+			// Rate limiting
 			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 			session.Rate = policy.Rate
 			session.Per = policy.Per
