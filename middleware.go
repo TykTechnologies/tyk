@@ -144,14 +144,14 @@ type BaseMiddleware struct {
 	Spec   *APISpec
 	Proxy  ReturningHttpHandler
 	logger *logrus.Entry
-	mu     sync.RWMutex
+	mu     sync.Mutex
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
 
 func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if t.logger == nil {
 		t.logger = logrus.NewEntry(log)
@@ -161,6 +161,9 @@ func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
 }
 
 func (t *BaseMiddleware) SetName(name string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	t.logger = t.Logger().WithField("mw", name)
 }
 
