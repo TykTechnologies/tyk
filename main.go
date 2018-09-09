@@ -381,7 +381,7 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/trace", traceHandler).Methods("POST")
+	r.HandleFunc("/debug", traceHandler).Methods("POST")
 
 	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
 	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")

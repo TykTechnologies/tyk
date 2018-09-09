@@ -1375,12 +1375,12 @@ func TestTracing(t *testing.T) {
 	authHeaders := map[string][]string{"Authorization": {keyID}}
 
 	ts.Run(t, []test.TestCase{
-		{Method: "GET", Path: "/tyk/trace", AdminAuth: true, Code: 405},
-		{Method: "POST", Path: "/tyk/trace", AdminAuth: true, Code: 400, BodyMatch: "Request malformed"},
-		{Method: "POST", Path: "/tyk/trace", Data: `{}`, AdminAuth: true, Code: 400, BodyMatch: "Spec field is missing"},
-		{Method: "POST", Path: "/tyk/trace", Data: `{"Spec": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Request field is missing"},
-		{Method: "POST", Path: "/tyk/trace", Data: `{"Spec": {}, "Request": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Spec not valid, skipped!"},
-		{Method: "POST", Path: "/tyk/trace", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `"code":401`},
-		{Method: "POST", Path: "/tyk/trace", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `"code":200`},
+		{Method: "GET", Path: "/tyk/debug", AdminAuth: true, Code: 405},
+		{Method: "POST", Path: "/tyk/debug", AdminAuth: true, Code: 400, BodyMatch: "Request malformed"},
+		{Method: "POST", Path: "/tyk/debug", Data: `{}`, AdminAuth: true, Code: 400, BodyMatch: "Spec field is missing"},
+		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Request field is missing"},
+		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}, "Request": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Spec not valid, skipped!"},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `"code":401`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `"code":200`},
 	}...)
 }
