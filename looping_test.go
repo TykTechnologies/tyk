@@ -126,3 +126,26 @@ func TestLooping(t *testing.T) {
 		}...)
 	})
 }
+
+func TestConcurrencyReloads(t *testing.T) {
+    var wg sync.WaitGroup
+
+    ts := newTykTestServer()
+    defer ts.Close()
+
+    buildAndLoadAPI()
+
+    for i := 0; i < 10; i++ {
+        wg.Add(1)
+        go func() {
+            ts.Run(t, test.TestCase{Path: "/sample", Code: 200})
+            wg.Done()
+        }()
+    }
+
+    for j := 0; j < 5; j++ {
+        buildAndLoadAPI()
+    }
+
+    wg.Wait()
+}

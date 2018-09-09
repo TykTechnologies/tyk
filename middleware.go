@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -144,15 +143,11 @@ type BaseMiddleware struct {
 	Spec   *APISpec
 	Proxy  ReturningHttpHandler
 	logger *logrus.Entry
-	mu     sync.Mutex
 }
 
 func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
 
 func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	if t.logger == nil {
 		t.logger = logrus.NewEntry(log)
 	}
@@ -161,21 +156,11 @@ func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
 }
 
 func (t *BaseMiddleware) SetName(name string) {
-	logger := t.Logger()
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.logger = logger.WithField("mw", name)
+	t.logger = t.Logger().WithField("mw", name)
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
-	logger := t.Logger()
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.logger = getLogEntryForRequest(logger, r, ctxGetAuthToken(r), nil)
+	t.logger = getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
 }
 
 func (t BaseMiddleware) Init() {}
