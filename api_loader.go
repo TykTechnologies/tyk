@@ -24,6 +24,7 @@ import (
 )
 
 type ChainObject struct {
+	Domain         string
 	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
@@ -444,6 +445,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	chainDef.ThisHandler = chain
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
+	chainDef.Domain = spec.Domain
 
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
@@ -618,7 +620,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
 		}
 
-		mainLog.Info("Processed and listening on: ", chainObj.ListenOn)
+		mainLog.Infof("Processed and listening on: %s%s", chainObj.Domain, chainObj.ListenOn)
 		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 	}
 
