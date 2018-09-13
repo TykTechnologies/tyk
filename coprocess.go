@@ -3,8 +3,8 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
@@ -145,8 +145,8 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
 func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) {
-	r.ContentLength = int64(len(object.Request.Body))
-	r.Body = ioutil.NopCloser(strings.NewReader(object.Request.Body))
+	r.ContentLength = int64(len(object.Request.RawBody))
+	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
 
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
