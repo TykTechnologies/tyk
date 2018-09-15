@@ -25,10 +25,7 @@ static void LoadMiddlewareIntoState(lua_State* L, char* middleware_name, char* m
 	luaL_dostring(L, middleware_contents);
 }
 
-static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object) {
-
-	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
-
+static void LuaDispatchHook(struct CoProcessMessage* object, struct CoProcessMessage* outputObject) {
 	lua_State *L = luaL_newstate();
 
 	luaL_openlibs(L);
@@ -52,7 +49,7 @@ static struct CoProcessMessage* LuaDispatchHook(struct CoProcessMessage* object)
 	outputObject->p_data = (void*)output;
 	outputObject->length = lua_output_length;
 
-	return outputObject;
+	return;
 }
 
 static void LuaDispatchEvent(char* event_json) {
@@ -107,10 +104,10 @@ type LuaDispatcher struct {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
+func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) {
 	object := (*C.struct_CoProcessMessage)(objectPtr)
-	newObjectPtr := C.LuaDispatchHook(object)
-	return unsafe.Pointer(newObjectPtr)
+	newObject := (*C.struct_CoProcessMessage)(newObjectPtr)
+	C.LuaDispatchHook(object, newObject)
 }
 
 // Reload will perform a middleware reload when a hot reload is triggered.
