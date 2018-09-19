@@ -8,7 +8,7 @@
 
 static void LuaInit();
 
-static void LuaDispatchHook(struct CoProcessMessage*, struct CoProcessMessage*);
+static int LuaDispatchHook(struct CoProcessMessage*, struct CoProcessMessage*);
 static void LuaDispatchEvent(char*);
 
 void LoadCachedMiddleware(void*);

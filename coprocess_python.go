@@ -124,10 +124,10 @@ static void Python_SetEnv(char* python_path) {
 	setenv("PYTHONPATH", python_path, 1 );
 }
 
-static void Python_DispatchHook(struct CoProcessMessage* object, struct CoProcessMessage* new_object) {
+static int Python_DispatchHook(struct CoProcessMessage* object, struct CoProcessMessage* new_object) {
 	if (object->p_data == NULL) {
 		free(object);
-		return;
+		return -1;
 	}
 
 	gilState = PyGILState_Ensure();
@@ -145,7 +145,7 @@ static void Python_DispatchHook(struct CoProcessMessage* object, struct CoProces
 	if( result == NULL ) {
 		PyErr_Print();
 		PyGILState_Release(gilState);
-		return;
+		return -1;
 	}
 	PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
 	char* output = PyBytes_AsString(new_object_msg_item);
@@ -163,7 +163,7 @@ static void Python_DispatchHook(struct CoProcessMessage* object, struct CoProces
 	new_object->length = msg_length;
 
 	PyGILState_Release(gilState);
-	return;
+	return 0;
 }
 
 static void Python_DispatchEvent(char* event_json) {
@@ -205,11 +205,14 @@ type PythonDispatcher struct {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) {
+func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) error {
 	object := (*C.struct_CoProcessMessage)(objectPtr)
 	newObject := (*C.struct_CoProcessMessage)(newObjectPtr)
-	// TODO: restore error result
-	C.Python_DispatchHook(object, newObject)
+
+	if result := C.Python_DispatchHook(object, newObject); result != 0 {
+		return errors.New("Dispatch error")
+	}
+	return nil
 }
 
 // DispatchEvent dispatches a Tyk event.

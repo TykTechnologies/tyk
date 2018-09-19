@@ -9,7 +9,7 @@ static int Python_LoadDispatcher();
 static int Python_NewDispatcher(char*);
 static void Python_ReloadDispatcher();
 
-static void Python_DispatchHook(struct CoProcessMessage*, struct CoProcessMessage*);
+static int Python_DispatchHook(struct CoProcessMessage*, struct CoProcessMessage*);
 static void Python_DispatchEvent(char*);
 
 #endif

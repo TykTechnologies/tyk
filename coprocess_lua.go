@@ -25,7 +25,7 @@ static void LoadMiddlewareIntoState(lua_State* L, char* middleware_name, char* m
 	luaL_dostring(L, middleware_contents);
 }
 
-static void LuaDispatchHook(struct CoProcessMessage* object, struct CoProcessMessage* outputObject) {
+static int LuaDispatchHook(struct CoProcessMessage* object, struct CoProcessMessage* outputObject) {
 	lua_State *L = luaL_newstate();
 
 	luaL_openlibs(L);
@@ -49,7 +49,7 @@ static void LuaDispatchHook(struct CoProcessMessage* object, struct CoProcessMes
 	outputObject->p_data = (void*)output;
 	outputObject->length = lua_output_length;
 
-	return;
+	return 0;
 }
 
 static void LuaDispatchEvent(char* event_json) {
@@ -67,6 +67,7 @@ static void LuaDispatchEvent(char* event_json) {
 import "C"
 
 import (
+	"errors"
 	"io/ioutil"
 	"path/filepath"
 	"unsafe"
@@ -104,10 +105,13 @@ type LuaDispatcher struct {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) {
+func (d *LuaDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) error {
 	object := (*C.struct_CoProcessMessage)(objectPtr)
 	newObject := (*C.struct_CoProcessMessage)(newObjectPtr)
-	C.LuaDispatchHook(object, newObject)
+	if result := C.LuaDispatchHook(object, newObject); result != 0 {
+		return errors.New("Dispatch error")
+	}
+	return nil
 }
 
 // Reload will perform a middleware reload when a hot reload is triggered.
