@@ -338,7 +338,7 @@ func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 
 
 // IncrementByWithExpire increments given key by value in Redis
 // and sets expiration if it is a new key
-func (r RedisCluster) IncrementByWithExpire(keyName string, incBy int64, expire int64) int64 {
+func (r RedisCluster) IncrementByWithExpire(keyName string, incBy int64, expire int64) ([]int64, error) {
 	logEntry := log.WithFields(logrus.Fields{
 		"keyName": keyName,
 		"incBy":   incBy,
@@ -349,14 +349,22 @@ func (r RedisCluster) IncrementByWithExpire(keyName string, incBy int64, expire 
 	val, err := redis.Int64(r.singleton().Do("INCRBY", keyName, incBy))
 	if err != nil {
 		logEntry.WithError(err).Error("Error trying to increment value")
+		return nil, err
 	} else {
 		logEntry.Debug("Incremented key by number")
 	}
-	if val == incBy {
+	ttl := expire
+	if val == incBy && expire != 0 {
 		logEntry.Debug("--> Setting Expire")
 		r.singleton().Do("EXPIRE", keyName, expire)
+	} else {
+		// for existing key - let client know how mach ttl left
+		ttl, err = redis.Int64(r.singleton().Do("TTL", keyName))
+		if err != nil {
+			logEntry.WithError(err).Error("Error trying to get TTL")
+		}
 	}
-	return val
+	return []int64{val, ttl}, nil
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)

@@ -96,6 +96,9 @@ func onServerStatusReceivedHandler(payload string) {
 				WithField("serverData", serverData).
 				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
 			return
+		} else if DQLManager != nil {
+			// notify distributed quota limiter about server data
+			DQLManager.CheckServerLoad(serverData.ID, serverData.LoadPerSec)
 		}
 		log.Debug(DRLManager.Report())
 	} else {

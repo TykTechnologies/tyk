@@ -154,9 +154,9 @@ func (l *LDAPStorageHandler) IncrememntWithExpire(keyName string, timeout int64)
 	return 999
 }
 
-func (l *LDAPStorageHandler) IncrementByWithExpire(keyName string, incBy int64, timeout int64) int64 {
+func (l *LDAPStorageHandler) IncrementByWithExpire(keyName string, incBy int64, timeout int64) ([]int64, error) {
 	l.notifyReadOnly()
-	return 999
+	return []int64{999, 999}, nil
 }
 
 func (l *LDAPStorageHandler) notifyReadOnly() bool {

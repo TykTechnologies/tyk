@@ -20,18 +20,19 @@ type NotificationCommand string
 const (
 	RedisPubSubChannel = "tyk.cluster.notifications"
 
-	NoticeApiUpdated             NotificationCommand = "ApiUpdated"
-	NoticeApiRemoved             NotificationCommand = "ApiRemoved"
-	NoticeApiAdded               NotificationCommand = "ApiAdded"
-	NoticeGroupReload            NotificationCommand = "GroupReload"
-	NoticePolicyChanged          NotificationCommand = "PolicyChanged"
-	NoticeConfigUpdate           NotificationCommand = "NoticeConfigUpdated"
-	NoticeDashboardZeroConf      NotificationCommand = "NoticeDashboardZeroConf"
-	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"
-	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
-	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
-	NoticeGatewayLENotification  NotificationCommand = "NoticeGatewayLENotification"
-	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
+	NoticeApiUpdated                  NotificationCommand = "ApiUpdated"
+	NoticeApiRemoved                  NotificationCommand = "ApiRemoved"
+	NoticeApiAdded                    NotificationCommand = "ApiAdded"
+	NoticeGroupReload                 NotificationCommand = "GroupReload"
+	NoticePolicyChanged               NotificationCommand = "PolicyChanged"
+	NoticeConfigUpdate                NotificationCommand = "NoticeConfigUpdated"
+	NoticeDashboardZeroConf           NotificationCommand = "NoticeDashboardZeroConf"
+	NoticeDashboardConfigRequest      NotificationCommand = "NoticeDashboardConfigRequest"
+	NoticeGatewayConfigResponse       NotificationCommand = "NoticeGatewayConfigResponse"
+	NoticeGatewayDRLNotification      NotificationCommand = "NoticeGatewayDRLNotification"
+	NoticeGatewayLENotification       NotificationCommand = "NoticeGatewayLENotification"
+	KeySpaceUpdateNotification        NotificationCommand = "KeySpaceUpdateNotification"
+	DQLChunkRefundRequestNotification NotificationCommand = "DQLChunkRefundRequestNotification"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -103,6 +104,11 @@ func handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded
 		reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
 		handleKeySpaceEventCacheFlush(notif.Payload)
+	case DQLChunkRefundRequestNotification:
+		if config.Global().ManagementNode {
+			return
+		}
+		onChunkRefundRequestReceivedHandler(notif.Payload)
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return
@@ -134,7 +140,7 @@ var notificationVerifier goverify.Verifier
 func isPayloadSignatureValid(notification Notification) bool {
 
 	switch notification.Command {
-	case NoticeGatewayDRLNotification, NoticeGatewayLENotification:
+	case NoticeGatewayDRLNotification, NoticeGatewayLENotification, DQLChunkRefundRequestNotification:
 		// Gateway to gateway
 		return true
 	}

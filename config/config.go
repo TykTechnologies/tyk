@@ -252,6 +252,12 @@ type Tracer struct {
 	// for options required by supported tracer implementation.
 	Options map[string]interface{} `json:"options"`
 }
+type ChunkedQuotaConfig struct {
+	EnableChunkedQuota bool    `json:"enable_chunked_quota"`
+	ChunkSize          int64   `json:"quota_chunk_size"`
+	ChunkReturnTimeout uint64  `json:"chunk_return_timeout"`
+	ChunkReturnPart    float64 `json:"chunk_return_part"`
+}
 
 // Config is the configuration object used by tyk to set up various parameters.
 type Config struct {
@@ -399,8 +405,7 @@ type Config struct {
 	ForceGlobalSessionLifetime     bool  `bson:"force_global_session_lifetime" json:"force_global_session_lifetime"`
 	HideGeneratorHeader            bool  `json:"hide_generator_header"`
 
-	DistributedQuotaEnabled       bool  `json:"distributed_quota_enabled"`
-	DistributedQuotaSyncFrequency int32 `json:"distributed_quota_sync_frequency"`
+	ChunkedQuota ChunkedQuotaConfig `json:"chunked_quota"`
 }
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.

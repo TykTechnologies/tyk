@@ -362,7 +362,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 
 // IncrementByWithExpire increments given key by value in Redis
 // and sets expiration if it is a new key
-func (r *RPCStorageHandler) IncrementByWithExpire(keyName string, incBy int64, expire int64) int64 {
+func (r *RPCStorageHandler) IncrementByWithExpire(keyName string, incBy int64, expire int64) ([]int64, error) {
 	ibd := InboundData{
 		KeyName:  keyName,
 		IntValue: incBy,
@@ -388,10 +388,10 @@ func (r *RPCStorageHandler) IncrementByWithExpire(keyName string, incBy int64, e
 
 	if val == nil {
 		log.Warning("RPC IncrementByWithExpire returned nil value, returning 0")
-		return 0
+		return nil, nil
 	}
 
-	return val.(int64)
+	return val.([]int64), err
 }
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)

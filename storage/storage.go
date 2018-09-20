@@ -53,7 +53,7 @@ type Handler interface {
 	AddToSortedSet(string, string, float64)
 	GetSortedSetRange(string, string, string) ([]string, []float64, error)
 	RemoveSortedSetRange(string, string, string) error
-	IncrementByWithExpire(string, int64, int64) int64
+	IncrementByWithExpire(string, int64, int64) ([]int64, error)
 }
 
 const defaultHashAlgorithm = "murmur64"
