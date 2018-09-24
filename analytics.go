@@ -277,6 +277,10 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			if !strings.HasPrefix(record.RawPath, "/") {
 				record.RawPath = "/" + record.RawPath
 			}
+			//if tracking path prepend apiid for grouping in aggregate queries
+			if record.TrackPath {
+				record.Path = record.APIID + record.Path
+			}
 
 			if encoded, err := msgpack.Marshal(record); err != nil {
 				log.WithError(err).Error("Error encoding analytics data")
