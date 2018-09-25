@@ -78,9 +78,7 @@ class TykMiddleware:
             handler(object, object.spec)
             return
         elif handler.arg_count == 4:
-            md = object.session.metadata
-            object.request, object.session, md = handler(object.request, object.session, md, object.spec)
-            object.session.metadata.MergeFrom(md)
+            object.request, object.session, md = handler(object.request, object.session, object.session.metadata, object.spec)
         elif handler.arg_count == 3:
             object.request, object.session = handler(object.request, object.session, object.spec)
         return object
