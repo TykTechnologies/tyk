@@ -103,7 +103,10 @@ func (self *RedisCluster) populateSlotsCache() {
 			for _, line := range lines {
 				if line != "" {
 					fields := strings.Split(line, " ")
-					addr := fields[1]
+					addrField := fields[1]
+					// Support Redis 4.x format that includes cluster bus port after "@"
+					addrParts := strings.Split(addrField, "@")
+					addr := addrParts[0]
 					if addr == ":0" {
 						addr = item.Key
 					}
