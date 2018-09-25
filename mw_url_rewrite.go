@@ -187,6 +187,8 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 					valStr = url.QueryEscape(valStr)
 				}
 				in = strings.Replace(in, v[0], valStr, -1)
+			} else {
+				in = ""
 			}
 		}
 	}
@@ -210,6 +212,8 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 					valStr = url.QueryEscape(valStr)
 				}
 				in = strings.Replace(in, v[0], valStr, -1)
+			} else {
+				in = ""
 			}
 		}
 	}
