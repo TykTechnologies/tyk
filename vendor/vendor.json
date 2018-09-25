@@ -91,10 +91,10 @@
 			"revisionTime": "2016-08-17T21:35:54Z"
 		},
 		{
-			"checksumSHA1": "V1gC0TLYL9e8KaJ36kmUu/ZzQAA=",
+			"checksumSHA1": "tJULlRWQUYzfZry+j7PuYIt0/Qc=",
 			"path": "github.com/TykTechnologies/redigocluster/rediscluster",
-			"revision": "a855bb8b4c85b2be51d7ee2e22e000467589bce8",
-			"revisionTime": "2018-02-16T17:38:47Z"
+			"revision": "2acc814701aff22e7583f242bbd5d32d70bd07eb",
+			"revisionTime": "2018-09-24T15:19:45Z"
 		},
 		{
 			"checksumSHA1": "KmjnydoAbofMieIWm+it5OWERaM=",
@@ -191,8 +191,8 @@
 		{
 			"checksumSHA1": "3kM5bMyfqvdCfgQdOb01CR1aA74=",
 			"path": "github.com/garyburd/redigo/redis",
-			"revision": "a7327d8ced8067e916e7e35490522fd0182fa839",
-			"revisionTime": "2018-02-28T18:30:32Z"
+			"revision": "569eae59ada904ea8db7a225c2b47165af08735a",
+			"revisionTime": "2018-04-04T16:07:26Z"
 		},
 		{
 			"checksumSHA1": "OvNubVhC95zaeONCY6Ztp0DScrc=",
@@ -307,12 +307,6 @@
 			"path": "github.com/lonelycode/osin",
 			"revision": "da239c9dacb656fc52eca8e7b879824e3145f242",
 			"revisionTime": "2016-04-23T09:52:02Z"
-		},
-		{
-			"checksumSHA1": "x87zR0VzytTmPXbrON3cG8XkKcQ=",
-			"path": "github.com/lonelycode/redigocluster/rediscluster",
-			"revision": "488cecc7456ee5d7665d352ae1f91c4229522bc3",
-			"revisionTime": "2017-01-05T07:49:30Z"
 		},
 		{
 			"checksumSHA1": "plye7pUJSHwBcI5lmVf7vozbRuo=",
