@@ -649,11 +649,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		token := ctxGetAuthToken(req)
 
-		var obfuscated string
-		if len(token) > 4 {
-			obfuscated = "****" + token[len(token)-4:]
-		}
-
 		var alias string
 		if session != nil {
 			alias = session.Alias
@@ -663,7 +658,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"prefix":      "proxy",
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
-			"user_id":     obfuscated,
+			"user_id":     obfuscateKey(token),
 			"user_name":   alias,
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,
