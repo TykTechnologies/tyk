@@ -28,7 +28,7 @@ class TykMiddleware:
         self.module_path = os.path.join(self.bundle_root_path, filepath)
         self.parse_manifest()
 
-        self.mw_path = os.path.join(self.module_path, "/middleware.py")
+        self.mw_path = os.path.join(self.module_path, "middleware.py")
 
         # Fallback for single file bundles:
         if len(self.manifest['file_list']) == 1:
