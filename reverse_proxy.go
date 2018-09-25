@@ -470,6 +470,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
 	}
 
+	if !config.Global().ProxySSLDisableRenegotiation {
+		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
+	}
+
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
 		log.Debug("Setting timeout for outbound request to: ", timeOut)
