@@ -1,4 +1,4 @@
-package main
+package rpc
 
 import (
 	"encoding/json"
@@ -6,27 +6,22 @@ import (
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-// Purger is an interface that will define how the in-memory store will be purged
-// of analytics data to prevent it growing too large
-type Purger interface {
-	PurgeCache()
-	PurgeLoop(<-chan time.Time)
-}
+const analyticsKeyName = "tyk-system-analytics"
 
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type RPCPurger struct {
-	Store storage.Handler
+	Store      storage.Handler
+	RecordFunc func() interface{}
 }
 
 // Connect Connects to RPC
 func (r *RPCPurger) Connect() {
 	if RPCClientIsConnected && RPCCLientSingleton != nil && RPCFuncClientSingleton != nil {
-		log.Info("RPC Analytics client using singleton")
+		Log.Info("RPC Analytics client using singleton")
 		return
 	}
 }
@@ -43,7 +38,7 @@ func (r RPCPurger) PurgeLoop(ticker <-chan time.Time) {
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *RPCPurger) PurgeCache() {
 	if _, err := RPCFuncClientSingleton.Call("Ping", nil); err != nil {
-		log.Error("Can't purge cache, failed to ping RPC: ", err)
+		Log.Error("Can't purge cache, failed to ping RPC: ", err)
 		return
 	}
 
@@ -51,51 +46,28 @@ func (r *RPCPurger) PurgeCache() {
 	if len(analyticsValues) == 0 {
 		return
 	}
-	keys := make([]AnalyticsRecord, len(analyticsValues))
+	keys := make([]interface{}, len(analyticsValues))
 
 	for i, v := range analyticsValues {
-		decoded := AnalyticsRecord{}
+		decoded := r.RecordFunc()
 		if err := msgpack.Unmarshal(v.([]byte), &decoded); err != nil {
-			log.Error("Couldn't unmarshal analytics data: ", err)
+			Log.Error("Couldn't unmarshal analytics data: ", err)
 		} else {
-			log.Debug("Decoded Record: ", decoded)
+			Log.Debug("Decoded Record: ", decoded)
 			keys[i] = decoded
 		}
 	}
 
 	data, err := json.Marshal(keys)
 	if err != nil {
-		log.Error("Failed to marshal analytics data")
+		Log.Error("Failed to marshal analytics data")
 		return
 	}
 
 	// Send keys to RPC
 	if _, err := RPCFuncClientSingleton.Call("PurgeAnalyticsData", string(data)); err != nil {
 		emitRPCErrorEvent(rpcFuncClientSingletonCall, "PurgeAnalyticsData", err)
-		log.Warn("Failed to call purge, retrying: ", err)
+		Log.Warn("Failed to call purge, retrying: ", err)
 	}
 
-}
-
-type RedisPurger struct {
-	Store storage.Handler
-}
-
-func (r RedisPurger) PurgeLoop(ticker <-chan time.Time) {
-	for {
-		<-ticker
-		r.PurgeCache()
-	}
-}
-
-func (r *RedisPurger) PurgeCache() {
-	expireAfter := config.Global().AnalyticsConfig.StorageExpirationTime
-	if expireAfter == 0 {
-		expireAfter = 60 // 1 minute
-	}
-
-	exp, _ := r.Store.GetExp(analyticsKeyName)
-	if exp <= 0 {
-		r.Store.SetExp(analyticsKeyName, int64(expireAfter))
-	}
 }

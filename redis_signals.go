@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/garyburd/redigo/redis"
 
 	"github.com/TykTechnologies/goverify"
@@ -123,7 +125,7 @@ func handleKeySpaceEventCacheFlush(payload string) {
 			key = splitKeys[0]
 		}
 
-		RPCGlobalCache.Delete("apikey-" + key)
+		rpc.RPCGlobalCache.Delete("apikey-" + key)
 		SessionCache.Delete(key)
 	}
 }

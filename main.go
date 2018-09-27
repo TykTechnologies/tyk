@@ -44,6 +44,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -62,7 +63,7 @@ var (
 	DefaultQuotaStore        DefaultSessionManager
 	FallbackKeySesionManager = SessionHandler(&DefaultSessionManager{})
 	MonitoringHandler        config.TykEventHandler
-	RPCListener              RPCStorageHandler
+	RPCListener              rpc.RPCStorageHandler
 	DashService              DashboardServiceSender
 	CertificateManager       *certs.CertificateManager
 	NewRelicApplication      newrelic.Application
@@ -137,6 +138,14 @@ func setupGlobals() {
 	healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:"}
 	InitHostCheckManager(healthCheckStore)
 
+	// Get the notifier ready
+	mainLog.Debug("Notifier will not work in hybrid mode")
+	mainNotifierStore := storage.RedisCluster{}
+	mainNotifierStore.Connect()
+	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
+
+	setupRPC()
+
 	if config.Global().EnableAnalytics && analytics.Store == nil {
 		globalConf := config.Global()
 		globalConf.LoadIgnoredIPs()
@@ -158,7 +167,12 @@ func setupGlobals() {
 
 			rpcPurgeOnce.Do(func() {
 				store := storage.RedisCluster{KeyPrefix: "analytics-"}
-				purger := RPCPurger{Store: &store}
+				purger := rpc.RPCPurger{
+					Store: &store,
+					RecordFunc: func() interface{} {
+						return AnalyticsRecord{}
+					},
+				}
 				purger.Connect()
 				go purger.PurgeLoop(rpcPurgeTicker)
 			})
@@ -174,12 +188,6 @@ func setupGlobals() {
 			log.WithField("prefix", "coprocess").Error(err)
 		}
 	}
-
-	// Get the notifier ready
-	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := storage.RedisCluster{}
-	mainNotifierStore.Connect()
-	MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel}
 
 	if config.Global().Monitor.EnableTriggerMonitors {
 		h := &WebHookHandler{}
@@ -854,8 +862,8 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.PingTimeout = 60
 	}
 
-	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
-	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
+	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
+	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
 	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
 }
@@ -877,11 +885,10 @@ func getHostDetails() {
 
 func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	if config.Global().SlaveOptions.UseRPC {
-		return &RPCStorageHandler{
-			KeyPrefix: keyPrefix,
-			HashKeys:  hashKeys,
-			UserKey:   config.Global().SlaveOptions.APIKey,
-			Address:   config.Global().SlaveOptions.ConnectionString,
+		return &rpc.RPCStorageHandler{
+			KeyPrefix:    keyPrefix,
+			HashKeys:     hashKeys,
+			SlaveOptions: config.Global().SlaveOptions,
 		}
 	}
 	return storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
@@ -1075,10 +1082,9 @@ func start() {
 
 	if slaveOptions := config.Global().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
-		RPCListener = RPCStorageHandler{
+		RPCListener = rpc.RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
-			UserKey:          slaveOptions.APIKey,
-			Address:          slaveOptions.ConnectionString,
+			SlaveOptions:     slaveOptions,
 			SuppressRegister: true,
 		}
 
@@ -1092,6 +1098,25 @@ func start() {
 	// interval counts from the start of one reload to the next.
 	go reloadLoop(time.Tick(time.Second))
 	go reloadQueueLoop()
+}
+
+func setupRPC() {
+	if !config.Global().SlaveOptions.UseRPC {
+		return
+	}
+
+	log.Info("Preparing RPC client sub-system")
+
+	// prepare RPC package
+	rpc.Log = log
+	rpc.Instrument = instrument
+	rpc.MainNotifier = &MainNotifier
+	rpc.SessionCache = SessionCache
+	rpc.ReloadCallback = doReload
+	rpc.ReloadURLStructureCallback = reloadURLStructure
+	rpc.HandleAddKeyCallback = handleAddKey
+	rpc.HandleDeleteKeyCallback = handleDeleteKey
+	rpc.HandleDeleteHashedKeyCallback = handleDeleteHashedKey
 }
 
 func generateListener(listenPort int) (net.Listener, error) {
@@ -1337,7 +1362,7 @@ func listen(listener, controlListener net.Listener, err error) {
 		fmt.Fprintf(w, "Hello Tiki")
 	})
 
-	if !rpcEmergencyMode {
+	if !rpc.IsRPCEmergencyMode() {
 		doReload()
 	}
 }

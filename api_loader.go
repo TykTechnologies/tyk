@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -35,12 +37,12 @@ type ChainObject struct {
 	Subrouter      *mux.Router
 }
 
-func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, *RPCStorageHandler, *RPCStorageHandler) {
+func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.RedisCluster, *rpc.RPCStorageHandler, *rpc.RPCStorageHandler) {
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
 	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys, UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	rpcAuthStore := rpc.RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys, SlaveOptions: config.Global().SlaveOptions}
+	rpcOrgStore := rpc.RPCStorageHandler{KeyPrefix: "orgkey.", SlaveOptions: config.Global().SlaveOptions}
 
 	FallbackKeySesionManager.Init(&redisStore)
 
