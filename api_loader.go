@@ -39,8 +39,8 @@ func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.Redis
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
 	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys, UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey."}
 
 	FallbackKeySesionManager.Init(&redisStore)
 

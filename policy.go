@@ -7,9 +7,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/Sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -157,11 +158,11 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 }
 
 func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
-	if rpcEmergencyMode {
+	if rpc.IsEmergencyMode() {
 		return LoadPoliciesFromRPCBackup()
 	}
 
-	store := &RPCStorageHandler{UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	store := &RPCStorageHandler{}
 	if !store.Connect() {
 		return nil
 	}

@@ -17,6 +17,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/rubyist/circuitbreaker"
 
@@ -341,11 +343,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
 func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
-	if rpcEmergencyMode {
+	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
 
-	store := RPCStorageHandler{UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	store := RPCStorageHandler{}
 	if !store.Connect() {
 		return nil
 	}
@@ -361,7 +363,7 @@ func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 
 	//store.Disconnect()
 
-	if rpcLoadCount > 0 {
+	if rpc.LoadCount() > 0 {
 		saveRPCDefinitionsBackup(apiCollection)
 	}
 
