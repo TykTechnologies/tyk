@@ -85,7 +85,7 @@ func NewDQL(store storage.Handler) *DQL {
 
 func (d *DQL) getQuotaChannels(key string) *quotaChannels {
 	d.channelsMu.Lock()
-	d.channelsMu.Unlock()
+	defer d.channelsMu.Unlock()
 	ch, ok := d.channels[key]
 	if !ok {
 		return nil
