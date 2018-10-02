@@ -209,7 +209,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
 
-	if mwDriver == apidef.OttoDriver {
+	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
 
