@@ -50,20 +50,19 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 	objectMsgStr := string(objectMsg)
 
 	CObjectStr := C.CString(objectMsgStr)
-	defer C.free(unsafe.Pointer(CObjectStr))
 
 	objectPtr := (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
 	objectPtr.p_data = unsafe.Pointer(CObjectStr)
 	objectPtr.length = C.int(len(objectMsg))
-	defer C.free(unsafe.Pointer(objectPtr))
 
-	newObjectPtr := (*C.struct_CoProcessMessage)(GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr)))
-	defer C.free(unsafe.Pointer(newObjectPtr))
+	newObjectPtr := (*C.struct_CoProcessMessage)(C.malloc(C.size_t(unsafe.Sizeof(C.struct_CoProcessMessage{}))))
 
-	if newObjectPtr == nil {
-		return nil, errors.New("Dispatch error")
+	// Call the dispatcher (objectPtr is freed during this call):
+	if err = GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr), unsafe.Pointer(newObjectPtr)); err != nil {
+		C.free(unsafe.Pointer(newObjectPtr.p_data))
+		C.free(unsafe.Pointer(newObjectPtr))
+		return nil, err
 	}
-
 	newObjectBytes := C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
 
 	newObject := &coprocess.Object{}
@@ -77,6 +76,10 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 	if err != nil {
 		return nil, err
 	}
+
+	// Free the returned object memory:
+	C.free(unsafe.Pointer(newObjectPtr.p_data))
+	C.free(unsafe.Pointer(newObjectPtr))
 
 	return newObject, nil
 }

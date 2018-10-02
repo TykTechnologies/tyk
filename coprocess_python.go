@@ -36,7 +36,7 @@ static int Python_Init() {
 
 
 static int Python_LoadDispatcher() {
-	PyObject *module_name = PyUnicode_FromString( dispatcher_module_name );
+	PyObject* module_name = PyUnicode_FromString( dispatcher_module_name );
 	dispatcher_module = PyImport_Import( module_name );
 
 	if( dispatcher_module == NULL ) {
@@ -63,7 +63,7 @@ static int Python_LoadDispatcher() {
 
 static void Python_ReloadDispatcher() {
 	gilState = PyGILState_Ensure();
-	PyObject *hook_name = PyUnicode_FromString(dispatcher_reload);
+	PyObject* hook_name = PyUnicode_FromString(dispatcher_reload);
 	if( dispatcher_reload_hook == NULL ) {
 		dispatcher_reload_hook = PyObject_GetAttr(dispatcher, hook_name);
 	};
@@ -124,21 +124,28 @@ static void Python_SetEnv(char* python_path) {
 	setenv("PYTHONPATH", python_path, 1 );
 }
 
-static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* object) {
-	struct CoProcessMessage* outputObject = malloc(sizeof *outputObject);
-
+static int Python_DispatchHook(struct CoProcessMessage* object, struct CoProcessMessage* new_object) {
 	if (object->p_data == NULL) {
-		return outputObject;
+		free(object);
+		return -1;
 	}
 
 	gilState = PyGILState_Ensure();
-	PyObject *args = PyTuple_Pack( 1, PyBytes_FromStringAndSize(object->p_data, object->length) );
+	PyObject* input = PyBytes_FromStringAndSize(object->p_data, object->length);
+	PyObject* args = PyTuple_Pack( 1, input );
 
-	PyObject *result = PyObject_CallObject( dispatcher_hook, args );
+	PyObject* result = PyObject_CallObject( dispatcher_hook, args );
+
+	free(object->p_data);
+	free(object);
+
+	Py_DECREF(input);
+	Py_DECREF(args);
+
 	if( result == NULL ) {
 		PyErr_Print();
 		PyGILState_Release(gilState);
-		return NULL;
+		return -1;
 	}
 	PyObject* new_object_msg_item = PyTuple_GetItem( result, 0 );
 	char* output = PyBytes_AsString(new_object_msg_item);
@@ -146,17 +153,23 @@ static struct CoProcessMessage* Python_DispatchHook(struct CoProcessMessage* obj
 	PyObject* new_object_msg_length = PyTuple_GetItem( result, 1 );
 	int msg_length = PyLong_AsLong(new_object_msg_length);
 
-	outputObject->p_data = (void*)output;
-	outputObject->length = msg_length;
+	// Copy the message in order to avoid accessing the result PyObject internal buffer:
+	char* output_copy = malloc(msg_length);
+	memcpy(output_copy, output, msg_length);
+
+	Py_DECREF(result);
+
+	new_object->p_data= (void*)output_copy;
+	new_object->length = msg_length;
 
 	PyGILState_Release(gilState);
-	return outputObject;
+	return 0;
 }
 
 static void Python_DispatchEvent(char* event_json) {
 	gilState = PyGILState_Ensure();
-	PyObject *args = PyTuple_Pack( 1, PyUnicode_FromString(event_json) );
-	PyObject *result = PyObject_CallObject( dispatch_event, args );
+	PyObject* args = PyTuple_Pack( 1, PyUnicode_FromString(event_json) );
+	PyObject* result = PyObject_CallObject( dispatch_event, args );
 	PyGILState_Release(gilState);
 }
 
@@ -192,10 +205,14 @@ type PythonDispatcher struct {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer) unsafe.Pointer {
+func (d *PythonDispatcher) Dispatch(objectPtr unsafe.Pointer, newObjectPtr unsafe.Pointer) error {
 	object := (*C.struct_CoProcessMessage)(objectPtr)
-	newObjectPtr := C.Python_DispatchHook(object)
-	return unsafe.Pointer(newObjectPtr)
+	newObject := (*C.struct_CoProcessMessage)(newObjectPtr)
+
+	if result := C.Python_DispatchHook(object, newObject); result != 0 {
+		return errors.New("Dispatch error")
+	}
+	return nil
 }
 
 // DispatchEvent dispatches a Tyk event.
