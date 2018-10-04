@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lonelycode/gorpc"
-
+	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"

@@ -392,7 +392,7 @@ func (ln *customListener) Init(addr string) (err error) {
 	return
 }
 
-func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, err error) {
+func (ln *customListener) Accept() (conn net.Conn, err error) {
 	c, err := ln.L.Accept()
 	if err != nil {
 		return
@@ -419,7 +419,7 @@ func (ln *customListener) Accept() (conn io.ReadWriteCloser, clientAddr string, 
 		return
 	}
 
-	return c, string(id), nil
+	return c, nil
 }
 
 func (ln *customListener) Close() error {

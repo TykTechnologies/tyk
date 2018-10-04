@@ -3,6 +3,7 @@ package gorpc
 import (
 	"fmt"
 	"io"
+	"net"
 	"runtime"
 	"sync"
 	"time"
@@ -180,14 +181,13 @@ func (s *Server) Serve() error {
 func serverHandler(s *Server, workersCh chan struct{}) {
 	defer s.stopWg.Done()
 
-	var conn io.ReadWriteCloser
-	var clientAddr string
+	var conn net.Conn
 	var err error
 
 	for {
 		acceptChan := make(chan struct{})
 		go func() {
-			if conn, clientAddr, err = s.Listener.Accept(); err != nil {
+			if conn, err = s.Listener.Accept(); err != nil {
 				s.LogError("gorpc.Server: [%s]. Cannot accept new connection: [%s]", s.Addr, err)
 				time.Sleep(time.Second)
 			}
@@ -208,21 +208,26 @@ func serverHandler(s *Server, workersCh chan struct{}) {
 		}
 
 		s.stopWg.Add(1)
-		go serverHandleConnection(s, conn, clientAddr, workersCh)
+		go serverHandleConnection(s, conn, workersCh)
 	}
 }
 
-func serverHandleConnection(s *Server, conn io.ReadWriteCloser, clientAddr string, workersCh chan struct{}) {
+func serverHandleConnection(s *Server, conn net.Conn, workersCh chan struct{}) {
 	defer s.stopWg.Done()
+	var clientAddr string
 
 	if s.OnConnect != nil {
-		newConn, err := s.OnConnect(clientAddr, conn)
+		newConn, clientAddr, err := s.OnConnect(conn)
 		if err != nil {
 			s.LogError("gorpc.Server: [%s]->[%s]. OnConnect error: [%s]", clientAddr, s.Addr, err)
 			conn.Close()
 			return
 		}
 		conn = newConn
+	}
+
+	if clientAddr == "" {
+		clientAddr = conn.RemoteAddr().String()
 	}
 
 	var enabledCompression bool
