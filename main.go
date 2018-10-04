@@ -44,6 +44,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -158,7 +159,12 @@ func setupGlobals() {
 
 			rpcPurgeOnce.Do(func() {
 				store := storage.RedisCluster{KeyPrefix: "analytics-"}
-				purger := RPCPurger{Store: &store}
+				purger := rpc.Purger{
+					Store: &store,
+					AnalyticsRecordFunc: func() interface{} {
+						return AnalyticsRecord{}
+					},
+				}
 				purger.Connect()
 				go purger.PurgeLoop(rpcPurgeTicker)
 			})
@@ -810,6 +816,10 @@ func initialiseSystem() error {
 		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
+	// suply rpc client globals to join it main loging and instrumentation sub systems
+	rpc.Log = log
+	rpc.Instrument = instrument
+
 	setupGlobals()
 
 	if *cli.Port != "" {
@@ -854,8 +864,8 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.PingTimeout = 60
 	}
 
-	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
-	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
+	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
+	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
 	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
 }
@@ -880,8 +890,6 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 		return &RPCStorageHandler{
 			KeyPrefix: keyPrefix,
 			HashKeys:  hashKeys,
-			UserKey:   config.Global().SlaveOptions.APIKey,
-			Address:   config.Global().SlaveOptions.ConnectionString,
 		}
 	}
 	return storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
@@ -1077,8 +1085,6 @@ func start() {
 		mainLog.Debug("Starting RPC reload listener")
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
-			UserKey:          slaveOptions.APIKey,
-			Address:          slaveOptions.ConnectionString,
 			SuppressRegister: true,
 		}
 
@@ -1337,7 +1343,7 @@ func listen(listener, controlListener net.Listener, err error) {
 		fmt.Fprintf(w, "Hello Tiki")
 	})
 
-	if !rpcEmergencyMode {
+	if !rpc.IsEmergencyMode() {
 		doReload()
 	}
 }

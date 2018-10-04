@@ -9,12 +9,13 @@ import (
 	"github.com/lonelycode/gorpc"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 )
 
 func startRPCMock(dispatcher *gorpc.Dispatcher) *gorpc.Server {
 
-	GlobalRPCCallTimeout = 100 * time.Millisecond
+	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
 
 	globalConf := config.Global()
 	globalConf.SlaveOptions.UseRPC = true
@@ -56,13 +57,7 @@ func stopRPCMock(server *gorpc.Server) {
 		server.Stop()
 	}
 
-	RPCCLientSingleton.Stop()
-	RPCClientIsConnected = false
-	RPCCLientSingleton = nil
-	RPCFuncClientSingleton = nil
-	rpcLoadCount = 0
-	rpcEmergencyMode = false
-	rpcEmergencyModeLoaded = false
+	rpc.Reset()
 }
 
 // Our RPC layer too racy, but not harmul, mostly global variables like RPCIsClientConnected
@@ -164,8 +159,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	})
 
 	t.Run("RPC is back, hard reload", func(t *testing.T) {
-		rpcEmergencyModeLoaded = false
-		rpcEmergencyMode = false
+		rpc.ResetEmergencyMode()
 
 		dispatcher := gorpc.NewDispatcher()
 		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
