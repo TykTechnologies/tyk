@@ -49,6 +49,12 @@
 			"revisionTime": "2017-02-22T15:40:38Z"
 		},
 		{
+			"checksumSHA1": "pk+Fj0KfcNdwugEfI9657E7flgI=",
+			"path": "github.com/TykTechnologies/gorpc",
+			"revision": "2fd6ca5242c4dbee5ab151010ee844f3fb5507a8",
+			"revisionTime": "2018-09-28T16:00:09Z"
+		},
+		{
 			"checksumSHA1": "FEq3KG6Kgarh8P5XIUx3bH13zDM=",
 			"path": "github.com/TykTechnologies/goverify",
 			"revision": "7ccc57452adef8d43b60485fb109e97d9e138d0c",
@@ -295,12 +301,6 @@
 			"path": "github.com/lonelycode/go-uuid/uuid",
 			"revision": "ed3ca8a15a931b141440a7e98e4f716eec255f7d",
 			"revisionTime": "2014-12-02T16:54:02Z"
-		},
-		{
-			"checksumSHA1": "OQ6h/9ehSr5avWJD3CbaZdZ8pwU=",
-			"path": "github.com/lonelycode/gorpc",
-			"revision": "5108a99af7137601fdc00c899caa4a3f0a8b31ef",
-			"revisionTime": "2015-06-11T14:24:37Z"
 		},
 		{
 			"checksumSHA1": "5OpChAvGZcoxGkZAp3qf5ZxKR84=",

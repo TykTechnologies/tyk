@@ -3,7 +3,6 @@ package rpc
 import (
 	"crypto/tls"
 	"errors"
-	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -13,8 +12,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gocraft/health"
-	"github.com/lonelycode/gorpc"
 	"github.com/satori/go.uuid"
+
+	"github.com/TykTechnologies/gorpc"
 )
 
 var (
@@ -174,7 +174,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		clientSingleton.Conns = 20
 	}
 
-	clientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
+	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -349,12 +349,15 @@ func FuncClientSingleton(funcName string, request interface{}) (interface{}, err
 	return funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 }
 
-func onConnectFunc(remoteAddr string, rwc io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	clientSingletonMu.Lock()
 	defer clientSingletonMu.Unlock()
 
 	clientIsConnected = true
-	return rwc, nil
+	remoteAddr := conn.RemoteAddr().String()
+	Log.WithField("remoteAddr", remoteAddr).Debug("connected to RPC server")
+
+	return conn, remoteAddr, nil
 }
 
 func Disconnect() bool {
