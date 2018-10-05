@@ -106,7 +106,7 @@ func EmitErrorEvent(jobName string, funcName string, err error) {
 }
 
 func EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]string) {
-	if Instrument != nil {
+	if Instrument == nil {
 		return
 	}
 
