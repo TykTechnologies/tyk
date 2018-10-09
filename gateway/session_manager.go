@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -92,6 +93,13 @@ const (
 	sessionFailRateLimit
 	sessionFailQuota
 )
+
+type rawQuotaData struct {
+	key              string
+	quotaRenewalRate int64
+	quotaRenews      int64
+	quotaMax         int64
+}
 
 // ForwardMessage will enforce rate limiting, returning a non-zero
 // sessionFailReason if session limits have been exceeded.
@@ -190,7 +198,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		}
 
 		if globalConf.ChunkedQuota.EnableChunkedQuota {
-			if l.ChunkedRedisQuotaExceeded(currentSession) {
+			if l.ChunkedRedisQuotaExceeded(currentSession, apiID) {
 				return sessionFailQuota
 			}
 		} else if l.RedisQuotaExceeded(r, currentSession, key, store, apiID) {
@@ -205,61 +213,35 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, apiID string) bool {
 	log.Debug("[QUOTA] Inbound raw key is: ", key)
 
-	// check for limit on API level (set to session by ApplyPolicies)
-	var apiLimit *user.APILimit
-	if len(currentSession.AccessRights) > 0 {
-		if rights, ok := currentSession.AccessRights[apiID]; !ok {
-			log.WithField("apiID", apiID).Debug("[QUOTA] unexpected apiID")
-			return false
-		} else {
-			apiLimit = rights.Limit
-		}
+	quotaData, apiLimit, err := l.getQuotaData(currentSession, apiID)
+	if err != nil {
+		log.WithError(err).WithField("apiID", apiID).Debug("[QUOTA] could not pre[are quota data")
+		return false
 	}
 
 	// Are they unlimited?
-	if apiLimit == nil {
-		if currentSession.QuotaMax == -1 {
-			// No quota set
-			return false
-		}
-	} else if apiLimit.QuotaMax == -1 {
+	if quotaData.quotaMax == -1 {
 		// No quota set
 		return false
 	}
 
-	rawKey := ""
-	var quotaRenewalRate int64
-	var quotaRenews int64
-	var quotaMax int64
-	if apiLimit == nil {
-		rawKey = QuotaKeyPrefix + currentSession.KeyHash()
-		quotaRenewalRate = currentSession.QuotaRenewalRate
-		quotaRenews = currentSession.QuotaRenews
-		quotaMax = currentSession.QuotaMax
-	} else {
-		rawKey = QuotaKeyPrefix + apiID + "-" + currentSession.KeyHash()
-		quotaRenewalRate = apiLimit.QuotaRenewalRate
-		quotaRenews = apiLimit.QuotaRenews
-		quotaMax = apiLimit.QuotaMax
-	}
-
-	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
-	log.Debug("Renewing with TTL: ", quotaRenewalRate)
+	log.Debug("[QUOTA] Quota limiter key is: ", quotaData.key)
+	log.Debug("Renewing with TTL: ", quotaData.quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
-	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
+	qInt := store.IncrememntWithExpire(quotaData.key, quotaData.quotaRenewalRate)
 
 	// if the returned val is >= quota: block
-	if qInt-1 >= quotaMax {
-		renewalDate := time.Unix(quotaRenews, 0)
+	if qInt-1 >= quotaData.quotaMax {
+		renewalDate := time.Unix(quotaData.quotaRenews, 0)
 		log.Debug("Renewal Date is: ", renewalDate)
-		log.Debug("As epoch: ", quotaRenews)
+		log.Debug("As epoch: ", quotaData.quotaRenews)
 		log.Debug("Session: ", currentSession)
 		log.Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
-			log.Debug("Incorrect key expiry setting detected, correcting")
-			go store.DeleteRawKey(rawKey)
+			log.Warning("Incorrect key expiry setting detected, correcting")
+			go store.DeleteRawKey(quotaData.key)
 			qInt = 1
 		} else {
 			// Renewal date is in the future and the quota is exceeded
@@ -272,15 +254,15 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	if qInt == 1 {
 		current := time.Now().Unix()
 		if apiLimit == nil {
-			currentSession.QuotaRenews = current + quotaRenewalRate
+			currentSession.QuotaRenews = current + quotaData.quotaRenewalRate
 		} else {
-			apiLimit.QuotaRenews = current + quotaRenewalRate
+			apiLimit.QuotaRenews = current + quotaData.quotaRenewalRate
 		}
 		ctxScheduleSessionUpdate(r)
 	}
 
 	// If not, pass and set the values of the session to quotamax - counter
-	remaining := quotaMax - qInt
+	remaining := quotaData.quotaMax - qInt
 	if remaining < 0 {
 		remaining = 0
 	}
@@ -294,12 +276,50 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	return false
 }
 
-func (l *SessionLimiter) ChunkedRedisQuotaExceeded(currentSession *user.SessionState) bool {
+func (l *SessionLimiter) ChunkedRedisQuotaExceeded(currentSession *user.SessionState, apiID string) bool {
+	quotaData, _, err := l.getQuotaData(currentSession, apiID)
+	if err != nil {
+		log.WithError(err).WithField("apiID", apiID).Debug("[QUOTA] could not pre[are quota data")
+		return false
+	}
+
 	// Are they unlimited?
-	if currentSession.QuotaMax == -1 {
+	if quotaData.quotaMax == -1 {
 		// No quota set
 		return false
 	}
 
-	return DQLManager.IncrementAndCheck(currentSession)
+	return DQLManager.IncrementAndCheck(quotaData)
+}
+
+func (l *SessionLimiter) getQuotaData(currentSession *user.SessionState, apiID string) (*rawQuotaData, *user.APILimit, error) {
+	// check for limit on API level (set to session by ApplyPolicies)
+	var apiLimit *user.APILimit
+	if len(currentSession.AccessRights) > 0 {
+		if rights, ok := currentSession.AccessRights[apiID]; !ok {
+			return nil, nil, fmt.Errorf("[QUOTA] unexpected apiID %s", apiID)
+		} else {
+			apiLimit = rights.Limit
+		}
+	}
+
+	var quotaData *rawQuotaData
+
+	if apiLimit == nil {
+		quotaData = &rawQuotaData{
+			key:              QuotaKeyPrefix + currentSession.KeyHash(),
+			quotaRenewalRate: currentSession.QuotaRenewalRate,
+			quotaRenews:      currentSession.QuotaRenews,
+			quotaMax:         currentSession.QuotaMax,
+		}
+	} else {
+		quotaData = &rawQuotaData{
+			key:              QuotaKeyPrefix + apiID + "-" + currentSession.KeyHash(),
+			quotaRenewalRate: apiLimit.QuotaRenewalRate,
+			quotaRenews:      apiLimit.QuotaRenews,
+			quotaMax:         apiLimit.QuotaMax,
+		}
+	}
+
+	return quotaData, apiLimit, nil
 }

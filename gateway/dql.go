@@ -9,7 +9,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -95,29 +94,27 @@ func (d *DQL) getQuotaChannels(key string) *quotaChannels {
 }
 
 // IncrementAndCheck increments quota counter for the given session and returns true if quota is exceeded
-func (d *DQL) IncrementAndCheck(session *user.SessionState) bool {
-	key := QuotaKeyPrefix + session.KeyHash()
-
+func (d *DQL) IncrementAndCheck(quotaData *rawQuotaData) bool {
 	// get key quota channels for the key
 	d.channelsMu.Lock()
-	ch, ok := d.channels[key] // one set of channels per API key
+	ch, ok := d.channels[quotaData.key] // one set of channels per API key
 	if !ok {
 		ch = &quotaChannels{
 			processingCh:         make(chan *quotaProcessingMsg, d.chunkedQuotaConfig.ChunkSize),
 			refundCh:             make(chan bool),
 			refundRequestChannel: make(chan bool),
 		}
-		d.channels[key] = ch
-		go d.quotaCounter(key, ch)                                   // one go routine per API key
-		go d.quotaChunkRefundRequester(key, ch.refundRequestChannel) // again one go routine per API key
+		d.channels[quotaData.key] = ch
+		go d.quotaCounter(quotaData.key, ch)                                   // one go routine per API key
+		go d.quotaChunkRefundRequester(quotaData.key, ch.refundRequestChannel) // again one go routine per API key
 	}
 	d.channelsMu.Unlock()
 
 	// send message for quota processing
 	replyCh := make(chan bool)
 	ch.processingCh <- &quotaProcessingMsg{
-		max:         session.QuotaMax,
-		renewalRate: session.QuotaRenewalRate,
+		max:         quotaData.quotaMax,
+		renewalRate: quotaData.quotaRenewalRate,
 		replyCh:     replyCh,
 	}
 
