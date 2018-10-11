@@ -59,8 +59,6 @@ func (c *CoProcessor) Dispatch(object *coprocess.Object) (*coprocess.Object, err
 
 	// Call the dispatcher (objectPtr is freed during this call):
 	if err = GlobalDispatcher.Dispatch(unsafe.Pointer(objectPtr), unsafe.Pointer(newObjectPtr)); err != nil {
-		C.free(unsafe.Pointer(newObjectPtr.p_data))
-		C.free(unsafe.Pointer(newObjectPtr))
 		return nil, err
 	}
 	newObjectBytes := C.GoBytes(newObjectPtr.p_data, newObjectPtr.length)
