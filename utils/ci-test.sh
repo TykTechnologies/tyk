@@ -41,9 +41,11 @@ fi
 
 go test -race $PKGS || fatal "go test -race failed"
 
-for opts in "${MATRIX[@]}"; do
-	show go vet $opts $PKGS || fatal "go vet errored"
-done
+if [[ $GO_VET ]]; then
+	for opts in "${MATRIX[@]}"; do
+		show go vet $opts $PKGS || fatal "go vet errored"
+	done
+fi
 
 # Includes all top-level files and dirs that don't start with a dot
 # (hidden). Also excludes all of vendor/.
