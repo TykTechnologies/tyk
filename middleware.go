@@ -425,6 +425,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 			session := cachedVal.(user.SessionState)
 			if err := t.ApplyPolicies(key, &session); err != nil {
 				t.Logger().Error(err)
+				return session, false
 			}
 			return session, true
 		}
@@ -444,6 +445,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
 			t.Logger().Error(err)
+			return session, false
 		}
 		t.Logger().Debug("Got key")
 		return session, true
@@ -465,6 +467,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
 			t.Logger().Error(err)
+			return session, false
 		}
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
