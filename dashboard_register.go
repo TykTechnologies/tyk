@@ -36,6 +36,8 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
+var hbClient *http.Client
+
 func initialiseClient(timeout time.Duration) *http.Client {
 	client := &http.Client{}
 	if config.Global().HttpServerOptions.UseSSL {
@@ -167,9 +169,10 @@ func (h *HTTPDashboardHandler) sendHeartBeat() error {
 	req := h.newRequest(h.HeartBeatEndpoint)
 	req.Header.Set("x-tyk-nodeid", NodeID)
 	req.Header.Set("x-tyk-nonce", ServiceNonce)
-	c := initialiseClient(5 * time.Second)
-
-	resp, err := c.Do(req)
+	if hbClient == nil {
+		hbClient = initialiseClient(5 * time.Second)
+	}
+	resp, err := hbClient.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return errors.New("dashboard is down? Heartbeat is failing")
 	}
