@@ -254,7 +254,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 }
 
 func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
-	log.Error("SetExp Not Implemented")
+	log.Error("RPCStorageHandler.SetExp - Not Implemented")
 	return nil
 }
 
@@ -357,7 +357,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RPCStorageHandler) GetKeys(filter string) []string {
-	log.Error("GetKeys Not Implemented")
+	log.Error("RPCStorageHandler.GetKeys - Not Implemented")
 	return nil
 }
 
@@ -509,17 +509,17 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
 func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
-	log.Warning("NO PUBSUB DEFINED")
+	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
 
 func (r *RPCStorageHandler) Publish(channel, message string) error {
-	log.Warning("NO PUBSUB DEFINED")
+	log.Warning("RPCStorageHandler.Publish - NO PUBSUB DEFINED")
 	return nil
 }
 
 func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
-	log.Error("GetAndDeleteSet Not implemented, please disable your purger")
+	log.Error("RPCStorageHandler.GetAndDeleteSet - Not implemented, please disable your purger")
 	return nil
 }
 
@@ -596,16 +596,16 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 }
 
 func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.GetSet - Not implemented")
 	return nil, nil
 }
 
 func (r RPCStorageHandler) AddToSet(keyName, value string) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.AddToSet - Not implemented")
 }
 
 func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.RemoveFromSet - Not implemented")
 }
 
 func (r RPCStorageHandler) IsAccessError(err error) bool {
@@ -839,25 +839,25 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.DeleteScanMatch - Not implemented")
 	return false
 }
 
 func (r *RPCStorageHandler) GetKeyPrefix() string {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.GetKeyPrefix - Not implemented")
 	return ""
 }
 
 func (r *RPCStorageHandler) AddToSortedSet(keyName, value string, score float64) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.AddToSortedSet - Not implemented")
 }
 
 func (r *RPCStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.GetSortedSetRange - Not implemented")
 	return nil, nil, nil
 }
 
 func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.RemoveSortedSetRange - Not implemented")
 	return nil
 }
