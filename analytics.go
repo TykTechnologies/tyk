@@ -277,7 +277,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			if !strings.HasPrefix(record.RawPath, "/") {
 				record.RawPath = "/" + record.RawPath
 			}
-			//if tracking path prepend apiid for grouping in aggregate queries
+			//if tracking path prepend b64 of json containing apiid and api name for grouping in aggregate queries
 			if record.TrackPath {
 				record.Path = record.APIID + record.Path
 			}
