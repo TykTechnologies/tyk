@@ -36,8 +36,6 @@ type HTTPDashboardHandler struct {
 	heartBeatStopSentinel bool
 }
 
-var hbClient *http.Client
-
 func initialiseClient(timeout time.Duration) *http.Client {
 	client := &http.Client{}
 	if config.Global().HttpServerOptions.UseSSL {
@@ -139,8 +137,13 @@ func (h *HTTPDashboardHandler) Register() error {
 }
 
 func (h *HTTPDashboardHandler) StartBeating() error {
+
+	req := h.newRequest(h.HeartBeatEndpoint)
+
+	client := initialiseClient(5 * time.Second)
+
 	for !h.heartBeatStopSentinel {
-		if err := h.sendHeartBeat(); err != nil {
+		if err := h.sendHeartBeat(req, client); err != nil {
 			log.Warning(err)
 		}
 		time.Sleep(time.Second * 2)
@@ -165,19 +168,17 @@ func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
 	return req
 }
 
-func (h *HTTPDashboardHandler) sendHeartBeat() error {
-	req := h.newRequest(h.HeartBeatEndpoint)
-	req.Header.Set("x-tyk-nodeid", NodeID)
-	req.Header.Set("x-tyk-nonce", ServiceNonce)
-	if hbClient == nil {
-		hbClient = initialiseClient(5 * time.Second)
-	}
-	resp, err := hbClient.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
+
+	resp, err := client.Do(req)
+	if err != nil {
 		return errors.New("dashboard is down? Heartbeat is failing")
 	}
 
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("dashboard is down? Heartbeat non-200 response")
+	}
 	val := NodeResponseOK{}
 	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
 		return err
