@@ -108,7 +108,7 @@ func prepareGenericJWTSession(testName string, method string, claimName string, 
 	var sessionFunc JwtCreator
 	switch method {
 	default:
-		log.Warningf("Signing method '%s' is not recognised, defaulting to HMAC signature")
+		log.Warningf("Signing method '%s' is not recognised, defaulting to HMAC signature", method)
 		method = HMACSign
 		fallthrough
 	case HMACSign:

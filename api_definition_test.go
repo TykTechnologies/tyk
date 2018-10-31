@@ -133,6 +133,32 @@ func TestWhitelist(t *testing.T) {
 			{Path: "/", Code: 403},
 		}...)
 	})
+
+	t.Run("Test #1944", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.WhiteList = []string{"/foo/{fooId}$", "/foo/{fooId}/bar/{barId}$", "/baz/{bazId}"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: 403},
+			{Path: "/foo/", Code: 200},
+			{Path: "/foo/1", Code: 200},
+			{Path: "/foo/1/bar", Code: 403},
+			{Path: "/foo/1/bar/", Code: 200},
+			{Path: "/foo/1/bar/1", Code: 200},
+			{Path: "/", Code: 403},
+			{Path: "/baz", Code: 403},
+			{Path: "/baz/", Code: 200},
+			{Path: "/baz/1", Code: 200},
+			{Path: "/baz/1/", Code: 200},
+			{Path: "/baz/1/bazz", Code: 200},
+		}...)
+	})
 }
 
 func TestBlacklist(t *testing.T) {
