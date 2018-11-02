@@ -3,6 +3,7 @@
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
 : ${SIGNKEY:="729EA673"}
 : ${BUILDPKGS:="1"}
+: ${PKGNAME:="tyk-gateway"}
 BUILDTOOLSDIR=$SOURCEBINPATH/build_tools
 BUILDDIR=$SOURCEBINPATH/build
 
@@ -121,7 +122,7 @@ CONFIGFILES=(
     --config-files /opt/tyk-gateway/tyk.conf
 )
 FPMCOMMON=(
-    --name tyk-gateway
+    --name "$PKGNAME"
     --description "$DESCRIPTION"
     -v $VERSION
     --vendor "Tyk Technologies Ltd"
@@ -132,6 +133,7 @@ FPMCOMMON=(
     --after-install $TEMPLATEDIR/install/post_install.sh
     --after-remove $TEMPLATEDIR/install/post_remove.sh
 )
+[ -z $PKGCONFLICTS ] || FPMCOMMON+=( --conflicts $PKGCONFLICTS )
 FPMRPM=(
     --before-upgrade $TEMPLATEDIR/install/post_remove.sh
     --after-upgrade $TEMPLATEDIR/install/post_install.sh
@@ -150,7 +152,7 @@ do
     echo "Creating RPM Package for $arch"
     fpm "${FPMCOMMON[@]}" "${FPMRPM[@]}" -C $archDir -a $arch -t rpm "${CONFIGFILES[@]}" ./=/opt/tyk-gateway
 
-    rpmName="tyk-gateway-$VERSION-1.${arch/amd64/x86_64}.rpm"
+    rpmName="$PKGNAME-$VERSION-1.${arch/amd64/x86_64}.rpm"
     echo "Signing $arch RPM"
     $BUILDTOOLSDIR/rpm-sign.exp $rpmName
 done
