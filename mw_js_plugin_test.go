@@ -27,7 +27,7 @@ func TestJSVMLogs(t *testing.T) {
 	log.Out = &buf
 	log.Formatter = new(prefixed.TextFormatter)
 
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 
 	jsvm.RawLog = logrus.New()
@@ -81,7 +81,8 @@ func TestJSVMBody(t *testing.T) {
 	}
 	body := "foô \uffff \u0000 \xff bàr"
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
+
 	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
@@ -117,7 +118,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 		Pre:                 true,
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 	jsvm.Timeout = time.Millisecond
 
@@ -165,7 +166,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -201,7 +202,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -247,7 +248,7 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -296,7 +297,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		globalConf.TykJSPath = old
 		config.SetGlobal(globalConf)
 	}()
-	jsvm := JSVM{}
+	jsvm := &OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
@@ -463,7 +464,7 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 }
 
 func TestJSVMBase64(t *testing.T) {
-	jsvm := JSVM{}
+	jsvm := OttoJSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log))
 
 	inputString := "teststring"
