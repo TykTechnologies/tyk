@@ -5,17 +5,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -55,37 +54,39 @@ func (d *VirtualEndpoint) Name() string {
 	return "VirtualEndpoint"
 }
 
-func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
+func preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j TykJSVM) {
 	// the only call site uses (&foo, &bar) so meta and j won't be
 	// nil.
-	var src interface{}
+	var src string
+	log := j.GetLog()
+	//to make this not panic for both jsvms always make sure it is read into a string
 	switch meta.FunctionSourceType {
 	case "file":
-		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
-		f, err := os.Open(meta.FunctionSourceURI)
+		log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
+		f, err := ioutil.ReadFile(meta.FunctionSourceURI)
 		if err != nil {
-			j.Log.WithError(err).Error("Failed to open Endpoint JS")
+			log.WithError(err).Error("Failed to open Endpoint JS")
 			return
 		}
-		src = f
+		src = string(f)
 	case "blob":
 		if config.Global().DisableVirtualPathBlobs {
-			j.Log.Error("[JSVM] Blobs not allowed on this node")
+			log.Error("[JSVM] Blobs not allowed on this node")
 			return
 		}
-		j.Log.Debug("Loading JS blob")
+		log.Debug("Loading JS blob")
 		js, err := base64.StdEncoding.DecodeString(meta.FunctionSourceURI)
 		if err != nil {
-			j.Log.WithError(err).Error("Failed to load blob JS")
+			log.WithError(err).Error("Failed to load blob JS")
 			return
 		}
-		src = js
+		src = string(js)
 	default:
-		j.Log.Error("Type must be either file or blob (base64)!")
+		log.Error("Type must be either file or blob (base64)!")
 		return
 	}
-	if _, err := j.VM.Run(src); err != nil {
-		j.Log.WithError(err).Error("Could not load virtual endpoint JS")
+	if _, err := j.Run(src); err != nil {
+		log.WithError(err).Error("Could not load virtual endpoint JS")
 	}
 }
 
@@ -174,47 +175,15 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		d.Logger().WithError(err).Error("Failed to encode session for VM")
 		return nil
 	}
-
 	// Run the middleware
-	vm := d.Spec.JSVM.VM.Copy()
-	vm.Interrupt = make(chan func(), 1)
-	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)
-	// buffered, leaving no chance of a goroutine leak since the
-	// spawned goroutine will send 0 or 1 values.
-	ret := make(chan otto.Value, 1)
-	errRet := make(chan error, 1)
-	go func() {
-		defer func() {
-			// the VM executes the panic func that gets it
-			// to stop, so we must recover here to not crash
-			// the whole Go program.
-			recover()
-		}()
-		returnRaw, err := vm.Run(vmeta.ResponseFunctionName + `(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
-		ret <- returnRaw
-		errRet <- err
-	}()
-	var returnRaw otto.Value
-	t := time.NewTimer(d.Spec.JSVM.Timeout)
-	select {
-	case returnRaw = <-ret:
-		if err := <-errRet; err != nil {
-			d.Logger().WithError(err).Error("Failed to run JS middleware")
-			return nil
-		}
-		t.Stop()
-	case <-t.C:
-		t.Stop()
-		d.Logger().Error("JS middleware timed out after ", d.Spec.JSVM.Timeout)
-		vm.Interrupt <- func() {
-			// only way to stop the VM is to send it a func
-			// that panics.
-			panic("stop")
-		}
+	err, code, returnDataStr := d.Spec.JSVM.RunJSRequestVirtual(d, d.logger, vmeta, string(requestAsJson), string(sessionAsJson), specAsJson)
+	if err != nil {
+		//TODO
+		fmt.Println(err)
+	}
+	if code != -1 {
 		return nil
 	}
-	returnDataStr, _ := returnRaw.ToString()
-
 	// Decode the return object
 	newResponseData := VMResponseObject{}
 	if err := json.Unmarshal([]byte(returnDataStr), &newResponseData); err != nil {
