@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -153,7 +152,6 @@ func (j *OttoJSVM) RunJSRequestDynamic(d *DynamicMiddleware, logger *logrus.Entr
 
 func (j *OttoJSVM) RunJSRequestVirtual(d *VirtualEndpoint, logger *logrus.Entry, vmeta *apidef.VirtualMeta, requestAsJson string, sessionAsJson string, specAsJson string) (error, int, string) {
 	vm := j.VM.Copy()
-	fmt.Println("VIRTUALREQUEST")
 	vm.Interrupt = make(chan func(), 1)
 	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)
 	// buffered, leaving no chance of a goroutine leak since the
