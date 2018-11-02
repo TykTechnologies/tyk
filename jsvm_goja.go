@@ -420,7 +420,7 @@ func (j *GojaJSVM) LoadTykJSApi() {
 		return returnVal
 	})
 
-	j.Run(`function TykJsResponse(response, session_meta) {
+	j.VM.RunString(`function TykJsResponse(response, session_meta) {
 		return JSON.stringify({Response: response, SessionMeta: session_meta})
 	}`)
 }
