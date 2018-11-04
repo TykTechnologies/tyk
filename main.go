@@ -610,7 +610,7 @@ func doReload() {
 	count := syncAPISpecs()
 	// skip re-loading only if dashboard service reported 0 APIs
 	// this means if only one is left, it will not be unloaded,
-	// this is preferred to accidentally loading 0 and downing services
+	// this is preferred to accidentally loading 0 and downing all services
 	if count == 0 {
 		mainLog.Warning("No API Definitions found, not reloading")
 		return
