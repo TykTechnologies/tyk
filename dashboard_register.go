@@ -169,6 +169,8 @@ func (h *HTTPDashboardHandler) newRequest(endpoint string) *http.Request {
 }
 
 func (h *HTTPDashboardHandler) sendHeartBeat(req *http.Request, client *http.Client) error {
+	req.Header.Set("x-tyk-nodeid", NodeID)
+	req.Header.Set("x-tyk-nonce", ServiceNonce)
 
 	resp, err := client.Do(req)
 	if err != nil {
