@@ -3,6 +3,8 @@
 package main
 
 import (
+	"fmt"
+	"github.com/gorilla/mux"
 	"testing"
 	"time"
 
@@ -76,6 +78,102 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	count := syncAPISpecs()
 	if count != 0 {
 		t.Error("Should return empty value for malformed rpc response", apiSpecs)
+	}
+}
+
+const apiDefListTest = `[{
+	"api_id": "1",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"versions": {
+			"v1": {"name": "v1"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+}]`
+
+const apiDefListTest2 = `[{
+	"api_id": "1",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"versions": {
+			"v1": {"name": "v1"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+},
+{
+	"api_id": "2",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"versions": {
+			"v2": {"name": "v2"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v2",
+		"target_url": "` + testHttpAny + `"
+	}
+}]`
+
+func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
+	// Mock RPC
+	callCount := 0
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+		if callCount == 0 {
+			callCount += 1
+			return apiDefListTest, nil
+		}
+
+		if callCount == 1 {
+			callCount += 1
+			return apiDefListTest2, nil
+		}
+
+		return "malformed json", nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+
+	rpc := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc)
+
+	// Three cases: 1 API, 2 APIs and Malformed data
+	exp := []int{4, 6, 6}
+
+	for _, e := range exp {
+		doReload()
+
+		rtCnt := 0
+		mainRouter.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+			rtCnt += 1
+			fmt.Println(route.GetPathTemplate())
+			return nil
+		})
+
+		if rtCnt != e {
+			t.Errorf("There should be %v routes, got %v", e, rtCnt)
+		}
 	}
 }
 
