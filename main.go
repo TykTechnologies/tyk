@@ -230,7 +230,7 @@ func buildConnStr(resource string) string {
 	return config.Global().DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() int {
+func syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
 
 	apisMu.Lock()
@@ -241,7 +241,7 @@ func syncAPISpecs() int {
 		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
-			return 0
+			return 0, err
 		}
 
 		apiSpecs = tmpSpecs
@@ -250,7 +250,11 @@ func syncAPISpecs() int {
 	} else if config.Global().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
-		apiSpecs = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		var err error
+		apiSpecs, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		if err != nil {
+			return 0, err
+		}
 	} else {
 		apiSpecs = loader.FromDir(config.Global().AppPath)
 	}
@@ -269,10 +273,10 @@ func syncAPISpecs() int {
 		}
 	}
 
-	return len(apiSpecs)
+	return len(apiSpecs), nil
 }
 
-func syncPolicies() int {
+func syncPolicies() (count int, err error) {
 	var pols map[string]user.Policy
 
 	mainLog.Info("Loading policies")
@@ -288,15 +292,14 @@ func syncPolicies() int {
 		mainLog.Info("Using Policies from Dashboard Service")
 
 		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
-
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
+		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
 	default:
 		// this is the only case now where we need a policy record name
 		if config.Global().Policies.PolicyRecordName == "" {
 			mainLog.Debug("No policy record name defined, skipping...")
-			return 0
+			return 0, nil
 		}
 		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
 	}
@@ -311,7 +314,7 @@ func syncPolicies() int {
 		policiesByID = pols
 	}
 
-	return len(pols)
+	return len(pols), err
 }
 
 // stripSlashes removes any trailing slashes from the request's URL
@@ -605,14 +608,22 @@ func doReload() {
 	}
 
 	// Load the API Policies
-	syncPolicies()
-	// load the specs
-	count := syncAPISpecs()
-	// skip re-loading only if dashboard service reported 0 APIs
-	// and current registry had 0 APIs
-	if count == 0 && apisByIDLen() == 0 {
-		mainLog.Warning("No API Definitions found, not reloading")
+	if _, err := syncPolicies(); err != nil {
+		mainLog.Error("Error during syncing policies:", err.Error())
 		return
+	}
+
+	// load the specs
+	if count, err := syncAPISpecs(); err != nil {
+		mainLog.Error("Error during syncing apis:", err.Error())
+		return
+	} else {
+		// skip re-loading only if dashboard service reported 0 APIs
+		// and current registry had 0 APIs
+		if count == 0 && apisByIDLen() == 0 {
+			mainLog.Warning("No API Definitions found, not reloading")
+			return
+		}
 	}
 
 	// We have updated specs, lets load those...

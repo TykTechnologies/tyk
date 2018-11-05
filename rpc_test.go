@@ -73,7 +73,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	count := syncAPISpecs()
+	count, _ := syncAPISpecs()
 	if count != 0 {
 		t.Error("Should return empty value for malformed rpc response", apiSpecs)
 	}
@@ -103,12 +103,12 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		ts := newTykTestServer()
 		defer ts.Close()
 
-		apiBackup := LoadDefinitionsFromRPCBackup()
+		apiBackup, _ := LoadDefinitionsFromRPCBackup()
 		if len(apiBackup) != 1 {
 			t.Fatal("Should have APIs in backup")
 		}
 
-		policyBackup := LoadPoliciesFromRPCBackup()
+		policyBackup, _ := LoadPoliciesFromRPCBackup()
 		if len(policyBackup) != 1 {
 			t.Fatal("Should have Policies in backup")
 		}
@@ -118,7 +118,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 
-		count := syncAPISpecs()
+		count, _ := syncAPISpecs()
 		if count != 1 {
 			t.Error("Should return array with one spec", apiSpecs)
 		}
@@ -191,11 +191,11 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCachedAuth, Code: 200},
 		}...)
 
-		if count := syncAPISpecs(); count != 2 {
+		if count, _ := syncAPISpecs(); count != 2 {
 			t.Error("Should fetch latest specs", count)
 		}
 
-		if count := syncPolicies(); count != 2 {
+		if count, _ := syncPolicies(); count != 2 {
 			t.Error("Should fetch latest policies", count)
 		}
 	})

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -157,14 +158,14 @@ func parsePoliciesFromRPC(list string) (map[string]user.Policy, error) {
 	return policies, nil
 }
 
-func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
+func LoadPoliciesFromRPC(orgId string) (map[string]user.Policy, error) {
 	if rpc.IsEmergencyMode() {
 		return LoadPoliciesFromRPCBackup()
 	}
 
 	store := &RPCStorageHandler{}
 	if !store.Connect() {
-		return nil
+		return nil, errors.New("Policies backup: Failed connecting to database")
 	}
 
 	rpcPolicies := store.GetPolicies(orgId)
@@ -175,10 +176,12 @@ func LoadPoliciesFromRPC(orgId string) map[string]user.Policy {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Failed decode: ", err, rpcPolicies)
-		return nil
+		return nil, err
 	}
 
-	saveRPCPoliciesBackup(rpcPolicies)
+	if err := saveRPCPoliciesBackup(rpcPolicies); err != nil {
+		return nil, err
+	}
 
-	return policies
+	return policies, nil
 }
