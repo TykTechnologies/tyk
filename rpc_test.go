@@ -3,6 +3,7 @@
 package main
 
 import (
+	"github.com/TykTechnologies/tyk/cli"
 	"github.com/gorilla/mux"
 	"testing"
 	"time"
@@ -120,15 +121,26 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
 		if callCount == 0 {
 			callCount += 1
-			return apiDefListTest, nil
+			return `[]`, nil
 		}
 
 		if callCount == 1 {
 			callCount += 1
+			return apiDefListTest, nil
+		}
+
+		if callCount == 2 {
+			callCount += 1
 			return apiDefListTest2, nil
 		}
 
-		return "malformed json", nil
+		if callCount == 3 {
+			callCount += 1
+			return "malformed json", nil
+		}
+
+		// clean up
+		return `[]`, nil
 	})
 	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
 		return true
@@ -141,7 +153,10 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 	defer stopRPCMock(rpc)
 
 	// Three cases: 1 API, 2 APIs and Malformed data
-	exp := []int{4, 6, 6}
+	exp := []int{1, 4, 6, 6, 2}
+	if *cli.HTTPProfile {
+		exp = []int{4, 6, 8, 8, 4}
+	}
 
 	for _, e := range exp {
 		doReload()
