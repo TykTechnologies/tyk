@@ -1,6 +1,9 @@
 #!/bin/bash
 : ${ORGDIR:="/src/github.com/TykTechnologies"}
 : ${SOURCEBINPATH:="${ORGDIR}/tyk"}
+: ${DEBVERS:="ubuntu/precise ubuntu/trusty ubuntu/xenial debian/jessie"}
+: ${RPMVERS:="el/6 el7"}
+: ${PKGNAME:="tyk-gateway"}
 
 echo "Set version number"
 : ${VERSION:=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "$1\.$2\.$3"' version.go)}
@@ -12,16 +15,18 @@ cd $RELEASE_DIR/
 
 for arch in i386 amd64 arm64
 do
-    debName="tyk-gateway_${VERSION}_${arch}.deb"
-    rpmName="tyk-gateway-$VERSION-1.${arch/amd64/x86_64}.rpm"
+    debName="${PKGNAME}_${VERSION}_${arch}.deb"
+    rpmName="$PKGNAME-$VERSION-1.${arch/amd64/x86_64}.rpm"
 
-    echo "Pushing $debName to PackageCloud"
-    package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/precise $debName
-    package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/trusty $debName
-    package_cloud push tyk/$PACKAGECLOUDREPO/ubuntu/xenial $debName
-    package_cloud push tyk/$PACKAGECLOUDREPO/debian/jessie $debName
+    for ver in $DEBVERS
+    do
+        echo "Pushing $debName to PackageCloud $ver"
+        package_cloud push tyk/$PACKAGECLOUDREPO/$ver $debName
+    done
 
-    echo "Pushing $rpmName to PackageCloud"
-    package_cloud push tyk/$PACKAGECLOUDREPO/el/6 $rpmName
-    package_cloud push tyk/$PACKAGECLOUDREPO/el/7 $rpmName
+    for ver in $RPMVERS
+    do
+        echo "Pushing $rpmName to PackageCloud $ver"
+        package_cloud push tyk/$PACKAGECLOUDREPO/$ver $rpmName
+    done
 done
