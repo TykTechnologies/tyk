@@ -21,8 +21,6 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-// --- Utility functions during startup to ensure a sane VM is present for each API Def ----
-
 type OttoJSVM struct {
 	Spec    *APISpec
 	VM      *otto.Otto
@@ -124,6 +122,7 @@ func (j *OttoJSVM) RunJSRequestDynamic(d *DynamicMiddleware, logger *logrus.Entr
 			recover()
 		}()
 		returnRaw, err := vm.Run(middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
+
 		ret <- returnRaw
 		errRet <- err
 	}()
@@ -435,83 +434,7 @@ func (j *OttoJSVM) Run(s string) (interface{}, error) {
 	return j.VM.Run(s)
 }
 
-const coreJS = `
-var TykJS = {
-	TykMiddleware: {
-		MiddlewareComponentMeta: function(configuration) {
-			this.configuration = configuration
-		}
-	},
-	TykEventHandlers: {
-		EventHandlerComponentMeta: function() {}
-	}
+// wraps otto string function to avoid using reflection in tests etc when stringifying results of vm.Run() so it here where its safer
+func (j *OttoJSVM) String(val interface{}) string {
+	return val.(otto.Value).String()
 }
-
-TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.ProcessRequest = function(request, session, config) {
-	log("Process Request Not Implemented")
-	return request
-}
-
-TykJS.TykMiddleware.MiddlewareComponentMeta.prototype.DoProcessRequest = function(request, session, config) {
-	request.Body = b64dec(request.Body)
-	var processed_request = this.ProcessRequest(request, session, config)
-
-	if (!processed_request) {
-		log("Middleware didn't return request object!")
-		return
-	}
-
-	// Reset the headers object
-	processed_request.Request.Headers = {}
-	processed_request.Request.Body = b64enc(processed_request.Request.Body)
-
-	return JSON.stringify(processed_request)
-}
-
-// The user-level middleware component
-TykJS.TykMiddleware.NewMiddleware = function(configuration) {
-	TykJS.TykMiddleware.MiddlewareComponentMeta.call(this, configuration)
-}
-
-// Set up object inheritance
-TykJS.TykMiddleware.NewMiddleware.prototype = Object.create(TykJS.TykMiddleware.MiddlewareComponentMeta.prototype)
-TykJS.TykMiddleware.NewMiddleware.prototype.constructor = TykJS.TykMiddleware.NewMiddleware
-
-TykJS.TykMiddleware.NewMiddleware.prototype.NewProcessRequest = function(callback) {
-	this.ProcessRequest = callback
-}
-
-TykJS.TykMiddleware.NewMiddleware.prototype.ReturnData = function(request, session) {
-	return {Request: request, SessionMeta: session}
-}
-
-TykJS.TykMiddleware.NewMiddleware.prototype.ReturnAuthData = function(request, session) {
-	return {Request: request, Session: session}
-}
-
-// Event Handler implementation
-
-TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.DoProcessEvent = function(event, context) {
-	// call the handler
-	log("Calling built - in handle")
-	this.Handle(event, context)
-	return
-}
-
-TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype.Handle = function(request, context) {
-	log("Handler not implemented!")
-	return request
-}
-
-// The user-level event handler component
-TykJS.TykEventHandlers.NewEventHandler = function() {
-	TykJS.TykEventHandlers.EventHandlerComponentMeta.call(this)
-}
-
-// Set up object inheritance for events
-TykJS.TykEventHandlers.NewEventHandler.prototype = Object.create(TykJS.TykEventHandlers.EventHandlerComponentMeta.prototype)
-TykJS.TykEventHandlers.NewEventHandler.prototype.constructor = TykJS.TykEventHandlers.NewEventHandler
-
-TykJS.TykEventHandlers.NewEventHandler.prototype.NewHandler = function(callback) {
-	this.Handle = callback
-};`

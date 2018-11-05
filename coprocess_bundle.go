@@ -98,7 +98,7 @@ func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
 	// Call HandleMiddlewareCache only when using rich plugins:
-	if GlobalDispatcher != nil && b.Spec.CustomMiddleware.Driver != apidef.OttoDriver {
+	if GlobalDispatcher != nil && (b.Spec.CustomMiddleware.Driver != apidef.OttoDriver && b.Spec.CustomMiddleware.Driver != apidef.GojaDriver) {
 		GlobalDispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
 	}
 }

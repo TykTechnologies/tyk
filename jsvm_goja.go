@@ -137,7 +137,7 @@ func (j *GojaJSVM) RunJSRequestDynamic(d *DynamicMiddleware, logger *logrus.Entr
 			// the whole Go program.
 			recover()
 		}()
-		returnRaw, err := vm.RunString(middlewareClassname + `.DoProcessRequest(` + string(requestAsJson) + `, ` + string(sessionAsJson) + `, ` + specAsJson + `);`)
+		returnRaw, err := vm.RunString(middlewareClassname + `.DoProcessRequest(` + requestAsJson + `, ` + sessionAsJson + `, ` + specAsJson + `);`)
 		ret <- returnRaw
 		errRet <- err
 	}()
@@ -428,4 +428,9 @@ func (j *GojaJSVM) LoadTykJSApi() {
 func (j *GojaJSVM) Run(s string) (interface{}, error) {
 
 	return j.VM.RunString(s)
+}
+
+// wraps goja String() function to avoid using reflection in functions/tests when stringifying results of vm.Run() - so do it here where its safer to assume type
+func (j *GojaJSVM) String(val interface{}) string {
+	return val.(goja.Value).String()
 }

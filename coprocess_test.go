@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
 
