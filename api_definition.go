@@ -340,14 +340,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
+func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
 	if rpcEmergencyMode {
 		return LoadDefinitionsFromRPCBackup()
 	}
 
 	store := RPCStorageHandler{UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
 	if !store.Connect() {
-		return nil
+		return nil, errors.New("Can't connect RPC layer")
 	}
 
 	// enable segments
@@ -362,18 +362,19 @@ func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 	//store.Disconnect()
 
 	if rpcLoadCount > 0 {
-		saveRPCDefinitionsBackup(apiCollection)
+		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
+			return nil, err
+		}
 	}
 
 	return a.processRPCDefinitions(apiCollection)
 }
 
-func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APISpec {
+func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*APISpec, error) {
 
 	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
-		log.Error("Failed decode: ", err)
-		return nil
+		return nil, err
 	}
 
 	var specs []*APISpec
@@ -394,7 +395,7 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APIS
 		specs = append(specs, spec)
 	}
 
-	return specs
+	return specs, nil
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition {
