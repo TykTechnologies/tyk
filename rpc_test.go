@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
+
+	"github.com/TykTechnologies/tyk/cli"
+
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -59,6 +63,119 @@ func stopRPCMock(server *gorpc.Server) {
 	rpc.Reset()
 }
 
+const apiDefListTest = `[{
+	"api_id": "1",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"versions": {
+			"v1": {"name": "v1"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+}]`
+
+const apiDefListTest2 = `[{
+	"api_id": "1",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"versions": {
+			"v1": {"name": "v1"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+},
+{
+	"api_id": "2",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"versions": {
+			"v2": {"name": "v2"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v2",
+		"target_url": "` + testHttpAny + `"
+	}
+}]`
+
+func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
+	// Mock RPC
+	callCount := 0
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *DefRequest) (string, error) {
+		if callCount == 0 {
+			callCount += 1
+			return `[]`, nil
+		}
+
+		if callCount == 1 {
+			callCount += 1
+			return apiDefListTest, nil
+		}
+
+		if callCount == 2 {
+			callCount += 1
+			return apiDefListTest2, nil
+		}
+
+		if callCount == 3 {
+			callCount += 1
+			return "malformed json", nil
+		}
+
+		// clean up
+		return `[]`, nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+	dispatcher.AddFunc("GetPolicies", func(orgId string) (string, error) {
+		return `[]`, nil
+	})
+
+	rpc := startRPCMock(dispatcher)
+	defer stopRPCMock(rpc)
+
+	// Three cases: 1 API, 2 APIs and Malformed data
+	exp := []int{1, 4, 6, 6, 2}
+	if *cli.HTTPProfile {
+		exp = []int{4, 6, 8, 8, 4}
+	}
+
+	for _, e := range exp {
+		doReload()
+
+		rtCnt := 0
+		mainRouter.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+			rtCnt += 1
+			//fmt.Println(route.GetPathTemplate())
+			return nil
+		})
+
+		if rtCnt != e {
+			t.Errorf("There should be %v routes, got %v", e, rtCnt)
+		}
+	}
+}
+
 // Our RPC layer too racy, but not harmul, mostly global variables like RPCIsClientConnected
 func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	// Mock RPC
@@ -73,7 +190,7 @@ func TestSyncAPISpecsRPCFailure(t *testing.T) {
 	rpc := startRPCMock(dispatcher)
 	defer stopRPCMock(rpc)
 
-	count := syncAPISpecs()
+	count, _ := syncAPISpecs()
 	if count != 0 {
 		t.Error("Should return empty value for malformed rpc response", apiSpecs)
 	}
@@ -103,12 +220,12 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		ts := newTykTestServer()
 		defer ts.Close()
 
-		apiBackup := LoadDefinitionsFromRPCBackup()
+		apiBackup, _ := LoadDefinitionsFromRPCBackup()
 		if len(apiBackup) != 1 {
 			t.Fatal("Should have APIs in backup")
 		}
 
-		policyBackup := LoadPoliciesFromRPCBackup()
+		policyBackup, _ := LoadPoliciesFromRPCBackup()
 		if len(policyBackup) != 1 {
 			t.Fatal("Should have Policies in backup")
 		}
@@ -118,7 +235,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: authHeaders, Code: 200},
 		}...)
 
-		count := syncAPISpecs()
+		count, _ := syncAPISpecs()
 		if count != 1 {
 			t.Error("Should return array with one spec", apiSpecs)
 		}
@@ -191,11 +308,11 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 			{Path: "/sample", Headers: notCachedAuth, Code: 200},
 		}...)
 
-		if count := syncAPISpecs(); count != 2 {
+		if count, _ := syncAPISpecs(); count != 2 {
 			t.Error("Should fetch latest specs", count)
 		}
 
-		if count := syncPolicies(); count != 2 {
+		if count, _ := syncPolicies(); count != 2 {
 			t.Error("Should fetch latest policies", count)
 		}
 	})
