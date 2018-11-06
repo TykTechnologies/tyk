@@ -3,10 +3,12 @@
 package main
 
 import (
-	"github.com/TykTechnologies/tyk/cli"
-	"github.com/gorilla/mux"
 	"testing"
 	"time"
+
+	"github.com/gorilla/mux"
+
+	"github.com/TykTechnologies/tyk/cli"
 
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/config"
