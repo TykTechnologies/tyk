@@ -5,6 +5,8 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 
@@ -28,7 +30,7 @@ func getTagListAsString() string {
 	return tagList
 }
 
-func LoadDefinitionsFromRPCBackup() []*APISpec {
+func LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	tagList := getTagListAsString()
 	checkKey := BackupApiKeyBase + tagList
 
@@ -37,8 +39,7 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 	log.Info("[RPC] --> Loading API definitions from backup")
 
 	if !connected {
-		log.Error("[RPC] --> RPC Backup recovery failed: redis connection failed")
-		return nil
+		return nil, errors.New("[RPC] --> RPC Backup recovery failed: redis connection failed")
 	}
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
@@ -46,15 +47,18 @@ func LoadDefinitionsFromRPCBackup() []*APISpec {
 	apiListAsString := decrypt([]byte(secret), cryptoText)
 
 	if err != nil {
-		log.Error("[RPC] --> Failed to get node backup (", checkKey, "): ", err)
-		return nil
+		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
 	a := APIDefinitionLoader{}
 	return a.processRPCDefinitions(apiListAsString)
 }
 
-func saveRPCDefinitionsBackup(list string) {
+func saveRPCDefinitionsBackup(list string) error {
+	if !json.Valid([]byte(list)) {
+		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
+	}
+
 	log.Info("Storing RPC Definitions backup")
 	tagList := getTagListAsString()
 
@@ -66,19 +70,20 @@ func saveRPCDefinitionsBackup(list string) {
 	log.Info("--> Connected to DB")
 
 	if !connected {
-		log.Error("--> RPC Backup save failed: redis connection failed")
-		return
+		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
-		log.Error("Failed to store node backup: ", err)
+		return errors.New("Failed to store node backup: " + err.Error())
 	}
+
+	return nil
 }
 
-func LoadPoliciesFromRPCBackup() map[string]user.Policy {
+func LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	tagList := getTagListAsString()
 	checkKey := BackupPolicyKeyBase + tagList
 
@@ -88,8 +93,7 @@ func LoadPoliciesFromRPCBackup() map[string]user.Policy {
 	log.Info("[RPC] Loading Policies from backup")
 
 	if !connected {
-		log.Error("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
-		return nil
+		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
 	}
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
@@ -97,21 +101,24 @@ func LoadPoliciesFromRPCBackup() map[string]user.Policy {
 	listAsString := decrypt([]byte(secret), cryptoText)
 
 	if err != nil {
-		log.Error("[RPC] --> Failed to get node policy backup (", checkKey, "): ", err)
-		return nil
+		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
 	}
 
 	if policies, err := parsePoliciesFromRPC(listAsString); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "policy",
 		}).Error("Failed decode: ", err)
-		return nil
+		return nil, err
 	} else {
-		return policies
+		return policies, nil
 	}
 }
 
-func saveRPCPoliciesBackup(list string) {
+func saveRPCPoliciesBackup(list string) error {
+	if !json.Valid([]byte(list)) {
+		return errors.New("--> RPC Backup save failure: wrong format, skipping.")
+	}
+
 	log.Info("Storing RPC policies backup")
 	tagList := getTagListAsString()
 
@@ -123,16 +130,17 @@ func saveRPCPoliciesBackup(list string) {
 	log.Info("--> Connected to DB")
 
 	if !connected {
-		log.Error("--> RPC Backup save failed: redis connection failed")
-		return
+		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
 	secret := rightPad2Len(config.Global().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
-		log.Error("Failed to store node backup: ", err)
+		return errors.New("Failed to store node backup: " + err.Error())
 	}
+
+	return nil
 }
 
 // encrypt string to base64 crypto using AES
