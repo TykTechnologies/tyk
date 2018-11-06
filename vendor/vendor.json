@@ -357,6 +357,12 @@
 			"revisionTime": "2016-10-20T16:18:36Z"
 		},
 		{
+			"checksumSHA1": "GsU3DMfKXECkDJyjINXYr2Hj3Nc=",
+			"path": "github.com/netbrain/goautosocket",
+			"revision": "bef85f0aef40c230fa5451a1ca200919722e978a",
+			"revisionTime": "2015-06-24T14:57:46Z"
+		},
+		{
 			"checksumSHA1": "fG/hdI57tzm9CfcELMa7QVXESR8=",
 			"path": "github.com/newrelic/go-agent",
 			"revision": "29ec3cd1bb2f21d21d36da37dae52695cb2c3a17",
