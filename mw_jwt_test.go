@@ -87,7 +87,6 @@ func createJWTSessionWithRSAWithPolicy(policyID string) *user.SessionState {
 }
 
 // JWTSessionHMAC
-
 func prepareJWTSessionHMAC(tb testing.TB) string {
 	spec := buildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
