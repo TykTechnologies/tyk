@@ -12,11 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/robertkrimen/otto"
+	_ "github.com/robertkrimen/otto/underscore"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/robertkrimen/otto"
-	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/Sirupsen/logrus"
 )

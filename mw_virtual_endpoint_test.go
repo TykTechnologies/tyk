@@ -64,7 +64,7 @@ func TestVirtualEndpointOtto(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint(virtTestJS, "GET")
+	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true)
 
 	ts.Run(t, test.TestCase{
 		Path:      "/virt",

@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/dop251/goja"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/dop251/goja"
 	_ "github.com/robertkrimen/otto/underscore"
 )
 
@@ -166,7 +167,6 @@ func (j *GojaJSVM) RunJSRequestDynamic(d *DynamicMiddleware, logger *logrus.Entr
 
 func (j *GojaJSVM) RunJSRequestVirtual(d *VirtualEndpoint, logger *logrus.Entry, vmeta *apidef.VirtualMeta, requestAsJson string, sessionAsJson string, specAsJson string) (error, int, string) {
 
-	interrupt := make(chan func(), 1)
 	d.Logger().Debug("Running: ", vmeta.ResponseFunctionName)
 	// buffered, leaving no chance of a goroutine leak since the
 	// spawned goroutine will send 0 or 1 values.
@@ -192,14 +192,12 @@ func (j *GojaJSVM) RunJSRequestVirtual(d *VirtualEndpoint, logger *logrus.Entry,
 			return nil, -1, ""
 		}
 		t.Stop()
+
 	case <-t.C:
 		t.Stop()
 		d.Logger().Error("JS middleware timed out after ", j.GetTimeout())
-		interrupt <- func() {
-			// only way to stop the VM is to send it a func
-			// that panics.
-			panic("stop")
-		}
+
+		j.VM.Interrupt("Stopping VM for timeout")
 		return nil, -1, ""
 	}
 	returnDataStr := returnRaw.String()
@@ -394,7 +392,7 @@ func (j *GojaJSVM) LoadTykJSApi() {
 			return nil
 		}
 
-		doAddOrUpdate(apiKey, &newSession, suppressReset == "1")
+		doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false)
 
 		return nil
 	})

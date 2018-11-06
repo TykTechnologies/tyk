@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -178,8 +177,8 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 	// Run the middleware
 	err, code, returnDataStr := d.Spec.JSVM.RunJSRequestVirtual(d, d.logger, vmeta, string(requestAsJson), string(sessionAsJson), specAsJson)
 	if err != nil {
-		//TODO
-		fmt.Println(err)
+		log.Errorf("JSVM VE error: %v", err)
+		return nil
 	}
 	if code != -1 {
 		return nil

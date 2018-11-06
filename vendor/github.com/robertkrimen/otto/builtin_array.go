@@ -170,7 +170,10 @@ func builtinArray_splice(call FunctionCall) Value {
 	length := int64(toUint32(thisObject.get("length")))
 
 	start := valueToRangeIndex(call.Argument(0), length, false)
-	deleteCount := valueToRangeIndex(call.Argument(1), int64(length)-start, true)
+	deleteCount := length - start
+	if arg, ok := call.getArgument(1); ok {
+		deleteCount = valueToRangeIndex(arg, length-start, true)
+	}
 	valueArray := make([]Value, deleteCount)
 
 	for index := int64(0); index < deleteCount; index++ {

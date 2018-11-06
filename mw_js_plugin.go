@@ -144,9 +144,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	err, code, returnDataStr := d.Spec.JSVM.RunJSRequestDynamic(d, logger, string(requestAsJson), string(sessionAsJson), specAsJson)
 	if err != nil {
 		log.Errorf("JSVM error: %v", err)
+		return err, code
 	}
 
-	if code != -1 {
+	if code != -1 || returnDataStr == "" {
 		return nil, code
 	}
 	// Decode the return object
