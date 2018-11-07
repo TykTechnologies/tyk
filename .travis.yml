@@ -7,7 +7,7 @@ notifications:
 
 env:
   global:
-    - TYK_LOGLEVEL=info
+    - TYK_LOGLEVEL=panic
 
 addons:
   apt:
