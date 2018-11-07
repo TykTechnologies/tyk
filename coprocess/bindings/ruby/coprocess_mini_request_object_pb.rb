@@ -20,6 +20,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
     optional :request_uri, :string, 12
     optional :scheme, :string, 13
     optional :raw_body, :bytes, 14
+    repeated :raw_certificates, :bytes, 15
   end
 end
 
