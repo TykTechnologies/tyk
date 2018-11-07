@@ -5,13 +5,16 @@ package main
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"context"
 
@@ -25,9 +28,6 @@ import (
 )
 
 const (
-	grpcListenAddr = ":9999"
-	grpcListenPath = "tcp://127.0.0.1:9999"
-
 	testHeaderName  = "Testheader"
 	testHeaderValue = "testvalue"
 )
@@ -104,6 +104,10 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 			if strings.Compare(sessionKeyValue, v) != 0 {
 				return d.grpcError(object, k+" doesn't match value in object.Session.Metadata")
 			}
+		}
+	case "testMutualTLS":
+		if len(object.Request.RawCertificates) == 0 {
+			return d.grpcError(object, "raw_certificates is empty")
 		}
 	}
 	return object, nil
@@ -204,26 +208,28 @@ func loadTestGRPCAPIs() {
 	})
 }
 
-func startTykWithGRPC() (*tykTestServer, *grpc.Server) {
+func startTykWithGRPC(grpcPort int) (*tykTestServer, *grpc.Server) {
 	// Setup the gRPC server:
-	listener, _ := net.Listen("tcp", grpcListenAddr)
+	listener, _ := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	grpcServer := newTestGRPCServer()
 	go grpcServer.Serve(listener)
 
 	// Setup Tyk:
 	cfg := config.CoProcessConfig{
 		EnableCoProcess:     true,
-		CoProcessGRPCServer: grpcListenPath,
+		CoProcessGRPCServer: fmt.Sprintf("tcp://127.0.0.1:%d", grpcPort),
 	}
 	ts := newTykTestServer(tykTestServerConfig{coprocessConfig: cfg})
 
 	// Load test APIs:
 	loadTestGRPCAPIs()
+
+	time.Sleep(1 * time.Second)
 	return &ts, grpcServer
 }
 
 func TestGRPCDispatch(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
+	ts, grpcServer := startTykWithGRPC(9999)
 	defer ts.Close()
 	defer grpcServer.Stop()
 
@@ -302,11 +308,62 @@ func TestGRPCDispatch(t *testing.T) {
 			Headers: headers,
 		})
 	})
+}
 
+func TestGRPCMutualTLS(t *testing.T) {
+	serverCertPem, _, combinedPEM, _ := genServerCertificate()
+	certID, _ := CertificateManager.Add(combinedPEM, "")
+	defer CertificateManager.Delete(certID)
+
+	globalConf := config.Global()
+	globalConf.EnableCustomDomains = true
+	globalConf.HttpServerOptions.UseSSL = true
+	globalConf.ListenPort = 0
+	globalConf.HttpServerOptions.SSLCertificates = []string{certID}
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts, grpcServer := startTykWithGRPC(9998)
+	defer ts.Close()
+	defer grpcServer.Stop()
+
+	// Initialize client certificates
+	clientCertPem, _, _, clientCert := genCertificate(&x509.Certificate{})
+
+	client := getTLSClient(&clientCert, serverCertPem)
+	clientCertID, _ := CertificateManager.Add(clientCertPem, "")
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.Domain = "localhost"
+		spec.Proxy.ListenPath = "/"
+		spec.UseMutualTLSAuth = true
+		spec.ClientCertificates = []string{clientCertID}
+
+		spec.Proxy.ListenPath = "/grpc-mutual-tls/"
+		spec.Proxy.StripListenPath = true
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Pre: []apidef.MiddlewareDefinition{
+				{Name: "testMutualTLS"},
+			},
+			Driver: apidef.GrpcDriver,
+		}
+	})
+
+	ts.Run(t, test.TestCase{
+		Code: 200, Client: client, Domain: "localhost", Path: "/grpc-mutual-tls/",
+	})
+
+	CertificateManager.Delete(clientCertID)
+	CertificateManager.FlushCache()
+
+	client = getTLSClient(&clientCert, serverCertPem)
+	ts.Run(t, test.TestCase{
+		Client: client, Domain: "localhost", ErrorMatch: badcertErr,
+	})
 }
 
 func BenchmarkGRPCDispatch(b *testing.B) {
-	ts, grpcServer := startTykWithGRPC()
+	ts, grpcServer := startTykWithGRPC(9999)
 	defer ts.Close()
 	defer grpcServer.Stop()
 

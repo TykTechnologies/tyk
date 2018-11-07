@@ -95,6 +95,13 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		Scheme:     r.URL.Scheme,
 	}
 
+	if r.TLS != nil {
+		certs := make([][]byte, len(r.TLS.PeerCertificates))
+		for i, c := range r.TLS.PeerCertificates {
+			certs[i] = c.Raw
+		}
+		miniRequestObject.RawCertificates = certs
+	}
 	if r.Body != nil {
 		defer r.Body.Close()
 		miniRequestObject.RawBody, _ = ioutil.ReadAll(r.Body)
