@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	metaLabel    = "$tyk_meta."
-	contextLabel = "$tyk_context."
+	metaLabel        = "$tyk_meta."
+	contextLabel     = "$tyk_context."
+	triggerKeyPrefix = "trigger"
+	triggerKeySep    = "-"
 )
 
 var dollarMatch = regexp.MustCompile(`\$\d+`)
@@ -178,7 +180,7 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 
 		replaceGroups := contextMatch.FindAllStringSubmatch(in, -1)
 		for _, v := range replaceGroups {
-			contextKey := strings.Replace(v[0], "$tyk_context.", "", 1)
+			contextKey := strings.Replace(v[0], contextLabel, "", 1)
 
 			if val, ok := contextData[contextKey]; ok {
 				valStr := valToStr(val)
@@ -202,7 +204,7 @@ func replaceTykVariables(r *http.Request, in string, escape bool) string {
 
 		replaceGroups := metaMatch.FindAllStringSubmatch(in, -1)
 		for _, v := range replaceGroups {
-			contextKey := strings.Replace(v[0], "$tyk_meta.", "", 1)
+			contextKey := strings.Replace(v[0], metaLabel, "", 1)
 
 			val, ok := session.MetaData[contextKey]
 			if ok {
@@ -362,10 +364,13 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 		vals, ok := r.Header[mhCN]
 		if ok {
 			for i, v := range vals {
-				b := mr.Check(v)
-				if len(b) > 0 {
-					kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mhCN + "-" + strconv.Itoa(i)
-					contextData[kn] = b
+				match := mr.FindStringSubmatch(v)
+				if len(match) > 0 {
+					kn := buildTriggerKey(triggernum, mhCN, i)
+					contextData[kn] = match[0]
+
+					addGroupsToContextData(&contextData, kn, match[1:])
+
 					fCount++
 				}
 			}
@@ -392,11 +397,13 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 		vals, ok := qvals[mv]
 		if ok {
 			for i, v := range vals {
-				b := mr.Check(v)
-				if len(b) > 0 {
-					kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mv + "-" + strconv.Itoa(i)
+				match := mr.FindStringSubmatch(v)
+				if len(match) > 0 {
+					kn := buildTriggerKey(triggernum, mv, i)
+					contextData[kn] = match[0]
 
-					contextData[kn] = b
+					addGroupsToContextData(&contextData, kn, match[1:])
+
 					fCount++
 				}
 			}
@@ -422,11 +429,13 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 		pathParts := strings.Split(r.URL.Path, "/")
 
 		for _, part := range pathParts {
-			b := mr.Check(part)
-			if len(b) > 0 {
-				kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mv + "-" + strconv.Itoa(fCount)
+			match := mr.FindStringSubmatch(part)
+			if len(match) > 0 {
+				kn := buildTriggerKey(triggernum, mv, fCount)
+				contextData[kn] = match[0]
 
-				contextData[kn] = b
+				addGroupsToContextData(&contextData, kn, match[1:])
+
 				fCount++
 			}
 		}
@@ -452,11 +461,13 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 		if ok {
 			val, valOk := rawVal.(string)
 			if valOk {
-				b := mr.Check(val)
-				if len(b) > 0 {
-					kn := "trigger-" + strconv.Itoa(triggernum) + "-" + mh
+				matches := mr.FindStringSubmatch(val)
+				if len(matches) > 0 {
+					kn := buildTriggerKey(triggernum, mh)
+					contextData[kn] = matches[0]
 
-					contextData[kn] = b
+					addGroupsToContextData(&contextData, kn, matches[1:])
+
 					fCount++
 				}
 			}
@@ -479,13 +490,39 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 	contextData := ctxGetData(r)
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
 
-	b := options.Check(string(bodyBytes))
-	if len(b) > 0 {
-		kn := "trigger-" + strconv.Itoa(triggernum) + "-payload"
+	matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
 
-		contextData[kn] = string(b)
+	if len(matches) > 0 {
+		kn := buildTriggerKey(triggernum, "payload")
+		contextData[kn] = matches[0][0]
+
+		for i, match := range matches {
+			kn = buildTriggerKey(triggernum, "payload", i)
+			contextData[kn] = match[0]
+
+			addGroupsToContextData(&contextData, kn, match[1:])
+		}
 		return true
 	}
 
 	return false
+}
+
+func buildTriggerKey(num int, name string, indices ...int) string {
+	parts := []string{triggerKeyPrefix, strconv.Itoa(num), name}
+
+	if len(indices) > 0 {
+		for _, index := range indices {
+			parts = append(parts, strconv.Itoa(index))
+		}
+	}
+
+	return strings.Join(parts, triggerKeySep)
+}
+
+func addGroupsToContextData(cd *map[string]interface{}, keyPrefix string, groups []string) {
+	for i, g := range groups {
+		k := strings.Join([]string{keyPrefix, strconv.Itoa(i)}, triggerKeySep)
+		(*cd)[k] = g
+	}
 }
