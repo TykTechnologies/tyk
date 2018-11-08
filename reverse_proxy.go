@@ -234,9 +234,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if targetToUse == target {
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
-			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
+			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path, spec.Proxy.DisableStripPrefix)
 			if req.URL.RawPath != "" {
-				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath)
+				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath, spec.Proxy.DisableStripPrefix)
 			}
 		}
 		if !spec.Proxy.PreserveHostHeader {
@@ -317,7 +317,10 @@ func defaultTransport() *http.Transport {
 	}
 }
 
-func singleJoiningSlash(a, b string) string {
+func singleJoiningSlash(a, b string, disableStripPrefix bool) string {
+	if disableStripPrefix && len(b) == 0 {
+		return a
+	}
 	a = strings.TrimRight(a, "/")
 	b = strings.TrimLeft(b, "/")
 	if len(b) > 0 {
