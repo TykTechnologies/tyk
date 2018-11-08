@@ -787,7 +787,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 				r.CheckForKeyspaceChanges(orgId)
 			}
 		}
-		log.Warning("Keysapce warning: ", err)
+		log.Warning("Keyspace warning: ", err)
 		return
 	}
 
