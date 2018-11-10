@@ -109,7 +109,7 @@ func TestWrappedServeHTTP(t *testing.T) {
 }
 
 func TestSingleJoiningSlash(t *testing.T) {
-	tests := []struct {
+	testsFalse := []struct {
 		a, b, want string
 	}{
 		{"foo", "", "foo"},
@@ -119,9 +119,23 @@ func TestSingleJoiningSlash(t *testing.T) {
 		{"foo/", "/bar", "foo/bar"},
 		{"foo//", "//bar", "foo/bar"},
 	}
-	for _, tc := range tests {
+	for _, tc := range testsFalse {
 		t.Run(fmt.Sprintf("%s+%s", tc.a, tc.b), func(t *testing.T) {
-			got := singleJoiningSlash(tc.a, tc.b)
+			got := singleJoiningSlash(tc.a, tc.b, false)
+			if got != tc.want {
+				t.Fatalf("want %s, got %s", tc.want, got)
+			}
+		})
+	}
+	testsTrue := []struct {
+		a, b, want string
+	}{
+		{"foo/", "", "foo/"},
+		{"foo", "", "foo"},
+	}
+	for _, tc := range testsTrue {
+		t.Run(fmt.Sprintf("%s+%s", tc.a, tc.b), func(t *testing.T) {
+			got := singleJoiningSlash(tc.a, tc.b, true)
 			if got != tc.want {
 				t.Fatalf("want %s, got %s", tc.want, got)
 			}
