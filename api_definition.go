@@ -34,6 +34,14 @@ const (
 	RPCStorageEngine  apidef.StorageEngineCode = "rpc"
 )
 
+// Constants used by the version check middleware
+const (
+	headerLocation    = "header"
+	urlParamLocation  = "url-param"
+	urlLocation       = "url"
+	expiredTimeFormat = "2006-01-02 15:04"
+)
+
 // URLStatus is a custom enum type to avoid collisions
 type URLStatus int
 
@@ -183,7 +191,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.
 			continue
 		}
 		// calculate the time
-		if t, err := time.Parse("2006-01-02 15:04", ver.Expires); err != nil {
+		if t, err := time.Parse(expiredTimeFormat, ver.Expires); err != nil {
 			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
@@ -899,9 +907,10 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+	path := strings.ToLower(r.URL.Path)
 	// Check if ignored
 	for _, v := range rxPaths {
-		if !v.Spec.MatchString(strings.ToLower(r.URL.Path)) {
+		if !v.Spec.MatchString(path) {
 			continue
 		}
 
@@ -964,15 +973,14 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 // CheckSpecMatchesStatus checks if a url spec has a specific status
 func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode URLStatus) (bool, interface{}) {
+	matchPath := r.URL.Path
+	if !strings.HasPrefix(matchPath, "/") {
+		matchPath = "/" + matchPath
+	}
 	// Check if ignored
 	for _, v := range rxPaths {
 		if mode != v.Status {
 			continue
-		}
-
-		matchPath := r.URL.Path
-		if !strings.HasPrefix(matchPath, "/") {
-			matchPath = "/" + matchPath
 		}
 		match := v.Spec.MatchString(matchPath)
 
@@ -1072,13 +1080,13 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 	}
 
 	switch a.VersionDefinition.Location {
-	case "header":
+	case headerLocation:
 		return r.Header.Get(a.VersionDefinition.Key)
 
-	case "url-param":
+	case urlParamLocation:
 		return r.URL.Query().Get(a.VersionDefinition.Key)
 
-	case "url":
+	case urlLocation:
 		uPath := strings.TrimPrefix(r.URL.Path, a.Proxy.ListenPath)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 

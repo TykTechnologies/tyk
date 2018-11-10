@@ -37,6 +37,20 @@ func testPrepareVersioning() (string, string) {
 						},
 					},
 				},
+				URLRewrite: []apidef.URLRewriteMeta{
+					{
+						Path:         "/a",
+						Method:       http.MethodGet,
+						MatchPattern: "/a(.*)",
+						RewriteTo:    "/b",
+					},
+					{
+						Path:         "/c",
+						Method:       http.MethodPost,
+						MatchPattern: "/c(.*)",
+						RewriteTo:    "/d",
+					},
+				},
 				Ignored: []apidef.EndPointMeta{
 					{
 						Path: "/ignore",
