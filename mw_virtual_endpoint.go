@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -103,24 +104,37 @@ func (d *VirtualEndpoint) EnabledForSpec() bool {
 	return false
 }
 
-func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request) *http.Response {
+func (d *VirtualEndpoint) getMetaFromRequest(r *http.Request) *apidef.VirtualMeta {
 	_, versionPaths, _, _ := d.Spec.Version(r)
 	found, meta := d.Spec.CheckSpecMatchesStatus(r, versionPaths, VirtualPath)
-
 	if !found {
 		return nil
 	}
 
+	vmeta, ok := meta.(*apidef.VirtualMeta)
+	if !ok {
+		return nil
+	}
+
+	return vmeta
+}
+
+func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Request, vmeta *apidef.VirtualMeta) *http.Response {
 	t1 := time.Now().UnixNano()
-	vmeta := meta.(*apidef.VirtualMeta)
+
+	if vmeta == nil {
+		if vmeta = d.getMetaFromRequest(r); vmeta == nil {
+			return nil
+		}
+	}
 
 	// Create the proxy object
-	defer r.Body.Close()
 	originalBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		d.Logger().WithError(err).Error("Failed to read request body!")
 		return nil
 	}
+	defer r.Body.Close()
 
 	requestData := RequestObject{
 		Headers: r.Header,
@@ -280,11 +294,18 @@ func forceResponse(w http.ResponseWriter,
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	vmeta := d.getMetaFromRequest(r)
+	if vmeta == nil {
+		// nothing can be done here, reply with 200 to allow proxy to target
+		return nil, http.StatusOK
+	}
 
-	res := d.ServeHTTPForCache(w, r)
-
-	if res == nil {
-		return nil, 200
+	if res := d.ServeHTTPForCache(w, r, vmeta); res == nil {
+		if vmeta.ProxyOnError {
+			return nil, http.StatusOK
+		} else {
+			return errors.New("Error during virtual endpoint execution. Contact Administrator for more details."), http.StatusInternalServerError
+		}
 	}
 
 	return nil, mwStatusRespond

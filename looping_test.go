@@ -90,7 +90,7 @@ func TestLooping(t *testing.T) {
                 }
                 return TykJsResponse(resp, session.meta_data)
             }
-        `, "POST")
+        `, "POST", "/virt", true)
 
 		ts.Run(t, []test.TestCase{
 			{Method: "POST", Path: "/virt", Data: postAction, BodyMatch: `"Url":"/post_action`},
