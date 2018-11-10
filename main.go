@@ -32,6 +32,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/lonelycode/osin"
+	"github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
 	"github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
@@ -755,15 +756,17 @@ func setupLogger() {
 
 	if config.Global().UseLogstash {
 		mainLog.Debug("Enabling Logstash support")
-		hook, err := logstashHook.NewHook(config.Global().LogstashTransport,
-			config.Global().LogstashNetworkAddr,
-			"tyk-gateway")
 
+		conn, err := gas.Dial(config.Global().LogstashTransport, config.Global().LogstashNetworkAddr)
+		if err != nil {
+			log.Errorf("Error making connection for logstash hook: %v", err)
+		}
+		hook, err := logstashHook.NewHookWithConn(conn, "tyk-gateway")
 		if err == nil {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
+			mainLog.Debug("Logstash hook active")
 		}
-		mainLog.Debug("Logstash hook active")
 	}
 
 	if config.Global().UseRedisLog {
