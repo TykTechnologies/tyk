@@ -9,13 +9,57 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
+type AnalyticsRecord struct {
+	Method        string
+	Path          string
+	RawPath       string
+	ContentLength int64
+	UserAgent     string
+	Day           int
+	Month         time.Month
+	Year          int
+	Hour          int
+	ResponseCode  int
+	APIKey        string
+	TimeStamp     time.Time
+	APIVersion    string
+	APIName       string
+	APIID         string
+	OrgID         string
+	OauthID       string
+	RequestTime   int64
+	RawRequest    string
+	RawResponse   string
+	IPAddress     string
+	Geo           GeoData
+	Tags          []string
+	Alias         string
+	TrackPath     bool
+	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
+}
+type GeoData struct {
+	Country struct {
+		ISOCode string `maxminddb:"iso_code"`
+	} `maxminddb:"country"`
+
+	City struct {
+		GeoNameID uint              `maxminddb:"geoname_id"`
+		Names     map[string]string `maxminddb:"names"`
+	} `maxminddb:"city"`
+
+	Location struct {
+		Latitude  float64 `maxminddb:"latitude"`
+		Longitude float64 `maxminddb:"longitude"`
+		TimeZone  string  `maxminddb:"time_zone"`
+	} `maxminddb:"location"`
+}
+
 const analyticsKeyName = "tyk-system-analytics"
 
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type Purger struct {
-	Store               storage.Handler
-	AnalyticsRecordFunc func() interface{}
+	Store storage.Handler
 }
 
 // Connect Connects to RPC
@@ -68,7 +112,7 @@ func (r *Purger) PurgeCache() {
 	keys := make([]interface{}, len(analyticsValues))
 
 	for i, v := range analyticsValues {
-		decoded := r.AnalyticsRecordFunc()
+		decoded := AnalyticsRecord{}
 		if err := msgpack.Unmarshal(v.([]byte), &decoded); err != nil {
 			Log.WithError(err).Error("Couldn't unmarshal analytics data")
 		} else {

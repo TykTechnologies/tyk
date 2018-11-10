@@ -162,9 +162,6 @@ func setupGlobals() {
 				store := storage.RedisCluster{KeyPrefix: "analytics-"}
 				purger := rpc.Purger{
 					Store: &store,
-					AnalyticsRecordFunc: func() interface{} {
-						return AnalyticsRecord{}
-					},
 				}
 				purger.Connect()
 				go purger.PurgeLoop(rpcPurgeTicker)
