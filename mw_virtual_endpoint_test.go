@@ -33,7 +33,7 @@ func testPrepareVirtualEndpoint(js string, method string, path string, proxyOnEr
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 path,
 			Method:               method,
-			proxyOnError:         proxyOnError,
+			ProxyOnError:         proxyOnError,
 		}
 		v := spec.VersionData.Versions["v1"]
 		v.UseExtendedPaths = true
