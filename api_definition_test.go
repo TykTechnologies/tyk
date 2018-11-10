@@ -74,8 +74,8 @@ func TestURLRewrites(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/rewrite1?show_env=1", Code: 200, BodyMatch: `"URI":"/get?show_env=2"`},
-			{Path: "/rewrite", Code: 200, BodyMatch: `"URI":"/get?just_rewrite"`},
+			{Path: "/rewrite1?show_env=1", Code: http.StatusOK, BodyMatch: `"URI":"/get?show_env=2"`},
+			{Path: "/rewrite", Code: http.StatusOK, BodyMatch: `"URI":"/get?just_rewrite"`},
 		}...)
 	})
 }
@@ -106,12 +106,12 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			// Should mock path
-			{Path: "/reply/", Code: 200, BodyMatch: "flump"},
-			{Path: "/reply/123", Code: 200, BodyMatch: "flump"},
+			{Path: "/reply/", Code: http.StatusOK, BodyMatch: "flump"},
+			{Path: "/reply/123", Code: http.StatusOK, BodyMatch: "flump"},
 			// Should get original upstream response
-			{Path: "/get", Code: 200, BodyMatch: `"Url":"/get"`},
+			{Path: "/get", Code: http.StatusOK, BodyMatch: `"Url":"/get"`},
 			// Reject not whitelisted (but know by upstream) path
-			{Method: "POST", Path: "/post", Code: 403},
+			{Method: "POST", Path: "/post", Code: http.StatusForbidden},
 		}...)
 	})
 
@@ -127,10 +127,36 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			// Should mock path
-			{Path: "/simple", Code: 200},
-			{Path: "/regex/123/test", Code: 200},
-			{Path: "/regex/123/differ", Code: 403},
-			{Path: "/", Code: 403},
+			{Path: "/simple", Code: http.StatusOK},
+			{Path: "/regex/123/test", Code: http.StatusOK},
+			{Path: "/regex/123/differ", Code: http.StatusForbidden},
+			{Path: "/", Code: http.StatusForbidden},
+		}...)
+	})
+
+	t.Run("Test #1944", func(t *testing.T) {
+		buildAndLoadAPI(func(spec *APISpec) {
+			updateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.Paths.WhiteList = []string{"/foo/{fooId}$", "/foo/{fooId}/bar/{barId}$", "/baz/{bazId}"}
+				v.UseExtendedPaths = false
+			})
+
+			spec.Proxy.ListenPath = "/"
+		})
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/foo", Code: http.StatusForbidden},
+			{Path: "/foo/", Code: http.StatusOK},
+			{Path: "/foo/1", Code: http.StatusOK},
+			{Path: "/foo/1/bar", Code: http.StatusForbidden},
+			{Path: "/foo/1/bar/", Code: http.StatusOK},
+			{Path: "/foo/1/bar/1", Code: http.StatusOK},
+			{Path: "/", Code: http.StatusForbidden},
+			{Path: "/baz", Code: http.StatusForbidden},
+			{Path: "/baz/", Code: http.StatusOK},
+			{Path: "/baz/1", Code: http.StatusOK},
+			{Path: "/baz/1/", Code: http.StatusOK},
+			{Path: "/baz/1/bazz", Code: http.StatusOK},
 		}...)
 	})
 }
@@ -158,12 +184,12 @@ func TestBlacklist(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/blacklist/literal", Code: 403},
-			{Path: "/blacklist/123/test", Code: 403},
+			{Path: "/blacklist/literal", Code: http.StatusForbidden},
+			{Path: "/blacklist/123/test", Code: http.StatusForbidden},
 
-			{Path: "/blacklist/123/different", Code: 200},
+			{Path: "/blacklist/123/different", Code: http.StatusOK},
 			// POST method not blacklisted
-			{Method: "POST", Path: "/blacklist/literal", Code: 200},
+			{Method: "POST", Path: "/blacklist/literal", Code: http.StatusOK},
 		}...)
 	})
 
@@ -178,12 +204,12 @@ func TestBlacklist(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/blacklist/literal", Code: 403},
-			{Path: "/blacklist/123/test", Code: 403},
+			{Path: "/blacklist/literal", Code: http.StatusForbidden},
+			{Path: "/blacklist/123/test", Code: http.StatusForbidden},
 
-			{Path: "/blacklist/123/different", Code: 200},
+			{Path: "/blacklist/123/different", Code: http.StatusOK},
 			// POST method also blacklisted
-			{Method: "POST", Path: "/blacklist/literal", Code: 403},
+			{Method: "POST", Path: "/blacklist/literal", Code: http.StatusForbidden},
 		}...)
 	})
 }
@@ -211,8 +237,8 @@ func TestConflictingPaths(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		// Should ignore auth check
-		{Method: "POST", Path: "/customer-servicing/documents/metadata/purge", Code: 200},
-		{Method: "GET", Path: "/customer-servicing/documents/metadata/{id}", Code: 200},
+		{Method: "POST", Path: "/customer-servicing/documents/metadata/purge", Code: http.StatusOK},
+		{Method: "GET", Path: "/customer-servicing/documents/metadata/{id}", Code: http.StatusOK},
 	}...)
 }
 
@@ -241,8 +267,8 @@ func TestIgnored(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			// Should ignore auth check
-			{Path: "/ignored/literal", Code: 200},
-			{Path: "/ignored/123/test", Code: 200},
+			{Path: "/ignored/literal", Code: http.StatusOK},
+			{Path: "/ignored/123/test", Code: http.StatusOK},
 			// Only GET is ignored
 			{Method: "POST", Path: "/ext/ignored/literal", Code: 401},
 
@@ -263,10 +289,10 @@ func TestIgnored(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			// Should ignore auth check
-			{Path: "/ignored/literal", Code: 200},
-			{Path: "/ignored/123/test", Code: 200},
+			{Path: "/ignored/literal", Code: http.StatusOK},
+			{Path: "/ignored/123/test", Code: http.StatusOK},
 			// All methods ignored
-			{Method: "POST", Path: "/ext/ignored/literal", Code: 200},
+			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusOK},
 
 			{Path: "/", Code: 401},
 		}...)
@@ -308,9 +334,9 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 
 			//Should get original upstream response
-			//{Method: "GET", Path: "/get", Code: 200, HeadersMatch: headers},
+			//{Method: "GET", Path: "/get", Code: http.StatusOK, HeadersMatch: headers},
 			//Reject not whitelisted (but know by upstream) path
-			{Method: "POST", Path: "/get", Code: 403},
+			{Method: "POST", Path: "/get", Code: http.StatusForbidden},
 		}...)
 	})
 }
@@ -435,10 +461,10 @@ func TestDefaultVersion(t *testing.T) {
 	authHeaders := map[string]string{"authorization": key}
 
 	ts.Run(t, []test.TestCase{
-		{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
-		{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
-		{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
-		{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+		{Path: "/foo", Headers: authHeaders, Code: http.StatusForbidden},      // Not whitelisted for default v2
+		{Path: "/bar", Headers: authHeaders, Code: http.StatusOK},             // Whitelisted for default v2
+		{Path: "/foo?v=v1", Headers: authHeaders, Code: http.StatusOK},        // Allowed for v1
+		{Path: "/bar?v=v1", Headers: authHeaders, Code: http.StatusForbidden}, // Not allowed for v1
 	}...)
 }
 
@@ -456,10 +482,10 @@ func BenchmarkDefaultVersion(b *testing.B) {
 		ts.Run(
 			b,
 			[]test.TestCase{
-				{Path: "/foo", Headers: authHeaders, Code: 403},      // Not whitelisted for default v2
-				{Path: "/bar", Headers: authHeaders, Code: 200},      // Whitelisted for default v2
-				{Path: "/foo?v=v1", Headers: authHeaders, Code: 200}, // Allowed for v1
-				{Path: "/bar?v=v1", Headers: authHeaders, Code: 403}, // Not allowed for v1
+				{Path: "/foo", Headers: authHeaders, Code: http.StatusForbidden},      // Not whitelisted for default v2
+				{Path: "/bar", Headers: authHeaders, Code: http.StatusOK},             // Whitelisted for default v2
+				{Path: "/foo?v=v1", Headers: authHeaders, Code: http.StatusOK},        // Allowed for v1
+				{Path: "/bar?v=v1", Headers: authHeaders, Code: http.StatusForbidden}, // Not allowed for v1
 			}...,
 		)
 	}
@@ -511,8 +537,8 @@ func TestGetVersionFromRequest(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
-			{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+			{Path: "/foo", Code: http.StatusOK, Headers: map[string]string{"X-API-Version": "v1"}},
+			{Path: "/bar", Code: http.StatusForbidden, Headers: map[string]string{"X-API-Version": "v1"}},
 		}...)
 	})
 
@@ -526,8 +552,8 @@ func TestGetVersionFromRequest(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/foo?version=v2", Code: 200},
-			{Path: "/bar?version=v2", Code: 403},
+			{Path: "/foo?version=v2", Code: http.StatusOK},
+			{Path: "/bar?version=v2", Code: http.StatusForbidden},
 		}...)
 	})
 
@@ -540,8 +566,8 @@ func TestGetVersionFromRequest(t *testing.T) {
 		})
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/v3/foo", Code: 200},
-			{Path: "/v3/bar", Code: 403},
+			{Path: "/v3/foo", Code: http.StatusOK},
+			{Path: "/v3/bar", Code: http.StatusForbidden},
 		}...)
 	})
 }
@@ -566,8 +592,8 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, []test.TestCase{
-				{Path: "/foo", Code: 200, Headers: map[string]string{"X-API-Version": "v1"}},
-				{Path: "/bar", Code: 403, Headers: map[string]string{"X-API-Version": "v1"}},
+				{Path: "/foo", Code: http.StatusOK, Headers: map[string]string{"X-API-Version": "v1"}},
+				{Path: "/bar", Code: http.StatusForbidden, Headers: map[string]string{"X-API-Version": "v1"}},
 			}...)
 		}
 	})
@@ -584,8 +610,8 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, []test.TestCase{
-				{Path: "/foo?version=v2", Code: 200},
-				{Path: "/bar?version=v2", Code: 403},
+				{Path: "/foo?version=v2", Code: http.StatusOK},
+				{Path: "/bar?version=v2", Code: http.StatusForbidden},
 			}...)
 		}
 	})
@@ -601,8 +627,8 @@ func BenchmarkGetVersionFromRequest(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, []test.TestCase{
-				{Path: "/v3/foo", Code: 200},
-				{Path: "/v3/bar", Code: 403},
+				{Path: "/v3/foo", Code: http.StatusOK},
+				{Path: "/v3/bar", Code: http.StatusForbidden},
 			}...)
 		}
 	})
