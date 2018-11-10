@@ -168,6 +168,7 @@ type VirtualMeta struct {
 	Path                 string `bson:"path" json:"path"`
 	Method               string `bson:"method" json:"method"`
 	UseSession           bool   `bson:"use_session" json:"use_session"`
+	ProxyOnError         bool   `bson:"proxy_on_error" json:"proxy_on_error"`
 }
 
 type MethodTransformMeta struct {
@@ -377,6 +378,7 @@ type APIDefinition struct {
 		PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
 		ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
 		TargetURL                   string                        `bson:"target_url" json:"target_url"`
+		DisableStripPrefix          bool                          `bson:"disable_strip_prefix" json:"disable_strip_prefix"`
 		StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
 		EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
 		Targets                     []string                      `bson:"target_list" json:"target_list"`

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 )
 
 type ChainObject struct {
+	Domain         string
 	ListenOn       string
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
@@ -37,38 +39,29 @@ func prepareStorage() (storage.RedisCluster, storage.RedisCluster, storage.Redis
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
 	redisOrgStore := storage.RedisCluster{KeyPrefix: "orgkey."}
 	healthStore := storage.RedisCluster{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys, UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.Global().HashKeys}
+	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey."}
 
 	FallbackKeySesionManager.Init(&redisStore)
 
 	return redisStore, redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
 }
 
-func skipSpecBecauseInvalid(spec *APISpec) bool {
+func skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
 
 	if spec.Proxy.ListenPath == "" {
-		mainLog.WithFields(logrus.Fields{
-			"org_id": spec.OrgID,
-			"api_id": spec.APIID,
-		}).Error("Listen path is empty, skipping API ID: ", spec.APIID)
+		logger.Error("Listen path is empty")
 		return true
 	}
 
 	if strings.Contains(spec.Proxy.ListenPath, " ") {
-		mainLog.WithFields(logrus.Fields{
-			"org_id": spec.OrgID,
-			"api_id": spec.APIID,
-		}).Error("Listen path contains spaces, is invalid, skipping API ID: ", spec.APIID)
+		logger.Error("Listen path contains spaces, is invalid")
 		return true
 	}
 
 	_, err := url.Parse(spec.Proxy.TargetURL)
 	if err != nil {
-		mainLog.WithFields(logrus.Fields{
-			"org_id": spec.OrgID,
-			"api_id": spec.APIID,
-		}).Error("couldn't parse target URL: ", err)
+		logger.Error("couldn't parse target URL: ", err)
 		return true
 	}
 
@@ -101,19 +94,22 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 
 func processSpec(spec *APISpec, apisByListen map[string]int,
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler,
-	subrouter *mux.Router) *ChainObject {
+	subrouter *mux.Router, logger *logrus.Entry) *ChainObject {
 
 	var chainDef ChainObject
 	chainDef.Subrouter = subrouter
 
-	var coprocessLog = log.WithFields(logrus.Fields{
-		"prefix":   "coprocess",
+	logger = logger.WithFields(logrus.Fields{
+		"org_id":   spec.OrgID,
+		"api_id":   spec.APIID,
 		"api_name": spec.Name,
 	})
 
-	mainLog.WithFields(logrus.Fields{
-		"api_name": spec.Name,
-	}).Info("Loading API")
+	var coprocessLog = logger.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	})
+
+	logger.Info("Loading API")
 
 	if len(spec.TagHeaders) > 0 {
 		// Ensure all headers marked for tagging are lowercase
@@ -125,10 +121,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		spec.TagHeaders = lowerCaseHeaders
 	}
 
-	if skipSpecBecauseInvalid(spec) {
-		mainLog.WithFields(logrus.Fields{
-			"api_name": spec.Name,
-		}).Warning("Skipped!")
+	if skipSpecBecauseInvalid(spec, logger) {
+		logger.Warning("Spec not valid, skipped!")
 		chainDef.Skip = true
 		return &chainDef
 	}
@@ -155,10 +149,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 	if pathModified {
-		mainLog.WithFields(logrus.Fields{
-			"org_id": spec.OrgID,
-			"api_id": spec.APIID,
-		}).Error("Listen path collision, changed to ", spec.Proxy.ListenPath)
+		logger.Error("Listen path collision, changed to ", spec.Proxy.ListenPath)
 	}
 
 	// Set up LB targets:
@@ -204,9 +195,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	var prefix string
 	if spec.CustomMiddlewareBundle != "" {
 		if err := loadBundle(spec); err != nil {
-			mainLog.WithFields(logrus.Fields{
-				"api_name": spec.Name,
-			}).Error("Couldn't load bundle")
+			logger.Error("Couldn't load bundle")
 		}
 		tykBundlePath := filepath.Join(config.Global().MiddlewarePath, "bundles")
 		bundleNameHash := md5.New()
@@ -215,13 +204,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 		prefix = filepath.Join(tykBundlePath, bundlePath)
 	}
 
-	mainLog.WithFields(logrus.Fields{
-		"api_name": spec.Name,
-	}).Debug("Loading Middleware")
+	logger.Debug("Initializing API")
 	var mwPaths []string
+
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwDriver = loadCustomMiddleware(spec)
 
-	if spec.CustomMiddleware.Driver == apidef.OttoDriver {
+	if config.Global().EnableJSVM && mwDriver == apidef.OttoDriver {
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
 
@@ -230,12 +218,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	if spec.UseOauth2 {
-		log.Debug("Loading OAuth Manager")
+		logger.Debug("Loading OAuth Manager")
 		oauthManager := addOAuthHandlers(spec, subrouter)
-		log.Debug("-- Added OAuth Handlers")
+		logger.Debug("-- Added OAuth Handlers")
 
 		spec.OAuthManager = oauthManager
-		log.Debug("Done loading OAuth Manager")
+		logger.Debug("Done loading OAuth Manager")
 	}
 
 	enableVersionOverrides := false
@@ -251,9 +239,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	var proxy ReturningHttpHandler
 	if enableVersionOverrides {
-		mainLog.WithFields(logrus.Fields{
-			"api_name": spec.Name,
-		}).Info("Multi target enabled")
+		logger.Info("Multi target enabled")
 		proxy = NewMultiTargetProxy(spec)
 	} else {
 		proxy = TykNewSingleHostReverseProxy(spec.target, spec)
@@ -262,7 +248,8 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors
 	createResponseMiddlewareChain(spec)
 
-	baseMid := BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger}
+
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
 			baseMid.Spec.CircuitBreakerEnabled = true
@@ -280,9 +267,7 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if spec.UseKeylessAccess {
 		chainDef.Open = true
-		mainLog.WithFields(logrus.Fields{
-			"api_name": spec.Name,
-		}).Info("Checking security policy: Open")
+		logger.Info("Checking security policy: Open")
 
 		// Add pre-process MW
 		chainArray := []alice.Constructor{}
@@ -360,23 +345,23 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		// Select the keying method to use for setting session states
 		if mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
-			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: OAuth")
+			logger.Info("Checking security policy: OAuth")
 		}
 
 		if mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, cache.New(60*time.Second, 60*time.Minute)}) {
-			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: Basic")
+			logger.Info("Checking security policy: Basic")
 		}
 
 		if mwAppendEnabled(&authArray, &HMACMiddleware{BaseMiddleware: baseMid}) {
-			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: HMAC")
+			logger.Info("Checking security policy: HMAC")
 		}
 
 		if mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
-			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: JWT")
+			logger.Info("Checking security policy: JWT")
 		}
 
 		if mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
-			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: OpenID")
+			logger.Info("Checking security policy: OpenID")
 		}
 
 		coprocessAuth := EnableCoProcess && mwDriver != apidef.OttoDriver && spec.EnableCoProcessAuth
@@ -392,13 +377,13 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		if ottoAuth {
 
-			mainLog.Info("----> Checking security policy: JS Plugin")
+			logger.Info("----> Checking security policy: JS Plugin")
 
 			authArray = append(authArray, createDynamicMiddleware(mwAuthCheckFunc.Name, true, false, baseMid))
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
-			mainLog.WithField("api_name", spec.Name).Info("Checking security policy: Token")
+			logger.Info("Checking security policy: Token")
 			authArray = append(authArray, createMiddleware(&AuthKey{baseMid}))
 		}
 
@@ -435,16 +420,12 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
-		mainLog.WithField("api_name", spec.Name).Debug("Custom middleware completed processing")
-
 		// Use createMiddleware(&ModifiedMiddleware{baseMid})  to run custom middleware
 		chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}})
 
-		log.Debug("Chain completed")
-
 		var simpleArray []alice.Constructor
 		mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
-		mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
+		mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid})
 		mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
 		simpleArray = append(simpleArray, authArray...)
@@ -453,30 +434,47 @@ func processSpec(spec *APISpec, apisByListen map[string]int,
 
 		rateLimitPath := spec.Proxy.ListenPath + "tyk/rate-limits/"
 
-		mainLog.WithField("api_name", spec.Name).Debug("Rate limit endpoint is: ", rateLimitPath)
+		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
 
 		chainDef.RateLimitPath = rateLimitPath
 		chainDef.RateLimitChain = alice.New(simpleArray...).
 			Then(http.HandlerFunc(userRatesCheck))
 	}
 
-	mainLog.WithField("api_name", spec.Name).Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
+	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
 	chainDef.ThisHandler = chain
 	chainDef.ListenOn = spec.Proxy.ListenPath + "{rest:.*}"
+	chainDef.Domain = spec.Domain
 
-	if config.Global().UseRedisLog {
-		log.WithFields(logrus.Fields{
-			"prefix":      "gateway",
-			"user_ip":     "--",
-			"server_name": "--",
-			"user_id":     "--",
-			"org_id":      spec.OrgID,
-			"api_id":      spec.APIID,
-		}).Info("Loaded: ", spec.Name)
-	}
+	logger.WithFields(logrus.Fields{
+		"prefix":      "gateway",
+		"user_ip":     "--",
+		"server_name": "--",
+		"user_id":     "--",
+	}).Info("API Loaded")
 
 	return &chainDef
+}
+
+// Check for recursion
+const defaultLoopLevelLimit = 5
+
+func isLoop(r *http.Request) (bool, error) {
+	if r.URL.Scheme != "tyk" {
+		return false, nil
+	}
+
+	limit := ctxLoopLevelLimit(r)
+	if limit == 0 {
+		limit = defaultLoopLevelLimit
+	}
+
+	if ctxLoopLevel(r) > limit {
+		return true, fmt.Errorf("Loop level too deep. Found more than %d loops in single request", limit)
+	}
+
+	return true, nil
 }
 
 type DummyProxyHandler struct {
@@ -484,7 +482,32 @@ type DummyProxyHandler struct {
 }
 
 func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	d.SH.ServeHTTP(w, r)
+	if found, err := isLoop(r); found {
+		if err != nil {
+			handler := ErrorHandler{*d.SH.Base()}
+			handler.HandleError(w, r, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		r.URL.Scheme = "http"
+		if methodOverride := r.URL.Query().Get("method"); methodOverride != "" {
+			r.Method = methodOverride
+		}
+
+		// No need to handle errors, in all error cases limit will be set to 0
+		loopLevelLimit, _ := strconv.Atoi(r.URL.Query().Get("loop_limit"))
+
+		if origURL := ctxGetOrigRequestURL(r); origURL != nil {
+			r.URL.RawQuery = origURL.RawQuery
+			ctxSetOrigRequestURL(r, nil)
+		}
+
+		ctxIncLoopLevel(r, loopLevelLimit)
+
+		d.SH.Spec.middlewareChain.ThisHandler.ServeHTTP(w, r)
+	} else {
+		d.SH.ServeHTTP(w, r)
+	}
 }
 
 func loadGlobalApps(router *mux.Router) {
@@ -571,9 +594,13 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 				subrouter = muxer
 			}
 
-			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter)
+			chainObj := processSpec(spec, apisByListen, redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore, subrouter, logrus.NewEntry(log))
+
 			chainObj.Index = i
 			chainChannel <- chainObj
+			apisMu.Lock()
+			spec.middlewareChain = chainObj
+			apisMu.Unlock()
 		}(spec, i)
 
 		// TODO: This will not deal with skipped APis well
@@ -593,7 +620,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 			chainObj.Subrouter.Handle(chainObj.RateLimitPath, chainObj.RateLimitChain)
 		}
 
-		mainLog.Info("Processed and listening on: ", chainObj.ListenOn)
+		mainLog.Infof("Processed and listening on: %s%s", chainObj.Domain, chainObj.ListenOn)
 		chainObj.Subrouter.Handle(chainObj.ListenOn, chainObj.ThisHandler)
 	}
 

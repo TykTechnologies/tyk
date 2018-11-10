@@ -3,6 +3,7 @@ package gorpc
 import (
 	"fmt"
 	"io"
+	"net"
 	"sync"
 	"time"
 )
@@ -501,7 +502,7 @@ func (e *ClientError) Error() string {
 func clientHandler(c *Client) {
 	defer c.stopWg.Done()
 
-	var conn io.ReadWriteCloser
+	var conn net.Conn
 	var err error
 
 	for {
@@ -529,9 +530,9 @@ func clientHandler(c *Client) {
 	}
 }
 
-func clientHandleConnection(c *Client, conn io.ReadWriteCloser) {
+func clientHandleConnection(c *Client, conn net.Conn) {
 	if c.OnConnect != nil {
-		newConn, err := c.OnConnect(c.Addr, conn)
+		newConn, _, err := c.OnConnect(conn)
 		if err != nil {
 			c.LogError("gorpc.Client: [%s]. OnConnect error: [%s]", c.Addr, err)
 			conn.Close()

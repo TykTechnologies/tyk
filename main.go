@@ -31,19 +31,21 @@ import (
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
-	"github.com/lonelycode/gorpc"
 	"github.com/lonelycode/osin"
+	"github.com/netbrain/goautosocket"
 	"github.com/rs/cors"
 	"github.com/satori/go.uuid"
 	"rsc.io/letsencrypt"
 
 	"github.com/TykTechnologies/goagain"
+	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	cli "github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -158,7 +160,9 @@ func setupGlobals() {
 
 			rpcPurgeOnce.Do(func() {
 				store := storage.RedisCluster{KeyPrefix: "analytics-"}
-				purger := RPCPurger{Store: &store}
+				purger := rpc.Purger{
+					Store: &store,
+				}
 				purger.Connect()
 				go purger.PurgeLoop(rpcPurgeTicker)
 			})
@@ -224,7 +228,7 @@ func buildConnStr(resource string) string {
 	return config.Global().DBAppConfOptions.ConnectionString + resource
 }
 
-func syncAPISpecs() int {
+func syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{}
 
 	apisMu.Lock()
@@ -235,7 +239,7 @@ func syncAPISpecs() int {
 		tmpSpecs, err := loader.FromDashboardService(connStr, config.Global().NodeSecret)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)
-			return 0
+			return 0, err
 		}
 
 		apiSpecs = tmpSpecs
@@ -244,7 +248,11 @@ func syncAPISpecs() int {
 	} else if config.Global().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
-		apiSpecs = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		var err error
+		apiSpecs, err = loader.FromRPC(config.Global().SlaveOptions.RPCKey)
+		if err != nil {
+			return 0, err
+		}
 	} else {
 		apiSpecs = loader.FromDir(config.Global().AppPath)
 	}
@@ -263,10 +271,10 @@ func syncAPISpecs() int {
 		}
 	}
 
-	return len(apiSpecs)
+	return len(apiSpecs), nil
 }
 
-func syncPolicies() int {
+func syncPolicies() (count int, err error) {
 	var pols map[string]user.Policy
 
 	mainLog.Info("Loading policies")
@@ -282,15 +290,14 @@ func syncPolicies() int {
 		mainLog.Info("Using Policies from Dashboard Service")
 
 		pols = LoadPoliciesFromDashboard(connStr, config.Global().NodeSecret, config.Global().Policies.AllowExplicitPolicyID)
-
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		pols = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
+		pols, err = LoadPoliciesFromRPC(config.Global().SlaveOptions.RPCKey)
 	default:
 		// this is the only case now where we need a policy record name
 		if config.Global().Policies.PolicyRecordName == "" {
 			mainLog.Debug("No policy record name defined, skipping...")
-			return 0
+			return 0, nil
 		}
 		pols = LoadPoliciesFromFile(config.Global().Policies.PolicyRecordName)
 	}
@@ -305,7 +312,7 @@ func syncPolicies() int {
 		policiesByID = pols
 	}
 
-	return len(pols)
+	return len(pols), err
 }
 
 // stripSlashes removes any trailing slashes from the request's URL
@@ -358,34 +365,38 @@ func loadAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
 	}
 
+	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
+
 	mainLog.Info("Initialising Tyk REST API Endpoints")
 
 	// set up main API handlers
-	r.HandleFunc("/reload/group", allowMethods(groupResetHandler, "GET"))
-	r.HandleFunc("/reload", allowMethods(resetHandler(nil), "GET"))
+	r.HandleFunc("/reload/group", groupResetHandler).Methods("GET")
+	r.HandleFunc("/reload", resetHandler(nil)).Methods("GET")
 
 	if !isRPCMode() {
-		r.HandleFunc("/org/keys", allowMethods(orgHandler, "GET"))
-		r.HandleFunc("/org/keys/{keyName:[^/]*}", allowMethods(orgHandler, "POST", "PUT", "GET", "DELETE"))
-		r.HandleFunc("/keys/policy/{keyName}", allowMethods(policyUpdateHandler, "POST"))
-		r.HandleFunc("/keys/create", allowMethods(createKeyHandler, "POST"))
-		r.HandleFunc("/apis", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
-		r.HandleFunc("/apis/{apiID}", allowMethods(apiHandler, "GET", "POST", "PUT", "DELETE"))
-		r.HandleFunc("/health", allowMethods(healthCheckhandler, "GET"))
-		r.HandleFunc("/oauth/clients/create", allowMethods(createOauthClient, "POST"))
-		r.HandleFunc("/oauth/refresh/{keyName}", allowMethods(invalidateOauthRefresh, "DELETE"))
-		r.HandleFunc("/cache/{apiID}", allowMethods(invalidateCacheHandler, "DELETE"))
+		r.HandleFunc("/org/keys", orgHandler).Methods("GET")
+		r.HandleFunc("/org/keys/{keyName:[^/]*}", orgHandler).Methods("POST", "PUT", "GET", "DELETE")
+		r.HandleFunc("/keys/policy/{keyName}", policyUpdateHandler).Methods("POST")
+		r.HandleFunc("/keys/create", createKeyHandler).Methods("POST")
+		r.HandleFunc("/apis", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/apis/{apiID}", apiHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/health", healthCheckhandler).Methods("GET")
+		r.HandleFunc("/oauth/clients/create", createOauthClient).Methods("POST")
+		r.HandleFunc("/oauth/refresh/{keyName}", invalidateOauthRefresh).Methods("DELETE")
+		r.HandleFunc("/cache/{apiID}", invalidateCacheHandler).Methods("DELETE")
 	} else {
 		mainLog.Info("Node is slaved, REST API minimised")
 	}
 
-	r.HandleFunc("/keys", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
-	r.HandleFunc("/keys/{keyName:[^/]*}", allowMethods(keyHandler, "POST", "PUT", "GET", "DELETE"))
-	r.HandleFunc("/certs", allowMethods(certHandler, "POST", "GET"))
-	r.HandleFunc("/certs/{certID:[^/]*}", allowMethods(certHandler, "POST", "GET", "DELETE"))
-	r.HandleFunc("/oauth/clients/{apiID}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", allowMethods(oAuthClientHandler, "GET", "DELETE"))
-	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", allowMethods(oAuthClientTokensHandler, "GET"))
+	r.HandleFunc("/debug", traceHandler).Methods("POST")
+
+	r.HandleFunc("/keys", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/keys/{keyName:[^/]*}", keyHandler).Methods("POST", "PUT", "GET", "DELETE")
+	r.HandleFunc("/certs", certHandler).Methods("POST", "GET")
+	r.HandleFunc("/certs/{certID:[^/]*}", certHandler).Methods("POST", "GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}", oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", oAuthClientHandler).Methods("GET", "DELETE")
+	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", oAuthClientTokensHandler).Methods("GET")
 
 	mainLog.Debug("Loaded API Endpoints")
 }
@@ -591,18 +602,26 @@ func doReload() {
 
 	// Initialize/reset the JSVM
 	if config.Global().EnableJSVM {
-		GlobalEventsJSVM.Init(nil)
+		GlobalEventsJSVM.Init(nil, logrus.NewEntry(log))
 	}
 
 	// Load the API Policies
-	syncPolicies()
-	// load the specs
-	count := syncAPISpecs()
-	// skip re-loading only if dashboard service reported 0 APIs
-	// and current registry had 0 APIs
-	if count == 0 && apisByIDLen() == 0 {
-		mainLog.Warning("No API Definitions found, not reloading")
+	if _, err := syncPolicies(); err != nil {
+		mainLog.Error("Error during syncing policies:", err.Error())
 		return
+	}
+
+	// load the specs
+	if count, err := syncAPISpecs(); err != nil {
+		mainLog.Error("Error during syncing apis:", err.Error())
+		return
+	} else {
+		// skip re-loading only if dashboard service reported 0 APIs
+		// and current registry had 0 APIs
+		if count == 0 && apisByIDLen() == 0 {
+			mainLog.Warning("No API Definitions found, not reloading")
+			return
+		}
 	}
 
 	// We have updated specs, lets load those...
@@ -734,15 +753,17 @@ func setupLogger() {
 
 	if config.Global().UseLogstash {
 		mainLog.Debug("Enabling Logstash support")
-		hook, err := logstashHook.NewHook(config.Global().LogstashTransport,
-			config.Global().LogstashNetworkAddr,
-			"tyk-gateway")
 
+		conn, err := gas.Dial(config.Global().LogstashTransport, config.Global().LogstashNetworkAddr)
+		if err != nil {
+			log.Errorf("Error making connection for logstash hook: %v", err)
+		}
+		hook, err := logstashHook.NewHookWithConn(conn, "tyk-gateway")
 		if err == nil {
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
+			mainLog.Debug("Logstash hook active")
 		}
-		mainLog.Debug("Logstash hook active")
 	}
 
 	if config.Global().UseRedisLog {
@@ -806,6 +827,10 @@ func initialiseSystem() error {
 		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
+	// suply rpc client globals to join it main loging and instrumentation sub systems
+	rpc.Log = log
+	rpc.Instrument = instrument
+
 	setupGlobals()
 
 	if *cli.Port != "" {
@@ -850,8 +875,8 @@ func afterConfSetup(conf *config.Config) {
 		conf.SlaveOptions.PingTimeout = 60
 	}
 
-	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
-	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
+	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
+	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
 	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
 }
@@ -876,8 +901,6 @@ func getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 		return &RPCStorageHandler{
 			KeyPrefix: keyPrefix,
 			HashKeys:  hashKeys,
-			UserKey:   config.Global().SlaveOptions.APIKey,
-			Address:   config.Global().SlaveOptions.ConnectionString,
 		}
 	}
 	return storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys}
@@ -1073,8 +1096,6 @@ func start() {
 		mainLog.Debug("Starting RPC reload listener")
 		RPCListener = RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
-			UserKey:          slaveOptions.APIKey,
-			Address:          slaveOptions.ConnectionString,
 			SuppressRegister: true,
 		}
 
@@ -1333,7 +1354,7 @@ func listen(listener, controlListener net.Listener, err error) {
 		fmt.Fprintf(w, "Hello Tiki")
 	})
 
-	if !rpcEmergencyMode {
+	if !rpc.IsEmergencyMode() {
 		doReload()
 	}
 }

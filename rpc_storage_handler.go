@@ -1,20 +1,14 @@
 package main
 
 import (
-	"crypto/tls"
-	"errors"
-	"io"
-	"net"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/garyburd/redigo/redis"
-	"github.com/lonelycode/gorpc"
-	cache "github.com/pmylund/go-cache"
-	"github.com/satori/go.uuid"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
@@ -52,191 +46,115 @@ type GroupKeySpaceRequest struct {
 }
 
 var (
-	// rpcLoadCount is a counter to check if this is a cold boot
-	rpcLoadCount           int
-	rpcEmergencyMode       bool
-	rpcEmergencyModeLoaded bool
-
-	GlobalRPCCallTimeout time.Duration
-	GlobalRPCPingTimeout time.Duration
+	dispatcherFuncs = map[string]interface{}{
+		"Login": func(clientAddr, userKey string) bool {
+			return false
+		},
+		"LoginWithGroup": func(clientAddr string, groupData *GroupLoginRequest) bool {
+			return false
+		},
+		"GetKey": func(keyName string) (string, error) {
+			return "", nil
+		},
+		"SetKey": func(ibd *InboundData) error {
+			return nil
+		},
+		"GetExp": func(keyName string) (int64, error) {
+			return 0, nil
+		},
+		"GetKeys": func(keyName string) ([]string, error) {
+			return nil, nil
+		},
+		"DeleteKey": func(keyName string) (bool, error) {
+			return true, nil
+		},
+		"DeleteRawKey": func(keyName string) (bool, error) {
+			return true, nil
+		},
+		"GetKeysAndValues": func(searchString string) (*KeysValuesPair, error) {
+			return nil, nil
+		},
+		"GetKeysAndValuesWithFilter": func(searchString string) (*KeysValuesPair, error) {
+			return nil, nil
+		},
+		"DeleteKeys": func(keys []string) (bool, error) {
+			return true, nil
+		},
+		"Decrement": func(keyName string) error {
+			return nil
+		},
+		"IncrememntWithExpire": func(ibd *InboundData) (int64, error) {
+			return 0, nil
+		},
+		"AppendToSet": func(ibd *InboundData) error {
+			return nil
+		},
+		"SetRollingWindow": func(ibd *InboundData) (int, error) {
+			return 0, nil
+		},
+		"GetApiDefinitions": func(dr *DefRequest) (string, error) {
+			return "", nil
+		},
+		"GetPolicies": func(orgId string) (string, error) {
+			return "", nil
+		},
+		"PurgeAnalyticsData": func(data string) error {
+			return nil
+		},
+		"CheckReload": func(clientAddr, orgId string) (bool, error) {
+			return false, nil
+		},
+		"GetKeySpaceUpdate": func(clientAddr, orgId string) ([]string, error) {
+			return nil, nil
+		},
+		"GetGroupKeySpaceUpdate": func(clientAddr string, groupData *GroupKeySpaceRequest) ([]string, error) {
+			return nil, nil
+		},
+		"Ping": func() bool {
+			return false
+		},
+	}
 )
 
 // RPCStorageHandler is a storage manager that uses the redis database.
 type RPCStorageHandler struct {
 	KeyPrefix        string
 	HashKeys         bool
-	UserKey          string
-	Address          string
-	killChan         chan int
-	Killed           bool
-	Connected        bool
-	ID               string
 	SuppressRegister bool
 }
 
-func (r *RPCStorageHandler) Register() {
-	r.ID = uuid.NewV4().String()
-	r.killChan = make(chan int)
-	log.Debug("RPC Client registered")
-}
-
-func (r *RPCStorageHandler) checkDisconnect() {
-	res := <-r.killChan
-	log.Info("RPC Client disconnecting: ", res)
-	r.Killed = true
-	r.Disconnect()
-}
-
-func (r *RPCStorageHandler) ReConnect() {
-	// no-op, let the gorpc client handle it.
-}
-
-var RPCCLientSingleton *gorpc.Client
-var RPCCLientSingletonMu sync.Mutex
-var RPCFuncClientSingleton *gorpc.DispatcherClient
 var RPCGlobalCache = cache.New(30*time.Second, 15*time.Second)
-var RPCClientIsConnected bool
 
-const (
-	rpcCLientSingletonCall     = "gorpcClientCall"
-	rpcFuncClientSingletonCall = "gorpcDispatcherClientCall"
-)
-
-func emitRPCErrorEvent(jobName string, funcName string, err error) {
-	job := instrument.NewJob(jobName)
-	if emitErr := job.EventErr(funcName, err); emitErr != nil {
-		log.WithError(emitErr).WithFields(logrus.Fields{
-			"jobName":  jobName,
-			"funcName": funcName,
-		})
-	}
-}
-
-func emitRPCErrorEventKv(jobName string, funcName string, err error, kv map[string]string) {
-	job := instrument.NewJob(jobName)
-	if emitErr := job.EventErrKv(funcName, err, kv); emitErr != nil {
-		log.WithError(emitErr).WithFields(logrus.Fields{
-			"jobName":  jobName,
-			"funcName": funcName,
-			"kv":       kv,
-		})
-	}
-}
-
-var rpcConnectMu sync.Mutex
-
-// Connect will establish a connection to the DB
+// Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
-	rpcConnectMu.Lock()
-	defer rpcConnectMu.Unlock()
-
-	if RPCClientIsConnected {
-		log.Debug("Using RPC singleton for connection")
-		return true
+	slaveOptions := config.Global().SlaveOptions
+	rpcConfig := rpc.Config{
+		UseSSL:                slaveOptions.UseSSL,
+		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
+		ConnectionString:      slaveOptions.ConnectionString,
+		RPCKey:                slaveOptions.RPCKey,
+		APIKey:                slaveOptions.APIKey,
+		GroupID:               slaveOptions.GroupID,
+		CallTimeout:           slaveOptions.CallTimeout,
+		PingTimeout:           slaveOptions.PingTimeout,
+		RPCPoolSize:           slaveOptions.RPCPoolSize,
 	}
 
-	if RPCCLientSingleton != nil {
-		return rpcEmergencyMode != true
-	}
-
-	// RPC Client is unset
-	// Set up the cache
-	log.Info("Setting new RPC connection!")
-
-	connID := uuid.NewV4().String()
-
-	// Length should fit into 1 byte. Protection if we decide change uuid in future.
-	if len(connID) > 255 {
-		panic("connID is too long")
-	}
-
-	if slaveOptions := config.Global().SlaveOptions; slaveOptions.UseSSL {
-		clientCfg := &tls.Config{
-			InsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
-		}
-
-		RPCCLientSingleton = gorpc.NewTLSClient(r.Address, clientCfg)
-	} else {
-		RPCCLientSingleton = gorpc.NewTCPClient(r.Address)
-	}
-
-	if log.Level != logrus.DebugLevel {
-		RPCCLientSingleton.LogError = gorpc.NilErrorLogger
-	}
-
-	RPCCLientSingleton.OnConnect = r.OnConnectFunc
-
-	RPCCLientSingleton.Conns = config.Global().SlaveOptions.RPCPoolSize
-	if RPCCLientSingleton.Conns == 0 {
-		RPCCLientSingleton.Conns = 20
-	}
-
-	RPCCLientSingleton.Dial = func(addr string) (conn io.ReadWriteCloser, err error) {
-		dialer := &net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}
-
-		useSSL := config.Global().SlaveOptions.UseSSL
-
-		if useSSL {
-			cfg := &tls.Config{
-				InsecureSkipVerify: config.Global().SlaveOptions.SSLInsecureSkipVerify,
+	return rpc.Connect(
+		rpcConfig,
+		r.SuppressRegister,
+		dispatcherFuncs,
+		func(userKey string, groupID string) interface{} {
+			return GroupLoginRequest{
+				UserKey: userKey,
+				GroupID: groupID,
 			}
-
-			conn, err = tls.DialWithDialer(dialer, "tcp", addr, cfg)
-		} else {
-			conn, err = dialer.Dial("tcp", addr)
-		}
-
-		if err != nil {
-			emitRPCErrorEventKv(
-				rpcCLientSingletonCall,
-				"dial",
-				err,
-				map[string]string{
-					"addr":   addr,
-					"useSSL": strconv.FormatBool(useSSL),
-				},
-			)
-			return
-		}
-
-		conn.Write([]byte("proto2"))
-		conn.Write([]byte{byte(len(connID))})
-		conn.Write([]byte(connID))
-		return conn, nil
-	}
-	RPCCLientSingleton.Start()
-	d := getDispatcher()
-
-	if RPCFuncClientSingleton == nil {
-		RPCFuncClientSingleton = d.NewFuncClient(RPCCLientSingleton)
-	}
-
-	if !r.Login() {
-		return false
-	}
-
-	if !r.SuppressRegister {
-		r.Register()
-		go r.checkDisconnect()
-	}
-
-	return true
-}
-
-func (r *RPCStorageHandler) OnConnectFunc(remoteAddr string, rwc io.ReadWriteCloser) (io.ReadWriteCloser, error) {
-	RPCCLientSingletonMu.Lock()
-	defer RPCCLientSingletonMu.Unlock()
-
-	RPCClientIsConnected = true
-	return rwc, nil
-}
-
-func (r *RPCStorageHandler) Disconnect() bool {
-	RPCClientIsConnected = false
-	return true
+		},
+		func() {
+			reloadURLStructure(nil)
+		},
+		doReload,
+	)
 }
 
 func (r *RPCStorageHandler) hashKey(in string) string {
@@ -260,178 +178,63 @@ func (r *RPCStorageHandler) cleanKey(keyName string) string {
 	return setKeyName
 }
 
-var rpcLoginMu sync.Mutex
-var reLoginRunning uint32
-
-func (r *RPCStorageHandler) ReAttemptLogin(err error) bool {
-	if atomic.LoadUint32(&reLoginRunning) == 1 {
-		return false
-	}
-	atomic.StoreUint32(&reLoginRunning, 1)
-
-	rpcLoginMu.Lock()
-	if rpcLoadCount == 0 && !rpcEmergencyModeLoaded {
-		log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
-		log.Warning("[RPC Store] ----> Found APIs... beginning emergency load")
-		rpcEmergencyModeLoaded = true
-		go doReload()
-	}
-	rpcLoginMu.Unlock()
-
-	time.Sleep(time.Second * 3)
-	atomic.StoreUint32(&reLoginRunning, 0)
-
-	if strings.Contains(err.Error(), "Cannot obtain response during timeout") {
-		r.ReConnect()
-		return false
-	}
-
-	log.Warning("[RPC Store] Login failed, waiting 3s to re-attempt")
-
-	return r.Login()
-}
-
-func (r *RPCStorageHandler) GroupLogin() bool {
-	groupLoginData := GroupLoginRequest{
-		UserKey: r.UserKey,
-		GroupID: config.Global().SlaveOptions.GroupID,
-	}
-	ok, err := RPCFuncClientSingleton.CallTimeout("LoginWithGroup", groupLoginData, GlobalRPCCallTimeout)
-	if err != nil {
-		log.Error("RPC Login failed: ", err)
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
-			"LoginWithGroup",
-			err,
-			map[string]string{
-				"GroupID": groupLoginData.GroupID,
-			},
-		)
-		rpcEmergencyMode = true
-		go r.ReAttemptLogin(err)
-		return false
-	}
-
-	if ok == false {
-		log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
-		go r.ReAttemptLogin(errors.New("Login incorrect"))
-		return false
-	}
-	log.Debug("[RPC Store] Group Login complete")
-	rpcLoadCount++
-
-	// Recovery
-	if rpcEmergencyMode {
-		rpcEmergencyMode = false
-		rpcEmergencyModeLoaded = false
-		reloadURLStructure(nil)
-	}
-
-	return true
-}
-
-func (r *RPCStorageHandler) Login() bool {
-	log.Debug("[RPC Store] Login initiated")
-
-	if len(r.UserKey) == 0 {
-		log.Fatal("No API Key set!")
-	}
-
-	// If we have a group ID, lets login as a group
-	if config.Global().SlaveOptions.GroupID != "" {
-		return r.GroupLogin()
-	}
-
-	ok, err := RPCFuncClientSingleton.CallTimeout("Login", r.UserKey, GlobalRPCCallTimeout)
-	if err != nil {
-		log.Error("RPC Login failed: ", err)
-		emitRPCErrorEvent(rpcFuncClientSingletonCall, "Login", err)
-		rpcEmergencyMode = true
-		go r.ReAttemptLogin(err)
-		return false
-	}
-
-	if ok == false {
-		log.Error("RPC Login incorrect")
-		rpcEmergencyMode = true
-		go r.ReAttemptLogin(errors.New("Login incorrect"))
-		return false
-	}
-	log.Debug("[RPC Store] Login complete")
-	rpcLoadCount++
-
-	if rpcEmergencyMode {
-		rpcEmergencyMode = false
-		rpcEmergencyModeLoaded = false
-		reloadURLStructure(nil)
-	}
-
-	return true
-}
-
 // GetKey will retrieve a key from the database
 func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 	start := time.Now() // get current time
 	log.Debug("[STORE] Getting WAS: ", keyName)
 	log.Debug("[STORE] Getting: ", r.fixKey(keyName))
 
+	value, err := r.GetRawKey(r.fixKey(keyName))
+
+	elapsed := time.Since(start)
+	log.Debug("GetKey took ", elapsed)
+
+	return value, err
+}
+
+func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	// Check the cache first
 	if config.Global().SlaveOptions.EnableRPCCache {
 		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := RPCGlobalCache.Get(r.fixKey(keyName))
+		cachedVal, found := RPCGlobalCache.Get(keyName)
 		log.Debug("--> Found? ", found)
 		if found {
-			elapsed := time.Since(start)
-			log.Debug("GetKey took ", elapsed)
-			log.Debug(cachedVal.(string))
 			return cachedVal.(string), nil
 		}
 	}
 
-	// Not cached
-	value, err := RPCFuncClientSingleton.CallTimeout("GetKey", r.fixKey(keyName), GlobalRPCCallTimeout)
+	value, err := rpc.FuncClientSingleton("GetKey", keyName)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"GetKey",
 			err,
 			map[string]string{
-				"keyName":      keyName,
-				"fixedKeyName": r.fixKey(keyName),
+				"keyName": keyName,
 			},
 		)
 		if r.IsAccessError(err) {
-			if r.Login() {
-				return r.GetKey(keyName)
+			if rpc.Login() {
+				return r.GetRawKey(keyName)
 			}
 		}
-
 		log.Debug("Error trying to get value:", err)
 		return "", storage.ErrKeyNotFound
 	}
-	elapsed := time.Since(start)
-	log.Debug("GetKey took ", elapsed)
-
 	if config.Global().SlaveOptions.EnableRPCCache {
-		// Cache it
-		RPCGlobalCache.Set(r.fixKey(keyName), value, cache.DefaultExpiration)
+		// Cache key
+		RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
 	}
-
+	//return hash key without prefix so it doesnt get double prefixed in redis
 	return value.(string), nil
-}
-
-func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
-	log.Error("Not Implemented!")
-	return "", nil
 }
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
-	value, err := RPCFuncClientSingleton.CallTimeout("GetExp", r.fixKey(keyName), GlobalRPCCallTimeout)
+	value, err := rpc.FuncClientSingleton("GetExp", r.fixKey(keyName))
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"GetExp",
 			err,
 			map[string]string{
@@ -440,7 +243,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 			},
 		)
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.GetExp(keyName)
 			}
 		}
@@ -451,7 +254,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 }
 
 func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
-	log.Error("SetExp Not Implemented")
+	log.Error("RPCStorageHandler.SetExp - Not Implemented")
 	return nil
 }
 
@@ -464,10 +267,10 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 		Timeout:      timeout,
 	}
 
-	_, err := RPCFuncClientSingleton.CallTimeout("SetKey", ibd, GlobalRPCCallTimeout)
+	_, err := rpc.FuncClientSingleton("SetKey", ibd)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"SetKey",
 			err,
 			map[string]string{
@@ -477,7 +280,7 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 		)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.SetKey(keyName, session, timeout)
 			}
 		}
@@ -499,10 +302,10 @@ func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) er
 // Decrement will decrement a key in redis
 func (r *RPCStorageHandler) Decrement(keyName string) {
 	log.Warning("Decrement called")
-	_, err := RPCFuncClientSingleton.CallTimeout("Decrement", keyName, GlobalRPCCallTimeout)
+	_, err := rpc.FuncClientSingleton("Decrement", keyName)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"Decrement",
 			err,
 			map[string]string{
@@ -511,7 +314,7 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 		)
 	}
 	if r.IsAccessError(err) {
-		if r.Login() {
+		if rpc.Login() {
 			r.Decrement(keyName)
 			return
 		}
@@ -526,10 +329,10 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		Expire:  expire,
 	}
 
-	val, err := RPCFuncClientSingleton.CallTimeout("IncrememntWithExpire", ibd, GlobalRPCCallTimeout)
+	val, err := rpc.FuncClientSingleton("IncrememntWithExpire", ibd)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"IncrememntWithExpire",
 			err,
 			map[string]string{
@@ -538,7 +341,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		)
 	}
 	if r.IsAccessError(err) {
-		if r.Login() {
+		if rpc.Login() {
 			return r.IncrememntWithExpire(keyName, expire)
 		}
 	}
@@ -554,7 +357,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 
 // GetKeys will return all keys according to the filter (filter is a prefix - e.g. tyk.keys.*)
 func (r *RPCStorageHandler) GetKeys(filter string) []string {
-	log.Error("GetKeys Not Implemented")
+	log.Error("RPCStorageHandler.GetKeys - Not Implemented")
 	return nil
 }
 
@@ -564,10 +367,10 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 
-	kvPair, err := RPCFuncClientSingleton.CallTimeout("GetKeysAndValuesWithFilter", searchStr, GlobalRPCCallTimeout)
+	kvPair, err := rpc.FuncClientSingleton("GetKeysAndValuesWithFilter", searchStr)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"GetKeysAndValuesWithFilter",
 			err,
 			map[string]string{
@@ -576,7 +379,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 		)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.GetKeysAndValuesWithFilter(filter)
 			}
 		}
@@ -598,12 +401,12 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 
 	searchStr := r.KeyPrefix + "*"
 
-	kvPair, err := RPCFuncClientSingleton.CallTimeout("GetKeysAndValues", searchStr, GlobalRPCCallTimeout)
+	kvPair, err := rpc.FuncClientSingleton("GetKeysAndValues", searchStr)
 	if err != nil {
-		emitRPCErrorEvent(rpcFuncClientSingletonCall, "GetKeysAndValues", err)
+		rpc.EmitErrorEvent(rpc.FuncClientSingletonCall, "GetKeysAndValues", err)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.GetKeysAndValues()
 			}
 		}
@@ -625,10 +428,10 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
 	log.Debug("DEL Key was: ", keyName)
 	log.Debug("DEL Key became: ", r.fixKey(keyName))
-	ok, err := RPCFuncClientSingleton.CallTimeout("DeleteKey", r.fixKey(keyName), GlobalRPCCallTimeout)
+	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"DeleteKey",
 			err,
 			map[string]string{
@@ -638,7 +441,7 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 		)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.DeleteKey(keyName)
 			}
 		}
@@ -649,10 +452,10 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
-	ok, err := RPCFuncClientSingleton.CallTimeout("DeleteRawKey", keyName, GlobalRPCCallTimeout)
+	ok, err := rpc.FuncClientSingleton("DeleteRawKey", keyName)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"DeleteRawKey",
 			err,
 			map[string]string{
@@ -661,7 +464,7 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 		)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.DeleteRawKey(keyName)
 			}
 		}
@@ -679,10 +482,10 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 		}
 
 		log.Debug("Deleting: ", asInterface)
-		ok, err := RPCFuncClientSingleton.CallTimeout("DeleteKeys", asInterface, GlobalRPCCallTimeout)
+		ok, err := rpc.FuncClientSingleton("DeleteKeys", asInterface)
 		if err != nil {
-			emitRPCErrorEventKv(
-				rpcFuncClientSingletonCall,
+			rpc.EmitErrorEventKv(
+				rpc.FuncClientSingletonCall,
 				"DeleteKeys",
 				err,
 				map[string]string{
@@ -692,7 +495,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 			)
 
 			if r.IsAccessError(err) {
-				if r.Login() {
+				if rpc.Login() {
 					return r.DeleteKeys(keys)
 				}
 			}
@@ -706,17 +509,17 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
 func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(redis.Message)) error {
-	log.Warning("NO PUBSUB DEFINED")
+	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
 
 func (r *RPCStorageHandler) Publish(channel, message string) error {
-	log.Warning("NO PUBSUB DEFINED")
+	log.Warning("RPCStorageHandler.Publish - NO PUBSUB DEFINED")
 	return nil
 }
 
 func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
-	log.Error("GetAndDeleteSet Not implemented, please disable your purger")
+	log.Error("RPCStorageHandler.GetAndDeleteSet - Not implemented, please disable your purger")
 	return nil
 }
 
@@ -726,10 +529,10 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 		Value:   value,
 	}
 
-	_, err := RPCFuncClientSingleton.CallTimeout("AppendToSet", ibd, GlobalRPCCallTimeout)
+	_, err := rpc.FuncClientSingleton("AppendToSet", ibd)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"AppendToSet",
 			err,
 			map[string]string{
@@ -738,7 +541,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 		)
 	}
 	if r.IsAccessError(err) {
-		if r.Login() {
+		if rpc.Login() {
 			r.AppendToSet(keyName, value)
 		}
 	}
@@ -761,10 +564,10 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 		Expire:  -1,
 	}
 
-	intVal, err := RPCFuncClientSingleton.CallTimeout("SetRollingWindow", ibd, GlobalRPCCallTimeout)
+	intVal, err := rpc.FuncClientSingleton("SetRollingWindow", ibd)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"SetRollingWindow",
 			err,
 			map[string]string{
@@ -774,7 +577,7 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 		)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.SetRollingWindow(keyName, per, val, false)
 			}
 		}
@@ -793,16 +596,16 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 }
 
 func (r RPCStorageHandler) GetSet(keyName string) (map[string]string, error) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.GetSet - Not implemented")
 	return nil, nil
 }
 
 func (r RPCStorageHandler) AddToSet(keyName, value string) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.AddToSet - Not implemented")
 }
 
 func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.RemoveFromSet - Not implemented")
 }
 
 func (r RPCStorageHandler) IsAccessError(err error) bool {
@@ -819,10 +622,10 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		Tags:  tags,
 	}
 
-	defString, err := RPCFuncClientSingleton.CallTimeout("GetApiDefinitions", dr, GlobalRPCCallTimeout)
+	defString, err := rpc.FuncClientSingleton("GetApiDefinitions", dr)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"GetApiDefinitions",
 			err,
 			map[string]string{
@@ -832,7 +635,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.GetApiDefinitions(orgId, tags)
 			}
 		}
@@ -850,10 +653,10 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) GetPolicies(orgId string) string {
-	defString, err := RPCFuncClientSingleton.CallTimeout("GetPolicies", orgId, GlobalRPCCallTimeout)
+	defString, err := rpc.FuncClientSingleton("GetPolicies", orgId)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"GetPolicies",
 			err,
 			map[string]string{
@@ -862,7 +665,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 		)
 
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				return r.GetPolicies(orgId)
 			}
 		}
@@ -879,10 +682,10 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 // CheckForReload will start a long poll
 func (r *RPCStorageHandler) CheckForReload(orgId string) {
 	log.Debug("[RPC STORE] Check Reload called...")
-	reload, err := RPCFuncClientSingleton.CallTimeout("CheckReload", orgId, GlobalRPCPingTimeout)
+	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			"CheckReload",
 			err,
 			map[string]string{
@@ -891,7 +694,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 		)
 		if r.IsAccessError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
-			if r.Login() {
+			if rpc.Login() {
 				r.CheckForReload(orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
@@ -933,7 +736,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 			}).Info("Can't connect to RPC layer")
 
 			if r.IsAccessError(err) {
-				if r.Login() {
+				if rpc.Login() {
 					continue
 				}
 			}
@@ -971,20 +774,20 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		reqData["GroupID"] = groupID
 	}
 
-	keys, err = RPCFuncClientSingleton.CallTimeout(funcName, req, GlobalRPCCallTimeout)
+	keys, err = rpc.FuncClientSingleton(funcName, req)
 	if err != nil {
-		emitRPCErrorEventKv(
-			rpcFuncClientSingletonCall,
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
 			funcName,
 			err,
 			reqData,
 		)
 		if r.IsAccessError(err) {
-			if r.Login() {
+			if rpc.Login() {
 				r.CheckForKeyspaceChanges(orgId)
 			}
 		}
-		log.Warning("Keysapce warning: ", err)
+		log.Warning("Keyspace warning: ", err)
 		return
 	}
 
@@ -999,6 +802,16 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
+func getSessionAndCreate(keyName string, r *RPCStorageHandler) {
+	newKeyName := "apikey-" + storage.HashStr(keyName)
+	sessionString, err := r.GetRawKey(keyName)
+	if err != nil {
+		log.Error("Key not found in master - skipping")
+	} else {
+		handleAddKey(keyName, newKeyName[7:], sessionString, "-1")
+	}
+}
+
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1007,16 +820,16 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 			if splitKeys[1] == "hashed" {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				handleDeleteHashedKey(splitKeys[0], "")
+				getSessionAndCreate(splitKeys[0], r)
 			}
 		} else {
 			log.Info("--> removing cached key: ", key)
 			handleDeleteKey(key, "-1")
+			getSessionAndCreate(splitKeys[0], r)
 		}
-
 		SessionCache.Delete(key)
 		RPCGlobalCache.Delete(r.KeyPrefix + key)
 	}
-
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
@@ -1026,120 +839,25 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string) {
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.DeleteScanMatch - Not implemented")
 	return false
 }
 
 func (r *RPCStorageHandler) GetKeyPrefix() string {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.GetKeyPrefix - Not implemented")
 	return ""
 }
 
 func (r *RPCStorageHandler) AddToSortedSet(keyName, value string, score float64) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.AddToSortedSet - Not implemented")
 }
 
 func (r *RPCStorageHandler) GetSortedSetRange(keyName, scoreFrom, scoreTo string) ([]string, []float64, error) {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.GetSortedSetRange - Not implemented")
 	return nil, nil, nil
 }
 
 func (r *RPCStorageHandler) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) error {
-	log.Error("Not implemented")
+	log.Error("RPCStorageHandler.RemoveSortedSetRange - Not implemented")
 	return nil
-}
-
-func getDispatcher() *gorpc.Dispatcher {
-	dispatch := gorpc.NewDispatcher()
-
-	dispatch.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return false
-	})
-
-	dispatch.AddFunc("LoginWithGroup", func(clientAddr string, groupData *GroupLoginRequest) bool {
-		return false
-	})
-
-	dispatch.AddFunc("GetKey", func(keyName string) (string, error) {
-		return "", nil
-	})
-
-	dispatch.AddFunc("SetKey", func(ibd *InboundData) error {
-		return nil
-	})
-
-	dispatch.AddFunc("GetExp", func(keyName string) (int64, error) {
-		return 0, nil
-	})
-
-	dispatch.AddFunc("GetKeys", func(keyName string) ([]string, error) {
-		return nil, nil
-	})
-
-	dispatch.AddFunc("DeleteKey", func(keyName string) (bool, error) {
-		return true, nil
-	})
-
-	dispatch.AddFunc("DeleteRawKey", func(keyName string) (bool, error) {
-		return true, nil
-	})
-
-	dispatch.AddFunc("GetKeysAndValues", func(searchString string) (*KeysValuesPair, error) {
-		return nil, nil
-	})
-
-	dispatch.AddFunc("GetKeysAndValuesWithFilter", func(searchString string) (*KeysValuesPair, error) {
-		return nil, nil
-	})
-
-	dispatch.AddFunc("DeleteKeys", func(keys []string) (bool, error) {
-		return true, nil
-	})
-
-	dispatch.AddFunc("Decrement", func(keyName string) error {
-		return nil
-	})
-
-	dispatch.AddFunc("IncrememntWithExpire", func(ibd *InboundData) (int64, error) {
-		return 0, nil
-	})
-
-	dispatch.AddFunc("AppendToSet", func(ibd *InboundData) error {
-		return nil
-	})
-
-	dispatch.AddFunc("SetRollingWindow", func(ibd *InboundData) (int, error) {
-		return 0, nil
-	})
-
-	dispatch.AddFunc("GetApiDefinitions", func(dr *DefRequest) (string, error) {
-		return "", nil
-	})
-
-	dispatch.AddFunc("GetPolicies", func(orgId string) (string, error) {
-		return "", nil
-	})
-
-	dispatch.AddFunc("PurgeAnalyticsData", func(data string) error {
-		return nil
-	})
-
-	dispatch.AddFunc("CheckReload", func(clientAddr, orgId string) (bool, error) {
-		return false, nil
-	})
-
-	dispatch.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgId string) ([]string, error) {
-		return nil, nil
-	})
-
-	dispatch.AddFunc("GetGroupKeySpaceUpdate", func(clientAddr string, groupData *GroupKeySpaceRequest) ([]string, error) {
-		return nil, nil
-	})
-
-	dispatch.AddFunc("Ping", func() bool {
-		return false
-	})
-
-	return dispatch
-
 }

@@ -24,11 +24,10 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/miekg/dns"
 	"github.com/satori/go.uuid"
-
-	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -503,7 +502,7 @@ const sampleAPI = `{
     },
     "auth": {
         "auth_header_name": "authorization"
-    },
+	},
     "version_data": {
         "not_versioned": true,
         "versions": {

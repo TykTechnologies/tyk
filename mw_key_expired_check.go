@@ -18,15 +18,15 @@ func (k *KeyExpired) Name() string {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	logger := k.Logger()
 	session := ctxGetSession(r)
 	if session == nil {
 		return errors.New("Session state is missing or unset! Please make sure that auth headers are properly applied"), http.StatusBadRequest
 	}
 
 	token := ctxGetAuthToken(r)
-	logEntry := getLogEntryForRequest(r, token, nil)
 	if session.IsInactive {
-		logEntry.Info("Attempted access from inactive key.")
+		logger.Info("Attempted access from inactive key.")
 		// Fire a key expired event
 		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
@@ -44,7 +44,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	if !k.Spec.AuthManager.KeyExpired(session) {
 		return nil, http.StatusOK
 	}
-	logEntry.Info("Attempted access from expired key.")
+	logger.Info("Attempted access from expired key.")
 
 	k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key.", OriginatingRequest: EncodeRequestToEvent(r)},

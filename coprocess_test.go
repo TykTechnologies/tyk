@@ -14,6 +14,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
 
+	"github.com/Sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 )
@@ -24,6 +26,10 @@ var (
 	CoProcessName     = apidef.MiddlewareDriver("test")
 	MessageType       = coprocess.ProtobufMessage
 	testDispatcher, _ = NewCoProcessDispatcher()
+
+	coprocessLog = log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+	})
 )
 
 /* Dispatcher functions */
@@ -35,17 +41,15 @@ func TestCoProcessDispatch(t *testing.T) {
 	}
 
 	messagePtr := testDispatcher.ToCoProcessMessage(object)
-	newMessagePtr := testDispatcher.Dispatch(messagePtr)
-
-	newObject := testDispatcher.ToCoProcessObject(newMessagePtr)
-	t.Log(newObject)
+	newMessagePtr := testDispatcher.ToCoProcessMessage(&coprocess.Object{})
+	testDispatcher.Dispatch(messagePtr, newMessagePtr)
 }
 
 func TestCoProcessDispatchEvent(t *testing.T) {
 	spec := createSpecTest(t, basicCoProcessDef)
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
-	baseMid := BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy, coprocessLog}
 
 	meta := EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
@@ -127,7 +131,7 @@ func buildCoProcessChain(spec *APISpec, hookName string, hookType coprocess.Hook
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := TykNewSingleHostReverseProxy(remote, spec)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{spec, proxy}
+	baseMid := BaseMiddleware{spec, proxy, coprocessLog}
 	mw := CreateCoProcessMiddleware(hookName, hookType, driver, baseMid)
 	return alice.New(mw).Then(proxyHandler)
 }

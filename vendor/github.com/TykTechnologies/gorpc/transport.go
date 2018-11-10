@@ -2,7 +2,6 @@ package gorpc
 
 import (
 	"crypto/tls"
-	"io"
 	"net"
 	"time"
 )
@@ -21,7 +20,7 @@ var (
 // Otherwise gorpc may hang.
 // The conn implementation must call Flush() on underlying buffered
 // streams before returning from Write().
-type DialFunc func(addr string) (conn io.ReadWriteCloser, err error)
+type DialFunc func(addr string) (conn net.Conn, err error)
 
 // Listener is an interface for custom listeners intended for the Server.
 type Listener interface {
@@ -38,7 +37,7 @@ type Listener interface {
 	// Otherwise gorpc may hang.
 	// The conn implementation must call Flush() on underlying buffered
 	// streams before returning from Write().
-	Accept() (conn io.ReadWriteCloser, clientAddr string, err error)
+	Accept() (conn net.Conn, err error)
 
 	// Close closes the listener.
 	// All pending calls to Accept() must immediately return errors after
@@ -47,7 +46,7 @@ type Listener interface {
 	Close() error
 }
 
-func defaultDial(addr string) (conn io.ReadWriteCloser, err error) {
+func defaultDial(addr string) (conn net.Conn, err error) {
 	return dialer.Dial("tcp", addr)
 }
 
@@ -60,16 +59,16 @@ func (ln *defaultListener) Init(addr string) (err error) {
 	return
 }
 
-func (ln *defaultListener) Accept() (conn io.ReadWriteCloser, clientAddr string, err error) {
+func (ln *defaultListener) Accept() (conn net.Conn, err error) {
 	c, err := ln.L.Accept()
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if err = setupKeepalive(c); err != nil {
 		c.Close()
-		return nil, "", err
+		return nil, err
 	}
-	return c, c.RemoteAddr().String(), nil
+	return c, nil
 }
 
 func (ln *defaultListener) Close() error {
@@ -97,19 +96,19 @@ func (ln *netListener) Init(addr string) (err error) {
 	return
 }
 
-func (ln *netListener) Accept() (conn io.ReadWriteCloser, clientAddr string, err error) {
+func (ln *netListener) Accept() (conn net.Conn, err error) {
 	c, err := ln.L.Accept()
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	return c, c.RemoteAddr().String(), nil
+	return c, nil
 }
 
 func (ln *netListener) Close() error {
 	return ln.L.Close()
 }
 
-func unixDial(addr string) (conn io.ReadWriteCloser, err error) {
+func unixDial(addr string) (conn net.Conn, err error) {
 	c, err := net.Dial("unix", addr)
 	if err != nil {
 		return nil, err
@@ -198,7 +197,7 @@ func NewUnixServer(addr string, handler HandlerFunc) *Server {
 func NewTLSClient(addr string, cfg *tls.Config) *Client {
 	return &Client{
 		Addr: addr,
-		Dial: func(addr string) (conn io.ReadWriteCloser, err error) {
+		Dial: func(addr string) (conn net.Conn, err error) {
 			c, err := tls.DialWithDialer(dialer, "tcp", addr, cfg)
 			if err != nil {
 				return nil, err

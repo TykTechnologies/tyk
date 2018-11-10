@@ -1,3 +1,5 @@
+// +build coprocess
+
 package main
 
 import (
@@ -16,15 +18,17 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestJSVMLogs(t *testing.T) {
 	var buf bytes.Buffer
+	log := logrus.New()
+	log.Out = &buf
+	log.Formatter = new(prefixed.TextFormatter)
+
 	jsvm := JSVM{}
-	jsvm.Init(nil)
-	jsvm.Log = logrus.New()
-	jsvm.Log.Out = &buf
-	jsvm.Log.Formatter = new(prefixed.TextFormatter)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	jsvm.RawLog = logrus.New()
 	jsvm.RawLog.Out = &buf
@@ -78,7 +82,7 @@ func TestJSVMBody(t *testing.T) {
 	body := "foô \uffff \u0000 \xff bàr"
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader(body))
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -114,7 +118,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", "/foo", strings.NewReader("body"))
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	jsvm.Timeout = time.Millisecond
 
 	// this js plugin just loops forever, keeping Otto at 100% CPU
@@ -157,12 +161,12 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -193,12 +197,12 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -239,12 +243,12 @@ testJSVMData.NewProcessRequest(function(request, session, config) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -273,7 +277,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	return testJSVMCore.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
+		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil},
 		MiddlewareClassName: "testJSVMCore",
 		Pre:                 true,
 	}
@@ -293,7 +297,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		config.SetGlobal(globalConf)
 	}()
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 	if _, err := jsvm.VM.Run(js); err != nil {
 		t.Fatalf("failed to set up js plugin: %v", err)
 	}
@@ -306,6 +310,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 		t.Fatalf("wanted header to be %q, got %q", want, got)
 	}
 }
+
 func TestJSVMRequestScheme(t *testing.T) {
 	dynMid := &DynamicMiddleware{
 		BaseMiddleware: BaseMiddleware{
@@ -317,7 +322,7 @@ func TestJSVMRequestScheme(t *testing.T) {
 	req := httptest.NewRequest("GET", "/foo", nil)
 	req.URL.Scheme = "http"
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	const js = `
 var leakMid = new TykJS.TykMiddleware.NewMiddleware({})
@@ -350,73 +355,72 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	spec.ConfigData = map[string]interface{}{
-		"base_url": ts.URL,
-	}
-
-	const js = `
+	bundle := registerBundle("jsvm_make_http_request", map[string]string{
+		"manifest.json": `
+		{
+		    "file_list": [],
+		    "custom_middleware": {
+		        "driver": "otto",
+		        "pre": [{
+		            "name": "testTykMakeHTTPRequest",
+		            "path": "middleware.js"
+		        }]
+		    }
+		}
+	`,
+		"middleware.js": `
 	var testTykMakeHTTPRequest = new TykJS.TykMiddleware.NewMiddleware({})
-	
+
 	testTykMakeHTTPRequest.NewProcessRequest(function(request, session, spec) {
 		var newRequest = {
 			"Method": "GET",
 			"Headers": {"Accept": "application/json"},
 			"Domain": spec.config_data.base_url,
-			"Resource": "/sample"
+			"Resource": "/api/get"
 		}
-	
+
 		var resp = TykMakeHttpRequest(JSON.stringify(newRequest));
 		var useableResponse = JSON.parse(resp);
-	
+
 		if(useableResponse.Code > 400) {
 			request.ReturnOverrides.ResponseCode = useableResponse.code
 			request.ReturnOverrides.ResponseError = "error"
 		}
-		
-		return testTykMakeHTTPRequest.ReturnData(request, {})
-	});`
 
-	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{spec, nil},
-		MiddlewareClassName: "testTykMakeHTTPRequest",
-		Pre:                 true,
-	}
-	jsvm := JSVM{}
-	jsvm.Init(nil)
-	if _, err := jsvm.VM.Run(js); err != nil {
-		t.Fatalf("failed to set up js plugin: %v", err)
-	}
-	dynMid.Spec.JSVM = jsvm
+		return testTykMakeHTTPRequest.ReturnData(request, {})
+	});
+	`})
 
 	t.Run("Existing endpoint", func(t *testing.T) {
 		buildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/sample"
+			spec.ConfigData = map[string]interface{}{
+				"base_url": ts.URL,
+			}
+			spec.CustomMiddlewareBundle = bundle
+		}, func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/api"
 		})
 
-		r := testReq(t, "GET", "/v1/test-data", nil)
-		_, code := dynMid.ProcessRequest(nil, r, nil)
-		if want := 200; code != 200 {
-			t.Fatalf("wanted code to be %d, got %d", want, code)
-		}
+		ts.Run(t, test.TestCase{Path: "/sample", Code: 200})
 	})
 
 	t.Run("Nonexistent endpoint", func(t *testing.T) {
 		buildAndLoadAPI(func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/abc"
+			spec.Proxy.ListenPath = "/sample"
+			spec.ConfigData = map[string]interface{}{
+				"base_url": ts.URL,
+			}
+			spec.CustomMiddlewareBundle = bundle
 		})
 
-		r := testReq(t, "GET", "/v1/test-data", nil)
-		_, code := dynMid.ProcessRequest(nil, r, nil)
-		if want := 404; code != 404 {
-			t.Fatalf("wanted code to be %d, got %d", want, code)
-		}
+		ts.Run(t, test.TestCase{Path: "/sample", Code: 404})
 	})
 }
 
 func TestJSVMBase64(t *testing.T) {
 	jsvm := JSVM{}
-	jsvm.Init(nil)
+	jsvm.Init(nil, logrus.NewEntry(log))
 
 	inputString := "teststring"
 	inputB64 := "dGVzdHN0cmluZw=="

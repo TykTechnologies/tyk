@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"net/http"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -22,16 +23,17 @@ function testVirtData(request, session, config) {
 }
 `
 
-func testPrepareVirtualEndpoint() {
+func testPrepareVirtualEndpoint(js string, method string, path string, proxyOnError bool) {
 	buildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "testVirtData",
 			FunctionSourceType:   "blob",
-			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(virtTestJS)),
-			Path:                 "/virt",
-			Method:               "GET",
+			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
+			Path:                 path,
+			Method:               method,
+			ProxyOnError:         proxyOnError,
 		}
 		v := spec.VersionData.Versions["v1"]
 		v.UseExtendedPaths = true
@@ -59,7 +61,7 @@ func TestVirtualEndpoint(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint()
+	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true)
 
 	ts.Run(t, test.TestCase{
 		Path:      "/virt",
@@ -72,13 +74,25 @@ func TestVirtualEndpoint(t *testing.T) {
 	})
 }
 
+func TestVirtualEndpoint500(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	testPrepareVirtualEndpoint("abc", "GET", "/abc", false)
+
+	ts.Run(t, test.TestCase{
+		Path: "/abc",
+		Code: http.StatusInternalServerError,
+	})
+}
+
 func BenchmarkVirtualEndpoint(b *testing.B) {
 	b.ReportAllocs()
 
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	testPrepareVirtualEndpoint()
+	testPrepareVirtualEndpoint(virtTestJS, "GET", "/virt", true)
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, test.TestCase{

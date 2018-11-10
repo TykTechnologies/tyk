@@ -234,9 +234,9 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		if targetToUse == target {
 			req.URL.Scheme = targetToUse.Scheme
 			req.URL.Host = targetToUse.Host
-			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path)
+			req.URL.Path = singleJoiningSlash(targetToUse.Path, req.URL.Path, spec.Proxy.DisableStripPrefix)
 			if req.URL.RawPath != "" {
-				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath)
+				req.URL.RawPath = singleJoiningSlash(targetToUse.Path, req.URL.RawPath, spec.Proxy.DisableStripPrefix)
 			}
 		}
 		if !spec.Proxy.PreserveHostHeader {
@@ -270,7 +270,7 @@ func TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec) *ReverseProxy 
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
 	}
-	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{spec, proxy}
+	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy}
 	return proxy
 }
 
@@ -317,7 +317,10 @@ func defaultTransport() *http.Transport {
 	}
 }
 
-func singleJoiningSlash(a, b string) string {
+func singleJoiningSlash(a, b string, disableStripPrefix bool) string {
+	if disableStripPrefix && len(b) == 0 {
+		return a
+	}
 	a = strings.TrimRight(a, "/")
 	b = strings.TrimLeft(b, "/")
 	if len(b) > 0 {
@@ -470,6 +473,10 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 		transport.TLSClientConfig.CipherSuites = getCipherAliases(p.TykAPISpec.Proxy.Transport.SSLCipherSuites)
 	}
 
+	if !config.Global().ProxySSLDisableRenegotiation {
+		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
+	}
+
 	// Use the default unless we've modified the timout
 	if timeOut > 0 {
 		log.Debug("Setting timeout for outbound request to: ", timeOut)
@@ -492,7 +499,6 @@ func httpTransport(timeOut int, rw http.ResponseWriter, req *http.Request, p *Re
 
 func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Request, withCache bool) *http.Response {
 	outReqIsWebsocket := IsWebsocket(req)
-
 	var roundTripper http.RoundTripper
 
 	p.TykAPISpec.Lock()
@@ -650,11 +656,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		token := ctxGetAuthToken(req)
 
-		var obfuscated string
-		if len(token) > 4 {
-			obfuscated = "****" + token[len(token)-4:]
-		}
-
 		var alias string
 		if session != nil {
 			alias = session.Alias
@@ -664,7 +665,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			"prefix":      "proxy",
 			"user_ip":     addrs,
 			"server_name": outreq.Host,
-			"user_id":     obfuscated,
+			"user_id":     obfuscateKey(token),
 			"user_name":   alias,
 			"org_id":      p.TykAPISpec.OrgID,
 			"api_id":      p.TykAPISpec.APIID,

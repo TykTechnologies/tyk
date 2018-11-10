@@ -97,6 +97,108 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 		"acl3": {
 			AccessRights: map[string]user.AccessDefinition{"c": {}},
 		},
+		"per_api_and_partitions": {
+			ID: "per_api_and_partitions",
+			Partitions: user.PolicyPartitions{
+				PerAPI:    true,
+				Quota:     true,
+				RateLimit: true,
+				Acl:       true,
+			},
+			AccessRights: map[string]user.AccessDefinition{"d": {
+				Limit: &user.APILimit{
+					QuotaMax:         1000,
+					QuotaRenewalRate: 3600,
+					Rate:             20,
+					Per:              1,
+				},
+			}},
+		},
+		"per_api_and_some_partitions": {
+			ID: "per_api_and_some_partitions",
+			Partitions: user.PolicyPartitions{
+				PerAPI:    true,
+				Quota:     false,
+				RateLimit: true,
+				Acl:       false,
+			},
+			AccessRights: map[string]user.AccessDefinition{"d": {
+				Limit: &user.APILimit{
+					QuotaMax:         1000,
+					QuotaRenewalRate: 3600,
+					Rate:             20,
+					Per:              1,
+				},
+			}},
+		},
+		"per_api_and_no_other_partitions": {
+			ID: "per_api_and_no_other_partitions",
+			Partitions: user.PolicyPartitions{
+				PerAPI:    true,
+				Quota:     false,
+				RateLimit: false,
+				Acl:       false,
+			},
+			AccessRights: map[string]user.AccessDefinition{
+				"d": {
+					Limit: &user.APILimit{
+						QuotaMax:         1000,
+						QuotaRenewalRate: 3600,
+						Rate:             20,
+						Per:              1,
+					},
+				},
+				"c": {
+					Limit: &user.APILimit{
+						QuotaMax: -1,
+						Rate:     2000,
+						Per:      60,
+					},
+				},
+			},
+		},
+		"per_api_with_the_same_api": {
+			ID: "per_api_with_the_same_api",
+			Partitions: user.PolicyPartitions{
+				PerAPI:    true,
+				Quota:     false,
+				RateLimit: false,
+				Acl:       false,
+			},
+			AccessRights: map[string]user.AccessDefinition{
+				"d": {
+					Limit: &user.APILimit{
+						QuotaMax:         5000,
+						QuotaRenewalRate: 3600,
+						Rate:             200,
+						Per:              10,
+					},
+				},
+			},
+		},
+		"per_api_with_limit_set_from_policy": {
+			ID:       "per_api_with_limit_set_from_policy",
+			QuotaMax: -1,
+			Rate:     300,
+			Per:      1,
+			Partitions: user.PolicyPartitions{
+				PerAPI:    true,
+				Quota:     false,
+				RateLimit: false,
+				Acl:       false,
+			},
+			AccessRights: map[string]user.AccessDefinition{
+				"d": {
+					Limit: &user.APILimit{
+						QuotaMax:         5000,
+						QuotaRenewalRate: 3600,
+						Rate:             200,
+						Per:              10,
+					},
+				},
+				"e": {},
+			},
+		},
 	}
 	policiesMu.RUnlock()
 	bmid := &BaseMiddleware{Spec: &APISpec{
@@ -210,6 +312,84 @@ func testPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
 					t.Fatalf("couldn't apply policy: %s", err.Error())
 				}
 				want := newPolicy.AccessRights
+				if !reflect.DeepEqual(want, s.AccessRights) {
+					t.Fatalf("want %v got %v", want, s.AccessRights)
+				}
+			},
+		},
+		{
+			name:     "Per API is set with other partitions to true",
+			policies: []string{"per_api_and_partitions"},
+			errMatch: "cannot apply policy per_api_and_partitions which has per_api and any of partitions set",
+		},
+		{
+			name:     "Per API is set to true with some partitions set to true",
+			policies: []string{"per_api_and_some_partitions"},
+			errMatch: "cannot apply policy per_api_and_some_partitions which has per_api and any of partitions set",
+		},
+		{
+			name:     "Per API is set to true with no other partitions set to true",
+			policies: []string{"per_api_and_no_other_partitions"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"d": {
+						Limit: &user.APILimit{
+							QuotaMax:         1000,
+							QuotaRenewalRate: 3600,
+							Rate:             20,
+							Per:              1,
+						},
+					},
+					"c": {
+						Limit: &user.APILimit{
+							QuotaMax: -1,
+							Rate:     2000,
+							Per:      60,
+						},
+					},
+				}
+				if !reflect.DeepEqual(want, s.AccessRights) {
+					t.Fatalf("want %v got %v", want, s.AccessRights)
+				}
+			},
+		},
+		{
+			name:     "several policies with Per API set to true but specifying limit for the same API",
+			policies: []string{"per_api_and_no_other_partitions", "per_api_with_the_same_api"},
+			errMatch: "cannot apply multiple policies for API: d",
+		},
+		{
+			name:     "several policies, mixed the one which has Per API set to true and partitioned ones",
+			policies: []string{"per_api_and_no_other_partitions", "quota1"},
+			errMatch: "cannot apply multiple policies when some are partitioned and some have per_api set",
+		},
+		{
+			name:     "several policies, mixed the one which has Per API set to true and partitioned ones (different order)",
+			policies: []string{"rate1", "per_api_and_no_other_partitions"},
+			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
+		},
+		{
+			name:     "Per API is set to true and some API gets limit set from policy's fields",
+			policies: []string{"per_api_with_limit_set_from_policy"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				want := map[string]user.AccessDefinition{
+					"d": {
+						Limit: &user.APILimit{
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+							Rate:             200,
+							Per:              10,
+						},
+					},
+					"e": {
+						Limit: &user.APILimit{
+							QuotaMax:    -1,
+							Rate:        300,
+							Per:         1,
+							SetByPolicy: true,
+						},
+					},
+				}
 				if !reflect.DeepEqual(want, s.AccessRights) {
 					t.Fatalf("want %v got %v", want, s.AccessRights)
 				}

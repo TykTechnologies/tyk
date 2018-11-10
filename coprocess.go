@@ -3,8 +3,8 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/Sirupsen/logrus"
@@ -145,8 +145,8 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 
 // ObjectPostProcess does CoProcessObject post-processing (adding/removing headers or params, etc.).
 func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Request) {
-	r.ContentLength = int64(len(object.Request.Body))
-	r.Body = ioutil.NopCloser(strings.NewReader(object.Request.Body))
+	r.ContentLength = int64(len(object.Request.RawBody))
+	r.Body = ioutil.NopCloser(bytes.NewReader(object.Request.RawBody))
 
 	for _, dh := range object.Request.DeleteHeaders {
 		r.Header.Del(dh)
@@ -222,9 +222,9 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Debug("CoProcess Request, HookType: ", m.HookType)
+	logger := m.Logger()
+
+	logger.Debug("CoProcess Request, HookType: ", m.HookType)
 
 	if !EnableCoProcess {
 		return nil, 200
@@ -260,9 +260,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	returnObject, err := coProcessor.Dispatch(object)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).WithError(err).Error("Dispatch error")
+		logger.WithError(err).Error("Dispatch error")
 		if m.HookType == coprocess.HookType_CustomKeyCheck {
 			return errors.New("Key not authorised"), 403
 		} else {
@@ -289,9 +287,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	// The CP middleware indicates this is a bad auth:
 	if returnObject.Request.ReturnOverrides.ResponseCode > 400 {
-
-		logEntry := getLogEntryForRequest(r, token, nil)
-		logEntry.Info("Attempted access with invalid key.")
+		logger.WithField("key", obfuscateKey(token)).Info("Attempted access with invalid key")
 
 		// Fire Authfailed Event
 		AuthFailed(m, r, token)

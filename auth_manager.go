@@ -107,6 +107,12 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 	b.store = store
 	b.store.Connect()
 
+	// for RPC we don't need to setup async session writes
+	switch store.(type) {
+	case *RPCStorageHandler:
+		return
+	}
+
 	if b.asyncWrites {
 		// check pool size in config and set to 50 if unset
 		b.poolSize = config.Global().SessionUpdatePoolSize

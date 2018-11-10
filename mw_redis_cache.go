@@ -143,7 +143,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			log.Debug("This is a virtual function")
 			vp := VirtualEndpoint{BaseMiddleware: m.BaseMiddleware}
 			vp.Init()
-			reqVal = vp.ServeHTTPForCache(w, r)
+			reqVal = vp.ServeHTTPForCache(w, r, nil)
 		} else {
 			// This passes through and will write the value to the writer, but spit out a copy for the cache
 			log.Debug("Not virtual, passing")

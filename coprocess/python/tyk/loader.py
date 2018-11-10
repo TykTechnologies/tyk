@@ -17,9 +17,9 @@ class MiddlewareLoader():
       return self
 
     def load_module(self, module_name):
-      module = imp.load_module(module_name, self.module_path)
-
+      module = None
+      with open(self.module_path, 'rb') as fp:
+        module = imp.load_module(module_name, fp, self.module_path, ('.py', 'rb', imp.PY_SOURCE))
       sys.modules[module_name] = module
       self.mw.imported_modules.append(module_name)
-
       return module

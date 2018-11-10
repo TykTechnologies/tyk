@@ -97,7 +97,8 @@ func (b *Bundle) Verify() error {
 func (b *Bundle) AddToSpec() {
 	b.Spec.CustomMiddleware = b.Manifest.CustomMiddleware
 
-	if GlobalDispatcher != nil {
+	// Call HandleMiddlewareCache only when using rich plugins:
+	if GlobalDispatcher != nil && b.Spec.CustomMiddleware.Driver != apidef.OttoDriver {
 		GlobalDispatcher.HandleMiddlewareCache(&b.Manifest, b.Path)
 	}
 }

@@ -133,7 +133,10 @@ func TestKeyHandler(t *testing.T) {
 	ts := newTykTestServer()
 	defer ts.Close()
 
-	buildAndLoadAPI()
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.Auth.UseParam = true
+	})
 
 	// Access right not specified
 	masterKey := createStandardSession()
@@ -150,7 +153,7 @@ func TestKeyHandler(t *testing.T) {
 	policiesMu.Lock()
 	policiesByID["abc_policy"] = user.Policy{
 		Active:   true,
-		QuotaMax: 1234567890,
+		QuotaMax: 5,
 	}
 	policiesMu.Unlock()
 	withPolicy := createStandardSession()
@@ -204,11 +207,28 @@ func TestKeyHandler(t *testing.T) {
 				Code:      200,
 			},
 			{
+				Method: "GET",
+				Path:   "/sample/?authorization=wrong_key_id",
+				Code:   403,
+			},
+			{
+				Method: "GET",
+				Path:   "/sample/?authorization=my_key_id",
+				Code:   200,
+			},
+			{
 				Method:    "GET",
 				Path:      "/tyk/keys/my_key_id" + "?api_id=test",
 				AdminAuth: true,
 				Code:      200,
-				BodyMatch: `"quota_max":1234567890`,
+				BodyMatch: `"quota_max":5`,
+			},
+			{
+				Method:    "GET",
+				Path:      "/tyk/keys/my_key_id" + "?api_id=test",
+				AdminAuth: true,
+				Code:      200,
+				BodyMatch: `"quota_remaining":4`,
 			},
 		}...)
 	})

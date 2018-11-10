@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -57,6 +58,12 @@ func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 		job := instrument.NewJob("SystemAPIError")
 		job.Event(strconv.Itoa(code))
 	}
+}
+
+type MethodNotAllowedHandler struct{}
+
+func (m MethodNotAllowedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	doJSONWrite(w, http.StatusMethodNotAllowed, apiError("Method not supported"))
 }
 
 func allowMethods(next http.HandlerFunc, methods ...string) http.HandlerFunc {
@@ -198,13 +205,6 @@ func doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool
 	return nil
 }
 
-func obfuscateKey(keyName string) string {
-	if len(keyName) > 4 {
-		return "****" + keyName[len(keyName)-4:]
-	}
-	return "--"
-}
-
 // ---- TODO: This changes the URL structure of the API completely ----
 // ISSUE: If Session stores are stored with API specs, then managing keys will need to be done per store, i.e. add to all stores,
 // remove from all stores, update to all stores, stores handle quotas separately though because they are localised! Keys will
@@ -309,7 +309,8 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 	}
 
 	sessionManager := FallbackKeySesionManager
-	if spec := getApiSpec(apiID); spec != nil {
+	spec := getApiSpec(apiID)
+	if spec != nil {
 		sessionManager = spec.SessionManager
 	}
 
@@ -326,7 +327,7 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		quotaKey = QuotaKeyPrefix + sessionKey
 	}
 
-	if usedQuota, err := sessionManager.Store().GetKey(quotaKey); err == nil {
+	if usedQuota, err := sessionManager.Store().GetRawKey(quotaKey); err == nil {
 		qInt, _ := strconv.Atoi(usedQuota)
 		remaining := session.QuotaMax - int64(qInt)
 
@@ -335,7 +336,17 @@ func handleGetDetail(sessionKey, apiID string, byHash bool) (interface{}, int) {
 		} else {
 			session.QuotaRemaining = remaining
 		}
+	} else {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    obfuscateKey(sessionKey),
+			"error":  err,
+			"status": "ok",
+		}).Info("Can't retrieve key quota")
 	}
+
+	mw := BaseMiddleware{Spec: spec}
+	mw.ApplyPolicies(sessionKey, &session)
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -374,6 +385,36 @@ func handleGetAllKeys(filter, apiID string) (interface{}, int) {
 	}).Info("Retrieved key list.")
 
 	return sessionsObj, http.StatusOK
+}
+
+func handleAddKey(keyName, hashedName, sessionString, apiID string) {
+	mw := BaseMiddleware{
+		Spec: &APISpec{
+			SessionManager: FallbackKeySesionManager,
+		},
+	}
+	sess := user.SessionState{}
+	json.Unmarshal([]byte(sessionString), &sess)
+	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
+	var err error
+	if config.Global().HashKeys {
+		err = mw.Spec.SessionManager.UpdateSession(hashedName, &sess, 0, true)
+	} else {
+		err = mw.Spec.SessionManager.UpdateSession(keyName, &sess, 0, false)
+	}
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "api",
+			"key":    keyName,
+			"status": "fail",
+			"err":    err,
+		}).Error("Failed to update key.")
+	}
+	log.WithFields(logrus.Fields{
+		"prefix": "RPC",
+		"key":    obfuscateKey(keyName),
+		"status": "ok",
+	}).Info("Updated hashed key in slave storage.")
 }
 
 func handleDeleteKey(keyName, apiID string) (interface{}, int) {
@@ -779,6 +820,13 @@ func handleOrgAddOrUpdate(keyName string, r *http.Request) (interface{}, int) {
 		return apiError("Error writing to key store " + err.Error()), http.StatusInternalServerError
 	}
 
+	// identify that spec has org session
+	if spec != nil {
+		spec.Lock()
+		spec.OrgHasNoSession = false
+		spec.Unlock()
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
 		"org":    keyName,
@@ -859,6 +907,13 @@ func handleDeleteOrgKey(orgID string) (interface{}, int) {
 		"key":    orgID,
 		"status": "ok",
 	}).Info("Org key deleted.")
+
+	// identify that spec has no org session
+	if spec != nil {
+		spec.Lock()
+		spec.OrgHasNoSession = true
+		spec.Unlock()
+	}
 
 	statusObj := apiModifyKeySuccess{
 		Key:    orgID,
@@ -1617,6 +1672,20 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, VersionData, v)
 }
 
+func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {
+	setCtxValue(r, OrigRequestURL, url)
+}
+
+func ctxGetOrigRequestURL(r *http.Request) *url.URL {
+	if v := r.Context().Value(OrigRequestURL); v != nil {
+		if urlVal, ok := v.(*url.URL); ok {
+			return urlVal
+		}
+	}
+
+	return nil
+}
+
 func ctxSetUrlRewritePath(r *http.Request, path string) {
 	setCtxValue(r, UrlRewritePath, path)
 }
@@ -1629,10 +1698,55 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	}
 	return ""
 }
+
 func ctxGetDefaultVersion(r *http.Request) bool {
 	return r.Context().Value(VersionDefault) != nil
 }
 
 func ctxSetDefaultVersion(r *http.Request) {
 	setCtxValue(r, VersionDefault, true)
+}
+
+func ctxLoopLevel(r *http.Request) int {
+	if v := r.Context().Value(LoopLevel); v != nil {
+		if intVal, ok := v.(int); ok {
+			return intVal
+		}
+	}
+
+	return 0
+}
+
+func ctxSetLoopLevel(r *http.Request, value int) {
+	setCtxValue(r, LoopLevel, value)
+}
+
+func ctxIncLoopLevel(r *http.Request, loopLimit int) {
+	ctxSetLoopLimit(r, loopLimit)
+	ctxSetLoopLevel(r, ctxLoopLevel(r)+1)
+}
+
+func ctxLoopLevelLimit(r *http.Request) int {
+	if v := r.Context().Value(LoopLevelLimit); v != nil {
+		if intVal, ok := v.(int); ok {
+			return intVal
+		}
+	}
+
+	return 0
+}
+
+func ctxSetLoopLimit(r *http.Request, limit int) {
+	// Can be set only one time per request
+	if ctxLoopLevelLimit(r) == 0 && limit > 0 {
+		setCtxValue(r, LoopLevelLimit, limit)
+	}
+}
+
+func ctxTraceEnabled(r *http.Request) bool {
+	return r.Context().Value(Trace) != nil
+}
+
+func ctxSetTrace(r *http.Request) {
+	setCtxValue(r, Trace, true)
 }

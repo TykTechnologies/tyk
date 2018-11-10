@@ -75,8 +75,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 
 	if key == "" {
 		// No header value, fail
-		logEntry := getLogEntryForRequest(r, "", nil)
-		logEntry.Info("Attempted access with malformed header, no auth header found.")
+		k.Logger().Info("Attempted access with malformed header, no auth header found.")
 
 		return errors.New("Authorization field missing"), http.StatusUnauthorized
 	}
@@ -87,8 +86,7 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	// Check if API key valid
 	session, keyExists := k.CheckSessionAndIdentityForValidKey(key, r)
 	if !keyExists {
-		logEntry := getLogEntryForRequest(r, key, nil)
-		logEntry.Info("Attempted access with non-existent key.")
+		k.Logger().WithField("key", obfuscateKey(key)).Info("Attempted access with non-existent key.")
 
 		// Fire Authfailed Event
 		AuthFailed(k, r, key)

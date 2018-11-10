@@ -74,7 +74,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 			Result: logrus.WithFields(logrus.Fields{
 				"path":   "/test",
 				"origin": "127.0.0.1",
-				"key":    logHiddenValue,
+				"key":    obfuscateKey("abs"),
 			}),
 		},
 		// enable_key_logging is not set, key is not passed, no additional data field
@@ -97,7 +97,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 				"origin": "127.0.0.1",
 				"a":      1,
 				"b":      "test",
-				"key":    logHiddenValue,
+				"key":    obfuscateKey("abc"),
 			}),
 		},
 		// enable_key_logging is not set, key is not passed, additional data fields are passed
@@ -117,7 +117,7 @@ func TestGetLogEntryForRequest(t *testing.T) {
 	for _, test := range testData {
 		globalConf.EnableKeyLogging = test.EnableKeyLogging
 		config.SetGlobal(globalConf)
-		logEntry := getLogEntryForRequest(testReq, test.Key, test.Data)
+		logEntry := getLogEntryForRequest(nil, testReq, test.Key, test.Data)
 		if logEntry.Data["path"] != test.Result.Data["path"] {
 			t.Error("Expected 'path':", test.Result.Data["path"], "Got:", logEntry.Data["path"])
 		}

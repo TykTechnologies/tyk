@@ -17,6 +17,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
+	"github.com/Sirupsen/logrus"
 	"github.com/rubyist/circuitbreaker"
 
 	"github.com/TykTechnologies/gojsonschema"
@@ -136,7 +139,7 @@ type ExtendedCircuitBreakerMeta struct {
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	*apidef.APIDefinition
-	sync.Mutex
+	sync.RWMutex
 
 	RxPaths                  map[string][]URLSpec
 	WhiteListEnabled         map[string]bool
@@ -161,6 +164,9 @@ type APISpec struct {
 	WSTransport              http.RoundTripper
 	WSTransportCreated       time.Time
 	GlobalConfig             config.Config
+	OrgHasNoSession          bool
+
+	middlewareChain *ChainObject
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
@@ -172,8 +178,12 @@ var ServiceNonce string
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
+func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition, logger *logrus.Entry) *APISpec {
 	spec := &APISpec{}
+
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
 
 	// parse version expiration time stamps
 	for key, ver := range def.VersionData.Versions {
@@ -182,7 +192,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 		}
 		// calculate the time
 		if t, err := time.Parse(expiredTimeFormat, ver.Expires); err != nil {
-			log.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
+			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
 			def.VersionData.Versions[key] = ver
@@ -206,22 +216,24 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 
 	// Create and init the virtual Machine
 	if config.Global().EnableJSVM {
-		spec.JSVM.Init(spec)
+		spec.JSVM.Init(spec, logger)
 	}
 
 	// Set up Event Handlers
-	log.Debug("INITIALISING EVENT HANDLERS")
+	if len(def.EventHandlers.Events) > 0 {
+		logger.Debug("Initializing event handlers")
+	}
 	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
-		log.Debug("FOUND EVENTS TO INIT")
+		logger.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {
-			log.Debug("CREATING EVENT HANDLERS")
+			logger.Debug("CREATING EVENT HANDLERS")
 			eventHandlerInstance, err := EventHandlerByName(handlerConf, spec)
 
 			if err != nil {
-				log.Error("Failed to init event handler: ", err)
+				logger.Error("Failed to init event handler: ", err)
 			} else {
-				log.Debug("Init Event Handler: ", eventName)
+				logger.Debug("Init Event Handler: ", eventName)
 				spec.EventPaths[eventName] = append(spec.EventPaths[eventName], eventHandlerInstance)
 			}
 
@@ -239,7 +251,7 @@ func (a APIDefinitionLoader) MakeSpec(def *apidef.APIDefinition) *APISpec {
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec)
 
 		} else {
-			log.Warning("Legacy path detected! Upgrade to extended.")
+			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v)
 		}
 		spec.RxPaths[v.Name] = pathSpecs
@@ -326,7 +338,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 	// Process
 	var specs []*APISpec
 	for _, def := range apiDefs {
-		spec := a.MakeSpec(def)
+		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 
@@ -338,14 +350,14 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint, secret string) ([]*A
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
-func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
-	if rpcEmergencyMode {
+func (a APIDefinitionLoader) FromRPC(orgId string) ([]*APISpec, error) {
+	if rpc.IsEmergencyMode() {
 		return LoadDefinitionsFromRPCBackup()
 	}
 
-	store := RPCStorageHandler{UserKey: config.Global().SlaveOptions.APIKey, Address: config.Global().SlaveOptions.ConnectionString}
+	store := RPCStorageHandler{}
 	if !store.Connect() {
-		return nil
+		return nil, errors.New("Can't connect RPC layer")
 	}
 
 	// enable segments
@@ -359,19 +371,20 @@ func (a APIDefinitionLoader) FromRPC(orgId string) []*APISpec {
 
 	//store.Disconnect()
 
-	if rpcLoadCount > 0 {
-		saveRPCDefinitionsBackup(apiCollection)
+	if rpc.LoadCount() > 0 {
+		if err := saveRPCDefinitionsBackup(apiCollection); err != nil {
+			return nil, err
+		}
 	}
 
 	return a.processRPCDefinitions(apiCollection)
 }
 
-func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APISpec {
+func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) ([]*APISpec, error) {
 
 	var apiDefs []*apidef.APIDefinition
 	if err := json.Unmarshal([]byte(apiCollection), &apiDefs); err != nil {
-		log.Error("Failed decode: ", err)
-		return nil
+		return nil, err
 	}
 
 	var specs []*APISpec
@@ -388,11 +401,11 @@ func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string) []*APIS
 			def.Proxy.ListenPath = newListenPath
 		}
 
-		spec := a.MakeSpec(def)
+		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 
-	return specs
+	return specs, nil
 }
 
 func (a APIDefinitionLoader) ParseDefinition(r io.Reader) *apidef.APIDefinition {
@@ -418,7 +431,7 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 		}
 		def := a.ParseDefinition(f)
 		f.Close()
-		spec := a.MakeSpec(def)
+		spec := a.MakeSpec(def, nil)
 		specs = append(specs, spec)
 	}
 	return specs
@@ -438,8 +451,8 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo) ([]U
 }
 
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus) {
-	apiLangIDsRegex := regexp.MustCompile(`{(.*?)}`)
-	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `(.*?)`)
+	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
+	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
 	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex

@@ -6,16 +6,16 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	cache "github.com/pmylund/go-cache"
 
-	"github.com/TykTechnologies/tyk/request"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -26,7 +26,10 @@ var GlobalRate = ratecounter.NewRateCounter(1 * time.Second)
 
 type TykMiddleware interface {
 	Init()
-	Base() BaseMiddleware
+	Base() *BaseMiddleware
+	SetName(string)
+	SetRequestLogger(*http.Request)
+	Logger() *logrus.Entry
 	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
@@ -48,15 +51,19 @@ func createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMi
 func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 	// construct a new instance
 	mw.Init()
+	mw.SetName(mw.Name())
+	mw.Logger().Debug("Init")
 
 	// Pull the configuration
 	mwConf, err := mw.Config()
 	if err != nil {
-		log.Fatal("[Middleware] Configuration load failed")
+		mw.Logger().Fatal("[Middleware] Configuration load failed")
 	}
 
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mw.SetRequestLogger(r)
+
 			if config.Global().NewRelic.AppName != "" {
 				if txn, ok := w.(newrelic.Transaction); ok {
 					defer newrelic.StartSegment(txn, mw.Name()).End()
@@ -76,6 +83,7 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			job.EventKv("executed", meta)
 			job.EventKv(eventName, meta)
 			startTime := time.Now()
+			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
@@ -83,16 +91,23 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			}
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-
-				handler := ErrorHandler{mw.Base()}
+				handler := ErrorHandler{*mw.Base()}
 				handler.HandleError(w, r, err.Error(), errCode)
 
 				meta["error"] = err.Error()
 
-				job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
-				job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
+				finishTime := time.Since(startTime)
+				job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+
+				mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 				return
 			}
+
+			finishTime := time.Since(startTime)
+			job.TimingKv("exec_time", finishTime.Nanoseconds(), meta)
+			job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
+			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 			// Special code, bypasses all other execution
 			if errCode != mwStatusRespond {
@@ -102,9 +117,6 @@ func createMiddleware(mw TykMiddleware) func(http.Handler) http.Handler {
 			} else {
 				mw.Base().UpdateRequestSession(r)
 			}
-
-			job.TimingKv("exec_time", time.Since(startTime).Nanoseconds(), meta)
-			job.TimingKv(eventName+".exec_time", time.Since(startTime).Nanoseconds(), meta)
 		})
 	}
 }
@@ -128,11 +140,28 @@ func mwList(mws ...TykMiddleware) []alice.Constructor {
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type BaseMiddleware struct {
-	Spec  *APISpec
-	Proxy ReturningHttpHandler
+	Spec   *APISpec
+	Proxy  ReturningHttpHandler
+	logger *logrus.Entry
 }
 
-func (t BaseMiddleware) Base() BaseMiddleware { return t }
+func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
+
+func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
+	if t.logger == nil {
+		t.logger = logrus.NewEntry(log)
+	}
+
+	return t.logger
+}
+
+func (t *BaseMiddleware) SetName(name string) {
+	t.logger = t.Logger().WithField("mw", name)
+}
+
+func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
+	t.logger = getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+}
 
 func (t BaseMiddleware) Init() {}
 func (t BaseMiddleware) EnabledForSpec() bool {
@@ -148,7 +177,7 @@ func (t BaseMiddleware) OrgSession(key string) (user.SessionState, bool) {
 	if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 		// If exists, assume it has been authorized and pass on
 		// We cache org expiry data
-		log.Debug("Setting data expiry: ", session.OrgID)
+		t.Logger().Debug("Setting data expiry: ", session.OrgID)
 		go t.SetOrgExpiry(session.OrgID, session.DataExpires)
 	}
 
@@ -161,11 +190,11 @@ func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 }
 
 func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
-	log.Debug("Checking: ", orgid)
+	t.Logger().Debug("Checking: ", orgid)
 	cachedVal, found := ExpiryCache.Get(orgid)
 	if !found {
 		go t.OrgSession(orgid)
-		log.Debug("no cached entry found, returning 7 days")
+		t.Logger().Debug("no cached entry found, returning 7 days")
 		return 604800
 	}
 
@@ -186,7 +215,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	lifetime := session.Lifetime(t.Spec.SessionLifetime)
 	if err := t.Spec.SessionManager.UpdateSession(token, session, lifetime, false); err != nil {
-		log.WithError(err).Error("Can't update session")
+		t.Logger().WithError(err).Error("Can't update session")
 		return false
 	}
 
@@ -205,8 +234,12 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 // will overwrite the session state to use the policy values.
 func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) error {
 	rights := session.AccessRights
+	if rights == nil {
+		rights = make(map[string]user.AccessDefinition)
+	}
 	tags := make(map[string]bool)
 	didQuota, didRateLimit, didACL := false, false, false
+	didPerAPI := make(map[string]bool)
 	policies := session.PolicyIDs()
 	for i, polID := range policies {
 		policiesMu.RLock()
@@ -214,23 +247,72 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 		policiesMu.RUnlock()
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
-			log.Error(err)
+			t.Logger().Error(err)
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise youcould overwrite a session key with a policy from a different org!
-		if policy.OrgID != t.Spec.OrgID {
+		if t.Spec != nil && policy.OrgID != t.Spec.OrgID {
 			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
+			t.Logger().Error(err)
+			return err
+		}
+
+		if policy.Partitions.PerAPI &&
+			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl) {
+			err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
 			log.Error(err)
 			return err
 		}
 
-		if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
+		if policy.Partitions.PerAPI {
+			// new logic when you can specify quota or rate in more than one policy but for different APIs
+			if didQuota || didRateLimit || didACL { // no other partitions allowed
+				err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
+				log.Error(err)
+				return err
+			}
+			for apiID, accessRights := range policy.AccessRights {
+				// check if limit was already set for this API by other policy assigned to key
+				if didPerAPI[apiID] {
+					err := fmt.Errorf("cannot apply multiple policies for API: %s", apiID)
+					log.Error(err)
+					return err
+				}
+
+				// check if we already have limit on API level specified when policy was created
+				if accessRights.Limit == nil {
+					// limit was not specified on API level so we will populate it from policy
+					accessRights.Limit = &user.APILimit{
+						QuotaMax:         policy.QuotaMax,
+						QuotaRenewalRate: policy.QuotaRenewalRate,
+						Rate:             policy.Rate,
+						Per:              policy.Per,
+						SetByPolicy:      true,
+					}
+				}
+
+				// adjust policy access right with limit on API level
+				policy.AccessRights[apiID] = accessRights
+
+				// overwrite session access right for this API
+				rights[apiID] = accessRights
+
+				// identify that limit for that API is set (to allow set it only once)
+				didPerAPI[apiID] = true
+			}
+		} else if policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl {
 			// This is a partitioned policy, only apply what is active
+			// legacy logic when you can specify quota or rate only in no more than one policy
+			if len(didPerAPI) > 0 { // no policies with per_api set allowed
+				err := fmt.Errorf("cannot apply multiple policies when some are partitioned and some have per_api set")
+				log.Error(err)
+				return err
+			}
 			if policy.Partitions.Quota {
 				if didQuota {
 					err := fmt.Errorf("cannot apply multiple quota policies")
-					log.Error(err)
+					t.Logger().Error(err)
 					return err
 				}
 				didQuota = true
@@ -242,11 +324,11 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			if policy.Partitions.RateLimit {
 				if didRateLimit {
 					err := fmt.Errorf("cannot apply multiple rate limit policies")
-					log.Error(err)
+					t.Logger().Error(err)
 					return err
 				}
 				didRateLimit = true
-				// Rate limting
+				// Rate limiting
 				session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 				session.Rate = policy.Rate
 				session.Per = policy.Per
@@ -267,11 +349,10 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 				}
 				session.HMACEnabled = policy.HMACEnabled
 			}
-
 		} else {
 			if len(policies) > 1 {
 				err := fmt.Errorf("cannot apply multiple policies if any are non-partitioned")
-				log.Error(err)
+				t.Logger().Error(err)
 				return err
 			}
 			// This is not a partitioned policy, apply everything
@@ -279,7 +360,7 @@ func (t BaseMiddleware) ApplyPolicies(key string, session *user.SessionState) er
 			session.QuotaMax = policy.QuotaMax
 			session.QuotaRenewalRate = policy.QuotaRenewalRate
 
-			// Rate limting
+			// Rate limiting
 			session.Allowance = policy.Rate // This is a legacy thing, merely to make sure output is consistent. Needs to be purged
 			session.Rate = policy.Rate
 			session.Per = policy.Per
@@ -330,7 +411,7 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	}
 
 	// Try and get the session from the session store
-	log.Debug("Querying local cache")
+	t.Logger().Debug("Querying local cache")
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
 		cacheKey = storage.HashStr(key)
@@ -340,17 +421,17 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := SessionCache.Get(cacheKey)
 		if found {
-			log.Debug("--> Key found in local cache")
+			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState)
 			if err := t.ApplyPolicies(key, &session); err != nil {
-				log.Error(err)
+				t.Logger().Error(err)
 			}
 			return session, true
 		}
 	}
 
 	// Check session store
-	log.Debug("Querying keystore")
+	t.Logger().Debug("Querying keystore")
 	session, found := t.Spec.SessionManager.SessionDetail(key, false)
 	if found {
 		session.SetKeyHash(cacheKey)
@@ -362,19 +443,19 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
-			log.Error(err)
+			t.Logger().Error(err)
 		}
-		log.Debug("--> Got key")
+		t.Logger().Debug("Got key")
 		return session, true
 	}
 
-	log.Debug("Querying authstore")
+	t.Logger().Debug("Querying authstore")
 	// 2. If not there, get it from the AuthorizationHandler
 	session, found = t.Spec.AuthManager.KeyAuthorised(key)
 	if found {
 		session.SetKeyHash(cacheKey)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
-		log.Info("Recreating session for key: ", key)
+		t.Logger().Info("Recreating session for key: ", key)
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
@@ -383,10 +464,10 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(key string, r *http.R
 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(key, &session); err != nil {
-			log.Error(err)
+			t.Logger().Error(err)
 		}
 
-		log.Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
+		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.SessionLifetime))
 		ctxScheduleSessionUpdate(r)
 	}
 
