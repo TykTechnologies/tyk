@@ -1403,7 +1403,7 @@ func TestBrokenClients(t *testing.T) {
 
 		var record AnalyticsRecord
 		msgpack.Unmarshal(results[0].([]byte), &record)
-		if record.ResponseCode != 500 {
+		if record.ResponseCode != 499 {
 			t.Fatal("Analytics record do not match:", record)
 		}
 	})
