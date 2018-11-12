@@ -366,11 +366,7 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 			for i, v := range vals {
 				match := mr.FindStringSubmatch(v)
 				if len(match) > 0 {
-					kn := buildTriggerKey(triggernum, mhCN, i)
-					contextData[kn] = match[0]
-
-					addGroupsToContextData(&contextData, kn, match[1:])
-
+					addMatchToContextData(contextData, match, triggernum, mhCN, i)
 					fCount++
 				}
 			}
@@ -399,11 +395,7 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 			for i, v := range vals {
 				match := mr.FindStringSubmatch(v)
 				if len(match) > 0 {
-					kn := buildTriggerKey(triggernum, mv, i)
-					contextData[kn] = match[0]
-
-					addGroupsToContextData(&contextData, kn, match[1:])
-
+					addMatchToContextData(contextData, match, triggernum, mv, i)
 					fCount++
 				}
 			}
@@ -431,11 +423,7 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 		for _, part := range pathParts {
 			match := mr.FindStringSubmatch(part)
 			if len(match) > 0 {
-				kn := buildTriggerKey(triggernum, mv, fCount)
-				contextData[kn] = match[0]
-
-				addGroupsToContextData(&contextData, kn, match[1:])
-
+				addMatchToContextData(contextData, match, triggernum, mv, fCount)
 				fCount++
 			}
 		}
@@ -461,13 +449,9 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 		if ok {
 			val, valOk := rawVal.(string)
 			if valOk {
-				matches := mr.FindStringSubmatch(val)
-				if len(matches) > 0 {
-					kn := buildTriggerKey(triggernum, mh)
-					contextData[kn] = matches[0]
-
-					addGroupsToContextData(&contextData, kn, matches[1:])
-
+				match := mr.FindStringSubmatch(val)
+				if len(match) > 0 {
+					addMatchToContextData(contextData, match, triggernum, mh)
 					fCount++
 				}
 			}
@@ -497,15 +481,23 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 		contextData[kn] = matches[0][0]
 
 		for i, match := range matches {
-			kn = buildTriggerKey(triggernum, "payload", i)
-			contextData[kn] = match[0]
-
-			addGroupsToContextData(&contextData, kn, match[1:])
+			if len(match) > 0 {
+				addMatchToContextData(contextData, match, triggernum, "payload", i)
+			}
 		}
 		return true
 	}
 
 	return false
+}
+
+func addMatchToContextData(cd map[string]interface{}, match []string, trNum int, trName string, indices ...int) {
+	kn := buildTriggerKey(trNum, trName, indices...)
+	cd[kn] = match[0]
+
+	if len(match) > 1 {
+		addGroupsToContextData(cd, kn, match[1:])
+	}
 }
 
 func buildTriggerKey(num int, name string, indices ...int) string {
@@ -520,9 +512,9 @@ func buildTriggerKey(num int, name string, indices ...int) string {
 	return strings.Join(parts, triggerKeySep)
 }
 
-func addGroupsToContextData(cd *map[string]interface{}, keyPrefix string, groups []string) {
+func addGroupsToContextData(cd map[string]interface{}, keyPrefix string, groups []string) {
 	for i, g := range groups {
 		k := strings.Join([]string{keyPrefix, strconv.Itoa(i)}, triggerKeySep)
-		(*cd)[k] = g
+		cd[k] = g
 	}
 }
