@@ -879,6 +879,10 @@ func afterConfSetup(conf *config.Config) {
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	initGenericEventHandlers(conf)
 	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
+
+	if conf.HealthCheckEndpointName == "" {
+		conf.HealthCheckEndpointName = "hello"
+	}
 }
 
 var hostDetails struct {
@@ -1350,7 +1354,7 @@ func listen(listener, controlListener net.Listener, err error) {
 	mainLog.Info("--> Listening on port: ", config.Global().ListenPort)
 	mainLog.Info("--> PID: ", hostDetails.PID)
 
-	mainRouter.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+	mainRouter.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello Tiki")
 	})
 
