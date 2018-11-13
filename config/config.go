@@ -294,6 +294,7 @@ type Config struct {
 	MinTokenLength                    int                                   `json:"min_token_length"`
 	DisableRegexpCache                bool                                  `json:"disable_regexp_cache"`
 	RegexpCacheExpire                 int32                                 `json:"regexp_cache_expire"`
+	HealthCheckEndpointName           string                                `json:"health_check_endpoint_name"`
 }
 
 type CertData struct {

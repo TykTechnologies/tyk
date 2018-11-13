@@ -755,6 +755,9 @@ const confSchema = `{
 	},
 	"proxy_ssl_disable_renegotiation": {
 		"type": "boolean"
+	},
+	"health_check_endpoint_name": {
+		"type": "string"
 	}
 }
 }`
