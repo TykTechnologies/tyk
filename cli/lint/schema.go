@@ -753,8 +753,11 @@ const confSchema = `{
 	"regexp_cache_expire": {
 		"type": "integer"
 	},
-    "proxy_ssl_disable_renegotiation": {
-        "type": "boolean"
-    }
+	"proxy_ssl_disable_renegotiation": {
+		"type": "boolean"
+	},
+	"health_check_endpoint_name": {
+		"type": "string"
+	}
 }
 }`

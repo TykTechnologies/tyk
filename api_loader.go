@@ -626,7 +626,7 @@ func loadApps(specs []*APISpec, muxer *mux.Router) {
 
 	// All APIs processed, now we can healthcheck
 	// Add a root message to check all is OK
-	muxer.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+	muxer.HandleFunc("/"+config.Global().HealthCheckEndpointName, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Hello Tiki")
 	})
 
