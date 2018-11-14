@@ -682,6 +682,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			}
 			return nil
 		}
+
+		if strings.Contains(err.Error(), "context canceled") {
+			p.ErrorHandler.HandleError(rw, logreq, "Client closed request", 499)
+			return nil
+		}
+
 		if strings.Contains(err.Error(), "no such host") {
 			p.ErrorHandler.HandleError(rw, logreq, "Upstream host lookup failed", http.StatusInternalServerError)
 			return nil
