@@ -567,3 +567,47 @@ func BenchmarkRegexpFindAllStringSubmatch(b *testing.B) {
 
 	b.Log(res)
 }
+
+func TestFindStringSubmatch(t *testing.T) {
+	ResetCache(defaultCacheItemTTL, true)
+
+	// 1st miss
+	rx := MustCompile("abc(\\w)")
+	res := rx.FindStringSubmatch("qweabcxyzabc123abcz")
+	expectedRes := []string{"abcx", "x"}
+
+	if !reflect.DeepEqual(res, expectedRes) {
+		t.Error("Expected :", expectedRes, " Got:", res)
+	}
+	// 2nd hit
+	res2 := rx.FindStringSubmatch("qweabcxyzabc123abcz")
+	if !reflect.DeepEqual(res2, expectedRes) {
+		t.Error("Expected :", expectedRes, " Got:", res2)
+	}
+}
+
+func TestTestFindStringSubmatchRegexpNotSet(t *testing.T) {
+	ResetCache(defaultCacheItemTTL, true)
+
+	rx := &Regexp{}
+
+	res := rx.FindStringSubmatch("qweabcxyzabc123abcz")
+	if len(res) > 0 {
+		t.Error("Expected 0 length slice returned. Got:", res)
+	}
+}
+
+func BenchmarkRegexpFindStringSubmatch(b *testing.B) {
+	b.ReportAllocs()
+
+	ResetCache(defaultCacheItemTTL, true)
+
+	rx := MustCompile("abc(\\w)")
+	var res []string
+
+	for i := 0; i < b.N; i++ {
+		res = rx.FindStringSubmatch("qweabcxyzabc123abcz")
+	}
+
+	b.Log(res)
+}
