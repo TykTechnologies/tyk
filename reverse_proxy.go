@@ -672,7 +672,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}).Error("http: proxy error: ", err)
 
 		if strings.Contains(err.Error(), "timeout awaiting response headers") {
-			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", 408)
+			p.ErrorHandler.HandleError(rw, logreq, "Upstream service reached hard timeout.", http.StatusGatewayTimeout)
 
 			if p.TykAPISpec.Proxy.ServiceDiscovery.UseDiscoveryService {
 				if ServiceCache != nil {
