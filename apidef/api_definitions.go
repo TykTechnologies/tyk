@@ -542,6 +542,14 @@ func (s *StringRegexMap) Check(value string) string {
 	return s.matchRegex.FindString(value)
 }
 
+func (s *StringRegexMap) FindStringSubmatch(value string) []string {
+	return s.matchRegex.FindStringSubmatch(value)
+}
+
+func (s *StringRegexMap) FindAllStringSubmatch(value string, n int) [][]string {
+	return s.matchRegex.FindAllStringSubmatch(value, n)
+}
+
 func (s *StringRegexMap) Init() error {
 	var err error
 	if s.matchRegex, err = regexp.Compile(s.MatchPattern); err != nil {

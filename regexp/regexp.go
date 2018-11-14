@@ -18,6 +18,7 @@ var (
 	replaceAllStringCache        = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
 	replaceAllLiteralStringCache = newRegexpStrStrRetStrCache(defaultCacheItemTTL, true)
 	replaceAllStringFuncCache    = newRegexpStrFuncRetStrCache(defaultCacheItemTTL, true)
+	findStringSubmatchCache      = newRegexpStrRetSliceStrCache(defaultCacheItemTTL, true)
 	findAllStringCache           = newRegexpStrIntRetSliceStrCache(defaultCacheItemTTL, true)
 	findAllStringSubmatchCache   = newRegexpStrIntRetSliceSliceStrCache(defaultCacheItemTTL, true)
 )
@@ -41,6 +42,7 @@ func ResetCache(ttl time.Duration, isEnabled bool) {
 	replaceAllStringCache.reset(ttl, isEnabled)
 	replaceAllLiteralStringCache.reset(ttl, isEnabled)
 	replaceAllStringFuncCache.reset(ttl, isEnabled)
+	findStringSubmatchCache.reset(ttl, isEnabled)
 	findAllStringCache.reset(ttl, isEnabled)
 	findAllStringSubmatchCache.reset(ttl, isEnabled)
 }
@@ -320,8 +322,7 @@ func (re *Regexp) FindStringSubmatch(s string) []string {
 	if re.Regexp == nil {
 		return []string{}
 	}
-	// TODO: add cache for FindStringSubmatch
-	return re.Regexp.FindStringSubmatch(s)
+	return findStringSubmatchCache.do(re.Regexp, s, re.Regexp.FindStringSubmatch)
 }
 
 // FindStringSubmatchIndex is the same as regexp.Regexp.FindStringSubmatchIndex but returns cached result instead.
