@@ -129,6 +129,32 @@ func TestRewriterTriggers(t *testing.T) {
 		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
 
+			r.Header.Set("x-test", "hello-world")
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "hello-(\\w+)"}
+			hOpt.Init()
+
+			return TestDef{
+				"Header Single Group",
+				"/test/straight/rewrite", "/change/to/me/ignore",
+				"/test/straight/rewrite", "/change/to/me/world",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-X-Test-0-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/straight/rewrite", nil)
+
 			patt := "bar"
 			r.Header.Set("x-test-Two", patt)
 
@@ -286,6 +312,30 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=foo-bar", nil)
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo-(\\w+)"}
+			hOpt.Init()
+
+			return TestDef{
+				"Query Single Group",
+				"/test/query/rewrite", "/change/to/me/ignore",
+				"/test/query/rewrite", "/change/to/me/bar",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							QueryValMatches: map[string]apidef.StringRegexMap{
+								"x_test": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-x_test-0-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/query/rewrite?x_test=foo&y_test=bar", nil)
 
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
@@ -430,6 +480,52 @@ func TestRewriterTriggers(t *testing.T) {
 			}
 		},
 		func() TestDef {
+			var jsonStr = []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar\\w*"}
+			hOpt.Init()
+
+			return TestDef{
+				"Payload Multiple Match",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/barxxx/baryyy",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-payload-0/$tyk_context.trigger-0-payload-1",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			var jsonStr = []byte(`{"foo":"barxxx", "fooble":"baryyy"}`)
+			r, _ := http.NewRequest("POST", "/test/pl/rewrite", bytes.NewBuffer(jsonStr))
+
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar(\\w*)"}
+			hOpt.Init()
+
+			return TestDef{
+				"Payload Multiple Match Groups",
+				"/test/pl/rewrite", "/change/to/me/ignore",
+				"/test/pl/rewrite", "/change/to/me/xxx/yyy",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PayloadMatches: hOpt,
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-payload-0-0/$tyk_context.trigger-0-payload-1-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
 			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
 			hOpt.Init()
@@ -447,6 +543,29 @@ func TestRewriterTriggers(t *testing.T) {
 							},
 						},
 						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foobar/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo(\\w+)"}
+			hOpt.Init()
+
+			return TestDef{
+				"PathPart Single Group",
+				"/test/foobar/rewrite", "/change/to/me/ignore",
+				"/test/foobar/rewrite", "/change/to/me/bar",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0-0",
 					},
 				},
 				r,
@@ -498,6 +617,29 @@ func TestRewriterTriggers(t *testing.T) {
 				r,
 			}
 		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar-(\\w+)"}
+			hOpt.Init()
+
+			return TestDef{
+				"Meta Simple Group",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/baz",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							SessionMetaMatches: map[string]apidef.StringRegexMap{
+								"rewrite": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-rewrite-0",
+					},
+				},
+				r,
+			}
+		},
 	}
 	for _, tf := range tests {
 		tc := tf()
@@ -510,7 +652,7 @@ func TestRewriterTriggers(t *testing.T) {
 
 			ctxSetSession(tc.req, &user.SessionState{
 				MetaData: map[string]interface{}{
-					"rewrite": "bar",
+					"rewrite": "bar-baz",
 				},
 			}, "", false)
 
