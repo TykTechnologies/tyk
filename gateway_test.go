@@ -1361,3 +1361,50 @@ func TestTracing(t *testing.T) {
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 	}...)
 }
+
+func TestBrokenClients(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+	defer resetTestConfig()
+
+	globalConf := config.Global()
+	globalConf.ProxyDefaultTimeout = 1
+	config.SetGlobal(globalConf)
+
+	buildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.EnforcedTimeoutEnabled = true
+	})
+
+	buf := make([]byte, 1024)
+
+	t.Run("Valid client", func(t *testing.T) {
+		conn, _ := net.DialTimeout("tcp", ts.ln.Addr().String(), 0)
+		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
+		conn.Read(buf)
+
+		if string(buf[:12]) != "HTTP/1.1 200" {
+			t.Error("Invalid server response:", string(buf))
+		}
+	})
+
+	t.Run("Invalid client: close without read", func(t *testing.T) {
+		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
+		analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+		conn, _ := net.DialTimeout("tcp", ts.ln.Addr().String(), 0)
+		conn.Write([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"))
+		conn.Close()
+		//conn.Read(buf)
+
+		time.Sleep(recordsBufferFlushInterval + 50*time.Millisecond)
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+		var record AnalyticsRecord
+		msgpack.Unmarshal(results[0].([]byte), &record)
+		if record.ResponseCode != 499 {
+			t.Fatal("Analytics record do not match:", record)
+		}
+	})
+}
