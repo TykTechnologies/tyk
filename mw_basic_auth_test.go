@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -53,6 +55,80 @@ func TestBasicAuth(t *testing.T) {
 		{Method: "GET", Path: "/", Headers: wrongFormat, Code: 400, BodyMatch: `Attempted access with malformed header, values not in basic auth format`},
 		{Method: "GET", Path: "/", Headers: malformed, Code: 400, BodyMatch: `Attempted access with malformed header, auth data not encoded correctly`},
 	}...)
+}
+
+func TestBasicAuthCachedUserCollision(t *testing.T) {
+	globalConf := config.Global()
+	globalConf.HashKeys = true
+	globalConf.HashKeyFunction = "murmur64"
+	config.SetGlobal(globalConf)
+	defer resetTestConfig()
+
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	session := testPrepareBasicAuth(false)
+
+	correct := map[string]string{"Authorization": genAuthHeader("bellbell1", "password")}
+	remove1 := map[string]string{"Authorization": genAuthHeader("bellbell", "password")}
+	remove2 := map[string]string{"Authorization": genAuthHeader("bellbel", "password")}
+	remove3 := map[string]string{"Authorization": genAuthHeader("bellbe", "password")}
+	remove4 := map[string]string{"Authorization": genAuthHeader("bellb", "password")}
+	remove5 := map[string]string{"Authorization": genAuthHeader("bell", "password")}
+	add1 := map[string]string{"Authorization": genAuthHeader("bellbell11", "password")}
+	add2 := map[string]string{"Authorization": genAuthHeader("bellbell12", "password")}
+	add3 := map[string]string{"Authorization": genAuthHeader("bellbell13", "password")}
+
+	ts.Run(t, []test.TestCase{
+		// Create base auth based key
+		{Method: "POST", Path: "/tyk/keys/bellbell1", Data: session, AdminAuth: true, Code: http.StatusOK},
+		{Method: "GET", Path: "/", Headers: correct, Code: http.StatusOK},
+		{Method: "GET", Path: "/", Headers: remove1, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: remove2, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: remove3, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: remove4, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: remove5, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: add1, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: add2, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: add3, Code: http.StatusUnauthorized},
+		{Method: "GET", Path: "/", Headers: correct, Code: http.StatusOK},
+	}...)
+}
+
+func TestBasicAuthCachedPasswordCollision(t *testing.T) {
+	ts := newTykTestServer()
+	defer ts.Close()
+
+	for _, useCache := range []bool{true, false} {
+		correct := map[string]string{"Authorization": genAuthHeader("bellbell1", "password")}
+		remove1 := map[string]string{"Authorization": genAuthHeader("bellbell1", "passwor")}
+		remove2 := map[string]string{"Authorization": genAuthHeader("bellbell1", "passwo")}
+		remove3 := map[string]string{"Authorization": genAuthHeader("bellbell1", "passw")}
+		remove4 := map[string]string{"Authorization": genAuthHeader("bellbell1", "pass")}
+		remove5 := map[string]string{"Authorization": genAuthHeader("bellbell1", "pas")}
+		add1 := map[string]string{"Authorization": genAuthHeader("bellbell1", "password1")}
+		add2 := map[string]string{"Authorization": genAuthHeader("bellbell1", "password22")}
+		add3 := map[string]string{"Authorization": genAuthHeader("bellbell1", "password333")}
+
+		t.Run(fmt.Sprintf("Cache disabled:%v", useCache), func(t *testing.T) {
+			session := testPrepareBasicAuth(useCache)
+
+			ts.Run(t, []test.TestCase{
+				// Create base auth based key
+				{Method: "POST", Path: "/tyk/keys/bellbell1", Data: session, AdminAuth: true, Code: http.StatusOK},
+				{Method: "GET", Path: "/", Headers: correct, Code: http.StatusOK},
+				{Method: "GET", Path: "/", Headers: remove1, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: remove2, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: remove3, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: remove4, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: remove5, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: add1, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: add2, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: add3, Code: http.StatusUnauthorized},
+				{Method: "GET", Path: "/", Headers: correct, Code: http.StatusOK},
+			}...)
+		})
+	}
 }
 
 func BenchmarkBasicAuth(b *testing.B) {
