@@ -18,7 +18,7 @@ We'd love to accept your patches! Before we can take them, we have to jump a cou
 
 The Tyk CLA [must be signed](https://github.com/TykTechnologies/tyk/blob/master/CLA.md) by all contributors. You will be automatically asked to sign CLA once PR will be created.
 
-Once you are CLA'ed, we'll be able to accept your pull requests. For any issues that you face during this process, please create an GitHub issue explaining the problem and we will help get it sorted out.
+Once you are CLA'ed, we'll be able to accept your pull requests. For any issues that you face during this process, please create a GitHub issue explaining the problem and we will help get it sorted out.
 
 ***NOTE***: Only original source code from you and other people that have
 signed the CLA can be accepted into the repository. This policy does not
@@ -65,11 +65,11 @@ some bugs or smaller features. It is always better to discuss your idea with our
 You need to clone Tyk from GitHub to your GOPATH folder, or alternatively you can run `go get -d github.com/TykTechnologies/tyk` which automatically downloads project to the right path.
 
 ### Building the project
-You need to have working Go enironment: see [golang.org](https://golang.org/doc/code.html) for more info on how Go works with code.
+You need to have working Go environment: see [golang.org](https://golang.org/doc/code.html) for more info on how Go works with code.
 
-To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. If you want to just test a subset of the project, you can pass the `-run` argument with name of the test. Note that logs are hidden by default when running the tests, which you can override by setting `TYK_LOGLEVEL=info`.
+To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. If you want to just test a subset of the project, you can pass the `-run` argument with the name of the test. Note that logs are hidden by default when running the tests, which you can override by setting `TYK_LOGLEVEL=info`.
 
-Currently in order for tests to pass, a **Redis host is required**. We know, this is terrible and should be handled with an interface, and it is, however in the current version there is a hard requirement for the application to have its default memory setup to use redis as part of a deployment, this is to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement. Simplest way to run Redis is to use official Docker image [https://hub.docker.com/_/redis/](https://hub.docker.com/_/redis/)
+Currently, in order for tests to pass, a **Redis host is required**. We know, this is terrible and should be handled with an interface, and it is, however in the current version there is a hard requirement for the application to have its default memory setup to use Redis as part of a deployment, this is to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement. The simplest way to run Redis is to use official Docker image [https://hub.docker.com/_/redis/](https://hub.docker.com/_/redis/)
 
 ### Adding dependencies
 
