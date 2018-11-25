@@ -109,7 +109,7 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, e
 
 	for _, resourceGroup := range b.ResourceGroups {
 		if len(resourceGroup.Resources) < 1 {
-			return versionInfo, errors.New("no resourcs defined in the resource group")
+			return versionInfo, errors.New("no resources defined in the resource group")
 		}
 
 		for _, resource := range resourceGroup.Resources {
@@ -124,7 +124,7 @@ func (b *BluePrintAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, e
 				endPointMethodMeta := apidef.EndpointMethodMeta{}
 				code, err := strconv.Atoi(action.Examples[0].Responses[0].Name)
 				if err != nil {
-					log.Warning("Could not genrate response code form Name field, using 200")
+					log.Warning("Could not generate response code from Name field, using 200")
 					code = 200
 				}
 				endPointMethodMeta.Code = code
