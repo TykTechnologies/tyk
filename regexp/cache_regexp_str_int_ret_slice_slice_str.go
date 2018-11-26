@@ -2,7 +2,6 @@ package regexp
 
 import (
 	"regexp"
-	"strconv"
 	"time"
 )
 
@@ -25,14 +24,18 @@ func (c *regexpStrIntRetSliceSliceStrCache) do(r *regexp.Regexp, s string, n int
 		return noCacheFn(s, n)
 	}
 
+	kb := keyBuilderPool.Get().(*keyBuilder)
+	defer keyBuilderPool.Put(kb)
+	kb.Reset()
+
 	// generate key, check key size
-	key := r.String() + s + strconv.Itoa(n)
-	if len(key) > maxKeySize {
+	nsKey := kb.AppendString(r.String()).AppendString(s).AppendInt(n).UnsafeKey()
+	if len(nsKey) > maxKeySize {
 		return noCacheFn(s, n)
 	}
 
 	// cache hit
-	if res, found := c.getStrSliceOfSlices(key); found {
+	if res, found := c.getStrSliceOfSlices(nsKey); found {
 		return res
 	}
 
@@ -42,7 +45,7 @@ func (c *regexpStrIntRetSliceSliceStrCache) do(r *regexp.Regexp, s string, n int
 		return res
 	}
 
-	c.add(key, res)
+	c.add(kb.Key(), res)
 
 	return res
 }
