@@ -988,6 +988,11 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if len(newSession.AccessRights) > 0 {
 		for apiID := range newSession.AccessRights {
+			// reset API-level limit to nil if it has a zero-value
+			if access := newSession.AccessRights[apiID]; access.Limit != nil && *access.Limit == (user.APILimit{}) {
+				access.Limit = nil
+				newSession.AccessRights[apiID] = access
+			}
 			apiSpec := getApiSpec(apiID)
 			if apiSpec != nil {
 				checkAndApplyTrialPeriod(newKey, apiID, newSession)
