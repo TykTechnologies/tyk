@@ -58,15 +58,38 @@ var testRewriterData = []struct {
 	},
 }
 
+type testRewriterCase struct {
+	name     string
+	meta     *apidef.URLRewriteMeta
+	reqMaker func() *http.Request
+	want     string
+}
+
+func prepareRewriterCases() []testRewriterCase {
+	tcs := make([]testRewriterCase, len(testRewriterData))
+	for i, td := range testRewriterData {
+		reqTarget := td.in
+		tcs[i] = testRewriterCase{
+			name: td.name,
+			meta: &apidef.URLRewriteMeta{
+				MatchPattern: td.pattern,
+				RewriteTo:    td.to,
+			},
+			reqMaker: func() *http.Request {
+				return httptest.NewRequest("GET", reqTarget, nil)
+			},
+			want: td.want,
+		}
+	}
+	return tcs
+}
+
 func TestRewriter(t *testing.T) {
-	for _, tc := range testRewriterData {
+	cases := prepareRewriterCases()
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			testConf := apidef.URLRewriteMeta{
-				MatchPattern: tc.pattern,
-				RewriteTo:    tc.to,
-			}
-			r := httptest.NewRequest("GET", tc.in, nil)
-			got, err := urlRewrite(&testConf, r)
+			r := tc.reqMaker()
+			got, err := urlRewrite(tc.meta, r)
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
@@ -77,15 +100,21 @@ func TestRewriter(t *testing.T) {
 	}
 }
 func BenchmarkRewriter(b *testing.B) {
+	cases := prepareRewriterCases()
+	//warm-up regexp caches
+	for _, tc := range cases {
+		r := tc.reqMaker()
+		urlRewrite(tc.meta, r)
+	}
+
 	b.ReportAllocs()
-	for _, tc := range testRewriterData {
-		testConf := apidef.URLRewriteMeta{
-			MatchPattern: tc.pattern,
-			RewriteTo:    tc.to,
-		}
+	b.ResetTimer()
+	for _, tc := range cases {
 		for i := 0; i < b.N; i++ {
-			r := httptest.NewRequest("GET", tc.in, nil)
-			urlRewrite(&testConf, r)
+			b.StopTimer()
+			r := tc.reqMaker()
+			b.StartTimer()
+			urlRewrite(tc.meta, r)
 		}
 	}
 }
