@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 
 	"github.com/TykTechnologies/tyk/request"
 
@@ -151,10 +152,18 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing int64, code int, resp
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
 			if responseCopy != nil {
+				// Make a copy of response body as Response.Write resets underlying buffer to 0 len
+				responseCopyBodyBuffer := new(bytes.Buffer)
+				recordBodyBuffer := new(bytes.Buffer)
+				io.Copy(responseCopyBodyBuffer, responseCopy.Body) // this resets responseCopy.Body buffer to 0 len
+				*recordBodyBuffer = *responseCopyBodyBuffer
+				responseCopy.Body = ioutil.NopCloser(recordBodyBuffer) // fix responseCopy.Body buffer after io.Copy
 				// Get the wire format representation
 				var wireFormatRes bytes.Buffer
-				responseCopy.Write(&wireFormatRes)
+				responseCopy.Write(&wireFormatRes) // this resets responseCopy.Body buffer to 0 len again
 				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+				// fix Body to be read again
+				responseCopy.Body = ioutil.NopCloser(responseCopyBodyBuffer) // fix responseCopy.Body buffer after responseCopy.Write
 			}
 		}
 
