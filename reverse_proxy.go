@@ -371,7 +371,11 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) *htt
 }
 
 func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Request) *http.Response {
-	return p.WrappedServeHTTP(rw, req, true)
+	resp := p.WrappedServeHTTP(rw, req, true)
+
+	nopCloseResponseBody(resp)
+
+	return resp
 }
 
 func (p *ReverseProxy) CheckHardTimeoutEnforced(spec *APISpec, req *http.Request) (bool, int) {
@@ -890,11 +894,8 @@ func (n nopCloser) Read(p []byte) (int, error) {
 	return num, err
 }
 
-// Close is a no-op Close plus moves position to the start just in case
+// Close is a no-op Close
 func (n nopCloser) Close() error {
-	// seek to the start if body ever called to be closed
-	n.Seek(0, io.SeekStart)
-
 	return nil
 }
 

@@ -231,6 +231,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		log.Error("Could not create response object: ", err)
 	}
+	nopCloseResponseBody(newRes)
 
 	defer newRes.Body.Close()
 	for _, h := range hopHeaders {
@@ -263,7 +264,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// Record analytics
 	if !m.Spec.DoNotTrack {
-		go m.sh.RecordHit(r, 0, newRes.StatusCode, nil)
+		go m.sh.RecordHit(r, 0, newRes.StatusCode, newRes)
 	}
 
 	// Stop any further execution
