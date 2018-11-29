@@ -646,6 +646,101 @@ func TestAnalytics(t *testing.T) {
 			t.Error("Analytics record do not match", record)
 		}
 	})
+
+	t.Run("Detailed analytics", func(t *testing.T) {
+		defer resetTestConfig()
+		globalConf := config.Global()
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+		config.SetGlobal(globalConf)
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+		})
+
+		key := createSession()
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, test.TestCase{
+			Path: "/", Headers: authHeaders, Code: 200,
+		})
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
+
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(results) != 1 {
+			t.Error("Should return 1 record: ", len(results))
+		}
+
+		var record AnalyticsRecord
+		msgpack.Unmarshal(results[0].([]byte), &record)
+		if record.ResponseCode != 200 {
+			t.Error("Analytics record do not match", record)
+		}
+
+		if record.RawRequest == "" {
+			t.Error("Detailed request info not found", record)
+		}
+
+		if record.RawResponse == "" {
+			t.Error("Detailed response info not found", record)
+		}
+	})
+
+	t.Run("Detailed analytics with cache", func(t *testing.T) {
+		defer resetTestConfig()
+		globalConf := config.Global()
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+		config.SetGlobal(globalConf)
+
+		buildAndLoadAPI(func(spec *APISpec) {
+			spec.UseKeylessAccess = false
+			spec.Proxy.ListenPath = "/"
+			spec.CacheOptions = apidef.CacheOptions{
+				CacheTimeout:         120,
+				EnableCache:          true,
+				CacheAllSafeRequests: true,
+			}
+		})
+
+		key := createSession()
+
+		authHeaders := map[string]string{
+			"authorization": key,
+		}
+
+		ts.Run(t, []test.TestCase{
+			{Path: "/", Headers: authHeaders, Code: 200},
+			{Path: "/", Headers: authHeaders, Code: 200},
+		}...)
+
+		// let records to to be sent
+		time.Sleep(recordsBufferFlushInterval + 50)
+
+		results := analytics.Store.GetAndDeleteSet(analyticsKeyName)
+		if len(results) != 2 {
+			t.Error("Should return 1 record: ", len(results))
+		}
+
+		// Take second cached request
+		var record AnalyticsRecord
+		msgpack.Unmarshal(results[1].([]byte), &record)
+		if record.ResponseCode != 200 {
+			t.Error("Analytics record do not match", record)
+		}
+
+		if record.RawRequest == "" {
+			t.Error("Detailed request info not found", record)
+		}
+
+		if record.RawResponse == "" {
+			t.Error("Detailed response info not found", record)
+		}
+	})
 }
 
 func TestListener(t *testing.T) {
