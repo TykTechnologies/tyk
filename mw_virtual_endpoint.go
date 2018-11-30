@@ -28,6 +28,7 @@ type RequestObject struct {
 	Body    string
 	URL     string
 	Params  map[string][]string
+	Scheme  string
 }
 
 type ResponseObject struct {
@@ -125,10 +126,15 @@ func (d *VirtualEndpoint) ServeHTTPForCache(w http.ResponseWriter, r *http.Reque
 		return nil
 	}
 
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
 	requestData := RequestObject{
 		Headers: r.Header,
 		Body:    string(originalBody),
 		URL:     r.URL.Path,
+		Scheme:  scheme,
 	}
 
 	// We need to copy the body _back_ for the decode

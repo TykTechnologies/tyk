@@ -110,6 +110,10 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		}
 		headers.Set("Host", host)
 	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
 
 	requestData := MiniRequestObject{
 		Headers:        headers,
@@ -123,7 +127,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		DeleteParams:   []string{},
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
-		Scheme:         r.URL.Scheme,
+		Scheme:         scheme,
 	}
 
 	requestAsJson, err := json.Marshal(requestData)

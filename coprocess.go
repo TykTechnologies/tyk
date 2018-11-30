@@ -77,7 +77,10 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 	if host != "" {
 		headers["Host"] = host
 	}
-
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
 	miniRequestObject := &coprocess.MiniRequestObject{
 		Headers:        headers,
 		SetHeaders:     map[string]string{},
@@ -92,7 +95,7 @@ func (c *CoProcessor) ObjectFromRequest(r *http.Request) *coprocess.Object {
 		},
 		Method:     r.Method,
 		RequestUri: r.RequestURI,
-		Scheme:     r.URL.Scheme,
+		Scheme:     scheme,
 	}
 
 	if r.Body != nil {
