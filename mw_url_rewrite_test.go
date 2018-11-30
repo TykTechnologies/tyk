@@ -599,6 +599,12 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
 			hOpt.Init()
 
+			ctxSetSession(r, &user.SessionState{
+				MetaData: map[string]interface{}{
+					"rewrite": "bar-baz",
+				},
+			}, "", false)
+
 			return TestDef{
 				"Meta Simple",
 				"/test/foo/rewrite", "/change/to/me/ignore",
@@ -622,6 +628,12 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar-(\\w+)"}
 			hOpt.Init()
 
+			ctxSetSession(r, &user.SessionState{
+				MetaData: map[string]interface{}{
+					"rewrite": "bar-baz",
+				},
+			}, "", false)
+
 			return TestDef{
 				"Meta Simple Group",
 				"/test/foo/rewrite", "/change/to/me/ignore",
@@ -640,6 +652,88 @@ func TestRewriterTriggers(t *testing.T) {
 				r,
 			}
 		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
+			hOpt.Init()
+
+			ctxSetSession(r, &user.SessionState{
+				MetaData: map[string]interface{}{
+					"rewrite": "bar-baz",
+					"somevar": "someval",
+				},
+			}, "", false)
+
+			return TestDef{
+				"Meta Value from Session",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/bar/someval",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							SessionMetaMatches: map[string]apidef.StringRegexMap{
+								"rewrite": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-rewrite/$tyk_meta.somevar",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
+			hOpt.Init()
+
+			ctxSetSession(r, &user.SessionState{
+				MetaData: map[string]interface{}{
+					"rewrite": "bar-baz",
+				},
+			}, "", false)
+
+			return TestDef{
+				"Variable not found",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/foo//",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0/$tyk_context.nonexistent/$tyk_meta.nonexistent",
+					},
+				},
+				r,
+			}
+		},
+		func() TestDef {
+			r, _ := http.NewRequest("GET", "/test/foo/rewrite", nil)
+			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
+			hOpt.Init()
+
+			return TestDef{
+				"Session not found",
+				"/test/foo/rewrite", "/change/to/me/ignore",
+				"/test/foo/rewrite", "/change/to/me/foo/",
+				[]apidef.RoutingTrigger{
+					{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							PathPartMatches: map[string]apidef.StringRegexMap{
+								"pathpart": hOpt,
+							},
+						},
+						RewriteTo: "/change/to/me/$tyk_context.trigger-0-pathpart-0/$tyk_meta.nonexistent",
+					},
+				},
+				r,
+			}
+		},
 	}
 	for _, tf := range tests {
 		tc := tf()
@@ -649,12 +743,6 @@ func TestRewriterTriggers(t *testing.T) {
 				RewriteTo:    tc.to,
 				Triggers:     tc.triggerConf,
 			}
-
-			ctxSetSession(tc.req, &user.SessionState{
-				MetaData: map[string]interface{}{
-					"rewrite": "bar-baz",
-				},
-			}, "", false)
 
 			got, err := urlRewrite(&testConf, tc.req)
 			if err != nil {
