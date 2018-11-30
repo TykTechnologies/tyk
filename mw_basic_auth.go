@@ -126,7 +126,7 @@ func (k *BasicAuthKeyIsValid) doBcryptWithCache(cacheDuration time.Duration, has
 		return err
 	}
 
-	hasher := murmur3.New32()
+	hasher := murmur3.New64()
 	hasher.Write(password)
 	k.cache.Set(string(hashedPassword), string(hasher.Sum(nil)), cacheDuration)
 
@@ -157,7 +157,7 @@ func (k *BasicAuthKeyIsValid) compareHashAndPassword(hash string, password strin
 		return k.doBcryptWithCache(cacheTTL, hashBytes, passwordBytes)
 	}
 
-	hasher := murmur3.New32()
+	hasher := murmur3.New64()
 	hasher.Write(passwordBytes)
 	if cachedPass.(string) != string(hasher.Sum(nil)) {
 
