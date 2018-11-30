@@ -177,49 +177,38 @@ func urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 func replaceTykVariables(r *http.Request, in string, escape bool) string {
 	if strings.Contains(in, contextLabel) {
 		contextData := ctxGetData(r)
-
-		replaceGroups := contextMatch.FindAllStringSubmatch(in, -1)
-		for _, v := range replaceGroups {
-			contextKey := strings.Replace(v[0], contextLabel, "", 1)
-
-			if val, ok := contextData[contextKey]; ok {
-				valStr := valToStr(val)
-				// If contains url with domain
-				if escape && !strings.HasPrefix(valStr, "http") {
-					valStr = url.QueryEscape(valStr)
-				}
-				in = strings.Replace(in, v[0], valStr, -1)
-			} else {
-				in = ""
-			}
-		}
+		vars := contextMatch.FindAllString(in, -1)
+		in = replaceVariables(in, vars, contextData, contextLabel, escape)
 	}
 
 	if strings.Contains(in, metaLabel) {
-		// Meta data from the token
+		vars := metaMatch.FindAllString(in, -1)
 		session := ctxGetSession(r)
 		if session == nil {
-			return in
-		}
-
-		replaceGroups := metaMatch.FindAllStringSubmatch(in, -1)
-		for _, v := range replaceGroups {
-			contextKey := strings.Replace(v[0], metaLabel, "", 1)
-
-			val, ok := session.MetaData[contextKey]
-			if ok {
-				valStr := valToStr(val)
-				// If contains url with domain
-				if escape && !strings.HasPrefix(valStr, "http") {
-					valStr = url.QueryEscape(valStr)
-				}
-				in = strings.Replace(in, v[0], valStr, -1)
-			} else {
-				in = ""
-			}
+			in = replaceVariables(in, vars, nil, metaLabel, escape)
+		} else {
+			in = replaceVariables(in, vars, session.MetaData, metaLabel, escape)
 		}
 	}
 
+	return in
+}
+
+func replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
+	for _, v := range vars {
+		key := strings.Replace(v, label, "", 1)
+		val, ok := vals[key]
+		if ok {
+			valStr := valToStr(val)
+			// If contains url with domain
+			if escape && !strings.HasPrefix(valStr, "http") {
+				valStr = url.QueryEscape(valStr)
+			}
+			in = strings.Replace(in, v, valStr, -1)
+		} else {
+			in = strings.Replace(in, v, "", -1)
+		}
+	}
 	return in
 }
 
